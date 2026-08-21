@@ -89,6 +89,7 @@ mlartifacts
 **/_build/
 **/.jupyter_cache/
 **/test_tmp/
+**/converted_exercises/
 semantic_digital_twin/resources/output
 
 # test generated files

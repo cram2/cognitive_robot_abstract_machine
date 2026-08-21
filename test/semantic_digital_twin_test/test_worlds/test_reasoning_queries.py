@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.predetermined_maps.kitchen_environment import (
     KitchenEnvironment,
@@ -60,6 +62,51 @@ def test_world_reasoner_reason_returns_dicts():
     result = reasoner.reason()
 
     assert isinstance(result, dict)
+
+
+@pytest.fixture(scope="module")
+def reasoned_kitchen_world() -> World:
+    """
+    The small kitchen with everything the reasoner can make of it.
+    """
+    world = URDFParser.from_file(
+        file_path=os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "..",
+            "..",
+            "semantic_digital_twin",
+            "resources",
+            "urdf",
+            "kitchen-small.urdf",
+        )
+    ).parse()
+    with world.modify_world():
+        WorldReasoner(world).reason()
+    return world
+
+
+def test_work_surfaces_are_counter_tops(reasoned_kitchen_world):
+    """
+    The kitchen's two work surfaces, the sink area's and the island's, are what a
+    counter top is.
+    """
+    assert {
+        counter_top.root.name.name
+        for counter_top in reasoned_kitchen_world.get_semantic_annotations_by_type(
+            CounterTop
+        )
+    } == {"sink_area_surface", "kitchen_island_surface"}
+
+
+def test_the_table_is_a_table(reasoned_kitchen_world):
+    """
+    The kitchen holds one table, and it is the one the URDF names as such.
+    """
+    assert [
+        table.root.name.name
+        for table in reasoned_kitchen_world.get_semantic_annotations_by_type(Table)
+    ] == ["table_area"]
 
 
 def test_semantic_annotations_on_surfaces(kitchen_environment_fixture):

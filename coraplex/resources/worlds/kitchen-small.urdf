@@ -2187,7 +2187,11 @@
     <parent link="iai_fridge_main"/>
     <child link="iai_fridge_door"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <!-- Changed from upstream iai_kitchen: velocity was 10 rad/s, a speed a door does not
+         swing at. The controller keeps a braking margin from a joint's own position limit
+         that grows with that limit, and at 10 rad/s the margin is wide enough that this
+         door can be neither fully opened nor shut. -->
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1.0"/>
     <!--
       <limit lower="0" upper="0" effort="300" velocity="10"/>
 -->
@@ -2220,8 +2224,12 @@
 </link>
 
 <!-- JOINTS -->
+<!-- Changed from upstream iai_kitchen: big_table_1 hangs off its own centroid, so at
+     z=0 two thirds of the table stood and the rest was buried; z is the mesh's own
+     -min_z, which rests it on the floor. y moved 0.5 m away from the kitchen island,
+     which was close enough that a robot base driving round it could not keep clear. -->
 <joint name="table_area_joint" type="fixed">
-  <origin rpy="0 0 3.14159265359" xyz="-2.7 -0.6 0"/>
+  <origin rpy="0 0 3.14159265359" xyz="-2.7 -1.1 0.3618950843811035"/>
   <parent link="room_link"/>
   <child link="table_area"/>
 </joint>

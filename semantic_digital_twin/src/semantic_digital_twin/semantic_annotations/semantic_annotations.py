@@ -700,7 +700,7 @@ class Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers):
 
 
 @dataclass(eq=False)
-class Fridge(Cabinet): ...
+class Fridge(Cabinet, HasShelfLayers): ...
 
 
 @dataclass(eq=False)

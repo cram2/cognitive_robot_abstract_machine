@@ -198,6 +198,8 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
+            "buffer_zone_distance": to_json(self.buffer_zone_distance),
+            "violated_distance": to_json(self.violated_distance),
             "robot": to_json(self.robot.id),
             "body_subset": to_json(
                 {b.id for b in self.body_subset} if self.body_subset else None
@@ -215,7 +217,12 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
                 tracker.get_world_entity_with_id(id=body_id)
                 for body_id in body_subset_ids
             }
-        return cls(robot=robot, body_subset=body_subset)
+        return cls(
+            buffer_zone_distance=from_json(data["buffer_zone_distance"], **kwargs),
+            violated_distance=from_json(data["violated_distance"], **kwargs),
+            robot=robot,
+            body_subset=body_subset,
+        )
 
     def __eq__(self, other):
         if not isinstance(other, AvoidExternalCollisions):

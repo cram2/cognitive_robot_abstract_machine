@@ -49,6 +49,11 @@ parts:
         - file: notebooks/pose
       - file: ros_utils.rst
 
+  - caption: Self-Assessment
+    chapters:
+    - file: self_assessment/exercises_intro
+    - file: self_assessment/exercises/0_writing_a_robot_plan
+
   - caption: API
     chapters:
     - file: autoapi/coraplex/index.md

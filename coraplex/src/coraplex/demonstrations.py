@@ -157,7 +157,7 @@ class RobotDemonstration(ABC):
     Whether the plan drives the real robot or a simulated one.
     """
 
-    collision_avoidance: bool = False
+    collision_avoidance: bool = True
     """
     Whether collision avoidance is added to every motion state chart of this run.
     """

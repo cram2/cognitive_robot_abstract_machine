@@ -6,10 +6,12 @@ from krrood.entity_query_language.factories import (
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wardrobe,
+    CounterTop,
     Door,
     Drawer,
     Fridge,
     Handle,
+    Table,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -174,3 +176,59 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
         )
 
     return get_fridges(case)
+
+
+def conditions_298007268171441410345026630675720006650(case) -> bool:
+    def has_bodies_named_surface(case: World) -> bool:
+        """
+        Get conditions on whether it's possible to conclude a value for
+        World.semantic_annotations  of type CounterTop.
+        """
+        return True
+
+    return has_bodies_named_surface(case)
+
+
+def conclusion_298007268171441410345026630675720006650(case) -> List[CounterTop]:
+    def get_counter_tops(case: World) -> List[CounterTop]:
+        """
+        Get possible value(s) for World.semantic_annotations of types list/set of
+        CounterTop.
+
+        A kitchen names the slab it works on after the surface it offers, as the sink
+        area and the kitchen island both do.
+        """
+        kse = variable(Body, case.kinematic_structure_entities)
+        return (
+            entity(inference(CounterTop)(root=kse))
+            .where(contains(kse.name.name.lower(), "surface"))
+            .tolist()
+        )
+
+    return get_counter_tops(case)
+
+
+def conditions_136384373453856960722768665443025831150(case) -> bool:
+    def has_bodies_named_table(case: World) -> bool:
+        """
+        Get conditions on whether it's possible to conclude a value for
+        World.semantic_annotations  of type Table.
+        """
+        return True
+
+    return has_bodies_named_table(case)
+
+
+def conclusion_136384373453856960722768665443025831150(case) -> List[Table]:
+    def get_tables(case: World) -> List[Table]:
+        """
+        Get possible value(s) for World.semantic_annotations of types list/set of Table.
+        """
+        kse = variable(Body, case.kinematic_structure_entities)
+        return (
+            entity(inference(Table)(root=kse))
+            .where(contains(kse.name.name.lower(), "table"))
+            .tolist()
+        )
+
+    return get_tables(case)

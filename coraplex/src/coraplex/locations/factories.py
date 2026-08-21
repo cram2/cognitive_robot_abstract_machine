@@ -21,7 +21,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cabinet,
     Drawer,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -85,7 +85,7 @@ def reachability_location(
     man = ViewManager.get_end_effector_view(arm, context.robot)
 
     grasp_description = grasp_description or GraspDescription(
-        ApproachDirection.FRONT,
+        ApproachDirection.BACK,
         VerticalAlignment.NoAlignment,
         man,
     )
@@ -188,55 +188,32 @@ def visibility_location(target: Union[Pose, Body], context: Context) -> Location
 
 
 def giskard_reachability_location(
-    target: Union[Pose, Body],
+    target: Union[Point3, Pose, Body],
     context: Context,
     arm: Arms,
-    grasp_description: GraspDescription = None,
+    grasp_description: Optional[GraspDescription] = None,
 ) -> Location:
     """
     Factory method that creates a location with a Giskard backend, the giskard backend
     uses the Giskard full-body control to find a robot pose.
 
-    :param target: Target pose or body that should be reachable
+    The location carries no reachability validator: its backend hands out a pose only
+    once the robot has driven there and reached the target from it, so the reach has
+    already been performed by the time a candidate appears.
+
+    :param target: Target point, pose or body that should be reachable. A point is
+        reached for turned the way the robot stands, a pose as it is given.
     :param context: Plan context in which to create the location
     :param arm: Arm to use for reachability estimation
-    :param grasp_description: Grap that should be used for reachability estimation
+    :param grasp_description: How the gripper comes at the target. Leaving it out leaves
+        the side open, and every side is tried at each pose the search considers.
     :returns: A location that is reachable from the target pose, using Giskard for
         reachability estimation.
     """
-    target_pose, target_body = (
-        (target.global_pose, target) if isinstance(target, Body) else (target, None)
-    )
-
-    man = ViewManager.get_end_effector_view(arm, context.robot)
-
-    grasp_description = grasp_description or GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        man,
-    )
+    target_pose = target.global_pose if isinstance(target, Body) else target
 
     backend = GiskardLocationBackend(
         target, arm, grasp_description, context.robot, context.world
     )
 
-    return Location(
-        context,
-        target_pose,
-        backend,
-        [
-            AreReachableBy(
-                pose_sequence=grasp_description.pose_sequence(
-                    target_pose,
-                    _get_object_in_hand(context.robot, context.world, arm)
-                    or target_body,
-                ),
-                context=Context(
-                    robot=context.robot,
-                    world=context.world,
-                    alternative_motion_mappings=context.alternative_motion_mappings,
-                ),
-                tip_link=man.tool_frame,
-            )
-        ],
-    )
+    return Location(context, target_pose, backend, [])

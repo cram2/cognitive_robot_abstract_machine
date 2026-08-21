@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import timedelta
 from typing import List
 
-from typing_extensions import Optional, Any
+from typing_extensions import Optional
 
-from krrood.entity_query_language.factories import (
-    a,
-    an,
-    entity,
-    variable,
-)
 from coraplex.config.action_conf import ActionConfig
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
@@ -27,9 +20,15 @@ from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from coraplex.view_manager import ViewManager
+from krrood.entity_query_language.factories import (
+    a,
+    an,
+    entity,
+    variable,
+)
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.predicates import InsideOf
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Door
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 

@@ -18,15 +18,23 @@ from coraplex.plans.executables import (
     ModelChangeExecutable,
 )
 from coraplex.plans.factories import execute_single, sequential
-from coraplex.plans.plan_node import MotionNode, PlanNode, ExecutionBoundaryNode
+from coraplex.plans.plan_node import (
+    MotionNode,
+    PlanNode,
+    ExecutionBoundaryNode,
+    StandaloneMotionNode,
+)
 from coraplex.robot_plans import MoveToolCenterPointMotion
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
+from coraplex.robot_plans.actions.core.container import OpenAction, CloseAction
 from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.pick_up import ReachAction, PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
+from coraplex.robot_plans.motions.base import StandaloneMotion
 from coraplex.robot_plans.motions.misc import DetectingMotion, PerceptionTask
 from coraplex.utils import split_list_by_type
+from giskardpy.motion_statechart.goals.open_close import Open, Close
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -308,6 +316,104 @@ def test_execution_boundary_splits_the_merged_motion_chart(immutable_model_world
     ]
     assert len(executable.execution_list[0].motion_mappings) == 2
     assert len(executable.execution_list[2].motion_mappings) == 1
+
+
+# %% motions that run in a chart of their own
+
+
+@dataclass
+class MotionInItsOwnChart(MoveToolCenterPointMotion, StandaloneMotion):
+    """
+    Motion that asks to be executed in a motion statechart of its own.
+
+    Stands in for any motion whose goal must not share a chart with its neighbours.
+    """
+
+
+def test_standalone_motion_is_not_merged_with_its_neighbours(immutable_model_world):
+    """
+    A motion that runs in its own chart separates the motions around it into one merged
+    chart per side, while itself staying alone in the chart between them.
+    """
+    world, view, context = immutable_model_world
+
+    standalone_motion = MotionInItsOwnChart(Pose(reference_frame=world.root), Arms.LEFT)
+    plan = sequential(
+        [
+            MoveToolCenterPointMotion(Pose(reference_frame=world.root), Arms.LEFT),
+            MoveToolCenterPointMotion(Pose(reference_frame=world.root), Arms.RIGHT),
+            standalone_motion,
+            MoveToolCenterPointMotion(Pose(reference_frame=world.root), Arms.LEFT),
+        ],
+        context=context,
+    )
+
+    plan.notify()
+    executable = plan.parse()
+
+    assert [type(child) for child in executable.execution_list] == [
+        GiskardExecutable,
+        GiskardExecutable,
+        GiskardExecutable,
+    ]
+    assert [len(child.motion_mappings) for child in executable.execution_list] == [
+        2,
+        1,
+        1,
+    ]
+    assert list(executable.execution_list[1].motion_mappings) == [
+        standalone_motion.plan_node
+    ]
+    assert type(standalone_motion.plan_node) is StandaloneMotionNode
+
+
+def test_open_action_runs_the_open_goal_in_its_own_chart(immutable_model_world):
+    """
+    Opening a container splits into the grasping motions, the open goal alone, and the
+    gripper release.
+    """
+    world, view, context = immutable_model_world
+
+    plan = execute_single(
+        OpenAction(world.get_body_by_name("handle_cab10_m"), Arms.LEFT),
+        context=context,
+    )
+    plan.notify()
+    executable = plan.parse()
+
+    assert [type(child) for child in executable.execution_list] == [
+        GiskardExecutable,
+        GiskardExecutable,
+        GiskardExecutable,
+    ]
+    (container_goal,) = executable.execution_list[1].motion_mappings.values()
+    assert [
+        type(node) for node in container_goal.nodes[0].nodes if isinstance(node, Open)
+    ] == [Open]
+
+
+def test_close_action_runs_the_close_goal_in_its_own_chart(immutable_model_world):
+    """
+    Closing a container splits the same way as opening it.
+    """
+    world, view, context = immutable_model_world
+
+    plan = execute_single(
+        CloseAction(world.get_body_by_name("handle_cab10_m"), Arms.LEFT),
+        context=context,
+    )
+    plan.notify()
+    executable = plan.parse()
+
+    assert [type(child) for child in executable.execution_list] == [
+        GiskardExecutable,
+        GiskardExecutable,
+        GiskardExecutable,
+    ]
+    (container_goal,) = executable.execution_list[1].motion_mappings.values()
+    assert [
+        type(node) for node in container_goal.nodes[0].nodes if isinstance(node, Close)
+    ] == [Close]
 
 
 # %% perception inside the merged chart

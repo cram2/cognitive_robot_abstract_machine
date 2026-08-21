@@ -91,7 +91,7 @@ class ReachAction(ActionDescription, ReachTuningParameters, HasGraspDetectionThr
             MoveToolCenterPointMotion(
                 target_pre_pose,
                 self.arm,
-                allow_gripper_collision=False,
+                allow_gripper_collision=True,
                 max_linear_velocity=self.pre_approach_linear_velocity,
             ),
         ]
@@ -103,7 +103,7 @@ class ReachAction(ActionDescription, ReachTuningParameters, HasGraspDetectionThr
             MoveToolCenterPointMotion(
                 target_pose,
                 self.arm,
-                allow_gripper_collision=False,
+                allow_gripper_collision=True,
                 movement_type=MovementType.CARTESIAN,
                 max_linear_velocity=self.final_approach_linear_velocity,
             )
@@ -213,6 +213,9 @@ class PickUpAction(
                 MoveGripperMotion(
                     motion=GripperState.CLOSE,
                     gripper=self.arm,
+                    # Fingers closing on an object touch it, which is the grasp rather
+                    # than a collision to abort over.
+                    allow_gripper_collision=True,
                     finger_velocity=self.grasp_closing_velocity,
                     stall_minimum_time=self.grasp_stall_minimum_time,
                     tolerate_stall=self.tolerate_grasp_stall,
@@ -318,7 +321,9 @@ class GraspingAction(ActionDescription):
 
         return sequential(
             [
-                MoveToolCenterPointMotion(pre_pose, self.arm),
+                MoveToolCenterPointMotion(
+                    pre_pose, self.arm, allow_gripper_collision=True
+                ),
                 MoveGripperMotion(GripperState.OPEN, self.arm),
                 MoveToolCenterPointMotion(
                     grasp_pose, self.arm, allow_gripper_collision=True

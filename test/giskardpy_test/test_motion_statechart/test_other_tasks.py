@@ -1,6 +1,7 @@
 from math import radians
 
 import numpy as np
+import pytest
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -48,6 +49,22 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+
+HINGE_HAS_MOVED = 0.05
+"""
+How far a hinge has to have turned, in radians, before the hand is judged on following
+it, so that the grasp itself is not measured as drift.
+"""
+
+HAND_STAYS_ON_HANDLE = 0.05
+"""
+How far, in meters, the hand may drift from where it took hold of the handle while the
+mechanism swings.
+
+A hand that keeps up trails it by under two centimeters; one that lets go is left behind
+by half a meter, so anything between the two tells the cases apart.
+"""
 
 
 class TestFeatureFunctions:
@@ -854,6 +871,143 @@ class TestOpenClose:
 
         assert opened.observation_state == ObservationStateValues.TRUE
         assert closed.observation_state == ObservationStateValues.TRUE
+
+    @staticmethod
+    def _add_door(world: World) -> ActiveConnection1DOF:
+        """
+        Put a door with a handle in front of the robot.
+
+        :param world: The world the door is added to.
+        :return: The door's hinge, whose position runs from shut (0) to wide open
+            (pi/2).
+        """
+        with world.modify_world():
+            door = Door.create_with_new_body_in_world(
+                name="door",
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.5, z=1, yaw=np.pi, reference_frame=world.root
+                ),
+            )
+            handle_body = Handle.create_with_new_body_in_world(
+                name="handle",
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.5, y=0.45, z=1, yaw=np.pi, reference_frame=world.root
+                ),
+            )
+
+            lower_limits = DerivativeMap()
+            lower_limits.position = 0
+            lower_limits.velocity = -1
+            upper_limits = DerivativeMap()
+            upper_limits.position = np.pi / 2
+            upper_limits.velocity = 1
+
+            hinge = Hinge.create_with_new_body_in_world(
+                name="hinge",
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.5, y=-0.5, z=1, yaw=np.pi, reference_frame=world.root
+                ),
+                parent_connection_specification=Hinge.parent_connection_specification(
+                    dof_limits=DegreeOfFreedomLimits(
+                        lower=lower_limits, upper=upper_limits
+                    ),
+                    axis=Vector3.Z(),
+                ),
+            )
+
+            door.add(handle_body)
+            door.add(hinge)
+
+        return door.mechanical_joint.root.parent_connection
+
+    def test_close_drives_the_mechanism_onto_its_own_limit(self, pr2_world_copy):
+        """
+        A door is shut when it rests on its hinge's limit, which is where ``Close``
+        without a goal state aims, so it has to arrive there and say so.
+        """
+        root_C_hinge = self._add_door(pr2_world_copy)
+        shut_position = root_C_hinge.dof.limits.lower.position
+        root_C_hinge.position = 1.0
+        pr2_world_copy.notify_state_change()
+
+        r_tip = pr2_world_copy.get_body_by_name("r_gripper_tool_frame")
+        handle = pr2_world_copy.get_semantic_annotations_by_type(Handle)[0].root
+
+        msc = MotionStatechart()
+        msc.add_node(
+            sequence := Sequence(
+                [
+                    CartesianPose(
+                        root_link=pr2_world_copy.root,
+                        tip_link=r_tip,
+                        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            yaw=np.pi, reference_frame=handle
+                        ),
+                    ),
+                    close := Close(tip_link=r_tip, environment_link=handle),
+                ]
+            )
+        )
+        msc.add_node(EndMotion.when_true(sequence))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert close.observation_state == ObservationStateValues.TRUE
+        assert root_C_hinge.position == pytest.approx(shut_position, abs=1e-2)
+
+    def test_the_hand_keeps_up_with_the_mechanism_it_drives(self, pr2_world_copy):
+        """
+        The hand holds the handle throughout the swing, so where the handle goes the
+        hand goes.
+
+        A hand that falls behind is a hand dragged through the door it is opening,
+        whatever the mechanism's own goal ends up reporting.
+        """
+        root_C_hinge = self._add_door(pr2_world_copy)
+        r_tip = pr2_world_copy.get_body_by_name("r_gripper_tool_frame")
+        handle = pr2_world_copy.get_semantic_annotations_by_type(Handle)[0].root
+
+        msc = MotionStatechart()
+        msc.add_node(
+            sequence := Sequence(
+                [
+                    CartesianPose(
+                        root_link=pr2_world_copy.root,
+                        tip_link=r_tip,
+                        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            yaw=np.pi, reference_frame=handle
+                        ),
+                    ),
+                    Open(tip_link=r_tip, environment_link=handle),
+                ]
+            )
+        )
+        msc.add_node(EndMotion.when_true(sequence))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
+        kin_sim.compile(motion_statechart=msc)
+
+        grasped_handle_T_tip = None
+        offsets_during_swing = []
+        for _ in range(3_000):
+            kin_sim.tick()
+            if kin_sim.motion_statechart.is_end_motion():
+                break
+            handle_T_tip = pr2_world_copy.compute_forward_kinematics_np(handle, r_tip)
+            if root_C_hinge.position < HINGE_HAS_MOVED:
+                grasped_handle_T_tip = handle_T_tip
+                continue
+            offsets_during_swing.append(
+                np.linalg.norm(handle_T_tip[:3, 3] - grasped_handle_T_tip[:3, 3])
+            )
+
+        assert offsets_during_swing, "the door never moved, so nothing was measured"
+        assert max(offsets_during_swing) < HAND_STAYS_ON_HANDLE
 
     def test_unscrew_and_tighten_bottle_cap(self, pr2_world_copy):
         screw_pitch = 0.03

@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from dataclasses import field, dataclass
 from itertools import combinations
 from typing import Optional
@@ -24,6 +25,7 @@ from giskardpy.motion_statechart.plotters.plot_specs import (
     plot_specification_field,
 )
 from krrood.symbolic_math.symbolic_math import Scalar, FloatVariable
+from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
 from semantic_digital_twin.collision_checking.collision_groups import CollisionGroup
 from semantic_digital_twin.collision_checking.collision_matrix import (
     CollisionRule,
@@ -71,6 +73,48 @@ class _CancelBecauseCollisionViolated(CancelMotion):
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.start_condition = self.create_violation_condition()
         return NodeArtifacts()
+
+    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
+        """
+        End the motion over the collisions that are violated as this runs.
+
+        A cancellation is started from the observation of the tick before, so what was
+        violated then may be back out of the way by now -- the avoidance has had a tick
+        to deal with it. What counts is how close the contacts are as this runs, so that
+        no motion is ended over a collision that is over.
+        """
+        violated_tasks = [task for task in self.tasks if self.is_violated(task)]
+        if not violated_tasks:
+            return None
+        raise CollisionViolatedError(
+            violated_collisions=[
+                self.last_contact(context, task) for task in violated_tasks
+            ],
+            thresholds=[
+                task.violated_distance.evaluate()[0] for task in violated_tasks
+            ],
+        )
+
+    @staticmethod
+    def is_violated(task: _CollisionAvoidanceTask) -> bool:
+        """
+        :param task: The task whose contact is judged.
+        :return: Whether that contact is closer right now than the task permits.
+        """
+        return (
+            task.contact_distance.evaluate()[0] < task.violated_distance.evaluate()[0]
+        )
+
+    @abstractmethod
+    def last_contact(
+        self, context: MotionStatechartContext, task: _CollisionAvoidanceTask
+    ) -> ClosestPoints:
+        """
+        :param context: Holds the collision managers the contacts are read from.
+        :param task: The task whose violated collision is looked up.
+        :return: The closest contact that task last saw.
+        """
+        raise NotImplementedError
 
     def create_violation_condition(self) -> Scalar:
         """
@@ -266,6 +310,7 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
     """
     The list of external collision avoidance tasks to check for collisions.
     """
+
     exception: Exception = field(init=False, default=Exception)
     """
     Set to init=False, because this class creates its own exception.
@@ -285,23 +330,12 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
             )
         return NodeArtifacts()
 
-    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
-        violated_tasks = [
-            task
-            for task in self.tasks
-            if task.observation_state == ObservationStateValues.FALSE
-        ]
-        collisions = []
-        thresholds = []
-        for task in violated_tasks:
-            collision = context.external_collision_manager.last_closest_contacts[
-                task.collision_group
-            ][0]
-            collisions.append(collision)
-            thresholds.append(task.violated_distance.evaluate()[0])
-        raise CollisionViolatedError(
-            violated_collisions=collisions, thresholds=thresholds
-        )
+    def last_contact(
+        self, context: MotionStatechartContext, task: _ExternalCollisionAvoidanceTask
+    ) -> ClosestPoints:
+        return context.external_collision_manager.last_closest_contacts[
+            task.collision_group
+        ][task.collision_index]
 
 
 @dataclass(eq=False, repr=False)
@@ -386,7 +420,9 @@ class ExternalCollisionAvoidance(Goal):
         left out of drawings. Set `plot_specs.collapse_children` to False to draw them.
     """
 
-    plot_specifications: NodePlotSpec = plot_specification_field(NodePlotSpec.create_collapsed_goal_style)
+    plot_specifications: NodePlotSpec = plot_specification_field(
+        NodePlotSpec.create_collapsed_goal_style
+    )
 
     robot: AbstractRobot = field(kw_only=True, default=None)
     """
@@ -653,6 +689,7 @@ class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
     """
     The list of self collision avoidance tasks to check for collisions.
     """
+
     exception: Exception = field(init=False, default=Exception)
     """
     Set to init=False, because this class creates its own exception.
@@ -672,23 +709,12 @@ class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
             )
         return NodeArtifacts()
 
-    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
-        violated_tasks = [
-            task
-            for task in self.tasks
-            if task.observation_state == ObservationStateValues.FALSE
-        ]
-        collisions = []
-        thresholds = []
-        for task in violated_tasks:
-            collision = context.self_collision_manager.last_closest_contacts[
-                task.collision_group_a, task.collision_group_b
-            ][0]
-            collisions.append(collision)
-            thresholds.append(task.violated_distance.evaluate()[0])
-        raise CollisionViolatedError(
-            violated_collisions=collisions, thresholds=thresholds
-        )
+    def last_contact(
+        self, context: MotionStatechartContext, task: _SelfCollisionAvoidanceTask
+    ) -> ClosestPoints:
+        return context.self_collision_manager.last_closest_contacts[
+            task.collision_group_a, task.collision_group_b
+        ][0]
 
 
 @dataclass(eq=False, repr=False)
@@ -703,7 +729,9 @@ class SelfCollisionAvoidance(Goal):
         draw them.
     """
 
-    plot_specs: NodePlotSpec = plot_specification_field(NodePlotSpec.create_collapsed_goal_style)
+    plot_specs: NodePlotSpec = plot_specification_field(
+        NodePlotSpec.create_collapsed_goal_style
+    )
 
     robot: AbstractRobot = field(kw_only=True, default=None)
     """

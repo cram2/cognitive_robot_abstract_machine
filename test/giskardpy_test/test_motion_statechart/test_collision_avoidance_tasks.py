@@ -10,9 +10,11 @@ from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     DefaultWeights,
+    ObservationStateValues,
 )
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.goals.collision_avoidance import (
+    _CancelBecauseExternalCollisionViolated,
     _CancelBecauseSelfCollisionViolated,
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
@@ -751,6 +753,70 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
     assert len(msc.nodes) == 78
 
     kin_sim.tick_until_end(500)
+
+
+# %% cancelling over a violation that is already over
+
+
+@dataclass
+class DistanceReadAt:
+    """
+    Stands in for a collision distance, which a task holds as a symbol and reads by
+    evaluating it.
+    """
+
+    value: float
+    """
+    The distance, in meters.
+    """
+
+    def evaluate(self) -> list[float]:
+        return [self.value]
+
+
+@dataclass
+class CollisionTaskWhoseViolationResolved:
+    """
+    Stands in for a collision avoidance task that observed a violation a tick ago and
+    whose contact is back out of the violated distance since.
+
+    A cancellation is started from the observation of the tick before, so this is the
+    state a task is in when the avoidance dealt with a contact within one tick.
+    """
+
+    observation_state: ObservationStateValues = ObservationStateValues.FALSE
+    """
+    What the task observed when the cancellation was started: a violation.
+    """
+
+    contact_distance: DistanceReadAt = field(
+        default_factory=lambda: DistanceReadAt(0.13)
+    )
+    """
+    How far the contact is now: further off than the task demands.
+    """
+
+    violated_distance: DistanceReadAt = field(
+        default_factory=lambda: DistanceReadAt(0.05)
+    )
+    """
+    How close the contact may come before it counts as violated.
+    """
+
+
+def test_a_violation_that_resolved_does_not_cancel_the_motion():
+    """
+    What decides a cancellation is how close the contact is when it runs, not what was
+    observed a tick earlier. A motion ended on the older reading dies for a collision
+    the avoidance has already dealt with, and reports a distance that is not violated at
+    all.
+    """
+    cancel = _CancelBecauseExternalCollisionViolated(
+        tasks=[CollisionTaskWhoseViolationResolved()],
+        name="External Collision Violated",
+    )
+
+    assert cancel.on_tick(context=None) is None
 
 
 # %% collision check counting

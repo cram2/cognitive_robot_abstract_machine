@@ -936,6 +936,7 @@ class HasSupportingSurface(IsStorageSpace):
         surface_circuit = self._build_surface_sampler(
             category_of_interest=category_of_interest,
             object_bloat=largest_xy_object_dimension,
+            surface_inset=largest_xy_object_dimension / 2,
         )
 
         if surface_circuit is None:
@@ -955,6 +956,7 @@ class HasSupportingSurface(IsStorageSpace):
         self,
         category_of_interest: Optional[Type[SemanticAnnotation]] = None,
         object_bloat: float = 0.1,
+        surface_inset: float = 0.0,
     ):
         """
         Build a probabilistic circuit representing the supporting surface, truncated by
@@ -963,9 +965,11 @@ class HasSupportingSurface(IsStorageSpace):
 
         :param category_of_interest: The type of object sample points around.
         :param object_bloat: The amount of bloat to apply to the object event.
+        :param surface_inset: The distance to keep between a sample and the edge of the
+            surface.
         """
         truncated_event_2d = self._2d_surface_sample_space_excluding_objects(
-            object_bloat
+            object_bloat, surface_inset
         )
 
         objects_of_interest = (
@@ -983,16 +987,22 @@ class HasSupportingSurface(IsStorageSpace):
         else:
             return uniform_measure_of_event(truncated_event_2d)
 
-    def _2d_surface_sample_space_excluding_objects(self, object_bloat: float) -> Event:
+    def _2d_surface_sample_space_excluding_objects(
+        self, object_bloat: float, surface_inset: float = 0.0
+    ) -> Event:
         """
         Compute a 2D event representing the supporting surface, truncated by the objects
         on the surface.
 
         :param object_bloat: The amount of bloat to apply to the object events.
+        :param surface_inset: The amount by which the surface is shrunk, so that a
+            sampled point keeps that distance to the edge of the surface.
         """
         area_of_self = BoundingBoxCollection.from_shapes(self.supporting_surface.area)
         area_of_self.transform_all_shapes_to_own_frame()
-        event = area_of_self.event
+        event = area_of_self.bloat(
+            x_amount=-surface_inset, y_amount=-surface_inset
+        ).event
 
         event_2d = event.marginal(SpatialVariables.xy)
         for obj in self.objects:

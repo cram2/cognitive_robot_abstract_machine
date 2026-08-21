@@ -85,18 +85,28 @@ jobs:
           uv sync --extra doc --active --inexact
           uv pip install pygraphviz
 
-      - name: Strip exercise-tagged cells (semantic_digital_twin only)
-        if: ${{ inputs.lib == 'semantic_digital_twin' }}
+      # Leaves only the example solutions in the published pages. Runs on the exercise
+      # sources themselves rather than through the doc/ symlink, because the book root
+      # differs per library (doc for most, doc/source for coraplex).
+      - name: Strip exercise-tagged cells
+        if: ${{ hashFiles(format('{0}/self_assessment/exercises/*.md', inputs.lib)) != '' }}
         run: |
-          cd $GITHUB_WORKSPACE/semantic_digital_twin/doc/self_assessment/exercises
-          source /opt/ros/cram-env/bin/activate
+          if [ "${{ inputs.use_container }}" = "true" ]; then
+            source /opt/ros/cram-env/bin/activate
+            run_tool=""
+          else
+            # The doc tooling comes from the root project's "doc" extra, so resolve the
+            # environment there rather than from the library the exercises live in.
+            run_tool="uv run --no-sync --project $GITHUB_WORKSPACE"
+          fi
+          cd $GITHUB_WORKSPACE/${{ inputs.lib }}/self_assessment/exercises
           find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
             ipynb="${f%.md}.ipynb"
-            jupytext --from md:myst --to ipynb "$f" -o "$ipynb"
-            jupyter nbconvert --config $GITHUB_WORKSPACE/semantic_digital_twin/scripts/configs/nb_remove_exercises.json \
+            $run_tool jupytext --from md:myst --to ipynb "$f" -o "$ipynb"
+            $run_tool jupyter nbconvert --config $GITHUB_WORKSPACE/${{ inputs.lib }}/scripts/configs/nb_remove_exercises.json \
               --to notebook --inplace \
               "$ipynb"
-            jupytext --to md:myst "$ipynb" -o "$f"
+            $run_tool jupytext --to md:myst "$ipynb" -o "$f"
             rm -f "$ipynb"
           done
 

@@ -14,6 +14,14 @@ logo                        : "_static/images/cora-plex-dark.png"  # A path to t
 # See https://jupyterbook.org/content/execute.html
 execute:
   execute_notebooks: auto
+  # The exercises drive a simulated robot: they need ROS and the robot descriptions, which
+  # the documentation runner does not have, and a run costs minutes. They are published as
+  # source and executed by scripts/test_exercises.sh instead.
+  # myst-nb matches these with PurePosixPath.match, which anchors at the right and reads "**"
+  # as a single component, so each directory level needs a pattern of its own.
+  exclude_patterns:
+    - "self_assessment/*"
+    - "self_assessment/exercises/*"
 
 # Define the name of the latex output file for PDF builds
 latex:

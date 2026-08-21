@@ -7,6 +7,7 @@ from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
@@ -41,13 +42,13 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
         return
 
     @property
-    def _motion_chart(self) -> Sequence:
+    def _motion_chart(self) -> MotionStatechartNode:
         tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
         goal_copy = deepcopy(self.target)
         goal_copy = self.world.transform(goal_copy, self.world.root)
         goal_point = goal_copy.to_position()
         goal_point.z = 0
-        return Sequence(
+        reach = Sequence(
             [
                 # Due to its limited kinematics and bad tracking and joint delays, Stretch has better results in
                 # real demos when straightening the wrist joint and pointing at the goal first
@@ -81,6 +82,12 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
                     minimum_success=1,
                 ),
             ]
+        )
+        if not self.allow_gripper_collision:
+            return reach
+        return Parallel(
+            [reach, *self._only_allow_gripper_collision_rules(self.arm)],
+            name="MoveTCP",
         )
 
 
@@ -155,15 +162,18 @@ class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):
             goal_normal=Vector3(1, 0, 0, reference_frame=self.object_part),
             tip_normal=Vector3(0, -1, 0, self.robot.root),
         )
-        close = Close(tip_link=tip, environment_link=self.object_part)
+        close = Close(
+            tip_link=tip,
+            environment_link=self.object_part,
+            goal_joint_state=self.goal_joint_state,
+        )
         return Parallel([cart, align, close])
 
 
 class StretchMoveGripperMotion(MoveGripperMotion, AlternativeMotion[Stretch]):
     """
-    Gripper motion tuned for Stretch: forces convergence checks to hold for at
-    least one second so the local minimum isn't reported before the gripper
-    has actually moved.
+    Gripper motion tuned for Stretch: forces convergence checks to hold for at least one
+    second so the local minimum isn't reported before the gripper has actually moved.
     """
 
     execution_type = ExecutionType.SIMULATED, ExecutionType.REAL

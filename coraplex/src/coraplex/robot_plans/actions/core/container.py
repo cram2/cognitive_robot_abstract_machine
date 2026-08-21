@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any, Dict
+from typing_extensions import Any, Dict, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
@@ -26,7 +26,10 @@ from coraplex.plans.plan_node import PlanNode
 from coraplex.querying.predicates import GripperIsFree
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.pick_up import GraspingAction
-from coraplex.robot_plans.motions.container import OpeningMotion, ClosingMotion
+from coraplex.robot_plans.motions.container import (
+    ClosingMotion,
+    OpeningMotion,
+)
 from coraplex.robot_plans.motions.gripper import MoveGripperMotion
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
@@ -52,6 +55,18 @@ class OpenAction(ActionDescription):
     Arm that should be used for opening the container.
     """
 
+    approach_direction: ApproachDirection = ApproachDirection.FRONT
+    """
+    The side of the handle the gripper approaches from.
+    """
+
+    goal_joint_state: Optional[float] = None
+    """
+    How far the container is opened.
+
+    None opens it as far as its own limit allows.
+    """
+
     grasping_prepose_distance: float = ActionConfig.grasping_prepose_distance
     """
     The distance in meters the gripper should be at in the x-axis away from the handle.
@@ -63,7 +78,7 @@ class OpenAction(ActionDescription):
         end_effector = arm.end_effector
 
         grasp_description = GraspDescription(
-            ApproachDirection.FRONT,
+            self.approach_direction,
             VerticalAlignment.NoAlignment,
             end_effector,
         )
@@ -71,7 +86,7 @@ class OpenAction(ActionDescription):
         return sequential(
             [
                 GraspingAction(self.object_designator, self.arm, grasp_description),
-                OpeningMotion(self.object_designator, self.arm),
+                OpeningMotion(self.object_designator, self.arm, self.goal_joint_state),
                 MoveGripperMotion(
                     GripperState.OPEN, self.arm, allow_gripper_collision=True
                 ),
@@ -149,10 +164,29 @@ class CloseAction(ActionDescription):
     Arm that should be used for closing.
     """
 
+    approach_direction: ApproachDirection = ApproachDirection.FRONT
+    """
+    The side of the handle the gripper approaches from.
+    """
+
+    goal_joint_state: float = 0.01
+    """
+    How far the container is left open.
+    """
+
     grasping_prepose_distance: float = ActionConfig.grasping_prepose_distance
     """
     The distance in meters between the gripper and the handle before approaching to
     grasp.
+    """
+
+    goal_joint_state_tolerance: float = 0.09
+    """
+    How far short of its goal, in the unit of its own degree of freedom, the container
+    may stop and still count as closed.
+
+    The last stretch onto a mechanism's own limit is only approached asymptotically, so
+    a container that has to arrive exactly never reports that it got there.
     """
 
     @property
@@ -161,7 +195,7 @@ class CloseAction(ActionDescription):
         end_effector = arm.end_effector
 
         grasp_description = GraspDescription(
-            ApproachDirection.FRONT,
+            self.approach_direction,
             VerticalAlignment.NoAlignment,
             end_effector,
         )
@@ -169,7 +203,7 @@ class CloseAction(ActionDescription):
         return sequential(
             [
                 GraspingAction(self.object_designator, self.arm, grasp_description),
-                ClosingMotion(self.object_designator, self.arm),
+                ClosingMotion(self.object_designator, self.arm, self.goal_joint_state),
                 MoveGripperMotion(
                     GripperState.OPEN, self.arm, allow_gripper_collision=True
                 ),
@@ -181,10 +215,13 @@ class CloseAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> SymbolicExpression | bool:
         """
-        The container has to be closed.
+        The container has to be closed as far as it was asked to be.
         """
         close_connection = kwargs[
             "object_designator"
         ].get_first_parent_connection_of_type(ActiveConnection1DOF)
 
-        return variable_from(close_connection).position < 0.1
+        return (
+            variable_from(close_connection).position
+            < kwargs["goal_joint_state"] + kwargs["goal_joint_state_tolerance"]
+        )

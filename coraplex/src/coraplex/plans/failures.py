@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 from typing_extensions import TYPE_CHECKING
 
+from giskardpy.motion_statechart.exceptions import CollisionViolatedError
+from giskardpy.qp.exceptions import InfeasibleException
 from krrood.exceptions import DataclassException
 from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.robots.robot_parts import EndEffector
@@ -14,6 +16,16 @@ if TYPE_CHECKING:
     from coraplex.validation.goal_validator import MultiJointPositionGoalValidator
     from coraplex.language import LanguageNode
     from semantic_digital_twin.datastructures.definitions import StaticJointState
+
+
+MOTION_DID_NOT_WORK_OUT = (TimeoutError, InfeasibleException, CollisionViolatedError)
+"""
+How a full-body solve ends when the motion cannot be carried out: it runs out of ticks,
+the controller cannot satisfy its constraints, or moving there would hit something.
+
+None of these say the plan is wrong, only that this way of carrying it out is, so a step
+with other candidates on offer is free to try the next one.
+"""
 
 
 @dataclass

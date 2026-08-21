@@ -38,7 +38,6 @@ try:
 except ImportError:
     VizMarkerPublisher = None
 from semantic_digital_twin.collision_checking.collision_rules import (
-    AvoidExternalCollisions,
     AllowSelfCollisions,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -106,21 +105,11 @@ class Location(Iterable[Pose]):
                 _world=test_world, node=self.context.ros_node
             ).with_tf_publisher()
 
-        for pose_candidate in self.generator:
+        for pose_candidate in self.generator.copy_for_world(test_world):
 
             test_robot.set_root_pose(pose_candidate)
 
-            test_world.collision_manager.clear_temporary_rules()
-            test_world.collision_manager.add_temporary_rule(
-                AvoidExternalCollisions(robot=test_robot, violated_distance=0.05)
-            )
-            test_world.collision_manager.add_temporary_rule(
-                AllowSelfCollisions(robot=test_robot)
-            )
-            test_world.collision_manager.update_collision_matrix()
-            collisions = test_world.collision_manager.compute_collisions()
-
-            if collisions.contacts:
+            if self.stands_in_collision(test_world, test_robot):
                 logger.debug(f"Candidate pose in collision, skipping")
                 continue
 
@@ -129,6 +118,35 @@ class Location(Iterable[Pose]):
                 for validator in self.validators
             ):
                 yield pose_candidate
+
+    @staticmethod
+    def stands_in_collision(world: World, robot: AbstractRobot) -> bool:
+        """
+        Whether the robot, as it currently stands, is closer to its surroundings than
+        its own collision rules permit.
+
+        This is the condition
+        :class:`~giskardpy.motion_statechart.goals.collision_avoidance.ExternalCollisionAvoidance`
+        cancels a motion on, so a candidate is discarded exactly when standing there would
+        abort the motion that follows. Anything merely *near* the robot is reported as a
+        contact too, at a positive distance, and does not count.
+
+        The whole robot is judged, hands included: what arrives at a standing pose is the
+        robot as it stands, driven by a motion that allows nothing to touch, so a hand
+        left inside a shelf aborts that drive however welcome it would be later.
+
+        :param world: The world the robot stands in.
+        :param robot: The robot whose surroundings are checked.
+        """
+        collision_manager = world.collision_manager
+        collision_manager.clear_temporary_rules()
+        collision_manager.add_temporary_rule(AllowSelfCollisions(robot=robot))
+        collision_manager.update_collision_matrix()
+        return any(
+            contact.distance
+            < collision_manager.get_violated_distance(contact.body_a, contact.body_b)
+            for contact in collision_manager.compute_collisions().contacts
+        )
 
     def merge(self, other: Location) -> Location:
         """
@@ -153,9 +171,9 @@ class Location(Iterable[Pose]):
 @dataclass
 class DeferredLocation(Iterable[Pose]):
     """
-    Lazily rebuilds a concrete :class:`Location` from current world state on each
-    iteration, so its pose generator and validators reflect the world at the moment the
-    location is consumed (execution time) rather than when the plan was constructed.
+    Lazily rebuilds its pose candidates from current world state on each iteration, so
+    they reflect the world at the moment the location is consumed (execution time)
+    rather than when the plan was constructed.
 
     .. warning::
         :meth:`__iter__` must stay a generator (``yield from``). Returning
@@ -165,9 +183,11 @@ class DeferredLocation(Iterable[Pose]):
         first ``next``, which only happens once the underspecified action is grounded.
     """
 
-    location_factory: Callable[[], Location]
+    location_factory: Callable[[], Iterable[Pose]]
     """
-    Builds a fresh :class:`Location` from the current world state.
+    Builds a fresh source of pose candidates from the current world state.
+
+    A :class:`Location` is the usual choice, but any iterable of poses works.
     """
 
     def __iter__(self) -> Iterator[Pose]:
@@ -184,6 +204,20 @@ class PoseGeneratorBackend:
     @abstractmethod
     def __iter__(self) -> Iterator[Pose]:
         pass
+
+    def copy_for_world(self, world: World) -> PoseGeneratorBackend:
+        """
+        Move this backend into ``world``, so a location can generate its candidates in
+        the same throwaway world it checks them in and leave the world it was built on
+        untouched.
+
+        Backends that only read the world when they are constructed keep working as they
+        are, which is why this returns the backend itself unless a subclass says
+        otherwise.
+
+        :param world: The world the candidates should be generated in.
+        """
+        return self
 
     def merge(self, other: PoseGeneratorBackend) -> PoseGeneratorBackend:
         """

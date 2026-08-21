@@ -40,9 +40,13 @@ def test_pose_reachable(immutable_model_world):
 
 
 def test_pose_not_reachable(immutable_model_world):
+    """
+    The robot drives while it reaches, so nothing on the floor of the apartment is out
+    of its way; what it cannot get to is a pose above the height its arm rises to.
+    """
     world, robot_view, context = immutable_model_world
 
-    pose = Pose(Point3.from_iterable([2.3, 2, 1]), reference_frame=world.root)
+    pose = Pose(Point3.from_iterable([2.3, 2, 3]), reference_frame=world.root)
 
     assert not IsReachableBy(
         context=Context(
@@ -74,11 +78,15 @@ def test_pose_sequence_reachable(immutable_model_world):
 
 
 def test_pose_sequence_not_reachable(immutable_model_world):
+    """
+    A sequence of poses above the height the arm rises to cannot be addressed, however
+    the robot drives.
+    """
     world, robot_view, context = immutable_model_world
 
-    pose1 = Pose(Point3.from_iterable([2.6, 1.4, 1]), reference_frame=world.root)
-    pose2 = Pose(Point3.from_iterable([2.7, 1.4, 1]), reference_frame=world.root)
-    pose3 = Pose(Point3.from_iterable([2.7, 1.4, 1.1]), reference_frame=world.root)
+    pose1 = Pose(Point3.from_iterable([2.6, 1.4, 3]), reference_frame=world.root)
+    pose2 = Pose(Point3.from_iterable([2.7, 1.4, 3]), reference_frame=world.root)
+    pose3 = Pose(Point3.from_iterable([2.7, 1.4, 3.1]), reference_frame=world.root)
 
     assert not AreReachableBy(
         context=Context(
@@ -119,11 +127,15 @@ def test_unmatched_tip_link_raises(immutable_model_world):
 
 
 def test_pose_sequence_one_not_reachable(immutable_model_world):
+    """
+    One pose above the height the arm rises to is enough to make the whole sequence
+    unaddressable, even though the two before it are fine.
+    """
     world, robot_view, context = immutable_model_world
 
     pose1 = Pose(Point3.from_iterable([1.6, 1.4, 1]), reference_frame=world.root)
     pose2 = Pose(Point3.from_iterable([1.7, 1.4, 1]), reference_frame=world.root)
-    pose3 = Pose(Point3.from_iterable([2.7, 2.4, 1.5]), reference_frame=world.root)
+    pose3 = Pose(Point3.from_iterable([2.7, 2.4, 3]), reference_frame=world.root)
 
     assert not IsReachableBy(
         context=Context(
@@ -303,12 +315,14 @@ def test_is_object_reachable_by_reachable(immutable_model_world):
 
 def test_is_object_reachable_by_not_reachable(immutable_model_world):
     """
-    End-to-end: an object far away from the robot is not reachable.
+    End-to-end: an object above the height the robot's arm rises to is not reachable.
+
+    Distance alone no longer settles this, because the robot drives while it reaches.
     """
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        5, 5, 0.7, 0, 0, 0, reference_frame=milk.parent_connection.parent
+        2, 1.5, 3, 0, 0, 0, reference_frame=milk.parent_connection.parent
     )
 
     assert not IsObjectReachableBy(

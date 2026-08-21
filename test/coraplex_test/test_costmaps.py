@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from coraplex.locations.costmaps import (
+    BASE_CLEARANCE,
     OccupancyCostmap,
     GaussianCostmap,
     OrientationGenerator,
@@ -474,3 +475,77 @@ def test_orientation_generator_by_axis_x(immutable_model_world):
     generated_orientation = ori_gen(target_position, origin_pose)
 
     assert generated_orientation.to_list() == pytest.approx([0, 0, 1, 0], abs=0.001)
+
+
+# %% how many samples a map hands out, and which cells they come from
+
+
+def test_default_distance_to_obstacle_clears_the_base(immutable_model_world):
+    """
+    The default inflation has to cover the robot's own base, or a free cell is not
+    somewhere it can stand.
+    """
+    world, robot_view, context = immutable_model_world
+    base_box = robot_view.mobile_base.bounding_box
+
+    distance = OccupancyCostmap.default_distance_to_obstacle(robot_view)
+
+    assert distance == (base_box.depth / 2 + base_box.width / 2) / 2 + BASE_CLEARANCE
+
+
+def test_every_region_gets_its_own_sample_budget(immutable_model_world):
+    """
+    Regions are separate places to stand, so a map that falls apart into many of them
+    must not starve each one -- which is what dividing a fixed total between them does.
+    """
+    world, robot_view, context = immutable_model_world
+    np_map = np.zeros((200, 200))
+    np_map[40:45, 40:45] = 1
+    np_map[120:125, 120:125] = 2
+    costmap = GaussianCostmap(
+        resolution=0.02,
+        origin=Pose(reference_frame=world.root),
+        mean=200,
+        sigma=15,
+        world=world,
+        number_of_samples=5,
+    )
+    costmap.map = np_map
+
+    poses = list(costmap)
+
+    assert len(poses) == 2 * costmap.number_of_samples
+
+
+def test_random_samples_come_from_cells_the_map_rates(immutable_model_world):
+    """
+    A costmap is a distribution, so drawing at random has to follow its values. Drawing
+    evenly across the map instead spends the budget on the cells it rates unusable.
+    """
+    world, robot_view, context = immutable_model_world
+    np_map = np.zeros((200, 200))
+    rated_cells = {(40, 40): 1, (80, 80): 2, (120, 120): 3}
+    for (row, column), value in rated_cells.items():
+        np_map[row, column] = value
+    costmap = GaussianCostmap(
+        resolution=0.02,
+        origin=Pose(reference_frame=world.root),
+        mean=200,
+        sigma=15,
+        world=world,
+        number_of_samples=len(rated_cells),
+        sample_randomly=True,
+    )
+    costmap.map = np_map
+    center = np.array(np_map.shape) // 2
+
+    poses = list(costmap)
+
+    drawn_cells = {
+        (
+            round(float(pose.to_position().x) / costmap.resolution + center[0]),
+            round(float(pose.to_position().y) / costmap.resolution + center[1]),
+        )
+        for pose in poses
+    }
+    assert drawn_cells == set(rated_cells)

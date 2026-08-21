@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import ClassVar, Optional, List
 
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
@@ -133,6 +133,12 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
     If the gripper is allowed to collide with something
     """
 
+    holds_its_goal_until_the_motion_ends: ClassVar[bool] = True
+    """
+    Whatever the fingers were closed or opened around stays where the hand left it, so
+    the arm may not be freed while the world settles around it.
+    """
+
     def perform(self):
         return
 
@@ -161,14 +167,35 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
                 [joint_task, stall_monitor], minimum_success=1, name=name
             )
 
-        if self.finger_velocity is None:
-            return done_node
+        accompanying_nodes = [self._hold_tool_center_point(arm)]
+        if self.finger_velocity is not None:
+            accompanying_nodes.append(
+                JointVelocityLimit(
+                    connections=list(goal_state.connections),
+                    max_velocity=self.finger_velocity,
+                )
+            )
+        if self.allow_gripper_collision:
+            accompanying_nodes.extend(
+                self._only_allow_gripper_collision_rules(self.gripper)
+            )
+        return Parallel([done_node, *accompanying_nodes], name=name)
 
-        velocity_limit = JointVelocityLimit(
-            connections=list(goal_state.connections),
-            max_velocity=self.finger_velocity,
+    def _hold_tool_center_point(self, end_effector: EndEffector) -> CartesianPose:
+        """
+        :param end_effector: The end effector whose fingers are moving.
+        :return: A goal that keeps the tool center point where the fingers started
+            moving. Nothing else asks the arm to stay while a hand opens or closes, and
+            an arm left free drifts out of the pose the motion before it worked to
+            reach -- pushed by the very buffer zones that pose was chosen to respect.
+        """
+        return CartesianPose(
+            root_link=self.world.root,
+            tip_link=end_effector.tool_frame,
+            goal_pose=Pose(reference_frame=end_effector.tool_frame),
+            name="hold tool center point",
+            weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
         )
-        return Parallel([done_node, velocity_limit], name=name)
 
 
 @dataclass
@@ -236,13 +263,20 @@ class MoveToolCenterPointMotion(
             and self.robot.mobile_base.full_body_controlled
             else self.robot.root
         )
+        # A move that is allowed to touch what it manipulates also has to outrank the
+        # buffer zones kept around it, or the goal is given up on at the edge of one.
+        weight = (
+            DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+            if self.allow_gripper_collision
+            else DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
+        )
         if self.movement_type == MovementType.TRANSLATION:
             task = CartesianPosition(
                 root_link=root,
                 tip_link=tip,
                 goal_point=self.target.to_position(),
                 name="MoveTCP",
-                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+                weight=weight,
                 threshold=self.resolved_position_threshold(),
             )
         else:
@@ -251,14 +285,18 @@ class MoveToolCenterPointMotion(
                 tip_link=tip,
                 goal_pose=self.target,
                 name="MoveTCP",
-                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+                weight=weight,
                 translation_threshold=self.resolved_position_threshold(),
                 orientation_threshold=self.resolved_orientation_threshold(),
             )
-        velocity_limit_nodes = self._velocity_limit_nodes(root, tip)
-        if not velocity_limit_nodes:
+        accompanying_nodes = self._velocity_limit_nodes(root, tip)
+        if self.allow_gripper_collision:
+            accompanying_nodes.extend(
+                self._only_allow_gripper_collision_rules(self.arm)
+            )
+        if not accompanying_nodes:
             return task
-        return Parallel([task, *velocity_limit_nodes], name="MoveTCP")
+        return Parallel([task, *accompanying_nodes], name="MoveTCP")
 
 
 @dataclass

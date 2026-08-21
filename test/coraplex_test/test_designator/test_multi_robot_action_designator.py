@@ -33,6 +33,7 @@ from coraplex.robot_plans.actions.core.pick_up import (
     PickUpAction,
 )
 from coraplex.robot_plans.actions.core.placing import PlaceAction
+from coraplex.robot_plans.motions.gripper import MoveToolCenterPointMotion
 from coraplex.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
     SetGripperAction,
@@ -645,6 +646,121 @@ def test_close(immutable_multiple_robot_apartment, rclpy_node):
     assert world.get_connection_by_name(
         "cabinet10_drawer_middle_joint"
     ).position == pytest.approx(0, abs=0.1)
+
+
+def test_open_stops_at_the_requested_goal_state(immutable_multiple_robot_apartment):
+    """
+    A container whose full range the robot cannot follow has to be openable part of the
+    way, so opening stops where it is asked to instead of always at the container's own
+    limit.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+
+    plan = sequential(
+        [
+            MoveTorsoAction(TorsoState.HIGH),
+            ParkArmsAction(Arms.BOTH),
+            NavigateAction(
+                Pose(
+                    Point3.from_iterable([1.6, 1.9, 0]),
+                    Quaternion.from_iterable([0, 0, 0.3, 1]),
+                    reference_frame=world.root,
+                )
+            ),
+            OpenAction(
+                world.get_body_by_name("handle_cab10_m"),
+                Arms.LEFT,
+                goal_joint_state=0.25,
+            ),
+        ],
+        context,
+    )
+    with simulated_robot:
+        plan.perform()
+    assert world.get_connection_by_name(
+        "cabinet10_drawer_middle_joint"
+    ).position == pytest.approx(0.25, abs=0.05)
+
+
+def test_close_stops_at_the_requested_goal_state(
+    immutable_multiple_robot_apartment, rclpy_node
+):
+    """
+    A container the robot cannot push all the way shut has to be closable part of the
+    way, so closing stops where it is asked to instead of always at the container's own
+    limit.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+
+    world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.3
+    world.notify_state_change()
+
+    navigate_position = [1.5, 1.85, 0] if isinstance(robot, Tiago) else [1.65, 2.0, 0]
+
+    plan = sequential(
+        [
+            MoveTorsoAction(TorsoState.HIGH),
+            ParkArmsAction(Arms.BOTH),
+            NavigateAction(
+                Pose(
+                    Point3.from_iterable(navigate_position),
+                    Quaternion.from_iterable([0, 0, 0.4, 1]),
+                    reference_frame=world.root,
+                )
+            ),
+            CloseAction(
+                world.get_body_by_name("handle_cab10_m"),
+                Arms.LEFT,
+                goal_joint_state=0.15,
+            ),
+        ],
+        context,
+    )
+    with simulated_robot:
+        plan.perform()
+    assert world.get_connection_by_name(
+        "cabinet10_drawer_middle_joint"
+    ).position == pytest.approx(0.15, abs=0.05)
+
+
+# %% approach direction of container manipulation
+
+
+@pytest.mark.parametrize("action_type", [OpenAction, CloseAction])
+@pytest.mark.parametrize(
+    "approach_direction", [ApproachDirection.FRONT, ApproachDirection.BACK]
+)
+def test_container_manipulation_grasps_from_the_requested_side(
+    immutable_multiple_robot_apartment, action_type, approach_direction
+):
+    """
+    A handle whose body frame is turned against the room can only be reached from the
+    back, so opening and closing have to grasp from the requested side instead of always
+    from the handle's own front.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+    handle = world.get_body_by_name("handle_cab10_m")
+    expected_poses = GraspDescription(
+        approach_direction,
+        VerticalAlignment.NoAlignment,
+        ViewManager.get_end_effector_view(Arms.LEFT, robot),
+    ).grasp_pose_sequence(handle)[:2]
+
+    node = execute_single(
+        action_type(handle, Arms.LEFT, approach_direction=approach_direction), context
+    )
+    node.designator.expand()
+    node.plan.get_nodes_by_designator_type(GraspingAction)[0].designator.expand()
+
+    reached_poses = [
+        tool_center_point_node.designator.target
+        for tool_center_point_node in node.plan.get_nodes_by_designator_type(
+            MoveToolCenterPointMotion
+        )
+    ]
+    assert [pose.to_np().tolist() for pose in reached_poses] == [
+        pose.to_np().tolist() for pose in expected_poses
+    ]
 
 
 def test_facing(immutable_multiple_robot_apartment):

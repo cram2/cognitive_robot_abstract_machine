@@ -477,6 +477,7 @@ class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso]):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            full_body_controlled=True,
         )
 
 
@@ -546,7 +547,7 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
                     ),
                 ),
                 AvoidExternalCollisions(
-                    buffer_zone_distance=0.2,
+                    buffer_zone_distance=0.1,
                     violated_distance=0.05,
                     robot=self,
                     body_subset={

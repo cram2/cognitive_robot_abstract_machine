@@ -47,6 +47,9 @@ class Open(Goal):
     weight: float = field(
         default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
     )
+    """
+    Priority of driving the mechanism to its goal state.
+    """
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.connection = self.environment_link.get_first_parent_connection_of_type(
@@ -117,6 +120,9 @@ class Close(Open):
     weight: float = field(
         default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
     )
+    """
+    Priority of driving the mechanism to its goal state.
+    """
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.connection = self.environment_link.get_first_parent_connection_of_type(

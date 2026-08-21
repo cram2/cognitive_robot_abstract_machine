@@ -3,8 +3,13 @@ from itertools import combinations
 
 import pytest
 
+from krrood.adapters.json_serializer import from_json, to_json
+
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
+)
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheckingResult,
@@ -841,3 +846,23 @@ class TestGeometryInspectionWhileBuildingRules:
         AvoidAllCollisions().update(world)
 
         assert counter.inspections == len(world.bodies)
+
+
+class TestCollisionRuleSerialization:
+    """
+    A rule that survives a JSON round trip must keep the distances it was configured
+    with: they are the whole point of the rule, and a world rebuilt from a specification
+    otherwise runs on the dataclass defaults instead of the robot's own margins.
+    """
+
+    def test_external_collision_rule_keeps_its_distances(self, pr2_world_copy):
+        robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        rule = AvoidExternalCollisions(
+            buffer_zone_distance=0.1, violated_distance=0.05, robot=robot
+        )
+
+        tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_copy)
+        restored = from_json(to_json(rule), **tracker.create_kwargs())
+
+        assert restored.buffer_zone_distance == rule.buffer_zone_distance
+        assert restored.violated_distance == rule.violated_distance

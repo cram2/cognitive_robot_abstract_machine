@@ -67,13 +67,16 @@ class ExecutionEnvironment:
         GiskardExecutable.execution_type = self.previous_type
         GiskardExecutable.collision_avoidance = self.previous_collision_avoidance
 
-    def __call__(self, collision_avoidance: bool = False):
+    def __call__(self, collision_avoidance: bool = False) -> ExecutionEnvironment:
         """
-        Configure the environment for use as a context manager, allowing ``with
-        simulated_robot(collision_avoidance=True):``.
+        Allow ``with simulated_robot(collision_avoidance=True):``.
+
+        :param collision_avoidance: Whether motions run within it avoid collisions.
+        :return: A separate environment executing the same way. The environments below
+            are shared by everyone who imports them, so configuring one in place would
+            leave collision avoidance switched on for every later user of it.
         """
-        self.collision_avoidance = collision_avoidance
-        return self
+        return ExecutionEnvironment(self.execution_type, collision_avoidance)
 
 
 # These are imported, so they don't have to be initialized when executing with

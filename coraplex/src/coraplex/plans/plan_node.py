@@ -20,7 +20,6 @@ from coraplex.plans.executables import (
 )
 from coraplex.plans.failures import PlanFailure
 from coraplex.plans.plan_entity import PlanEntity
-from coraplex.utils import split_list_by_type
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import Task
@@ -349,30 +348,65 @@ class PlanNode(PlanEntity):
         """
         Merge consecutive giskard executables into a single one while leaving the other
         executables untouched and in their original order.
+
+        Executables that carry an execution boundary keep their own chart, so they are
+        left untouched as well.
         """
         result = []
-        for group in split_list_by_type(executables, GiskardExecutable):
-            if not isinstance(group[0], GiskardExecutable):
-                result.extend(group)
+        for group in self.group_mergeable_executables(executables):
+            if len(group) == 1:
+                result.append(group[0])
                 continue
             result.append(
                 GiskardExecutable(
-                    motion_mappings=self.merge_motion_mappings(group),
+                    motion_nodes=self.merge_motion_nodes(group),
                     context=self.plan.context,
                 )
             )
         return result
 
-    def merge_motion_mappings(
-        self, motions: List[GiskardExecutable]
-    ) -> Dict[MotionNode, Task]:
+    @staticmethod
+    def merges_with_neighbours(executable: Executable) -> bool:
         """
-        Combine the motion mappings of several giskard executables into one mapping.
+        :param executable: The executable to judge.
+        :return: Whether the chart of this executable may be merged into the charts next
+            to it.
         """
-        new_mappings = {}
-        for motion in motions:
-            new_mappings.update(motion.motion_mappings)
-        return new_mappings
+        return isinstance(executable, GiskardExecutable) and not any(
+            isinstance(node, ExecutionBoundaryNode) for node in executable.motion_nodes
+        )
+
+    def group_mergeable_executables(
+        self, executables: List[Executable]
+    ) -> List[List[Executable]]:
+        """
+        Split a list of executables into consecutive runs that may be merged into one
+        chart, preserving order.
+
+        Everything that is not a mergeable giskard executable ends up in a group of its
+        own.
+        """
+        groups: List[List[Executable]] = []
+        for executable in executables:
+            joins_previous_group = (
+                groups
+                and self.merges_with_neighbours(groups[-1][-1])
+                and self.merges_with_neighbours(executable)
+            )
+            if joins_previous_group:
+                groups[-1].append(executable)
+                continue
+            groups.append([executable])
+        return groups
+
+    def merge_motion_nodes(self, motions: List[GiskardExecutable]) -> List[MotionNode]:
+        """
+        Combine the motions of several giskard executables into one run order.
+
+        The motions themselves are combined rather than the tasks they turn into, so
+        that a merged executable still builds its chart when it runs.
+        """
+        return [node for motion in motions for node in motion.motion_nodes]
 
     def __node_info__(self):
         return [
@@ -388,7 +422,7 @@ class PlanNode(PlanEntity):
 
 
 @dataclass(eq=False, repr=False)
-class ExecutionBoundaryNode(ABC, PlanNode):
+class ExecutionBoundaryNode(PlanNode, ABC):
     """
     A PlanNode that interrupts the merging of surrounding motions into one chart.
     """
@@ -542,9 +576,19 @@ class DesignatorNode(PlanNode, ABC):
 
     def __node_info__(self):
         parent_infos = super().__node_info__()
-        designator_field = [f"{field.name}: {getattr(self.designator, field.name)}" for field in self.designator.fields]
-        parent_infos.append("---------------- Designator Parameter --------------------")
-        parent_infos.extend([f"Designator Type: {self.designator.__class__.__name__}", *designator_field])
+        designator_field = [
+            f"{field.name}: {getattr(self.designator, field.name)}"
+            for field in self.designator.fields
+        ]
+        parent_infos.append(
+            "---------------- Designator Parameter --------------------"
+        )
+        parent_infos.extend(
+            [
+                f"Designator Type: {self.designator.__class__.__name__}",
+                *designator_field,
+            ]
+        )
         return parent_infos
 
     def __node_label__(self):
@@ -645,11 +689,7 @@ class ActionNode(DesignatorNode):
             motion_exec.post_condition_node = post_condition_node
             return motion_exec
 
-        giskard_child_execs = [
-            executable
-            for executable in child_execs[0].execution_list
-            if isinstance(executable, GiskardExecutable)
-        ]
+        giskard_child_execs = child_execs[0].giskard_executables
         giskard_child_execs[0].pre_condition_node = pre_condition_node
         giskard_child_execs[-1].post_condition_node = post_condition_node
         return child_execs[0]
@@ -699,11 +739,16 @@ class MotionNode(DesignatorNode):
         return None
 
     def parse(self) -> Executable:
-        task = self.motion.motion_chart
+        return GiskardExecutable(motion_nodes=[self], context=self.plan.context)
 
-        return GiskardExecutable(
-            motion_mappings={self: task}, context=self.plan.context
-        )
+
+@dataclass(eq=False, repr=False)
+class StandaloneMotionNode(MotionNode, ExecutionBoundaryNode):
+    """
+    A motion that is executed in a motion statechart of its own.
+
+    The motions around it are still merged with each other, never with this one.
+    """
 
 
 ActionLike = Union[Match, Designator, PlanNode]

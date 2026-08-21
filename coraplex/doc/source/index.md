@@ -32,6 +32,13 @@
 - ✅ Faster iteration in simulation, safer rollouts on real robots.
 - ✅ Robust control that anticipates uncertainty—and recovers when reality disagrees.
 
+## Hands-on exercises
+
+Write a robot plan yourself, step by step, in [Writing a Robot Plan](self_assessment/exercises/0_writing_a_robot_plan.md):
+a PR2 takes a milk out of a closed fridge and puts it down on the kitchen island. See
+[Hands-On Exercises](self_assessment/exercises_intro.md) for how to run the exercises as
+notebooks.
+
 ## Installation
 
 The recommended installation method is via `pip`:

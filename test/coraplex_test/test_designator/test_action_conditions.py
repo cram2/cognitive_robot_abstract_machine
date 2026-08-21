@@ -10,8 +10,12 @@ from coraplex.datastructures.grasp import GraspDescription
 from coraplex.exceptions import ConditionNotSatisfied, MotionDidNotFinish
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
+from coraplex.robot_plans.actions.core.container import CloseAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -68,10 +72,19 @@ def test_get_bound_variables(immutable_model_world):
 
 
 def test_pick_up_pre_conditions(mutable_model_world):
+    """
+    The pre condition reports whether the object can be reached, and says which of its
+    statements is the one that fails.
+
+    The robot drives while it reaches, so an object it cannot get to is one out of the
+    height its arm rises to rather than one merely standing far away.
+    """
     world, view, context = mutable_model_world
+    milk = world.get_body_by_name("milk.stl")
+    milk_origin_within_reach = milk.parent_connection.origin
 
     pick_action = PickUpAction(
-        world.get_body_by_name("milk.stl"),
+        milk,
         Arms.LEFT,
         GraspDescription(
             ApproachDirection.FRONT,
@@ -81,6 +94,10 @@ def test_pick_up_pre_conditions(mutable_model_world):
     )
 
     plan = sequential([pick_action], context)
+
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2, 1.5, 3, reference_frame=milk.parent_connection.parent
+    )
 
     with pytest.raises(ConditionNotSatisfied):
         _construct_and_evaluate_condition(
@@ -100,6 +117,7 @@ def test_pick_up_pre_conditions(mutable_model_world):
     with pytest.raises(ConditionNotSatisfied):
         _construct_and_evaluate_condition(pick_action, pick_action.pre_condition)
 
+    milk.parent_connection.origin = milk_origin_within_reach
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1.9, 1.4, 0
     )
@@ -147,3 +165,33 @@ def test_pick_up_post_condition(mutable_model_world):
     )
 
     assert _construct_and_evaluate_condition(pick_action, pick_action.post_condition)
+
+
+# %% how far short of shut still counts as closed
+
+
+def test_close_action_judges_a_container_by_the_tolerance_it_was_given(
+    mutable_model_world,
+):
+    """
+    A mechanism is only driven onto its own limit asymptotically, so how far short of
+    the goal still counts as closed is the caller's to say.
+    """
+    world, view, context = mutable_model_world
+    handle = world.get_body_by_name("handle_cab10_m")
+    close_action = CloseAction(
+        handle, Arms.LEFT, goal_joint_state=0.0, goal_joint_state_tolerance=0.3
+    )
+    connection = handle.get_first_parent_connection_of_type(ActiveConnection1DOF)
+    post_condition = close_action.post_condition(
+        close_action.bound_variables, context, close_action.designator_parameter
+    )
+    tolerance = close_action.goal_joint_state_tolerance
+
+    connection.position = close_action.goal_joint_state + tolerance / 2
+    stopped_within_tolerance = evaluate_condition(post_condition)
+    connection.position = close_action.goal_joint_state + tolerance * 2
+    stopped_beyond_tolerance = evaluate_condition(post_condition)
+
+    assert stopped_within_tolerance
+    assert not stopped_beyond_tolerance

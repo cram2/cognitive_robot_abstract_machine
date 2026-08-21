@@ -1,4 +1,4 @@
-from test import world---
+---
 jupyter:
   jupytext:
     text_representation:

@@ -20,6 +20,58 @@ from semantic_digital_twin.world import World
 
 
 class TestExternalCollisionExpressionManager:
+    def test_contacts_are_kept_in_the_order_their_data_was_written_in(
+        self, cylinder_bot_world
+    ):
+        """
+        Whoever reports a violated collision reads the contact by the index of the data
+        block that observed it, so the kept contacts have to be in the same order as
+        those blocks. Out of order, a violation is reported against a pair that is not
+        the one that was violated.
+        """
+        float_variable_data = FloatVariableData()
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
+        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        collision_manager = cylinder_bot_world.collision_manager
+        collision_manager.temporary_rules.extend(
+            [
+                AvoidCollisionBetweenGroups(
+                    buffer_zone_distance=10,
+                    violated_distance=0.0,
+                    body_group_a=[robot.root],
+                    body_group_b=[env1],
+                ),
+                AvoidCollisionBetweenGroups(
+                    buffer_zone_distance=15,
+                    violated_distance=0.23,
+                    body_group_a=[robot.root],
+                    body_group_b=[env2],
+                ),
+            ]
+        )
+        collision_manager.max_avoided_bodies_rules.append(
+            MaxAvoidedCollisionsOverride(2, {robot.root})
+        )
+        collision_manager.add_collision_consumer(
+            external_collisions := ExternalCollisionVariableManager(float_variable_data)
+        )
+        external_collisions.register_group_of_body(robot.root)
+        collision_manager.update_collision_matrix()
+        collision_manager.compute_collisions()
+
+        group = external_collisions.get_collision_group(robot.root)
+        kept_contacts = external_collisions.last_closest_contacts[group]
+
+        assert len(kept_contacts) == 2
+        for index, contact in enumerate(kept_contacts):
+            assert (
+                contact.distance
+                == external_collisions.get_contact_distance_symbol(
+                    group, index
+                ).evaluate()[0]
+            )
+
     def test_simple(self, cylinder_bot_world):
         float_variable_data = FloatVariableData()
         float_variable_data.register_expression(FloatVariable("muh"))

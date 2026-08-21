@@ -30,6 +30,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("coraplex")
 
+BASE_CLEARANCE = 0.1
+"""
+How much room, in meters, a robot base is given beyond its own radius when obstacles are
+inflated, so that standing on a free cell leaves it clear of what is next to it.
+"""
+
 
 class OrientationGenerator:
     """
@@ -171,7 +177,11 @@ class Costmap(PoseGeneratorBackend):
 
     number_of_samples: int = field(kw_only=True, default=200)
     """
-    Number of samples to return at max
+    Number of samples to draw from each region of the map, at most.
+
+    Every region is a place of its own to stand in, and how many of them a map falls
+    apart into says nothing about how many candidates any one of them owes, so the budget
+    is per region rather than shared out between them.
     """
 
     sample_randomly: bool = field(kw_only=True, default=False)
@@ -375,19 +385,30 @@ class Costmap(PoseGeneratorBackend):
         ):
             self.number_of_samples = self.map.flatten().shape[0]
 
-        segmented_maps = self.segment_map()
-        samples_per_map = self.number_of_samples // len(segmented_maps)
-        for seg_map in segmented_maps:
+        for seg_map in self.segment_map():
+            weights = seg_map.flatten()
+            sample_count = min(self.number_of_samples, np.count_nonzero(weights))
+            if sample_count == 0:
+                continue
 
             if self.sample_randomly:
-                indices = np.random.choice(seg_map.size, samples_per_map, replace=False)
+                # A costmap is a distribution, so a random draw follows its values: an
+                # even draw over the whole segment would spend most samples on the cells
+                # the map rates worst, and on the zeroed ones it rates unusable.
+                indices = np.random.choice(
+                    seg_map.size,
+                    sample_count,
+                    replace=False,
+                    p=weights / weights.sum(),
+                )
             else:
-                indices = np.argpartition(seg_map.flatten(), -samples_per_map)[
-                    -samples_per_map:
-                ]
+                indices = np.argpartition(weights, -sample_count)[-sample_count:]
 
+            # Best first, so a consumer that stops at its first usable candidate spends
+            # its time on the places the map rates highest.
+            indices = indices[np.argsort(weights[indices])[::-1]]
             indices = np.dstack(np.unravel_index(indices, self.map.shape)).reshape(
-                samples_per_map, 2
+                -1, 2
             )
 
             height = seg_map.shape[0]
@@ -562,6 +583,16 @@ class OccupancyCostmap(Costmap):
 
         return np.flip(map)
 
+    @staticmethod
+    def default_distance_to_obstacle(robot: AbstractRobot) -> float:
+        """
+        :param robot: The robot that has to stand on the free cells.
+        :return: How far obstacles are inflated for that robot: the radius of its base
+            plus :data:`BASE_CLEARANCE`.
+        """
+        base_bb = robot.mobile_base.bounding_box
+        return (base_bb.depth / 2 + base_bb.width / 2) / 2 + BASE_CLEARANCE
+
     @classmethod
     def default_map(cls, context: Context, target: Pose) -> OccupancyCostmap:
         """
@@ -575,14 +606,12 @@ class OccupancyCostmap(Costmap):
         ground_pose = deepcopy(target)
         ground_pose.z = 0
 
-        base_bb = context.robot.mobile_base.bounding_box
-
         return OccupancyCostmap(
             resolution=0.02,
             width=200,
             height=200,
             world=context.world,
-            distance_to_obstacle=(base_bb.depth / 2 + base_bb.width / 2) / 2 + 0.1,
+            distance_to_obstacle=cls.default_distance_to_obstacle(context.robot),
             robot_view=context.robot,
             origin=ground_pose,
         )

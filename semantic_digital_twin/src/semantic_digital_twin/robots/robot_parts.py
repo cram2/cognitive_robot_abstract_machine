@@ -832,6 +832,26 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
 
         connection.origin = pose.to_homogeneous_matrix()
 
+    def can_see_body(self, target_body: Body):
+        """
+        Performs a ray test from the robot to check if the given body is visible, the
+        check filters out bodies of the ' robot form the hit list of the ray test.
+
+        :param target_body: The body for which the ray test is to be performed
+        :return: True if the target body is visible for the robot, False otherwise
+        """
+        ray_tracer = self._world.ray_tracer
+        camera = self.get_default_camera()
+        ray = ray_tracer.ray_test(
+            camera.bodies[0].global_transform.to_position()[:3].to_np(),
+            target_body.global_transform.to_position()[:3].to_np(),
+            multiple_hits=True,
+        )
+
+        hit_bodies = [body for body in ray[2] if body not in self.bodies]
+
+        return hit_bodies[0] == target_body if len(hit_bodies) > 0 else False
+
     @property
     def _one_dof_connections(self) -> list[ActiveConnection1DOF]:
         """

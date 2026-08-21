@@ -780,8 +780,8 @@ def test_detecting_motion_takes_the_execution_type_of_the_environment(
 
     with simulated_robot:
         executable = plan.parse()
+        tasks = list(executable.motion_mappings.values())
 
-    tasks = list(executable.motion_mappings.values())
     assert [type(task) for task in tasks] == [PerceptionTask]
     assert tasks[0].execution_type is ExecutionType.SIMULATED
 

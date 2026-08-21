@@ -183,7 +183,12 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
             self.last_closest_contacts[group_a].append(collision)
 
         for group_a, collisions in self.last_closest_contacts.items():
-            collisions = sorted(collisions, key=lambda c: c.distance)
+            # Kept in the order the data blocks below are written in, so that whoever
+            # reads a contact by the index of the block that observed it gets the pair
+            # that block is about.
+            collisions = self.last_closest_contacts[group_a] = sorted(
+                collisions, key=lambda c: c.distance
+            )
             for i in range(
                 min(
                     len(collisions),

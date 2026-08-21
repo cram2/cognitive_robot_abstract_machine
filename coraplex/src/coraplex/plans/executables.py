@@ -75,6 +75,21 @@ class Executable:
         for executable in self.execution_list:
             executable.execute()
 
+    @property
+    def giskard_executables(self) -> List[GiskardExecutable]:
+        """
+        The motion state charts run under this executable, in execution order.
+
+        An action body that ends up in more than one chart is held as a composite of
+        composites, so the charts it starts and finishes in are not all at the top
+        level.
+        """
+        return [
+            giskard_executable
+            for executable in self.execution_list
+            for giskard_executable in executable.giskard_executables
+        ]
+
 
 @dataclass
 class GiskardExecutable(Executable):
@@ -83,10 +98,9 @@ class GiskardExecutable(Executable):
     the motions, pre -and postconditions and the pause and interrupt calls.
     """
 
-    motion_mappings: Dict[MotionNode, Task] = field(kw_only=True)
+    motion_nodes: List[MotionNode] = field(kw_only=True)
     """
-    Mapping from the motion nodes of the plan to their giskard tasks, in execution
-    order.
+    The motions this executable runs, in execution order.
     """
 
     pre_condition_node: Optional[ConditionNode] = field(default=None, kw_only=True)
@@ -122,6 +136,31 @@ class GiskardExecutable(Executable):
     """
     Currently build motion state chart, internal only for managing the building the msc.
     """
+
+    _motion_mappings: Optional[Dict[MotionNode, Task]] = field(init=False, default=None)
+    """
+    The tasks built from :attr:`motion_nodes`, once they have been.
+    """
+
+    @property
+    def giskard_executables(self) -> List[GiskardExecutable]:
+        return [self]
+
+    @property
+    def motion_mappings(self) -> Dict[MotionNode, Task]:
+        """
+        The giskard task of every motion this executable runs, in execution order.
+
+        Built on first use rather than when the plan is parsed, so that a motion is
+        turned into a task against the world it will run in: everything before it has
+        run by then, and a chart built earlier describes a world that no longer exists --
+        a hand that has since taken hold of something, for one.
+        """
+        if self._motion_mappings is None:
+            self._motion_mappings = {
+                node: node.motion.motion_chart for node in self.motion_nodes
+            }
+        return self._motion_mappings
 
     @property
     def motion_state_chart(self) -> MotionStatechart:
@@ -233,10 +272,18 @@ class GiskardExecutable(Executable):
         from coraplex.plans.condition_nodes import PlanNodeStatusMonitor
 
         skip_end_conditions = []
-        plan_nodes = list(self.motion_mappings.keys())
+        plan_nodes = list(self.motion_nodes)
         for index, (plan_node, task) in enumerate(zip(plan_nodes, tasks)):
-            # a task is done once its own goal is observed (as giskard's Sequence does)
-            task.end_condition = task.observation_variable
+            # A task is done once its own goal is observed (as giskard's Sequence does),
+            # which hands the robot to the task after it. Only the last task hands it to
+            # nobody, so only there can a motion keep its goal in force while the chart
+            # winds down.
+            holds_on = (
+                task is tasks[-1]
+                and plan_node.designator.holds_its_goal_until_the_motion_ends
+            )
+            if not holds_on:
+                task.end_condition = task.observation_variable
 
             pause_monitor = PlanNodeStatusMonitor(
                 predicate=lambda node=plan_node: node.is_paused,
@@ -279,18 +326,18 @@ class GiskardExecutable(Executable):
 
     @property
     def is_interrupted(self) -> bool:
-        return any(node.is_interrupted for node in self.motion_mappings)
+        return any(node.is_interrupted for node in self.motion_nodes)
 
     @property
     def is_paused(self) -> bool:
-        return any(node.is_paused for node in self.motion_mappings)
+        return any(node.is_paused for node in self.motion_nodes)
 
     def execute(self) -> None:
         """
         Builds the motion state chart from the motions and executes it according to the
         execution type.
         """
-        if len(self.motion_mappings) == 0:
+        if len(self.motion_nodes) == 0:
             return
 
         match GiskardExecutable.execution_type:
@@ -321,7 +368,7 @@ class GiskardExecutable(Executable):
         executor.compile(motion_state_chart)
 
         counter = 0
-        while counter < len(self.motion_mappings) * 2000:
+        while counter < len(self.motion_nodes) * 2000:
             # Interrupting and pausing are handled inside the motion state chart by
             # per-task monitors (see motion_state_chart): an interrupt ends the
             # motion via EndMotion, a pause holds the active task via its
@@ -457,13 +504,17 @@ class UnderspecifiedExecutable(Executable):
     """
 
     def execute(self) -> None:
-        from coraplex.plans.failures import PlanFailure, EmptyUnderspecified
+        from coraplex.plans.failures import (
+            MOTION_DID_NOT_WORK_OUT,
+            PlanFailure,
+            EmptyUnderspecified,
+        )
 
         while self.node.advance():
             try:
                 self.node.current_candidate.parse().execute()
                 self.node.stop_grounding()
                 return
-            except PlanFailure:
+            except (PlanFailure, *MOTION_DID_NOT_WORK_OUT):
                 continue
         raise EmptyUnderspecified()

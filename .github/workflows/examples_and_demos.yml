@@ -30,6 +30,7 @@ jobs:
       matrix:
         include:
           - script: coraplex/scripts/test_notebook_examples.sh
+          - script: coraplex/scripts/test_exercises.sh
           - script: semantic_digital_twin/scripts/test_notebook_examples.sh
           - script: semantic_digital_twin/scripts/test_exercises.sh
           - script: semantic_digital_twin/scripts/test_quizzes.sh

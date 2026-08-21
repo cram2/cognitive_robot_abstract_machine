@@ -27,7 +27,6 @@ from coraplex.datastructures.enums import TaskStatus, MonitorBehavior
 from coraplex.plans.failures import PlanFailure, AllChildrenFailed
 from coraplex.fluent import Fluent
 from coraplex.plans.plan_node import PlanNode, ExecutionBoundaryNode
-from coraplex.utils import split_list_by_type
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +64,7 @@ class LanguageNode(PlanNode, ABC):
         child_execs = [child.parse() for child in self.children]
 
         return GiskardExecutable(
-            motion_mappings=self.merge_motion_mappings(child_execs),
+            motion_nodes=self.merge_motion_nodes(child_execs),
             context=self.plan.context,
         )
 
@@ -76,23 +75,10 @@ class LanguageNode(PlanNode, ABC):
         the consecutive giskard executables between them.
         """
         child_executables = [node.parse() for node in self.children]
-
-        giskard_exec_groups = split_list_by_type(child_executables, GiskardExecutable)
-
-        exec_list = []
-
-        for group in giskard_exec_groups:
-            if isinstance(group[0], GiskardExecutable):
-                exec_list.append(
-                    GiskardExecutable(
-                        motion_mappings=self.merge_motion_mappings(group),
-                        context=self.plan.context,
-                    )
-                )
-            else:
-                exec_list.extend(group)
-
-        return Executable(execution_list=exec_list, context=self.plan.context)
+        return Executable(
+            execution_list=self.merge_motion_executables(child_executables),
+            context=self.plan.context,
+        )
 
 
 @dataclass

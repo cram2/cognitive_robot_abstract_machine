@@ -1,4 +1,4 @@
-from coraplex.plans.plan import Plan---
+---
 jupyter:
   jupytext:
     text_representation:

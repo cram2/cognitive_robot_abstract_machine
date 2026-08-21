@@ -37,8 +37,34 @@ from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
+
+
+def grasp_of_the_carried_object(
+    plan_node: PlanNode, arm: Arms, robot: AbstractRobot
+) -> GraspDescription:
+    """
+    Find how whatever the robot is carrying ended up in its gripper.
+
+    Putting something down is picking it up run backwards, so the grasp is not the
+    placing's to choose: it is whichever one the pick-up before it settled on.
+
+    :param plan_node: The node to look back from.
+    :param arm: The arm doing the placing.
+    :param robot: The robot doing it.
+    :return: The grasp the object is held with, and a front grasp when nothing was
+        picked up.
+    """
+    previous_pick = plan_node.get_previous_node_by_designator_type(PickUpAction)
+    if previous_pick is not None:
+        return previous_pick.designator.grasp_description
+    return GraspDescription(
+        ApproachDirection.FRONT,
+        VerticalAlignment.NoAlignment,
+        ViewManager.get_arm_view(arm, robot).end_effector,
+    )
 
 
 @dataclass
@@ -49,8 +75,9 @@ class PlaceAction(ActionDescription, PlaceTuningParameters, HasGraspDetectionThr
 
     object_designator: Body
     """
-    Object designator_description describing the object that should be place
+    Object designator_description describing the object that should be place.
     """
+
     target_location: Pose
     """
     Pose in the world at which the object should be placed.
@@ -58,7 +85,7 @@ class PlaceAction(ActionDescription, PlaceTuningParameters, HasGraspDetectionThr
 
     arm: Arms
     """
-    Arm that is currently holding the object
+    Arm that is currently holding the object.
     """
 
     grasp_release_threshold: float = field(default=0.1, kw_only=True)
@@ -86,16 +113,8 @@ class PlaceAction(ActionDescription, PlaceTuningParameters, HasGraspDetectionThr
 
     @property
     def _action_plan(self) -> PlanNode:
-        end_effector = ViewManager.get_arm_view(self.arm, self.robot).end_effector
-        previous_pick = self.plan_node.get_previous_node_by_designator_type(
-            PickUpAction
-        )
-        previous_grasp_description = (
-            previous_pick.designator.grasp_description
-            if previous_pick
-            else GraspDescription(
-                ApproachDirection.FRONT, VerticalAlignment.NoAlignment, end_effector
-            )
+        previous_grasp_description = grasp_of_the_carried_object(
+            self.plan_node, self.arm, self.robot
         )
         transport_pose, placing_pose, retract_pose = (
             previous_grasp_description.pose_sequence(
@@ -108,18 +127,19 @@ class PlaceAction(ActionDescription, PlaceTuningParameters, HasGraspDetectionThr
                 MoveToolCenterPointMotion(
                     transport_pose,
                     self.arm,
-                    allow_gripper_collision=False,
+                    allow_gripper_collision=True,
                     max_linear_velocity=self.transport_linear_velocity,
                 ),
                 MoveToolCenterPointMotion(
                     placing_pose,
                     self.arm,
-                    allow_gripper_collision=False,
+                    allow_gripper_collision=True,
                     max_linear_velocity=self.placing_linear_velocity,
                 ),
                 MoveGripperMotion(
                     GripperState.OPEN,
                     self.arm,
+                    allow_gripper_collision=True,
                     finger_velocity=self.release_opening_velocity,
                 ),
                 self._retract_plan(retract_pose),

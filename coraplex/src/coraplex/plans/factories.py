@@ -129,9 +129,11 @@ def make_node(action_like: ActionLike) -> PlanNode:
         UnderspecifiedNode,
         ActionNode,
         MotionNode,
+        StandaloneMotionNode,
     )
     from coraplex.robot_plans.actions.base import ActionDescription
     from coraplex.robot_plans import BaseMotion
+    from coraplex.robot_plans.motions.base import StandaloneMotion
 
     if isinstance(action_like, PlanNode):
         return action_like
@@ -140,6 +142,8 @@ def make_node(action_like: ActionLike) -> PlanNode:
         return underspecified_action
     elif isinstance(action_like, ActionDescription):
         return ActionNode(designator=action_like)
+    elif isinstance(action_like, StandaloneMotion):
+        return StandaloneMotionNode(designator=action_like)
     elif isinstance(action_like, BaseMotion):
         return MotionNode(designator=action_like)
     else:
