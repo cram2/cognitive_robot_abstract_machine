@@ -106,6 +106,33 @@ def test_to_json_joint_position_list(mini_world):
     assert node_copy.goal_state == node.goal_state
 
 
+def test_world_entities_are_serialized_by_id(mini_world):
+    """
+    A node writes its world entity references as ids and resolves them back to the
+    world's own objects, rather than shipping a copy of the entity.
+    """
+    root = mini_world.get_kinematic_structure_entity_by_name("root")
+    tip = mini_world.get_kinematic_structure_entity_by_name("tip")
+    node = CartesianPose(
+        root_link=root,
+        tip_link=tip,
+        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.1, reference_frame=root
+        ),
+    )
+
+    json_data = json.loads(json.dumps(to_json(node)))
+    assert json_data["root_link"] == to_json(root.id)
+    assert json_data["tip_link"] == to_json(tip.id)
+
+    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    node_copy = from_json(json_data, **tracker.create_kwargs())
+
+    assert node_copy.root_link is root
+    assert node_copy.tip_link is tip
+    assert node_copy.goal_pose.reference_frame is root
+
+
 def test_start_condition(mini_world):
     msc = MotionStatechart()
     node1 = ConstTrueNode()

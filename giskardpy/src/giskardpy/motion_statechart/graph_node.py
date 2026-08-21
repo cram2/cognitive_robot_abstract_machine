@@ -27,6 +27,7 @@ from krrood.adapters.json_serializer import (
     to_json,
     from_json,
 )
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
 from krrood.exceptions import DataclassException
@@ -41,6 +42,7 @@ from semantic_digital_twin.spatial_types import (
     Pose,
 )
 from semantic_digital_twin.world_description.geometry import Color
+from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
@@ -501,7 +503,7 @@ class NodeArtifacts:
 
 
 @dataclass(repr=False, eq=False)
-class MotionStatechartNode:
+class MotionStatechartNode(SubclassJSONSerializer):
     name: str = field(default=None, kw_only=True)
     """
     A name for the node within a motion statechart.
@@ -606,6 +608,50 @@ class MotionStatechartNode:
             name=str(PrefixedName("life_cycle", name)),
             motion_statechart_node=self,
         )
+
+    def to_json(self) -> Dict[str, Any]:
+        """
+        Serialize this node, writing referenced world entities as their id rather than
+        by value.
+        """
+        result = super().to_json()
+        for attribute in DataclassOnlyIntrospector().discover(self.__class__):
+            value = getattr(self, attribute.public_name)
+            if isinstance(value, (list, set)):
+                result[attribute.public_name] = [
+                    WorldEntityWithID._item_to_json(item) for item in value
+                ]
+            else:
+                result[attribute.public_name] = WorldEntityWithID._item_to_json(value)
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        """
+        Rebuild a node, resolving serialized ids back to the world's own entities.
+        """
+        values = {}
+        for attribute in DataclassOnlyIntrospector().discover(cls):
+            if attribute.public_name not in data:
+                continue
+            value = data[attribute.public_name]
+            if isinstance(value, list):
+                items = [
+                    WorldEntityWithID._item_from_json(item, **kwargs) for item in value
+                ]
+                # to_json writes list and set fields alike, so ask the field how it
+                # builds its own container
+                value = set(items) if attribute.field.default_factory is set else items
+            else:
+                value = WorldEntityWithID._item_from_json(value, **kwargs)
+            values[attribute] = value
+
+        node = cls(**{a.public_name: v for a, v in values.items() if a.field.init})
+
+        for attribute, value in values.items():
+            if not attribute.field.init:
+                setattr(node, attribute.public_name, value)
+        return node
 
     @property
     def parent_node(self) -> Optional[MotionStatechartNode]:
