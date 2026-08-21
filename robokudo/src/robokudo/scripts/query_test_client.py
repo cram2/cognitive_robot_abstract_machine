@@ -256,10 +256,10 @@ def main_cli(args: Optional[List[str]] = None) -> None:
 def main(timeout_seconds: float = 20.0, result: Optional[ResultQueue] = None) -> None:
     timeout_deadline = time.monotonic() + timeout_seconds
     result_queue = result if result is not None else Queue()
-    ctx = Context()
-    rclpy.init(context=ctx)
-    action_client = RoboKudoActionClient(preempt_timer=None, context=ctx)
-    executor = SingleThreadedExecutor(context=ctx)
+    ros_context = Context()
+    rclpy.init(context=ros_context)
+    action_client = RoboKudoActionClient(preempt_timer=None, context=ros_context)
+    executor = SingleThreadedExecutor(context=ros_context)
     executor.add_node(action_client)
     result_dict: Dict[str, Any] = dict()
     result_dict["timed_out"] = False
@@ -269,7 +269,7 @@ def main(timeout_seconds: float = 20.0, result: Optional[ResultQueue] = None) ->
         action_client.send_goal(goal_type="test")
 
         # Keep the node alive until the action is done
-        while rclpy.ok(context=ctx) and not action_client.done:
+        while rclpy.ok(context=ros_context) and not action_client.done:
             if not time.monotonic() < timeout_deadline:
                 result_dict["timed_out"] = True
                 break
@@ -289,8 +289,8 @@ def main(timeout_seconds: float = 20.0, result: Optional[ResultQueue] = None) ->
         executor.remove_node(action_client)
         executor.shutdown()
         action_client.destroy_node()
-        if rclpy.ok(context=ctx):
-            rclpy.shutdown(context=ctx)
+        if rclpy.ok(context=ros_context):
+            rclpy.shutdown(context=ros_context)
 
 
 if __name__ == "__main__":
