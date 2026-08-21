@@ -5,6 +5,7 @@ import json
 import logging
 import time
 from queue import Queue
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol
 
 import rclpy
 from action_msgs.msg import GoalStatus
@@ -13,7 +14,6 @@ from rclpy.action import ActionClient
 from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from rclpy.node import Node
 from rosidl_runtime_py.convert import message_to_ordereddict
-from typing_extensions import TYPE_CHECKING, Optional, List, Dict, Any, Protocol
 
 from robokudo_msgs.action import Query
 

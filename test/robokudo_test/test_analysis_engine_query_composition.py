@@ -14,7 +14,8 @@ import pkgutil
 import signal
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing_extensions import Any, Iterator, List
+from types import FrameType
+from typing import Any, Iterator, List
 
 import pytest
 
@@ -56,7 +57,8 @@ def bounded_build_time() -> Iterator[None]:
     Fail with :class:`AnalysisEngineBuildTimedOut` instead of hanging past the timeout.
     """
 
-    def raise_timeout(signum, frame):
+    def raise_timeout(signal_number: int, frame: FrameType | None) -> None:
+        """Raise the build timeout exception for the active alarm."""
         raise AnalysisEngineBuildTimedOut(
             f"implementation() did not return within {BUILD_TIMEOUT_SECONDS}s."
         )
@@ -80,6 +82,7 @@ class FakeCameraConfig:
     """
 
     interface_type: str = "FakeCameraInterface"
+    """Camera-interface identifier expected by the collection reader."""
 
 
 @dataclass
@@ -89,6 +92,7 @@ class FakeCameraInterface:
     """
 
     interface_type: str = "FakeCameraInterface"
+    """Camera-interface identifier expected by the collection reader."""
 
     def has_new_data(self) -> bool:
         """
