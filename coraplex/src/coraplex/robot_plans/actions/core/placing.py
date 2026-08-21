@@ -27,6 +27,7 @@ from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.mixins import (
     HasGraspDetectionThreshold,
+    HasTcpGoalThresholds,
     PlaceTuningParameters,
 )
 from coraplex.robot_plans.motions.gripper import (
@@ -42,7 +43,12 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class PlaceAction(ActionDescription, PlaceTuningParameters, HasGraspDetectionThreshold):
+class PlaceAction(
+    ActionDescription,
+    PlaceTuningParameters,
+    HasGraspDetectionThreshold,
+    HasTcpGoalThresholds,
+):
     """
     Places an Object at a position using an arm.
     """
@@ -80,6 +86,8 @@ class PlaceAction(ActionDescription, PlaceTuningParameters, HasGraspDetectionThr
                     retract_pose,
                     self.arm,
                     max_linear_velocity=self.retract_linear_velocity,
+                    position_threshold=self.position_threshold,
+                    orientation_threshold=self.orientation_threshold,
                 ),
             ],
         )
@@ -110,12 +118,16 @@ class PlaceAction(ActionDescription, PlaceTuningParameters, HasGraspDetectionThr
                     self.arm,
                     allow_gripper_collision=False,
                     max_linear_velocity=self.transport_linear_velocity,
+                    position_threshold=self.position_threshold,
+                    orientation_threshold=self.orientation_threshold,
                 ),
                 MoveToolCenterPointMotion(
                     placing_pose,
                     self.arm,
                     allow_gripper_collision=False,
                     max_linear_velocity=self.placing_linear_velocity,
+                    position_threshold=self.position_threshold,
+                    orientation_threshold=self.orientation_threshold,
                 ),
                 MoveGripperMotion(
                     GripperState.OPEN,

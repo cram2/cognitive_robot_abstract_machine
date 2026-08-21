@@ -27,6 +27,7 @@ from coraplex.querying.predicates import GripperIsFree
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.mixins import (
     HasGraspDetectionThreshold,
+    HasTcpGoalThresholds,
     PickUpTuningParameters,
     ReachTuningParameters,
 )
@@ -46,7 +47,12 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ReachAction(ActionDescription, ReachTuningParameters, HasGraspDetectionThreshold):
+class ReachAction(
+    ActionDescription,
+    ReachTuningParameters,
+    HasGraspDetectionThreshold,
+    HasTcpGoalThresholds,
+):
     """
     Let the robot reach a specific pose.
     """
@@ -93,6 +99,8 @@ class ReachAction(ActionDescription, ReachTuningParameters, HasGraspDetectionThr
                 self.arm,
                 allow_gripper_collision=False,
                 max_linear_velocity=self.pre_approach_linear_velocity,
+                position_threshold=self.position_threshold,
+                orientation_threshold=self.orientation_threshold,
             ),
         ]
         if self.open_gripper_at_pre_pose:
@@ -106,6 +114,8 @@ class ReachAction(ActionDescription, ReachTuningParameters, HasGraspDetectionThr
                 allow_gripper_collision=False,
                 movement_type=MovementType.CARTESIAN,
                 max_linear_velocity=self.final_approach_linear_velocity,
+                position_threshold=self.position_threshold,
+                orientation_threshold=self.orientation_threshold,
             )
         )
         return sequential(children=children)
@@ -160,7 +170,10 @@ class ReachAction(ActionDescription, ReachTuningParameters, HasGraspDetectionThr
 
 @dataclass
 class PickUpAction(
-    ActionDescription, PickUpTuningParameters, HasGraspDetectionThreshold
+    ActionDescription,
+    PickUpTuningParameters,
+    HasGraspDetectionThreshold,
+    HasTcpGoalThresholds,
 ):
     """
     Let the robot pick up an object.
@@ -209,6 +222,8 @@ class PickUpAction(
                     pre_approach_linear_velocity=self.pre_approach_linear_velocity,
                     final_approach_linear_velocity=self.final_approach_linear_velocity,
                     open_gripper_at_pre_pose=True,
+                    position_threshold=self.position_threshold,
+                    orientation_threshold=self.orientation_threshold,
                 ),
                 MoveGripperMotion(
                     motion=GripperState.CLOSE,
@@ -240,6 +255,8 @@ class PickUpAction(
                     allow_gripper_collision=True,
                     movement_type=MovementType.TRANSLATION,
                     max_linear_velocity=self.lift_linear_velocity,
+                    position_threshold=self.position_threshold,
+                    orientation_threshold=self.orientation_threshold,
                 ),
             ],
         )
@@ -290,7 +307,7 @@ class PickUpAction(
 
 
 @dataclass
-class GraspingAction(ActionDescription):
+class GraspingAction(ActionDescription, HasTcpGoalThresholds):
     """
     Grasps an object described by the given Object Designator description.
     """
@@ -318,10 +335,19 @@ class GraspingAction(ActionDescription):
 
         return sequential(
             [
-                MoveToolCenterPointMotion(pre_pose, self.arm),
+                MoveToolCenterPointMotion(
+                    pre_pose,
+                    self.arm,
+                    position_threshold=self.position_threshold,
+                    orientation_threshold=self.orientation_threshold,
+                ),
                 MoveGripperMotion(GripperState.OPEN, self.arm),
                 MoveToolCenterPointMotion(
-                    grasp_pose, self.arm, allow_gripper_collision=True
+                    grasp_pose,
+                    self.arm,
+                    allow_gripper_collision=True,
+                    position_threshold=self.position_threshold,
+                    orientation_threshold=self.orientation_threshold,
                 ),
                 MoveGripperMotion(
                     GripperState.CLOSE, self.arm, allow_gripper_collision=True

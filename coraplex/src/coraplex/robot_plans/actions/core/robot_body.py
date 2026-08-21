@@ -20,7 +20,7 @@ from coraplex.datastructures.enums import AxisIdentifier, Arms
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.plans.factories import execute_single, sequential
 from coraplex.robot_plans.actions.base import ActionDescription, DescriptionType
-from coraplex.robot_plans.mixins import HasMaxJointVelocity
+from coraplex.robot_plans.mixins import HasMaxJointVelocity, HasTcpGoalThresholds
 from coraplex.robot_plans.motions.gripper import (
     MoveGripperMotion,
     MoveTCPWaypointsMotion,
@@ -217,7 +217,7 @@ class CarryAction(ActionDescription):
 
 
 @dataclass
-class FollowToolCenterPointPathAction(ActionDescription):
+class FollowToolCenterPointPathAction(ActionDescription, HasTcpGoalThresholds):
     """
     Represents an action to move a robotic arm's TCP (Tool Center Point) along a path of
     poses.
@@ -241,6 +241,8 @@ class FollowToolCenterPointPathAction(ActionDescription):
             target_locations,
             self.arm,
             allow_gripper_collision=True,
+            position_threshold=self.position_threshold,
+            orientation_threshold=self.orientation_threshold,
         )
 
         return execute_single(motion)
@@ -254,7 +256,7 @@ class FollowToolCenterPointPathAction(ActionDescription):
 
 
 @dataclass
-class MoveManipulatorAction(ActionDescription):
+class MoveManipulatorAction(ActionDescription, HasTcpGoalThresholds):
     """
     Move the end_effector to a specific pose.
     """
@@ -281,6 +283,8 @@ class MoveManipulatorAction(ActionDescription):
                 self.target_pose,
                 self.end_effector,
                 self.allow_gripper_collision,
+                position_threshold=self.position_threshold,
+                orientation_threshold=self.orientation_threshold,
             )
         )
 

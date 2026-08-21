@@ -45,8 +45,10 @@ def test_get_bound_variables(immutable_model_world):
 
     bound_variables = pick_action._create_variables()
 
-    assert len(bound_variables) == 11
+    assert len(bound_variables) == 13
     assert list(bound_variables.keys()) == [
+        "position_threshold",
+        "orientation_threshold",
         "grasp_detection_threshold",
         "pre_approach_linear_velocity",
         "final_approach_linear_velocity",
