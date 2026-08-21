@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
-from typing_extensions import ClassVar, List, Type
+from typing_extensions import ClassVar, List, Optional, Type
 
 from coraplex.alternative_motion_mapping import AlternativeMotion
 from coraplex.datastructures.dataclasses import Context
@@ -162,6 +162,20 @@ class RobotDemonstration(ABC):
     Whether collision avoidance is added to every motion state chart of this run.
     """
 
+    real_time_factor: Optional[float] = None
+    """
+    Multiple of real (wall-clock) time to pace this run's tick loop to, forwarded to
+    :class:`~coraplex.execution_environment.ExecutionEnvironment`. ``None`` ticks as fast
+    as the QP solver allows.
+    """
+
+    prediction_horizon: Optional[int] = None
+    """
+    Overrides the prediction horizon for this run, forwarded to
+    :class:`~coraplex.execution_environment.ExecutionEnvironment`. ``None`` leaves it at
+    whatever it already was.
+    """
+
     ros_session: RobotDemonstrationRosSession | None = field(init=False, default=None)
     """
     Session held for the duration of a real run, and ``None`` in simulation.
@@ -249,6 +263,8 @@ class RobotDemonstration(ABC):
             with ExecutionEnvironment(
                 execution_type=self.execution_type,
                 collision_avoidance=self.collision_avoidance,
+                real_time_factor=self.real_time_factor,
+                prediction_horizon=self.prediction_horizon,
             ):
                 plan.perform()
         finally:

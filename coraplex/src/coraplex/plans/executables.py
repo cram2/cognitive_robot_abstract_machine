@@ -118,6 +118,27 @@ class GiskardExecutable(Executable):
     :py:class:`pycram.motion_executor.ExecutionEnvironment`.
     """
 
+    real_time_factor: ClassVar[Optional[float]] = None
+    """
+    Paces :meth:`_execute_simulation`'s tick loop to run no faster than this multiple
+    of real (wall-clock) time, managed by
+    :py:class:`pycram.motion_executor.ExecutionEnvironment`. ``None`` (the default)
+    ticks as fast as the QP solver allows, which is what every existing test relies on;
+    set this only for demos meant to be watched.
+    """
+
+    prediction_horizon: ClassVar[int] = 4
+    """
+    Prediction horizon passed to :meth:`_execute_simulation`'s
+    :class:`~giskardpy.qp.qp_controller_config.QPControllerConfig`, managed by
+    :py:class:`pycram.motion_executor.ExecutionEnvironment`.
+
+    4 (the default, and the minimum the QP formulation accepts) is what every existing
+    robot's tuning assumes. Raise it only for robots with real, tight jerk limits (a
+    short horizon can make reaching their velocity limit mathematically infeasible
+    within it) - raising it for everyone regressed other robots' plans in testing.
+    """
+
     _current_motion_state_chart: MotionStatechart = field(init=False, default=None)
     """
     Currently build motion state chart, internal only for managing the building the msc.
@@ -308,17 +329,30 @@ class GiskardExecutable(Executable):
         Compiles the motion state chart and ticks it in the world of the context until
         it is done.
         """
+        target_frequency = 50
         executor = Ros2Executor(
             context=MotionStatechartContext(
                 world=self.context.world,
                 qp_controller_config=QPControllerConfig(
-                    target_frequency=50, prediction_horizon=4, verbose=False
+                    target_frequency=target_frequency,
+                    prediction_horizon=GiskardExecutable.prediction_horizon,
+                    verbose=False,
                 ),
             ),
             ros_node=self.context.ros_node,
         )
         motion_state_chart = self.motion_state_chart
         executor.compile(motion_state_chart)
+
+        # None (the default) ticks as fast as the QP solver allows; set via
+        # ExecutionEnvironment(real_time_factor=...) to pace ticks to (a multiple of)
+        # real time instead, so a demo plays out at a watchable speed rather than
+        # teleporting through every intermediate joint configuration.
+        tick_period = (
+            1.0 / (target_frequency * GiskardExecutable.real_time_factor)
+            if GiskardExecutable.real_time_factor
+            else None
+        )
 
         counter = 0
         while counter < len(self.motion_mappings) * 2000:
@@ -331,8 +365,13 @@ class GiskardExecutable(Executable):
                 time.sleep(0.01)
                 continue
 
+            tick_start_time = time.time()
             executor.tick()
             counter += 1
+            if tick_period is not None:
+                remaining = tick_period - (time.time() - tick_start_time)
+                if remaining > 0:
+                    time.sleep(remaining)
             if executor.motion_statechart.is_end_motion():
                 break
 

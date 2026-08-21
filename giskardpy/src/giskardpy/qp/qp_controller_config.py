@@ -70,7 +70,7 @@ class QPControllerConfig:
 
     dof_weights: Dict[PrefixedName, DerivativeMap[float]] = field(
         default_factory=lambda: defaultdict(
-            lambda: DerivativeMap(None, 0.01, None, None)
+            lambda: DerivativeMap(None, 0.01, None, 0.01)
         )
     )
     """
