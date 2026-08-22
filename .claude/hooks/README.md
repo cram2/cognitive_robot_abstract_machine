@@ -180,6 +180,13 @@ the narrative that doesn't belong in structured data.
 - Decide where a new piece of work goes → `/add-plan-item <description>`. It runs the shared scope
   check in [`scope-decision.md`](../skills/add-plan-item/scope-decision.md) — the rule all four plan
   skills defer to for "is this new work, or a change to work already in flight?"
+- Choose whether either skill implements on its own, plans first, or asks → `/plan-item-mode
+  <auto|plan|ask> [kickoff|resolve|both]`, or the
+  [`plan_item_mode.py`](./plan_item_mode.py) `resolve|set` it calls. Defaults in
+  [`plan-item-modes.toml`](./plan-item-modes.toml) are `auto` for both; `set` pins a per-user
+  override at `.claude/personal/plan-item-modes.toml` on the notes branch. What each mode obliges
+  the skill to do, and when `auto` still stops to ask →
+  [`execution-modes.md`](../skills/plan-dashboard/execution-modes.md).
 - Recheck one for updates, without rereading it →
   [`plan-updates-since.sh`](./plan-updates-since.sh) `<plan-id> [--since <sha>]`. Every
   `session-start.sh` run stamps the notes-branch commit it just fetched (gitignored, at
