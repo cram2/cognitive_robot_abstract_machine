@@ -1,20 +1,65 @@
+from _thread import LockType
+from dataclasses import dataclass, field
 from threading import Lock
+from typing import Any
 
+from krrood.singleton import SingletonMeta
 from rclpy import create_node
 from rclpy.node import Node
-from typing_extensions import Any
 
 from robokudo.exceptions import RoboKudoROSNodeMissing
 
-_rk_node: Node = None
-"""
-Central RoboKudo ROS node.
-"""
+# %% central node registry
 
-_rk_node_lock = Lock()
-"""
-Lock for safe creation of the central ROS node.
-"""
+
+@dataclass
+class RoboKudoNodeRegistry(metaclass=SingletonMeta):
+    """
+    Own RoboKudo's central ROS node.
+    """
+
+    _node: Node | None = field(default=None, init=False, repr=False)
+    """
+    Currently registered central ROS node.
+    """
+
+    _lock: LockType = field(default_factory=Lock, init=False, repr=False)
+    """
+    Synchronize access to the registered node.
+    """
+
+    def initialize(self, node_name: str, *args: Any, **kwargs: Any) -> Node:
+        """
+        Create and return the central node when none is registered.
+        """
+        with self._lock:
+            if self._node is None:
+                self._node = create_node(node_name, *args, **kwargs)
+            return self._node
+
+    def register(self, node: Node) -> None:
+        """
+        Register an existing node as the central node.
+        """
+        with self._lock:
+            self._node = node
+
+    def get(self) -> Node:
+        """
+        Return the central node.
+        """
+        with self._lock:
+            if self._node is None:
+                raise RoboKudoROSNodeMissing()
+            return self._node
+
+    def clear(self, node: Node | None = None) -> None:
+        """
+        Clear the central node.
+        """
+        with self._lock:
+            if node is None or self._node is node:
+                self._node = None
 
 
 def init_node(node_name: str, *args: Any, **kwargs: Any) -> Node:
@@ -28,11 +73,7 @@ def init_node(node_name: str, *args: Any, **kwargs: Any) -> Node:
     :param node_name: Name of the ROS node
     :return: The newly created ROS node
     """
-    global _rk_node
-    with _rk_node_lock:
-        if _rk_node is None:
-            _rk_node = create_node(node_name, *args, **kwargs)
-    return _rk_node
+    return RoboKudoNodeRegistry().initialize(node_name, *args, **kwargs)
 
 
 def register_node(node: Node) -> None:
@@ -41,21 +82,16 @@ def register_node(node: Node) -> None:
 
     :param node: ROS node to make available through :func:`get_node`.
     """
-    global _rk_node
-    with _rk_node_lock:
-        _rk_node = node
+    RoboKudoNodeRegistry().register(node)
 
 
-def clear_node(node: Node) -> None:
+def clear_node(node: Node | None = None) -> None:
     """
-    Clear the central ROS node if ``node`` is currently registered.
+    Clear the central RoboKudo ROS node.
 
-    :param node: Node whose registration should be removed.
+    :param node: Registered node to clear, or None to force a reset.
     """
-    global _rk_node
-    with _rk_node_lock:
-        if _rk_node is node:
-            _rk_node = None
+    RoboKudoNodeRegistry().clear(node)
 
 
 def get_node() -> Node:
@@ -65,9 +101,4 @@ def get_node() -> Node:
     :return: The central ROS node instance
     :raises RoboKudoROSNodeMissing: If the node has not been initialized yet.
     """
-    global _rk_node
-    with _rk_node_lock:
-        if _rk_node is None:
-            raise RoboKudoROSNodeMissing()
-        else:
-            return _rk_node
+    return RoboKudoNodeRegistry().get()

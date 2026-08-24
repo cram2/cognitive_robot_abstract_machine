@@ -1,3 +1,5 @@
+import pytest
+
 from robokudo.exceptions import RoboKudoROSNodeMissing
 from robokudo.io import ros
 
@@ -10,12 +12,16 @@ class RegisteredNode:
     """
 
 
-def setup_function():
-    ros._rk_node = None
+def test_node_registry_reuses_its_single_instance() -> None:
+    assert ros.RoboKudoNodeRegistry() is ros.RoboKudoNodeRegistry()
 
 
-def teardown_function():
-    ros._rk_node = None
+def setup_function() -> None:
+    ros.clear_node()
+
+
+def teardown_function() -> None:
+    ros.clear_node()
 
 
 def test_register_node_makes_node_available():
@@ -32,7 +38,18 @@ def test_clear_node_removes_registered_node():
 
     ros.clear_node(node)
 
-    assert ros._rk_node is None
+    with pytest.raises(RoboKudoROSNodeMissing):
+        ros.get_node()
+
+
+def test_clear_node_without_node_removes_registered_node():
+    node = RegisteredNode()
+    ros.register_node(node)
+
+    ros.clear_node()
+
+    with pytest.raises(RoboKudoROSNodeMissing):
+        ros.get_node()
 
 
 def test_clear_node_does_not_remove_another_registered_node():
@@ -46,9 +63,5 @@ def test_clear_node_does_not_remove_another_registered_node():
 
 
 def test_get_node_raises_when_no_node_is_registered():
-    try:
+    with pytest.raises(RoboKudoROSNodeMissing):
         ros.get_node()
-    except RoboKudoROSNodeMissing as error:
-        assert "RoboKudo ROS node is not initialized" in str(error)
-    else:
-        raise AssertionError("get_node() must fail without a registered node")
