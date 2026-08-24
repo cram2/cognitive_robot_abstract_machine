@@ -183,16 +183,18 @@ class RobotDemonstration(ABC):
 
     real_time_factor: Optional[float] = None
     """
-    Multiple of real (wall-clock) time to pace this run's tick loop to, forwarded to
-    :class:`~coraplex.execution_environment.ExecutionEnvironment`. ``None`` ticks as fast
-    as the QP solver allows.
+    Multiple of real (wall-clock) time to pace this run's tick loop to, written onto
+    :attr:`~coraplex.datastructures.dataclasses.Context.real_time_factor` in
+    :meth:`run`. ``None`` leaves the context's own default, which ticks as fast as the
+    QP solver allows.
     """
 
     prediction_horizon: Optional[int] = None
     """
-    Overrides the prediction horizon for this run, forwarded to
-    :class:`~coraplex.execution_environment.ExecutionEnvironment`. ``None`` leaves it at
-    whatever it already was.
+    Overrides the prediction horizon for this run, written onto
+    :attr:`~coraplex.datastructures.dataclasses.Context.prediction_horizon` in
+    :meth:`run`. ``None`` leaves the context's own default, which is what every
+    existing robot's tuning assumes.
     """
 
     ros_session: RobotDemonstrationRosSession | None = field(init=False, default=None)
@@ -304,12 +306,15 @@ class RobotDemonstration(ABC):
         try:
             if not self.is_scene_populated(world):
                 self.populate_scene(world)
-            plan = self.build_plan(self.build_context(world))
+            context = self.build_context(world)
+            if self.real_time_factor is not None:
+                context.real_time_factor = self.real_time_factor
+            if self.prediction_horizon is not None:
+                context.prediction_horizon = self.prediction_horizon
+            plan = self.build_plan(context)
             with ExecutionEnvironment(
                 execution_type=self.execution_type,
                 collision_avoidance=self.collision_avoidance,
-                real_time_factor=self.real_time_factor,
-                prediction_horizon=self.prediction_horizon,
             ):
                 plan.perform()
         finally:

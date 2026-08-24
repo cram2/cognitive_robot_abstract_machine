@@ -88,6 +88,26 @@ class Context(PlanEntity):
     Should pre -and postconditions of actions be evaluated in this plan.
     """
 
+    real_time_factor: Optional[float] = field(default=None)
+    """
+    Multiple of real (wall-clock) time
+    :meth:`~coraplex.plans.executables.GiskardExecutable._execute_simulation` paces its
+    tick loop to. ``None`` (the default) ticks as fast as the QP solver allows, which is
+    what every existing test relies on; set this only for demos meant to be watched.
+    """
+
+    prediction_horizon: int = field(default=4)
+    """
+    Prediction horizon passed to the
+    :class:`~giskardpy.qp.qp_controller_config.QPControllerConfig` building this plan's
+    motion state charts.
+
+    4 (the default, and the minimum the QP formulation accepts) is what every existing
+    robot's tuning assumes. Raise it only for robots with real, tight jerk limits (a
+    short horizon can make reaching their velocity limit mathematically infeasible
+    within it) - raising it for everyone regressed other robots' plans in testing.
+    """
+
     query_backend: QueryBackend = field(
         default_factory=EntityQueryLanguageGenerativeBackend
     )

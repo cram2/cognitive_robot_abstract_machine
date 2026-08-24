@@ -68,12 +68,10 @@ def test_park_arms_is_actually_reached(monkeypatch):
     world = demonstration.acquire_world()
     try:
         demonstration.populate_scene(world)
-        plan = demonstration.build_plan(demonstration.build_context(world))
-        with ExecutionEnvironment(
-            execution_type=demonstration.execution_type,
-            real_time_factor=demonstration.real_time_factor,
-            prediction_horizon=demonstration.prediction_horizon,
-        ):
+        context = demonstration.build_context(world)
+        context.prediction_horizon = demonstration.prediction_horizon
+        plan = demonstration.build_plan(context)
+        with ExecutionEnvironment(execution_type=demonstration.execution_type):
             plan.perform()
 
         panda = world.get_semantic_annotations_by_type(Panda)[0]
