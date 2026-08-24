@@ -9,9 +9,7 @@ perception pipeline needed.
 from __future__ import annotations
 
 import logging
-import os
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 logging.basicConfig(level=logging.DEBUG)
@@ -25,18 +23,16 @@ from coraplex.demonstrations import RobotDemonstration
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.adapters.mjcf import MJCFParser
-from semantic_digital_twin.adapters.multi_sim import MujocoBody, MujocoSim
+from semantic_digital_twin.adapters.multi_sim import MujocoBody
+from semantic_digital_twin.api import WorldSpecification
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.panda import Panda
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    Connection6DoF,
-    FixedConnection,
-)
+from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Color, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -61,22 +57,19 @@ class PandaSimpleDemo(RobotDemonstration):
 
     ros_node_name: ClassVar[str] = "panda_demo_node"
 
-    multi_sim: MujocoSim | None = field(init=False, default=None)
-    """
-    The MuJoCo simulation backing this run, started once the scene is fully populated.
-    """
-
     def build_simulated_world(self) -> World:
         """
-        Parse the Panda MJCF scene from the ``iai_franka_panda_description`` package.
+        Parse the robot's MJCF scene from the ``iai_franka_panda_description`` package.
+
+        :return: The parsed world, annotated with :attr:`used_robot`.
         """
         scene_path = (
             Path(get_package_share_directory("iai_franka_panda_description"))
             / "mjcf"
             / "panda.xml"
         )
-        world = MJCFParser(str(scene_path)).parse()
-        Panda.from_world(world)
+        world = WorldSpecification.from_mjcf(str(scene_path)).to_domain_object()
+        self.used_robot.from_world(world)
         return world
 
     def is_scene_populated(self, world: World) -> bool:
@@ -88,35 +81,23 @@ class PandaSimpleDemo(RobotDemonstration):
 
         The simulation is built from the world's state at construction time, so it can
         only start once every body the scene needs is already in the world.
-        """
-        with world.modify_world():
-            ground_plane = Body(name=PrefixedName("ground_plane"))
-            ground_plane_geometry = ShapeCollection(
-                [
-                    Box(
-                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                            reference_frame=ground_plane
-                        ),
-                        scale=Scale(2.0, 2.0, 0.02),
-                        color=Color(0.6, 0.6, 0.6, 1.0),
-                    )
-                ],
-                reference_frame=ground_plane,
-            )
-            ground_plane.collision, ground_plane.visual = (
-                ground_plane_geometry,
-                ground_plane_geometry,
-            )
-            world.add_connection(
-                FixedConnection(
-                    parent=world.root,
-                    child=ground_plane,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        z=-0.01, reference_frame=world.root
-                    ),
-                )
-            )
 
+        :param world: The world to add the ground plane and cubes to, modified in
+            place.
+        """
+        Floor.get_annotation_specification(
+            "ground_plane",
+            Floor.get_default_root_kinematic_structure_entity_specification(
+                "ground_plane", scale=Scale(2.0, 2.0, 0.02)
+            ),
+        ).spawn(
+            world,
+            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                z=-0.01, reference_frame=world.root
+            ),
+        )
+
+        with world.modify_world():
             cube_bottom = Body(name=PrefixedName("cube_bottom"))
             cube_bottom_geometry = ShapeCollection(
                 [
@@ -180,9 +161,7 @@ class PandaSimpleDemo(RobotDemonstration):
                 MujocoBody(gravitation_compensation_factor=1.0)
             )
 
-        headless = os.environ.get("CI", "false").lower() == "true"
-        self.multi_sim = MujocoSim(world=world, headless=headless, step_size=1e-3)
-        self.multi_sim.start_simulation()
+        self.start_mujoco_simulation(world)
 
     def build_context(self, world: World) -> Context:
         return Context(
@@ -193,16 +172,6 @@ class PandaSimpleDemo(RobotDemonstration):
 
     def build_plan(self, context: Context) -> PlanNode:
         return sequential([ParkArmsAction(Arms.BOTH)], context=context)
-
-    def tear_down(self) -> None:
-        """
-        Let the simulation settle for a moment before stopping it, so a non-headless
-        viewer sees the final pose rather than the window closing mid-motion.
-        """
-        if self.multi_sim is not None:
-            time.sleep(2.0)
-            self.multi_sim.stop_simulation()
-        super().tear_down()
 
 
 def main(execution_type: ExecutionType = ExecutionType.SIMULATED) -> None:

@@ -183,7 +183,7 @@ class Panda(AbstractRobot, HasOneArm[PandaArm]):
         The finger joints are left unset -- Franka does not publish an acceleration
         limit for the gripper.
         """
-        accel_limits = {
+        acceleration_limits = {
             "joint1": 15.0,
             "joint2": 7.5,
             "joint3": 10.0,
@@ -197,7 +197,7 @@ class Panda(AbstractRobot, HasOneArm[PandaArm]):
                 lambda: None,
                 {
                     self._world.get_connection_by_name(name): limit
-                    for name, limit in accel_limits.items()
+                    for name, limit in acceleration_limits.items()
                 },
             )
         )

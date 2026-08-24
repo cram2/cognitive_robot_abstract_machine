@@ -2859,10 +2859,14 @@ class MujocoSynchronizer(MultiSimSynchronizer):
             return None
         return mj_model.jnt_qposadr[joint_id]
 
-    def _resolve_ctrl_address(self, connection: Connection) -> Optional[int]:
+    def _resolve_control_address(self, connection: Connection) -> Optional[int]:
         """
-        Resolve the ``ctrl`` address of the MuJoCo actuator driving
+        Resolve the address of the MuJoCo actuator's ``ctrl`` array driving
         ``connection``, or ``None`` if it has none.
+
+        :param connection: The connection to resolve the driving actuator for.
+        :return: The actuator's ``ctrl`` array address, or ``None`` if
+            ``connection`` has no driving actuator.
         """
         mj_model = self.simulator._mj_model
         actuator_id = mujoco.mj_name2id(
@@ -3031,15 +3035,15 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         self,
         connection: ActiveConnection1DOF,
         qpos_address: int,
-        ctrl_address: Optional[int],
+        control_address: Optional[int],
         positions: numpy.ndarray,
         previous_positions: numpy.ndarray,
         state_index: Dict[Any, int],
     ) -> None:
         """
         Push the 1DoF world state for ``connection`` into the MuJoCo qpos slot
-        at ``qpos_adr``, and into its actuator's ``ctrl`` setpoint at
-        ``ctrl_address`` if it has one. No-op if the DoF value is unchanged.
+        at ``qpos_address``, and into its actuator's ``ctrl`` setpoint at
+        ``control_address`` if it has one. No-op if the DoF value is unchanged.
 
         Without the ``ctrl`` write, a position-servo actuator keeps pulling
         its joint back toward the stale setpoint left over from the last time
@@ -3050,8 +3054,8 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         if positions[idx] == previous_positions[idx]:
             return
         self.simulator._mj_data.qpos[qpos_address] = positions[idx]
-        if ctrl_address is not None:
-            self.simulator._mj_data.ctrl[ctrl_address] = positions[idx]
+        if control_address is not None:
+            self.simulator._mj_data.ctrl[control_address] = positions[idx]
 
     def _on_state_change(self) -> None:
         """
@@ -3090,7 +3094,7 @@ class MujocoSynchronizer(MultiSimSynchronizer):
                 self._write_1dof_to_qpos(
                     connection,
                     qpos_adr,
-                    self._resolve_ctrl_address(connection),
+                    self._resolve_control_address(connection),
                     positions,
                     previous_positions,
                     state_index,

@@ -9,7 +9,9 @@ the right environment -- live here, so a demonstration only writes its own scene
 
 from __future__ import annotations
 
+import os
 import threading
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -23,6 +25,7 @@ from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.execution_environment import ExecutionEnvironment
 from coraplex.plans.plan_node import PlanNode
+from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -128,6 +131,22 @@ class RobotDemonstrationRosSession:
         self.stop()
 
 
+# %% mujoco simulation
+
+MUJOCO_STEP_SIZE_SECONDS = 1e-3
+"""
+Default physics step size for a MuJoCo simulation started via
+:meth:`RobotDemonstration.start_mujoco_simulation`.
+"""
+
+MUJOCO_SETTLE_SECONDS = 2.0
+"""
+How long :meth:`RobotDemonstration.tear_down` lets a running MuJoCo simulation continue
+before stopping it, so a non-headless viewer sees the final pose rather than the window
+closing mid-motion.
+"""
+
+
 # %% demonstrations
 
 
@@ -179,6 +198,13 @@ class RobotDemonstration(ABC):
     ros_session: RobotDemonstrationRosSession | None = field(init=False, default=None)
     """
     Session held for the duration of a real run, and ``None`` in simulation.
+    """
+
+    multi_sim: MujocoSim | None = field(init=False, default=None)
+    """
+    The MuJoCo simulation started via :meth:`start_mujoco_simulation`, stepping this
+    run's world once the scene is fully populated. ``None`` for a demonstration that
+    never starts one.
     """
 
     @abstractmethod
@@ -249,6 +275,25 @@ class RobotDemonstration(ABC):
         WorldSynchronizer(_world=world, node=self.ros_session.node)
         return world
 
+    def start_mujoco_simulation(
+        self, world: World, step_size: float = MUJOCO_STEP_SIZE_SECONDS
+    ) -> MujocoSim:
+        """
+        Start a local MuJoCo simulation stepping ``world``'s physics.
+
+        Call this only once every body the scene needs is already in ``world`` -- the
+        simulation is built from the world's state at construction time. Runs headless
+        when the ``CI`` environment variable is set, so it needs no display there.
+
+        :param world: The world to simulate.
+        :param step_size: The physics step size, in seconds.
+        :return: The started simulation.
+        """
+        headless = os.environ.get("CI", "false").lower() == "true"
+        self.multi_sim = MujocoSim(world=world, headless=headless, step_size=step_size)
+        self.multi_sim.start_simulation()
+        return self.multi_sim
+
     def run(self) -> World:
         """
         Acquire a world, populate it if needed, and perform the plan against it.
@@ -273,12 +318,20 @@ class RobotDemonstration(ABC):
 
     def tear_down(self) -> None:
         """
-        Release the ROS session if this demonstration started the ROS context.
+        Stop the MuJoCo simulation if one was started, then release the ROS session if
+        this demonstration started the ROS context.
 
-        A session running inside a context somebody else owns is left alone: that owner
+        The simulation, if any, is left running for a moment first, so a non-headless
+        viewer sees the final pose rather than the window closing mid-motion. A ROS
+        session running inside a context somebody else owns is left alone: that owner
         decides when its nodes go away, and destroying this one early can drop world
         modifications that have not reached the controller yet.
         """
+        if self.multi_sim is not None:
+            time.sleep(MUJOCO_SETTLE_SECONDS)
+            self.multi_sim.stop_simulation()
+            self.multi_sim = None
+
         if self.ros_session is None or not self.ros_session.owns_context:
             return
         self.ros_session.stop()
