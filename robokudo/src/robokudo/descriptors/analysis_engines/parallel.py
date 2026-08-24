@@ -84,8 +84,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         seq = Pipeline("RWPipeline")
-        # parallel = py_trees.composites.Parallel()
-        parallel = Parallel(policy=ParallelPolicy.SuccessOnAll(synchronise=True))
+        parallel = Parallel(
+            name="Parallel", policy=ParallelPolicy.SuccessOnAll(synchronise=True)
+        )
         parallel.add_children(
             [
                 # py_trees.behaviours.Count(name="Annotator A", fail_until=-1, running_until=30, success_until=1000),

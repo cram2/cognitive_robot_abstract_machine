@@ -10,6 +10,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.pipeline import Pipeline
 from robokudo.tree_components.task_scheduler import IterativeTaskScheduler
+from robokudo.utils.tree import add_children_to_parent
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -33,19 +34,21 @@ class AnalysisEngine(AnalysisEngineInterface):
         #
         # Please note that the same instance of annotators might be used in multiple trees.
         # The scheduler/planning will take care of maintaining the correct relationships for dynamic trees.
-        tree1 = Sequence("Tree1")
-        tree2 = Sequence("Tree1")
-        tree1.add_children(
+        tree1 = Sequence("Tree1", memory=True)
+        tree2 = Sequence("Tree2", memory=True)
+        add_children_to_parent(
+            tree1,
             [collection_reader, image_preprocessor, slow1, slow2],
         )
-        tree2.add_children(
+        add_children_to_parent(
+            tree2,
             [collection_reader, image_preprocessor, slow1],
         )
 
         # Pipeline creation
         seq = Pipeline("Pipeline")
         # The Job Scheduler needs to be the first child of a Sequence
-        task_scheduling = Sequence("Task Scheduling")
+        task_scheduling = Sequence("Task Scheduling", memory=True)
         task_scheduling.add_child(IterativeTaskScheduler(tree_list=[tree1, tree2]))
 
         seq.add_children(
