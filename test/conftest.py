@@ -13,6 +13,8 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 
+from .pytest_environment import PytestEnvironmentVariable
+
 try:
     from semantic_digital_twin.robots.garmi import Garmi
 except ImportError:
@@ -145,7 +147,7 @@ The structure of fixtures in this conftest:
 
 
 def pytest_configure(config):
-    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    worker = os.environ.get(PytestEnvironmentVariable.XDIST_WORKER)
 
     if worker:
         worker_num = int(worker.removeprefix("gw"))

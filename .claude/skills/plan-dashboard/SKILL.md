@@ -90,7 +90,7 @@ Also read the generated URL cache, if present (used in step 3, absent on a
 plan's first-ever publish — not an error):
 
 ```bash
-git show "FETCH_HEAD:.claude/personal/plans/_generated/dashboard-urls.yaml" 2>/dev/null
+git show "FETCH_HEAD:${DASHBOARD_URL_CACHE_PATH}" 2>/dev/null
 ```
 
 If a plan has a `tracking_issue`, resolve its `html_url` (via
@@ -203,33 +203,61 @@ publishing for the first time and want to sanity-check the visual design —
 skip this on a routine re-publish of an already-designed dashboard.
 
 Look up this plan's (or, in index mode, the index's own — use the fixed key
-`_index`) existing URL from the `dashboard-urls.yaml` you read in step 1.
+`_index`) existing URL from the cache you read in step 1.
 Call `Artifact` with that as `url:` if found (updates the existing page in
 place); omit `url` if this is a first-ever publish (mints a new one).
+
+**Never skip the `url:` when the cache has one.** Publishing without it mints
+a second artifact for the same plan, and the duplicate cannot be deleted from
+a session — it can only stop being referenced.
 
 Favicon: keep a single stable emoji across every redeploy of the **same**
 artifact identity. Suggested: 📋 for a per-plan dashboard, 🗂️ for the master
 index — pick your own if these clash with something already published, but
 keep whichever you pick fixed for that artifact going forward.
 
-If this was a first publish, or the returned URL differs from the cache,
-merge your updated url(s) into the existing `dashboard-urls.yaml` content
-(write the result to a scratch file, e.g. `/tmp/updated-dashboard-urls.yaml`),
-then push it back with the same helper `refresh_dashboard.sh` uses
-internally for the manifest correction:
+Then record the URL — **never by hand-writing the cache YAML yourself.** Every
+bulk refresh in this cache's history did exactly that and wrote a URL naming
+no artifact the account had ever published; the next run then passed that dead
+URL as `url:`, could not update a page that wasn't there, minted a fresh one,
+and left the plan with a duplicate dashboard. Writing this file is
+deterministic, so it belongs in the script, not in your recollection of what
+`Artifact` just returned.
+
+Call `Artifact` with `action: "list"` and write its rows to a scratch JSON
+file as `[{"title": ..., "url": ..., "updated": ...}, ...]` — `updated` is the
+date each row already carries, and is what separates two artifacts sharing a
+title. Then:
+
+```bash
+git show "FETCH_HEAD:${DASHBOARD_URL_CACHE_PATH}" > /tmp/dashboard-urls.yaml
+python3 "${RECORD_DASHBOARD_URL_SCRIPT}" \
+  --key <plan-id or _index> \
+  --expected-title "<the plan's own title: from plan.yaml, or the index page's title>" \
+  --listing /tmp/artifact_listing.json \
+  --cache /tmp/dashboard-urls.yaml \
+  --output /tmp/updated-dashboard-urls.yaml
+```
+
+It finds the artifact by title and records *that* URL, so no UUID ever passes
+through you. When several artifacts share the title — a duplicate already
+exists — it takes the most recently updated one, which is the page that was
+just published; `--url` overrides that and must name one of them. It exits
+non-zero only when the title matches no artifact at all, meaning nothing was
+published under it. Report a non-zero exit instead of working around it.
+
+Push the result back only when it says `"changed": true`, with the same helper
+`refresh_dashboard.sh` uses internally for the manifest correction:
 
 ```bash
 bash "${WRITE_PERSONAL_NOTES_FILE_SCRIPT}" \
   --source /tmp/updated-dashboard-urls.yaml \
-  --destination "${PLANS_DIR}/_generated/dashboard-urls.yaml" \
+  --destination "${DASHBOARD_URL_CACHE_PATH}" \
   --message "Record dashboard URL for <plan-id or _index>"
 ```
 
 It does its work in a scratch worktree and never touches the current branch
-or working tree. Skip this whole step if the URL you already had matches
-what `Artifact` returned — nothing changed, nothing to push (the script is
-a no-op in that case anyway, but there's no reason to write the scratch
-file at all).
+or working tree.
 
 ## 4. Report back
 

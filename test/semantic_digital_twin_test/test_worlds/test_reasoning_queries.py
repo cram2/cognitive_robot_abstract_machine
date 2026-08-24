@@ -15,6 +15,11 @@ from semantic_digital_twin.reasoning.queries import (
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    PrismaticConnection,
+    RevoluteConnection,
+)
 from semantic_digital_twin.world_description.geometry import Color
 
 
@@ -241,3 +246,51 @@ def test_sort_annotations_by_volume(kitchen_environment_fixture):
     assert sort_annotations_by_volume(
         semantic_annotations_on_surfaces([table2], kitchen_environment_fixture)
     ) == [lettuce, carrot]
+
+
+def test_world_reasoner_adds_default_mechanical_joints_to_urdf_bodies_with_direct_active_connections():
+    """
+    Doors and drawers loaded from a URDF are commonly wired straight to their
+    cabinet with an active connection and no separate joint body, e.g.
+    ``iai_fridge_main`` -> (revolute) -> ``iai_fridge_door`` in ``coraplex``'s
+    ``kitchen-small.urdf``. The world reasoner must still give such doors a Hinge
+    and such drawers a Slider, splicing them in as:
+    cabinet -> active connection -> joint -> fixed -> door/drawer.
+    """
+    coraplex_worlds_directory = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "..",
+        "..",
+        "coraplex",
+        "resources",
+        "worlds",
+    )
+    world = URDFParser.from_file(
+        file_path=os.path.join(coraplex_worlds_directory, "kitchen-small.urdf")
+    ).parse()
+    reasoner = WorldReasoner(world)
+
+    reasoner.infer_semantic_annotations()
+
+    doors = world.get_semantic_annotations_by_type(Door)
+    assert doors
+    for door in doors:
+        hinge = door.mechanical_joint
+        assert isinstance(hinge, Hinge)
+        assert door.root.parent_kinematic_structure_entity == hinge.root
+        assert isinstance(door.root.parent_connection, FixedConnection)
+        assert isinstance(hinge.root.parent_connection, RevoluteConnection)
+
+    drawers = world.get_semantic_annotations_by_type(Drawer)
+    assert drawers
+    for drawer in drawers:
+        slider = drawer.mechanical_joint
+        assert isinstance(slider, Slider)
+        assert drawer.root.parent_kinematic_structure_entity == slider.root
+        assert isinstance(drawer.root.parent_connection, FixedConnection)
+        assert isinstance(slider.root.parent_connection, PrismaticConnection)
+
+    # Collapsing each door's/drawer's original direct connection must not leave its
+    # degree of freedom orphaned.
+    assert world.validate()

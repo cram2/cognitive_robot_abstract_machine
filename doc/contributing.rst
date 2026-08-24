@@ -12,14 +12,11 @@ install pre-commit hooks:
   pre-commit install
 
 ``ormatic_interface.py`` files are generated and never reviewed, so the repository
-tracks them as empty placeholders; the pre-commit hooks above keep any commit of
-them empty automatically. Run ``python scripts/regenerate_all_orm.py`` whenever you
-need a real one locally (for example for database work) -- CI regenerates them the
-same way for tests. That script also marks the files it regenerates with git's
-skip-worktree bit, so git ignores your local, real content and never proposes to
-stage or commit it -- even with ``git add -A``. Run
-``python scripts/protect_generated_orm_interfaces.py`` on its own if you want that
-protection without regenerating (for example right after cloning).
+ignores them rather than tracking them: git never proposes them for staging -- not
+even with ``git add -A`` -- and never has to overwrite your generated copy to switch
+branches. Run ``python scripts/regenerate_all_orm.py`` to build them, which a fresh
+clone needs before it can persist anything and a changed mapped datastructure needs
+again; CI generates them the same way for its tests.
 
 If you have any questions or feedback, consider submitting a `GitHub
 Issue <https://github.com/cram2/cognitive_robot_abstract_machine/issues>`__.

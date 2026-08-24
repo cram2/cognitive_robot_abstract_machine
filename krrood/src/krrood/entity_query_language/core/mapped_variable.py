@@ -8,12 +8,14 @@ expressions.
 from __future__ import annotations
 
 import operator
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Self
 
 from typing_extensions import (
+    TYPE_CHECKING,
     Iterable,
     Any,
     Type,
@@ -32,7 +34,11 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     UnificationDict,
 )
-from krrood.entity_query_language.exceptions import SymbolicDunderAccessError
+from krrood.entity_query_language.exceptions import (
+    MultipleValuesAlongAccessPath,
+    ReadOnlyMapping,
+    SymbolicDunderAccessError,
+)
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.math_operations import MathOperator
 from krrood.entity_query_language.utils import (
@@ -41,6 +47,11 @@ from krrood.entity_query_language.utils import (
     convert_args_and_kwargs_into_hashable_key,
 )
 from krrood.symbol_graph.helpers import get_field_type_endpoint
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.operators.arithmetic import (
+        ArithmeticOperation,
+    )
 
 
 @dataclass(eq=False, repr=False)
@@ -96,7 +107,7 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
         all_kwargs = merge_args_and_kwargs(type_, args, kwargs, ignore_first=True)
         return convert_args_and_kwargs_into_hashable_key(all_kwargs)
 
-    def __getattr__(self, name: str) -> CanBehaveLikeAVariable[T]:
+    def __getattr__(self, name: str) -> Attribute[T]:
         # Dunder names are never symbolic attribute access. Mapping them would (a) let copy/pickle
         # and other machinery that probes optional dunder hooks recurse into endless variable
         # creation, and (b) blur language semantics. Access a dunder-named member symbolically via a
@@ -110,29 +121,35 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
         """
         Surface the wrapped value type's attributes for interactive completion.
 
-        ``__getattr__`` already makes every non-dunder name a valid (symbolic) attribute, but
-        completion engines list ``__dir__`` only — which would otherwise show just this
-        expression's own members. We union those with the public attributes of the value type so
-        e.g. ``case_variable.<tab>`` offers the case type's fields.
+        ``__getattr__`` already makes every non-dunder name a valid (symbolic)
+        attribute, but completion engines list ``__dir__`` only — which would otherwise
+        show just this expression's own members. We union those with the public
+        attributes of the value type so e.g. ``case_variable.<tab>`` offers the case
+        type's fields.
 
-        ``_type_`` is read from ``__dict__`` directly (never ``getattr``, which routes through
-        ``__getattr__`` and would return a :class:`MappedVariable` instead of ``None``). This does
-        not affect attribute resolution in any way.
+        ``_type_`` is read from ``__dict__`` directly (never ``getattr``, which routes
+        through ``__getattr__`` and would return a :class:`MappedVariable` instead of
+        ``None``). This does not affect attribute resolution in any way.
         """
         names = set(super().__dir__())
         type_ = self.__dict__.get("_type_")
         if isinstance(type_, type):
             names.update(
-                name for name in dir(type_) if not (name.startswith("__") and name.endswith("__"))
+                name
+                for name in dir(type_)
+                if not (name.startswith("__") and name.endswith("__"))
             )
             for klass in type_.__mro__:
                 names.update(getattr(klass, "__annotations__", {}).keys())
         return sorted(names)
 
-    def __getitem__(self, key) -> CanBehaveLikeAVariable[T]:
-        return self._get_mapped_variable_(Index, key)
+    def __getitem__(self, key: Any) -> Index[T]:
+        indexing = (
+            IndexByExpression if isinstance(key, SymbolicExpression) else IndexByValue
+        )
+        return self._get_mapped_variable_(indexing, key)
 
-    def __call__(self, *args, **kwargs) -> CanBehaveLikeAVariable[T]:
+    def __call__(self, *args, **kwargs) -> Call[T]:
         return self._get_mapped_variable_(Call, args, kwargs)
 
     def __eq__(self, other) -> Comparator:
@@ -155,7 +172,7 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
 
     def _arithmetic_(
         self, other: Any, math_operator: MathOperator
-    ) -> CanBehaveLikeAVariable[T]:
+    ) -> ArithmeticOperation:
         """
         Build a binary arithmetic operation with this variable as the left operand.
 
@@ -171,7 +188,7 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
 
     def _reflected_arithmetic_(
         self, other: Any, math_operator: MathOperator
-    ) -> CanBehaveLikeAVariable[T]:
+    ) -> ArithmeticOperation:
         """
         Build a binary arithmetic operation with this variable as the right operand.
 
@@ -189,49 +206,49 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
 
         return ArithmeticOperation(other, self, math_operator)
 
-    def __add__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __add__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other, MathOperator.ADD)
 
-    def __radd__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __radd__(self, other) -> ArithmeticOperation:
         return self._reflected_arithmetic_(other, MathOperator.ADD)
 
-    def __sub__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __sub__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other, MathOperator.SUBTRACT)
 
-    def __rsub__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __rsub__(self, other) -> ArithmeticOperation:
         return self._reflected_arithmetic_(other, MathOperator.SUBTRACT)
 
-    def __mul__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __mul__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other, MathOperator.MULTIPLY)
 
-    def __rmul__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __rmul__(self, other) -> ArithmeticOperation:
         return self._reflected_arithmetic_(other, MathOperator.MULTIPLY)
 
-    def __truediv__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __truediv__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other, MathOperator.DIVIDE)
 
-    def __rtruediv__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __rtruediv__(self, other) -> ArithmeticOperation:
         return self._reflected_arithmetic_(other, MathOperator.DIVIDE)
 
-    def __floordiv__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __floordiv__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other, MathOperator.FLOOR_DIVIDE)
 
-    def __rfloordiv__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __rfloordiv__(self, other) -> ArithmeticOperation:
         return self._reflected_arithmetic_(other, MathOperator.FLOOR_DIVIDE)
 
-    def __mod__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __mod__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other, MathOperator.MODULO)
 
-    def __rmod__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __rmod__(self, other) -> ArithmeticOperation:
         return self._reflected_arithmetic_(other, MathOperator.MODULO)
 
-    def __pow__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __pow__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other, MathOperator.POWER)
 
-    def __rpow__(self, other) -> CanBehaveLikeAVariable[T]:
+    def __rpow__(self, other) -> ArithmeticOperation:
         return self._reflected_arithmetic_(other, MathOperator.POWER)
 
-    def __neg__(self) -> CanBehaveLikeAVariable[T]:
+    def __neg__(self) -> ArithmeticOperation:
         from krrood.entity_query_language.operators.arithmetic import (
             UnaryArithmeticOperation,
         )
@@ -251,6 +268,16 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
     _child_: CanBehaveLikeAVariable[T]
     """
     The child expression to apply the mapping to.
+    """
+
+    _rerooted_chains_: Dict[uuid.UUID, MappedVariable] = field(
+        init=False, default_factory=dict
+    )
+    """
+    This chain rebuilt on other roots, keyed by the identifier of each new root.
+
+    Roots are identified rather than held, because comparing two symbolic expressions
+    builds a comparison instead of answering whether they are the same.
     """
 
     def __post_init__(self):
@@ -289,7 +316,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
     @abstractmethod
     def _apply_mapping_(
         self, value: Any, sources: Optional[OperationResult] = None
-    ) -> Iterable[Any]:
+    ) -> Iterable[T]:
         """
         Apply the mapping to a value from the child variable.
 
@@ -297,6 +324,45 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         :param sources: The bindings from the evaluation context.
         """
         pass
+
+    @abstractmethod
+    def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
+        """
+        :param child: The expression to apply this mapping to.
+        :return: This mapping applied to ``child``.
+        """
+
+    def _reroot_on_(
+        self, root: CanBehaveLikeAVariable, replaced: SymbolicExpression
+    ) -> CanBehaveLikeAVariable:
+        """
+        Rebuild this mapping chain on top of another expression.
+
+        Each mapping is rebuilt once per root, so chains that share a mapping still
+        share it afterwards and keep ranging over the same values.
+
+        .. note::
+            The root alone identifies a rebuild: ``replaced`` is either this chain's
+            own base or a step within it, both fixed once the chain exists.
+
+        :param root: The expression to place at the base of the rebuilt chain.
+        :param replaced: The expression ``root`` takes the place of, which is this
+            chain's own base unless a step within the chain names the new root.
+        :return: The mappings applied after ``replaced``, in the same order, on top of
+            ``root``.
+        """
+        if self._id_ == replaced._id_:
+            return root
+        if root._id_ in self._rerooted_chains_:
+            return self._rerooted_chains_[root._id_]
+        if isinstance(self._child_, MappedVariable):
+            rebuilt_child = self._child_._reroot_on_(root, replaced)
+        elif self._child_._id_ == replaced._id_:
+            rebuilt_child = root
+        else:
+            rebuilt_child = self._child_
+        self._rerooted_chains_[root._id_] = self._rebuild_on_(rebuilt_child)
+        return self._rerooted_chains_[root._id_]
 
     @property
     def _access_path_(self) -> List[Self]:
@@ -311,7 +377,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         return result[:-1][::-1]
 
     @property
-    def _chain_root_(self) -> Any:
+    def _chain_root_(self) -> CanBehaveLikeAVariable:
         """
         :return: The first non-:class:`MappedVariable` expression at the base of this
             mapping chain (e.g. the ``robot`` variable behind ``robot.arm.joint``).
@@ -336,6 +402,8 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         """
         current = instance
         for domain_mapping in self._access_path_[:-1]:
+            if not isinstance(domain_mapping, SingleValueMapping):
+                raise MultipleValuesAlongAccessPath(self, domain_mapping)
             current = next(domain_mapping._apply_mapping_(current))
 
         self._set_child_instance_value_(current, value)
@@ -346,21 +414,42 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
         This modifies instance in-place.
 
+        Two mappings name where their value is kept and so override this: an
+        :class:`Attribute` names a field, and an :class:`IndexByValue` names the key an
+        element is stored under. The other three do not, and a value cannot be written
+        through any of them: a :class:`Call` computes its value, an
+        :class:`IndexByExpression` names which elements to reach rather than where one
+        of them lives, and a :class:`FlatVariable` reaches every element without naming
+        any.
+
+        Naming such a place is a separate question from how many values a mapping
+        reaches. A call reaches exactly one value and still cannot be written through,
+        because it computes that value rather than reading it from somewhere.
+
         :param instance: The instance to be updated.
         :param value: The value to set.
+        :raises ReadOnlyMapping: If this mapping does not name where its value is kept.
         """
-        raise NotImplementedError
+        raise ReadOnlyMapping(self)
 
-    def apply_mapping_on_external_root(self, instance: Any) -> Any:
+    def apply_mapping_on_external_root(self, instance: Any) -> T:
         """
-        Apply the mapping on the given instance by following the access path and
-        applying the mapping at each step.
+        Follow this chain from a value outside query evaluation, applying each mapping
+        along the access path in turn.
 
-        :param instance: The instance to apply the mapping on.
-        :return: An iterable of the mapped values.
+        .. warning::
+            This is only for use cases where symbolic access is needed outside of EQL's
+            query evaluation.
+
+        :param instance: The value to follow the chain from.
+        :return: The value the chain leads to.
+        :raises MultipleValuesAlongAccessPath: If a step reaches more than one value,
+            leaving the rest of the chain without one value to follow.
         """
         current = instance
         for domain_mapping in self._access_path_:
+            if not isinstance(domain_mapping, SingleValueMapping):
+                raise MultipleValuesAlongAccessPath(self, domain_mapping)
             current = next(domain_mapping._apply_mapping_(current))
         return current
 
@@ -378,7 +467,23 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
 
 @dataclass(eq=False, repr=False)
-class Attribute(MappedVariable[T]):
+class SingleValueMapping(MappedVariable[T], ABC):
+    """
+    A mapping that reaches a single value, fully determined by the expression it is
+    applied to and its own arguments.
+
+    Two occurrences of one therefore denote the same value and share the node
+    :meth:`CanBehaveLikeAVariable._get_mapped_variable_` gives them.
+
+    ..note::
+        The guarantee is *at most* one value. An attribute reaches no value when the
+        instance does not have that attribute, and an index by a value reaches no value
+        when nothing is stored under that key.
+    """
+
+
+@dataclass(eq=False, repr=False)
+class Attribute(SingleValueMapping[T]):
     """
     A symbolic attribute that can be used to access attributes of symbolic variables.
 
@@ -406,9 +511,14 @@ class Attribute(MappedVariable[T]):
 
     def _apply_mapping_(
         self, value: Any, sources: Optional[OperationResult] = None
-    ) -> Iterable[Any]:
+    ) -> Iterable[T]:
         if hasattr(value, self._attribute_name_):
             yield getattr(value, self._attribute_name_)
+
+    def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(
+            Attribute, _attribute_name_=self._attribute_name_
+        )
 
     @property
     def _name_(self):
@@ -419,10 +529,12 @@ class Attribute(MappedVariable[T]):
 
 
 @dataclass(eq=False, repr=False)
-class Index(MappedVariable):
+class Index(MappedVariable[T], ABC):
     """
-    A variable that was created through collection indexing by a certain key on its
-    child variable.
+    A variable created by indexing its child by a key.
+
+    What the key is decides how many values the indexing reaches, so the two kinds are
+    separate: see :class:`IndexByValue` and :class:`IndexByExpression`.
     """
 
     _key_: Any
@@ -430,31 +542,61 @@ class Index(MappedVariable):
     The key to index with.
     """
 
-    def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
-    ) -> Iterable[Any]:
-        try:
-            # Need to verify that this solution is general and not a hack.
-            if isinstance(self._key_, SymbolicExpression) and not (
-                isinstance(value, UnificationDict) and self._key_ in value
-            ):
-                for key in self._key_._evaluate_(sources):
-                    yield value[key.value]
-            else:
-                yield value[self._key_]
-        except IndexError:  # break iterator if the key does not exist
-            return
-
     @property
     def _name_(self):
         return f"{self._child_._var_._name_}[{repr(self._key_)}]"
+
+
+@dataclass(eq=False, repr=False)
+class IndexByValue(Index[T], SingleValueMapping[T]):
+    """
+    Indexing by a key that is a plain value, which reaches the one element stored under
+    it.
+    """
+
+    def _apply_mapping_(
+        self, value: Any, sources: Optional[OperationResult] = None
+    ) -> Iterable[T]:
+        try:
+            yield value[self._key_]
+        except IndexError:  # break iterator if the key does not exist
+            return
+
+    def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(IndexByValue, _key_=self._key_)
 
     def _set_child_instance_value_(self, instance: Any, value: Any):
         instance[self._key_] = value
 
 
 @dataclass(eq=False, repr=False)
-class Call(MappedVariable):
+class IndexByExpression(Index[T]):
+    """
+    Indexing by a key that is itself an expression, which reaches one element per value
+    that expression takes.
+
+    A row of a query is the exception: it is keyed by the expressions it binds, so
+    indexing it by one of them reaches the single value bound to it.
+    """
+
+    def _apply_mapping_(
+        self, value: Any, sources: Optional[OperationResult] = None
+    ) -> Iterable[T]:
+        try:
+            if isinstance(value, UnificationDict) and self._key_ in value:
+                yield value[self._key_]
+                return
+            for key in self._key_._evaluate_(sources):
+                yield value[key.value]
+        except IndexError:  # break iterator if the key does not exist
+            return
+
+    def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(IndexByExpression, _key_=self._key_)
+
+
+@dataclass(eq=False, repr=False)
+class Call(SingleValueMapping[T]):
     """
     A variable created through a function call operation on its child variable.
     """
@@ -471,11 +613,16 @@ class Call(MappedVariable):
 
     def _apply_mapping_(
         self, value: Any, sources: Optional[OperationResult] = None
-    ) -> Iterable[Any]:
+    ) -> Iterable[T]:
         if len(self._args_) > 0 or len(self._kwargs_) > 0:
             yield value(*self._args_, **self._kwargs_)
         else:
             yield value()
+
+    def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(
+            Call, _args_=self._args_, _kwargs_=self._kwargs_
+        )
 
     @property
     def _name_(self):
@@ -497,12 +644,21 @@ class FlatVariable(MappedVariable[T]):
     Given a child expression that evaluates to an iterable (e.g., Views.bodies), this mapping yields
     one solution per inner element while preserving the original bindings (e.g., the View instance),
     similar to UNNEST in SQL.
+
+    Unlike a :class:`SingleValueMapping`, it takes no argument naming which element it means, so
+    the iteration belongs to the node itself: each flattening written is a variable of
+    its own, and two of them range over the elements independently.
     """
 
     def _apply_mapping_(
         self, value: Iterable[T], sources: Optional[OperationResult] = None
     ) -> Iterable[T]:
         yield from value
+
+    def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
+        # Not routed through the mapped-variable cache: a flattening is an iteration
+        # variable, so each one written ranges over the elements on its own.
+        return FlatVariable(child)
 
     @cached_property
     def _name_(self) -> str:

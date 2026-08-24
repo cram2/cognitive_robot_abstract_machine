@@ -6,7 +6,7 @@ import sys
 import krrood.utils as krrood_utils
 from krrood.utils import (
     get_scope_from_imports,
-    _warn_about_unresolvable_type_checking_import_once,
+    _log_unresolvable_import_once,
 )
 
 
@@ -81,7 +81,7 @@ def test_repeated_unresolvable_type_checking_import_logs_only_once(
     ``AttributeError`` and previously logged its own line, flooding the log with
     thousands of duplicates for a single, known-transient cause.
     """
-    _warn_about_unresolvable_type_checking_import_once.cache_clear()
+    _log_unresolvable_import_once.cache_clear()
     provider_module = "test.krrood_test.dataset.latebound_annotation_type"
 
     log_calls = []

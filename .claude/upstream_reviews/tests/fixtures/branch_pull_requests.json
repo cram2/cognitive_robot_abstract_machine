@@ -1,0 +1,18 @@
+{
+  "repository": {
+    "pullRequests": {
+      "nodes": [
+        {
+          "number": 400,
+          "state": "CLOSED",
+          "headRepositoryOwner": {"login": "another-contributor"}
+        },
+        {
+          "number": 513,
+          "state": "OPEN",
+          "headRepositoryOwner": {"login": "example-fork-owner"}
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "repository": {
+    "pullRequests": {
+      "nodes": [
+        {
+          "number": 400,
+          "state": "OPEN",
+          "headRepositoryOwner": {"login": "another-contributor"}
+        }
+      ]
+    }
+  }
+}

@@ -3,7 +3,7 @@
 ## Avoid Behaviour
 - Avoid using global variables
 - Avoid accessing any ormatic_interface.py files. if there are issues regarding the ormatic interface run the script `scripts/regenerate_all_orm.py`. If it does not fix the issue, consider consulting the developer.
-- ormatic_interface.py files are committed empty on purpose: CI regenerates them for test runs only, and the `empty-ormatic-interface` pre-commit hook always truncates them back to empty before a commit is created. Never stage real generated content in them or work around the hook. `scripts/regenerate_all_orm.py` also marks the files it regenerates with git's skip-worktree bit (see `scripts/protect_generated_orm_interfaces.py`) so a locally regenerated copy is never proposed for staging in the first place; never clear that bit to force one into a commit.
+- ormatic_interface.py files are generated, never written, so the repository ignores them instead of tracking them (see the rule in `.gitignore`): the test suite builds them for its runs, and a local checkout builds them with `scripts/regenerate_all_orm.py`. Never track one again - git refuses to overwrite a tracked path a checkout has generated its own copy of, which is what used to make every branch switch fail.
 - Avoid using mutable objects as default arguments
 - If you are unsure why something was done or why specific numbers were chosen, ask the developer instead of inventing the reason and writing it as a comment.
 - Never comment on or modify pull requests on the upstream `cram2/cognitive_robot_abstract_machine` repository. You may only do so when working in a fork and the user has explicitly allowed it - either through existing personal notes/instructions, or by asking the user first and having them accept.
@@ -89,6 +89,14 @@
 
 ## Type Hints
 - Classes and methods should always have accurate type hints (including `Any`) where applicable
+- When a family of classes each declares the type it handles, carry that type as a bound
+  generic parameter, not as a `ClassVar`: inherit `Generic[T]` plus
+  `krrood.patterns.subclass_safe_generic.SubClassSafeGeneric`, have each member bind it
+  (`class MemberOfFamily(Family[ConcreteType])`), and read it back through
+  `SubClassSafeGeneric`'s own helpers rather than re-deriving it. The binding is then part
+  of the type signature instead of a separate attribute that can disagree with it.
+  Note `SubClassSafeGeneric` is a non-frozen dataclass, so members cannot be
+  `@dataclass(frozen=True)`.
 
 ## Documentation
 - Classes and methods should always have meaningful, non-trivial documentation

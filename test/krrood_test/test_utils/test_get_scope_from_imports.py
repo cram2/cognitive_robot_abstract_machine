@@ -1,12 +1,20 @@
 import ast
+import inspect
 import os
 import math
+from dataclasses import dataclass
 from pathlib import Path
 from collections import defaultdict
 from typing import Any, Dict
 import pytest
+from typing_extensions import Optional
+
 from krrood.utils import get_scope_from_imports
 from krrood.exceptions import SourceDataNotProvided
+
+from ..dataset.type_checking_import_of_missing_module import (
+    OwnerOfAnnotationFromMissingModule,
+)
 
 
 def test_get_scope_from_imports_basic():
@@ -83,3 +91,20 @@ def test_get_scope_from_imports_relative(tmp_path):
         assert scope["A"] == A
     finally:
         sys.path.remove(str(tmp_path))
+
+
+# %% imports whose module cannot be found
+
+
+def test_scope_holds_the_other_imports_when_one_targets_a_missing_module():
+    """
+    A file importing a name from a module that does not exist must still yield the scope
+    its remaining imports define, instead of aborting the whole scope build.
+    """
+    source_path = inspect.getsourcefile(OwnerOfAnnotationFromMissingModule)
+
+    scope = get_scope_from_imports(file_path=source_path)
+
+    assert scope["Optional"] == Optional
+    assert scope["dataclass"] == dataclass
+    assert "GeneratedMapping" not in scope

@@ -8,7 +8,7 @@ is only consulted when no automatic resolution is possible.
 
 The default built-in strategy, composed as a :class:`ChainConditionResolver`:
 
-* :class:`TargetKnowledgeResolver` — find a condition already known for the target
+* :class:`TargetSufficientConditionsBasedResolver` — find a condition already known for the target
   conclusion that is True for the new case and False for the corner case.
 * :class:`CornerCaseKnowledgeResolver` — search non-active paths to the wrong conclusion
   for a positive condition that is True for the new case and False for the corner case.
@@ -227,7 +227,7 @@ class ChainConditionResolver(ConditionResolver):
 
     @classmethod
     def backward_inference_default(cls) -> ChainConditionResolver:
-        """Return the standard chain: :class:`TargetKnowledgeResolver` then
+        """Return the standard chain: :class:`TargetSufficientConditionsBasedResolver` then
         :class:`CornerCaseKnowledgeResolver`, in priority order.
         """
         return cls([TargetSufficientConditionsBasedResolver(), CornerCaseKnowledgeResolver()])

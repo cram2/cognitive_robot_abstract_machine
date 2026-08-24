@@ -27,7 +27,7 @@ from typing_extensions import (
     Tuple,
 )
 
-from krrood.entity_query_language.core.mapped_variable import Attribute, Index
+from krrood.entity_query_language.core.mapped_variable import Attribute, IndexByValue
 from krrood.entity_query_language._monitoring import monitored
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.base import (
@@ -465,6 +465,19 @@ def _get_set_field_names(clazz: Type) -> Tuple[str, ...]:
     )
 
 
+@lru_cache(maxsize=None)
+def _get_tuple_field_names(clazz: Type) -> Tuple[str, ...]:
+    """
+    :param clazz: The domain class to inspect.
+    :return: The names of all fields annotated as tuples.
+    """
+    return tuple(
+        attr_name
+        for attr_name, hint in _get_type_hints_cached(clazz).items()
+        if get_origin(hint) is tuple or hint is tuple
+    )
+
+
 class DataAccessObject(HasGeneric[T]):
     """
     Base class for Data Access Objects (DAOs) providing bidirectional conversion between
@@ -727,7 +740,14 @@ class DataAccessObject(HasGeneric[T]):
                     for item in source_collection
                 ]
 
-            setattr(self, relationship.key, type(source_collection)(dao_collection))
+            # The instrumented DAO attribute expects an iterable duck-typed as its own
+            # collection class; an immutable domain container (tuple) is held as a
+            # list at the ORM layer (see WrappedTable.create_many_to_many_relationship),
+            # so it must be assigned as one here too.
+            assignable_container_type = (
+                list if type(source_collection) is tuple else type(source_collection)
+            )
+            setattr(self, relationship.key, assignable_container_type(dao_collection))
 
     def _get_or_queue_dao(
         self,
@@ -918,13 +938,18 @@ class DataAccessObject(HasGeneric[T]):
     @staticmethod
     def _finalize_object_containers(domain_object: Any) -> None:
         """
-        Convert lists to sets based on type hints.
+        Convert lists to sets or tuples based on type hints.
         """
         for attr_name in _get_set_field_names(type(domain_object)):
             value = getattr(domain_object, attr_name, None)
             if isinstance(value, list):
                 # object.__setattr__ (not setattr) so this also works on frozen dataclasses.
                 object.__setattr__(domain_object, attr_name, set(value))
+        for attr_name in _get_tuple_field_names(type(domain_object)):
+            value = getattr(domain_object, attr_name, None)
+            if isinstance(value, list):
+                # object.__setattr__ (not setattr) so this also works on frozen dataclasses.
+                object.__setattr__(domain_object, attr_name, tuple(value))
 
     def _call_post_inits(
         self,
@@ -1117,7 +1142,7 @@ class DataAccessObject(HasGeneric[T]):
                 state._alternative_mappings_being_referenced[instance].append(
                     (
                         domain_object,
-                        Index(
+                        IndexByValue(
                             _key_=index,
                             _child_=Attribute(_attribute_name_=key, _child_=None),
                         ),

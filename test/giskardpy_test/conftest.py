@@ -1,6 +1,13 @@
-import os
-import runpy
-from pathlib import Path
+# %% ORM interfaces
+
+# Built before the imports below, which read a mapped datastructure: pytest imports every
+# conftest of a run before calling any hook, so a hook would fire too late. The build runs
+# once per process and never on an xdist worker.
+from ..orm_interface_build import regenerate_orm_interfaces
+
+regenerate_orm_interfaces()
+
+
 
 import numpy as np
 import pytest
@@ -36,20 +43,6 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from semantic_digital_twin.robots.pr2 import PR2Joint
 
-
-def pytest_configure(config):
-    # Only the xdist controller generates: workers run this hook too, and
-    # concurrent writers would truncate the file while another process formats it.
-    if os.environ.get("PYTEST_XDIST_WORKER"):
-        return
-
-    # Ensure ORM classes are generated before tests run
-    repo_root = Path(__file__).resolve().parents[2]
-    generate_orm_path = repo_root / "giskardpy" / "scripts" / "generate_orm.py"
-    # Execute the ORM generation script as a standalone module
-    runpy.run_path(str(generate_orm_path), run_name="__main__")
-
-
 @pytest.fixture()
 def better_pr2_pose():
     return {
@@ -74,7 +67,6 @@ def better_pr2_pose():
         PR2Joint.HEAD_TILT: 0,
     }
 
-
 @pytest.fixture(scope="function")
 def pr2_with_box(pr2_world_copy) -> World:
     with pr2_world_copy.modify_world():
@@ -93,7 +85,6 @@ def pr2_with_box(pr2_world_copy) -> World:
         pr2_world_copy.add_connection(root_C_box)
     return pr2_world_copy
 
-
 @pytest.fixture()
 def mini_world():
     world = World()
@@ -105,7 +96,6 @@ def mini_world():
         )
         world.add_connection(connection)
     return world
-
 
 @pytest.fixture()
 def giskard_factory(init_rospy, robot: GiskardTester):
@@ -142,16 +132,13 @@ def giskard_factory(init_rospy, robot: GiskardTester):
 
     return _create_giskard
 
-
 @pytest.fixture()
 def giskard(giskard_factory, default_joint_state):
     return giskard_factory(default_joint_state)
 
-
 @pytest.fixture()
 def giskard_better_pose(giskard_factory, better_pose):
     return giskard_factory(better_pose)
-
 
 @pytest.fixture()
 def kitchen_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
@@ -168,7 +155,6 @@ def kitchen_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
     )
     return giskard_better_pose
 
-
 @pytest.fixture()
 def apartment_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
     giskard_better_pose.default_env_name = "iai_apartment"
@@ -184,7 +170,6 @@ def apartment_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
         ),
     )
     return giskard_better_pose
-
 
 def _symmetric_prismatic_limits(
     position: float | None, velocity: float
@@ -204,7 +189,6 @@ def _symmetric_prismatic_limits(
             position=position, velocity=velocity, acceleration=None, jerk=None
         ),
     )
-
 
 def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
     """
@@ -228,18 +212,15 @@ def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
     MinimalRobot.from_world(world)
     return world
 
-
 @pytest.fixture()
 def prismatic_bot():
     return _make_prismatic_world([_symmetric_prismatic_limits(1, 1)])
-
 
 @pytest.fixture()
 def prismatic_bot2():
     return _make_prismatic_world(
         [_symmetric_prismatic_limits(1, 1), _symmetric_prismatic_limits(0.5, 0.5)]
     )
-
 
 @pytest.fixture()
 def prismatic_world_no_position_limits():

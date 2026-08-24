@@ -791,11 +791,20 @@ class WrappedTable:
         # create a relationship
         rel_name = f"{wrapped_field.field.name}"
 
-        # Use the actual container type from the domain model (e.g., list)
-        container_name = module_and_class_name(wrapped_field.container_type)
+        # SQLAlchemy instruments a collection class in place (it needs an appender
+        # method), which an immutable domain container such as tuple cannot provide.
+        # The relationship is therefore held as a list at the ORM layer; from_dao
+        # restores the domain field's own tuple type once its object is populated
+        # (see DataAccessObject._finalize_object_containers).
+        collection_class_type = (
+            list
+            if wrapped_field.container_type is tuple
+            else wrapped_field.container_type
+        )
+        container_name = module_and_class_name(collection_class_type)
 
         # Association Object pattern
-        rel_type = f"Mapped[{module_and_class_name(wrapped_field.container_type)}[{association_table.name}]]"
+        rel_type = f"Mapped[{container_name}[{association_table.name}]]"
         rel_constructor = (
             f"relationship('{association_table.name}', "
             f"collection_class={container_name}, "

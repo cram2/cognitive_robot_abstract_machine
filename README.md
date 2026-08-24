@@ -145,6 +145,12 @@ plan dashboards) end to end, in order.
   mode, without writing any code. The "Resolve"/"Resume"/"Reconsider" button
   on a blocked/in-progress/deferred item's dashboard card copies the
   invoking command for this skill.
+- **[`.claude/skills/add-plan-item/`](.claude/skills/add-plan-item/SKILL.md)** -
+  decides where a newly described piece of work belongs - folded into an
+  unlanded item, a new item in an existing plan, a plan of its own, or
+  tracked nowhere - by running the shared scope check in
+  [`scope-decision.md`](.claude/skills/add-plan-item/scope-decision.md)
+  against live branch and PR state, then proposes the outcome via plan mode.
 - **[`.claude/skills/stacked-pr-maintenance/`](.claude/skills/stacked-pr-maintenance/SKILL.md)** -
   runs one maintenance pass over a stacked-PR fork-staging workflow: reparents any pull
   request whose base has landed, closes what has landed by fast-forwarding, restacks

@@ -1,0 +1,17 @@
+query PullRequestForBranch($owner: String!, $name: String!, $headRefName: String!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(
+      headRefName: $headRefName
+      first: 20
+      orderBy: { field: CREATED_AT, direction: DESC }
+    ) {
+      nodes {
+        number
+        state
+        headRepositoryOwner {
+          login
+        }
+      }
+    }
+  }
+}

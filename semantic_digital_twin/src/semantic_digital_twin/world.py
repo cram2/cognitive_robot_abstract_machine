@@ -643,13 +643,16 @@ class World(HasSimulatorProperties):
         self.collision_manager.add_to_world(self)
 
     @classmethod
-    def create_with_root_body(cls, root_body_name: str = "map") -> World:
+    def create_with_root_body(
+        cls, root_body_name: str = "map", prefix: Optional[str] = None
+    ) -> World:
         """
         Creates a new instance of the World class with a root body.
 
-        :param root_body_name: The unprefixed name of the root body.
+        :param root_body_name: The root body's name.
+        :param prefix: Optional namespace prefix for the root body's name.
         """
-        root_body = Body(name=PrefixedName(root_body_name))
+        root_body = Body(name=PrefixedName(root_body_name, prefix))
         world = World()
         with world.modify_world():
             world.add_body(root_body)
@@ -1728,6 +1731,9 @@ class World(HasSimulatorProperties):
         :param branch_root: The root of the branch to be moved.
         :param new_parent: The new parent of the branch.
         """
+        # Ensure FK is up to date before computing the relative pose, since this may be
+        # called mid-block, e.g. from a mount strategy inside a still-open modify_world block.
+        self.update_forward_kinematics()
         new_parent_T_child = self.compute_forward_kinematics(new_parent, branch_root)
         self.remove_connection(branch_root.parent_connection)
         self.add_connection(

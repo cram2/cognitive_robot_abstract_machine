@@ -1,11 +1,15 @@
 import logging
 import os
+import threading
 import time
+from dataclasses import dataclass
 
 import mujoco
 import pytest
 import numpy
+import trimesh
 from PIL import Image
+from trimesh.visual.material import SimpleMaterial
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -44,6 +48,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoActuator,
     MujocoBuilder,
     MujocoLight,
+    MujocoSynchronizer,
 )
 
 urdf_dir = os.path.join(
@@ -317,9 +322,11 @@ def test_mesh_scale_and_equality(test_mjcf_2_world):
 def _write_textured_tetrahedron(directory, texture_color) -> str:
     """
     Writes a minimal textured OBJ+MTL+PNG mesh (a tetrahedron, so its convex hull is
-    non-degenerate) into ``directory``, textured with a solid ``texture_color``, and returns
-    the OBJ file's path. Always named "tetra.obj"/"tetra.mtl"/"wood.png", so callers writing
-    into different directories can reproduce a texture basename collision between them.
+    non-degenerate) into ``directory``, textured with a solid ``texture_color``, and
+    returns the OBJ file's path.
+
+    Always named "tetra.obj"/"tetra.mtl"/"wood.png", so callers writing into different
+    directories can reproduce a texture basename collision between them.
     """
     directory.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (4, 4), color=texture_color).save(directory / "wood.png")
@@ -683,11 +690,12 @@ def test_spawn_body_with_connections():
 
 
 def test_body_frame_excludes_joint_state_at_build_time():
-    """A body's static frame must be built at the reference (zero-joint) pose.
+    """
+    A body's static frame must be built at the reference (zero-joint) pose.
 
-    The joint is non-zero while the simulator is built and is evaluated at a
-    different angle, so a frame that baked in the build-time angle would have it
-    applied twice and drift away from the world forward kinematics.
+    The joint is non-zero while the simulator is built and is evaluated at a different
+    angle, so a frame that baked in the build-time angle would have it applied twice and
+    drift away from the world forward kinematics.
     """
     world = World()
     base_body = Body(name=PrefixedName("base"))
@@ -848,6 +856,445 @@ def test_world_sim_state_sync():
         )
     finally:
         stop_multisim_if_running(multi_sim)
+
+
+def _write_thin_slab_mesh(directory) -> str:
+    """
+    Writes a minimal OBJ mesh for a closed box thin enough (1e-5 units) that MuJoCo's
+    default ("legacy") volume-based inertia estimator used to reject it as "mesh volume
+    is too small" (fixed upstream as of MuJoCo 3.11) - the shape of real CAD furniture
+    panels (a door slab, a backing panel), reproduced with an actual ArtVIP dataset
+    object.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    mesh_file = directory / "slab.obj"
+    thickness = 1e-5
+    mesh_file.write_text(
+        "o slab\n"
+        "v 0.0 0.0 0.0\n"
+        "v 1.0 0.0 0.0\n"
+        "v 1.0 1.0 0.0\n"
+        "v 0.0 1.0 0.0\n"
+        f"v 0.0 0.0 {thickness}\n"
+        f"v 1.0 0.0 {thickness}\n"
+        f"v 1.0 1.0 {thickness}\n"
+        f"v 0.0 1.0 {thickness}\n"
+        "f 1 2 3\nf 1 3 4\n"
+        "f 5 6 7\nf 5 7 8\n"
+        "f 1 2 6\nf 1 6 5\n"
+        "f 2 3 7\nf 2 7 6\n"
+        "f 3 4 8\nf 3 8 7\n"
+        "f 4 1 5\nf 4 5 8\n"
+    )
+    return str(mesh_file)
+
+
+def test_builder_compiles_a_body_with_thin_panel_geometry(tmp_path):
+    # Before MuJoCo 3.11, the default inertia estimator rejected a mesh this thin with
+    # "ValueError: mesh volume is too small", so this raised instead of compiling.
+    mesh_file = _write_thin_slab_mesh(tmp_path)
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        panel = Body(
+            name=PrefixedName("panel"),
+            visual=ShapeCollection([mesh_shape]),
+            collision=ShapeCollection([mesh_shape]),
+        )
+        world.add_kinematic_structure_entity(panel)
+        world.add_connection(FixedConnection(parent=root, child=panel))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [mesh_spec] = builder.spec.meshes
+    assert mesh_spec.name.startswith("slab")
+
+
+def _write_flat_quad_mesh(directory) -> str:
+    """
+    Writes a minimal OBJ mesh for a single-sided, exactly flat quad (zero thickness,
+    every vertex exactly coplanar) - the shape of a door or cover panel modelled as a
+    single sheet rather than a closed solid, reproduced with a real ArtVIP object.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    mesh_file = directory / "panel.obj"
+    mesh_file.write_text(
+        "o panel\n"
+        "v 0.0 0.0 0.0\n"
+        "v 1.0 0.0 0.0\n"
+        "v 1.0 1.0 0.0\n"
+        "v 0.0 1.0 0.0\n"
+        "f 1 2 3\nf 1 3 4\n"
+    )
+    return str(mesh_file)
+
+
+def test_builder_compiles_a_body_with_an_exactly_flat_panel(tmp_path):
+    # Before the fix, MuJoCo rejected a mesh with exactly coplanar vertices as
+    # "ValueError: mesh ... has coplanar vertices, cannot compute convex hull" - a
+    # different failure than a thin-but-closed mesh (test above), since there is no
+    # volume-based inertia estimate to fall back on at all: there is no volume.
+    mesh_file = _write_flat_quad_mesh(tmp_path)
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        panel = Body(
+            name=PrefixedName("panel"),
+            visual=ShapeCollection([mesh_shape]),
+            collision=ShapeCollection([mesh_shape]),
+        )
+        world.add_kinematic_structure_entity(panel)
+        world.add_connection(FixedConnection(parent=root, child=panel))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [mesh_spec] = builder.spec.meshes
+    assert mesh_spec.name == "panel_thickened"
+
+
+def _write_flat_quad_mesh_at_scale(directory, scale: float) -> str:
+    """
+    Writes a minimal OBJ mesh for a single-sided, exactly flat quad ``scale`` units
+    across - large enough that a fixed, furniture-scale thickening offset would be
+    below STL's float32 export precision at this magnitude and get rounded back to
+    exactly zero, reproduced with a real ArtVIP object (one ~24000-unit panel).
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    mesh_file = directory / "large_panel.obj"
+    mesh_file.write_text(
+        "o large_panel\n"
+        f"v 0.0 0.0 0.0\n"
+        f"v {scale} 0.0 0.0\n"
+        f"v {scale} {scale} 0.0\n"
+        f"v 0.0 {scale} 0.0\n"
+        "f 1 2 3\nf 1 3 4\n"
+    )
+    return str(mesh_file)
+
+
+def test_builder_compiles_a_body_with_a_large_flat_panel(tmp_path):
+    # Before scaling the thickening offset to the mesh's own extent, this reproduced
+    # "ValueError: mesh ... has coplanar vertices, cannot compute convex hull" even
+    # after the fixed-offset fix above: the fixed offset survived Python-side but was
+    # rounded back to exactly zero by STL's float32 precision at this magnitude.
+    mesh_file = _write_flat_quad_mesh_at_scale(tmp_path, scale=24000.0)
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        panel = Body(
+            name=PrefixedName("panel"),
+            visual=ShapeCollection([mesh_shape]),
+            collision=ShapeCollection([mesh_shape]),
+        )
+        world.add_kinematic_structure_entity(panel)
+        world.add_connection(FixedConnection(parent=root, child=panel))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [mesh_spec] = builder.spec.meshes
+    assert mesh_spec.name == "large_panel_thickened"
+
+
+def test_builder_compiles_a_body_with_a_flat_coloured_untextured_mesh(tmp_path):
+    # Before the fix, MujocoMeshConverter._resolve_texture_file_path assumed a
+    # TextureVisuals material always has a backing image and crashed with
+    # "AttributeError: 'NoneType' object has no attribute 'info'" on a material with
+    # only a flat diffuse colour and no image (e.g. a painted wall with no texture map).
+    flat_colour_mesh = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
+    flat_colour_mesh.visual = trimesh.visual.TextureVisuals(
+        material=SimpleMaterial(diffuse=(120, 80, 40, 255))
+    )
+    mesh_file = str(tmp_path / "painted_box.obj")
+    flat_colour_mesh.export(mesh_file)
+
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        panel = Body(
+            name=PrefixedName("panel"),
+            visual=ShapeCollection([mesh_shape]),
+            collision=ShapeCollection([mesh_shape]),
+        )
+        world.add_kinematic_structure_entity(panel)
+        world.add_connection(FixedConnection(parent=root, child=panel))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [mesh_spec] = builder.spec.meshes
+    assert mesh_spec.name == "painted_box"
+
+
+def test_thicken_if_near_planar_regenerates_instead_of_reusing_a_stale_file(tmp_path):
+    # Before the fix, the thickened output was only (re)written if it didn't already
+    # exist on disk, keyed by the source mesh's basename alone - two different meshes
+    # sharing a basename across builds into the same asset folder (e.g. two objects each
+    # containing a "cover.stl") silently reused whichever one happened to be written
+    # first, reproduced here with a stale file left directly in the asset folder.
+    mesh_file = _write_flat_quad_mesh(tmp_path)  # "panel.obj" -> "panel_thickened.stl"
+    builder = MujocoBuilder()
+    builder._asset_folder_path = str(tmp_path)
+
+    stale_triangle = trimesh.Trimesh(
+        vertices=[[0, 0, 0], [1, 0, 0], [0, 1, 0]], faces=[[0, 1, 2]], process=False
+    )
+    stale_triangle.export(str(tmp_path / "panel_thickened.stl"))
+
+    thickened_path = builder._thicken_if_near_planar(mesh_file)
+
+    # A correctly thickened quad has its 4 corners duplicated (front/back), not the
+    # stale triangle's 3.
+    assert len(trimesh.load(thickened_path, force="mesh").vertices) == 8
+
+
+@dataclass
+class BoxOnPlaneWorld:
+    """
+    A world holding a ground plane and one free-floating box, together with the
+    pieces of it a test needs to address afterwards.
+    """
+
+    world: World
+    """
+    The world itself, ready for a simulator to be built from it.
+    """
+
+    box: Body
+    """
+    The free-floating box, used as the reference frame for poses written to it.
+    """
+
+    box_connection: Connection6DoF
+    """
+    The box's 6DoF connection to the world root, whose origin the tests set.
+    """
+
+
+def _build_box_on_plane_world() -> BoxOnPlaneWorld:
+    """
+    Build a ground plane plus a single free-floating box, authored directly
+    into a :class:`World` so a simulator can be built from it without spawning.
+
+    :return: The world and the box handles the caller needs.
+    """
+    world = World()
+    root = Body(name=PrefixedName("world"))
+    with world.modify_world():
+        world.add_body(root)
+
+        ground_plane = Body(name=PrefixedName("ground_plane"))
+        ground_plane.collision = ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        reference_frame=ground_plane
+                    ),
+                    scale=Scale(2.0, 2.0, 0.1),
+                    color=Color(1.0, 1.0, 0.0, 1.0),
+                )
+            ],
+            reference_frame=ground_plane,
+        )
+        world.add_connection(FixedConnection(parent=root, child=ground_plane))
+
+        box = Body(name=PrefixedName("free_box"))
+        box.collision = ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        reference_frame=box
+                    ),
+                    scale=Scale(0.2, 0.2, 0.2),
+                    color=Color(1.0, 0.0, 0.0, 1.0),
+                )
+            ],
+            reference_frame=box,
+        )
+        box_connection = Connection6DoF.create_with_dofs(
+            world=world, parent=root, child=box
+        )
+        world.add_connection(box_connection)
+    return BoxOnPlaneWorld(world=world, box=box, box_connection=box_connection)
+
+
+def test_pose_written_during_sim_to_world_pull_reaches_the_simulator():
+    """
+    A pose written from another thread while the physics thread is inside its
+    *sim → world* pull must still reach MuJoCo.
+
+    The pull overwrites ``world.state`` from ``qpos`` and pauses the sibling
+    state-change callback while it does so. A write that lands inside that
+    window is therefore overwritten with the pre-write pose *and* has its
+    notification swallowed by the pause, so it never reaches ``qpos`` and no
+    error is raised anywhere -- the pose is simply lost. Under load this is
+    what made ``test_world_sim_state_sync`` fail, with the box settling at the
+    origin instead of the pose it was teleported to.
+
+    Rather than wait for that interleaving to happen by chance, this drives it:
+    the pull is held open inside ``_read_6dof_from_qpos`` while a second thread
+    writes a new pose.
+    """
+    target_xyz = numpy.array([0.4, -0.3, 1.25])
+
+    scene = _build_box_on_plane_world()
+    box, box_connection = scene.box, scene.box_connection
+    multi_sim = MujocoSim(world=scene.world, headless=headless, step_size=STEP_SIZE)
+    synchronizer = multi_sim.synchronizer
+    # The pull is wall-clock throttled; this test calls it explicitly and must
+    # not have the call skipped.
+    synchronizer.sync_rate_hz = MujocoSynchronizer.UNTHROTTLED_SYNC_RATE_HZ
+
+    pull_is_inside = threading.Event()
+    let_pull_finish = threading.Event()
+    original_read = synchronizer._read_6dof_from_qpos
+
+    def blocking_read(connection, qpos_address):
+        pull_is_inside.set()
+        assert let_pull_finish.wait(
+            timeout=10
+        ), "test did not release the sim → world pull"
+        return original_read(connection, qpos_address)
+
+    write_failed = []
+
+    def write_new_pose():
+        try:
+            box_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=float(target_xyz[0]),
+                y=float(target_xyz[1]),
+                z=float(target_xyz[2]),
+                reference_frame=box,
+            )
+        except BaseException as error:  # surfaced on the main thread below
+            write_failed.append(error)
+
+    try:
+        synchronizer._read_6dof_from_qpos = blocking_read
+
+        # The physics thread is never started: _sim_to_world is what the
+        # physics thread would call after each mj_step, and calling it directly
+        # keeps the interleaving deterministic.
+        puller = threading.Thread(target=synchronizer._sim_to_world, daemon=True)
+        puller.start()
+        assert pull_is_inside.wait(timeout=10), "sim → world pull never started"
+
+        writer = threading.Thread(target=write_new_pose, daemon=True)
+        writer.start()
+        # Give the writer every chance to slip into the middle of the pull.
+        time.sleep(0.2)
+
+        let_pull_finish.set()
+        puller.join(timeout=10)
+        writer.join(timeout=10)
+        assert not puller.is_alive(), "sim → world pull did not finish"
+        assert not writer.is_alive(), "pose write did not finish"
+        assert not write_failed, f"pose write raised: {write_failed[0]!r}"
+
+        qpos_address = synchronizer._resolve_qpos_address(box_connection)
+        assert qpos_address is not None, "free joint is missing from the MuJoCo model"
+        written_xyz = numpy.asarray(
+            multi_sim.simulator._mj_data.qpos[qpos_address : qpos_address + 3], dtype=float
+        )
+        assert numpy.allclose(written_xyz, target_xyz, atol=1e-6), (
+            "pose written during the sim → world pull never reached MuJoCo: "
+            f"qpos={written_xyz}, expected={target_xyz}"
+        )
+    finally:
+        synchronizer._read_6dof_from_qpos = original_read
+        let_pull_finish.set()
+        synchronizer.stop()
+
+
+def test_pose_write_waits_for_the_running_physics_step():
+    """
+    The *world → sim* push must write ``qpos`` under the simulator's model
+    lock, the same lock :meth:`MujocoSimulator.step_callback` holds across
+    ``mj_step``.
+
+    The scene integrates with RK4, which saves the state at the top of the step
+    and writes the integrated ``qpos`` back at the end. A pose written into
+    ``qpos`` while a step is in flight is therefore overwritten by that final
+    write and disappears -- the body carries on from its old pose and nothing
+    reports an error. Under CI load the physics thread spends most of its wall
+    time inside ``mj_step``, which is what made ``test_world_sim_state_sync``
+    fail there while passing on an idle machine.
+
+    Holding the model lock from another thread stands in for a step in flight:
+    the push must block until it is released, and must land afterwards.
+    """
+    target_xyz = numpy.array([-0.25, 0.45, 1.75])
+
+    scene = _build_box_on_plane_world()
+    box, box_connection = scene.box, scene.box_connection
+    multi_sim = MujocoSim(world=scene.world, headless=headless, step_size=STEP_SIZE)
+    synchronizer = multi_sim.synchronizer
+
+    model_lock_held = threading.Event()
+    release_model_lock = threading.Event()
+    write_returned = threading.Event()
+    write_failed = []
+
+    def hold_model_lock():
+        with multi_sim.simulator._model_lock:
+            model_lock_held.set()
+            release_model_lock.wait(timeout=10)
+
+    def write_new_pose():
+        try:
+            box_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=float(target_xyz[0]),
+                y=float(target_xyz[1]),
+                z=float(target_xyz[2]),
+                reference_frame=box,
+            )
+        except BaseException as error:  # surfaced on the main thread below
+            write_failed.append(error)
+        finally:
+            write_returned.set()
+
+    try:
+        holder = threading.Thread(target=hold_model_lock, daemon=True)
+        holder.start()
+        assert model_lock_held.wait(timeout=10), "could not take the model lock"
+
+        writer = threading.Thread(target=write_new_pose, daemon=True)
+        writer.start()
+
+        assert not write_returned.wait(timeout=1.0), (
+            "the world → sim push completed while another thread held the "
+            "model lock, so it can also run in the middle of an mj_step, "
+            "where RK4 overwrites the pose it just wrote"
+        )
+
+        release_model_lock.set()
+        writer.join(timeout=10)
+        holder.join(timeout=10)
+        assert write_returned.is_set(), "pose write never finished"
+        assert not write_failed, f"pose write raised: {write_failed[0]!r}"
+
+        qpos_address = synchronizer._resolve_qpos_address(box_connection)
+        assert qpos_address is not None, "free joint is missing from the MuJoCo model"
+        written_xyz = numpy.asarray(
+            multi_sim.simulator._mj_data.qpos[qpos_address : qpos_address + 3], dtype=float
+        )
+        assert numpy.allclose(written_xyz, target_xyz, atol=1e-6), (
+            "pose never reached MuJoCo once the model lock was free: "
+            f"qpos={written_xyz}, expected={target_xyz}"
+        )
+    finally:
+        release_model_lock.set()
+        synchronizer.stop()
 
 
 def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():

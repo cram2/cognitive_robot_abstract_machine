@@ -182,3 +182,9 @@ CLAUDE.local.md
 # Scratch state, never committed: a stale copy read as current is a pass acting on a
 # stack that has since moved.
 .claude/stack/board.json
+
+# ORMatic generates every package's ormatic_interface.py from its dataclasses, so the
+# repository builds them (scripts/regenerate_all_orm.py) instead of tracking them.
+# Tracking a generated file made every branch switch fail while a checkout held its own
+# copy, which is what git refuses to overwrite.
+**/ormatic_interface.py

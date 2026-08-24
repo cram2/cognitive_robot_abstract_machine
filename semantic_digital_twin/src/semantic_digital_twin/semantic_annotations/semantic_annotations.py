@@ -268,9 +268,20 @@ class MechanicalJoint(HasRootBody):
         Inserts the joint between the whole (``main_has_root_body_annotation``) and the
         whole's current parent, preserving the whole's ancestry.
 
-        So whole_parent -(fixed)-> whole becomes whole_parent -(active)-> joint
-        -(fixed)-> whole. The joint keeps its active connection (now anchored at the
-        whole's parent); the whole hangs rigidly off the joint.
+        Ordinarily, whole_parent -(fixed)-> whole becomes whole_parent -(active)->
+        joint -(fixed)-> whole: the joint keeps its own active connection (now
+        anchored at the whole's parent), and the whole hangs rigidly off the joint.
+
+        When the whole is already wired straight to its parent through a connection
+        of the same type this joint provides (for example a door whose URDF attaches
+        it to its cabinet with a revolute joint directly, without a hinge body in
+        between), that connection is redundant with the joint's own: the joint takes
+        over carrying the physical joint data (its creator is expected to have copied
+        the axis, limits, ... over from it), the whole's old connection to its parent
+        is discarded, and the whole is attached to the joint with a fixed connection
+        instead. The degree of freedom the discarded connection used is reclaimed by
+        :meth:`World.delete_orphaned_dofs` when the enclosing ``modify_world`` block
+        exits.
         """
         if (
             main_has_root_body_annotation.root.parent_kinematic_structure_entity
@@ -281,13 +292,23 @@ class MechanicalJoint(HasRootBody):
         if list(self._world.kinematic_structure.successors(self.root.index)):
             raise MechanicalJointAlreadyMounted(self, main_has_root_body_annotation)
 
-        self._world.move_branch(
-            self.root,
-            main_has_root_body_annotation.root.parent_kinematic_structure_entity,
+        whole_parent = (
+            main_has_root_body_annotation.root.parent_kinematic_structure_entity
         )
-        main_has_root_body_annotation._world.move_branch(
-            main_has_root_body_annotation.root, self.root
-        )
+        whole_already_carries_this_joint_type = type(
+            main_has_root_body_annotation.root.parent_connection
+        ) is type(self.root.parent_connection)
+
+        self._world.move_branch(self.root, whole_parent)
+
+        if whole_already_carries_this_joint_type:
+            main_has_root_body_annotation._world.move_branch_with_fixed_connection(
+                main_has_root_body_annotation.root, self.root
+            )
+        else:
+            main_has_root_body_annotation._world.move_branch(
+                main_has_root_body_annotation.root, self.root
+            )
 
     @property
     def position(self):

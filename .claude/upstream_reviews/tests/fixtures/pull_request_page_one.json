@@ -1,0 +1,73 @@
+{
+  "repository": {
+    "pullRequest": {
+      "number": 513,
+      "title": "[DevTools] Even more scripted and Less agentic stacked PRs maintenance",
+      "url": "https://github.com/example-upstream/example-repo/pull/513",
+      "reviews": {
+        "nodes": [
+          {
+            "author": {"login": "first-reviewer"},
+            "state": "CHANGES_REQUESTED",
+            "body": "A few naming things.",
+            "submittedAt": "2026-08-06T09:15:00Z"
+          },
+          {
+            "author": {"login": "second-reviewer"},
+            "state": "COMMENTED",
+            "body": "",
+            "submittedAt": "2026-08-06T11:02:00Z"
+          }
+        ]
+      },
+      "reviewThreads": {
+        "pageInfo": {"hasNextPage": true, "endCursor": "CURSOR_PAGE_ONE"},
+        "nodes": [
+          {
+            "id": "THREAD_RESOLVED",
+            "isResolved": true,
+            "isOutdated": false,
+            "path": ".claude/stack/maintenance.py",
+            "line": 1031,
+            "comments": {
+              "nodes": [
+                {
+                  "databaseId": 3728009027,
+                  "author": {"login": "first-reviewer"},
+                  "body": "doc formatting",
+                  "createdAt": "2026-08-06T09:15:10Z",
+                  "url": "https://github.com/example-upstream/example-repo/pull/513#discussion_r3728009027"
+                }
+              ]
+            }
+          },
+          {
+            "id": "THREAD_UNRESOLVED_MIDDLE",
+            "isResolved": false,
+            "isOutdated": false,
+            "path": ".claude/stack/maintenance.py",
+            "line": 506,
+            "comments": {
+              "nodes": [
+                {
+                  "databaseId": 3727247950,
+                  "author": {"login": "first-reviewer"},
+                  "body": "i think its a bit weird to have this randomly in the middle of the file. please provide some way to easily discover this again and extend it if needed",
+                  "createdAt": "2026-08-06T09:16:00Z",
+                  "url": "https://github.com/example-upstream/example-repo/pull/513#discussion_r3727247950"
+                },
+                {
+                  "databaseId": 3727247999,
+                  "author": {"login": "pull-request-author"},
+                  "body": "Yeah me too but idk a better way",
+                  "createdAt": "2026-08-06T10:00:00Z",
+                  "url": "https://github.com/example-upstream/example-repo/pull/513#discussion_r3727247999"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

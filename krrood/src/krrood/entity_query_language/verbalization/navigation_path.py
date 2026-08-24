@@ -8,7 +8,7 @@ from typing_extensions import TYPE_CHECKING, Callable, List, Optional
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
     Call,
-    FlatVariable,
+    SingleValueMapping,
     Index,
     MappedVariable,
 )
@@ -126,7 +126,7 @@ def build_path_parts(
       (e.g. on a call result) stays a standalone ordinal hop. Non-integer keys keep the ``"[key]"``
       bracket form.
     * ``Call`` nodes appear as ``"()"`` with no source reference.
-    * ``FlatVariable`` nodes are skipped.
+    * Nodes that are not a :class:`SingleValueMapping` are skipped.
 
     :param chain: Innermost-first chain list (nearest the root first).
     :param relation_verb: Optional name → split-verb recogniser, injected so this module stays
@@ -169,7 +169,9 @@ def build_path_parts(
             _append_index(parts, node)
         elif isinstance(node, Call):
             parts.append(PathStep("()", None))
-        elif isinstance(node, FlatVariable):
+        elif not isinstance(node, SingleValueMapping):
+            # A flattening names no step of its own: it chooses among the values the
+            # step before it reached, which the path already names.
             pass
     return parts
 

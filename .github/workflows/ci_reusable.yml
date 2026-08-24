@@ -62,19 +62,6 @@ jobs:
             ${{ runner.os }}-cache-${{ inputs.lib }}
             ${{ runner.os }}-cache-
 
-      - name: Build ORM
-        # ormatic_interface.py files are committed empty (see AGENTS.md), and each package's
-        # generate_orm.py imports its upstream dependency's *already generated* interface
-        # module. Regenerating only this job's own lib would import an empty upstream module,
-        # so the whole chain (semantic_digital_twin -> giskardpy -> coraplex -> segmind ->
-        # experiments, see scripts/regenerate_all_orm.py) must run in order first.
-        if: ${{inputs.lib == 'coraplex' || inputs.lib == 'giskardpy' || inputs.lib == 'semantic_digital_twin' || inputs.lib == 'experiments'}}
-        run: |
-          cd cognitive_robot_abstract_machine
-          source /opt/ros/cram-env/bin/activate
-          source /opt/ros/overlay_ws/install/setup.bash
-          python scripts/regenerate_all_orm.py
-
       - name: Run CPP tests
         if: ${{inputs.lib == 'random_events'}}
         run: |

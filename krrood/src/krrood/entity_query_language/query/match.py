@@ -38,13 +38,14 @@ from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
     CanBehaveLikeAVariable,
     MappedVariable,
-    Index,
+    IndexByValue,
 )
 from krrood.entity_query_language.core.variable import Literal, DomainType, Variable
 from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     CalledMatchMultipleTimes,
     MatchTypeCannotBeDetermined,
+    ReadOnlyMapping,
 )
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
@@ -269,10 +270,10 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         Update the match with new keyword arguments to constrain the type we are
         matching with.
 
-        Eagerly creates the match's subject variable so it can be referenced in ``where``
-        conditions immediately (lowering the pattern into conditions stays lazy, tracked by
-        ``resolved``). If this match is later nested under a parent, the parent overwrites
-        the subject with its own attribute during resolution.
+        Eagerly creates the match's subject variable so it can be referenced in
+        ``where`` conditions immediately (lowering the pattern into conditions stays
+        lazy, tracked by ``resolved``). If this match is later nested under a parent,
+        the parent overwrites the subject with its own attribute during resolution.
 
         :param kwargs: The keyword arguments to match against.
         :return: The current match instance after updating it with the new keyword
@@ -658,10 +659,10 @@ class AttributeMatch(AbstractMatchExpression[T]):
         for step in self.variable._access_path_[:-1]:
             if isinstance(step, Attribute):
                 current_value = current_value.kwargs[step._attribute_name_]
-            elif isinstance(step, Index):
+            elif isinstance(step, IndexByValue):
                 current_value = current_value[step._key_]
             else:
-                assert_never(step)
+                raise ReadOnlyMapping(step)
 
         final_step = self.variable._access_path_[-1]
 

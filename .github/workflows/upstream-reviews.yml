@@ -1,0 +1,64 @@
+name: Upstream reviews
+
+# Reports the review threads a fork branch's upstream pull request has collected.
+#
+# Thread resolved-state is only exposed by GitHub's GraphQL API, which a Claude
+# session cannot reach, so the read happens here and the session reads this job's
+# log. Dispatch-only on purpose: nothing about this should run on a timer.
+#
+# Runs unchanged in any fork - the upstream comes from .claude/stack/stack.toml
+# and the fork owner from the runner's own context, so no repository is named here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: "Upstream pull request number (takes precedence over branch)"
+        required: false
+        type: string
+      branch:
+        description: "Fork branch whose upstream pull request to read"
+        required: false
+        type: string
+      include_resolved:
+        description: "Include threads already marked resolved"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: Report upstream review threads
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Read upstream review threads
+        env:
+          # gh is preinstalled on the runner; this is the only credential it needs,
+          # and read-only is all the job is granted.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          ARGUMENTS=()
+          if [ -n "${{ inputs.pull_request }}" ]; then
+            ARGUMENTS+=(--pull-request "${{ inputs.pull_request }}")
+          elif [ -n "${{ inputs.branch }}" ]; then
+            ARGUMENTS+=(--branch "${{ inputs.branch }}")
+          else
+            echo "Provide either pull_request or branch." >&2
+            exit 2
+          fi
+          if [ "${{ inputs.include_resolved }}" = "true" ]; then
+            ARGUMENTS+=(--include-resolved)
+          fi
+          python3 .claude/upstream_reviews/upstream_reviews.py "${ARGUMENTS[@]}"

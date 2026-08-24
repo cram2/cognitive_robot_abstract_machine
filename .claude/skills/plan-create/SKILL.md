@@ -91,6 +91,16 @@ they run in parallel?") — the same way the plan-dashboard system's own
 design was worked out via up-front questions before anything was written,
 not after.
 
+### Is it a new item, or a change to one already in flight?
+
+Ask this of every item before adding it, and prefer the change: an item that
+only modifies what an unlanded item introduces is that item's work, not a
+separate one. Follow `${SCOPE_DECISION_DOCUMENT}` — it holds the check and how
+to read it.
+
+For a single piece of work rather than a whole plan, `/add-plan-item` runs that
+same decision on its own and is the lighter-weight way in.
+
 If migrating a source doc: preserve its detail rather than compressing it
 away. Structured facts (branch, PR, base, status, blockers) become
 `plan.yaml` items; everything else (design rationale, history, "why",

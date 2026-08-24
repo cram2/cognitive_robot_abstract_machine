@@ -279,6 +279,13 @@ plan_roadmap_path() {
 # full plan-dashboard schema this feeds).
 PLAN_BRANCH_INDEX_PATH="${PLANS_DIR}/_generated/branch-index.tsv"
 
+# DASHBOARD_URL_CACHE_PATH: the generated cache mapping each plan id (plus
+# "_index" for the master index) to the Artifact URL its dashboard is
+# published at, so /plan-dashboard updates that page instead of minting a
+# second one. Named here rather than typed into plan-dashboard/SKILL.md,
+# same defined-once reasoning as PLAN_BRANCH_INDEX_PATH above.
+DASHBOARD_URL_CACHE_PATH="${PLANS_DIR}/_generated/dashboard-urls.yaml"
+
 # PLAN_DASHBOARD_DIRECTORY / *_SCRIPT / *_FILE / *_DOC: the canonical
 # location of every script, hook, requirements file, and reference doc the
 # plan-dashboard/plan-item-*/CI tooling invokes or reads - defined once,
@@ -308,6 +315,10 @@ REFRESH_DASHBOARD_SCRIPT="${PLAN_DASHBOARD_DIRECTORY}/refresh_dashboard.sh"
 # refresh_dashboard_support.py: the JSON-plumbing helpers
 # refresh_dashboard.sh calls between its two script calls.
 REFRESH_DASHBOARD_SUPPORT_SCRIPT="${PLAN_DASHBOARD_DIRECTORY}/refresh_dashboard_support.py"
+# record_dashboard_url.py: writes one key's published Artifact URL into
+# DASHBOARD_URL_CACHE_PATH, resolving that URL from the account's live
+# Artifact listing so a URL nobody published cannot be recorded.
+RECORD_DASHBOARD_URL_SCRIPT="${PLAN_DASHBOARD_DIRECTORY}/record_dashboard_url.py"
 # requirements.txt: the PyYAML/Jinja2/markdown dependencies every script
 # above needs - installed by both CI and a session running them directly.
 PLAN_DASHBOARD_REQUIREMENTS_FILE="${PLAN_DASHBOARD_DIRECTORY}/requirements.txt"
@@ -375,6 +386,26 @@ SETUP_PREREQUISITE_DOCUMENT="${SETUP_PERSONAL_NOTES_DIRECTORY}/prerequisite-chec
 # conventions instead of an empty file.
 STARTER_NOTES_FILE="${SETUP_PERSONAL_NOTES_DIRECTORY}/starter-notes.md"
 
+# ADD_PLAN_ITEM_DIRECTORY / SCOPE_DECISION_DOCUMENT /
+# CHECK_SCOPE_OVERLAP_SCRIPT / ADD_PLAN_ITEM_TESTS_DIRECTORY: the
+# where-does-this-work-belong half of the system - the skill someone runs when
+# describing new work (/add-plan-item), the shared scope rule all four plan
+# skills defer to instead of each restating it, the script that gathers that
+# rule's evidence, and its pytest suite. Same defined-once reasoning as every
+# path above.
+ADD_PLAN_ITEM_DIRECTORY=".claude/skills/add-plan-item"
+# scope-decision.md: the shared "is this new work, or a change to work already
+# in flight?" rule that plan-create, plan-item-kickoff, plan-item-resolve and
+# add-plan-item each reference in a line rather than each spelling it out.
+SCOPE_DECISION_DOCUMENT="${ADD_PLAN_ITEM_DIRECTORY}/scope-decision.md"
+# check_scope_overlap.py: reports which of the work's paths the base branch
+# lacks, and which unlanded branches already touch them - see the script's own
+# module docstring.
+CHECK_SCOPE_OVERLAP_SCRIPT="${ADD_PLAN_ITEM_DIRECTORY}/check_scope_overlap.py"
+# tests/: the pytest suite covering check_scope_overlap.py - the exact
+# directory CI and a session both run against.
+ADD_PLAN_ITEM_TESTS_DIRECTORY="${ADD_PLAN_ITEM_DIRECTORY}/tests"
+
 # SAVE_PLAN_SCRIPT: same reasoning as the block above, extended to
 # save-plan.sh - unlike the other hook scripts in this directory (which are
 # always run directly by a human, once, per hooks/README.md's own setup
@@ -388,6 +419,32 @@ SAVE_PLAN_SCRIPT=".claude/hooks/save-plan.sh"
 # invoked from plan-item-kickoff/SKILL.md and add-plan-item/SKILL.md, so it is
 # a path this codebase controls rather than one a human types once.
 PLAN_ITEM_BOOTSTRAP_SCRIPT=".claude/hooks/plan_item_bootstrap.py"
+
+# PLAN_ITEM_MODE_SCRIPT / PLAN_ITEM_MODES_CONFIG_FILE /
+# PERSONAL_PLAN_ITEM_MODES_PATH: the script that resolves whether a plan-item
+# skill asks, plans, or implements on its own, plus the two files it layers -
+# committed defaults in this repository, per-user overrides on the
+# personal-notes branch. Same committed-defaults/personal-override split as
+# STACK_CONFIG_FILE above. Invoked from plan-item-kickoff/SKILL.md and
+# plan-item-resolve/SKILL.md via execution-modes.md, so these are paths this
+# codebase controls rather than ones a human types once.
+PLAN_ITEM_MODE_SCRIPT=".claude/hooks/plan_item_mode.py"
+PLAN_ITEM_MODES_CONFIG_FILE=".claude/hooks/plan-item-modes.toml"
+PERSONAL_PLAN_ITEM_MODES_PATH=".claude/personal/plan-item-modes.toml"
+
+# EXECUTION_MODES_DOCUMENT: the shared "which mode is in force, what it
+# obliges, and when auto mode still asks" procedure that plan-item-kickoff and
+# plan-item-resolve both reference instead of each restating it - same
+# reasoning as DEPENDENCY_READINESS_DOCUMENT above.
+EXECUTION_MODES_DOCUMENT="${PLAN_DASHBOARD_DIRECTORY}/execution-modes.md"
+
+# PLAN_ITEM_GATHERING_DOCUMENT: the shared "what is already known and already
+# decided about this item?" procedure - the setup check, resolving the item off
+# the notes branch, the tracking-issue subscription, the full roadmap read, the
+# dependency chain and the standing conventions. plan-item-kickoff and
+# plan-item-resolve both run it in full and then add only what their own
+# situation needs, instead of each carrying its own copy.
+PLAN_ITEM_GATHERING_DOCUMENT="${PLAN_DASHBOARD_DIRECTORY}/plan-item-gathering.md"
 
 # GITHUB_LIST_PULL_REQUESTS_TOOL / GITHUB_PULL_REQUEST_READ_TOOL: the two
 # MCP tools every pr_data.json-gathering procedure in this system calls

@@ -73,7 +73,7 @@ from semantic_digital_twin.world_description.world_state_trajectory_plotter impo
 )
 
 
-def test_create_with_root_body_names_the_root_from_a_plain_string():
+def test_create_with_root_body_names_the_root_from_a_given_prefixed_name():
     world = World.create_with_root_body("kitchen")
     assert world.root.name == PrefixedName("kitchen")
 

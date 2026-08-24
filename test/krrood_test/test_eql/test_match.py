@@ -4,19 +4,25 @@ import pytest
 
 from krrood.entity_query_language.factories import (
     entity,
+    flat_variable,
     set_of,
     variable,
     the,
     an,
     a,
 )
-from krrood.entity_query_language.exceptions import MatchTypeCannotBeDetermined
+from krrood.entity_query_language.exceptions import (
+    MatchTypeCannotBeDetermined,
+    ReadOnlyMapping,
+)
 from krrood.entity_query_language.predicate import HasType
-from krrood.entity_query_language.query.match import Match
+from krrood.entity_query_language.query.match import AttributeMatch, Match
 from krrood.entity_query_language.core.base_expressions import UnificationDict
 from krrood.parametrization.random_events_translator import is_literal_comparator
 from ..dataset.example_classes import KRROODPositions, KRROODPosition
 from ..dataset.semantic_world_like_classes import (
+    Cabinet,
+    Drawer,
     FixedConnection,
     Container,
     Handle,
@@ -345,3 +351,24 @@ def test_has_ellipsis_attributes_true_for_ellipsis_element_in_plain_set():
         some_strings={"a", ..., "c"},
     )
     assert match.has_ellipsis_attributes is True
+
+
+# %% writing an attribute value back into a match
+
+
+def test_writing_through_a_flattened_attribute_of_a_match_is_rejected():
+    """
+    A flattening reaches every element of a collection without naming one, so a match
+    whose attribute is reached through one has no single place to write the value.
+    """
+    drawer = Drawer(handle=Handle(name="Handle1"), container=Container(name="Drawer1"))
+    match = a(Cabinet)(container=Container(name="Container1"), drawers=[drawer])
+    attribute_match = AttributeMatch(
+        parent=match,
+        attribute_name="handle",
+        assigned_value=Handle(name="Handle9"),
+        variable=flat_variable(match.variable.drawers).handle,
+    )
+
+    with pytest.raises(ReadOnlyMapping):
+        attribute_match._update_kwargs_from(match)

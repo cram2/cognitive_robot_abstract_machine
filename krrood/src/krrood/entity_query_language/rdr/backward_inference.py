@@ -177,7 +177,8 @@ def _index_conclusions_by_value(
     """One full traversal of the rule tree; buckets every conclusion value once.
 
     :param conditions_root: The root of the rule tree's condition DAG.
-    :return: A dict mapping each conclusion value to its :class:`ConclusionKnowledge`.
+    :return: A dict mapping each conclusion value to its
+        :class:`ConclusionSufficientConditionSets`.
     """
     buckets: Dict[Any, List[SufficientConditionSet]] = defaultdict(list)
     for path in _collect_rule_paths(conditions_root, []):
@@ -243,7 +244,7 @@ def get_conclusion_sufficient_conditions_from_a_rule_tree(
     complete set of conditions (including guards from ``Refinement`` and
     ``Alternative`` selectors) that must be true for the path to be traversed.
 
-    When no path exists, returns a :class:`ConclusionKnowledge` with
+    When no path exists, returns a :class:`ConclusionSufficientConditionSets` with
     ``is_satisfiable() == False``.
 
     :param expression: Any node belonging to the rule tree, or ``None`` for an empty

@@ -78,8 +78,8 @@ def test_sufficient_condition_set_requires_every_guard_to_hold():
     assert scs.evaluate_against(animal, Animal("eagle", has_fur=False, can_fly=True)) is False
 
 
-def test_what_do_we_know_about_resolves_conditions_root_from_any_tree_node():
-    """what_do_we_know_about() resolves the conditions root internally.
+def test_backward_inference_resolves_conditions_root_from_any_tree_node():
+    """Backward inference resolves the conditions root internally.
 
     Guarantee: passing any live node from the rule tree -- not only the
     already-resolved root -- yields the same knowledge, so callers never need

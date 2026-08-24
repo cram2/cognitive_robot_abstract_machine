@@ -1,4 +1,13 @@
-import os
+# %% ORM interfaces
+
+# Built before the imports below, which read a mapped datastructure: pytest imports every
+# conftest of a run before calling any hook, so a hook would fire too late. The build runs
+# once per process and never on an xdist worker.
+from ..orm_interface_build import regenerate_orm_interfaces
+
+regenerate_orm_interfaces()
+
+
 from copy import deepcopy
 from functools import partial
 
@@ -9,8 +18,6 @@ try:
 except ModuleNotFoundError:
     pass
 from sqlalchemy.orm import sessionmaker
-import runpy
-from pathlib import Path
 
 from krrood.ormatic.utils import create_engine, drop_database
 
@@ -34,20 +41,6 @@ from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import BoundingBox
 
-
-def pytest_configure(config):
-    # Only the xdist controller generates: workers run this hook too, and
-    # concurrent writers would truncate the file while another process formats it.
-    if os.environ.get("PYTEST_XDIST_WORKER"):
-        return
-
-    # Ensure ORM classes are generated before tests run
-    repo_root = Path(__file__).resolve().parents[2]
-    generate_orm_path = repo_root / "coraplex" / "scripts" / "generate_orm.py"
-    # Execute the ORM generation script as a standalone module
-    runpy.run_path(str(generate_orm_path), run_name="__main__")
-
-
 @pytest.fixture(scope="session")
 def viz_marker_publisher():
     rclpy.init()
@@ -56,13 +49,11 @@ def viz_marker_publisher():
     yield partial(VizMarkerPublisher, node=node)
     rclpy.shutdown()
 
-
 @pytest.fixture(scope="function")
 def mutable_model_world(pr2_apartment_world):
     world = deepcopy(pr2_apartment_world)
     pr2 = world.get_semantic_annotations_by_type(PR2)[0]
     return world, pr2, Context(world, pr2)
-
 
 @pytest.fixture(scope="function")
 def immutable_model_world(pr2_apartment_world):
@@ -73,7 +64,6 @@ def immutable_model_world(pr2_apartment_world):
     world.state._data[:] = state
     world.notify_state_change()
 
-
 @pytest.fixture
 def immutable_simple_pr2_world(simple_pr2_world_setup):
     world, robot_view, context = simple_pr2_world_setup
@@ -82,14 +72,12 @@ def immutable_simple_pr2_world(simple_pr2_world_setup):
     world.state._data[:] = state
     world.notify_state_change()
 
-
 @pytest.fixture
 def mutable_simple_pr2_world(simple_pr2_world_setup):
     world, robot_view, context = simple_pr2_world_setup
     copy_world = deepcopy(world)
     robot_view = world.get_semantic_annotations_by_type(PR2)[0]
     return world, robot_view, Context(copy_world, robot_view)
-
 
 @pytest.fixture(scope="function")
 def coraplex_testing_session():
@@ -102,7 +90,6 @@ def coraplex_testing_session():
     session.close()
     engine.dispose()
 
-
 @pytest.fixture(scope="function")
 def immutable_stretch_apartment_world(stretch_apartment_world):
     robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
@@ -113,7 +100,6 @@ def immutable_stretch_apartment_world(stretch_apartment_world):
 
     stretch_apartment_world.state._data[:] = state
     stretch_apartment_world.notify_state_change()
-
 
 @pytest.fixture
 def whole_scene_region(immutable_model_world) -> BoundingBox:

@@ -309,7 +309,11 @@ class InstantiatedVariable(
 
     def apply_mapping_on_external_root(self, *args, **kwargs: Dict[str, Any]) -> Any:
         """
-        Same as `MappedVariable.apply_mapping_on_external_root`
+        Build an instance of this variable's type from the given arguments.
+
+        :param args: Positional arguments for the type's constructor.
+        :param kwargs: Keyword arguments for the type's constructor.
+        :return: The constructed instance.
         """
         return self._type_(*args, **kwargs)
 

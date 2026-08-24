@@ -4,6 +4,16 @@ Fixtures for running demonstrations against a controller in its own process.
 
 from __future__ import annotations
 
+# %% ORM interfaces
+
+# Built before the imports below, which read a mapped datastructure: pytest imports every
+# conftest of a run before calling any hook, so a hook would fire too late. The build runs
+# once per process and never on an xdist worker.
+from ..orm_interface_build import regenerate_orm_interfaces
+
+regenerate_orm_interfaces()
+
+
 from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path

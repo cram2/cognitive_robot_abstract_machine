@@ -475,13 +475,6 @@ class TestRDR(TestCase):
             file = os.path.join(cwd, filename)
             expert.save_answers(file)
 
-    @unittest.skip(
-        "Flaky: MultiClassRDR.fit's expert-interaction count is not fully "
-        "deterministic, so the scripted answers in "
-        "mcrdr_expert_answers_stop_only_fit.py occasionally run out. Suspected "
-        "root cause is the conclusion-type comparison in "
-        "MultiClassRDR.add_conclusion (rdr.py), which needs developer review."
-    )
     def test_fit_mcrdr_stop_only(self):
         use_loaded_answers = True
         draw_tree = False

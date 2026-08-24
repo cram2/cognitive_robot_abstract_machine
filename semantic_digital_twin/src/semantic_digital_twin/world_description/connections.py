@@ -734,6 +734,13 @@ class Connection6DoF(Connection):
         find the DOF state that makes the *resulting* origin equal ``transformation``,
         rather than writing ``transformation`` in as ``_kinematics`` directly.
 
+        The degree-of-freedom writes and the notification they trigger are held
+        together under ``World._world_lock``. They form one logical pose
+        change, and an observer that reads or writes the state between them --
+        such as a running physics simulator syncing its own values back into
+        the world -- would otherwise see, and be able to overwrite, a pose that
+        is only half applied.
+
         :param transformation: The desired parent-to-child origin. Must carry a
             reference frame (:meth:`World.transform` raises
             :class:`~semantic_digital_twin.exceptions.MissingReferenceFrameError`
@@ -749,14 +756,15 @@ class Connection6DoF(Connection):
         )
         position = local_kinematics.to_position()
         orientation = local_kinematics.to_rotation_matrix().to_quaternion()
-        self._world.state[self.x.id].position = position[0]
-        self._world.state[self.y.id].position = position[1]
-        self._world.state[self.z.id].position = position[2]
-        self._world.state[self.qx.id].position = orientation[0]
-        self._world.state[self.qy.id].position = orientation[1]
-        self._world.state[self.qz.id].position = orientation[2]
-        self._world.state[self.qw.id].position = orientation[3]
-        self._world.notify_state_change()
+        with self._world._world_lock:
+            self._world.state[self.x.id].position = position[0]
+            self._world.state[self.y.id].position = position[1]
+            self._world.state[self.z.id].position = position[2]
+            self._world.state[self.qx.id].position = orientation[0]
+            self._world.state[self.qy.id].position = orientation[1]
+            self._world.state[self.qz.id].position = orientation[2]
+            self._world.state[self.qw.id].position = orientation[3]
+            self._world.notify_state_change()
 
     def copy_for_world(self, world: World) -> Connection6DoF:
         """
@@ -1041,16 +1049,25 @@ class OmniDrive(WheeledDrive):
         Overwrites the origin of the connection.
 
         .. warning:: Ignores z position, pitch, and yaw values.
+
+        The degree-of-freedom writes and the notification they trigger are held
+        together under ``World._world_lock``. They form one logical pose
+        change, and an observer that reads or writes the state between them --
+        such as a running physics simulator syncing its own values back into
+        the world -- would otherwise see, and be able to overwrite, a pose that
+        is only half applied.
+
         :param parent_T_child:
         """
         if isinstance(transformation, np.ndarray):
             transformation = HomogeneousTransformationMatrix(data=transformation)
         position = transformation.to_position()
         roll, pitch, yaw = transformation.to_rotation_matrix().to_rpy()
-        self._world.state[self.x.id].position = position.x
-        self._world.state[self.y.id].position = position.y
-        self._world.state[self.yaw.id].position = yaw
-        self._world.notify_state_change()
+        with self._world._world_lock:
+            self._world.state[self.x.id].position = position.x
+            self._world.state[self.y.id].position = position.y
+            self._world.state[self.yaw.id].position = yaw
+            self._world.notify_state_change()
 
     def get_free_variable_names(self) -> list[UUID]:
         return [self.x.id, self.y.id, self.yaw.id]
@@ -1303,16 +1320,25 @@ class DifferentialDrive(WheeledDrive):
         Overwrites the origin of the connection.
 
         .. warning:: Ignores z position, pitch, and yaw values.
+
+        The degree-of-freedom writes and the notification they trigger are held
+        together under ``World._world_lock``. They form one logical pose
+        change, and an observer that reads or writes the state between them --
+        such as a running physics simulator syncing its own values back into
+        the world -- would otherwise see, and be able to overwrite, a pose that
+        is only half applied.
+
         :param parent_T_child:
         """
         if isinstance(transformation, np.ndarray):
             transformation = HomogeneousTransformationMatrix(data=transformation)
         position = transformation.to_position()
         roll, pitch, yaw = transformation.to_rotation_matrix().to_rpy()
-        self._world.state[self.x.id].position = position.x
-        self._world.state[self.y.id].position = position.y
-        self._world.state[self.yaw.id].position = yaw
-        self._world.notify_state_change()
+        with self._world._world_lock:
+            self._world.state[self.x.id].position = position.x
+            self._world.state[self.y.id].position = position.y
+            self._world.state[self.yaw.id].position = yaw
+            self._world.notify_state_change()
 
     def get_free_variable_names(self) -> list[UUID]:
         return [self.x.id, self.y.id, self.yaw.id]

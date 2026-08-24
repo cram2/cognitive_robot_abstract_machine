@@ -52,8 +52,8 @@ jobs:
             ${{ runner.os }}-cache-
 
       - name: Build ORM
-        # ormatic_interface.py files are committed empty (see AGENTS.md), so the full
-        # dependency chain (semantic_digital_twin -> giskardpy -> coraplex -> segmind ->
+        # ormatic_interface.py files are not tracked (see AGENTS.md), so the full
+        # dependency chain (semantic_digital_twin -> giskardpy -> segmind -> coraplex ->
         # experiments, see scripts/regenerate_all_orm.py) must be regenerated before any
         # example or demo that touches the database can run. Every script in this
         # workflow's matrix lives under coraplex, semantic_digital_twin, or experiments,
