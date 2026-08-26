@@ -74,24 +74,24 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         The nested pipeline configuration:
 
-        * Annotator A: Runs for 9 iterations, succeeds on 10th
-        * Annotator B: Runs for 9 iterations, succeeds on 10th
+        * Preprocessing Annotator: Runs for 9 iterations, succeeds on 10th
+        * Data Analysis Annotator: Runs for 9 iterations, succeeds on 10th
         * Success check every 2 iterations
 
         :return: The configured pipeline with nested belief state processing
         """
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
-        second_seq = Sequence(name="BS Pipeline", memory=True)
+        second_seq = Sequence(name="Belief State Pipeline", memory=True)
         second_seq.add_children(
             [
                 TickCounter(
-                    name="Annotator A",
+                    name="Preprocessing Annotator",
                     duration=9,
                     completion_status=Status.SUCCESS,
                 ),
                 TickCounter(
-                    name="Annotator B",
+                    name="Data Analysis Annotator",
                     duration=9,
                     completion_status=Status.SUCCESS,
                 ),
@@ -104,7 +104,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             status=Status.SUCCESS,
         )
 
-        seq = Pipeline("RWPipeline")
+        seq = Pipeline("Real-World Pipeline")
 
         for annotator in [
             ClearAnnotatorOutputs(),
