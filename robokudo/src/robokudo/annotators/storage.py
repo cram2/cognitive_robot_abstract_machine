@@ -70,12 +70,19 @@ class StorageWriter(BaseAnnotator):
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self.storage = Storage(self.descriptor.parameters.db_name)
         self.storage_preparation_completed: bool = False
-        """Whether storage setup has already run for this writer."""
+        """
+        Whether storage setup has already run for this writer.
+        """
 
     def setup(self, **kwargs: Any) -> bool:
-        """Prepare the storage database before recording begins.
-        Guard it for executing it only once, since setup might be called multiple times
-        in the chosen tree executor."""
+        """
+        Prepare storage before recording begins.
+        It is guarded to execute only once, since setup might be called multiple times
+        in the chosen tree executor.
+
+        :param kwargs: Arguments forwarded to BaseAnnotator.setup()
+        :return: Whether storage preparation succeeded.
+        """
         if not super().setup(**kwargs):
             return False
         if self.storage_preparation_completed:
