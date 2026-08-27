@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cramera"
+authors = [
+    { name = "Vanessa Hassouna", email = "hassouna@uni-bremen.de" },
+]
+description = "Browser-based visualization for the CRAM architecture: 3D scene, EQL knowledge panel and execution graphs as swappable panels."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+keywords = ["robotics", "visualization"]
+dynamic = ["version", "dependencies"]
+license = { text = "GPL-3.0-only" }
+
+[project.urls]
+"Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
+
+[project.scripts]
+cramera = "cramera.server:main"
+cramera-live = "cramera.live.runner:main"
+cramera-onboard = "cramera.onboard.demo:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cramera*"]
+
+[tool.setuptools.package-data]
+# the web frontend ships with the package (all local assets, no CDN)
+cramera = ["web/**/*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "cramera._version.__version__" }
+dependencies = { file = "requirements.txt" }
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+]
