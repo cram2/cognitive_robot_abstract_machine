@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from __future__ import annotations
-from robokudo.io.ros import get_node
+from robokudo.io.ros import clear_node, get_node, init_node
 from robokudo.world import world_instance
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -32,7 +32,6 @@ from robokudo.annotators.query import QueryActionServer
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE, PACKAGE_NAME
 from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
-from robokudo.io.ros import init_node
 from robokudo.utils.logging_configuration import configure_logging
 from robokudo.utils.module_loader import ModuleLoader
 from robokudo.utils.tree import setup_with_descendants_rk
@@ -261,6 +260,7 @@ def main() -> None:
         thread_asrv.join()
 
         # 12. Clean up nodes
+        clear_node(node1)
         node1.destroy_node()
         query_action_server.destroy_node()
 

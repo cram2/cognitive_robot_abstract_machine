@@ -66,6 +66,11 @@ class BaseAnnotator(Behaviour):
     This class provides core functionality for CAS access, tree structure navigation,
     and GUI result handling. It serves as the foundation for implementing annotators in
     the RoboKudo framework.
+
+    Annotators may obtain RoboKudo's shared ROS node at any point in their lifecycle,
+    including while its executor is spinning, and may create and use ROS entities on it.
+    The application owns that node; annotators must not destroy it or shut down its
+    context.
     """
 
     class Descriptor:
@@ -164,8 +169,10 @@ class BaseAnnotator(Behaviour):
         Perform delayed initialization.
 
         This method is called for initialization tasks after the constructor has been
-        called. It can be used for setup calls that require ROS to be running, such as
-        setting up publishers/subscribers or drivers.
+        called. Setup may run after the shared ROS node's executor has started. An
+        annotator may obtain that node with :func:`robokudo.io.ros.get_node` and create
+        or use ROS entities on it. See :class:`BaseAnnotator` for its ownership
+        contract.
         """
         self.rk_logger.debug("%s.setup()" % self.__class__.__name__)
         return True
