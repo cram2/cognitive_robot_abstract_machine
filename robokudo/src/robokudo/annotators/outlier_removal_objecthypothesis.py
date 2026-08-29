@@ -30,10 +30,10 @@ from typing_extensions import Dict, List, Type
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS, CASViews
-from robokudo.io.ros import get_node
 from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 """
 This module implements a statistical outlierremoval based on the standard deviation and
@@ -109,7 +109,7 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.node = get_node()
+        self.node = ROSNodeRegistry().get()
 
         for param_name, default_value in vars(self.descriptor.parameters).items():
             self.node.declare_parameter(f"{self.name}/{param_name}", default_value)

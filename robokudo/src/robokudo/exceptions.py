@@ -20,22 +20,6 @@ class RoboKudoError(DataclassException, ABC):
 
 
 @dataclass
-class RoboKudoROSNodeMissing(RoboKudoError, RuntimeError):
-    """
-    Raised when a component requires the central RoboKudo ROS node.
-    """
-
-    def error_message(self) -> str:
-        return "RoboKudo ROS node is not initialized."
-
-    def suggest_correction(self) -> str:
-        return (
-            "initialize RoboKudo's central ROS node before constructing ROS-backed "
-            "interfaces."
-        )
-
-
-@dataclass
 class ColorToDepthRatioMissing(RoboKudoError, RuntimeError):
     """
     Raised when COLOR2DEPTH_RATIO is required but missing.

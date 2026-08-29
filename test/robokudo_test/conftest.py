@@ -7,9 +7,9 @@ import rclpy
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 from rclpy.node import Node
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 import robokudo.defs
-import robokudo.io.ros
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
 )
@@ -124,10 +124,11 @@ def ros_default():
 
 @pytest.fixture
 def node(ros_default):
+    node_registry = ROSNodeRegistry()
     n = Node(robokudo.defs.TEST_ROS_NODE_NAME)
-    robokudo.io.ros.register_node(n)
+    node_registry.register(n)
     yield n
-    robokudo.io.ros.clear_node(n)
+    node_registry.clear(n)
     n.destroy_node()
 
 

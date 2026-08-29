@@ -170,9 +170,10 @@ class BaseAnnotator(Behaviour):
 
         This method is called for initialization tasks after the constructor has been
         called. Setup may run after the shared ROS node's executor has started. An
-        annotator may obtain that node with :func:`robokudo.io.ros.get_node` and create
-        or use ROS entities on it. See :class:`BaseAnnotator` for its ownership
-        contract.
+        annotator may obtain that node with
+        :meth:`semantic_digital_twin.adapters.ros.node_registry.ROSNodeRegistry.get`
+        and create or use ROS entities on it. See :class:`BaseAnnotator` for its
+        ownership contract.
         """
         self.rk_logger.debug("%s.setup()" % self.__class__.__name__)
         return True

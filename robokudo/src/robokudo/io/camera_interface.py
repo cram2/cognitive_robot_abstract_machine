@@ -44,7 +44,6 @@ from typing_extensions import Optional, List, Any, TYPE_CHECKING, Union, Tuple
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import CameraDataMissing
-from robokudo.io.ros import get_node
 from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.types.tf import StampedTransform
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
@@ -53,6 +52,7 @@ from robokudo.world import (
     update_connection_transform,
     world_instance,
 )
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 if TYPE_CHECKING:
@@ -189,7 +189,7 @@ class ROSCameraInterface(CameraInterface):
         """
         super().__init__(camera_config)
 
-        self.node = node if node is not None else get_node()
+        self.node = node if node is not None else ROSNodeRegistry().get()
         """
         ROS node for communication with ROS.
         """

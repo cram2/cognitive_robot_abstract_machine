@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 from __future__ import annotations
-from robokudo.io.ros import clear_node, get_node, init_node
+
 from robokudo.world import world_instance
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -178,7 +179,8 @@ def main() -> None:
 
     # 4. Create a main ROS node
     node_name = PACKAGE_NAME + args.nodesuffix
-    node1 = init_node(
+    node_registry = ROSNodeRegistry()
+    node1 = rclpy.create_node(
         node_name,
         parameter_overrides=[
             Parameter(
@@ -189,6 +191,7 @@ def main() -> None:
             ),
         ],
     )
+    node_registry.register(node1)
     logger.info(f"Created node: {node_name}")
 
     # 5. Create any action servers or supporting nodes
@@ -243,7 +246,7 @@ def main() -> None:
     # If you have a custom version of `setup_with_descendants`, call it:
     setup_with_descendants_rk(ae_root)
 
-    viz = VizMarkerPublisher(_world=world_instance(), node=get_node())
+    viz = VizMarkerPublisher(_world=world_instance(), node=node1)
 
     try:
         # 9. Start ticking the Behavior Tree
@@ -260,7 +263,7 @@ def main() -> None:
         thread_asrv.join()
 
         # 12. Clean up nodes
-        clear_node(node1)
+        node_registry.clear(node1)
         node1.destroy_node()
         query_action_server.destroy_node()
 

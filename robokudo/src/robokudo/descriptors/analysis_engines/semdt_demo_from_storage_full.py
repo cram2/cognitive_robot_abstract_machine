@@ -1,5 +1,5 @@
-from robokudo.io.ros import get_node
 from robokudo.world import world_instance
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.clip_annotator import ClipAnnotator
@@ -28,7 +28,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         Create a pipeline that does tabletop segmentation and integrates primary
         navigation using a YOLO annotator.
         """
-        tf_publisher = TFPublisher(_world=world_instance(), node=get_node())
+        tf_publisher = TFPublisher(
+            _world=world_instance(), node=ROSNodeRegistry().get()
+        )
 
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
             "mongo", loop=False

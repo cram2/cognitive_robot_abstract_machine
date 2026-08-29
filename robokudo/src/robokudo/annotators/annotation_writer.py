@@ -17,7 +17,7 @@ from typing_extensions import Optional
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.cas_annotation_codecs import serialize_annotations
-from robokudo.io.ros import get_node
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 
 class AnnotationStorageWriter(BaseAnnotator):
@@ -136,7 +136,7 @@ class AnnotationPublisherWriter(BaseAnnotator):
         """
         self.rk_logger.debug("%s.setup()" % self.__class__.__name__)
 
-        node = get_node()
+        node = ROSNodeRegistry().get()
         self.pub = node.create_publisher(
             String, self.descriptor.parameters.topic_name, 10
         )

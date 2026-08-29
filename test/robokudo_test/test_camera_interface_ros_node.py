@@ -1,9 +1,11 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 import pytest
 
-from robokudo.exceptions import RoboKudoROSNodeMissing
 from robokudo.io import camera_interface
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from semantic_digital_twin.exceptions import ROSNodeNotRegisteredError
 
 # %% ROS node ownership
 
@@ -15,35 +17,42 @@ class CameraConfigWithoutTF:
     """
 
     interface_type: str = "ROSCameraInterface"
+    """
+    Selects the ROS camera interface implementation.
+    """
 
 
+@dataclass
 class RegisteredNode:
     """
     Mimic a registered ROS node.
     """
 
 
-def fail_private_node_creation(node_name: str):
-    raise AssertionError("ROSCameraInterface must use the registered RoboKudo node")
+@pytest.fixture
+def node_registry() -> Iterator[ROSNodeRegistry]:
+    """
+    Provide the empty process registry required by the camera integration tests.
+    """
+    registry = ROSNodeRegistry()
+    registry.clear()
+    yield registry
+    registry.clear()
 
 
-def test_ros_camera_interface_uses_registered_robokudo_node(monkeypatch):
+def test_ros_camera_interface_uses_registered_node(
+    node_registry: ROSNodeRegistry,
+) -> None:
     registered_node = RegisteredNode()
-    monkeypatch.setattr(camera_interface, "get_node", lambda: registered_node)
-    monkeypatch.setattr(camera_interface, "Node", fail_private_node_creation)
+    node_registry.register(registered_node)
 
     interface = camera_interface.ROSCameraInterface(CameraConfigWithoutTF())
 
     assert interface.node is registered_node
 
 
-def test_ros_camera_interface_raises_when_no_robokudo_node_exists(monkeypatch):
-    monkeypatch.setattr(
-        camera_interface,
-        "get_node",
-        lambda: (_ for _ in ()).throw(RoboKudoROSNodeMissing()),
-    )
-    monkeypatch.setattr(camera_interface, "Node", fail_private_node_creation)
-
-    with pytest.raises(RoboKudoROSNodeMissing):
+def test_ros_camera_interface_raises_when_no_node_is_registered(
+    node_registry: ROSNodeRegistry,
+) -> None:
+    with pytest.raises(ROSNodeNotRegisteredError):
         camera_interface.ROSCameraInterface(CameraConfigWithoutTF())

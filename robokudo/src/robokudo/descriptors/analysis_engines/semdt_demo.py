@@ -13,7 +13,6 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.idioms import pipeline_init
-from robokudo.io.ros import get_node
 from robokudo.pipeline import Pipeline
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
