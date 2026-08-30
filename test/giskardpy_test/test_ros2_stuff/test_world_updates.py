@@ -411,9 +411,9 @@ def control_loop(init_rospy) -> ControlLoopFixture:
     controlled_world = World(name="controlled")
     remote_world = World(name="remote")
     controlled_synchronizer = WorldSynchronizer(
-        node=rospy.node, _world=controlled_world
+        node=rospy.get_node(), _world=controlled_world
     )
-    remote_synchronizer = WorldSynchronizer(node=rospy.node, _world=remote_world)
+    remote_synchronizer = WorldSynchronizer(node=rospy.get_node(), _world=remote_world)
     time.sleep(0.3)
 
     # Build the structure on one side and let it propagate, so both worlds refer to the

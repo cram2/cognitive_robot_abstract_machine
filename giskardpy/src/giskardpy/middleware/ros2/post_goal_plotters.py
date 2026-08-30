@@ -72,7 +72,7 @@ class GoalTrajectoryPlotter(PostGoalPlotter):
             return
         file_name = self.create_file_name("trajectories", goal_id)
         self.trajectory_plotter.plot_trajectory(file_name)
-        rospy.node.get_logger().info(f"saved {file_name}")
+        rospy.get_node().get_logger().info(f"saved {file_name}")
 
 
 @dataclass
@@ -95,7 +95,7 @@ class GoalGanttChartPlotter(PostGoalPlotter):
             context=self.executor.context,
             second_length_in_cm=self.second_length_in_cm,
         )
-        rospy.node.get_logger().info(f"saved {file_name}")
+        rospy.get_node().get_logger().info(f"saved {file_name}")
 
 
 @dataclass
@@ -107,4 +107,4 @@ class MotionStatechartPlotter(PostGoalPlotter):
     def plot(self, goal_id: int) -> None:
         file_name = self.create_file_name("motion_statecharts", goal_id)
         self.executor.motion_statechart.draw(file_name)
-        rospy.node.get_logger().info(f"saved {file_name}")
+        rospy.get_node().get_logger().info(f"saved {file_name}")

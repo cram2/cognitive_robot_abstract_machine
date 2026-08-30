@@ -147,10 +147,10 @@ class TopicInputSynchronizer(
     def __post_init__(self):
         if not self.topic_name.startswith("/"):
             self.topic_name = f"/{self.topic_name}"
-        self.subscription = rospy.node.create_subscription(
+        self.subscription = rospy.get_node().create_subscription(
             self.message_type(), self.topic_name, self.buffer_message, 1
         )
-        rospy.node.get_logger().info(f"Subscribed to {self.topic_name}")
+        rospy.get_node().get_logger().info(f"Subscribed to {self.topic_name}")
 
     @classmethod
     def message_type(cls) -> Type[MessageType]:
@@ -191,7 +191,7 @@ class TopicInputSynchronizer(
         """
 
     def close(self) -> None:
-        rospy.node.destroy_subscription(self.subscription)
+        rospy.get_node().destroy_subscription(self.subscription)
 
 
 # %% joint states
@@ -295,7 +295,7 @@ class TfFrameSynchronizer(InputSynchronizer):
     """
 
     def __post_init__(self):
-        self.tf_wrapper = TFWrapper(node=rospy.node)
+        self.tf_wrapper = TFWrapper(node=rospy.get_node())
 
     def track(
         self, connection: Connection6DoF, tf_parent_frame: str, tf_child_frame: str

@@ -117,7 +117,7 @@ class ActionServerHandler:
 
     def __post_init__(self):
         self._action_server = ActionServer(
-            node=rospy.node,
+            node=rospy.get_node(),
             action_type=self.action_type,
             action_name=self.action_name,
             execute_callback=self.execute_callback,
@@ -129,7 +129,7 @@ class ActionServerHandler:
         """
         Log a message tagged with the action name and the current goal id.
         """
-        rospy.node.get_logger().info(
+        rospy.get_node().get_logger().info(
             f"{self.action_name}(Goal #{self.goal_id}): {message}"
         )
 

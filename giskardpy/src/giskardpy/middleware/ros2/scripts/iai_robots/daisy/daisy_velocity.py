@@ -14,10 +14,10 @@ from rclpy.exceptions import ParameterUninitializedException
 def main():
     rospy.init_node("giskard")
     try:
-        rospy.node.declare_parameters(
+        rospy.get_node().declare_parameters(
             namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
         )
-        robot_description = rospy.node.get_parameter_or("robot_description").value
+        robot_description = rospy.get_node().get_parameter_or("robot_description").value
     except ParameterUninitializedException as e:
         robot_description = load_xacro(
             "package://iai_daisy_description/robots/daisy.urdf.xacro"
