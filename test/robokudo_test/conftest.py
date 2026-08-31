@@ -6,6 +6,7 @@ import pytest
 import rclpy
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
+from py_trees.blackboard import Blackboard
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
@@ -134,22 +135,9 @@ def node(ros_default):
 
 @pytest.fixture(autouse=True)
 def cleanup_after_test():
+    """
+    Give each RoboKudo test an isolated behavior-tree blackboard.
+    """
+    Blackboard.clear()
     yield
-
-
-# Move this to general test/conftest.py?
-# @pytest.fixture(autouse=True, scope="function")
-# def cleanup_after_test(request):
-#     if request.node.get_closest_marker("skip_heavy_cleanup"):
-#         yield
-#         return
-#
-#     # heavy setup
-#     SymbolGraph.clear()
-#     class_diagram = ClassDiagram(
-#         recursive_subclasses(Symbol) + [World],
-#         introspector=DescriptorAwareIntrospector(),
-#     )
-#     SymbolGraph(_class_diagram=class_diagram)
-#     yield
-#     SymbolGraph.clear()
+    Blackboard.clear()
