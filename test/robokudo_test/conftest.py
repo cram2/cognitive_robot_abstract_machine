@@ -1,4 +1,5 @@
 import os
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 import py_trees
@@ -14,6 +15,7 @@ import robokudo.defs
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
 )
+from robokudo.identifier import BBIdentifier
 
 # %% Mongo storage preservation
 
@@ -133,11 +135,22 @@ def node(ros_default):
     n.destroy_node()
 
 
+def clear_blackboard() -> None:
+    """
+    Destroy blackboard-owned ROS nodes before clearing shared state.
+    """
+    blackboard = Blackboard()
+    if blackboard.exists(BBIdentifier.QUERY_SERVER):
+        query_server = blackboard.get(BBIdentifier.QUERY_SERVER)
+        query_server.destroy()
+    Blackboard.clear()
+
+
 @pytest.fixture(autouse=True)
-def cleanup_after_test():
+def isolate_blackboard() -> Iterator[None]:
     """
     Give each RoboKudo test an isolated behavior-tree blackboard.
     """
-    Blackboard.clear()
+    clear_blackboard()
     yield
-    Blackboard.clear()
+    clear_blackboard()
