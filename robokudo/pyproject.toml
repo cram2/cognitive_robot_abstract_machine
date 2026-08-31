@@ -36,6 +36,8 @@ dependencies = [
     "pooch",
     "krrood",
     "semantic_digital_twin",
+    "transformers",
+    "faiss-cpu"
 ]
 
 [project.urls]
