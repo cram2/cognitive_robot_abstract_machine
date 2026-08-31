@@ -259,7 +259,7 @@ class ROSNodeNotRegisteredError(UsageError, RuntimeError):
     def suggest_correction(self) -> str:
         return (
             "register the application-owned ROS node before constructing components "
-            "that require ROS access."
+            "that require ROS access. Please check out the ROSNodeRegistry class and its register() method."
         )
 
 
