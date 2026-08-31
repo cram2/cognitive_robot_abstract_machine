@@ -86,7 +86,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
 
     @left.setter
     def left(self, value: Bound):
-        self.cpp_object.left = value.value
+        self.cpp_object.left = rl.BorderType(value.value)
 
     @property
     def right(self) -> Bound:
@@ -97,7 +97,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
 
     @right.setter
     def right(self, value: Bound):
-        self.cpp_object.right = value.value
+        self.cpp_object.right = rl.BorderType(value.value)
 
     @classmethod
     def _from_cpp(cls, cpp_object: rl.SimpleInterval) -> Self:

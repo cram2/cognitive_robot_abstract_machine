@@ -92,7 +92,6 @@ class VerbalizationResultGenerator:
         imports = get_imports_from_types(
             [
                 VerbalizationResult,
-                Tuple,
                 *(result.callable_class for result in results),
             ]
         )

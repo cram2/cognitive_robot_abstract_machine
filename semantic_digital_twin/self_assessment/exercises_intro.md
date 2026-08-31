@@ -21,8 +21,8 @@ What you will get
 - Hints where appropriate, and space for your own solution
 
 Prerequisites
-- A working Python environment with the project dependencies installed: `pip install -r requirements.txt`
-- Make sure to also install the self-assessment dependencies: `pip install -r requirements-self-assessment.txt`
+- A working Python environment with the project dependencies installed: `pip install -e .`
+- Make sure to also install the self-assessment dependencies: `pip install -e ".[self-assessment]"`
 - To check if you have set up everything correctly run `bash scripts/test_exercises.sh` from the project root.
 
 How to use these exercises

@@ -25,9 +25,12 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from coraplex.robot_plans.motions.gripper import MoveGripperMotion
 from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
+from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
+from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianOrientation,
     CartesianPose,
     CartesianPositionVelocityLimit,
     CartesianRotationVelocityLimit,
@@ -40,6 +43,7 @@ from giskardpy.motion_statechart.tasks.pointing import Pointing
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.spatial_types import Point3, Quaternion
 from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 try:
     from coraplex.alternative_motion_mappings.hsrb_motion_mapping import *
@@ -62,7 +66,9 @@ def test_pick_up_motion(immutable_model_world):
         view.left_arm.end_effector,
     )
     pick_up = PickUpAction(
-        test_world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
+        test_world.get_semantic_annotations_by_type(Milk)[0],
+        Arms.LEFT,
+        grasp_description,
     )
 
     root = sequential(
@@ -338,7 +344,7 @@ def test_pick_up_action_close_motion_stall_tolerance_defaults_to_false(
         view.left_arm.end_effector,
     )
     pick_up = PickUpAction(
-        world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
+        world.get_semantic_annotations_by_type(Milk)[0], Arms.LEFT, grasp_description
     )
     sequential([pick_up], context=context)
 
@@ -364,7 +370,7 @@ def test_pick_up_action_close_motion_tolerates_stall_when_enabled(
         view.left_arm.end_effector,
     )
     pick_up = PickUpAction(
-        world.get_body_by_name("milk.stl"),
+        world.get_semantic_annotations_by_type(Milk)[0],
         Arms.LEFT,
         grasp_description,
         tolerate_grasp_stall=True,
@@ -393,7 +399,7 @@ def test_pick_up_action_velocity_fields_default_to_none(immutable_model_world):
     )
 
     pick_up = PickUpAction(
-        world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
+        world.get_semantic_annotations_by_type(Milk)[0], Arms.LEFT, grasp_description
     )
 
     assert pick_up.pre_approach_linear_velocity is None
@@ -466,12 +472,12 @@ def test_looking_motion_pointing_parameters(immutable_model_world):
 
 
 @pytest.mark.skipif(skip_tests, reason="Alternative motion mappings not available")
-def test_stretch_tool_center_point_straightens_wrist_while_turning(
+def test_stretch_tool_center_point_holds_the_base_heading(
     immutable_stretch_apartment_world,
 ):
     """
-    Straightening the wrist runs alongside the base rotation, so the gripper is already
-    aligned once the cartesian goal takes over.
+    The base orientation is held alongside the cartesian goal rather than before it, so
+    the base keeps the heading it started with while the arm reaches.
     """
     world, robot, context = immutable_stretch_apartment_world
     context.alternative_motion_mappings = [StretchMoveToolCenterPoint]
@@ -482,17 +488,13 @@ def test_stretch_tool_center_point_straightens_wrist_while_turning(
     execute_single(motion, context=context)
 
     with real_robot:
-        turning_stage = motion.motion_chart.nodes[0]
+        heading_stage = motion.motion_chart.nodes[0]
 
-    assert isinstance(turning_stage, Parallel)
-    assert {type(node) for node in turning_stage.nodes} == {Pointing, JointPositionList}
-    wrist_goal = next(
-        node for node in turning_stage.nodes if isinstance(node, JointPositionList)
-    )
-    assert [
-        connection.name.name for connection in wrist_goal.goal_state.connections
-    ] == ["joint_wrist_yaw"]
-    assert wrist_goal.goal_state.target_values == [0.0]
+    assert isinstance(heading_stage, CartesianOrientation)
+    assert heading_stage.root_link is world.root
+    assert heading_stage.tip_link is robot.root
+    assert heading_stage.binding_policy is GoalBindingPolicy.Bind_on_start
+    assert heading_stage.goal_orientation.reference_frame is robot.root
 
 
 @pytest.mark.skipif(skip_tests, reason="Alternative motion mappings not available")
@@ -517,7 +519,7 @@ def test_stretch_tool_center_point_accepts_a_local_minimum(
     assert isinstance(reaching_stage, Parallel)
     assert reaching_stage.minimum_success == 1
     assert {type(node) for node in reaching_stage.nodes} == {
-        CartesianPose,
+        CartesianPoseStraight,
         LocalMinimumReached,
     }
     local_minimum = next(

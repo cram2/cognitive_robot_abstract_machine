@@ -1,11 +1,15 @@
 import numpy as np
 import pytest
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Region, Body
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+    ShapeCollection,
+)
 from semantic_digital_twin.world_description.geometry import Color, Scale, Box
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
-    navigation_map_at_target,
+    PlanarGraphOfBoundingBoxes,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -53,10 +57,19 @@ def test_spawn_as_region(simple_world):
     world, target = simple_world
 
     # Create navigation map at target
-    gcs = navigation_map_at_target(target=target)
+    gcs = PlanarGraphOfBoundingBoxes.navigation_map_at_target(target=target)
 
-    # Spawn GCS as region
-    region = gcs.create_as_region()
+    # Spawn the GCS's free space as a region, extruded into a slab since the GCS's own
+    # boxes are 2D. The floor's supporting surface stands in for the target's own
+    # storage-space annotation here.
+    slab_height = 0.1
+    half_height = slab_height / 2
+    floor = Floor(root=target, _world=world)
+    boxes = BoundingBoxCollection(
+        [box.extrude(half_height) for box in gcs.graph.nodes()],
+        gcs.search_space.reference_frame,
+    )
+    region = floor.spawn_bounding_boxes_as_region(boxes=boxes)
 
     assert isinstance(region, Region)
     assert region in world.regions
@@ -73,9 +86,10 @@ def test_spawn_as_region(simple_world):
 
     expected_center_x = box.x_interval.center()
     expected_center_y = box.y_interval.center()
-    expected_center_z = box.z_interval.center()
+    expected_center_z = box.origin.z
 
     # Shape origin relative to region
     assert np.allclose(shape.origin.x, expected_center_x)
     assert np.allclose(shape.origin.y, expected_center_y)
     assert np.allclose(shape.origin.z, expected_center_z)
+    assert np.isclose(shape.scale.z, slab_height)

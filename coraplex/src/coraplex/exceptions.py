@@ -105,6 +105,24 @@ class WipingTargetMissing(DataclassException):
 
 
 @dataclass
+class PerceptionTargetMissing(DataclassException):
+    """
+    Raised when an action is asked to perceive before grasping but names no object.
+    """
+
+    instance: Designator
+    """
+    The action that has no object to detect.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.instance} perceives before grasping but names no object."
+
+    def suggest_correction(self) -> str:
+        return "provide an object_designator or leave perceive_before_grasp off."
+
+
+@dataclass
 class MissingToolFrame(DataclassException):
     """
     Raised when no tool frame is available for the requested arm.

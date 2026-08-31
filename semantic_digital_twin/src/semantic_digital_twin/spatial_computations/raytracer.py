@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing_extensions import Tuple, List, TYPE_CHECKING
+from typing_extensions import Optional, Tuple, List, TYPE_CHECKING
 
 import numpy as np
 import trimesh
 from trimesh import Scene
 
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.spatial_types.spatial_types import GenericSpatialType
@@ -25,6 +26,7 @@ class RayTracer:
     """
     Last model version of the world to which the ray tracer was updated.
     """
+
     _last_world_state: int
     """
     Last state version of the world to which the ray tracer was updated.
@@ -34,6 +36,7 @@ class RayTracer:
     """
     Maps the index of a body to the body itself.
     """
+
     scene_to_index: dict
     """
     Maps the index in the trimesh scene to the index of the body in the world.
@@ -121,6 +124,7 @@ class RayTracer:
         resolution: int = 512,
         min_distance: float = 0,
         max_distance: float = np.inf,
+        field_of_view: Optional[FieldOfView] = None,
     ) -> np.ndarray:
         """
         Creates a segmentation mask for the ray tracer scene from the camera position to
@@ -133,11 +137,12 @@ class RayTracer:
         :param resolution: The resolution of the segmentation mask.
         :param min_distance: The minimum distance of a body to be considered a hit.
         :param max_distance: The maximum distance of a body to be considered a hit.
+        :param field_of_view: The field of view of the camera, defaulting to FieldOfView()
         :return: A segmentation mask as a numpy array.
         """
         self.update_scene()
         ray_origins, ray_directions, pixels = self.create_camera_rays(
-            camera_pose, resolution=resolution
+            camera_pose, resolution=resolution, field_of_view=field_of_view
         )
 
         target_points = ray_origins + ray_directions * 10
@@ -172,6 +177,7 @@ class RayTracer:
         resolution: int = 512,
         min_distance: float = 0,
         max_distance: float = np.inf,
+        field_of_view: Optional[FieldOfView] = None,
     ) -> np.ndarray:
         """
         Creates a depth map for the ray tracer scene from the camera position to the
@@ -184,11 +190,12 @@ class RayTracer:
         :param resolution: The resolution of the depth map.
         :param min_distance: The minimum distance of a body to be considered a hit.
         :param max_distance: The maximum distance of a body to be considered a hit.
+        :param field_of_view: The field of view of the camera, defaulting to FieldOfView()
         :return: A depth map as a numpy array.
         """
         self.update_scene()
         ray_origins, ray_directions, pixels = self.create_camera_rays(
-            camera_pose, resolution=resolution
+            camera_pose, resolution=resolution, field_of_view=field_of_view
         )
 
         target_points = ray_origins + ray_directions * 10
@@ -224,7 +231,10 @@ class RayTracer:
         return a
 
     def create_camera_rays(
-        self, camera_pose: GenericSpatialType, resolution: int = 512, fov=90
+        self,
+        camera_pose: GenericSpatialType,
+        resolution: int = 512,
+        field_of_view: Optional[FieldOfView] = None,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Creates camera rays for the ray tracer scene from the camera position to the
@@ -235,13 +245,13 @@ class RayTracer:
 
         :param camera_pose: The position of the camera as a 4x4 transformation matrix.
         :param resolution: The resolution of the camera rays.
-        :param fov: The field of view of the camera in degrees.
+        :param field_of_view: The field of view of the camera, defaulting to FieldOfView()
         :return: The origin points of the rays, the direction vectors of the rays, and
             the pixel coordinates.
         """
+        field_of_view = field_of_view or FieldOfView()
         camera_pose = camera_pose.to_np()
         self.update_scene()
-        self.scene.camera.resolution = (resolution, resolution)
         # By default, the camera is looking along the -z axis, so we need to rotate it to look along the x-axis.
         rotate = trimesh.transformations.rotation_matrix(
             angle=np.radians(-90.0), direction=[0, 1, 0]
@@ -250,7 +260,10 @@ class RayTracer:
             angle=np.radians(180.0), direction=[1, 0, 0]
         )
 
-        self.scene.camera.fov = (fov, fov)
+        self.scene.camera.fov = (
+            np.degrees(field_of_view.horizontal_angle),
+            np.degrees(field_of_view.vertical_angle),
+        )
         self.scene.camera.resolution = [resolution, resolution]
         self.scene.graph[self.scene.camera.name] = camera_pose @ rotate_x @ rotate
 

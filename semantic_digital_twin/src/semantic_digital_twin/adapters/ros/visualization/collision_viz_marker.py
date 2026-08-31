@@ -99,6 +99,15 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer):
         time.sleep(0.2)
         self.world.collision_manager.add_collision_consumer(self)
 
+    def stop(self):
+        """
+        Stop consuming collision results.
+
+        The consumer publishes on a node that may already be gone once the world it is
+        registered on outlives it.
+        """
+        self.world.collision_manager.remove_collision_consumer(self)
+
     def on_world_model_update(self, world: World):
         self._root_frame_name = str(world.root.name)
 

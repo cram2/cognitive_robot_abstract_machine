@@ -112,10 +112,12 @@ repository - hooks that run automatically each session, and skills invoked
 on demand (`/<skill-name>`). Each is documented where it lives; the links
 below are a starting point, not a duplicate of that documentation.
 
-**New here? Start with [`.claude/hooks/README.md`](.claude/hooks/README.md)** -
-it walks through the one-time setup (a single script, no config needed) and
-everything it unlocks (personal notes, per-PR progress tracking, multi-PR
-plan dashboards) end to end, in order.
+**New here? Start with [`.claude/SETUP.md`](.claude/SETUP.md)** - the one-time
+setup in three steps, including what to change in your fork, your GitHub
+access and your Claude environment.
+[`.claude/hooks/README.md`](.claude/hooks/README.md) is the reference behind
+it: what the setup configures, and everything it unlocks (personal notes,
+per-PR progress tracking, multi-PR plan dashboards).
 
 - **[`.claude/hooks/`](.claude/hooks/README.md)** - a `SessionStart` hook
   that carries a contributor's own personal workflow notes, per-PR

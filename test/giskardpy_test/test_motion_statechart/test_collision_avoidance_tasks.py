@@ -674,7 +674,7 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
 def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
     VizMarkerPublisher(
         _world=pr2_with_box, node=rclpy_node
-    ).with_tf_and_collision_visualization()
+    ).with_collision_visualization()
     r_tip = pr2_with_box.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     l_forearm_link = pr2_with_box.get_kinematic_structure_entity_by_name(
         "l_forearm_link"

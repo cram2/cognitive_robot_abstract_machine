@@ -1,10 +1,12 @@
 import math
 import unittest
+from enum import Enum, auto
 
 import numpy as np
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
-from random_events.variable import Continuous
+from random_events.set import Set
+from random_events.variable import Continuous, Symbolic
 
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -12,7 +14,9 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
+from probabilistic_model.distributions.distributions import SymbolicDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
+from probabilistic_model.utils import MissingDict
 
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
@@ -796,6 +800,231 @@ class BackdoorAdjustmentWithAdjustmentTestCase(unittest.TestCase):
         )
 
 
+class Season(Enum):
+    WARM = auto()
+    COLD = auto()
+
+
+class Treatment(Enum):
+    LOW = auto()
+    HIGH = auto()
+
+
+class Outcome(Enum):
+    GOOD = auto()
+    BAD = auto()
+
+
+def _build_discrete_confounded_circuit() -> tuple:
+    """
+    Circuit with a discrete confounder (season) driving both a discrete cause
+    (treatment) and the effect (outcome), where treatment has no causal effect of
+    its own -- unlike `_build_confounded_circuit`'s continuous, deterministically
+    branch-tied cause, treatment's own distribution *overlaps* across confounder
+    states (both values have positive probability in both seasons), the shape that
+    exposes the union-coalescing `_split_into_atomic_values` exists to undo.
+
+    Two equal-weight strata:
+        Warm stratum (p=0.6): P(treatment=HIGH)=0.8, outcome=GOOD (deterministic)
+        Cold stratum (p=0.4): P(treatment=HIGH)=0.3, outcome=BAD (deterministic)
+
+    Ground truth:
+        P(outcome=GOOD | treatment=HIGH) = 0.8 -- spurious, driven by season.
+        P(outcome=GOOD | do(treatment=HIGH)) = 0.6 -- causal truth after adjusting
+            for season; equal to P(outcome=GOOD | do(treatment=LOW)), since
+            treatment has no real effect on outcome.
+    """
+    season = Symbolic("season", domain=Set.from_iterable(Season))
+    treatment = Symbolic("treatment", domain=Set.from_iterable(Treatment))
+    outcome = Symbolic("outcome", domain=Set.from_iterable(Outcome))
+
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    for season_value, treatment_high_probability, stratum_weight, outcome_value in [
+        (Season.WARM, 0.8, 0.6, Outcome.GOOD),
+        (Season.COLD, 0.3, 0.4, Outcome.BAD),
+    ]:
+        component = ProductUnit(probabilistic_circuit=circuit)
+        component.add_subcircuit(
+            leaf(
+                SymbolicDistribution(
+                    variable=season,
+                    probabilities=MissingDict(float, {hash(season_value): 1.0}),
+                ),
+                circuit,
+            )
+        )
+        treatment_distribution = SumUnit(probabilistic_circuit=circuit)
+        treatment_distribution.add_subcircuit(
+            leaf(
+                SymbolicDistribution(
+                    variable=treatment,
+                    probabilities=MissingDict(float, {hash(Treatment.HIGH): 1.0}),
+                ),
+                circuit,
+            ),
+            math.log(treatment_high_probability),
+        )
+        treatment_distribution.add_subcircuit(
+            leaf(
+                SymbolicDistribution(
+                    variable=treatment,
+                    probabilities=MissingDict(float, {hash(Treatment.LOW): 1.0}),
+                ),
+                circuit,
+            ),
+            math.log(1 - treatment_high_probability),
+        )
+        component.add_subcircuit(treatment_distribution)
+        component.add_subcircuit(
+            leaf(
+                SymbolicDistribution(
+                    variable=outcome,
+                    probabilities=MissingDict(float, {hash(outcome_value): 1.0}),
+                ),
+                circuit,
+            )
+        )
+        root.add_subcircuit(component, math.log(stratum_weight))
+
+    return circuit, treatment, season, outcome
+
+
+def _symbolic_probability(circuit: ProbabilisticCircuit, variable, value) -> float:
+    """
+    :return: P(variable == value) from circuit.
+    """
+    event = (
+        SimpleEvent.from_data({variable: Set.from_iterable([value])})
+        .as_composite_set()
+        .fill_missing_variables_pure(circuit.variables)
+    )
+    return float(circuit.probability(event))
+
+
+class DiscreteConfounderAdjustmentTestCase(unittest.TestCase):
+    """
+    `_build_discrete_confounded_circuit`'s treatment has no causal effect on outcome,
+    only a spurious correlation through the discrete confounder season. Regression
+    coverage for the union-coalescing bug `_split_into_atomic_values` fixes in
+    `_extract_disjoint_regions_for_variable` and `_extract_leaf_regions_for_variables`,
+    and for the cause-region weighting fix in.
+
+    `_add_region_for_cause_value` (weighting by P(cause=v), not P(cause=v | stratum)
+    * P(stratum), so a discrete adjustment set is not just a structural no-op).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.circuit, cls.treatment, cls.season, cls.outcome = (
+            _build_discrete_confounded_circuit()
+        )
+        cls.cc = CausalCircuit.from_probabilistic_circuit(
+            cls.circuit,
+            MarginalDeterminismTreeNode.from_causal_graph(
+                [cls.treatment, cls.season], [cls.outcome]
+            ),
+            [cls.treatment, cls.season],
+            [cls.outcome],
+        )
+
+    def test_conditioning_is_confounded(self):
+        conditioned, _ = self.circuit.truncated(
+            SimpleEvent.from_data({self.treatment: Set.from_iterable([Treatment.HIGH])})
+            .as_composite_set()
+            .fill_missing_variables_pure(self.circuit.variables)
+        )
+        self.assertAlmostEqual(
+            _symbolic_probability(conditioned, self.outcome, Outcome.GOOD),
+            0.8,
+            delta=0.01,
+        )
+
+    def test_intervention_without_adjustment_matches_conditioning(self):
+        # An empty adjustment set cannot separate the confound from the effect --
+        # it should reproduce the same spurious 0.8, not the causal 0.6.
+        naive = self.cc.backdoor_adjustment(self.treatment, self.outcome)
+        narrowed, _ = naive.truncated(
+            SimpleEvent.from_data({self.treatment: Set.from_iterable([Treatment.HIGH])})
+            .as_composite_set()
+            .fill_missing_variables_pure(naive.variables)
+        )
+        self.assertAlmostEqual(
+            _symbolic_probability(narrowed, self.outcome, Outcome.GOOD),
+            0.8,
+            delta=0.01,
+        )
+
+    def test_adjustment_recovers_causal_probability_for_each_cause_value(self):
+        adjusted = self.cc.backdoor_adjustment(
+            self.treatment, self.outcome, [self.season]
+        )
+        for treatment_value in (Treatment.HIGH, Treatment.LOW):
+            with self.subTest(treatment=treatment_value):
+                narrowed, region_probability = adjusted.truncated(
+                    SimpleEvent.from_data(
+                        {self.treatment: Set.from_iterable([treatment_value])}
+                    )
+                    .as_composite_set()
+                    .fill_missing_variables_pure(adjusted.variables)
+                )
+                self.assertGreater(region_probability, 0.0)
+                self.assertAlmostEqual(
+                    _symbolic_probability(narrowed, self.outcome, Outcome.GOOD),
+                    0.6,
+                    delta=0.01,
+                )
+
+    def test_adjusted_distribution_integrates_to_one(self):
+        adjusted = self.cc.backdoor_adjustment(
+            self.treatment, self.outcome, [self.season]
+        )
+        total = _symbolic_probability(
+            adjusted, self.outcome, Outcome.GOOD
+        ) + _symbolic_probability(adjusted, self.outcome, Outcome.BAD)
+        self.assertAlmostEqual(total, 1.0, delta=0.01)
+
+    def test_adjusted_region_mass_matches_the_marginal_cause_probability(self):
+        adjusted = self.cc.backdoor_adjustment(
+            self.treatment, self.outcome, [self.season]
+        )
+        _, high_mass = adjusted.truncated(
+            SimpleEvent.from_data({self.treatment: Set.from_iterable([Treatment.HIGH])})
+            .as_composite_set()
+            .fill_missing_variables_pure(adjusted.variables)
+        )
+        # P(treatment=HIGH) = P(WARM)*0.8 + P(COLD)*0.3 = 0.6*0.8 + 0.4*0.3 = 0.6
+        self.assertAlmostEqual(high_mass, 0.6, delta=0.01)
+
+
+class SplitIntoAtomicValuesTestCase(unittest.TestCase):
+    """
+    `_extract_disjoint_regions_for_variable` and `_extract_leaf_regions_for_variables`
+    both rely on `_split_into_atomic_values` to break a discrete union value (several of
+    a Symbolic variable's values, all with positive probability in one SumUnit branch)
+    into its individual elements.
+    """
+
+    def test_single_value_is_returned_unchanged(self):
+        self.assertEqual(
+            CausalCircuit._split_into_atomic_values(Treatment.HIGH), [Treatment.HIGH]
+        )
+
+    def test_union_of_values_is_split_into_elements(self):
+        circuit, treatment, _, _ = _build_discrete_confounded_circuit()
+        union_value = next(
+            simple_region[treatment] for simple_region in circuit.support.simple_sets
+        )
+        split_values = CausalCircuit._split_into_atomic_values(union_value)
+        self.assertEqual(len(split_values), 2)
+        self.assertEqual(
+            {value.element for value in split_values}, {Treatment.HIGH, Treatment.LOW}
+        )
+
+    def test_non_set_value_without_simple_sets_is_returned_unchanged(self):
+        self.assertEqual(CausalCircuit._split_into_atomic_values(0.5), [0.5])
+
+
 class ExtractLeafRegionsTestCase(unittest.TestCase):
     """
     _extract_leaf_regions_for_variable underpins both backdoor_adjustment and
@@ -827,24 +1056,140 @@ class ExtractLeafRegionsTestCase(unittest.TestCase):
     def test_cause_region_probabilities_sum_to_one(self):
         regions = self.cc._extract_leaf_regions_for_variable(self.x)
         self.assertAlmostEqual(
-            sum(probability for _, probability in regions), 1.0, delta=0.01
+            sum(region.probability for region in regions), 1.0, delta=0.01
         )
 
     def test_effect_region_probabilities_sum_to_one(self):
         regions = self.cc._extract_leaf_regions_for_variable(self.y)
         self.assertAlmostEqual(
-            sum(probability for _, probability in regions), 1.0, delta=0.01
+            sum(region.probability for region in regions), 1.0, delta=0.01
         )
 
     def test_all_region_probabilities_are_positive(self):
         for variable in [self.x, self.y]:
-            for _, probability in self.cc._extract_leaf_regions_for_variable(variable):
-                self.assertGreater(probability, 0.0)
+            for region in self.cc._extract_leaf_regions_for_variable(variable):
+                self.assertGreater(region.probability, 0.0)
 
     def test_regions_are_returned_as_event_probability_pairs(self):
-        for event, probability in self.cc._extract_leaf_regions_for_variable(self.x):
-            self.assertIsInstance(probability, float)
-            self.assertTrue(hasattr(event, "simple_sets"))
+        for region in self.cc._extract_leaf_regions_for_variable(self.x):
+            self.assertIsInstance(region.probability, float)
+            self.assertTrue(hasattr(region.event, "simple_sets"))
+
+
+class ExtractDisjointRegionsTestCase(unittest.TestCase):
+    """
+    _extract_disjoint_regions_for_variable is the disjoint counterpart of
+    _extract_leaf_regions_for_variable: it separates support regions coming from
+    different SumUnit branches instead of collapsing them into the variable's whole
+    marginal support.
+    """
+
+    def setUp(self):
+        self.circuit, self.x, self.w, self.y = _build_correlated_circuit()
+        self.causal_circuit = CausalCircuit.from_probabilistic_circuit(
+            self.circuit,
+            MarginalDeterminismTreeNode.from_causal_graph([self.x, self.w], [self.y]),
+            [self.x, self.w],
+            [self.y],
+        )
+
+    def test_finds_both_branches_separately_unlike_the_marginalized_version(self):
+        disjoint_regions = self.causal_circuit._extract_disjoint_regions_for_variable(
+            self.x
+        )
+        coarsened_regions = self.causal_circuit._extract_leaf_regions_for_variable(
+            self.x
+        )
+        self.assertEqual(len(disjoint_regions), 2)
+        self.assertEqual(len(coarsened_regions), 1)
+
+    def test_region_probabilities_sum_to_one(self):
+        regions = self.causal_circuit._extract_disjoint_regions_for_variable(self.x)
+        self.assertAlmostEqual(
+            sum(region.probability for region in regions), 1.0, delta=0.01
+        )
+
+    def test_all_region_probabilities_are_positive(self):
+        for region in self.causal_circuit._extract_disjoint_regions_for_variable(
+            self.x
+        ):
+            self.assertGreater(region.probability, 0.0)
+
+    def test_regions_are_returned_as_event_probability_pairs(self):
+        for region in self.causal_circuit._extract_disjoint_regions_for_variable(
+            self.x
+        ):
+            self.assertIsInstance(region.probability, float)
+            self.assertTrue(hasattr(region.event, "simple_sets"))
+
+    def test_regions_are_each_roughly_equal_weight(self):
+        # x's two branches are equal-weight (0.5 each) and non-overlapping.
+        probabilities = sorted(
+            region.probability
+            for region in self.causal_circuit._extract_disjoint_regions_for_variable(
+                self.x
+            )
+        )
+        self.assertAlmostEqual(probabilities[0], 0.5, delta=0.05)
+        self.assertAlmostEqual(probabilities[1], 0.5, delta=0.05)
+
+    def test_matches_the_marginalized_version_on_a_circuit_with_one_true_region(self):
+        # on a circuit whose cause variable genuinely has one contiguous support
+        # region (no branches to keep separate), both methods must agree.
+        circuit, x, y = _build_independent_circuit()
+        causal_circuit = CausalCircuit.from_probabilistic_circuit(
+            circuit, MarginalDeterminismTreeNode.from_causal_graph([x], [y]), [x], [y]
+        )
+        disjoint_regions = causal_circuit._extract_disjoint_regions_for_variable(y)
+        coarsened_regions = causal_circuit._extract_leaf_regions_for_variable(y)
+        self.assertEqual(len(disjoint_regions), len(coarsened_regions))
+
+
+class BestDisjointRegionTestCase(unittest.TestCase):
+    """
+    _best_disjoint_region can distinguish which SumUnit branch's region best explains an
+    interventional distribution -- unlike _best_region, whose regions always collapse to
+    the variable's whole domain (see ExtractDisjointRegionsTestCase).
+    """
+
+    def setUp(self):
+        self.circuit, self.x, self.w, self.y = _build_correlated_circuit()
+        self.causal_circuit = CausalCircuit.from_probabilistic_circuit(
+            self.circuit,
+            MarginalDeterminismTreeNode.from_causal_graph([self.x, self.w], [self.y]),
+            [self.x, self.w],
+            [self.y],
+        )
+        self.interventional = self.causal_circuit.backdoor_adjustment(
+            self.x, self.y, []
+        )
+
+    def _truncated_to_y(self, lower: float, upper: float):
+        event = SimpleEvent.from_data({self.y: closed(lower, upper)}).as_composite_set()
+        truncated, _ = self.interventional.truncated(
+            event.fill_missing_variables_pure(self.interventional.variables)
+        )
+        return truncated
+
+    def test_best_region_is_near_certain_once_truncated_to_one_branchs_effect(self):
+        truncated = self._truncated_to_y(9.6, 10)
+        best_region = self.causal_circuit._best_disjoint_region(self.x, truncated)
+        self.assertAlmostEqual(
+            truncated.probability(
+                best_region.fill_missing_variables_pure(truncated.variables)
+            ),
+            1.0,
+            delta=0.01,
+        )
+
+    def test_best_region_differs_for_different_effect_conditions(self):
+        low_best = self.causal_circuit._best_disjoint_region(
+            self.x, self._truncated_to_y(0, 0.4)
+        )
+        high_best = self.causal_circuit._best_disjoint_region(
+            self.x, self._truncated_to_y(9.6, 10)
+        )
+        self.assertNotEqual(low_best, high_best)
 
 
 class DiagnoseFailureStructuralTestCase(unittest.TestCase):

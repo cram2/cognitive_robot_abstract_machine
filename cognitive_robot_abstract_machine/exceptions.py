@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from krrood.exceptions import DataclassException
+from typing_extensions import Tuple
 
 
 @dataclass
@@ -63,3 +64,60 @@ class OrmGenerationFailedError(DataclassException, RuntimeError):
         return (
             "Run the generation again with --debug to follow what the generator does."
         )
+
+
+@dataclass
+class MissingOrmBuildChoiceError(DataclassException, ValueError):
+    """
+    Raised when a test run names the option that says when to build the ORM interfaces
+    without saying which choice it means.
+    """
+
+    option: str
+    """
+    The option that was left without a choice.
+    """
+
+    choices: Tuple[str, ...]
+    """
+    The choices it accepts.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.option} says nothing about when to build the ORM interfaces."
+
+    def suggest_correction(self) -> str:
+        return f"Follow it with one of {', '.join(self.choices)}."
+
+
+@dataclass
+class UnknownOrmBuildChoiceError(DataclassException, ValueError):
+    """
+    Raised when a test run says to build the ORM interfaces at a time that does not
+    exist.
+    """
+
+    source: str
+    """
+    Where the choice was read, such as the option or the environment variable stating
+    it.
+    """
+
+    choice: str
+    """
+    What it said, which names no time to build at.
+    """
+
+    choices: Tuple[str, ...]
+    """
+    The choices it accepts.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.source} says to build the ORM interfaces '{self.choice}', which is "
+            f"no time to build at."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"State one of {', '.join(self.choices)}."

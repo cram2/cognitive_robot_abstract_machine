@@ -6,7 +6,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "segmind"
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
+dependencies = [
+    "giskardpy",
+    "krrood",
+    "random_events",
+    "semantic_digital_twin",
+]
 description = "Annotates activitiy episodes represented by meshes moving in a 3D environment with the corresponding events, actions and activities."
 readme = "README.md"
 authors = [{ name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de" }, { name = "Sorin Arion", email = "sorin@uni-bremen.de"}]
@@ -24,7 +30,6 @@ include = ["segmind*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "segmind.__version__"}
-dependencies = { file = ["requirements.txt"] }
 
 [project.urls]
 Homepage = "https://github.com/cram2/cognitive_robot_abstract_machine"

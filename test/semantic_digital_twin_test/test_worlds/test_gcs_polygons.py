@@ -9,7 +9,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix,
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
-    BoundingBox,
+    VolumetricBoundingBox,
     Box,
     Mesh,
     Scale,
@@ -46,7 +46,7 @@ def unit_box_world() -> World:
 def unit_box_search_space(unit_box_world: World) -> BoundingBoxCollection:
     return BoundingBoxCollection(
         [
-            BoundingBox(
+            VolumetricBoundingBox(
                 min_x=-2,
                 max_x=3,
                 min_y=-2,
@@ -73,8 +73,9 @@ def unit_box_graph_of_convex_polygons(
 def non_convex_ring_world(tmp_path) -> World:
     """
     A world whose single obstacle is a non-convex ring (an annulus has a hole, so its
-    convex hull is not itself), used to exercise the bounding-box fallback in
-    :func:`~semantic_digital_twin.world_description.graph_of_convex_sets.polygons._shape_to_convex_set`.
+    convex hull is not itself), used to exercise the bounding-box fallback in :func:`~se
+    mantic_digital_twin.world_description.graph_of_convex_sets.polygons._shape_to_convex
+    _set`.
     """
     world = World()
     with world.modify_world():
@@ -94,7 +95,7 @@ def non_convex_ring_world(tmp_path) -> World:
 def non_convex_ring_search_space(non_convex_ring_world: World) -> BoundingBoxCollection:
     return BoundingBoxCollection(
         [
-            BoundingBox(
+            VolumetricBoundingBox(
                 min_x=-2,
                 max_x=3,
                 min_y=-2,
@@ -196,8 +197,8 @@ class TestGraphOfConvexPolygons:
         origin = HomogeneousTransformationMatrix(reference_frame=unit_box_world.root)
         two_boxes = BoundingBoxCollection(
             [
-                BoundingBox(-2, -2, -0.5, -1, -1, 0.5, origin),
-                BoundingBox(1, 1, -0.5, 2, 2, 0.5, origin),
+                VolumetricBoundingBox(-2, -2, -0.5, -1, -1, 0.5, origin),
+                VolumetricBoundingBox(1, 1, -0.5, 2, 2, 0.5, origin),
             ],
             unit_box_world.root,
         )
@@ -241,5 +242,6 @@ class TestGraphOfConvexPolygons:
         center = Point3(0.0, 0.0, 0.0, reference_frame=non_convex_ring_world.root)
         with pytest.raises(PointOccupiedError):
             graph_of_convex_polygons.path_from_to(
-                center, Point3(2.5, 2.5, 0.0, reference_frame=non_convex_ring_world.root)
+                center,
+                Point3(2.5, 2.5, 0.0, reference_frame=non_convex_ring_world.root),
             )

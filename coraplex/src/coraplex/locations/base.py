@@ -41,6 +41,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AllowSelfCollisions,
 )
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
@@ -104,11 +105,19 @@ class Location(Iterable[Pose]):
         if self.context.debug:
             VizMarkerPublisher(
                 _world=test_world, node=self.context.ros_node
-            ).with_tf_publisher()
+            )
 
         for pose_candidate in self.generator:
 
-            test_robot.set_root_pose(pose_candidate)
+            # A candidate says where to stand and which way to look, which is the
+            # heading NavigateAction is handed. Turning it into a base pose the same way
+            # is what makes the checks below see the configuration the robot ends up in
+            # rather than one rotated by whatever its forward axis is.
+            test_robot.set_root_pose(
+                test_robot.mobile_base.pose_facing(pose_candidate)
+                if isinstance(test_robot, HasMobileBase)
+                else pose_candidate
+            )
 
             test_world.collision_manager.clear_temporary_rules()
             test_world.collision_manager.add_temporary_rule(

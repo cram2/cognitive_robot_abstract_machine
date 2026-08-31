@@ -5,15 +5,19 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from typing_extensions import List
+
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from semantic_digital_twin.adapters.ros.msg_converter import SemDTToRos2Converter
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher, TfFrameNames
 from semantic_digital_twin.adapters.ros.visualization.collision_viz_marker import (
     CollisionVisualizationMarkerPublisher,
 )
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
+from semantic_digital_twin.exceptions import WorldHasMultipleTfPublishersError
+from semantic_digital_twin.world_description.geometry import Shape
 from visualization_msgs.msg import MarkerArray
 
 
@@ -42,8 +46,10 @@ class ShapeSource(Enum):
 class VizMarkerPublisher(ModelChangeCallback):
     """
     Publishes the world model as a visualization marker.
+
+    Markers are stamped with the frame names the world's tf publisher hands out, so
+    equally named bodies are told apart the same way in both.
     .. warning:: Relies on the tf tree to correctly position the markers.
-        Use TFPublisher to publish the tf tree.
     .. warning:: To see something in Rviz you must:
         1. add a MarkerArray plugin,
         2. set the current topic name,
@@ -88,9 +94,12 @@ class VizMarkerPublisher(ModelChangeCallback):
     )
     """QoS profile for the publisher."""
 
-    _tf_publisher: Optional[TFPublisher] = field(init=False, default=None)
+    tf_publisher: Optional[TFPublisher] = field(default=None, kw_only=True)
     """
-    Reference to a tf publisher created by this class.
+    The publisher of the tf tree the markers are positioned in.
+
+    Defaults to whatever already publishes the tf tree of the world, and to a publisher
+    started here while nothing does.
     """
 
     _collision_publisher: Optional[CollisionVisualizationMarkerPublisher] = field(
@@ -98,6 +107,14 @@ class VizMarkerPublisher(ModelChangeCallback):
     )
     """
     Reference to a collision marker publisher created by this class.
+    """
+
+    _started_tf_publisher: Optional[TFPublisher] = field(init=False, default=None)
+    """
+    The tf publisher started here, which is therefore stopped here as well.
+
+    Stays empty for a publisher that was given or that already published the tf tree of
+    the world, since those outlive this one.
     """
 
     _publisher: Publisher = field(init=False)
@@ -108,6 +125,8 @@ class VizMarkerPublisher(ModelChangeCallback):
     def __post_init__(self):
         super().__post_init__()
 
+        if self.tf_publisher is None:
+            self.tf_publisher = self._tf_publisher_of_world()
         self.publisher = self.node.create_publisher(
             MarkerArray, self.topic_name, self.qos_profile
         )
@@ -115,11 +134,35 @@ class VizMarkerPublisher(ModelChangeCallback):
         self.notify_model_change()
         time.sleep(0.2)
 
-    def with_tf_publisher(self):
+    def _tf_publisher_of_world(self) -> TFPublisher:
         """
-        Launches a tf publisher in conjunction with the VizMarkerPublisher.
+        :raises WorldHasMultipleTfPublishersError: If several publishers publish the tf
+            tree of the world.
+        :return: the publisher of the world's tf tree, started here while nothing
+            publishes it.
         """
-        self._tf_publisher = TFPublisher(_world=self._world, node=self.node)
+        publishers = TFPublisher.all_callbacks_of_this_type_from_world(self._world)
+        if len(publishers) > 1:
+            raise WorldHasMultipleTfPublishersError(
+                world=self._world, publisher_count=len(publishers)
+            )
+        if publishers:
+            return publishers[0]
+        self._started_tf_publisher = TFPublisher(_world=self._world, node=self.node)
+        return self._started_tf_publisher
+
+    def stop(self):
+        """
+        Deregister this publisher and stop the publishers it started.
+
+        Anything left running publishes on a node that may already be gone, and a world
+        outliving this publisher would keep notifying it.
+        """
+        if self._collision_publisher is not None:
+            self._collision_publisher.stop()
+        if self._started_tf_publisher is not None:
+            self._started_tf_publisher.stop()
+        super().stop()
 
     def with_collision_visualization(self, **kwargs):
         """
@@ -130,13 +173,6 @@ class VizMarkerPublisher(ModelChangeCallback):
         self._collision_publisher = CollisionVisualizationMarkerPublisher(
             node=self.node, world=self._world, **kwargs
         )
-
-    def with_tf_and_collision_visualization(self):
-        """
-        Create a publisher for tf and collision checks.
-        """
-        self.with_tf_publisher()
-        self.with_collision_visualization()
 
     def _select_shapes(self, body):
         if self.shape_source is ShapeSource.VISUAL_ONLY:
@@ -149,24 +185,33 @@ class VizMarkerPublisher(ModelChangeCallback):
 
     def on_model_change(self, **kwargs):
         self.markers = MarkerArray()
+        frame_names = self.tf_publisher.tf_model_callback.frame_names
         for body in self._world.bodies:
             shapes = self._select_shapes(body)
-            self._add_markers_for_shapes(shapes, str(body.name))
+            self._add_markers_for_shapes(shapes, str(body.name), frame_names)
 
         for region in self._world.regions:
             self._add_markers_for_shapes(
-                region.area.shapes, str(region.name), force_alpha=self.region_alpha
+                region.area.shapes,
+                str(region.name),
+                frame_names,
+                force_alpha=self.region_alpha,
             )
 
         self.publisher.publish(self.markers)
 
     def _add_markers_for_shapes(
-        self, shapes, marker_ns, force_alpha: Optional[float] = None
+        self,
+        shapes: List[Shape],
+        marker_ns: str,
+        frame_names: TfFrameNames,
+        force_alpha: Optional[float] = None,
     ):
         if not shapes:
             return
         for i, shape in enumerate(shapes):
             marker = SemDTToRos2Converter.convert(shape)
+            marker.header.frame_id = frame_names.assign(shape.origin.reference_frame)
             if force_alpha is not None:
                 marker.color.a = force_alpha
             elif not marker.mesh_use_embedded_materials:

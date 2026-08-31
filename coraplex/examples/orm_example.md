@@ -46,13 +46,14 @@ from coraplex.datastructures.enums import Arms, Grasp
 from coraplex.plans.factories import *
 from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2, TorsoState
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from coraplex.datastructures.dataclasses import Context
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
 context = Context(world, pr2_view)
 
-description = TransportAction(world.get_body_by_name("milk.stl"),
+description = TransportAction(world.get_semantic_annotations_by_type(Milk)[0],
                               Pose.from_xyz_quaternion(2.4, 2.8, 1,
                                                        0.0, 0.0, 0.0, 1.0, reference_frame=world.root),
                               Arms.LEFT)

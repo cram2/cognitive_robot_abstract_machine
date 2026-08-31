@@ -4,12 +4,18 @@ from copy import deepcopy
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
+from giskardpy.motion_statechart.goals.cartesian_goals import (
+    DifferentialDriveBaseGoal,
+    CartesianPoseStraight,
+)
 from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+    CartesianOrientation,
+)
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from coraplex.datastructures.enums import ExecutionType
@@ -24,7 +30,11 @@ from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import (
+    Vector3,
+    HomogeneousTransformationMatrix,
+    RotationMatrix,
+)
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
@@ -47,31 +57,19 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
         goal_copy = self.world.transform(goal_copy, self.world.root)
         goal_point = goal_copy.to_position()
         goal_point.z = 0
-        return Sequence(
+        return Parallel(
             [
                 # Due to its limited kinematics and bad tracking and joint delays, Stretch has better results in
                 # real demos when straightening the wrist joint and pointing at the goal first
-                Parallel(
-                    [
-                        Pointing(
-                            root_link=self.world.root,
-                            tip_link=self.robot.root,
-                            goal_point=goal_point,
-                            pointing_axis=Vector3(
-                                0, -1, 0, reference_frame=self.robot.root
-                            ),
-                            binding_policy=GoalBindingPolicy.Bind_at_build,
-                        ),
-                        JointPositionList(
-                            goal_state=JointState.from_str_dict(
-                                {"joint_wrist_yaw": 0.0}, world=self.world
-                            )
-                        ),
-                    ]
+                CartesianOrientation(
+                    root_link=self.world.root,
+                    tip_link=self.robot.root,
+                    goal_orientation=RotationMatrix(reference_frame=self.robot.root),
+                    binding_policy=GoalBindingPolicy.Bind_on_start,
                 ),
                 Parallel(
                     [
-                        CartesianPose(
+                        CartesianPoseStraight(
                             root_link=self.world.root,
                             tip_link=tip,
                             goal_pose=self.target,

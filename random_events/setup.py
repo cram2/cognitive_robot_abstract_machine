@@ -43,7 +43,6 @@ setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.8",
-    install_requires=open("requirements.txt").read().splitlines(),
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},
 )

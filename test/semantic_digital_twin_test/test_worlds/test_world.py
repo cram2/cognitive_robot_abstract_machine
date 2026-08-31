@@ -1,3 +1,4 @@
+import gc
 import os
 import subprocess
 import sys
@@ -430,6 +431,84 @@ def test_compute_fk_expression(world_setup):
     fk_expr = world.compose_forward_kinematics_expression(r2, l2)
     fk2 = fk_expr.evaluate()
     np.testing.assert_array_almost_equal(fk, fk2)
+
+
+# %% forward kinematics expressions and recompilation
+
+
+def test_compose_forward_kinematics_expression_returns_an_independent_copy(world_setup):
+    """
+    Callers get their own expression, so mutating it cannot corrupt the manager's
+    internal cache or what a later caller receives.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    original = world.compose_forward_kinematics_expression(world.root, r2)
+    original_pose = original.evaluate()
+
+    original.child_frame = None
+    original[0, 3] = 99.0
+
+    fresh = world.compose_forward_kinematics_expression(world.root, r2)
+    assert fresh.child_frame is r2
+    np.testing.assert_array_almost_equal(fresh.evaluate(), original_pose)
+
+
+def test_compose_forward_kinematics_expression_reports_its_free_variables(world_setup):
+    """
+    The copy handed to callers keeps its degrees of freedom resolvable, even once the
+    caller drops every other reference to the expression it came from.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection = world.get_connection(r1, r2)
+
+    expression = world.compose_forward_kinematics_expression(world.root, r2)
+    gc.collect()
+
+    assert connection.dof.variables.position in expression.free_variables()
+
+
+def test_move_branch_compiles_forward_kinematics_once(world_setup):
+    """
+    Re-parenting rebuilds the forward kinematics for the resulting structure only.
+
+    It used to compile twice: once defensively before computing the preserved pose, and
+    once when the modification block closed. The first is redundant whenever the
+    structure has not changed since the last compilation.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    manager = world._forward_kinematic_manager
+    compilations = []
+    original_compile = manager.compile
+
+    def counting_compile():
+        compilations.append(None)
+        original_compile()
+
+    manager.compile = counting_compile
+    try:
+        world.move_branch(r2, bf)
+    finally:
+        manager.compile = original_compile
+
+    assert len(compilations) == 1
+
+
+def test_update_forward_kinematics_refreshes_values_without_a_model_change(world_setup):
+    """
+    Only the recompilation is skipped when the structure is unchanged; the computed
+    poses are refreshed either way, because degree-of-freedom state can move without any
+    model change.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: PrismaticConnection = world.get_connection(r1, r2)
+
+    world.state[connection.dof.id].position = 1.0
+    world.update_forward_kinematics()
+
+    expected = world.compose_forward_kinematics_expression(world.root, r2).evaluate()
+    np.testing.assert_array_almost_equal(
+        world.compute_forward_kinematics_np(world.root, r2), expected
+    )
 
 
 def test_apply_control_commands(world_setup):
@@ -1531,6 +1610,29 @@ def test_reattach_child_to_new_parent(world_setup):
     assert l2 not in world.compute_child_kinematic_structure_entities(l1)
     new_child_global_pose = l2.global_transform
     assert np.allclose(old_child_global_pose, new_child_global_pose)
+
+
+def test_reattach_child_to_new_parent_offline(world_setup):
+    """
+    The offline path of move_branch_with_fixed_connection re-parents and preserves the
+    global pose, like the online path does.
+
+    Mount strategies take this path, because they run inside an already-open
+    modification block where recompiling forward kinematics would work against a half-
+    edited structure.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    old_child_global_pose = l2.global_transform
+    assert isinstance(l2.parent_connection, PrismaticConnection)
+
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(
+            new_parent=bf, branch_root=l2, enable_unsafe_inside_world_block=True
+        )
+
+    assert l2.parent_connection.parent == bf
+    assert isinstance(l2.parent_connection, FixedConnection)
+    assert np.allclose(l2.global_transform, old_child_global_pose)
 
 
 def test_move_branch_preserves_connection_type_and_pose():

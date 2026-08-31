@@ -6,14 +6,13 @@ WORKSPACE_DIR="/root/workspace/src/Segmind"
 LIBS_DIR="/root/libs"
 
 # Wait for files to be mounted
-while [ ! -f "$WORKSPACE_DIR/requirements.txt" ]; do
+while [ ! -f "$WORKSPACE_DIR/pyproject.toml" ]; do
   echo "Waiting for repo to mount..."
   sleep 1
 done
 
 # Your setup commands
 source /root/.virtualenvs/pycram-segmind/bin/activate
-pip install -r "$WORKSPACE_DIR/requirements.txt"
 pip install -e "$WORKSPACE_DIR"
 cd "$WORKSPACE_DIR/../ripple_down_rules" && git pull && pip install -r "requirements.txt" && pip install -e .
 cd "$WORKSPACE_DIR/../semantic_world" && git pull && pip install -r "requirements.txt" && pip install -e .

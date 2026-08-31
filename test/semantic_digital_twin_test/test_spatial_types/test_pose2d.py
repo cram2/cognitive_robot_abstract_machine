@@ -6,7 +6,13 @@ import pytest
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import SpatialTypeNotJsonSerializable
-from semantic_digital_twin.spatial_types import Pose2D, Pose, Point3, Quaternion
+from semantic_digital_twin.spatial_types import (
+    Point2,
+    Pose2D,
+    Pose,
+    Point3,
+    Quaternion,
+)
 from semantic_digital_twin.spatial_types.spatial_types import RotationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -109,15 +115,45 @@ class TestPose2DToPose:
         assert m[1, 3].to_np() == pytest.approx(2.0)
 
     def test_position_property(self):
-        p2 = Pose2D(x=5, y=6, yaw=0)
+        p2 = Pose2D(x=5, y=6, yaw=0.3)
         pt = p2.position
+        assert isinstance(pt, Point2)
         assert pt.x.to_np() == pytest.approx(5.0)
         assert pt.y.to_np() == pytest.approx(6.0)
+
+    def test_position_property_reference_frame_propagated(self):
+        frame = Body(name=PrefixedName("world"))
+        p2 = Pose2D(x=5, y=6, yaw=0, reference_frame=frame)
+        assert p2.position.reference_frame is frame
 
     def test_orientation_property(self):
         p2 = Pose2D(x=0, y=0, yaw=0)
         q = p2.orientation
         assert isinstance(q, Quaternion)
+
+
+class TestPose2DFromPositionAndYaw:
+    def test_composes_position_and_yaw(self):
+        position = Point2(x=1.5, y=-2.5)
+        p2 = Pose2D.from_position_and_yaw(position, yaw=0.7)
+        assert p2.x.to_np() == pytest.approx(1.5)
+        assert p2.y.to_np() == pytest.approx(-2.5)
+        assert p2.yaw.to_np() == pytest.approx(0.7)
+
+    def test_inherits_position_reference_frame(self):
+        frame = Body(name=PrefixedName("world"))
+        position = Point2(x=1.0, y=2.0, reference_frame=frame)
+        p2 = Pose2D.from_position_and_yaw(position, yaw=0.0)
+        assert p2.reference_frame is frame
+
+    def test_override_reference_frame(self):
+        frame = Body(name=PrefixedName("world"))
+        other_frame = Body(name=PrefixedName("other"))
+        position = Point2(x=1.0, y=2.0, reference_frame=frame)
+        p2 = Pose2D.from_position_and_yaw(
+            position, yaw=0.0, reference_frame=other_frame
+        )
+        assert p2.reference_frame is other_frame
 
 
 class TestPose2DFromPose:

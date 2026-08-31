@@ -29,8 +29,7 @@ jobs:
         pip install virtualenv
         python -m virtualenv venv
         source venv/bin/activate
-        pip install -r requirements-dev.txt
-        pip install .
+        pip install ".[dev]"
 
     - name: Install notebook testing tools
       run: |

@@ -55,7 +55,7 @@ jobs:
           source /opt/ros/overlay_ws/src/coraplex-venv/bin/activate
           pip install --upgrade pip --root-user-action=ignore
           cd /opt/ros/overlay_ws/src/coraplex
-          pip install -r requirements.txt
+          pip install -e .
           pip install jupytext treon
 
       # ----------------------------------------------------------------------------------------------------------------

@@ -59,7 +59,7 @@ def start_visualization(world: World) -> None:
         return
     rclpy.init()
     node = rclpy.create_node("viz_marker")
-    VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
+    VizMarkerPublisher(_world=world, node=node)
 
 
 def attach_tool(

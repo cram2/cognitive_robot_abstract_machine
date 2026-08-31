@@ -26,7 +26,7 @@ source coraplex/coraplex-venv/bin/activate
 echo "Installing python dependencies"
 pip install -U pip
 pip install -U setuptools
-pip install -r coraplex/requirements.txt
+pip install -e coraplex
 echo "Checking for dependencies of other ros packages"
 cd ~/workspace/ros
 echo "Building workspace"

@@ -4,18 +4,23 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
 
+import numpy as np
+
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from rclpy.node import Node
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.reasoning.predicates import visible
-from semantic_digital_twin.robots.robot_parts import Camera, AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    RotationMatrix,
+)
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
@@ -58,7 +63,7 @@ class PerceptionQuery(SubclassJSONSerializer):
     The semantic annotation for which to perceive.
     """
 
-    region: BoundingBox
+    region: VolumetricBoundingBox
     """
     The region in which the object should be detected.
     """
@@ -86,43 +91,24 @@ class PerceptionQuery(SubclassJSONSerializer):
         Answer this query from the world model alone.
 
         :return: The bodies of the queried annotation that lie inside the region and are
-            visible to the robot's camera.
+            visible to the robot's camera. A body several matching annotations describe
+            is one object, so it is reported once.
         """
-        result = []
-        sem_instances = self.world.get_semantic_annotations_by_type(
-            self.semantic_annotation
-        )
-        bodies = []
-        for sem_instance in sem_instances:
-            bodies.extend(sem_instance.bodies)
-
-        region_bodies = list(
-            filter(
-                None,
-                [
-                    (
-                        body
-                        if self.region.contains(body.global_transform.to_position())
-                        else None
-                    )
-                    for body in bodies
-                ],
+        bodies = dict.fromkeys(
+            body
+            for semantic_annotation in self.world.get_semantic_annotations_by_type(
+                self.semantic_annotation
             )
+            for body in semantic_annotation.bodies
         )
+        region_bodies = [
+            body
+            for body in bodies
+            if self.region.contains(body.global_transform.to_position())
+        ]
 
-        robot_camera = list(
-            filter(
-                None,
-                [
-                    cam if isinstance(cam, Camera) else None
-                    for cam in self.robot.get_sensors()
-                ],
-            )
-        )[0]
-        for body in region_bodies:
-            if visible(robot_camera, body):
-                result.append(body)
-        return result
+        robot_camera = self.robot.get_default_camera()
+        return [body for body in region_bodies if visible(robot_camera, body)]
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
@@ -180,20 +166,59 @@ class Detection:
         :raises AmbiguousDetection: If the annotation describes more than one body.
         """
         matching_annotations = self.resolve_annotations(world)
-        body = matching_annotations[0].root
-        detected_origin = world.transform(self.pose, body.parent_connection.parent)
+        matching_annotation = matching_annotations[0]
+        body = matching_annotation.root
+        robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
+
+        # Foundation Pose may return a upside down pose. this detects and fixes it by rotation around x by 180 degree
+        detected_global_pose = world.transform(
+            self.pose, world.root
+        ).to_homogeneous_matrix()
+        detected_global_pose = self._with_z_up_and_x_towards(
+            root_T_frame=detected_global_pose,
+            root_P_target=robot.root.global_transform.to_position(),
+        )
+
         if trust_orientation:
-            body.parent_connection.origin = detected_origin.to_homogeneous_matrix()
+            body.parent_connection.origin = detected_global_pose
         else:
+            parent_T_object = world.transform(
+                detected_global_pose, body.parent_connection.parent
+            )
             parent_origin = body.parent_connection.origin
             body.parent_connection.origin = (
                 HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                    point=detected_origin.to_position(),
+                    point=parent_T_object.to_position(),
                     rotation_matrix=parent_origin.to_rotation_matrix(),
                     reference_frame=body.parent_connection.parent,
                 )
             )
         return matching_annotations
+
+    @staticmethod
+    def _with_z_up_and_x_towards(
+        root_T_frame: HomogeneousTransformationMatrix, root_P_target: Point3
+    ) -> HomogeneousTransformationMatrix:
+        """
+        Return ``root_T_frame`` rotated by 180° around its own axes so that its z axis
+        points along the world z axis and its x axis points towards ``root_P_target`` as
+        closely as those rotations allow.
+
+        The position is left untouched, and every axis stays on the axis it started on.
+        :param root_T_frame:``HomogeneousTransformationMatrix`` which will be rotated
+        :param root_P_target:``Point3`` towards which root_T_frame x axis will point
+        :return: rotated transformation matrix
+        """
+        root_V_target = root_P_target - root_T_frame.to_position()
+
+        flip_z = root_T_frame[2, 2] < 0
+        flip_x = root_T_frame.to_rotation_matrix().x_vector().dot(root_V_target) > 0
+
+        return root_T_frame @ HomogeneousTransformationMatrix.from_xyz_rpy(
+            roll=np.pi if flip_z and not flip_x else 0,
+            pitch=np.pi if flip_z and flip_x else 0,
+            yaw=np.pi if flip_x and not flip_z else 0,
+        )
 
     def resolve_annotations(self, world: World) -> List[IsPerceivable]:
         """
@@ -226,13 +251,48 @@ class PerceptionInterface(ABC):
     """
 
     @abstractmethod
-    def detect(self, query: PerceptionQuery) -> List[Detection]:
+    def detect(
+        self, query: PerceptionQuery, accept_first_if_multiple: bool = False
+    ) -> Detection:
         """
         Answer a perception query.
 
         :param query: What to look for and where.
-        :return: The objects this source saw.
+        :param accept_first_if_multiple: Whether several candidates may be resolved by
+            taking the first one. When False, several candidates raise
+            :class:`~coraplex.exceptions.UnidentifiedDetections` instead of being chosen
+            between.
+        :return: The object this source saw.
+        :raises NothingDetected: If the source saw nothing.
+        :raises UnidentifiedDetections: If several candidates were seen and none of them
+            may be picked.
         """
+
+    @staticmethod
+    def narrow_to_single_detection(
+        detections: List[Detection],
+        query: PerceptionQuery,
+        accept_first_if_multiple: bool,
+    ) -> Detection:
+        """
+        Reduce what a source saw to the one detection a query is answered with.
+
+        :param detections: What the source reported for the query.
+        :param query: The query that was answered.
+        :param accept_first_if_multiple: Whether several candidates may be resolved by
+            taking the first one. When False, several candidates raise
+            :class:`~coraplex.exceptions.UnidentifiedDetections` instead of being chosen
+            between.
+        :return: The single detection the query is answered with.
+        :raises NothingDetected: If the source saw nothing.
+        :raises UnidentifiedDetections: If several candidates were seen and none of them
+            may be picked.
+        """
+        if not detections:
+            raise NothingDetected(query.semantic_annotation)
+        if len(detections) > 1 and not accept_first_if_multiple:
+            raise UnidentifiedDetections(query.semantic_annotation, len(detections))
+        return detections[0]
 
     @staticmethod
     def for_execution_type(
@@ -264,20 +324,26 @@ class WorldPerception(PerceptionInterface):
     already holds.
     """
 
-    def detect(self, query: PerceptionQuery) -> List[Detection]:
+    def detect(
+        self, query: PerceptionQuery, accept_first_if_multiple: bool = False
+    ) -> Detection:
         annotation_by_body = {}
         for annotation in query.world.get_semantic_annotations_by_type(
             query.semantic_annotation
         ):
             annotation_by_body.setdefault(annotation.root, type(annotation))
 
-        return [
+        detections = [
             Detection(
                 semantic_annotation=annotation_by_body[body], pose=body.global_pose
             )
             for body in query.from_world()
             if body in annotation_by_body
         ]
+
+        return self.narrow_to_single_detection(
+            detections, query, accept_first_if_multiple
+        )
 
 
 @dataclass
@@ -301,7 +367,9 @@ class RoboKudoPerception(PerceptionInterface):
     How long to wait for the action server before giving up.
     """
 
-    def detect(self, query: PerceptionQuery) -> List[Detection]:
+    def detect(
+        self, query: PerceptionQuery, accept_first_if_multiple: bool = False
+    ) -> Detection:
         # RoboKudo's messages only exist where its pipeline is installed, so they are
         # imported here rather than at module level: reading the world in simulation must
         # not depend on them.
@@ -322,11 +390,9 @@ class RoboKudoPerception(PerceptionInterface):
             if designator.pose and self._can_be_requested_object(designator, query)
         ]
 
-        if not detections:
-            raise NothingDetected(query.semantic_annotation)
-        if len(detections) > 1:
-            raise UnidentifiedDetections(query.semantic_annotation, len(detections))
-        return detections
+        return self.narrow_to_single_detection(
+            detections, query, accept_first_if_multiple
+        )
 
     @staticmethod
     def _can_be_requested_object(

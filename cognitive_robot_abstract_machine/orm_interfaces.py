@@ -37,6 +37,21 @@ INTERFACE_FILE_NAME = "ormatic_interface.py"
 Name every package's generator writes its interface to.
 """
 
+SOURCE_FILE_PATTERN = "*.py"
+"""
+What a module of a package is named like.
+"""
+
+MAPPING_ENGINE_SOURCE_FOLDERS: Tuple[Path, ...] = (
+    Path("krrood") / "src" / "krrood",
+    Path("cognitive_robot_abstract_machine"),
+)
+"""
+Folders of a checkout that every generator reads whichever package it is building for,
+relative to the root: the library that maps the classes, and the module that runs the
+generators.
+"""
+
 PROGRESS_DESCRIPTION = "Building ORM interfaces"
 """
 What the progress bar of a build calls itself.
@@ -180,6 +195,54 @@ class OrmInterface:
             / INTERFACE_FILE_NAME
         )
 
+    @property
+    def sources(self) -> Path:
+        """
+        The source folder holding the modules this interface maps.
+        """
+        return self.repository_root / self.package_name / "src" / self.package_name
+
+    @property
+    def mapping_engine_sources(self) -> List[Path]:
+        """
+        The folders of the library that maps this package's classes and of the module
+        that runs its generator.
+        """
+        return [
+            self.repository_root / folder for folder in MAPPING_ENGINE_SOURCE_FOLDERS
+        ]
+
+    @property
+    def inputs(self) -> List[Path]:
+        """
+        The files this package contributes to a build: its generator, the modules of its
+        source folder, and those of the mapping engine.
+
+        The interface itself is written by a build rather than read by one, so it is not
+        among them.
+        """
+        modules = [
+            module
+            for source_folder in (self.sources, *self.mapping_engine_sources)
+            for module in source_folder.rglob(SOURCE_FILE_PATTERN)
+            if module != self.path
+        ]
+        return [self.generator, *modules]
+
+    @property
+    def is_outdated(self) -> bool:
+        """
+        Whether this interface is missing, or older than a file this package contributes
+        to a build.
+
+        ..note:: A checkout that cannot build the interface counts as outdated, so the
+            build runs and reports what it is missing rather than being skipped.
+        """
+        if not self.path.exists() or not self.generator.exists():
+            return True
+        generated_at = self.path.stat().st_mtime
+        return any(source.stat().st_mtime > generated_at for source in self.inputs)
+
     def remove(self) -> None:
         """
         Delete the interface, so that a stale version cannot be imported while the new
@@ -270,6 +333,18 @@ class WorkspaceOrmInterfaces:
     """
     The interfaces in the order they are built, which follows their dependencies.
     """
+
+    @property
+    def is_outdated(self) -> bool:
+        """
+        Whether any interface is missing, or older than a file of the checkout a build
+        reads.
+
+        ..note:: A build covers every interface at once, so a package whose ORM model
+            another builds on outdates the whole workspace through its own interface,
+            and no interface has to look past its own package.
+        """
+        return any(interface.is_outdated for interface in self.interfaces)
 
     def regenerate(self, show_generator_output: bool = False) -> None:
         """

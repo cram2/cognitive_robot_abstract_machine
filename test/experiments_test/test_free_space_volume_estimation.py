@@ -12,7 +12,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
-    BoundingBox,
+    VolumetricBoundingBox,
     Box,
     Mesh,
     Scale,
@@ -21,8 +21,8 @@ from semantic_digital_twin.world_description.geometry import (
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-def _search_space_box(world: World, half_extent: float = 5.0) -> BoundingBox:
-    return BoundingBox(
+def _search_space_box(world: World, half_extent: float = 5.0) -> VolumetricBoundingBox:
+    return VolumetricBoundingBox(
         min_x=-half_extent,
         min_y=-half_extent,
         min_z=-half_extent,

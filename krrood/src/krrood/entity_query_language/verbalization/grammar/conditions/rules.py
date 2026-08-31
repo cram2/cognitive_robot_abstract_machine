@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import operator
 
-from krrood.entity_query_language.core.base_expressions import Filter
+from krrood.entity_query_language.core.base_expressions import (
+    Filter,
+    SymbolicExpression,
+)
+from krrood.entity_query_language.operators.causal import CausesEffect
 from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import (
@@ -12,6 +16,9 @@ from krrood.entity_query_language.operators.core_logical_operators import (
     flatten_operands,
 )
 from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
+from krrood.entity_query_language.verbalization.attribute_predicates import (
+    resolve_boolean_predicate,
+)
 from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
     VerbalizationFragment,
@@ -67,6 +74,12 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Logicals,
     Prepositions,
     Punctuation,
+)
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    clause,
+    ConjunctivePhrase,
+    Noun,
+    Verb,
 )
 
 
@@ -671,3 +684,105 @@ class FilterRule(PhraseRule):
         'Find a Robot whose battery is greater than 50'
         """
         return context.child(node.condition)
+
+
+def _causal_effect_clause(
+    condition: SymbolicExpression, context: RuleContext
+) -> VerbalizationFragment:
+    """
+    Render *condition* as one or more effect clauses, joined with an Oxford comma for a
+    conjunction, for :class:`CausesEffectRule` to prefix with the cause.
+
+    *condition* is an equality comparator, or an AND of them -- the only shapes
+    :meth:`~krrood.entity_query_language.operators.causal.CausesEffect.__post_init__`
+    allows. A boolean-attribute equality reads as *"<navigation> to [not] be grasped"*
+    (see :func:`_boolean_causal_effect_clause`); every other equality reads as the
+    generic *"<attribute> to be <value>"*.
+    """
+    if isinstance(condition, AND):
+        parts = [
+            _causal_effect_clause(operand, context)
+            for operand in flatten_operands(condition, AND)
+        ]
+        return oxford_comma(parts, Conjunctions.AND.as_fragment(), pair_comma=True)
+    if is_boolean_attribute_chain(condition.left):
+        return _boolean_causal_effect_clause(condition, context)
+    return PhraseFragment(
+        parts=[
+            context.child(condition.left),
+            Keywords.TO_BE.as_fragment(),
+            context.child(condition.right, as_value=True),
+        ]
+    )
+
+
+def _boolean_causal_effect_clause(
+    condition: Comparator, context: RuleContext
+) -> VerbalizationFragment:
+    """
+    Render a boolean-attribute equality as *"<navigation> to [not] <predicate>"* --
+    *"the Pick to be grasped"*, *"the Animal to not have milk"*, *"a Cow to produce
+    milk"* -- instead of forcing the generic *"<attribute> to be <value>"* template
+    onto it, which reads as a broken double clause (*"a Pick is grasped to be True"*:
+    the attribute's own predicative reading, *"is grasped"*, left stranded before *"to
+    be True"*).
+
+    *<navigation>* is the chain up to (not including) the boolean attribute itself.
+    *<predicate>* is the field's own declared
+    :class:`~krrood.entity_query_language.verbalization.boolean_predicate.BooleanPredicate`,
+    in its bare infinitive form -- whichever surface form (adjectival/possessive/verbal)
+    the field declares, so the clause reads naturally regardless of which one it is.
+    """
+    terminal = condition.left
+    predicate = resolve_boolean_predicate(terminal)
+    parts = [
+        context.child(terminal._child_, inline=True),
+        Prepositions.TO.as_fragment(),
+    ]
+    if not condition.right._value_:
+        parts.append(Logicals.NOT.as_fragment())
+    parts.append(predicate.bare_head())
+    predicate_object = predicate.predicate_object(terminal)
+    if predicate_object is not None:
+        parts.append(predicate_object)
+    return PhraseFragment(parts=parts)
+
+
+class CausesEffectRule(PhraseRule):
+    """``causes_effect(...)`` → *"<cause attribute> causes <attribute> to be <value>"*.
+
+    Evaluates identically to a plain condition under every backend (see
+    :class:`~krrood.entity_query_language.operators.causal.CausesEffect`) -- only
+    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend` additionally
+    reads it -- but names the searched cause explicitly, so a causal query is
+    recognisable from its verbalization alone rather than reading as a vague *"what"*.
+
+    >>> pick = variable(Pick, [])
+    >>> verbalize_expression(CausesEffect(pick.grasped == True, cause_attributes=[pick.arm]))
+    'the arm of a Pick causes the Pick to be grasped'
+    """
+
+    construct = CausesEffect
+
+    def build(self, node: CausesEffect, context: RuleContext) -> VerbalizationFragment:
+        """
+        Prefix the effect condition with *"<cause attribute> causes"*, rendering each
+        equality comparator through :func:`_causal_effect_clause` -- *"<attribute> to be
+        <value>"*, or for a boolean attribute, *"<navigation> to [not] <predicate>"*.
+
+        Falls back to the generic *"what causes"* when built without any
+        ``cause_attributes`` (a :class:`CausesEffect` constructed directly rather than
+        through :meth:`~krrood.entity_query_language.query.match.Match.causes_effect`).
+        """
+        effect_clause = _causal_effect_clause(node._child_, context)
+        if not node.cause_attributes:
+            return PhraseFragment(
+                parts=[Keywords.WHAT_CAUSES.as_fragment(), effect_clause]
+            )
+        cause_nouns = [
+            Noun(context.child(attribute)) for attribute in node.cause_attributes
+        ]
+        subject = (
+            cause_nouns[0] if len(cause_nouns) == 1 else ConjunctivePhrase(cause_nouns)
+        )
+        return clause(subject, Verb("cause"), effect_clause)

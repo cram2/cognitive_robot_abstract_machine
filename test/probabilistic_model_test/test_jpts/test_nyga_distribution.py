@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import plotly.graph_objects as go
 from numpy import testing
-from random_events.interval import closed, closed_open
+from random_events.interval import closed, closed_open, reals, Bound, SimpleInterval
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from random_events.variable import Continuous
 from scipy.special import logsumexp
@@ -64,11 +64,13 @@ class InductionStepTestCase(unittest.TestCase):
         self.assertEqual(self.induction_step.right_connecting_point_from_index(5), 8.0)
 
     def test_create_uniform_distribution_edge_case(self):
+        # a single piece spans the whole (unset) support of the induction, i.e. the
+        # entire real line, rather than being clipped to the data's own bounds
         distribution = self.induction_step.create_uniform_distribution()
         self.assertEqual(
             distribution,
             UniformDistribution(
-                variable=self.variable, interval=closed(1, 9).simple_sets[0]
+                variable=self.variable, interval=reals().simple_sets[0]
             ),
         )
 
@@ -323,6 +325,125 @@ class FittedNygaDistributionTestCase(unittest.TestCase):
         )
         self.assertEqual(likelihood.shape, (1000,))
         self.assertGreater(likelihood.min(), -np.inf)
+
+
+class SupportedUniformDistributionTestCase(unittest.TestCase):
+    """
+    Tests for how `InductionStep.create_uniform_distribution_from_indices` uses
+    `NygaInduction.support`: the piece touching the globally first or last datapoint is
+    intersected with it, which is what lets a leaf's tolerance widening be capped
+    without a separate adjustment step.
+    """
+
+    variable: Continuous = Continuous("x")
+    sorted_data: np.array = np.array([1, 2, 3, 4, 7, 9])
+
+    def induction_step_with_support(self, support: SimpleInterval) -> InductionStep:
+        nyga_distribution = NygaInduction(
+            self.variable, min_samples_per_quantile=1, support=support
+        )
+        weights = np.ones((len(self.sorted_data),))
+        cumulative_weights = np.append(0, np.cumsum(weights))
+        cumulative_log_weights = np.append(0, np.cumsum(np.log(weights)))
+        return InductionStep(
+            self.sorted_data,
+            cumulative_weights,
+            cumulative_log_weights,
+            0,
+            len(self.sorted_data),
+            nyga_distribution,
+        )
+
+    def test_edge_piece_is_unconstrained_by_the_default_support(self):
+        distribution = self.induction_step_with_support(
+            reals().simple_sets[0]
+        ).create_uniform_distribution()
+        self.assertEqual(
+            distribution,
+            UniformDistribution(
+                variable=self.variable, interval=reals().simple_sets[0]
+            ),
+        )
+
+    def test_edge_piece_is_clipped_to_a_given_support(self):
+        support = closed(0.0, 5.0).simple_sets[0]
+        distribution = self.induction_step_with_support(
+            support
+        ).create_uniform_distribution()
+        self.assertEqual(distribution.interval, support)
+
+    def test_internal_piece_is_unaffected_by_a_wider_support(self):
+        induction_step = self.induction_step_with_support(
+            closed(-10.0, 20.0).simple_sets[0]
+        )
+        distribution = induction_step.create_uniform_distribution_from_indices(3, 5)
+        self.assertEqual(
+            distribution,
+            UniformDistribution(
+                variable=self.variable, interval=closed_open(3.5, 8.0).simple_sets[0]
+            ),
+        )
+
+
+class NygaInductionSupportTestCase(unittest.TestCase):
+    """
+    Tests for how `NygaInduction.fit` narrows `support` - the mechanism that lets a
+    sibling leaf's data (e.g. another leaf of a :class:`JointProbabilityTree`) keep
+    this distribution's support from overlapping it.
+    """
+
+    variable: Continuous = Continuous("x")
+
+    def test_fit_narrows_the_default_support_to_data_range_widened_by_tolerance(self):
+        model = NygaInduction(
+            self.variable, min_samples_per_quantile=1, min_likelihood_improvement=0
+        )
+        model.fit([1.0, 2.0, 3.0])
+        # SimpleInterval stores its bounds as single-precision floats, so the exact
+        # value picks up rounding noise around the scale of tolerance_at_extremes itself
+        self.assertAlmostEqual(
+            model.support.lower, 1.0 - model.tolerance_at_extremes, delta=1e-5
+        )
+        self.assertAlmostEqual(
+            model.support.upper, 3.0 + model.tolerance_at_extremes, delta=1e-5
+        )
+
+    def test_fit_narrows_a_given_support_no_further_than_the_tolerance_window(self):
+        # wide enough that the tolerance window around the data sits inside it
+        given_support = closed(0.0, 10.0).simple_sets[0]
+        model = NygaInduction(
+            self.variable,
+            support=given_support,
+            min_samples_per_quantile=1,
+            min_likelihood_improvement=0,
+        )
+        model.fit([1.0, 2.0, 3.0])
+
+        self.assertAlmostEqual(
+            model.support.lower, 1.0 - model.tolerance_at_extremes, delta=1e-5
+        )
+        self.assertAlmostEqual(
+            model.support.upper, 3.0 + model.tolerance_at_extremes, delta=1e-5
+        )
+
+    def test_fit_narrows_a_given_support_to_stay_inside_it(self):
+        # narrower than the tolerance window around the data on the upper side
+        given_support = closed(0.0, 3.0000005).simple_sets[0]
+        model = NygaInduction(
+            self.variable,
+            support=given_support,
+            min_samples_per_quantile=1,
+            min_likelihood_improvement=0,
+        )
+        model.fit([1.0, 2.0, 3.0])
+
+        widest_leaf = max(
+            model.probabilistic_circuit.leaves,
+            key=lambda leaf: leaf.distribution.interval.upper,
+        )
+        self.assertAlmostEqual(
+            widest_leaf.distribution.interval.upper, 3.0000005, delta=1e-5
+        )
 
 
 if __name__ == "__main__":

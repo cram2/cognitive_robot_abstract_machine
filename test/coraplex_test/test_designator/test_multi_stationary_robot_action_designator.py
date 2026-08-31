@@ -25,6 +25,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.testing import _make_sine_scan_poses
 from coraplex.view_manager import ViewManager
+from krrood.entity_query_language.factories import an, entity, variable
 
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
@@ -38,6 +39,8 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -98,7 +101,28 @@ def robot_setup(request):
 
         world.add_connection(box1_connection)
         world.add_connection(box2_connection)
+
+        # The boxes stand in for any graspable object; the plans only need an annotation
+        # to name them by, not a particular kind of object.
+        world.add_semantic_annotations([HasRootBody(root=box1), HasRootBody(root=box2)])
     return world, request.param[1]
+
+
+def graspable_annotation(world: World, body: Body) -> HasRootBody:
+    """
+    The annotation naming ``body`` for the actions that take one rather than a body.
+
+    :param world: The world holding the annotations.
+    :param body: The body the annotation is rooted at.
+    :return: The annotation rooted at ``body``.
+    """
+    return an(
+        entity(
+            semantic_annotation := variable(
+                HasRootBody, domain=world.semantic_annotations
+            )
+        ).where(semantic_annotation.root == body)
+    ).first()
 
 
 @pytest.fixture
@@ -153,6 +177,7 @@ def test_reach_action_multi(immutable_stationary_block_world):
         left_arm.end_effector,
     )
     box_body = world.get_body_by_name("box1")
+    box = graspable_annotation(world, box_body)
     position = box_body.global_pose.position.to_np()
 
     plan = sequential(
@@ -162,7 +187,7 @@ def test_reach_action_multi(immutable_stationary_block_world):
                 target_pose=Pose(
                     Point3.from_iterable(position), reference_frame=world.root
                 ),
-                object_designator=box_body,
+                object_designator=box,
                 arm=Arms.LEFT,
                 grasp_description=grasp_description,
             ),
@@ -249,7 +274,11 @@ def test_pick_up_multi(mutable_stationary_block_world):
     plan = sequential(
         [
             ParkArmsAction(Arms.BOTH),
-            PickUpAction(world.get_body_by_name("box1"), Arms.LEFT, grasp_description),
+            PickUpAction(
+                graspable_annotation(world, world.get_body_by_name("box1")),
+                Arms.LEFT,
+                grasp_description,
+            ),
         ],
         context=context,
     ).plan
@@ -292,7 +321,11 @@ def test_place_multi(mutable_stationary_block_world, place_position):
     plan = sequential(
         [
             ParkArmsAction(Arms.BOTH),
-            PickUpAction(world.get_body_by_name("box1"), Arms.LEFT, grasp_description),
+            PickUpAction(
+                graspable_annotation(world, world.get_body_by_name("box1")),
+                Arms.LEFT,
+                grasp_description,
+            ),
             PlaceAction(
                 world.get_body_by_name("box1"),
                 Pose(place_position, reference_frame=world.root),

@@ -16,7 +16,7 @@ from semantic_digital_twin.world import World
 def test_grasp_bar(pr2_world_state_reset: World, rclpy_node):
     VizMarkerPublisher(
         _world=pr2_world_state_reset, node=rclpy_node
-    ).with_tf_publisher()
+    )
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )

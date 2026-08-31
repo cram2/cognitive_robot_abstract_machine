@@ -32,6 +32,11 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
 )
+from krrood.entity_query_language.operators.causal import (
+    Cause,
+    CausesEffect,
+    Confounder,
+)
 from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
@@ -464,6 +469,18 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         return isinstance(value, type(Ellipsis))
 
     @property
+    def has_cause_attributes(self) -> bool:
+        """
+        :return: Whether any attribute anywhere in this match's pattern (including nested
+            matches) is marked with :func:`~krrood.entity_query_language.factories.cause` --
+            a ``do()``-intervention target only a causal backend can resolve.
+        """
+        return any(
+            isinstance(attribute_match.assigned_value, Cause)
+            for attribute_match in self.matches_with_variables
+        )
+
+    @property
     def name(self) -> str:
         type_name = self.type.__name__ if self.type is not None else "?"
         return f"Match({type_name})"
@@ -480,6 +497,36 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         self.expression.where(*conditions)
         self.expression.build()
         return self
+
+    def causes_effect(self, *conditions: ConditionType) -> Match[T]:
+        """
+        Mark condition(s) as the effect side of a causal query, e.g.
+        ``a(Pick)(arm=cause).causes_effect(pick.variable.action.status == SUCCESS)``.
+
+        Sugar for ``self.where(CausesEffect(and_(*conditions), cause_attributes=...))``:
+        semantically identical to an ordinary ``.where()`` under every backend except
+        :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, which reads
+        the wrapped condition to find which variable(s) a
+        :data:`~krrood.entity_query_language.factories.cause` search should optimize for.
+        The ``cause``-marked attribute(s) are also attached to the built
+        :class:`~krrood.entity_query_language.operators.causal.CausesEffect` node, so its
+        verbalization can name them.
+
+        :param conditions: One literal comparator, or several combined with AND.
+        :return: This match, for chaining.
+        """
+        # `and_` stays a local import: factories.py imports this module, so a module-level
+        # import here would be circular.
+        from krrood.entity_query_language.factories import and_
+
+        cause_attributes = [
+            attribute_match.attribute
+            for attribute_match in self.matches_with_variables
+            if isinstance(attribute_match.assigned_value, Cause)
+        ]
+        return self.where(
+            CausesEffect(and_(*conditions), cause_attributes=cause_attributes)
+        )
 
     def from_(self, domain: DomainType) -> Self:
         """
@@ -604,6 +651,19 @@ class AttributeMatch(AbstractMatchExpression[T]):
         """
         if isinstance(self.assigned_value, AbstractMatchExpression):
             return self.assigned_value.variable
+        if (
+            isinstance(self.assigned_value, (Cause, Confounder))
+            and self.assigned_value._type_ is None
+        ):
+            # `cause`/`confounder` are shared instances written directly into every
+            # matching kwarg, so unlike a plain literal (whose `Literal` wrapper is
+            # created fresh right here, with `_type_=self.type`), an unresolved one has
+            # no declared type of its own yet, and mutating it in place would corrupt
+            # every other field also marked `cause`/`confounder`. Return a fresh,
+            # per-attribute copy with the type filled in instead, so code reading
+            # `assigned_variable._type_` (parametrization, generation) sees the
+            # attribute's declared type without touching the shared original.
+            return type(self.assigned_value)(_type_=self.type)
         elif not isinstance(self.assigned_value, SymbolicExpression):
             return Literal(
                 _name__=self.variable._name_,

@@ -13,7 +13,7 @@ from __future__ import annotations
 {{ import_line }}
 {% endfor %}
 
-results: Tuple[VerbalizationResult, ...] = (
+results: tuple[VerbalizationResult, ...] = (
 {% for entry in entries %}
     VerbalizationResult({{ entry.class_name }}, {{ entry.sentence }}),
 {% endfor %}

@@ -447,6 +447,16 @@ class TestExpression:
         a = sm.FloatVariable(name="a")
         assert a.equivalent(a.free_variables()[0])
 
+    def test_constant_expression_pins_no_free_variables(self):
+        assert sm.Vector([1, 2, 3]).pinned_free_variables == []
+
+    def test_symbolic_expression_pins_its_free_variables(self):
+        variables = sm.create_float_variables(["a", "b"])
+
+        pinned = sm.Vector(variables).pinned_free_variables
+
+        assert [variable.name for variable in pinned] == ["a", "b"]
+
     def test_pretty_str(self):
         e = sm.Matrix.eye(4)
         e.pretty_str()

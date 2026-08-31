@@ -16,9 +16,10 @@ from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bowl,
-    Spoon,
     Drawer,
     Handle,
+    Milk,
+    Spoon,
 )
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -65,7 +66,7 @@ try:
     )
 
     node = rclpy.create_node("viz_marker")
-    v = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
+    v = VizMarkerPublisher(_world=world, node=node)
 except ImportError:
     node = None
 
@@ -95,17 +96,17 @@ plan = sequential(
         ParkArmsAction(Arms.BOTH),
         MoveTorsoAction(TorsoState.HIGH),
         TransportAction(
-            world.get_body_by_name("milk.stl"),
+            world.get_semantic_annotations_by_type(Milk)[0],
             Pose.from_xyz_rpy(4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            world.get_body_by_name("bowl.stl"),
+            world.get_semantic_annotations_by_type(Bowl)[0],
             Pose.from_xyz_rpy(5, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            world.get_body_by_name("spoon.stl"),
+            world.get_semantic_annotations_by_type(Spoon)[0],
             Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
             GraspDescription(

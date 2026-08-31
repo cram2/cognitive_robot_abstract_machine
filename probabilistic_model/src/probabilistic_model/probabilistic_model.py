@@ -38,6 +38,7 @@ from abc import abstractmethod, ABC
 
 from probabilistic_model.exceptions import IntractableError, UndefinedOperationError
 from probabilistic_model.utils import neighbouring_points
+from random_events.plotting import EventPlotter, SimpleEventPlotter
 from random_events.product_algebra import VariableMap, Event, SimpleEvent
 from random_events.variable import Integer, Continuous, Variable, Symbolic
 
@@ -610,8 +611,8 @@ class ProbabilisticModel(ABC):
             max_of_samples + max_of_samples * PADDING_FACTOR_FOR_X_AXIS_IN_PLOT,
         )
         limited_complement_of_support = complement_of_support & limiting_interval
-        traces = SimpleEvent.from_data(
-            {self.variables[0]: limited_complement_of_support}
+        traces = SimpleEventPlotter(
+            SimpleEvent.from_data({self.variables[0]: limited_complement_of_support})
         ).plot()
         for trace in traces:
             trace.update(name=PDF_TRACE_NAME, marker=dict(color=PDF_TRACE_COLOR))
@@ -837,7 +838,7 @@ class ProbabilisticModel(ABC):
         """
         try:
             mode, _ = self.mode()
-            mode_traces = mode.plot(color=MODE_TRACE_COLOR)
+            mode_traces = EventPlotter(mode).plot(color=MODE_TRACE_COLOR)
             for trace in mode_traces:
                 trace.update(name=MODE_TRACE_NAME, mode="lines+markers")
         except IntractableError:

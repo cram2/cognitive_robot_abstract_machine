@@ -414,11 +414,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         :raises WorldHasMultipleSynchronizersError: If several synchronizers publish the
             changes of the world, leaving it undecided which stream to refer to.
         """
-        synchronizers = [
-            callback
-            for callback in world.get_world_model_manager().model_change_callbacks
-            if isinstance(callback, cls)
-        ]
+        synchronizers = cls.all_callbacks_of_this_type_from_world(world)
         if not synchronizers:
             raise WorldHasNoSynchronizerError(world=world)
         if len(synchronizers) > 1:
@@ -434,8 +430,17 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         Synchronizer.__post_init__(self)
         ModelChangeCallback.__post_init__(self)
 
-    def on_model_change(self, **kwargs):
-        publish_changes = kwargs.get("publish_changes")
+    def on_model_change(self, publish_changes: Optional[bool] = None, **kwargs):
+        """
+        Send the modification block the world just recorded to the other synchronizers.
+
+        Implements
+        :meth:`~semantic_digital_twin.callbacks.callback.ModelChangeCallback.on_model_change`.
+
+        :param publish_changes: Whether this modification may leave the world.
+        :raises MissingPublishChangesKWARG: If the notification did not say whether to
+            publish.
+        """
         if publish_changes is None:
             raise MissingPublishChangesKWARG(kwargs)
         if not publish_changes:
@@ -450,14 +455,35 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         update = WorldUpdate(meta_data=self.meta_data, modification_block=model_block)
         self._publish_or_defer(update)
 
-    def on_state_change(self, **kwargs):
-        publish_changes = kwargs.get("publish_changes")
+    def on_state_change(
+        self,
+        publish_changes: Optional[bool] = None,
+        force_republish: bool = False,
+        **kwargs,
+    ):
+        """
+        Send the positions of the degrees of freedom to the other synchronizers.
+
+        Implements
+        :meth:`~semantic_digital_twin.callbacks.callback.StateChangeCallback.on_state_change`.
+
+        :param publish_changes: Whether this state change may leave the world.
+        :param force_republish: Whether to send every degree of freedom instead of only
+            the ones that moved since the last message, so a receiver that has just
+            applied a model modification is given the whole state.
+        :raises MissingPublishChangesKWARG: If the notification did not say whether to
+            publish.
+        """
         if publish_changes is None:
             raise MissingPublishChangesKWARG(kwargs)
         if not publish_changes:
             return
 
-        changes = self.compute_state_changes()
+        changes = (
+            self._world.state.to_uuid_position_dict()
+            if force_republish
+            else self.compute_state_changes()
+        )
         if not changes:
             return
 

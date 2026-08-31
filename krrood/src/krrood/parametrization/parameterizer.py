@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 from enum import EnumType
 from functools import cached_property
@@ -10,8 +11,17 @@ from typing_extensions import Any, Iterable, Optional, Union, get_args
 from krrood.parametrization.exceptions import EmptyVariableDomain, InvalidEllipsis
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.operators.causal import (
+    Cause,
+    CausesEffect,
+    Confounder,
+)
 from krrood.entity_query_language.core.variable import Literal, Variable
 from krrood.entity_query_language.factories import and_
+from krrood.entity_query_language.operators.core_logical_operators import (
+    AND,
+    flatten_operands,
+)
 from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
@@ -93,6 +103,32 @@ class UnderspecifiedParameters:
     A cache for events that are created from symbolic expressions.
     """
 
+    search_cause_variables: list[random_events.variable.Variable] = field(
+        init=False, default_factory=list
+    )
+    """
+    Variables assigned a `Cause` (`cause`) marker: the do()-intervention targets
+    `ProbabilisticBackend` should search over.
+    """
+
+    search_confounder_variables: list[random_events.variable.Variable] = field(
+        init=False, default_factory=list
+    )
+    """
+    Variables assigned a `Confounder` (`confounder`) marker: Pearl's backdoor-criterion
+    adjustment set `ProbabilisticBackend` should sum out of each cause candidate's
+    interventional probability, so it is not left baked into the correlation between
+    cause and effect.
+    """
+
+    effect_variables_from_causes_effect: list[random_events.variable.Variable] = field(
+        init=False, default_factory=list
+    )
+    """
+    Variables compared in a `causes_effect(...)` condition: the effect(s) a `Cause`
+    search should optimize the interventional probability of.
+    """
+
     def __post_init__(self):
         self.statement.expression.build()
         self._random_event_compiler = WhereExpressionToRandomEventTranslator(
@@ -103,6 +139,24 @@ class UnderspecifiedParameters:
                 self._random_event_compiler.translate()
             )
         _ = self.variables  # make variables available
+        self._extract_effect_variables_from_causes_effect_conditions()
+
+    def _extract_effect_variables_from_causes_effect_conditions(self) -> None:
+        """
+        Populate :attr:`effect_variables_from_causes_effect` by walking the where
+        conditions for :class:`~krrood.entity_query_language.operators.causal.CausesEffect`
+        nodes and reading the variable(s) their wrapped comparator(s) compare.
+        """
+        root = self._random_event_compiler.conditions_root
+        if root is None:
+            return
+        for expression in itertools.chain([root], root._descendants_):
+            if not isinstance(expression, CausesEffect):
+                continue
+            for comparator in flatten_operands(expression._child_, AND):
+                self.effect_variables_from_causes_effect.append(
+                    self._random_event_compiler.variables[comparator.left]
+                )
 
     @cached_property
     def variables(self) -> dict[str, random_events.variable.Variable]:
@@ -131,6 +185,12 @@ class UnderspecifiedParameters:
         """
         krrood_variable = attribute_match.assigned_variable
 
+        if isinstance(krrood_variable, Cause):
+            return self._handle_cause_attribute_match(attribute_match)
+
+        if isinstance(krrood_variable, Confounder):
+            return self._handle_confounder_attribute_match(attribute_match)
+
         if isinstance(krrood_variable, Literal):
             return self._handle_literal_attribute_match(attribute_match)
 
@@ -138,6 +198,57 @@ class UnderspecifiedParameters:
             return self._handle_variable_attribute_match(attribute_match)
 
         return {}
+
+    def _handle_cause_attribute_match(
+        self, attribute_match: AttributeMatch
+    ) -> dict[str, random_events.variable.Variable]:
+        """
+        Handle attribute matches assigned a
+        :class:`~krrood.entity_query_language.operators.causal.Cause` (``cause``) marker:
+        register the variable to search over, the same way a free ``...`` field would
+        be, and record it as a cause variable for
+        :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`'s
+        interventional search.
+
+        :param attribute_match: The attribute match with a ``Cause`` assigned value.
+        :return: A dictionary of extracted variables.
+        """
+        name = attribute_match.name_from_variable_access_path
+        krrood_variable = attribute_match.assigned_variable
+        type_ = self._process_attribute_match_type(krrood_variable._type_)
+
+        if not issubclass(type_, compatible_types):
+            raise InvalidEllipsis(type_)
+
+        cause_variable = variable_from_name_and_type(name=name, type_=type_)
+        self.search_cause_variables.append(cause_variable)
+        return {name: cause_variable}
+
+    def _handle_confounder_attribute_match(
+        self, attribute_match: AttributeMatch
+    ) -> dict[str, random_events.variable.Variable]:
+        """
+        Handle attribute matches assigned a
+        :class:`~krrood.entity_query_language.operators.causal.Confounder`
+        (``confounder``) marker: register the variable to search over, the same way a
+        free ``...`` field would be, and record it as an adjustment variable for
+        :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`'s
+        interventional search.
+
+        :param attribute_match: The attribute match with a ``Confounder`` assigned
+            value.
+        :return: A dictionary of extracted variables.
+        """
+        name = attribute_match.name_from_variable_access_path
+        krrood_variable = attribute_match.assigned_variable
+        type_ = self._process_attribute_match_type(krrood_variable._type_)
+
+        if not issubclass(type_, compatible_types):
+            raise InvalidEllipsis(type_)
+
+        confounder_variable = variable_from_name_and_type(name=name, type_=type_)
+        self.search_confounder_variables.append(confounder_variable)
+        return {name: confounder_variable}
 
     def _handle_literal_attribute_match(
         self, attribute_match: AttributeMatch
@@ -431,8 +542,10 @@ class UnderspecifiedParameters:
             if mapped_variable is None:
                 continue
 
-            if attribute_match and isinstance(
-                attribute_match.assigned_value, SymbolicExpression
+            if (
+                attribute_match
+                and isinstance(attribute_match.assigned_value, SymbolicExpression)
+                and not isinstance(attribute_match.assigned_value, Literal)
             ):
                 [domain_index] = [
                     val

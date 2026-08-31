@@ -1,3 +1,4 @@
+import inspect
 from dataclasses import is_dataclass, fields
 from types import NoneType
 
@@ -36,7 +37,12 @@ def get_field_type_endpoint(owner_class: Type, field_name: str) -> Optional[Type
             return None
     wrapped_field = get_wrapped_field(owner_class, field_name)
     if wrapped_field is None:
-        prop = owner_class.__dict__.get(field_name)
+        # Static (non-triggering) lookup across the MRO, so a property inherited from a
+        # base class resolves the same as one declared directly on ``owner_class``.
+        try:
+            prop = inspect.getattr_static(owner_class, field_name)
+        except AttributeError:
+            prop = None
         if not isinstance(prop, property) or prop.fget is None:
             return None
         try:

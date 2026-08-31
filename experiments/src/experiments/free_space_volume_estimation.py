@@ -26,7 +26,10 @@ from typing_extensions import TYPE_CHECKING, List, Optional, Sequence, Tuple
 from experiments.experiment_definitions import VolumeBound
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.geometry import BoundingBox, Shape
+from semantic_digital_twin.world_description.geometry import (
+    VolumetricBoundingBox,
+    Shape,
+)
 
 if TYPE_CHECKING:
     from pydrake.geometry.optimization import HPolyhedron
@@ -71,7 +74,7 @@ class ObstacleContainmentChecker:
     otherwise).
     """
 
-    world_bounding_box: BoundingBox
+    world_bounding_box: VolumetricBoundingBox
     """
     The obstacle's bounding box, expressed in the target frame; used only if
     decomposition itself yields no pieces.
@@ -139,7 +142,7 @@ class MonteCarloFreeSpaceSampler:
     overlap.
     """
 
-    search_space_bounding_box: BoundingBox
+    search_space_bounding_box: VolumetricBoundingBox
     """
     The volume to sample points within.
     """
@@ -172,7 +175,7 @@ class MonteCarloFreeSpaceSampler:
     @classmethod
     def for_obstacle_shapes(
         cls,
-        search_space_bounding_box: BoundingBox,
+        search_space_bounding_box: VolumetricBoundingBox,
         obstacle_shapes: Sequence[Shape],
         target_frame: KinematicStructureEntity,
         sample_count: int = 2000,

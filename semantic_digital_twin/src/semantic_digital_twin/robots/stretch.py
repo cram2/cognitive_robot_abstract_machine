@@ -9,6 +9,7 @@ from pathlib import Path
 
 from typing_extensions import Self, List
 
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     SelfCollisionMatrixRule,
@@ -169,7 +170,7 @@ class StretchArm(Arm[StretchGripper]):
         arm_park = JointState.from_mapping(
             name=PrefixedName("arm_park", prefix=self.name.name),
             mapping={
-                self._world.get_connection_by_name(StretchJoint.LIFT): 0.7,
+                self._world.get_connection_by_name(StretchJoint.LIFT): 0.65,
                 self._world.get_connection_by_name(StretchJoint.ARM_L3): 0.0,
                 self._world.get_connection_by_name(StretchJoint.ARM_L2): 0.0,
                 self._world.get_connection_by_name(StretchJoint.ARM_L1): 0.0,
@@ -359,7 +360,10 @@ class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
 class StretchMobileBase(MobileBase[DifferentialDrive], HasTorso[StretchTorso]):
 
     full_body_controlled: bool = field(default=True, kw_only=True)
-    forward_axis: Vector3 = field(default_factory=Vector3.NEGATIVE_Y)
+
+    @classproperty
+    def forward_axis(cls) -> Vector3:
+        return Vector3.NEGATIVE_Y()
 
     def setup_hardware_interfaces(self):
         pass

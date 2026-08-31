@@ -1,8 +1,0 @@
--r requirements.txt
-pandas>=2.2.3
-graphviz
-matplotlib>=3.10.1
-random_events>=5.0.1
-typing_extensions>=4.13.2
-pytest-qt
-pytest-xvfb

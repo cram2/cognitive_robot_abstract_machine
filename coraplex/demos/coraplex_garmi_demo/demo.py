@@ -67,7 +67,6 @@ try:
     rclpy.init()
     rclpy_node = rclpy.create_node("ros_node")
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
-    viz.with_tf_publisher()
 except ImportError:
     pass
 

@@ -35,6 +35,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.world_description.world_entity import Body
 
 giskard_process = subprocess.Popen(
@@ -66,7 +67,7 @@ if execition_mode == ExecutionType.REAL:
 elif execition_mode == ExecutionType.SIMULATED:
     world = URDFParser.from_file(Tracy.get_ros_file_path()).parse()
     Tracy.from_world(world)
-    VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
+    VizMarkerPublisher(_world=world, node=node)
 
 print("Setup World")
 # Setup cubes
@@ -98,6 +99,12 @@ with world.modify_world():
     world.add_kinematic_structure_entity(box1)
     world.add_kinematic_structure_entity(box2)
     world.add_kinematic_structure_entity(box3)
+
+    # The boxes stand in for any graspable object; the plan only needs an annotation to
+    # name them by, not a particular kind of object.
+    box2_annotation = HasRootBody(root=box2)
+    box3_annotation = HasRootBody(root=box3)
+    world.add_semantic_annotations([box2_annotation, box3_annotation])
 
     world.add_connection(
         FixedConnection.create_with_dofs(
@@ -145,7 +152,7 @@ plan = sequential(
         # Stack Box 2
         ParkArmsAction(Arms.BOTH),
         PickUpAction(
-            box2,
+            box2_annotation,
             Arms.LEFT,
             GraspDescription(
                 ApproachDirection.FRONT,
@@ -161,7 +168,7 @@ plan = sequential(
         # Stack Box 3
         ParkArmsAction(Arms.BOTH),
         PickUpAction(
-            box3,
+            box3_annotation,
             Arms.RIGHT,
             GraspDescription(
                 ApproachDirection.FRONT,

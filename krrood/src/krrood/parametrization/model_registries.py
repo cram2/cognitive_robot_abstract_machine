@@ -4,6 +4,9 @@ from typing_extensions import Type, Dict
 
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from krrood.utils import get_class_and_attribute_name
+from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
+    CausalCircuit,
+)
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
@@ -76,3 +79,23 @@ class RelationalCircuitRegistry(ModelRegistry):
                 rename_map[circuit_var] = parameters.variables[qualified_name]
         grounded.update_variables(rename_map)
         return grounded
+
+
+@dataclass
+class CausalCircuitRegistry(ModelRegistry):
+    """
+    A registry that maps target classes directly to pre-built causal circuits, so a
+    ``cause``/``causes_effect()`` query can be routed through that circuit's
+    ``backdoor_adjustment`` method.
+
+    See
+    :class:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`.
+    """
+
+    circuits: Dict[Type, CausalCircuit]
+    """
+    A dictionary that maps classes to pre-built causal circuits.
+    """
+
+    def get_model(self, parameters: UnderspecifiedParameters) -> ProbabilisticModel:
+        return self.circuits[parameters.statement._expression.selected_variable._type_]

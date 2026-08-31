@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+import numpy as np
 
 
 @dataclass
@@ -10,12 +12,12 @@ class FieldOfView:
     horizontal angles of the camera's view.
     """
 
-    vertical_angle: float
+    vertical_angle: float = field(default=np.pi / 2)
     """
     The vertical angle of the camera's field of view, in radians.
     """
 
-    horizontal_angle: float
+    horizontal_angle: float = field(default=np.pi / 2)
     """
     The horizontal angle of the camera's field of view, in radians.
     """

@@ -26,6 +26,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     NounPhrase,
     RoleFragment,
     VerbalizationFragment,
+    WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.features import Definiteness
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
@@ -59,6 +60,13 @@ class BooleanPredicate(ABC):
         for the verbal."""
 
     @abstractmethod
+    def bare_head(self) -> VerbalizationFragment:
+        """:return: The same verb/copula as :meth:`head`, but in its bare infinitive form (*"be"*,
+        *"have"*, the lexical verb's own lemma) rather than the finite, morphology-inflected one —
+        for an infinitive context (*"causes it to **be** operational"*) where inflecting the verb
+        would be wrong."""
+
+    @abstractmethod
     def predicate_object(self, attribute: Attribute) -> Optional[VerbalizationFragment]:
         """:param attribute: The boolean attribute node, supplying the owner class and name for the
         default surface when the predicate names none.
@@ -83,6 +91,9 @@ class AdjectivalPredicate(BooleanPredicate):
     def head(self) -> VerbalizationFragment:
         return Copula().as_fragment()
 
+    def bare_head(self) -> VerbalizationFragment:
+        return WordFragment(text=Copula.lemma)
+
     def predicate_object(self, attribute: Attribute) -> VerbalizationFragment:
         if self.adjective is not None:
             return Adjective(self.adjective).as_fragment()
@@ -94,7 +105,8 @@ class AdjectivalPredicate(BooleanPredicate):
 @dataclass(frozen=True)
 class PossessivePredicate(BooleanPredicate):
     """
-    The attribute reads as something the subject *has* — *"has milk"*, *"has a backbone"*.
+    The attribute reads as something the subject *has* — *"has milk"*, *"has a
+    backbone"*.
     """
 
     noun: Optional[str] = None
@@ -104,11 +116,15 @@ class PossessivePredicate(BooleanPredicate):
 
     definiteness: Definiteness = Definiteness.BARE
     """
-    The determiner before the noun — bare for a mass/plural noun, indefinite for a count noun.
+    The determiner before the noun — bare for a mass/plural noun, indefinite for a count
+    noun.
     """
 
     def head(self) -> VerbalizationFragment:
         return Verb("have").as_fragment()
+
+    def bare_head(self) -> VerbalizationFragment:
+        return WordFragment(text=Verb("have").lemma)
 
     def predicate_object(self, attribute: Attribute) -> VerbalizationFragment:
         if self.noun is not None:
@@ -124,18 +140,20 @@ class PossessivePredicate(BooleanPredicate):
 @dataclass(frozen=True)
 class VerbalPredicate(BooleanPredicate):
     """
-    The attribute reads as an action the subject performs — *"produces milk"*, *"breathes"*.
+    The attribute reads as an action the subject performs — *"produces milk"*,
+    *"breathes"*.
     """
 
     verb: str
     """
-    The verb lemma (*"produce"*, *"breathe"*); conjugated and negated by the morphology pass.
+    The verb lemma (*"produce"*, *"breathe"*); conjugated and negated by the morphology
+    pass.
     """
 
     object_noun: Optional[str] = None
     """
-    An optional object noun (*"produces **milk**"*); ``None`` for an intransitive verb — one that
-    takes no object, so the predicate is the verb alone (*"breathes"*).
+    An optional object noun (*"produces **milk**"*); ``None`` for an intransitive verb —
+    one that takes no object, so the predicate is the verb alone (*"breathes"*).
     """
 
     object_definiteness: Definiteness = Definiteness.BARE
@@ -145,6 +163,9 @@ class VerbalPredicate(BooleanPredicate):
 
     def head(self) -> VerbalizationFragment:
         return Verb(self.verb).as_fragment()
+
+    def bare_head(self) -> VerbalizationFragment:
+        return WordFragment(text=self.verb)
 
     def predicate_object(self, attribute: Attribute) -> Optional[VerbalizationFragment]:
         if self.object_noun is None:

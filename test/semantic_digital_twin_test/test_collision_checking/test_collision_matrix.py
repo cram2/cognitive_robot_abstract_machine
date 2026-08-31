@@ -353,7 +353,7 @@ class TestCollisionRules:
     def test_compute_self_collision_matrix(self, pr2_world_state_reset, rclpy_node):
         VizMarkerPublisher(
             _world=pr2_world_state_reset, node=rclpy_node
-        ).with_tf_publisher()
+        )
         pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
         base_link = pr2_world_state_reset.get_body_by_name("base_link")
         head_pan_link = pr2_world_state_reset.get_body_by_name("head_pan_link")

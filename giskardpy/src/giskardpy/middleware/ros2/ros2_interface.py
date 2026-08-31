@@ -176,7 +176,7 @@ class MyActionClient:
             node=node_handle, action_type=action_type, action_name=action_name
         )
         while not self._client.wait_for_server(timeout_sec=2):
-            rospy.get_node().get_logger().info(f"Waiting for {action_name} server...")
+            self.node_handle.get_logger().info(f"Waiting for {action_name} server...")
 
     def send_goal_async(self, goal) -> Future:
         self._goal_counter += 1

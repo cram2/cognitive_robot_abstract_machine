@@ -253,8 +253,6 @@ def test_new_reachability_location_body(
 ):
     world, robot, context = immutable_multiple_robot_simple_apartment
 
-    # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
-
     plan = sequential(
         [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
         context,
@@ -275,8 +273,6 @@ def test_new_reachability_location_body(
 
 def test_merge_reachability_location(immutable_multiple_robot_simple_apartment):
     world, robot, context = immutable_multiple_robot_simple_apartment
-
-    # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
 
     plan = sequential(
         [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],

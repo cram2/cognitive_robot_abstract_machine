@@ -64,7 +64,11 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
-from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.geometry import (
+    VolumetricBoundingBox,
+    Color,
+    Scale,
+)
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
@@ -90,8 +94,12 @@ if TYPE_CHECKING:
         Leg,
         Sink,
         ShelfLayer,
+        Wall,
     )
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
+        PlanarGraphOfBoundingBoxes,
+    )
 
 
 @dataclass(eq=False)
@@ -314,11 +322,8 @@ class HasRootKinematicStructureEntity(
         return self._world.get_kinematic_structure_entities_of_branch(self.root)
 
 
-TBody = TypeVar("TBody", bound=Body)
-
-
 @dataclass(eq=False)
-class HasRootBody(HasRootKinematicStructureEntity[TBody]):
+class HasRootBody(HasRootKinematicStructureEntity[Body]):
     """
     Abstract base class for all objects which have a unambiguous root reference frame.
 
@@ -391,11 +396,8 @@ class HasRootBody(HasRootKinematicStructureEntity[TBody]):
         )
 
 
-TRegion = TypeVar("TRegion", bound=Region)
-
-
 @dataclass(eq=False)
-class HasRootRegion(HasRootKinematicStructureEntity[TRegion]):
+class HasRootRegion(HasRootKinematicStructureEntity[Region]):
     """
     A mixin class for semantic annotations that have a region.
     """
@@ -1129,6 +1131,110 @@ class HasSupportingSurface(IsStorageSpace):
             p_object_root.add_subcircuit(leaf(y_p, surface_circuit))
 
         return surface_circuit
+
+    def spawn_bounding_boxes_as_region(
+        self,
+        boxes: BoundingBoxCollection[VolumetricBoundingBox],
+        name: Optional[PrefixedName] = None,
+        color: Optional[Color] = None,
+    ) -> Region:
+        """
+        Spawn a collection of bounding boxes as a region, connected to this
+        annotation's root with a fixed connection.
+
+        :param boxes: The bounding boxes to spawn, e.g. the free space of a graph of
+            convex sets.
+        :param name: The name of the region. Defaults to "region".
+        :param color: The color of the region. Defaults to a translucent green.
+        :return: The region.
+        """
+        if name is None:
+            name = PrefixedName("region")
+        if color is None:
+            color = Color(0.5, 1.0, 0.5, 0.5)
+
+        shapes = boxes.as_shapes()
+        shapes.dye_shapes(color)
+        region = Region.from_shape_collection(name, shapes)
+
+        with self._world.modify_world():
+            self._world.add_region(region)
+            self._world.add_connection(FixedConnection(parent=self.root, child=region))
+        return region
+
+    def planar_free_space(
+        self,
+        max_height: float = 2.0,
+        tolerance: float = 0.001,
+        bloat_obstacles: float = 0.0,
+        bloat_walls: float = 0.0,
+        semantic_wall_annotation: Optional[Wall] = None,
+        obstacle_height_clearance: float = 0.01,
+    ) -> PlanarGraphOfBoundingBoxes:
+        """
+        Build a graph of the free space above this supporting surface, from the
+        surface's own top up to ``max_height``.
+
+        The search space is derived from :attr:`supporting_surface`'s own area -- its
+        x,y extent bounds the navigable region, and the height range determines which
+        obstacles in the world count as blocking.
+
+        :param max_height: The height of the free space above the surface.
+        :param tolerance: The tolerance for the intersection when calculating the
+            connectivity.
+        :param bloat_obstacles: The amount to bloat the obstacles.
+        :param bloat_walls: The amount to bloat wall obstacles.
+        :param semantic_wall_annotation: An optional wall annotation to be considered
+            as an obstacle.
+        :param obstacle_height_clearance: The amount every obstacle bounding box gets
+            expanded by in z, regardless of ``bloat_obstacles``/``bloat_walls``. The
+            search space starts comfortably above that many times over above the
+            surface's own top, so the surface's own body never registers as an
+            obstacle to the free space built over it.
+        :return: The graph of the free space above this surface.
+        """
+        from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+            SemanticEnvironmentAnnotation,
+        )
+        from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
+            PlanarGraphOfBoundingBoxes,
+        )
+
+        world = self._world
+        origin = HomogeneousTransformationMatrix(reference_frame=self.root)
+        surface_box = self.supporting_surface.area.as_bounding_box_collection_at_origin(
+            origin
+        ).bounding_box()
+
+        surface_top = surface_box.max_z + 2 * obstacle_height_clearance
+        search_space = BoundingBoxCollection(
+            [
+                VolumetricBoundingBox(
+                    surface_box.min_x,
+                    surface_box.min_y,
+                    surface_top,
+                    surface_box.max_x,
+                    surface_box.max_y,
+                    surface_top + max_height,
+                    origin,
+                )
+            ],
+            self.root,
+        )
+
+        semantic_obstacle_annotation = SemanticEnvironmentAnnotation(
+            root=world.root, _world=world
+        )
+
+        return PlanarGraphOfBoundingBoxes.free_space_from_semantic_annotation(
+            search_space,
+            semantic_obstacle_annotation,
+            semantic_wall_annotation,
+            tolerance,
+            bloat_obstacles,
+            bloat_walls,
+            obstacle_height_clearance,
+        )
 
 
 @dataclass(eq=False)

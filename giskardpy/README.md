@@ -38,7 +38,6 @@ cd giskardpy
 ```
 Install Giskardpy, `-e` is optional but prevents you from having to rebuild every time the code changes.
 ```
-pip3 install -r requirements.txt
 pip3 install -e .                           
 ```
 

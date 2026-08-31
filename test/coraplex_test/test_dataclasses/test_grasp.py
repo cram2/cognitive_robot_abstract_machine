@@ -1,5 +1,6 @@
 import os
 from copy import deepcopy
+from enum import Enum
 
 import numpy as np
 import pytest
@@ -19,6 +20,32 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+
+# %% fixture geometry
+
+
+class _FixtureGeometry(float, Enum):
+    """
+    The extents of the bodies the fixtures spawn, in meters.
+
+    A grasp sequence stands off from a body by half the body's extent along the approach
+    axis, so the expected poses are built from these.
+    """
+
+    MILK_HALF_DEPTH = 0.0321
+    """
+    Half the milk mesh's extent along its x axis.
+    """
+
+    MILK_HALF_WIDTH = 0.0326
+    """
+    Half the milk mesh's extent along its y axis.
+    """
+
+    BOX_HALF_EXTENT = 0.05
+    """
+    Half the fixture box's extent along every axis.
+    """
 
 
 @pytest.fixture(scope="session")
@@ -258,13 +285,14 @@ def test_grasp_sequence_front(immutable_simple_pr2_world):
     assert np.allclose(grasp_sequence[2].to_quaternion().to_list(), [0, 0, 0, 1])
 
     assert grasp_sequence[0].to_position().to_list() == pytest.approx(
-        [-0.082, 0, 0, 1], abs=0.01
+        [-(_FixtureGeometry.MILK_HALF_DEPTH + grasp_desc.manipulation_offset), 0, 0, 1],
+        abs=0.01,
     )
     assert grasp_sequence[1].to_position().to_list() == pytest.approx(
         [0, 0, 0, 1], abs=0.01
     )
     assert grasp_sequence[2].to_position().to_list() == pytest.approx(
-        [0, 0, 0.05, 1], abs=0.01
+        [0, 0, grasp_desc.manipulation_offset, 1], abs=0.01
     )
 
 
@@ -358,13 +386,14 @@ def test_grasp_sequence(immutable_simple_pr2_world):
     )
 
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [-0.082, 0, 0, 1], abs=0.01
+        [-(_FixtureGeometry.MILK_HALF_DEPTH + grasp_desc.manipulation_offset), 0, 0, 1],
+        abs=0.01,
     )
     assert sequence[1].to_position().to_list() == pytest.approx(
         [0, 0, 0.0, 1], abs=0.01
     )
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [0, 0.0, 0.05, 1], abs=0.01
+        [0, 0.0, grasp_desc.manipulation_offset, 1], abs=0.01
     )
 
 
@@ -393,13 +422,14 @@ def test_grasp_sequence_reverse(immutable_simple_pr2_holding_world):
     )
 
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [-0.082, 0, 0, 1], abs=0.01
+        [-(_FixtureGeometry.MILK_HALF_DEPTH + grasp_desc.manipulation_offset), 0, 0, 1],
+        abs=0.01,
     )
     assert sequence[1].to_position().to_list() == pytest.approx(
         [0, 0, 0.0, 1], abs=0.01
     )
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [0, 0.0, 0.05, 1], abs=0.01
+        [0, 0.0, grasp_desc.manipulation_offset, 1], abs=0.01
     )
 
 
@@ -428,13 +458,14 @@ def test_grasp_sequence_front_tracy(tracy_milk_world):
     )
 
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [-0.082, 0, 0, 1], abs=0.01
+        [-(_FixtureGeometry.MILK_HALF_DEPTH + grasp_desc.manipulation_offset), 0, 0, 1],
+        abs=0.01,
     )
     assert sequence[1].to_position().to_list() == pytest.approx(
         [0, 0, 0.0, 1], abs=0.01
     )
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [0, 0.0, 0.05, 1], abs=0.01
+        [0, 0.0, grasp_desc.manipulation_offset, 1], abs=0.01
     )
 
 
@@ -461,13 +492,14 @@ def test_grasp_sequence_right_tracy(tracy_milk_world):
     )
 
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [0, -0.082, 0, 1], abs=0.01
+        [0, -(_FixtureGeometry.MILK_HALF_WIDTH + grasp_desc.manipulation_offset), 0, 1],
+        abs=0.01,
     )
     assert sequence[1].to_position().to_list() == pytest.approx(
         [0, 0, 0.0, 1], abs=0.01
     )
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [0, 0.0, 0.05, 1], abs=0.01
+        [0, 0.0, grasp_desc.manipulation_offset, 1], abs=0.01
     )
 
 
@@ -488,11 +520,17 @@ def test_place_sequence(immutable_simple_pr2_holding_world):
     )
 
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [0.9179, 1, 1, 1], abs=0.01
+        [
+            1 - (_FixtureGeometry.MILK_HALF_DEPTH + grasp_desc.manipulation_offset),
+            1,
+            1,
+            1,
+        ],
+        abs=0.01,
     )
     assert sequence[1].to_position().to_list() == pytest.approx([1, 1, 1, 1], abs=0.01)
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [1, 1, 1.05, 1], abs=0.01
+        [1, 1, 1 + grasp_desc.manipulation_offset, 1], abs=0.01
     )
 
 
@@ -515,11 +553,17 @@ def test_place_sequence_right_tracy(tracy_milk_world):
     assert sequence[0].reference_frame == world.root
 
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [1, 1, 1.05, 1], abs=0.01
+        [1, 1, 1 + grasp_desc.manipulation_offset, 1], abs=0.01
     )
     assert sequence[1].to_position().to_list() == pytest.approx([1, 1, 1, 1], abs=0.01)
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [1, 0.918, 1.0, 1], abs=0.01
+        [
+            1,
+            1 - (_FixtureGeometry.MILK_HALF_WIDTH + grasp_desc.manipulation_offset),
+            1.0,
+            1,
+        ],
+        abs=0.01,
     )
 
     assert sequence[0].to_quaternion().to_list() == pytest.approx(
@@ -548,11 +592,12 @@ def test_pose_sequence_top(immutable_simple_pr2_world):
     assert sequence[0].reference_frame == world.get_body_by_name("milk.stl")
 
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [0, 0, 0.083, 1], abs=0.01
+        [0, 0, _FixtureGeometry.MILK_HALF_DEPTH + grasp_desc.manipulation_offset, 1],
+        abs=0.01,
     )
     assert sequence[1].to_position().to_list() == pytest.approx([0, 0, 0, 1], abs=0.01)
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [0, 0.0, 0.05, 1], abs=0.01
+        [0, 0.0, grasp_desc.manipulation_offset, 1], abs=0.01
     )
 
     assert sequence[0].to_quaternion().to_list() == pytest.approx(
@@ -579,11 +624,12 @@ def test_pose_sequence_top_tracy(tracy_milk_world):
     assert sequence[0].reference_frame == world.get_body_by_name("milk.stl")
 
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [0, 0, 0.083, 1], abs=0.01
+        [0, 0, _FixtureGeometry.MILK_HALF_DEPTH + grasp_desc.manipulation_offset, 1],
+        abs=0.01,
     )
     assert sequence[1].to_position().to_list() == pytest.approx([0, 0, 0, 1], abs=0.01)
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [0, 0.0, 0.05, 1], abs=0.01
+        [0, 0.0, grasp_desc.manipulation_offset, 1], abs=0.01
     )
 
     assert sequence[0].to_quaternion().to_list() == pytest.approx(
@@ -613,11 +659,17 @@ def test_pose_sequence_top_tracy_box(tracy_milk_world):
     assert sequence[0].reference_frame == world.root
 
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [1, 0, 1.1, 1], abs=0.01
+        [
+            1,
+            0,
+            1 + _FixtureGeometry.BOX_HALF_EXTENT + grasp_desc.manipulation_offset,
+            1,
+        ],
+        abs=0.01,
     )
     assert sequence[1].to_position().to_list() == pytest.approx([1, 0, 1, 1], abs=0.01)
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [1, 0.0, 1.05, 1], abs=0.01
+        [1, 0.0, 1 + grasp_desc.manipulation_offset, 1], abs=0.01
     )
 
     assert sequence[0].to_quaternion().to_list() == pytest.approx(
@@ -658,11 +710,17 @@ def test_pose_sequence_180_flip(immutable_simple_pr2_world):
     )
 
     assert sequence[0].to_position().to_list() == pytest.approx(
-        [1.083, 0, 1, 1], abs=0.001
+        [
+            1 + _FixtureGeometry.MILK_HALF_DEPTH + grasp_desc.manipulation_offset,
+            0,
+            1,
+            1,
+        ],
+        abs=0.001,
     )
     assert sequence[1].to_position().to_list() == pytest.approx(
         [1.0, 0, 1, 1], abs=0.001
     )
     assert sequence[2].to_position().to_list() == pytest.approx(
-        [1.0, 0, 1.05, 1], abs=0.001
+        [1.0, 0, 1 + grasp_desc.manipulation_offset, 1], abs=0.001
     )

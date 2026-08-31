@@ -1,6 +1,5 @@
 import unittest
 
-import plotly.graph_objects as go
 from sortedcontainers import SortedSet
 
 from krrood.adapters.json_serializer import to_json, from_json
@@ -8,7 +7,7 @@ from random_events.interval import *
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.set import SetElement, Set
 from random_events.sigma_algebra import AbstractSimpleSet
-from random_events.variable import Continuous, Integer, Symbolic
+from random_events.variable import Continuous, Symbolic
 
 str_set = {"a", "c", "b"}
 str_set_domain = Set.from_iterable(str_set)
@@ -162,42 +161,6 @@ class EventTestCase(unittest.TestCase):
         event_ = from_json(to_json(event))
         self.assertEqual(event_, event)
 
-    def test_plot_2d(self):
-        event_1 = SimpleEvent.from_data(
-            {
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
-            }
-        )
-        event_2 = SimpleEvent.from_data(
-            {
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(1, 2)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(1, 2)),
-            }
-        )
-        event = Event.from_simple_sets(event_1, event_2)
-        fig = go.Figure(event.plot(), event.plotly_layout())
-        self.assertIsNotNone(fig)  # fig.show()
-
-    def test_plot_3d(self):
-        event_1 = SimpleEvent.from_data(
-            {
-                self.x: SimpleInterval.from_data(0, 1),
-                self.y: SimpleInterval.from_data(0, 1),
-                self.z: SimpleInterval.from_data(0, 1),
-            }
-        )
-        event_2 = SimpleEvent.from_data(
-            {
-                self.x: SimpleInterval.from_data(1, 2),
-                self.y: SimpleInterval.from_data(1, 2),
-                self.z: SimpleInterval.from_data(1, 2),
-            }
-        )
-        event = Event.from_simple_sets(event_1, event_2)
-        fig = go.Figure(event.plot(), event.plotly_layout())
-        self.assertIsNotNone(fig)  # fig.show()
-
     def test_union(self):
         sa = SetElement.from_data("a", str_set)
         sb = SetElement.from_data("b", str_set)
@@ -242,7 +205,6 @@ class EventTestCase(unittest.TestCase):
                 {self.x: closed(0, 2) | closed(5, 6)}
             ).as_composite_set(),
         )
-        fig = go.Figure(marginal.plot())  # fig.show()
 
     def test_marginal_event_symbolic(self):
         a = Symbolic(name="a", domain=str_set_domain)
@@ -399,17 +361,6 @@ class EventTestCase(unittest.TestCase):
             {self.x: closed(0, 1), self.y: closed(0, 1)}
         ).as_composite_set()
         self.assertEqual(box.complement().size, float("inf"))
-
-
-class IntegerVariablePlotTestCase(unittest.TestCase):
-    count = Integer(name="count")
-
-    def test_plot_1d_with_integer_variable(self):
-        event = SimpleEvent.from_data({self.count: SimpleInterval.from_data(0, 5)})
-        traces = event.plot()
-        self.assertIsNotNone(traces)
-        fig = go.Figure(traces, event.plotly_layout())
-        self.assertIsNotNone(fig)
 
 
 class OperationsWithEmptySetsTestCase(unittest.TestCase):

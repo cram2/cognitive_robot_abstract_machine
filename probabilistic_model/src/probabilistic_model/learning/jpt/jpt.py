@@ -8,7 +8,7 @@ import pandas as pd
 from jpt.learning.impurity import Impurity
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
-from random_events.interval import closed
+from random_events.interval import closed, Bound, SimpleInterval
 from random_events.product_algebra import VariableMap
 from random_events.variable import Variable, Continuous, Integer, Symbolic
 from typing_extensions import Self
@@ -289,7 +289,10 @@ class JointProbabilityTree(SubclassJSONSerializer):
         if max_gain <= self.min_impurity_improvement:
 
             # create decomposable product node
-            leaf_node = self.create_leaf_node(data[self.indices[start:end]])
+            other_rows = np.concatenate([self.indices[:start], self.indices[end:]])
+            leaf_node = self.create_leaf_node(
+                data[self.indices[start:end]], data[other_rows]
+            )
             weight = number_of_samples / len(data)
             self.root.add_subcircuit(leaf_node, np.log(weight))
 
@@ -309,11 +312,55 @@ class JointProbabilityTree(SubclassJSONSerializer):
         self.c45queue.append((data, start, start + split_pos + 1, new_depth))
         self.c45queue.append((data, start + split_pos + 1, end, new_depth))
 
-    def create_leaf_node(self, data: np.ndarray) -> ProductUnit:
+    @staticmethod
+    def leaf_support(
+        own_values: np.ndarray, other_values: np.ndarray, tolerance_at_extremes: float
+    ) -> SimpleInterval:
+        """
+        The largest span around the range of `own_values` that stays clear of
+        `other_values`, widened by at most `tolerance_at_extremes` on each side.
+
+        Passed as the `support` of the :class:`NygaInduction` fit for a leaf, so that
+        widening that leaf's support for a variable to account for float
+        instabilities cannot cross into a sibling leaf's raw data for the same
+        variable - which would break the determinism of the tree the leaves are
+        mounted into. Considering only the nearest point on each side, rather than
+        every point in `other_values`, is sufficient because the widening cannot
+        reach further than `tolerance_at_extremes` in the first place.
+
+        :param own_values: The values of one continuous variable, for the rows of the
+            leaf under construction.
+        :param other_values: The values of that variable, for every row outside that
+            leaf.
+        :param tolerance_at_extremes: The widening to apply where `other_values`
+            leaves enough room for it.
+        :return: The allowed support.
+        """
+        own_lower, own_upper = own_values.min(), own_values.max()
+
+        lower, left = own_lower - tolerance_at_extremes, Bound.CLOSED
+        below = other_values[other_values < own_lower]
+        if len(below) > 0 and below.max() > lower:
+            lower, left = float(below.max()), Bound.OPEN
+
+        upper, right = own_upper + tolerance_at_extremes, Bound.CLOSED
+        above = other_values[other_values > own_upper]
+        if len(above) > 0 and above.min() < upper:
+            upper, right = float(above.min()), Bound.OPEN
+
+        return SimpleInterval.from_data(lower, upper, left, right)
+
+    def create_leaf_node(
+        self, data: np.ndarray, other_data: Optional[np.ndarray] = None
+    ) -> ProductUnit:
         """
         Create a fully decomposable product node from a 2D data array.
 
-        :param data: The preprocessed data to use for training
+        :param data: The preprocessed data to use for training.
+        :param other_data: The preprocessed data of every row that does not belong to
+            this leaf, used to keep continuous variables' fitted supports from
+            overlapping a sibling leaf's data. If not given, no such reservation is
+            made.
         :return: The leaf node.
         """
         result = ProductUnit(probabilistic_circuit=self.probabilistic_circuit)
@@ -326,6 +373,12 @@ class JointProbabilityTree(SubclassJSONSerializer):
                     min_likelihood_improvement=annotated_variable.min_likelihood_improvement,
                     min_samples_per_quantile=annotated_variable.min_samples_per_quantile,
                 )
+                if other_data is not None:
+                    distribution.support = self.leaf_support(
+                        data[:, index],
+                        other_data[:, index],
+                        distribution.tolerance_at_extremes,
+                    )
                 distribution = distribution.fit(data[:, index])
 
                 if isinstance(

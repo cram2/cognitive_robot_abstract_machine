@@ -70,6 +70,7 @@ _EXAMPLE_CLASSES = [
     "PrismaticConnection",
     "Drawer",
     "Cabinet",
+    "Pick",
 ]
 
 

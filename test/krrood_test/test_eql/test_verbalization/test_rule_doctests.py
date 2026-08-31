@@ -30,6 +30,7 @@ from typing_extensions import List
 import krrood.entity_query_language.factories as eql
 import krrood.entity_query_language.testing as testing_package
 import krrood.entity_query_language.verbalization as verbalization_package
+from krrood.entity_query_language.operators.causal import CausesEffect
 from krrood.entity_query_language.operators.core_logical_operators import Not
 from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
 from krrood.entity_query_language.verbalization import _example_domain as example_domain
@@ -66,6 +67,7 @@ _GLOBS = {factory.__name__: factory for factory in factories}
 _GLOBS.update(
     verbalize_expression=verbalize_expression,
     Not=Not,
+    CausesEffect=CausesEffect,
     Exists=Exists,
     ForAll=ForAll,
     datetime=datetime,

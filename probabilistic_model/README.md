@@ -12,8 +12,7 @@ Read the docs here https://cram2.github.io/cognitive_robot_abstract_machine/prob
 The project uses unittest for testing. To run the tests locally:
 
 ```bash
-pip install -r requirements-dev.txt
-pip install -e .
+pip install -e ".[dev]"
 python -m unittest discover test
 ```
 

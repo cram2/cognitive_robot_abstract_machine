@@ -3,6 +3,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from time import sleep
 from typing import Optional
+from typing_extensions import Dict, Set
 from uuid import UUID
 
 from geometry_msgs.msg import TransformStamped
@@ -28,6 +29,57 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TfFrameNames:
+    """
+    Names the tf frame every kinematic structure entity is published under.
+
+    Frame names must be unique across the whole tf tree, while entity names need not be
+    unique even within one world. Only entities that actually share a name are told
+    apart, by appending their identifier; every other frame keeps the entity's name. An
+    entity another publisher already broadcasts therefore keeps that publisher's frame
+    name, which is where our tree joins theirs.
+
+    The name an entity is first published under is kept for as long as this publisher
+    lives, so a frame never moves to another entity and an entity arriving later never
+    renames the ones already on the tree.
+    """
+
+    _frame_name_per_entity: Dict[UUID, str] = field(init=False, default_factory=dict)
+    """
+    The frame name each entity has been published under so far.
+    """
+
+    _assigned_frame_names: Set[str] = field(init=False, default_factory=set)
+    """
+    Every frame name handed out so far, kept even after the entity holding it is gone so
+    that no later entity can take over a name someone may still be following.
+    """
+
+    def assign(self, entity: KinematicStructureEntity) -> str:
+        """
+        :param entity: The entity about to be published.
+        :return: the tf frame name of an entity, giving it one if it has none yet.
+        """
+        if entity.id in self._frame_name_per_entity:
+            return self._frame_name_per_entity[entity.id]
+
+        frame_name = self._unused_frame_name_for(entity)
+        self._frame_name_per_entity[entity.id] = frame_name
+        self._assigned_frame_names.add(frame_name)
+        return frame_name
+
+    def _unused_frame_name_for(self, entity: KinematicStructureEntity) -> str:
+        """
+        :param entity: The entity about to be published.
+        :return: the frame name a not yet published entity should get.
+        """
+        frame_name = str(entity.name)
+        if frame_name not in self._assigned_frame_names:
+            return frame_name
+        return f"{frame_name}_{entity.id.hex}"
 
 
 @dataclass(eq=False)
@@ -71,6 +123,11 @@ class TfPublisherModelCallback(ModelChangeCallback):
     Compiled function for evaluating the tf expressions.
     """
 
+    frame_names: TfFrameNames = field(default_factory=TfFrameNames)
+    """
+    The tf frame name of every entity published so far.
+    """
+
     def on_model_change(self, **kwargs):
         self.update_connections_to_expression()
         self.compile_tf_expression()
@@ -112,8 +169,12 @@ class TfPublisherModelCallback(ModelChangeCallback):
             )
             child_link = self._world.get_kinematic_structure_entity_by_id(child_link_id)
 
-            self.tf_message.transforms[i].header.frame_id = str(parent_link.name)
-            self.tf_message.transforms[i].child_frame_id = str(child_link.name)
+            self.tf_message.transforms[i].header.frame_id = self.frame_names.assign(
+                parent_link
+            )
+            self.tf_message.transforms[i].child_frame_id = self.frame_names.assign(
+                child_link
+            )
 
     def update_tf_message(self):
         if self.compiled_tf.is_result_empty():
@@ -213,23 +274,23 @@ class TFPublisher(StateChangeCallback):
         )
 
     @classmethod
-    def create_with_ignore_existing_tf(cls, world: World, node: Node) -> Self:
+    def create_with_ignore_existing_tf(
+        cls,
+        world: World,
+        node: Node,
+        wait_for_existing_tf: int = 5,
+    ) -> Self:
         """
         Checks if any kinematic structure entity is already published in tf and ignores
         them.
 
         :param world: The world for which to create the TF publisher.
         :param node: The ROS2 node used to create the publisher.
+        :param wait_for_existing_tf: The time to wait for existing tf to be published.
         """
         tf_wrapper = TFWrapper(node=node)
-        for i in range(20):
-            all_frames = set(tf_wrapper.get_tf_frames())
-            if len(all_frames) > 0:
-                break
-            sleep(0.1)
-        else:
-            all_frames = set()
-            logging.info("Could not find any tf frames, publishing all tf")
+        sleep(wait_for_existing_tf)
+        all_frames = set(tf_wrapper.get_tf_frames())
         ignored_bodies = set(
             kse
             for kse in world.kinematic_structure_entities

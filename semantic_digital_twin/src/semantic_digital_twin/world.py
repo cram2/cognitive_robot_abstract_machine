@@ -383,6 +383,31 @@ def atomic_world_modification(func=None, modification: Type[WorldModification] =
     return _decorate(func)
 
 
+@dataclass(frozen=True)
+class ModelRevision:
+    """
+    Identifies one state of the kinematic structure.
+
+    Two revisions comparing equal mean the structure has not changed in between, so
+    anything derived from it - compiled forward kinematics, for example - is still
+    valid.
+    """
+
+    version: int
+    """
+    :attr:`WorldModelManager.version`, which only advances when a modification block
+    ends.
+    """
+
+    modifications_in_open_block: int
+    """
+    How many modifications the currently open block has recorded so far.
+
+    Distinguishes revisions *within* a still-open block, where ``version`` cannot yet
+    have advanced.
+    """
+
+
 @dataclass
 class WorldModelManager:
     """
@@ -471,6 +496,16 @@ class WorldModelManager:
         """
         with self._publication_order_lock:
             yield
+
+    @property
+    def revision(self) -> ModelRevision:
+        """
+        :return: An identifier for the current state of the kinematic structure.
+        """
+        return ModelRevision(
+            version=self.version,
+            modifications_in_open_block=len(self.current_model_modification_block),
+        )
 
     def update_model_version_and_notify_callbacks(self, **kwargs) -> None:
         """
@@ -1141,8 +1176,8 @@ class World(HasSimulatorProperties):
         """
         Removes a kinematic_structure_entity from the world.
 
-        Removing a kinematic_structure_entity this world does not own does nothing
-        and is not recorded, so a history can never open with the removal of a
+        Removing a kinematic_structure_entity this world does not own does nothing and
+        is not recorded, so a history can never open with the removal of a
         kinematic_structure_entity nothing added.
 
         :param kinematic_structure_entity: The kinematic_structure_entity to remove.
@@ -1170,9 +1205,9 @@ class World(HasSimulatorProperties):
         """
         Removes a degree of freedom from the world.
 
-        Removing a degree of freedom this world does not own does nothing and is
-        not recorded, so a history can never open with the removal of a degree of
-        freedom nothing added.
+        Removing a degree of freedom this world does not own does nothing and is not
+        recorded, so a history can never open with the removal of a degree of freedom
+        nothing added.
 
         :param dof: The degree of freedom to remove.
         """
@@ -1194,9 +1229,9 @@ class World(HasSimulatorProperties):
         Removes a semantic annotation from the current list of semantic annotations if
         it exists.
 
-        Removing a semantic annotation this world does not own does nothing and is
-        not recorded, so a history can never open with the removal of a semantic
-        annotation nothing added.
+        Removing a semantic annotation this world does not own does nothing and is not
+        recorded, so a history can never open with the removal of a semantic annotation
+        nothing added.
 
         :param semantic_annotation: The semantic annotation instance to be removed.
         """
@@ -1217,9 +1252,8 @@ class World(HasSimulatorProperties):
         """
         Removes an actuator from the current list of actuators if it exists.
 
-        Removing an actuator this world does not own does nothing and is not
-        recorded, so a history can never open with the removal of an actuator
-        nothing added.
+        Removing an actuator this world does not own does nothing and is not recorded,
+        so a history can never open with the removal of an actuator nothing added.
 
         :param actuator: The actuator instance to be removed.
         """
@@ -1718,6 +1752,7 @@ class World(HasSimulatorProperties):
         self,
         branch_root: KinematicStructureEntity,
         new_parent: KinematicStructureEntity,
+        enable_unsafe_inside_world_block: bool = False,
     ):
         """
         Destroys the connection between branch_root and its parent, and moves it to a
@@ -1730,11 +1765,15 @@ class World(HasSimulatorProperties):
 
         :param branch_root: The root of the branch to be moved.
         :param new_parent: The new parent of the branch.
+        :param enable_unsafe_inside_world_block: See :meth:`move_branch`.
         """
-        # Ensure FK is up to date before computing the relative pose, since this may be
-        # called mid-block, e.g. from a mount strategy inside a still-open modify_world block.
-        self.update_forward_kinematics()
-        new_parent_T_child = self.compute_forward_kinematics(new_parent, branch_root)
+        if not enable_unsafe_inside_world_block:
+            # Ensure FK is up to date before computing the relative pose, since this may be
+            # called mid-block, e.g. from a mount strategy inside a still-open modify_world block.
+            self.update_forward_kinematics()
+        new_parent_T_child = self.compute_forward_kinematics(
+            new_parent, branch_root, enable_unsafe_inside_world_block
+        )
         self.remove_connection(branch_root.parent_connection)
         self.add_connection(
             FixedConnection(
@@ -1957,7 +1996,9 @@ class World(HasSimulatorProperties):
         self._model_manager.update_model_version_and_notify_callbacks(
             publish_changes=publish_changes, **kwargs
         )
-        self.notify_state_change(publish_changes=publish_changes, **kwargs)
+        self.notify_state_change(
+            publish_changes=publish_changes, force_republish=True, **kwargs
+        )
 
         for callback in list(self.state.state_change_callbacks):
             callback.update_previous_world_state()
@@ -2306,15 +2347,21 @@ class World(HasSimulatorProperties):
 
     def update_forward_kinematics(self) -> None:
         """
-        Recompile and recompute forward kinematics of the world.
+        Bring the forward kinematics of the world up to date.
+
+        The expressions are recompiled only when the kinematic structure has changed
+        since they were last built, which is what makes this affordable to call
+        defensively. The values are always recomputed, because degree-of-freedom state
+        can change without any model change and leaves no trace in
+        :class:`ModelRevision`.
 
         ..warning::
             Use this method if you need to live update the forward kinematic inside a with self.modify_world(): block.
             Use with caution, as this only works if the world structure is not currently broken, and thus may lead to
-            crashes if its not the case. Also using this in a method that is called a lot, it may cause performance
-            issues because of unnecessary recompilations.
+            crashes if its not the case.
         """
-        self._forward_kinematic_manager.notify_model_change()
+        if not self._forward_kinematic_manager.matches_world_structure:
+            self._forward_kinematic_manager.notify_model_change()
         self._forward_kinematic_manager.recompute()
 
     def _manually_compute_entity_a_T_entity_b(

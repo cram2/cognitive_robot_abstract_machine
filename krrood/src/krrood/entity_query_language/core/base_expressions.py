@@ -9,6 +9,7 @@ during query evaluation.
 from __future__ import annotations
 
 import itertools
+import operator
 import uuid
 import weakref
 from abc import ABC, abstractmethod
@@ -17,6 +18,7 @@ from contextlib import AbstractContextManager
 from copy import copy
 from dataclasses import dataclass, field
 from functools import cached_property
+from types import EllipsisType
 from uuid import UUID
 
 from ordered_set import OrderedSet
@@ -38,6 +40,7 @@ from typing_extensions import (
     TypeAlias,
 )
 
+from krrood.adapters.json_serializer import list_like_classes
 from krrood.entity_query_language.evaluation_context import (
     get_evaluation_context,
     set_evaluation_context,
@@ -981,6 +984,70 @@ class BinaryExpression(SymbolicExpression, ABC):
             self.left = new_child
         elif self.right is old_child:
             self.right = new_child
+
+    def _is_equality_literal_comparator_or_conjunction_(self) -> bool:
+        """
+        :return: Whether this expression is an equality literal comparator (see
+            :meth:`_is_equality_literal_comparator_`), or several such comparators
+            combined with
+            :class:`~krrood.entity_query_language.operators.core_logical_operators.AND`.
+
+        Callers on an expression that might not be a :class:`BinaryExpression` at all
+        (a bare variable, a :class:`~....operators.core_logical_operators.Not`, ...)
+        must check ``isinstance(expression, BinaryExpression)`` themselves first --
+        this method only handles the two binary-expression shapes it is defined for.
+        """
+        # Local import: core_logical_operators.py imports this module, so a
+        # module-level import of AND here would be circular.
+        from krrood.entity_query_language.operators.core_logical_operators import AND
+
+        if isinstance(self, AND):
+            for operand in (self.left, self.right):
+                if (
+                    not isinstance(operand, BinaryExpression)
+                    or not operand._is_equality_literal_comparator_or_conjunction_()
+                ):
+                    return False
+            return True
+        return self._is_equality_literal_comparator_()
+
+    def _is_equality_literal_comparator_(self) -> bool:
+        """
+        :return: Whether this expression is exactly ``attribute == value`` for a
+            single concrete value -- the shape a causal effect condition requires:
+            you can ask what causes an attribute to equal a value, not what causes
+            it to satisfy an inequality, to be left unconstrained (``Ellipsis``), or
+            to fall within a set of values (a list/set/tuple), since a set
+            membership is not a single point intervention.
+        """
+        if not self._is_literal_comparator_():
+            return False
+        if self.operation is not operator.eq:
+            return False
+        value = self.right._value_
+        if isinstance(value, EllipsisType):
+            return False
+        return not isinstance(value, list_like_classes)
+
+    def _is_literal_comparator_(self) -> bool:
+        """
+        :return: Whether this expression compares a mapped variable against a
+            literal (e.g. ``attribute == value``), as opposed to, for example, a
+            comparison between two attributes.
+        """
+        # Local imports: comparator.py, mapped_variable.py and variable.py each
+        # import this module, so module-level imports of them here would be circular.
+        from krrood.entity_query_language.operators.comparator import Comparator
+        from krrood.entity_query_language.core.mapped_variable import MappedVariable
+        from krrood.entity_query_language.core.variable import Literal
+
+        if not isinstance(self, Comparator):
+            return False
+        if not isinstance(self.left, MappedVariable):
+            return False
+        if not isinstance(self.right, Literal):
+            return False
+        return True
 
 
 @dataclass(eq=False, repr=False)

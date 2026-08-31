@@ -151,8 +151,13 @@ class MultinomialInferenceTestCase(unittest.TestCase):
         self.assertEqual(mode["Y"], self.x.make_value(YEnum.A))
 
     def test_likelihood(self):
+        # Copy and normalize locally rather than relying on crafted_distribution
+        # already being normalized by another test -- likelihood() reads probabilities
+        # as stored, with no normalization of its own.
+        distribution = self.crafted_distribution.__copy__()
+        distribution.normalize()
         data = np.array([[XEnum.A, YEnum.A], [XEnum.B, YEnum.B]])
-        likelihood = self.crafted_distribution.likelihood(data)
+        likelihood = distribution.likelihood(data)
         self.assertEqual(likelihood.shape, (2,))
         self.assertAlmostEqual(likelihood[0], 0.1 / self.crafted_distribution_mass)
         self.assertAlmostEqual(likelihood[1], 0.4 / self.crafted_distribution_mass)
@@ -176,7 +181,9 @@ class MultinomialInferenceTestCase(unittest.TestCase):
         self.assertEqual(mode, mode_by_hand)
 
     def test_crafted_probability(self):
-        distribution = self.crafted_distribution
+        # Copy first: normalize() mutates in place, and crafted_distribution is a
+        # class-level fixture shared with every other test in this class.
+        distribution = self.crafted_distribution.__copy__()
         distribution.normalize()
         event = SimpleEvent.from_data()
         self.assertAlmostEqual(distribution.probability(event.as_composite_set()), 1)

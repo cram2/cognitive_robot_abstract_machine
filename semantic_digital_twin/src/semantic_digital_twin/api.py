@@ -53,6 +53,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import (
+    VolumetricBoundingBox,
     Scale,
     Color,
     Box,
@@ -730,7 +731,9 @@ class KinematicStructureEntitySpecification(
         anchor = Body(name=PrefixedName("spec_anchor"))
         return cls(
             name=name,
-            shapes=BoundingBoxCollection.from_event(anchor, event)
+            shapes=BoundingBoxCollection.from_event(
+                VolumetricBoundingBox, anchor, event
+            )
             .as_shapes()
             .copy_without_reference_frame(),
             child_specifications=(child_specifications or []),

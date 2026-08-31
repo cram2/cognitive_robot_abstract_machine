@@ -20,7 +20,51 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 keywords=["robotics"]
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
+dependencies = [
+    "rustworkx",
+    "nltk",
+    "numpy",
+    "trimesh>=4.11.1",
+    "typing_extensions",
+    "urdf-parser-py",
+    "xacro",
+    "matplotlib",
+    "casadi~=3.7.0",
+    "hypothesis!=6.156.6",  # 6.156.6 ships no linux-x86_64 wheel; skip it so uv sync resolves
+    "scipy",
+    "sqlacodegen",
+    "pytest-order",
+    "sqlalchemy",
+    "embreex",  # Hardware acceleration for trimesh raycasting
+    "rtree",  # For spatial indexing in trimesh
+    "random_events",
+    "plotly",
+    "daqp",
+    "pathlib",
+    "probabilistic_model",
+    "python-fcl",
+    "manifold3d",
+    "polytope",
+    "ortools",
+    "fbxloader",
+    "coacd",
+    "pymysql",
+    "pyglet==1.5.31",
+    "pycollada",
+    "psycopg",
+    "plyfile",
+    "huggingface-hub",
+    "usd-core>=24.11",
+    "vhacdx",
+    "rerun-sdk[datafusion]",
+    "imageio",
+    "imageio-ffmpeg",
+    "psutil~=5.9.0",
+    "giskardpy",
+    "krrood",
+    "physics_simulators",
+]
 license = "LGPL-3.0-only"
 
 [project.urls]
@@ -33,12 +77,18 @@ include = ["semantic_digital_twin*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "semantic_digital_twin._version.__version__"}
-dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]
 gui = [
     "ripple_down_rules[gui]",
 ]
 dev = [
-    "pytest>=7.0.0,<8.0.0"
+    "pytest>=7.0.0,<8.0.0",
+]
+self-assessment = [
+    "jupyter-book",
+    "jupytext",
+    "nbconvert",
+    "jupyterquiz",
+    "treon",
 ]

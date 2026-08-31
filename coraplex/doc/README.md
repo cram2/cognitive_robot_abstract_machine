@@ -10,10 +10,10 @@ the instructions below.
 The documentation uses jupyter-book as engine.
 
 
-Install the requirements in your python interpreter.
+Install the documentation dependencies from the repository root.
 
 ~~~
-pip install -r requirements.txt
+pip install -e ".[doc]"
 ~~~
 Run coraplex and build the docs.
 

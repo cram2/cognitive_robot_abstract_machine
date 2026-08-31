@@ -27,6 +27,7 @@ Canonical class list (the single source of truth;
   ``WeakLoveBird``
 * Containers (deep-nesting rule trees) — ``Handle``, ``Container``, ``FixedConnection``,
   ``PrismaticConnection``, ``Drawer``, ``Cabinet``
+* Causal queries (``cause`` / ``causes_effect()``) — ``Pick``
 """
 
 from __future__ import annotations
@@ -436,4 +437,25 @@ class Cabinet:
     drawers: list
     """
     The cabinet's drawers (aggregated antecedent → plural *"there are … drawers"*).
+    """
+
+
+# %% Causal queries (do() / causes_effect() examples)
+
+
+@dataclass
+class Pick:
+    """
+    A robot's attempt to grasp an object, whose success may hinge on where its arm was
+    positioned.
+    """
+
+    arm: float
+    """
+    The arm's position at the time of the attempt.
+    """
+
+    grasped: bool
+    """
+    Whether the attempt succeeded.
     """

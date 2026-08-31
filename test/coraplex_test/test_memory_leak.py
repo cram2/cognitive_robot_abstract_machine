@@ -17,6 +17,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 
 def test_ref_chain_after_copy(immutable_model_world):
@@ -59,8 +60,8 @@ def test_ref_chain_after_copy_with_execute_complex_plan(mutable_model_world):
     )
 
     description = TransportAction(
-        copy_world.get_body_by_name("milk.stl"),
-        Pose.from_xyz_quaternion(3.4, 2.2, 0.95, 0.0, 0.0, 1.0, 0.0, world.root),
+        copy_world.get_semantic_annotations_by_type(Milk)[0],
+        Pose.from_xyz_quaternion(3.1, 2.2, 0.95, 0.0, 0.0, 1.0, 0.0, world.root),
         Arms.RIGHT,
         GraspDescription(
             ApproachDirection.RIGHT,

@@ -763,17 +763,11 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         :param reference_frame: The reference frame to express the bounding boxes in.
         :returns: A collection of bounding boxes in world-space coordinates.
         """
-        collections = iter(
+        collections = (
             entity.collision.as_bounding_box_collection_at_origin(origin)
-            for entity in self.kinematic_structure_entities
-            if isinstance(entity, Body) and entity.has_collision()
+            for entity in self.bodies_with_collision
         )
-        bbs = BoundingBoxCollection([], origin.reference_frame)
-
-        for bb_collection in collections:
-            bbs = bbs.merge(bb_collection)
-
-        return bbs
+        return BoundingBoxCollection.merge_all(collections, origin.reference_frame)
 
     def as_bounding_box_collection_in_frame(
         self, reference_frame: KinematicStructureEntity

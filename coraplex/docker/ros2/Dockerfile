@@ -17,7 +17,7 @@ RUN echo "source $OVERLAY_WS/install/setup.bash" >> ~/.bashrc
 
 # RUN rm -rf $OVERLAY_WS/src/coraplex
 # COPY . $OVERLAY_WS/src/coraplex
-RUN python3 -m venv coraplex-venv --system-site-packages  && source coraplex-venv/bin/activate && pip install -U pip && pip install -U setuptools && pip install -r $OVERLAY_WS/src/coraplex/requirements.txt
+RUN python3 -m venv coraplex-venv --system-site-packages  && source coraplex-venv/bin/activate && pip install -U pip && pip install -U setuptools && pip install -e $OVERLAY_WS/src/coraplex
 
 COPY entrypoint.sh /
 ENTRYPOINT ["bash", "/entrypoint.sh"]

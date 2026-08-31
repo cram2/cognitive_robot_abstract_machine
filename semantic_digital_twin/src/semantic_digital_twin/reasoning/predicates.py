@@ -36,11 +36,11 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
 )
 from semantic_digital_twin.world_description.connections import FixedConnection
-from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
-    KinematicStructureEntity, SemanticAnnotation,
+    KinematicStructureEntity,
 )
 
 if TYPE_CHECKING:
@@ -99,14 +99,11 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     rt = RayTracer(camera._world)
     rt.update_scene()
 
-    # This ignores the camera orientation and sets it to identity
-    cam_pose = np.eye(4, dtype=float)
-    cam_pose[:3, 3] = camera.root.global_transform.to_np()[:3, 3]
-
     seg = rt.create_segmentation_mask(
-        HomogeneousTransformationMatrix(cam_pose, reference_frame=camera._world.root),
+        camera.root_T_forward_view,
         resolution=256,
         min_distance=0.2,
+        field_of_view=camera.field_of_view,
     )
     indices = np.unique(seg)
     indices = indices[indices > -1]
@@ -136,12 +133,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     :param body: The body for which the occluding bodies should be returned
     :return: A list of bodies that are occluding the given body.
     """
-    # get camera pose
-    camera_pose = np.eye(4, dtype=float)
-    camera_pose[:3, 3] = camera.root.global_transform.to_np()[:3, 3]
-    camera_pose = HomogeneousTransformationMatrix(
-        camera_pose, reference_frame=camera._world.root
-    )
+    camera_pose = camera.root_T_forward_view
 
     # create a world only containing the target body
     world_without_occlusion = deepcopy(body._world)
@@ -164,7 +156,10 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     ray_tracer_without_occlusion.update_scene()
     segmentation_mask_without_occlusion = (
         ray_tracer_without_occlusion.create_segmentation_mask(
-            camera_pose, resolution=256, min_distance=0.1
+            camera_pose,
+            resolution=256,
+            min_distance=0.1,
+            field_of_view=camera.field_of_view,
         )
     )
 
@@ -173,7 +168,10 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     ray_tracer_with_occlusion.update_scene()
     segmentation_mask_with_occlusion = (
         ray_tracer_with_occlusion.create_segmentation_mask(
-            camera_pose, resolution=256, min_distance=0.1
+            camera_pose,
+            resolution=256,
+            min_distance=0.1,
+            field_of_view=camera.field_of_view,
         )
     )
 
@@ -587,7 +585,10 @@ class ContainsType(Predicate):
 
 @symbolic_function
 def is_place_occupied(
-    box: BoundingBox, pose: Pose, world: World, allowed_bodies: List[Body] = None
+    box: VolumetricBoundingBox,
+    pose: Pose,
+    world: World,
+    allowed_bodies: List[Body] = None,
 ) -> bool:
     """
     Checks if the given region (as a box at its pose) intersects with any collidable

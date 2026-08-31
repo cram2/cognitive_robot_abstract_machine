@@ -20,7 +20,7 @@ The following three cells initilaize the CoraPlex world with a kitchen environme
 
 ```python
 from geometry_msgs.msg import PoseStamped
-from coraplex.graph_of_convex_sets import BoundingBox, GraphOfBoundingBoxes
+from coraplex.graph_of_convex_sets import BoundingBox, VolumetricGraphOfBoundingBoxes
 from coraplex.datastructures.enums import WorldMode
 from pycrap.ontologies import Robot, Kitchen
 from coraplex.worlds.bullet_world import BulletWorld
@@ -73,7 +73,7 @@ Now, we define a search space for the GCS algorithm around the open drawer and t
 ```python
 search_space = BoundingBox(min_x=-0.0, max_x=1.5, min_y=0.1, max_y=2, min_z=0, max_z=1.45)
 print('Calculating graph of convex sets...')
-cg = GraphOfBoundingBoxes.free_space_from_world(world, search_space=search_space)
+cg = VolumetricGraphOfBoundingBoxes.free_space_from_world(world, search_space=search_space)
 ```
 
 Given the connectivity graph a start pose and a goal pose for the path search is needed.

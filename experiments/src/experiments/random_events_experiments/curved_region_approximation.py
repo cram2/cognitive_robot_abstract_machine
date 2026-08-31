@@ -26,7 +26,7 @@ from functools import cached_property
 
 from random_events.product_algebra import Event
 from semantic_digital_twin.world_description.geometry import (
-    BoundingBox,
+    VolumetricBoundingBox,
     Cylinder,
     Sphere,
 )
@@ -52,7 +52,7 @@ class CurvedRegion(ABC):
     """
 
     @abstractmethod
-    def covering_boxes(self, subdivisions: int) -> tuple[BoundingBox, ...]:
+    def covering_boxes(self, subdivisions: int) -> tuple[VolumetricBoundingBox, ...]:
         """
         :param subdivisions: Number of parts each subdivided axis is cut into.
         :return: Boxes whose union covers the region.
@@ -93,7 +93,7 @@ class EuclideanDisc(CurvedRegion, Cylinder):
     covering, so it cancels out of the fidelity and what is measured is the disc's.
     """
 
-    def covering_boxes(self, subdivisions: int) -> tuple[BoundingBox, ...]:
+    def covering_boxes(self, subdivisions: int) -> tuple[VolumetricBoundingBox, ...]:
         """
         :param subdivisions: Number of strips the disc is cut into.
         :return: Boxes whose union covers the cylinder, one per strip, each spanning its
@@ -101,7 +101,7 @@ class EuclideanDisc(CurvedRegion, Cylinder):
         """
         half_height = self.height / 2.0
         return tuple(
-            BoundingBox(
+            VolumetricBoundingBox(
                 -half_width,
                 lower,
                 -half_height,
@@ -121,7 +121,7 @@ class EuclideanBall(CurvedRegion, Sphere):
     The region a threshold on a distance taken in space describes.
     """
 
-    def covering_boxes(self, subdivisions: int) -> tuple[BoundingBox, ...]:
+    def covering_boxes(self, subdivisions: int) -> tuple[VolumetricBoundingBox, ...]:
         """
         A ball cut into slabs alone is not captured any better than one box captures a
         disc, because each slab still holds a circular cross-section. Two axes therefore
@@ -132,7 +132,7 @@ class EuclideanBall(CurvedRegion, Sphere):
         :return: Boxes whose union covers the ball, one per slab and strip within it.
         """
         return tuple(
-            BoundingBox(
+            VolumetricBoundingBox(
                 -half_width,
                 strip_lower,
                 slab_lower,
@@ -171,7 +171,7 @@ class CoveringApproximation:
     """
 
     @cached_property
-    def boxes(self) -> tuple[BoundingBox, ...]:
+    def boxes(self) -> tuple[VolumetricBoundingBox, ...]:
         """
         :return: The boxes covering the region.
         """

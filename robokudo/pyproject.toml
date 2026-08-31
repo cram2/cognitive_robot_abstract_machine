@@ -20,7 +20,23 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 keywords=["robotics", "perception"]
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
+dependencies = [
+    "open3d>=0.15.2",
+    "numpy>=1.22.3",
+    "pydot>=1.4.2",
+    "scipy>=1.8.0",
+    "pymongo",
+    "numba==0.61.2",
+    "pyyaml",
+    "transforms3d",
+    "opencv-python>=4.11.0.86",
+    "matplotlib>=3.0",
+    "setuptools",
+    "pooch",
+    "krrood",
+    "semantic_digital_twin",
+]
 
 [project.urls]
 "Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
@@ -32,7 +48,6 @@ include = ["robokudo*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "robokudo._version.__version__"}
-dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]
 dev = [

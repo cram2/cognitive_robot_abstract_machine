@@ -18,6 +18,6 @@ RUN echo "source $OVERLAY_WS/devel/setup.bash" >> ~/.bashrc
 
 RUN pip3 install --upgrade pip
 WORKDIR $OVERLAY_WS/src/coraplex
-RUN pip3 install -r requirements.txt
+RUN pip3 install -e .
 
 EXPOSE 11311

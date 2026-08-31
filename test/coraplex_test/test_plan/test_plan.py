@@ -46,6 +46,7 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.robots.pr2 import PR2Joint
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 
 @pytest.fixture(scope="session")
@@ -571,7 +572,7 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
     world, robot_view, context = apartment_world_pr2_copy_with_context
     context.evaluate_conditions = False
 
-    milk = world.get_body_by_name("milk.stl")
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     milk_variable = variable_from([milk])
 
@@ -662,7 +663,9 @@ def test_motion_order_pick_up(mutable_model_world):
     root = sequential(
         [
             PickUpAction(
-                world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
+                world.get_semantic_annotations_by_type(Milk)[0],
+                Arms.LEFT,
+                grasp_description,
             ),
         ],
         context,
@@ -754,7 +757,7 @@ def test_node_expansion(immutable_model_world):
     plan = sequential(
         [
             PickUpAction(
-                object_designator=world.get_body_by_name("milk.stl"),
+                object_designator=world.get_semantic_annotations_by_type(Milk)[0],
                 arm=Arms.RIGHT,
                 grasp_description=GraspDescription(
                     ApproachDirection.FRONT,
@@ -792,7 +795,7 @@ def test_context_back_reference(immutable_model_world):
         [
             MoveTorsoAction(TorsoState.HIGH),
             PickUpAction(
-                world.get_body_by_name("milk.stl"),
+                world.get_semantic_annotations_by_type(Milk)[0],
                 Arms.RIGHT,
                 GraspDescription(
                     ApproachDirection.FRONT,
@@ -816,7 +819,7 @@ def test_action_nodes_unequal(immutable_model_world):
         [
             ParkArmsAction(Arms.LEFT),
             PickUpAction(
-                world.get_body_by_name("milk.stl"),
+                world.get_semantic_annotations_by_type(Milk)[0],
                 Arms.LEFT,
                 GraspDescription(
                     ApproachDirection.FRONT,

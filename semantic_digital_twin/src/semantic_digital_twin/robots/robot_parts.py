@@ -28,6 +28,7 @@ from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
 )
 from krrood.entity_query_language.factories import variable, contains, a, entity
+from krrood.ormatic.utils import classproperty
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
@@ -68,7 +69,10 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
     DegreeOfFreedom,
 )
-from semantic_digital_twin.world_description.geometry import BoundingBox, Scale
+from semantic_digital_twin.world_description.geometry import (
+    VolumetricBoundingBox,
+    Scale,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -458,7 +462,7 @@ class Camera(Sensor, ABC):
 
     forward_facing_axis: Vector3 = field(kw_only=True)
     """
-    The axis of the camera that is facing forward.
+    The axis of the camera that is facing forward, expressed in the camera's root frame.
     """
 
     field_of_view: FieldOfView = field(kw_only=True)
@@ -483,6 +487,26 @@ class Camera(Sensor, ABC):
     """
     The maximal height of the camera above the ground, in meters.
     """
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.forward_facing_axis.reference_frame = self.root
+
+    @property
+    def root_T_forward_view(self) -> HomogeneousTransformationMatrix:
+        """
+        The camera's pose in the world root frame, with its x axis along the direction
+        the camera looks.
+
+        The y and z axes only complete the frame and carry no meaning.
+        """
+        root_T_camera = self.root.global_transform
+        root_V_forward = root_T_camera.to_rotation_matrix() @ self.forward_facing_axis
+        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            point=root_T_camera.to_position(),
+            rotation_matrix=RotationMatrix.from_x_axis(root_V_forward),
+            reference_frame=root_T_camera.reference_frame,
+        )
 
 
 @dataclass(eq=False)
@@ -569,17 +593,34 @@ class MobileBase(AbstractRobotPart, Generic[TGenericDrive], ABC):
     generic parameter (e.g. ``MobileBase[OmniDrive]``) by each concrete mobile base.
     """
 
-    forward_axis: Vector3 = field(default_factory=Vector3.X)
-    """
-    Axis along which the robot manipulates.
-    """
-
     full_body_controlled: bool = field(default=False, kw_only=True)
     """
     If True, the robot can move its entire body during a motion.
 
     If False, only the robot will always stand still when moving an arm.
     """
+
+    @classproperty
+    @abstractmethod
+    def forward_axis(cls) -> Vector3:
+        """
+        The axis of this base that points where the robot faces.
+        """
+
+    def pose_facing(self, heading: Pose) -> Pose:
+        """
+        The base pose whose :attr:`forward_axis` points along ``heading``.
+
+        ``heading``'s orientation says where the robot's front should point, written as
+        its x-axis, so the same heading serves bases modelled with different axes. Its
+        position is kept as it is.
+        """
+        base_R_forward = RotationMatrix.from_vectors(x=self.forward_axis, z=Vector3.Z())
+        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            heading.to_position(),
+            heading.to_rotation_matrix() @ base_R_forward.inverse(),
+            reference_frame=heading.reference_frame,
+        ).to_pose()
 
     @classmethod
     def get_drive_connection_type(cls) -> Type[TGenericDrive]:
@@ -591,7 +632,7 @@ class MobileBase(AbstractRobotPart, Generic[TGenericDrive], ABC):
         return get_generic_type_parameters(cls, MobileBase)[0]
 
     @property
-    def bounding_box(self) -> BoundingBox:
+    def bounding_box(self) -> VolumetricBoundingBox:
         return self.root.collision.as_bounding_box_collection_in_frame(
             self._world.root
         ).bounding_box()

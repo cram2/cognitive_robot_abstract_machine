@@ -1,7 +1,7 @@
 from __future__ import absolute_import, annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, TYPE_CHECKING
+from typing import Dict, Optional, TYPE_CHECKING
 from uuid import UUID
 
 import numpy as np
@@ -23,6 +23,9 @@ from semantic_digital_twin.world_description.world_entity import (
     Connection,
     KinematicStructureEntity,
 )
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import ModelRevision
 
 
 @dataclass(eq=False)
@@ -61,6 +64,16 @@ class ForwardKinematicsManager(ModelChangeCallback):
 
     body_id_to_all_fk_index: Dict[UUID, int] = field(init=False, repr=False)
 
+    compiled_revision: Optional[ModelRevision] = field(
+        init=False, default=None, repr=False
+    )
+    """
+    The kinematic structure the current expressions were compiled against.
+
+    ``None`` until the first compilation. Lets :meth:`matches_world_structure` tell a
+    stale set of expressions from an up-to-date one.
+    """
+
     def on_model_change(self, **kwargs):
         if len(self._world.kinematic_structure_entities) == 0:
             return
@@ -68,6 +81,18 @@ class ForwardKinematicsManager(ModelChangeCallback):
         clear_memoization_cache(self)
         self.compile()
         self.recompute()  # we need to recompute because other model updaters might need fk.
+        self.compiled_revision = self._world.get_world_model_manager().revision
+
+    @property
+    def matches_world_structure(self) -> bool:
+        """
+        :return: Whether the compiled expressions still describe the world's kinematic
+            structure, i.e. whether recompiling them would produce the same result.
+        """
+        return (
+            self.compiled_revision is not None
+            and self.compiled_revision == self._world.get_world_model_manager().revision
+        )
 
     def update_root_T_kse_expression_cache(self):
         self.root_T_kse_expression_cache = {

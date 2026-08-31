@@ -1,14 +1,16 @@
 from copy import deepcopy
 from unittest.mock import MagicMock, patch
 import pytest
+from typing_extensions import List, Set, Tuple
 from rclpy.duration import Duration
+from rclpy.node import Node
 from rclpy.time import Time
 from tf2_py import LookupException
 
 from semantic_digital_twin.adapters.ros.semdt_to_ros2_converters import (
     HomogeneousTransformationMatrixToRos2Converter,
 )
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher, TfFrameNames
 from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -122,13 +124,17 @@ def test_tf_publisher_ignore_robot(rclpy_node, pr2_world_copy):
     assert transform.transform == transform2.transform
 
 
-def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world):
+def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world, ros_publishers):
     tf_wrapper = TFWrapper(node=rclpy_node)
-    tf_publisher = TFPublisher(
-        node=rclpy_node,
-        _world=pr2_apartment_world,
+    tf_publisher = ros_publishers.adopt(
+        TFPublisher(
+            node=rclpy_node,
+            _world=pr2_apartment_world,
+        )
     )
-    VizMarkerPublisher(_world=pr2_apartment_world, node=rclpy_node)
+    ros_publishers.adopt(
+        VizMarkerPublisher(_world=pr2_apartment_world, node=rclpy_node)
+    )
 
     milk = pr2_apartment_world.get_kinematic_structure_entities_by_name("milk.stl")[0]
 
@@ -351,3 +357,133 @@ def test_double_tf_publisher(rclpy_node, pr2_world_state_reset):
     assert tf_publisher2.tf_pub.publish.called
     published_msg = tf_publisher2.tf_pub.publish.call_args[0][0]
     assert len(published_msg.transforms) == 0
+
+
+# %% tf frame naming
+
+
+def world_with_bodies(*names: str) -> Tuple[World, List[Body]]:
+    """
+    Build a world whose root carries one body per given name.
+    """
+    world = World()
+    root = Body(name=PrefixedName("map"))
+    bodies = [Body(name=PrefixedName(name)) for name in names]
+    with world.modify_world():
+        world.add_body(root)
+        for body in bodies:
+            world.add_connection(FixedConnection(parent=root, child=body))
+    return world, bodies
+
+
+def attach_body(world: World, name: str) -> Body:
+    body = Body(name=PrefixedName(name))
+    with world.modify_world():
+        world.add_connection(FixedConnection(parent=world.root, child=body))
+    return body
+
+
+def test_frame_is_named_after_the_entity():
+    world, (milk,) = world_with_bodies("milk")
+
+    assert TfFrameNames().assign(milk) == "milk"
+
+
+def test_first_of_two_equally_named_bodies_keeps_the_plain_frame_name():
+    world, (first, second) = world_with_bodies("milk", "milk")
+    frame_names = TfFrameNames()
+
+    assert frame_names.assign(first) == "milk"
+    assert frame_names.assign(second) == f"milk_{second.id.hex}"
+
+
+def test_frame_names_are_reused_on_every_republish():
+    world, (first, second) = world_with_bodies("milk", "milk")
+    frame_names = TfFrameNames()
+    published = [frame_names.assign(first), frame_names.assign(second)]
+
+    assert [frame_names.assign(first), frame_names.assign(second)] == published
+
+
+def test_a_body_arriving_later_does_not_rename_the_bodies_already_published():
+    world, (first,) = world_with_bodies("milk")
+    frame_names = TfFrameNames()
+    published = frame_names.assign(first)
+
+    frame_names.assign(attach_body(world, "milk"))
+
+    assert frame_names.assign(first) == published
+
+
+def test_removing_a_body_leaves_the_frame_name_of_the_other_one_alone():
+    world, (first, second) = world_with_bodies("milk", "milk")
+    frame_names = TfFrameNames()
+    frame_names.assign(first)
+    published = frame_names.assign(second)
+
+    with world.modify_world():
+        world.remove_kinematic_structure_entity(first)
+
+    assert frame_names.assign(second) == published
+
+
+def published_child_frames(tf_publisher: TFPublisher) -> Set[str]:
+    """
+    The tf frames the publisher broadcasts a transform for.
+    """
+    return {
+        transform.child_frame_id
+        for transform in tf_publisher.tf_model_callback.tf_message.transforms
+    }
+
+
+def publisher_ignoring_existing_frames(
+    world: World, node: Node, existing_frames: List[str]
+) -> TFPublisher:
+    """
+    Build a publisher for a world whose tf tree already carries the given frames.
+    """
+    with patch.object(TFWrapper, "get_tf_frames", return_value=existing_frames):
+        return TFPublisher.create_with_ignore_existing_tf(node=node, world=world)
+
+
+def test_a_body_another_publisher_broadcasts_keeps_that_frame_name(rclpy_node):
+    world, (odom, milk) = world_with_bodies("odom_combined", "milk")
+
+    tf_publisher = publisher_ignoring_existing_frames(
+        world, rclpy_node, [str(odom.name)]
+    )
+
+    assert published_child_frames(tf_publisher) == {str(odom.name), str(milk.name)}
+
+
+def test_two_equally_named_bodies_another_publisher_broadcasts_get_a_frame_each(
+    rclpy_node,
+):
+    world, (first, second) = world_with_bodies("milk", "milk")
+
+    tf_publisher = publisher_ignoring_existing_frames(
+        world, rclpy_node, [str(first.name)]
+    )
+
+    assert published_child_frames(tf_publisher) == {
+        str(first.name),
+        f"{second.name}_{second.id.hex}",
+    }
+
+
+def test_two_equally_named_bodies_reach_the_tree_as_two_frames(rclpy_node):
+    world, (first, second) = world_with_bodies("milk", "milk")
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    TFPublisher(node=rclpy_node, _world=world)
+
+    assert tf_wrapper.wait_for_transform(
+        "map", "milk", timeout=Duration(seconds=1.0), time=Time()
+    )
+    published_frames = set(tf_wrapper.get_tf_frames())
+    told_apart_by_identifier = {
+        f"milk_{first.id.hex}",
+        f"milk_{second.id.hex}",
+    }
+
+    assert len(published_frames & told_apart_by_identifier) == 1

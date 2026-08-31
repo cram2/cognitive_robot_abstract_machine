@@ -5,10 +5,13 @@ Claude Code already loads as project memory, and which is gitignored — from a 
 you own. Your notes (e.g. "always open my PRs as drafts") follow you across sessions and are never
 committed to a shared branch.
 
+> **Setting this up for the first time?** [`../SETUP.md`](../SETUP.md) is the whole thing in
+> three steps, including the ones only you can do — labels on your fork, Claude's access to it,
+> and the variables a fresh-clone environment needs. This page is the reference behind it.
+>
 > **Rather see it in action than read about it?**
 > [`example-walkthrough.md`](../skills/plan-dashboard/example-walkthrough.md) is a short worked
-> example of the whole thing in use, from a plan-mode idea to a published dashboard. Or just run
-> `/setup-personal-notes` in a session and come back here when you want the details.
+> example of the whole thing in use, from a plan-mode idea to a published dashboard.
 
 Three kinds of content, stored the same way and never merged anywhere:
 
@@ -148,7 +151,9 @@ Override only what you need:
     config from them, and is a no-op if none are set.
 
 For Claude Code on the web, see <https://code.claude.com/docs/en/claude-code-on-the-web> for where
-either of those lives.
+either of those lives. [`setup_steps.py`](./setup_steps.py) prints the exact variable lines your
+clone needs — only the settings you have moved off their defaults — alongside the other two steps
+no script can perform for you.
 
 ### Fallback: your branch's own upstream
 

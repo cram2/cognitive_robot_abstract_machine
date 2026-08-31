@@ -12,12 +12,9 @@ from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.misc import MoveToReach
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
-from semantic_digital_twin.spatial_types import Pose2D, Pose
-from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
-    translate_free_space_to_where_condition,
-)
+from semantic_digital_twin.spatial_types import Point2, Pose2D, Pose
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
-    navigation_map_at_target,
+    PlanarGraphOfBoundingBoxes,
 )
 from semantic_digital_twin.exceptions import PointOccupiedError
 
@@ -42,7 +39,9 @@ class Sage10kOpenDoor(ActionDescription):
         A navigation map is created around the door handle and used to constrain an
         underspecified reach action, which is sequenced with an opening action.
         """
-        gcs = navigation_map_at_target(target=self.door.handle.root)
+        gcs = PlanarGraphOfBoundingBoxes.navigation_map_at_target(
+            target=self.door.handle.root
+        )
 
         arm = Arms.LEFT
 
@@ -57,8 +56,9 @@ class Sage10kOpenDoor(ActionDescription):
             x=x, y=y, z=z, reference_frame=self.door.handle.root
         )
 
-        # Find a node in free space that is near the pre-grasp pose.
-        target_node = gcs.node_of_point(pre_grasp_pose.position)
+        # Find a node in free space that is near the pre-grasp pose. gcs is planar, so
+        # the query point is its floor-plane projection, not the full 3D position.
+        target_node = gcs.node_of_point(Point2.from_pose(pre_grasp_pose))
         if target_node is None:
             raise PointOccupiedError(
                 self.world.transform(pre_grasp_pose, self.world.root).position
@@ -86,14 +86,17 @@ class Sage10kOpenDoor(ActionDescription):
             ),
         )
 
-        where_condition = translate_free_space_to_where_condition(
-            gcs.free_space_event,
-            reach_query.expression,
-            x_variable_name="MoveToReach.target_pose_offset_robot.x",
-            y_variable_name="MoveToReach.target_pose_offset_robot.y",
+        # constrain_to_free_space attaches the condition to the underlying Entity,
+        # which is all a query evaluation needs. reach_query (the Match) tracks its
+        # where conditions separately, for the parametrization that resolves this
+        # plan's underspecified fields, so it also needs to know about the condition
+        # -- appended directly rather than via Match.where(), since that would re-add
+        # it to the Entity a second time.
+        free_space_condition = gcs.constrain_to_free_space(
+            reach_query.expression.target_pose_offset_robot
         )
-
-        reach_action = reach_query.where(where_condition)
+        reach_query._where_conditions_.append(free_space_condition)
+        reach_action = reach_query
 
         open_action = OpenAction(object_designator=self.door.handle.root, arm=arm)
 

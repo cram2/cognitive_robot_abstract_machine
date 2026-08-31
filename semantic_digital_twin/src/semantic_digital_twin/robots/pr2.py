@@ -6,6 +6,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Self, List
 
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -464,6 +465,10 @@ class PR2Torso(Torso, HasLeftRightArm[PR2LeftArm, PR2RightArm], HasNeck[PR2Neck]
 
 @dataclass(eq=False)
 class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso]):
+
+    @classproperty
+    def forward_axis(cls) -> Vector3:
+        return Vector3.X()
 
     def setup_hardware_interfaces(self):
         pass

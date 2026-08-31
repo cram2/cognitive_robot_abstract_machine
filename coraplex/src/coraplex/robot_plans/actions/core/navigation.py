@@ -28,7 +28,8 @@ class NavigateAction(ActionDescription):
 
     target_location: Pose
     """
-    Location to which the robot should be navigated
+    Where the robot should stand, and which way it should face given as the pose's
+    x-axis.
     """
 
     keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
@@ -38,7 +39,12 @@ class NavigateAction(ActionDescription):
 
     @property
     def _action_plan(self) -> PlanNode:
-        return execute_single(MoveMotion(self.target_location, self.keep_joint_states))
+        return execute_single(
+            MoveMotion(
+                self.robot.mobile_base.pose_facing(self.target_location),
+                self.keep_joint_states,
+            )
+        )
 
     @staticmethod
     def pre_condition(
@@ -59,11 +65,11 @@ class NavigateAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
-        The robot needs to be within 3 cm of the target location.
+        The robot needs to be within 3 cm of where the heading puts its base.
         """
         return allclose(
             variable_from(context.robot.root).global_pose,
-            kwargs["target_location"],
+            context.robot.mobile_base.pose_facing(kwargs["target_location"]),
             atol=0.03,
         )
 

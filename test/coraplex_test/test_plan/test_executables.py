@@ -23,6 +23,7 @@ from coraplex.execution_environment import real_robot, simulated_robot
 from coraplex.plans.condition_nodes import PlanNodeStatusMonitor
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 
 @pytest.fixture
@@ -45,7 +46,7 @@ def reach_action_executable(immutable_model_world):
                 VerticalAlignment.NoAlignment,
                 view.right_arm.end_effector,
             ),
-            world.get_body_by_name("milk.stl"),
+            world.get_semantic_annotations_by_type(Milk)[0],
         ),
         context=context,
     )

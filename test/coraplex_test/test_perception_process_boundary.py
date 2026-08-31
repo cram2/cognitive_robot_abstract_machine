@@ -105,11 +105,11 @@ def test_detection_crosses_a_process_boundary(
     world, view, context = immutable_model_world
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
-    detections = RoboKudoPerception(ros_node=rclpy_node).detect(query)
+    detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
 
-    assert [detection.semantic_annotation for detection in detections] == [Milk]
+    assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detections[0].pose.to_position().to_np().flatten()[:3],
+        detection.pose.to_position().to_np().flatten()[:3],
         REPORTED_POSITION,
         atol=1e-9,
     )
@@ -143,11 +143,11 @@ def test_untyped_detection_crosses_a_process_boundary(
     pipeline_process_reporting("")
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
-    detections = RoboKudoPerception(ros_node=rclpy_node).detect(query)
+    detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
 
-    assert [detection.semantic_annotation for detection in detections] == [Milk]
+    assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detections[0].pose.to_position().to_np().flatten()[:3],
+        detection.pose.to_position().to_np().flatten()[:3],
         REPORTED_POSITION,
         atol=1e-9,
     )

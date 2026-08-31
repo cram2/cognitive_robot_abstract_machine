@@ -54,7 +54,6 @@ def run_demo(demo: Sage10kAbstractDemoHSRB):
     time.sleep(0.1)
 
     viz_marker_publisher = VizMarkerPublisher(_world=demo.world, node=node)
-    viz_marker_publisher.with_tf_publisher()
 
     with simulated_robot:
         demo.plan.perform()

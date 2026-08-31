@@ -6,7 +6,7 @@ import numpy as np
 from typing_extensions import Callable, List, Optional, Tuple
 
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
 
 from coraplex.datastructures.enums import (
@@ -23,7 +23,7 @@ A curve mapping a normalized time in [0, 1] to a local 3D point.
 """
 
 
-def _local_bounding_box(body: Body, use_visual: bool = False) -> BoundingBox:
+def _local_bounding_box(body: Body, use_visual: bool = False) -> VolumetricBoundingBox:
     """
     :param body: The body whose bounding box is computed.
     :param use_visual: Use the visual geometry instead of the collision geometry.

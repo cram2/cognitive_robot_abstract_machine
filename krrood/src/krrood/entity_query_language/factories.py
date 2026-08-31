@@ -27,6 +27,10 @@ from krrood.entity_query_language.core.base_expressions import (
     TruthValueOperator,
     OperationResult,
 )
+from krrood.entity_query_language.operators.causal import (
+    cause,
+    confounder,
+)
 from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
@@ -167,6 +171,12 @@ def variable_from(
     """
     return Variable(_domain_=domain)
 
+
+# %% Causal Constructs
+
+# `cause` and `confounder` (see operators/causal.py) are re-exported here so query-
+# building imports can come from this one module, alongside `a`, `an`, `set_of`, and
+# the rest of this file's factories.
 
 # %% Operators on Variables
 

@@ -175,6 +175,7 @@ from semantic_digital_twin.datastructures.definitions import TorsoState
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from coraplex.robot_plans.actions.composite.transporting import NavigateAction, PickUpAction, PlaceAction
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 import rclpy
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
@@ -189,7 +190,7 @@ with simulated_robot:
              Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root)
          ),
          PickUpAction(
-             object_designator=world.get_body_by_name("milk.stl"),
+             object_designator=world.get_semantic_annotations_by_type(Milk)[0],
              arm=arm,
              grasp_description=GraspDescription(
                  ApproachDirection.FRONT,
@@ -261,8 +262,9 @@ from coraplex.execution_environment import simulated_robot
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
-description = TransportAction(world.get_body_by_name("milk.stl"),
+description = TransportAction(world.get_semantic_annotations_by_type(Milk)[0],
                               Pose.from_xyz_quaternion(2.9, 2.2, 0.99,
                                                        0.0, 0.0, 1.0, 0.0, reference_frame=world.root),
                               Arms.LEFT)

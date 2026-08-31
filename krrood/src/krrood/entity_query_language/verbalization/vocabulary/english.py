@@ -207,6 +207,8 @@ class Keywords(VocabEnum):
     PREDICT = KeyWord("predict")
     RESPECTIVELY = KeyWord("respectively")
     TRUE = KeyWord("true")
+    WHAT_CAUSES = KeyWord("what causes")
+    TO_BE = KeyWord("to be")
 
 
 class Directive(VocabEnum):

@@ -1,5 +1,0 @@
--r requirements.txt
-tqdm
-pdbpp
-pytest
-omegaconf

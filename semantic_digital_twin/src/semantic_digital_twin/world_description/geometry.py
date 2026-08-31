@@ -38,6 +38,7 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
+    Point2,
     Point3,
     Vector3,
 )
@@ -340,10 +341,10 @@ class Scale:
 
         return simple_event
 
-    def to_bounding_box(self) -> BoundingBox:
+    def to_bounding_box(self) -> VolumetricBoundingBox:
         min_point = Point3(-self.x / 2, -self.y / 2, -self.z / 2)
         max_point = Point3(self.x / 2, self.y / 2, self.z / 2)
-        return BoundingBox.from_min_max(min_point, max_point, None)
+        return VolumetricBoundingBox.from_min_max(min_point, max_point, None)
 
     def to_np(self) -> np.ndarray:
         return np.array([self.x, self.y, self.z])
@@ -383,7 +384,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
     @property
     @abstractmethod
-    def local_frame_bounding_box(self) -> BoundingBox:
+    def local_frame_bounding_box(self) -> VolumetricBoundingBox:
         """
         Returns the bounding box of the shape.
         """
@@ -513,13 +514,13 @@ class Mesh(Shape):
         return self.mesh.volume
 
     @property
-    def local_frame_bounding_box(self) -> BoundingBox:
+    def local_frame_bounding_box(self) -> VolumetricBoundingBox:
         """
         Returns the local bounding box of the mesh.
 
         The bounding box is axis-aligned and centered at the origin.
         """
-        return BoundingBox.from_mesh(self.mesh, self.origin)
+        return VolumetricBoundingBox.from_mesh(self.mesh, self.origin)
 
     @staticmethod
     def _load_in_meters(filename: str, process: bool = True) -> trimesh.Trimesh:
@@ -972,11 +973,11 @@ class Sphere(Shape):
         return mesh
 
     @property
-    def local_frame_bounding_box(self) -> BoundingBox:
+    def local_frame_bounding_box(self) -> VolumetricBoundingBox:
         """
         Returns the bounding box of the sphere.
         """
-        return BoundingBox(
+        return VolumetricBoundingBox(
             -self.radius,
             -self.radius,
             -self.radius,
@@ -1032,7 +1033,7 @@ class Cylinder(Shape):
         return mesh
 
     @property
-    def local_frame_bounding_box(self) -> BoundingBox:
+    def local_frame_bounding_box(self) -> VolumetricBoundingBox:
         """
         Returns the bounding box of the cylinder.
 
@@ -1040,7 +1041,7 @@ class Cylinder(Shape):
         """
         half_width = self.width / 2
         half_height = self.height / 2
-        return BoundingBox(
+        return VolumetricBoundingBox(
             -half_width,
             -half_width,
             -half_height,
@@ -1091,7 +1092,7 @@ class Box(Shape):
         return mesh
 
     @property
-    def local_frame_bounding_box(self) -> BoundingBox:
+    def local_frame_bounding_box(self) -> VolumetricBoundingBox:
         """
         Returns the local bounding box of the box.
 
@@ -1100,7 +1101,7 @@ class Box(Shape):
         half_x = self.scale.x / 2
         half_y = self.scale.y / 2
         half_z = self.scale.z / 2
-        return BoundingBox(
+        return VolumetricBoundingBox(
             -half_x,
             -half_y,
             -half_z,
@@ -1151,7 +1152,7 @@ class Bounds(Generic[T], SubClassSafeGeneric):
         against this region, using the slab method.
 
         Assumes ``lower``/``upper`` are plain numeric arrays, as returned by
-        :meth:`BoundingBox.to_array_bounds`.
+        :meth:`VolumetricBoundingBox.to_array_bounds`.
 
         .. note::
             ``start``/``direction`` are plain arrays rather than :class:`Point3`/
@@ -1185,7 +1186,197 @@ class Bounds(Generic[T], SubClassSafeGeneric):
 
 
 @dataclass(eq=False)
-class BoundingBox:
+class AxisAlignedBox(ABC):
+    """
+    Shared behaviour for an axis-aligned box expressed over a fixed set of spatial axes.
+
+    :class:`VolumetricBoundingBox` and :class:`PlanarBoundingBox` differ only in which axes they
+    cover -- x, y, z versus x, y. Everything that depends only on that set of axes is
+    implemented here once; each subclass keeps its own fields (their count differs) and
+    the extras that are genuinely dimension-specific (``bloat``, ``dimensions``,
+    ``center``, ...).
+    """
+
+    @staticmethod
+    def _interval(
+        minimum: float, maximum: float, origin_component: Any
+    ) -> SimpleInterval:
+        """
+        :param minimum: The lower bound, relative to ``origin_component``.
+        :param maximum: The upper bound, relative to ``origin_component``.
+        :param origin_component: The origin's coordinate along this axis.
+        :return: The absolute interval this axis spans.
+        """
+        return SimpleInterval.from_data(
+            float(origin_component + minimum),
+            float(origin_component + maximum),
+            Bound.CLOSED,
+            Bound.CLOSED,
+        )
+
+    @classmethod
+    @abstractmethod
+    def axes(cls) -> Tuple[SpatialVariables, ...]:
+        """
+        :return: The spatial axes this box type is expressed over, in a fixed order
+            matching :attr:`_ordered_intervals`.
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def _ordered_intervals(self) -> Tuple[SimpleInterval, ...]:
+        """
+        :return: This box's interval along each of :meth:`axes`, in the same order.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def dimensionality(cls) -> int:
+        """
+        :return: The number of spatial axes this box type is expressed over.
+        """
+        return len(cls.axes())
+
+    @abstractmethod
+    def get_points(self) -> List[Point3] | List[Point2]:
+        """
+        :return: This box's corners, in its own local frame -- ``Point3`` for
+            :class:`VolumetricBoundingBox`, ``Point2`` for :class:`PlanarBoundingBox`.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def from_simple_event(
+        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+    ) -> List[Self]:
+        """
+        Create a list of bounding boxes from a simple random event.
+
+        :param simple_event: The random event.
+        :param origin: The origin of the intersection.
+        :return: The list of bounding boxes.
+        """
+        raise NotImplementedError
+
+    @property
+    def simple_event(self) -> SimpleEvent:
+        """
+        :return: The bounding box as a random event.
+        """
+        return SimpleEvent.from_data(
+            {
+                axis.value: interval
+                for axis, interval in zip(self.axes(), self._ordered_intervals)
+            }
+        )
+
+    def to_array_bounds(self) -> Bounds[npt.NDArray[np.float64]]:
+        """
+        Express this bounding box's lower and upper corners as plain-float vectors.
+
+        Array-based, not ``Point3``-based, for the same reason as
+        :meth:`from_array_bounds`: :meth:`~semantic_digital_twin.world_description.graph_of_convex_sets.boxes.GraphOfBoundingBoxes.calculate_connectivity`
+        reads these generically across dimensionality, and a 2D box has no ``Point3``
+        corners of its own.
+
+        :return: The corners, in the same frame as ``origin``.
+        """
+        intervals = self._ordered_intervals
+        lower = np.array([interval.lower for interval in intervals], dtype=np.float64)
+        upper = np.array([interval.upper for interval in intervals], dtype=np.float64)
+        return Bounds(lower, upper)
+
+    @classmethod
+    def from_array_bounds(
+        cls,
+        lower: npt.NDArray[np.float64],
+        upper: npt.NDArray[np.float64],
+        origin: HomogeneousTransformationMatrix,
+    ) -> Self:
+        """
+        Rebuild a bounding box from the plain-float corners :meth:`to_array_bounds`
+        returns.
+
+        Array-based rather than ``Point3``-based on purpose:
+        :meth:`~semantic_digital_twin.world_description.graph_of_convex_sets.boxes.GraphOfBoundingBoxes.calculate_connectivity`
+        uses this to rebuild a box generically across dimensionality, and a 2D box has
+        no ``Point3`` corners to build from.
+
+        :param lower: The lower corner.
+        :param upper: The upper corner.
+        :param origin: The origin of the bounding box.
+        :return: The bounding box.
+        """
+        return cls(*lower, *upper, origin)
+
+    def transform_to_origin(
+        self, reference_T_new_origin: HomogeneousTransformationMatrix
+    ) -> Self:
+        """
+        Transform the bounding box to a different reference frame.
+
+        :param reference_T_new_origin: The origin to express the box relative to.
+        :return: The box, re-expressed relative to ``reference_T_new_origin``.
+        """
+        reference_T_new_origin = HomogeneousTransformationMatrix(
+            data=reference_T_new_origin.to_np(),
+            reference_frame=reference_T_new_origin.reference_frame,
+        )
+
+        new_origin_reference_T_self = self.origin.reference_frame._world.transform(
+            self.origin, reference_T_new_origin.reference_frame
+        )
+
+        self_T_new_pose = reference_T_new_origin.inverse() @ new_origin_reference_T_self
+
+        list_self_T_corner = [
+            HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                corner.to_point3() if isinstance(corner, Point2) else corner
+            ).to_np()
+            for corner in self.get_points()
+        ]
+
+        list_reference_T_corner = [
+            self_T_new_pose.to_np() @ self_T_corner
+            for self_T_corner in list_self_T_corner
+        ]
+
+        dimensionality = len(self.axes())
+        list_reference_P_corner = [
+            reference_T_corner[:dimensionality, 3:]
+            for reference_T_corner in list_reference_T_corner
+        ]
+
+        min_corner = np.min(list_reference_P_corner, axis=0).flatten()
+        max_corner = np.max(list_reference_P_corner, axis=0).flatten()
+
+        return self.__class__.from_array_bounds(
+            min_corner, max_corner, reference_T_new_origin
+        )
+
+    def intersection_with(self, other: Self) -> Optional[Self]:
+        """
+        Compute the intersection of two bounding boxes.
+
+        :param other: The other bounding box.
+        :return: The intersection of the two bounding boxes or None if they do not
+            intersect.
+        """
+        other_in_same_frame = other.transform_to_origin(self.origin)
+        result = self.simple_event.intersection_with(other_in_same_frame.simple_event)
+        if result.is_empty():
+            return None
+        return self.__class__.from_simple_event(result, self.origin)[0]
+
+
+@dataclass(eq=False)
+class VolumetricBoundingBox(AxisAlignedBox):
+    """
+    An axis-aligned box in three-dimensional space.
+    """
+
     min_x: float
     """
     The minimum x-coordinate of the bounding box, relative to the origin.
@@ -1227,52 +1418,34 @@ class BoundingBox:
             (self.min_x, self.min_y, self.min_z, self.max_x, self.max_y, self.max_z)
         )
 
+    @classmethod
+    def axes(cls) -> Tuple[SpatialVariables, ...]:
+        return (SpatialVariables.x, SpatialVariables.y, SpatialVariables.z)
+
+    @property
+    def _ordered_intervals(self) -> Tuple[SimpleInterval, ...]:
+        return (self.x_interval, self.y_interval, self.z_interval)
+
     @property
     def x_interval(self) -> SimpleInterval:
         """
         :return: The x interval of the bounding box.
         """
-        return SimpleInterval.from_data(
-            float(self.origin.x + self.min_x),
-            float(self.origin.x + self.max_x),
-            Bound.CLOSED,
-            Bound.CLOSED,
-        )
+        return self._interval(self.min_x, self.max_x, self.origin.x)
 
     @property
     def y_interval(self) -> SimpleInterval:
         """
         :return: The y interval of the bounding box.
         """
-        return SimpleInterval.from_data(
-            float(self.origin.y + self.min_y),
-            float(self.origin.y + self.max_y),
-            Bound.CLOSED,
-            Bound.CLOSED,
-        )
+        return self._interval(self.min_y, self.max_y, self.origin.y)
 
     @property
     def z_interval(self) -> SimpleInterval:
         """
         :return: The z interval of the bounding box.
         """
-        return SimpleInterval.from_data(
-            float(self.origin.z + self.min_z),
-            float(self.origin.z + self.max_z),
-            Bound.CLOSED,
-            Bound.CLOSED,
-        )
-
-    def to_array_bounds(self) -> Bounds[np.ndarray]:
-        """
-        Express this bounding box's lower and upper corners as plain-float 3-vectors.
-
-        :return: The corners, in the same frame as ``origin``.
-        """
-        x, y, z = self.x_interval, self.y_interval, self.z_interval
-        lower = np.array([x.lower, y.lower, z.lower])
-        upper = np.array([x.upper, y.upper, z.upper])
-        return Bounds(lower, upper)
+        return self._interval(self.min_z, self.max_z, self.origin.z)
 
     def to_point3_bounds(self) -> Bounds[Point3]:
         """
@@ -1315,19 +1488,6 @@ class BoundingBox:
         return self.max_y - self.min_y
 
     @property
-    def simple_event(self) -> SimpleEvent:
-        """
-        :return: The bounding box as a random event.
-        """
-        return SimpleEvent.from_data(
-            {
-                SpatialVariables.x.value: self.x_interval,
-                SpatialVariables.y.value: self.y_interval,
-                SpatialVariables.z.value: self.z_interval,
-            }
-        )
-
-    @property
     def volume(self) -> float:
         """
         :return: The volume the bounding box encloses.
@@ -1355,7 +1515,7 @@ class BoundingBox:
 
     def bloat(
         self, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
-    ) -> BoundingBox:
+    ) -> VolumetricBoundingBox:
         """
         Enlarges the bounding box by a given amount in all dimensions.
 
@@ -1405,20 +1565,6 @@ class BoundingBox:
                 cls(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper, origin)
             )
         return result
-
-    def intersection_with(self, other: BoundingBox) -> Optional[BoundingBox]:
-        """
-        Compute the intersection of two bounding boxes.
-
-        :param other: The other bounding box.
-        :return: The intersection of the two bounding boxes or None if they do not
-            intersect.
-        """
-        other_in_same_frame = other.transform_to_origin(self.origin)
-        result = self.simple_event.intersection_with(other_in_same_frame.simple_event)
-        if result.is_empty():
-            return None
-        return self.__class__.from_simple_event(result, self.origin)[0]
 
     def enlarge(
         self,
@@ -1524,57 +1670,7 @@ class BoundingBox:
         )
         return Box(origin=origin, scale=scale)
 
-    def transform_to_origin(
-        self, reference_T_new_origin: HomogeneousTransformationMatrix
-    ) -> Self:
-        """
-        Transform the bounding box to a different reference frame.
-        """
-        reference_T_new_origin = HomogeneousTransformationMatrix(
-            data=reference_T_new_origin.to_np(),
-            reference_frame=reference_T_new_origin.reference_frame,
-        )
-
-        new_origin_reference_T_self = self.origin.reference_frame._world.transform(
-            self.origin, reference_T_new_origin.reference_frame
-        )
-
-        self_T_new_pose = reference_T_new_origin.inverse() @ new_origin_reference_T_self
-
-        # Get all 8 corners of the BB in link-local space
-        list_self_T_corner = [
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                self_T_corner
-            ).to_np()
-            for self_T_corner in self.get_points()
-        ]  # shape (8, 3)
-
-        list_reference_T_corner = [
-            self_T_new_pose.to_np() @ self_T_corner
-            for self_T_corner in list_self_T_corner
-        ]
-
-        list_reference_P_corner = [
-            reference_T_corner[:3, 3:] for reference_T_corner in list_reference_T_corner
-        ]
-
-        # Compute new corner points
-        min_corner = np.min(list_reference_P_corner, axis=0)
-        max_corner = np.max(list_reference_P_corner, axis=0)
-
-        world_bb = BoundingBox.from_min_max(
-            Point3.from_iterable(
-                min_corner, reference_frame=reference_T_new_origin.reference_frame
-            ),
-            Point3.from_iterable(
-                max_corner, reference_frame=reference_T_new_origin.reference_frame
-            ),
-            reference_T_new_origin,
-        )
-
-        return world_bb
-
-    def __eq__(self, other: BoundingBox) -> bool:
+    def __eq__(self, other: VolumetricBoundingBox) -> bool:
         return (
             np.isclose(self.min_x, other.min_x)
             and np.isclose(self.min_y, other.min_y)
@@ -1582,5 +1678,184 @@ class BoundingBox:
             and np.isclose(self.max_x, other.max_x)
             and np.isclose(self.max_y, other.max_y)
             and np.isclose(self.max_z, other.max_z)
-            and np.allclose(self.origin.to_np(), other.origin.to_np())
+            and np.allclose(self.origin, other.origin)
+        )
+
+
+@dataclass(eq=False)
+class PlanarBoundingBox(AxisAlignedBox):
+    """
+    An axis-aligned box in the x-y plane, with no z-extent.
+
+    The planar counterpart to :class:`VolumetricBoundingBox`: it represents a floor-plan
+    region rather than a volume, for graphs of convex sets that decompose free space
+    onto a single navigable plane instead of in three dimensions.
+    """
+
+    min_x: float
+    """
+    The minimum x-coordinate of the bounding box, relative to the origin.
+    """
+
+    min_y: float
+    """
+    The minimum y-coordinate of the bounding box, relative to the origin.
+    """
+
+    max_x: float
+    """
+    The maximum x-coordinate of the bounding box, relative to the origin.
+    """
+
+    max_y: float
+    """
+    The maximum y-coordinate of the bounding box, relative to the origin.
+    """
+
+    origin: HomogeneousTransformationMatrix
+    """
+    The origin of the bounding box.
+    """
+
+    def __hash__(self):
+        return hash((self.min_x, self.min_y, self.max_x, self.max_y))
+
+    @classmethod
+    def axes(cls) -> Tuple[SpatialVariables, ...]:
+        return (SpatialVariables.x, SpatialVariables.y)
+
+    @property
+    def _ordered_intervals(self) -> Tuple[SimpleInterval, ...]:
+        return (self.x_interval, self.y_interval)
+
+    @property
+    def x_interval(self) -> SimpleInterval:
+        """
+        :return: The x interval of the bounding box.
+        """
+        return self._interval(self.min_x, self.max_x, self.origin.x)
+
+    @property
+    def y_interval(self) -> SimpleInterval:
+        """
+        :return: The y interval of the bounding box.
+        """
+        return self._interval(self.min_y, self.max_y, self.origin.y)
+
+    @property
+    def depth(self) -> float:
+        return self.max_x - self.min_x
+
+    @property
+    def width(self) -> float:
+        return self.max_y - self.min_y
+
+    @property
+    def dimensions(self) -> List[float]:
+        """
+        :return: The dimensions of the bounding box as a list [depth, width].
+        """
+        return [self.depth, self.width]
+
+    @property
+    def area(self) -> float:
+        """
+        :return: The area the bounding box encloses.
+        """
+        return self.depth * self.width
+
+    @property
+    def center(self) -> Point2:
+        """
+        :return: The center of the bounding box, in the same frame as ``origin``.
+        """
+        return Point2(
+            self.x_interval.center(),
+            self.y_interval.center(),
+            reference_frame=self.origin.reference_frame,
+        )
+
+    def bloat(self, x_amount: float = 0.0, y_amount: float = 0.0) -> PlanarBoundingBox:
+        """
+        Enlarges the bounding box by a given amount in both dimensions.
+
+        :param x_amount: The amount to adjust minimum and maximum x-coordinates
+        :param y_amount: The amount to adjust minimum and maximum y-coordinates
+        :return: New enlarged bounding box
+        """
+        return self.__class__(
+            self.min_x - x_amount,
+            self.min_y - y_amount,
+            self.max_x + x_amount,
+            self.max_y + y_amount,
+            self.origin,
+        )
+
+    def contains(self, point: Point2) -> bool:
+        """
+        Check if the bounding box contains a point.
+        """
+        point_in_bb = point.reference_frame._world.transform(
+            point.to_point3(), self.origin.reference_frame
+        )
+        x, y = float(point_in_bb.x), float(point_in_bb.y)
+        return self.simple_event.contains((x, y))
+
+    def extrude(self, half_height: float) -> VolumetricBoundingBox:
+        """
+        Extrude this floor-plan box into a 3D slab, centered on the plane it was built
+        on.
+
+        :param half_height: Half the thickness of the resulting slab.
+        :return: The slab, in the same frame as ``origin``.
+        """
+        return VolumetricBoundingBox(
+            self.min_x,
+            self.min_y,
+            -half_height,
+            self.max_x,
+            self.max_y,
+            half_height,
+            self.origin,
+        )
+
+    @classmethod
+    def from_simple_event(
+        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+    ) -> List[Self]:
+        """
+        Create a list of bounding boxes from a simple random event.
+
+        :param simple_event: The random event.
+        :param origin: The origin of the intersection.
+        :return: The list of bounding boxes.
+        """
+        result = []
+        for x, y in itertools.product(
+            simple_event[SpatialVariables.x.value].simple_sets,
+            simple_event[SpatialVariables.y.value].simple_sets,
+        ):
+            result.append(cls(x.lower, y.lower, x.upper, y.upper, origin))
+        return result
+
+    def get_points(self) -> List[Point2]:
+        """
+        Get the 4 corners of the bounding box as ``Point2`` objects, in the box's own
+        local frame.
+
+        :return: A list of Point2 objects representing the corners of the bounding box.
+        """
+        return [
+            Point2(x, y, reference_frame=self.origin.reference_frame)
+            for x in (self.min_x, self.max_x)
+            for y in (self.min_y, self.max_y)
+        ]
+
+    def __eq__(self, other: PlanarBoundingBox) -> bool:
+        return (
+            np.isclose(self.min_x, other.min_x)
+            and np.isclose(self.min_y, other.min_y)
+            and np.isclose(self.max_x, other.max_x)
+            and np.isclose(self.max_y, other.max_y)
+            and np.allclose(self.origin, other.origin)
         )

@@ -14,6 +14,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
+from semantic_digital_twin.adapters.sage_10k_dataset.utils import (
+    Sage10kActionableScenes,
+)
 
 try:
     import huggingface_hub
@@ -125,6 +128,19 @@ class Sage10kDatasetLoader:
         unzipped_scene = self._download_scene_if_not_exists(scene_url)
         scene = self._parse_json(unzipped_scene)
         return scene
+
+    @staticmethod
+    def environment_name(scene_url: str) -> str:
+        """
+        :param scene_url: URL of a Sage10k scene.
+        :return: A label for the scene, taken from the curated scene's name where the
+            URL is one of :class:`Sage10kActionableScenes` and from the URL's filename
+            otherwise.
+        """
+        curated = {str(scene): scene.name.lower() for scene in Sage10kActionableScenes}
+        if scene_url in curated:
+            return curated[scene_url]
+        return Path(urlparse(scene_url).path).stem
 
     @classmethod
     def available_scenes(

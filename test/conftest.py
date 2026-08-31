@@ -3,16 +3,19 @@ import os
 import threading
 import time
 from copy import deepcopy
+from dataclasses import dataclass, field
 
 import numpy as np
 import objgraph
 import pytest
+from semantic_digital_twin.callbacks.callback import Callback
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 
+from .orm_interface_build import ORM_BUILD_OPTION, OrmBuild
 from .pytest_environment import PytestEnvironmentVariable
 
 try:
@@ -35,7 +38,13 @@ from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
-from typing_extensions import Type
+from typing_extensions import List, Type, TypeVar
+
+CallbackT = TypeVar("CallbackT", bound=Callback)
+"""
+The kind of publisher a test started.
+"""
+
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
@@ -144,6 +153,29 @@ The structure of fixtures in this conftest:
         after the test since there is no good method to reset the model after a test has changed it. 
 
 """
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """
+    Let a run state when it builds the ORM interfaces it reads.
+
+    ..note:: Registering the option is what lets a run state it and read it in ``--help``.
+        The build itself happens while pytest is still importing the conftests, before it
+        has parsed anything, so :meth:`OrmBuild.requested` reads the choice off the
+        arguments as they were given rather than off the parsed configuration.
+    """
+    parser.addoption(
+        ORM_BUILD_OPTION,
+        choices=OrmBuild.choices(),
+        default=None,
+        help=(
+            "when to build the generated ORM interfaces; "
+            f"'{OrmBuild.AUTO}' builds only what the checkout has not built since its "
+            f"sources changed, '{OrmBuild.ALWAYS}' builds every run, whatever the "
+            f"checkout holds, '{OrmBuild.NEVER}' builds nothing, and reads whatever the "
+            "checkout holds"
+        ),
+    )
 
 
 def pytest_configure(config):
@@ -942,6 +974,48 @@ def pr2_apartment_state_reset(pr2_apartment_world):
 ###############################
 ######### Utils ###############
 ###############################
+
+
+@dataclass
+class RosPublishers:
+    """
+    Keeps the ros publishers a test started and stops them when the test ends.
+
+    A publisher stays registered on the world it publishes, so one that is left running
+    on a world outliving the test publishes on a node that is already destroyed.
+    """
+
+    started: List[Callback] = field(default_factory=list)
+    """
+    The publishers started so far, in the order they were started.
+    """
+
+    def adopt(self, publisher: CallbackT) -> CallbackT:
+        """
+        :param publisher: The publisher whose lifetime ends with the test.
+        :return: the publisher itself, so it can be adopted where it is created.
+        """
+        self.started.append(publisher)
+        return publisher
+
+    def stop_all(self) -> None:
+        """
+        Stop every adopted publisher, latest first.
+        """
+        for publisher in reversed(self.started):
+            publisher.stop()
+        self.started.clear()
+
+
+@pytest.fixture(scope="function")
+def ros_publishers():
+    """
+    Hands out the owner of every publisher a test starts on a world it shares with other
+    tests.
+    """
+    publishers = RosPublishers()
+    yield publishers
+    publishers.stop_all()
 
 
 @pytest.fixture(scope="function")

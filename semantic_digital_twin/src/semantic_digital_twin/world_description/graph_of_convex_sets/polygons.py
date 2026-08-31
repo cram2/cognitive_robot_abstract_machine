@@ -186,7 +186,7 @@ class IrisSeedingSettings:
         :param lower: Lower corner of the region to seed.
         :param upper: Upper corner of the region to seed, in ``lower``'s reference
             frame.
-        :return: ``grid_resolution`` candidate seed points per axis.
+        :return:``grid_resolution`` candidate seed points per axis.
         """
         reference_frame = lower.reference_frame
         lower_array = lower.to_np()[:3]
@@ -278,12 +278,12 @@ def _shape_to_convex_set(
 
 
 @dataclass
-class GraphOfConvexPolygons(GraphOfConvexSets):
+class GraphOfConvexPolygons(GraphOfConvexSets[Point3, BoundingBoxCollection]):
     """
     A graph of convex sets whose regions are grown by Drake's IRIS algorithm and solved
     with Drake's ``GcsTrajectoryOptimization`` (:cite:t:`marcucci2022shortest`).
 
-    Unlike :class:`~semantic_digital_twin.world_description.graph_of_convex_sets.boxes.GraphOfBoundingBoxes`,
+    Unlike :class:`~semantic_digital_twin.world_description.graph_of_convex_sets.boxes.VolumetricGraphOfBoundingBoxes`,
     which exhaustively partitions free space into many small axis-aligned boxes, IRIS
     covers free space with a handful of large, non-axis-aligned convex regions -- a
     sufficient cover for solving path queries, not a complete map of free space (some
@@ -369,9 +369,7 @@ class GraphOfConvexPolygons(GraphOfConvexSets):
         semantic_annotation = SemanticEnvironmentAnnotation(
             root=world.root, _world=world
         )
-        obstacle_entities = cls._obstacle_entities(
-            result.search_space, semantic_annotation
-        )
+        obstacle_entities = semantic_annotation.obstacle_entities(result.search_space)
         result.obstacles = [
             _shape_to_convex_set(shape, world.root, bloat_obstacles, bloat_obstacles)
             for entity in obstacle_entities

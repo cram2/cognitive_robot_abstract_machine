@@ -29,6 +29,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
 )
 from semantic_digital_twin.testing import *
+from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -136,6 +140,57 @@ def test_has_root_kinematic_structure_entity_aggregate_bodies(kitchen_world):
         annotation.kinematic_structure_entities
         == kitchen_world.kinematic_structure_entities
     )
+
+
+def test_build_bloated_obstacle_collection_includes_bloated_walls():
+    """
+    A wall passed as ``semantic_wall_annotation`` must contribute its own bounding box
+    to the result, bloated by ``bloat_walls``, in addition to the plain obstacles.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    obstacle_body = Body(name=PrefixedName("obstacle"))
+    wall_body = Body(name=PrefixedName("wall"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_connection(
+            FixedConnection.create_with_dofs(
+                world,
+                root,
+                obstacle_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    -2.0, 0.0, 0.0, reference_frame=root
+                ),
+            )
+        )
+        world.add_connection(
+            FixedConnection.create_with_dofs(
+                world,
+                root,
+                wall_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    2.0, 0.0, 0.0, reference_frame=root
+                ),
+            )
+        )
+        obstacle_body.collision.append(Box(scale=Scale(0.2, 0.2, 0.2)))
+        wall_body.collision.append(Box(scale=Scale(0.2, 2.0, 0.2)))
+
+    origin = HomogeneousTransformationMatrix(reference_frame=root)
+    search_space = BoundingBoxCollection(
+        [VolumetricBoundingBox(-5, -5, -5, 5, 5, 5, origin)], root
+    )
+
+    obstacle_annotation = SemanticEnvironmentAnnotation(
+        root=obstacle_body, _world=world
+    )
+    wall_annotation = Wall(root=wall_body, _world=world)
+
+    result = obstacle_annotation.build_bloated_obstacle_collection(
+        search_space, semantic_wall_annotation=wall_annotation, bloat_walls=0.5
+    )
+
+    assert len(result.bounding_boxes) == 2
 
 
 def test_has_hinge_has_slider_aggregate_bodies():

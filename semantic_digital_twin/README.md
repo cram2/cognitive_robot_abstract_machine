@@ -81,7 +81,7 @@ git clone https://github.com/cram2/cognitive_robot_abstract_machine.git
 
 ```bash
 sudo apt install -y graphviz graphviz-dev
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 

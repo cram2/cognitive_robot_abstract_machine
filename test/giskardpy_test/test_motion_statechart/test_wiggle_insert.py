@@ -39,7 +39,7 @@ def _hole_at_current_tip(world: World, tip, root) -> Point3:
 def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
     VizMarkerPublisher(
         _world=pr2_world_state_reset, node=rclpy_node
-    ).with_tf_publisher()
+    )
     random.seed(0)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"

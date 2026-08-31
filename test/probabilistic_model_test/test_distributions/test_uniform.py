@@ -1,5 +1,8 @@
 import unittest
 
+import numpy as np
+import plotly.graph_objects as go
+
 from random_events.interval import *
 from random_events.product_algebra import *
 

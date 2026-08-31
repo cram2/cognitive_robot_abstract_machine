@@ -23,6 +23,14 @@ from typing_extensions import (
     Tuple,
     Dict,
     List,
+    get_args,
+)
+
+from random_events.variable import (
+    Continuous,
+    Integer,
+    compatible_types,
+    variable_from_name_and_type,
 )
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
@@ -36,6 +44,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 from krrood.entity_query_language.exceptions import (
     MultipleValuesAlongAccessPath,
+    NotNumberLikeFieldError,
     ReadOnlyMapping,
     SymbolicDunderAccessError,
 )
@@ -527,6 +536,36 @@ class Attribute(SingleValueMapping[T]):
     def _set_child_instance_value_(self, obj: Any, value: Any):
         setattr(obj, self._attribute_name_, value)
 
+    def number_like_field(self) -> Self:
+        """
+        Assert this attribute resolves to a number-like (integer or continuous) type.
+
+        :return: This attribute.
+        :raises AmbiguousQueryAttribute: If this attribute is chain-rooted at a query
+            that selects more than one variable, so it has no single subject to resolve
+            its type from.
+        :raises NotNumberLikeFieldError: If this attribute does not exist or is not
+            number-like.
+        """
+        from krrood.entity_query_language.query.query import Query
+
+        resolved_type = self._type_
+        if resolved_type is None:
+            root = self._chain_root_
+            if isinstance(root, Query):
+                resolved_type = root._rerooted_on_selection_(self)._type_
+        is_number_like = (
+            resolved_type is not None
+            and issubclass(resolved_type, compatible_types)
+            and isinstance(
+                variable_from_name_and_type(self._attribute_name_, resolved_type),
+                (Integer, Continuous),
+            )
+        )
+        if not is_number_like:
+            raise NotNumberLikeFieldError(self, resolved_type)
+        return self
+
 
 @dataclass(eq=False, repr=False)
 class Index(MappedVariable[T], ABC):
@@ -541,6 +580,22 @@ class Index(MappedVariable[T], ABC):
     """
     The key to index with.
     """
+
+    def _update_type_(self) -> None:
+        """
+        Narrow ``_type_`` to the child's element type: indexing a ``List[X]``-like
+        attribute reaches a single ``X``, not the container type itself.
+
+        Without this, an indexed attribute's ``_type_`` stayed the child's raw
+        container type (e.g. ``List[PlanNode]``), which later broke any
+        ``issubclass()`` check against it -- subscripted generics aren't valid
+        ``issubclass()`` arguments.
+        """
+        if self._type_ is not None:
+            return
+        child_type = self._child_._type_
+        args = get_args(child_type)
+        self._type_ = args[0] if args else child_type
 
     @property
     def _name_(self):

@@ -107,6 +107,7 @@ The plan will consist of the following steps:
 
 ```python
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from coraplex.datastructures.dataclasses import Context
@@ -121,13 +122,18 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 context = Context(world, PR2.from_world(world))
 milk_body = world.get_body_by_name("milk.stl")
 
+# The pick-up is told what it is grasping, so annotate the parsed mesh as milk.
+with world.modify_world():
+    milk = Milk(root=milk_body)
+    world.add_semantic_annotation(milk)
+
 plan = sequential(
     [
         ParkArmsAction(Arms.BOTH),
         MoveTorsoAction(TorsoState.HIGH),
         NavigateAction(Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root)),
         PickUpAction(
-            object_designator=milk_body,
+            object_designator=milk,
             arm=Arms.RIGHT,
             grasp_description=GraspDescription(
                 ApproachDirection.FRONT,

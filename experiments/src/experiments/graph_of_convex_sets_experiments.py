@@ -22,7 +22,7 @@ the scene, widened by 1 m in x and y (see
 For every environment, both GCS implementations are benchmarked and compared against
 a mesh-accurate free-space ground truth:
 
-  * :class:`GraphOfBoundingBoxes` exhaustively partitions free space into disjoint
+  * :class:`VolumetricGraphOfBoundingBoxes` exhaustively partitions free space into disjoint
     axis-aligned boxes; its own volume is an exact, always-valid lower bound on the
     true free volume (obstacle bounding boxes only ever over-approximate the real
     geometry).
@@ -77,9 +77,12 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import BoundingBox, Shape
+from semantic_digital_twin.world_description.geometry import (
+    VolumetricBoundingBox,
+    Shape,
+)
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
-    GraphOfBoundingBoxes,
+    VolumetricGraphOfBoundingBoxes,
 )
 from semantic_digital_twin.world_description.graph_of_convex_sets.polygons import (
     GraphOfConvexPolygons,
@@ -154,8 +157,9 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
 
     box_construction_duration: MeanAndStandardDeviation
     """
-    Time to build a complete, query-ready :class:`GraphOfBoundingBoxes` from an already-
-    loaded world via ``GraphOfBoundingBoxes.free_space_from_world`` (mean ± standard
+    Time to build a complete, query-ready :class:`VolumetricGraphOfBoundingBoxes` from
+    an already- loaded world via
+    ``VolumetricGraphOfBoundingBoxes.free_space_from_world`` (mean ± standard
     deviation).
 
     World loading is excluded: by the time a navigation goal arrives, the world is
@@ -180,8 +184,8 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
 
     box_free_space_volume: float
     """
-    Volume of :class:`GraphOfBoundingBoxes`'s own free-space partition (the sum of its
-    disjoint box volumes).
+    Volume of :class:`VolumetricGraphOfBoundingBoxes`'s own free-space partition (the
+    sum of its disjoint box volumes).
 
     Also a valid, exact lower bound on the true free volume, since obstacle bounding
     boxes only ever over-approximate the real obstacle geometry.
@@ -379,7 +383,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
 
         def _materialise_free_space():
             return BoundingBoxCollection.from_event(
-                reference_frame=world.root, event=free_space
+                VolumetricBoundingBox, reference_frame=world.root, event=free_space
             )
 
         free_space_collection, materialise_elapsed = self._measure(
@@ -387,7 +391,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         )
 
         def _compute_connectivity():
-            graph_of_convex_sets = GraphOfBoundingBoxes(
+            graph_of_convex_sets = VolumetricGraphOfBoundingBoxes(
                 world=world, search_space=search_space
             )
             for bounding_box in free_space_collection:
@@ -400,7 +404,9 @@ class GraphOfConvexSetsFreespaceBenchmark:
         )
 
         def _construct_box_graph_from_loaded_world():
-            return GraphOfBoundingBoxes.free_space_from_world(world, search_space)
+            return VolumetricGraphOfBoundingBoxes.free_space_from_world(
+                world, search_space
+            )
 
         _, box_construction_elapsed = self._measure(
             _construct_box_graph_from_loaded_world, repetitions=3
@@ -523,7 +529,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         return result, elapsed_times
 
     @staticmethod
-    def _collect_obstacles(world: World) -> List[BoundingBox]:
+    def _collect_obstacles(world: World) -> List[VolumetricBoundingBox]:
         """
         Return all obstacle bounding boxes from world expressed at the world root frame.
 
@@ -556,7 +562,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         ]
 
     @staticmethod
-    def _box_volume(box: BoundingBox) -> float:
+    def _box_volume(box: VolumetricBoundingBox) -> float:
         """
         :param box: The bounding box to measure.
         :return: The volume enclosed by box.
@@ -586,7 +592,9 @@ class GraphOfConvexSetsFreespaceBenchmark:
 
     @staticmethod
     def _compute_minimal_search_space(
-        obstacle_bounding_boxes: List[BoundingBox], world, xy_widen: float = 1.0
+        obstacle_bounding_boxes: List[VolumetricBoundingBox],
+        world,
+        xy_widen: float = 1.0,
     ) -> BoundingBoxCollection:
         """
         Derive a search-space bounding box as the minimal box covering every obstacle,
@@ -605,7 +613,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         if not obstacle_bounding_boxes:
             return BoundingBoxCollection(
                 shapes=[
-                    BoundingBox(
+                    VolumetricBoundingBox(
                         min_x=-2.0,
                         min_y=-2.0,
                         min_z=-2.0,
@@ -626,7 +634,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         half_xy_widen = xy_widen / 2.0
         return BoundingBoxCollection(
             shapes=[
-                BoundingBox(
+                VolumetricBoundingBox(
                     min_x=all_min_x - half_xy_widen,
                     min_y=all_min_y - half_xy_widen,
                     min_z=all_min_z,

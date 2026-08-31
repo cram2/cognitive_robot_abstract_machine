@@ -7,7 +7,7 @@ from typing import Optional, List, Deque, Tuple, Dict, Any
 import numpy as np
 import numpy.typing as npt
 import random_events
-from random_events.interval import closed, closed_open, SimpleInterval, Bound
+from random_events.interval import closed, closed_open, reals, SimpleInterval, Bound
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.variable import Continuous
 from typing_extensions import Self
@@ -155,23 +155,33 @@ class InductionStep:
         """
         Create a uniform distribution from the datapoint at `begin_index` to the datapoint at `end_index`.
 
+        The piece touching the globally first or last datapoint of the induction is
+        built unbounded on that side and then intersected with
+        :attr:`NygaInduction.support`, so that widening the support to absorb float
+        instabilities - or narrowing it to stay clear of a sibling distribution
+        elsewhere in a larger circuit - is expressed entirely through that one
+        interval rather than through a separate adjustment step.
+
         :param begin_index: The index of the first datapoint.
         :param end_index: The index of the last datapoint.
         """
-        if end_index == len(self.data):
-            interval = SimpleInterval.from_data(
-                self.left_connecting_point_from_index(begin_index),
-                self.right_connecting_point(),
-                Bound.CLOSED,
-                Bound.CLOSED,
-            )
-        else:
-            interval = SimpleInterval.from_data(
-                self.left_connecting_point_from_index(begin_index),
-                self.right_connecting_point_from_index(end_index),
-                Bound.CLOSED,
-                Bound.OPEN,
-            )
+        is_last_piece = end_index == len(self.data)
+
+        lower = (
+            -float("inf")
+            if begin_index == 0
+            else self.left_connecting_point_from_index(begin_index)
+        )
+        upper = (
+            float("inf")
+            if is_last_piece
+            else self.right_connecting_point_from_index(end_index)
+        )
+
+        interval = SimpleInterval.from_data(
+            lower, upper, Bound.CLOSED, Bound.CLOSED if is_last_piece else Bound.OPEN
+        )
+        interval = interval.intersection_with(self.nyga_induction.support)
         return UniformDistribution(variable=self.variable, interval=interval)
 
     def sum_weights_from_indices(self, begin_index: int, end_index: int) -> float:
@@ -411,6 +421,18 @@ class NygaInduction:
     float precision.
     """
 
+    support: SimpleInterval = field(default_factory=lambda: reals().simple_sets[0])
+    """
+    The allowed span of the distribution's support. Every uniform piece the induction
+    creates is intersected with this interval, so a sibling distribution for the same
+    variable elsewhere in a larger circuit (e.g. another leaf of a
+    :class:`~probabilistic_model.learning.jpt.jpt.JointProbabilityTree`) can be kept
+    from being overlapped by simply narrowing this interval instead of it.
+
+    Defaults to the entire real line; :meth:`fit` always narrows it further to at
+    most the data's own range widened by `tolerance_at_extremes` on both sides.
+    """
+
     probabilistic_circuit: ProbabilisticCircuit = field(
         init=False, default_factory=ProbabilisticCircuit, compare=False
     )
@@ -446,6 +468,16 @@ class NygaInduction:
             )
 
             return self.probabilistic_circuit
+
+        # narrow the support to at most the data's own range widened by tolerance_at_extremes
+        self.support = self.support.intersection_with(
+            SimpleInterval.from_data(
+                sorted_unique_data[0] - self.tolerance_at_extremes,
+                sorted_unique_data[-1] + self.tolerance_at_extremes,
+                Bound.CLOSED,
+                Bound.CLOSED,
+            )
+        )
 
         # if the log_weights are not given
         if weights is None:
@@ -483,31 +515,7 @@ class NygaInduction:
             induction_steps.extend(new_induction_steps)
 
         self.probabilistic_circuit.normalize()
-        self.adjust_extreme_points()
         return self.probabilistic_circuit
-
-    def adjust_extreme_points(self):
-        """
-        Applies `epsilon_at_extremes` to the support of the distribution.
-        """
-        # skip if this distribution is a dirac delta distribution
-        if len(self.probabilistic_circuit.nodes()) == 1:
-            return
-
-        # get the left most side of the distribution
-        lowest_leaf = min(
-            self.probabilistic_circuit.leaves,
-            key=lambda leaf: leaf.distribution.interval.lower,
-        )
-
-        lowest_leaf.distribution.interval.lower -= self.tolerance_at_extremes
-
-        highest_leaf = max(
-            self.probabilistic_circuit.leaves,
-            key=lambda leaf: leaf.distribution.interval.upper,
-        )
-
-        highest_leaf.distribution.interval.upper += self.tolerance_at_extremes
 
     def empty_copy(self) -> Self:
         return self.__class__(

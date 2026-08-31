@@ -132,8 +132,8 @@ source coraplex-venv/bin/activate
 Install the requirements in your python interpreter.
 
 ```shell
-cd <path-to-repo>/doc
-pip install -r requirements.txt
+cd <path-to-repo>
+pip install -e ".[doc]"
 ```
 
 Run coraplex and build the docs.

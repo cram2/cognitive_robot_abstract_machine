@@ -29,7 +29,7 @@ git submodule update --init --recursive
 
 Now, install all requirements.
 ```
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 ```
 
 ## Usage and Guides:

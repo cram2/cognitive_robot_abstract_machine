@@ -13,7 +13,12 @@ stop being feasible.
 import numpy as np
 
 from coraplex.datastructures.enums import ExecutionType
-from experiments.real_stretch_apartment_demo.demo import StretchApartmentDemonstration
+from experiments.real_stretch_apartment_demo.demo import (
+    CEREAL_NAME,
+    CEREAL_SHELF_LAYER_NAME,
+    CEREAL_SHELF_LAYER_T_CEREAL,
+    StretchApartmentDemonstration,
+)
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.world import World
 
@@ -24,10 +29,10 @@ How long to wait for the controller to serve its world once the demonstration is
 
 PLACEMENT_TOLERANCE = 0.2
 """
-How far from the bedside table's centre the cereal box may land.
+How far from the pose the plan places it at the cereal box may end up.
 
-The measured placement error is about 0.1m, so this discriminates a successful place
-from one that missed the furniture without being tight enough to chase controller noise.
+Loose enough not to chase controller noise, and far tighter than the distance to the
+bedside table it is carried to in between, so a cereal left there fails this.
 """
 
 
@@ -42,7 +47,10 @@ def test_demonstration_runs_against_a_controller_in_another_process(
 
     The result is read back by fetching the world from the controller again, which
     proves the furniture and the transported object landed in the controller's own
-    process rather than only in the demonstration's copy.
+    process rather than only in the demonstration's copy. The plan carries the cereal to
+    the bedside table and back, so it ends on its shelf layer again -- released to the
+    world rather than still hanging off the shelf it was spawned under or off the
+    gripper.
     """
     StretchApartmentDemonstration(
         execution_type=ExecutionType.REAL, used_robot=Stretch
@@ -52,20 +60,19 @@ def test_demonstration_runs_against_a_controller_in_another_process(
         timeout_seconds=RESULT_FETCH_TIMEOUT_SECONDS
     )
 
-    cereal = controller_world.get_body_by_name("cheeze_it.obj")
-    bedside_table = controller_world.get_body_by_name("bedside_table.dae")
-    assert cereal.parent_connection.parent is not controller_world.get_body_by_name(
-        "shelf_layer2"
-    )
+    cereal = controller_world.get_body_by_name(CEREAL_NAME)
+    shelf_layer = controller_world.get_body_by_name(CEREAL_SHELF_LAYER_NAME)
+    assert cereal.parent_connection.parent is controller_world.root
+
+    root_T_shelf_layer = controller_world.compute_forward_kinematics(
+        controller_world.root, shelf_layer
+    ).to_np()
+    root_T_cereal = controller_world.compute_forward_kinematics(
+        controller_world.root, cereal
+    ).to_np()
     np.testing.assert_allclose(
-        controller_world.compute_forward_kinematics(controller_world.root, cereal)
-        .to_position()
-        .to_np()[:2],
-        controller_world.compute_forward_kinematics(
-            controller_world.root, bedside_table
-        )
-        .to_position()
-        .to_np()[:2],
+        root_T_cereal[:2, 3],
+        (root_T_shelf_layer @ CEREAL_SHELF_LAYER_T_CEREAL.to_np())[:2, 3],
         atol=PLACEMENT_TOLERANCE,
     )
 

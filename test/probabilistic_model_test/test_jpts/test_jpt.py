@@ -241,6 +241,37 @@ class JPTTestCase(unittest.TestCase):
         self.assertEqual(self.model, deserialized)
 
 
+class DenseBoundaryDeterminismTestCase(unittest.TestCase):
+    """
+    Regression test for leaves whose data sits closer to a decision boundary than
+    `NygaInduction.tolerance_at_extremes`. Widening each leaf's support independently
+    would let the two supports overlap and break the tree's determinism; this checks
+    that leaf construction reserves the neighboring leaf's data instead.
+    """
+
+    def test_leaves_stay_deterministic_when_data_is_denser_than_tolerance(self):
+        # smaller than 2 * the default NygaInduction.tolerance_at_extremes (1e-6), so
+        # widening both sides by the full tolerance would make them overlap
+        gap = 2e-7
+        left_data = np.linspace(0.0, 5.0 - gap / 2, 50)
+        right_data = np.linspace(5.0 + gap / 2, 10.0, 50)
+        data = pd.DataFrame({"x": np.concatenate([left_data, right_data])})
+
+        (variable,) = infer_variables_from_dataframe(data)
+        model = JointProbabilityTree(annotated_variables=[variable])
+        preprocessed = model.preprocess_data(data)
+
+        left_data_rows, right_data_rows = preprocessed[:50], preprocessed[50:]
+        left_leaf = model.create_leaf_node(left_data_rows, right_data_rows)
+        right_leaf = model.create_leaf_node(right_data_rows, left_data_rows)
+
+        model.root = SumUnit(probabilistic_circuit=model.probabilistic_circuit)
+        model.root.add_subcircuit(left_leaf, 0.0)
+        model.root.add_subcircuit(right_leaf, 0.0)
+
+        self.assertTrue(model.probabilistic_circuit.is_deterministic())
+
+
 class BreastCancerTestCase(unittest.TestCase):
     data: pd.DataFrame
     model: JointProbabilityTree

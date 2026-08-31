@@ -3,15 +3,18 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Self
+from typing import Any, Self, TYPE_CHECKING
 
 import numpy as np
-from typing_extensions import Dict
+from typing_extensions import Dict, List
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithClassBasedID,
 )
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,43 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
     """
     Flag that indicates if the callback is paused.
     """
+
+    @classmethod
+    @abstractmethod
+    def _all_callbacks_from_world(cls, world: World) -> List[Callback]:
+        """
+        The list a world notifies when the change this kind of callback reacts to
+        happens.
+
+        A world keeps one such list per kind of change. A callback puts itself on the
+        list of its own kind when it is created and takes itself off again when it is
+        stopped, so the list is also what decides whether a callback is still live.
+
+        :param world: The world whose list is asked for.
+        :return: the callbacks on that list, of whatever class, in the order they were
+            created.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def all_callbacks_of_this_type_from_world(cls, world: World) -> List[Self]:
+        """
+        The callbacks of this class that the given world still notifies.
+
+        Two parts that share a world can find each other this way instead of one being
+        handed a reference to the other, which is what lets them be created in either
+        order and by unrelated code. A callback that has been stopped is no longer among
+        them, and neither is one attached to a different world.
+
+        :param world: The world to search.
+        :return: every callback of this class the world notifies, in the order they were
+            created.
+        """
+        return [
+            callback
+            for callback in cls._all_callbacks_from_world(world)
+            if isinstance(callback, cls)
+        ]
 
     def stop(self):
         """
@@ -78,6 +118,14 @@ class StateChangeCallback(Callback, ABC):
         self._world.state.state_change_callbacks.append(self)
         self.update_previous_world_state()
 
+    @classmethod
+    def _all_callbacks_from_world(cls, world: World) -> List[Callback]:
+        """
+        :param world: The world whose state change callbacks are asked for.
+        :return: everything the world notifies whenever its state changes.
+        """
+        return world.state.state_change_callbacks
+
     def notify_state_change(self, **kwargs):
         if not self._is_paused:
             self.on_state_change(**kwargs)
@@ -109,6 +157,14 @@ class ModelChangeCallback(Callback, ABC):
     def __post_init__(self):
         super().__post_init__()
         self._world.get_world_model_manager().model_change_callbacks.append(self)
+
+    @classmethod
+    def _all_callbacks_from_world(cls, world: World) -> List[Callback]:
+        """
+        :param world: The world whose model change callbacks are asked for.
+        :return: everything the world notifies whenever its model changes.
+        """
+        return world.get_world_model_manager().model_change_callbacks
 
     def notify_model_change(self, **kwargs):
         if not self._is_paused:

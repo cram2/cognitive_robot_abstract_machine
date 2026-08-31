@@ -8,7 +8,40 @@ project-excludes = ["**/*venv/**/*"]
 
 [project]
 name = "krrood"
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
+dependencies = [
+    "rdflib",
+    "jinja2",
+    "inflect",
+    "lemminflect",
+    "owlrl",
+    "typing-extensions>=4.12.2",
+    "rustworkx>=0.14.0",
+    "sqlalchemy",
+    "black",
+    "ruff",
+    "sortedcontainers",
+    "inflection",
+    "anytree>=2.8.0",
+    "ordered_set>=4",
+    "pygraphviz>=1.7",
+    "graphviz",
+    "tabulate",
+    "ipython",
+    "requests",
+    "colorama",
+    "tqdm",
+    "pygments",
+    "pandas",
+    "pyparsing>=3.2.3",
+    "omegaconf",
+    "pydot",
+    "ucimlrepo>=0.0.7",
+    "pdbpp",
+    "pytest",
+    "probabilistic_model",
+    "random_events",
+]
 description = "A python package for Knowledge Representation and Reasoning systems based on Object Oriented Design."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,6 +70,9 @@ classifiers = [
 dev = [
     "pytest>=7.0.0,<8.0.0",
     "mypy>=1.8",
+    "matplotlib",
+    "igraph",
+    "pyyaml",
 ]
 visualization = [
     "dash",
@@ -98,4 +134,3 @@ exclude_lines = [
 
 [tool.setuptools.dynamic]
 version = {attr = "krrood._version.__version__"}
-dependencies = { file = "requirements.txt" }

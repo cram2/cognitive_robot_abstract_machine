@@ -120,7 +120,6 @@ class TrainingEnvironment(ABC):
                 _world=plan.context.world,
                 node=rclpy.create_node("test_node"),
             )
-            pub.with_tf_publisher()
 
         with simulated_robot:
             try:

@@ -25,7 +25,7 @@ world.merge_world(robot_world)
 rclpy.init()
 VizMarkerPublisher(
     _world=world, node=rclpy.create_node("urdf_visualization_node")
-).with_tf_publisher()
+)
 sleep(2)
 
 your_robot_class: AbstractRobot = UnitreeG1

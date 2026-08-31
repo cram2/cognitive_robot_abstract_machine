@@ -22,7 +22,36 @@ classifiers = [
 keywords=["probabilistic models", "probabilistic machine learning", "probability theory", "variables",
     "reasoning under uncertainty"]
 license = "LGPL-3.0-only"
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
+dependencies = [
+    "random-events>=4.1.2",
+    "networkx",
+    "plotly",
+    "scipy",
+    "typing_extensions",
+    "numpy",
+    "sortedcontainers",
+    "tqdm",
+    "tabulate",
+    "N2G",
+    "python-igraph",
+    "rustworkx>=0.16.0",
+    "scikit-learn>=1.6.1",
+    "jax>=0.6.0",
+    "jaxtyping>=0.3.2",
+    "equinox>=0.12.1",
+    "mlflow>=2.22.0",
+    "optax>=0.2.4",
+    "pyjpt",
+    "mlflow-skinny>=2.22.0",
+    "dnutils",
+    "arff",
+    "deprecated",
+    "PySide6",
+    "qt-material",
+    "superqt",
+    "krrood",
+]
 
 [project.urls]
 "Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
@@ -34,4 +63,15 @@ include = ["probabilistic_model*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "probabilistic_model._version.__version__"}
-dependencies = {file = "requirements.txt"}
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pandas>=2.2.3",
+    "graphviz",
+    "matplotlib>=3.10.1",
+    "random_events>=5.0.1",
+    "typing_extensions>=4.13.2",
+    "pytest-qt",
+    "pytest-xvfb",
+]

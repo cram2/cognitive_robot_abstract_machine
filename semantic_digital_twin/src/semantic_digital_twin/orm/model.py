@@ -19,6 +19,7 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.spatial_types.spatial_types import (
     Quaternion,
     Pose,
+    Point2,
     Pose2D,
     SpatialType,
 )
@@ -275,27 +276,47 @@ class PoseMapping(AlternativeMapping[Pose]):
 
 
 @dataclass(eq=False)
-class Pose2DMapping(AlternativeMapping[Pose2D]):
+class Point2Mapping(AlternativeMapping[Point2]):
     x: float
     y: float
-    yaw: float
+
+    reference_frame: Optional[KinematicStructureEntity]
+
+    @classmethod
+    def from_domain_object(cls, obj: Point2):
+        result = cls(
+            x=float(obj.x), y=float(obj.y), reference_frame=obj.reference_frame
+        )
+        return result
+
+    def to_domain_object(self) -> Point2:
+        return Point2(x=self.x, y=self.y, reference_frame=self.reference_frame)
+
+
+@dataclass(eq=False)
+class Pose2DMapping(AlternativeMapping[Pose2D]):
+    position: Point2
+    bearing: float
     reference_frame: Optional[KinematicStructureEntity] = field(
         default=None, kw_only=True
     )
 
     @classmethod
     def from_domain_object(cls, obj: Pose2D):
-        result = cls(x=float(obj.x), y=float(obj.y), yaw=float(obj.yaw))
+        result = cls(position=obj.position, bearing=float(obj.yaw))
         result.reference_frame = obj.reference_frame
         return result
 
     def to_domain_object(self) -> Pose2D:
-        return Pose2D(
-            x=self.x,
-            y=self.y,
-            yaw=self.yaw,
+        return Pose2D.from_position_and_yaw(
+            self.position,
+            yaw=self.bearing,
             reference_frame=self.reference_frame,
         )
+
+    @classmethod
+    def required_pre_build_classes(cls) -> List[Type]:
+        return [Point2]
 
 
 class TrimeshType(TypeDecorator):
