@@ -18,14 +18,24 @@ class LifeCycleValues(IntEnum):
     :class:`~giskardpy.motion_statechart.motion_statechart.MotionStatechart`.
     """
 
-    NOT_STARTED = 0
+    color: str
+    """
+    The color a visualization draws a node in this state in.
+    """
+
+    badge: str
+    """
+    The short text a visualization labels a node in this state with.
+    """
+
+    NOT_STARTED = 0, "#9CA3AF", "—"
     """
     The node has not run yet.
 
     Its observation is forced back to unknown every tick.
     """
 
-    RUNNING = 1
+    RUNNING = 1, "#3B82F6", "▶"
     """
     The node is active: its constraints carry weight, its observation expression is
     evaluated and
@@ -33,28 +43,41 @@ class LifeCycleValues(IntEnum):
     called.
     """
 
-    PAUSED = 2
+    PAUSED = 2, "#EAB308", "<B>||</B>"
     """
     The node was running and its pause condition became true.
 
     Its constraints are deactivated and its observation is frozen at the last value.
     """
 
-    SUCCEEDED = 3
+    SUCCEEDED = 3, "#28A745", "✔"
     """
     The node was ended while it was observing its goal as reached.
     """
 
-    FAILED = 4
+    FAILED = 4, "#EF4444", "✖"
     """
     The node was ended while it was not.
     """
 
-    INTERRUPTED = 5
+    INTERRUPTED = 5, "#F97316", "■"
     """
     The node ended without being judged, either because an ancestor ended and took it
     down with it, or because it was not observing anything decisive at the time.
     """
+
+    def __new__(cls, value: int, color: str, badge: str) -> LifeCycleValues:
+        """
+        :param value: The number this state is stored as.
+        :param color: The color a visualization draws a node in this state in.
+        :param badge: The short text a visualization labels such a node with.
+        :return: The member standing for that state.
+        """
+        member = int.__new__(cls, value)
+        member._value_ = value
+        member.color = color
+        member.badge = badge
+        return member
 
     @classmethod
     def terminal_states(cls) -> FrozenSet[LifeCycleValues]:
@@ -97,34 +120,6 @@ class LifeCycleValues(IntEnum):
             case _:
                 return cls.INTERRUPTED
 
-    @property
-    def color(self) -> str:
-        """
-        :return: The color a visualization draws a node in this state in.
-        """
-        return {
-            LifeCycleValues.NOT_STARTED: "#9CA3AF",
-            LifeCycleValues.RUNNING: "#3B82F6",
-            LifeCycleValues.PAUSED: "#EAB308",
-            LifeCycleValues.SUCCEEDED: "#28A745",
-            LifeCycleValues.FAILED: "#EF4444",
-            LifeCycleValues.INTERRUPTED: "#F97316",
-        }[self]
-
-    @property
-    def symbol(self) -> str:
-        """
-        :return: The glyph a visualization labels a node in this state with.
-        """
-        return {
-            LifeCycleValues.NOT_STARTED: "—",
-            LifeCycleValues.RUNNING: "▶",
-            LifeCycleValues.PAUSED: "<B>||</B>",
-            LifeCycleValues.SUCCEEDED: "✔",
-            LifeCycleValues.FAILED: "✖",
-            LifeCycleValues.INTERRUPTED: "■",
-        }[self]
-
 
 class FloatEnum(float, Enum):
     """
@@ -137,31 +132,32 @@ class ObservationStateValues(FloatEnum):
     The trinary truth values used throughout the motion statechart.
     """
 
-    FALSE = float(Scalar.const_false())
-    UNKNOWN = float(Scalar.const_trinary_unknown())
-    TRUE = float(Scalar.const_true())
+    color: str
+    """
+    The color a visualization draws a node observing this in.
+    """
 
-    @property
-    def color(self) -> str:
-        """
-        :return: The color a visualization draws a node observing this in.
-        """
-        return {
-            ObservationStateValues.FALSE: "#FF5024",
-            ObservationStateValues.UNKNOWN: "#8F959E",
-            ObservationStateValues.TRUE: "#B6E5A0",
-        }[self]
+    badge: str
+    """
+    The short text a visualization labels a node observing this with.
+    """
 
-    @property
-    def symbol(self) -> str:
+    FALSE = float(Scalar.const_false()), "#FF5024", "False"
+    UNKNOWN = float(Scalar.const_trinary_unknown()), "#8F959E", "?"
+    TRUE = float(Scalar.const_true()), "#B6E5A0", "True"
+
+    def __new__(cls, value: float, color: str, badge: str) -> ObservationStateValues:
         """
-        :return: The text a visualization labels a node observing this with.
+        :param value: The number this truth value is stored as.
+        :param color: The color a visualization draws a node observing this in.
+        :param badge: The short text a visualization labels such a node with.
+        :return: The member standing for that truth value.
         """
-        return {
-            ObservationStateValues.FALSE: "False",
-            ObservationStateValues.UNKNOWN: "?",
-            ObservationStateValues.TRUE: "True",
-        }[self]
+        member = float.__new__(cls, value)
+        member._value_ = value
+        member.color = color
+        member.badge = badge
+        return member
 
 
 # %% life cycle predicates

@@ -129,9 +129,9 @@ class MotionStatechartGraphviz:
         obs_state = self.motion_statechart.observation_state[node]
         life_cycle_state = self.motion_statechart.life_cycle_state[node]
         obs_color = obs_state.color
-        obs_text = obs_state.symbol
+        obs_badge = obs_state.badge
         life_color = life_cycle_state.color
-        life_symbol = life_cycle_state.symbol
+        life_badge = life_cycle_state.badge
         label = (
             f'<<TABLE  BORDER="0" CELLBORDER="0" CELLSPACING="0">'
             f"<TR>"
@@ -144,9 +144,9 @@ class MotionStatechartGraphviz:
             f'  <TD CELLPADDING="0">'
             f'    <TABLE BORDER="0" CELLBORDER="2" CELLSPACING="0" WIDTH="100%">'
             f"      <TR>"
-            f'        <TD BGCOLOR="{obs_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{obs_text}</FONT></TD>'
+            f'        <TD BGCOLOR="{obs_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{obs_badge}</FONT></TD>'
             f"        <VR/>"
-            f'        <TD BGCOLOR="{life_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{life_symbol}</FONT></TD>'
+            f'        <TD BGCOLOR="{life_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{life_badge}</FONT></TD>'
             f"      </TR>"
             f"    </TABLE>"
             f"  </TD>"
