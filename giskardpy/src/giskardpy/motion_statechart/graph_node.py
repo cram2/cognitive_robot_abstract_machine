@@ -850,7 +850,9 @@ class MotionStatechartNode:
         ancestor_ending = self._create_ancestor_ending()
 
         return LifeCycleTransitions(
-            not_started=self._create_not_started_transitions(),
+            not_started=self._create_not_started_transitions(
+                any_reset_condition_true=any_reset_condition_true
+            ),
             running=self._create_running_transitions(
                 ancestor_ending=ancestor_ending,
                 any_reset_condition_true=any_reset_condition_true,
@@ -1040,11 +1042,15 @@ class MotionStatechartNode:
             else_result=sm.Scalar(LifeCycleValues.RUNNING),
         )
 
-    def _create_not_started_transitions(self) -> sm.Scalar:
+    def _create_not_started_transitions(
+        self, any_reset_condition_true: sm.Scalar
+    ) -> sm.Scalar:
         """
         A node starts once it is asked to and every ancestor is being started too, but
-        never underneath an ancestor that is ending on the same cycle.
+        never underneath an ancestor that is ending on the same cycle, and never while
+        it or an ancestor is being reset, because a reset outranks a start.
 
+        :param any_reset_condition_true: The combined reset condition for this node and its parents. Combined using trinary_logic_or.
         :return: The life cycle state this node reaches while it has not started.
         """
         start_condition = self._create_condition_holds(TransitionKind.START)
@@ -1060,9 +1066,14 @@ class MotionStatechartNode:
             )
             current = parent
 
-        return sm.if_else(
-            condition=start_condition,
-            if_result=sm.Scalar(LifeCycleValues.RUNNING),
+        return sm.if_cases(
+            cases=[
+                (
+                    any_reset_condition_true,
+                    sm.Scalar(LifeCycleValues.NOT_STARTED),
+                ),
+                (start_condition, sm.Scalar(LifeCycleValues.RUNNING)),
+            ],
             else_result=sm.Scalar(LifeCycleValues.NOT_STARTED),
         )
 

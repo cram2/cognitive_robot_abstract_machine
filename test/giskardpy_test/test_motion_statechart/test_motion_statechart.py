@@ -2481,6 +2481,67 @@ class TestLifeCycleTransitions:
         assert goal.life_cycle_state == LifeCycleValues.RUNNING
         assert goal.child.life_cycle_state == LifeCycleValues.RUNNING
 
+    def test_a_reset_outranks_a_start(self):
+        """
+        A reset outranks every other transition, so a node whose reset is held true does
+        not start while it is.
+        """
+        msc = MotionStatechart()
+        msc.add_nodes([trigger := ConstTrueNode(), node := ConstTrueNode()])
+        node.start_condition = trigger.observation_variable
+        node.reset_condition = trigger.observation_variable
+
+        executor = _compile_msc(msc)
+        executor.tick()
+        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+
+        executor.tick()
+        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+
+    def test_a_node_starts_once_its_reset_drops(self):
+        """
+        A reset holds a node back only for as long as it is true, so a start condition
+        that outlives it still starts the node.
+        """
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                trigger := ConstTrueNode(),
+                reset := Pulse(),
+                node := ConstTrueNode(),
+            ]
+        )
+        node.start_condition = trigger.observation_variable
+        node.reset_condition = reset.observation_variable
+
+        executor = _compile_msc(msc)
+        executor.tick()
+        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+
+        executor.tick()
+        assert node.life_cycle_state == LifeCycleValues.RUNNING
+
+    def test_a_resetting_ancestor_holds_back_a_child_that_would_start(self):
+        """
+        An ancestor resets everything beneath it, so a child whose start condition turns
+        true on the tick its ancestor is reset stays where it is.
+        """
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                reset := CountControlCycles(control_cycles=2),
+                goal := GoalWithChildStartingLate(delay_in_control_cycles=2),
+            ]
+        )
+        goal.reset_condition = reset.observation_variable
+
+        executor = _compile_msc(msc)
+        executor.tick()
+        executor.tick()
+
+        assert goal.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert goal.child.life_cycle_state == LifeCycleValues.NOT_STARTED
+
 
 # %% life cycle verdicts
 
