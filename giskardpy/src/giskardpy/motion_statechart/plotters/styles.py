@@ -93,7 +93,7 @@ LifeCycleStateToSymbol: Dict[LifeCycleValues, str] = {
     LifeCycleValues.RUNNING: "▶",
     # LifeCycleState.paused: '⏸',
     LifeCycleValues.PAUSED: "<B>||</B>",
-    LifeCycleValues.SUCCEEDED: "■",
+    LifeCycleValues.SUCCEEDED: "✔",
     LifeCycleValues.FAILED: "✖",
-    LifeCycleValues.INTERRUPTED: "⊘",
+    LifeCycleValues.INTERRUPTED: "■",
 }
