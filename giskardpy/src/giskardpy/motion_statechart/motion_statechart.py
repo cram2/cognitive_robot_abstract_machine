@@ -276,6 +276,13 @@ class ObservationState(State):
     :meth:`compile`.
     """
 
+    def __getitem__(self, node: MotionStatechartNode) -> ObservationStateValues:
+        """
+        :param node: The node to look up.
+        :return: What `node` observes, as an :class:`ObservationStateValues` member.
+        """
+        return ObservationStateValues(super().__getitem__(node))
+
     def compile(self, context: MotionStatechartContext):
         """
         Compiles the updater for observation states.
@@ -504,7 +511,7 @@ class StateHistoryItem:
         :return: Every node's name mapped to its observation state and life cycle state name.
         """
         merged = {
-            node.name: f"{self.observation_state[node]} | {life_cycle.name}"
+            node.name: f"{self.observation_state[node].name} | {life_cycle.name}"
             for node, life_cycle in self.life_cycle_state.items()
         }
         return str(merged)

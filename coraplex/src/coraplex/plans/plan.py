@@ -7,7 +7,6 @@ from dataclasses import field, dataclass
 import rustworkx as rx
 import rustworkx.visualization
 from typing_extensions import (
-    Dict,
     Optional,
     Any,
     List,
@@ -17,8 +16,6 @@ from typing_extensions import (
     TypeVar,
     Type,
 )
-
-from giskardpy.motion_statechart.data_types import LifeCycleValues
 
 from coraplex.plans.plan_entity import PlanEntity
 from coraplex.plans.plan_node import (
@@ -50,18 +47,6 @@ logger = logging.getLogger(__name__)
 
 
 T = TypeVar("T")
-
-PlanNodeStateColors: Dict[LifeCycleValues, str] = {
-    LifeCycleValues.NOT_STARTED: "blue",
-    LifeCycleValues.RUNNING: "lightgreen",
-    LifeCycleValues.PAUSED: "yellow",
-    LifeCycleValues.SUCCEEDED: "green",
-    LifeCycleValues.FAILED: "red",
-    LifeCycleValues.INTERRUPTED: "orange",
-}
-"""
-The color the plan visualizer draws a node in, per state that node is in.
-"""
 
 
 @dataclass
@@ -338,7 +323,9 @@ class Plan:
         GraphVisualizerBackend.PLOTLY: InteractiveGraphVisualizer,
         GraphVisualizerBackend.CYTOSCAPE: CytoscapeGraphVisualizer,
     }
-    """The visualizer to use for each rendering backend."""
+    """
+    The visualizer to use for each rendering backend.
+    """
 
     def visualize(
         self,
@@ -348,24 +335,34 @@ class Plan:
         """
         Open an interactive, real-time visualization of the plan graph.
 
-        Nodes appear as the plan is built, are labelled by their type, coloured by execution
-        status and reveal their status and timing when clicked. With the default physics layout
-        the nodes self-organize and bounce as the plan grows.
+        Nodes appear as the plan is built, are labelled by their type, coloured by
+        execution status and reveal their status and timing when clicked. With the
+        default physics layout the nodes self-organize and bounce as the plan grows.
 
         :param backend: The rendering technology to use.
         :param layout: The algorithm used to place the nodes.
         :return: The running visualizer.
         """
-        visualizer = self._visualizer_classes[backend](
+        visualizer = self._create_visualizer(backend=backend, layout=layout)
+        visualizer.run()
+        return visualizer
+
+    def _create_visualizer(
+        self, backend: GraphVisualizerBackend, layout: GraphLayout
+    ) -> GraphVisualizerBase:
+        """
+        :param backend: The rendering technology to use.
+        :param layout: The algorithm used to place the nodes.
+        :return: A visualizer of this plan, before it is started.
+        """
+        return self._visualizer_classes[backend](
             graph=self.plan_graph,
             label_getter=lambda node: node.__node_label__(),
             information_getter=lambda node: node.__node_info__(),
-            color_getter=lambda node: PlanNodeStateColors[node.status],
+            color_getter=lambda node: node.status.color,
             layout=layout,
             title=repr(self),
         )
-        visualizer.run()
-        return visualizer
 
     def _node_details(self, node: PlanNode) -> List[str]:
         """

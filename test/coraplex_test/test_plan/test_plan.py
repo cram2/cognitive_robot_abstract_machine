@@ -4,6 +4,10 @@ import time
 import pytest
 
 from giskardpy.motion_statechart.data_types import LifeCycleValues
+from krrood.rustworkx_utils.graph_visualizer_base import (
+    GraphLayout,
+    GraphVisualizerBackend,
+)
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
@@ -19,7 +23,7 @@ from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.factories import code, sequential, parallel, execute_single
 from coraplex.plans.failures import EmptyUnderspecified
-from coraplex.plans.plan import Plan, PlanNodeStateColors
+from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import PlanNode, ActionNode
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -842,9 +846,18 @@ def test_action_nodes_unequal(immutable_model_world):
 # %% how a plan is drawn
 
 
-def test_every_state_a_plan_node_can_be_in_has_a_color():
+def test_a_plan_node_is_drawn_in_the_color_of_its_state():
     """
-    The visualizer looks a node's color up by its state, so a state without one would
-    only show up as a failure while drawing.
+    A plan is drawn in the same colors the motion statechart plots use, because both
+    read them off the state itself.
     """
-    assert set(PlanNodeStateColors) == set(LifeCycleValues)
+    node = PlanNode()
+    plan = Plan()
+    plan.add_node(node)
+    node.status = LifeCycleValues.FAILED
+
+    visualizer = plan._create_visualizer(
+        backend=GraphVisualizerBackend.CYTOSCAPE, layout=GraphLayout.LAYERED
+    )
+
+    assert visualizer.node_color(node.index) == LifeCycleValues.FAILED.color

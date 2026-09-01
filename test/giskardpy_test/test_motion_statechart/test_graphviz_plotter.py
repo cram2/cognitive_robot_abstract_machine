@@ -4,7 +4,6 @@ from typing_extensions import Optional, Set, Union
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
-    LifeCycleValues,
     ObservationStateValues,
     TransitionKind,
 )
@@ -24,13 +23,7 @@ from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
 )
 from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
 from giskardpy.motion_statechart.plotters.plot_specs import TRANSITION_SPECS
-from giskardpy.motion_statechart.plotters.styles import (
-    LifeCycleStateToColor,
-    LifeCycleStateToSymbol,
-    ObservationStateToColor,
-    ObservationStateToEdgeStyle,
-    ObservationStateToSymbol,
-)
+from giskardpy.motion_statechart.plotters.styles import ObservationStateToEdgeStyle
 
 # %% helpers
 
@@ -204,22 +197,12 @@ def test_structure_copy_keeps_plot_specs():
 # %% every state and transition has to be drawable
 
 
-@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
-def test_every_life_cycle_state_has_a_color_and_a_symbol(life_cycle_state):
-    """
-    Both lookups are total, so a state missing from either only shows up as a KeyError
-    while drawing.
-    """
-    assert life_cycle_state in LifeCycleStateToColor
-    assert life_cycle_state in LifeCycleStateToSymbol
-
-
 @pytest.mark.parametrize("observation_state", list(ObservationStateValues))
-def test_every_observation_state_has_a_color_a_symbol_and_an_edge_style(
-    observation_state,
-):
-    assert observation_state in ObservationStateToColor
-    assert observation_state in ObservationStateToSymbol
+def test_every_observation_state_has_an_edge_style(observation_state):
+    """
+    The lookup is total, so a state missing from it only shows up as a KeyError while
+    drawing an edge.
+    """
     assert observation_state in ObservationStateToEdgeStyle
 
 

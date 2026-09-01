@@ -7,10 +7,7 @@ from typing_extensions import (
     TYPE_CHECKING,
 )
 
-from giskardpy.motion_statechart.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
-)
+from giskardpy.motion_statechart.data_types import ObservationStateValues
 
 if TYPE_CHECKING:
     pass
@@ -18,7 +15,6 @@ if TYPE_CHECKING:
 NotStartedColor = "#9F9F9F"
 MyBLUE = "#0000DD"
 MyGREEN = "#006600"
-MyORANGE = "#996900"
 MyRED = "#993000"
 MyGRAY = "#E0E0E0"
 
@@ -37,8 +33,6 @@ class ConditionColors:
     ResetCondColor = ChatGPTGray
 
 
-MonitorTrueGreen = "#B6E5A0"
-MonitorFalseRed = "#FF5024"
 FONT = "sans-serif"
 LineWidth = 4
 NodeSep = 1
@@ -56,18 +50,6 @@ ConditionFont = "monospace"
 
 ResetSymbol = "⟲"
 
-ObservationStateToColor: Dict[ObservationStateValues, str] = {
-    ObservationStateValues.UNKNOWN: ConditionColors.ResetCondColor,
-    ObservationStateValues.TRUE: MonitorTrueGreen,
-    ObservationStateValues.FALSE: MonitorFalseRed,
-}
-
-ObservationStateToSymbol: Dict[ObservationStateValues, str] = {
-    ObservationStateValues.UNKNOWN: "?",
-    ObservationStateValues.TRUE: "True",
-    ObservationStateValues.FALSE: "False",
-}
-
 ObservationStateToEdgeStyle: Dict[ObservationStateValues, Dict[str, str]] = {
     ObservationStateValues.UNKNOWN: {
         "penwidth": (LineWidth * 1.5) / 2,
@@ -76,24 +58,4 @@ ObservationStateToEdgeStyle: Dict[ObservationStateValues, Dict[str, str]] = {
     },
     ObservationStateValues.TRUE: {"penwidth": LineWidth * 1.5},
     ObservationStateValues.FALSE: {"style": "dashed", "penwidth": LineWidth * 1.5},
-}
-
-LifeCycleStateToColor: Dict[LifeCycleValues, str] = {
-    LifeCycleValues.NOT_STARTED: ConditionColors.ResetCondColor,
-    LifeCycleValues.RUNNING: ConditionColors.StartCondColor,
-    LifeCycleValues.PAUSED: ConditionColors.PauseCondColor,
-    LifeCycleValues.SUCCEEDED: MonitorTrueGreen,
-    LifeCycleValues.FAILED: MonitorFalseRed,
-    LifeCycleValues.INTERRUPTED: MyORANGE,
-}
-
-LifeCycleStateToSymbol: Dict[LifeCycleValues, str] = {
-    # LifeCycleState.not_started: '○',
-    LifeCycleValues.NOT_STARTED: "—",
-    LifeCycleValues.RUNNING: "▶",
-    # LifeCycleState.paused: '⏸',
-    LifeCycleValues.PAUSED: "<B>||</B>",
-    LifeCycleValues.SUCCEEDED: "✔",
-    LifeCycleValues.FAILED: "✖",
-    LifeCycleValues.INTERRUPTED: "■",
 }

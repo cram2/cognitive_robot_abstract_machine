@@ -97,6 +97,34 @@ class LifeCycleValues(IntEnum):
             case _:
                 return cls.INTERRUPTED
 
+    @property
+    def color(self) -> str:
+        """
+        :return: The color a visualization draws a node in this state in.
+        """
+        return {
+            LifeCycleValues.NOT_STARTED: "#9CA3AF",
+            LifeCycleValues.RUNNING: "#3B82F6",
+            LifeCycleValues.PAUSED: "#EAB308",
+            LifeCycleValues.SUCCEEDED: "#28A745",
+            LifeCycleValues.FAILED: "#EF4444",
+            LifeCycleValues.INTERRUPTED: "#F97316",
+        }[self]
+
+    @property
+    def symbol(self) -> str:
+        """
+        :return: The glyph a visualization labels a node in this state with.
+        """
+        return {
+            LifeCycleValues.NOT_STARTED: "—",
+            LifeCycleValues.RUNNING: "▶",
+            LifeCycleValues.PAUSED: "<B>||</B>",
+            LifeCycleValues.SUCCEEDED: "✔",
+            LifeCycleValues.FAILED: "✖",
+            LifeCycleValues.INTERRUPTED: "■",
+        }[self]
+
 
 class FloatEnum(float, Enum):
     """
@@ -112,6 +140,28 @@ class ObservationStateValues(FloatEnum):
     FALSE = float(Scalar.const_false())
     UNKNOWN = float(Scalar.const_trinary_unknown())
     TRUE = float(Scalar.const_true())
+
+    @property
+    def color(self) -> str:
+        """
+        :return: The color a visualization draws a node observing this in.
+        """
+        return {
+            ObservationStateValues.FALSE: "#FF5024",
+            ObservationStateValues.UNKNOWN: "#8F959E",
+            ObservationStateValues.TRUE: "#B6E5A0",
+        }[self]
+
+    @property
+    def symbol(self) -> str:
+        """
+        :return: The text a visualization labels a node observing this with.
+        """
+        return {
+            ObservationStateValues.FALSE: "False",
+            ObservationStateValues.UNKNOWN: "?",
+            ObservationStateValues.TRUE: "True",
+        }[self]
 
 
 # %% life cycle predicates

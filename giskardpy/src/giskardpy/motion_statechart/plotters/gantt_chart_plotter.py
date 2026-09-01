@@ -2,15 +2,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from giskardpy.motion_statechart.plotters.styles import (
-    LifeCycleStateToColor,
-    ObservationStateToColor,
-)
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
@@ -277,7 +273,6 @@ class HistoryGanttChartPlotter:
             node_idx=node_idx,
             history=life_cycle_history,
             control_cycle_indices=control_cycle_indices,
-            color_map=LifeCycleStateToColor,
             top=True,
         )
 
@@ -311,7 +306,6 @@ class HistoryGanttChartPlotter:
             node_idx=node_idx,
             history=obs_history,
             control_cycle_indices=control_cycle_indices,
-            color_map=ObservationStateToColor,
             top=False,
         )
 
@@ -353,7 +347,7 @@ class HistoryGanttChartPlotter:
             node_idx=node_idx,
             block_start=start,
             block_width=width,
-            color=LifeCycleStateToColor[last_lifecycle],
+            color=last_lifecycle.color,
             top=True,
         )
         self._draw_block(
@@ -361,7 +355,7 @@ class HistoryGanttChartPlotter:
             node_idx=node_idx,
             block_start=start,
             block_width=width,
-            color=ObservationStateToColor[last_observation],
+            color=last_observation.color,
             top=False,
         )
 
@@ -371,13 +365,12 @@ class HistoryGanttChartPlotter:
         node_idx: int,
         history: List[LifeCycleValues | ObservationStateValues],
         control_cycle_indices: List[int],
-        color_map: Dict[LifeCycleValues | ObservationStateValues, str],
         top: bool,
     ):
         """
         Plots a bar segment corresponding to the state changes of a node as per the
         history and its associated control cycle indices. Each state transition is
-        represented as a colored block determined by the color mapping.
+        represented as a block drawn in the color of the state it stands for.
 
         :param axis: The matplotlib Axes instance where the bar will be plotted.
         :param node_idx: The index of the node for which the bar is being plotted.
@@ -385,8 +378,6 @@ class HistoryGanttChartPlotter:
             observation state of the node.
         :param control_cycle_indices: A list of indices representing the control cycles
             associated with the state transitions.
-        :param color_map: A mapping between lifecycle or observation states and their
-            associated colors used for visualization.
         :param top: Indicates if the bar is to be plotted in the upper or lower part of
             the chart.
         """
@@ -400,7 +391,7 @@ class HistoryGanttChartPlotter:
                     node_idx=node_idx,
                     block_start=start_idx * self.x_width_per_control_cycle,
                     block_width=life_cycle_width,
-                    color=color_map[current_state],
+                    color=current_state.color,
                     top=top,
                 )
                 start_idx = idx
@@ -413,7 +404,7 @@ class HistoryGanttChartPlotter:
             node_idx=node_idx,
             block_start=start_idx * self.x_width_per_control_cycle,
             block_width=life_cycle_width,
-            color=color_map[current_state],
+            color=current_state.color,
             top=top,
         )
 
