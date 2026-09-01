@@ -18,6 +18,7 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
 )
 from giskardpy.motion_statechart.exceptions import GoalWithoutChildrenError
+from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.monitors.payload_monitors import CountControlCycles
@@ -25,6 +26,7 @@ from giskardpy.motion_statechart.monitors.progress_monitors import StillProgress
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstFalseNode,
     ConstTrueNode,
+    NodeObservingNothingYet,
 )
 from semantic_digital_twin.world import World
 
@@ -226,6 +228,59 @@ def test_the_next_alternative_starts_on_the_cycle_the_previous_one_fails():
 
     assert first.life_cycle_state == LifeCycleValues.FAILED
     assert second.life_cycle_state == LifeCycleValues.RUNNING
+
+
+# %% alternatives abandoned before they observed anything
+
+
+def test_an_alternative_abandoned_undecided_hands_over_to_the_next_one():
+    """
+    An alternative that is given up on while it still observes nothing is no more use
+    than one that failed outright, so the next one has to be tried.
+    """
+    first = NodeObservingNothingYet(name="first")
+    second = ConstTrueNode(name="second")
+    goal = TryInOrder(nodes=[first, second], give_up_after=GIVE_UP_AFTER)
+    _compile_and_tick(goal, alternatives_to_abandon=1)
+
+    assert first.life_cycle_state == LifeCycleValues.INTERRUPTED
+    assert second.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert goal.observation_state == ObservationStateValues.TRUE
+
+
+def test_a_composite_alternative_that_never_arrives_hands_over_to_the_next_one():
+    """
+    An alternative built from several nodes observes nothing decisive while its steps
+    are still short of their goals, which is what it looks like when it is abandoned.
+    """
+    first = Sequence(
+        name="first",
+        nodes=[ConstFalseNode(name="stuck step"), ConstTrueNode(name="unreached step")],
+    )
+    fallback = ConstTrueNode(name="fallback")
+    goal = TryInOrder(nodes=[first, fallback], give_up_after=GIVE_UP_AFTER)
+    _compile_and_tick(goal, alternatives_to_abandon=1)
+
+    assert first.life_cycle_state == LifeCycleValues.INTERRUPTED
+    assert fallback.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert goal.observation_state == ObservationStateValues.TRUE
+
+
+def test_the_goal_fails_once_every_alternative_was_abandoned():
+    """
+    Giving up on the last alternative decides the goal, instead of leaving whoever waits
+    for it waiting forever.
+    """
+    goal = TryInOrder(
+        nodes=[
+            NodeObservingNothingYet(name="first"),
+            NodeObservingNothingYet(name="second"),
+        ],
+        give_up_after=GIVE_UP_AFTER,
+    )
+    _compile_and_tick(goal, alternatives_to_abandon=2)
+
+    assert goal.observation_state == ObservationStateValues.FALSE
 
 
 # %% goals built without children

@@ -4,8 +4,9 @@ import time
 import numpy as np
 import pytest
 
+from giskardpy.motion_statechart.data_types import LifeCycleValues
+
 from coraplex.datastructures.enums import (
-    TaskStatus,
     MonitorBehavior,
     DetectionTechnique,
 )
@@ -177,7 +178,7 @@ def test_perform_parallel(immutable_model_world):
     plan.validate()
 
     for node in plan.nodes:
-        assert node.status == TaskStatus.SUCCEEDED
+        assert node.status == LifeCycleValues.SUCCEEDED
 
 
 def test_perform_repeat(immutable_model_world):
@@ -215,7 +216,7 @@ def test_exception_sequential(immutable_model_world):
     with pytest.raises(PlanFailure):
         perform_plan()
     assert len(plan.root.children) == 2
-    assert plan.root.status == TaskStatus.FAILED
+    assert plan.root.status == LifeCycleValues.FAILED
 
 
 def test_exception_try_in_order(immutable_model_world):
@@ -231,7 +232,7 @@ def test_exception_try_in_order(immutable_model_world):
     with simulated_robot:
         _ = plan.perform()
     assert len(plan.root.children) == 2
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
 
 
 def test_exception_try_all(immutable_model_world):
@@ -248,7 +249,7 @@ def test_exception_try_all(immutable_model_world):
         _ = plan.perform()
 
     assert type(plan.root) is TryAllNode
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
 
 
 def test_monitor_resume(immutable_model_world):
@@ -272,4 +273,4 @@ def test_monitor_resume(immutable_model_world):
         plan.perform()
     assert len(plan.root.children) == 1
     assert isinstance(plan.root, MonitorNode)
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED

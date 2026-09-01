@@ -6,10 +6,13 @@ from typing import List
 from typing_extensions import Optional
 
 from krrood.symbolic_math.symbolic_math import (
+    Scalar,
+    trinary_logic_and,
     trinary_logic_not,
     trinary_logic_or,
 )
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.graph_node import (
     Goal,
     MotionStatechartNode,
@@ -61,10 +64,10 @@ class TryInOrder(Goal):
     Takes a list of nodes and tries them one after another, short-circuiting on the
     first success.
 
-    The next alternative only starts once the previous one has actually failed, not
-    merely while it is still short of its goal. Its observation turns True as soon as an
-    alternative succeeds and False only once every one of them has failed, so it stays
-    unknown while any of them is still being tried.
+    The next alternative only starts once the previous one has ended without reaching
+    its goal, not merely while it is still short of it. Its observation turns True as
+    soon as an alternative succeeds and False only once every one of them is over, so it
+    stays unknown while any of them is still being tried.
     """
 
     nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
@@ -87,7 +90,7 @@ class TryInOrder(Goal):
     def expand(self, context: MotionStatechartContext) -> None:
         """
         Add the child nodes and wire them so each one starts only after the previous one
-        failed, short-circuiting on the first success.
+        ended without reaching its goal, short-circuiting on the first success.
 
         An alternative is ended once it reaches its goal or once it stops making
         progress; which of the two happened is decided by what the alternative observes
@@ -103,7 +106,7 @@ class TryInOrder(Goal):
         for node in self._alternatives:
             self.add_node(node)
             if previous_node is not None:
-                node.start_condition = previous_node.is_failed
+                node.start_condition = self._ended_without_succeeding(previous_node)
             still_progressing = StillProgressing(
                 name=f"{self.name}/progress_of_{node.name}",
                 monitored_node=node,
@@ -118,13 +121,42 @@ class TryInOrder(Goal):
             )
             previous_node = node
 
+    @staticmethod
+    def _ended_without_succeeding(node: MotionStatechartNode) -> Scalar:
+        """
+        An alternative abandoned while it observed nothing decisive is of no more use
+        than one that failed outright, so both count as ended without success.
+
+        :param node: The alternative to judge.
+        :return: True once that alternative ended anywhere but at its goal.
+        """
+        return trinary_logic_or(node.is_failed, node.is_interrupted)
+
+    @staticmethod
+    def _reached_its_goal(node: MotionStatechartNode) -> Scalar:
+        """
+        Whether an alternative is at its goal, answering false rather than unknown for
+        one that was abandoned before it ever got there.
+
+        .. note:: An observation may not read a life cycle predicate, so being abandoned
+            is read off the life cycle state itself.
+
+        :param node: The alternative to read.
+        :return: What that alternative observes while it runs, and whether it reached
+            its goal once it has ended.
+        """
+        was_abandoned = Scalar(
+            node.life_cycle_variable == int(LifeCycleValues.INTERRUPTED)
+        )
+        return trinary_logic_and(node.goal_reached, trinary_logic_not(was_abandoned))
+
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Build an observation that is True as soon as any alternative succeeded, and
-        False only once every one of them failed.
+        False only once every one of them is over without one having succeeded.
         """
         return NodeArtifacts(
             observation=trinary_logic_or(
-                *[node.goal_reached for node in self._alternatives]
+                *[self._reached_its_goal(node) for node in self._alternatives]
             ),
         )

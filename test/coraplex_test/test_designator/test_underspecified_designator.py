@@ -3,11 +3,12 @@ from krrood.entity_query_language.backends import (
     ProbabilisticBackend,
 )
 from krrood.entity_query_language.factories import a, an, variable_from
+from giskardpy.motion_statechart.data_types import LifeCycleValues
+
 from coraplex.datastructures.enums import (
     Arms,
     ApproachDirection,
     VerticalAlignment,
-    TaskStatus,
 )
 from coraplex.datastructures.grasp import GraspDescription
 
@@ -43,7 +44,7 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
     with simulated_robot:
         plan.perform()
 
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
     candidate = plan.root.children[0]
     assert isinstance(candidate.designator, NavigateAction)
     assert plan.root.parse() is not None
@@ -81,7 +82,7 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
     with simulated_robot:
         plan.perform()
 
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
     candidate = plan.root.children[-1]
     assert isinstance(candidate.designator, NavigateAction)
     assert plan.root.parse() is not None

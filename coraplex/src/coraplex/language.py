@@ -16,6 +16,7 @@ from typing_extensions import (
     Type,
 )
 
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import Goal
 from coraplex.language_giskard_templates import TryAll, TryInOrder
@@ -23,7 +24,7 @@ from coraplex.plans.executables import (
     GiskardExecutable,
     Executable,
 )
-from coraplex.datastructures.enums import TaskStatus, MonitorBehavior
+from coraplex.datastructures.enums import MonitorBehavior
 from coraplex.plans.failures import PlanFailure, AllChildrenFailed
 from coraplex.fluent import Fluent
 from coraplex.plans.plan_node import PlanNode, ExecutionBoundaryNode
@@ -152,7 +153,7 @@ class ParallelNode(ExecutesInParallel):
     def notify(self):
         self._perform_parallel(self.children)
         for child in self.children:
-            if child.status == TaskStatus.FAILED:
+            if child.status == LifeCycleValues.FAILED:
                 raise child.reason
 
 
@@ -250,7 +251,9 @@ class TryInOrderNode(ExecutesSequentially):
                 child.perform()
             except PlanFailure:
                 continue
-        failed = all([child.status == TaskStatus.FAILED for child in self.children])
+        failed = all(
+            [child.status == LifeCycleValues.FAILED for child in self.children]
+        )
         if failed:
             raise AllChildrenFailed(self)
 
@@ -267,7 +270,9 @@ class TryAllNode(ExecutesInParallel):
 
     def notify(self):
         self._perform_parallel(self.children)
-        failed = all([child.status == TaskStatus.FAILED for child in self.children])
+        failed = all(
+            [child.status == LifeCycleValues.FAILED for child in self.children]
+        )
         if failed:
             raise AllChildrenFailed(self)
 

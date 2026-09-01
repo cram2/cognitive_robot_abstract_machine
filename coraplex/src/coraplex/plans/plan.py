@@ -7,6 +7,7 @@ from dataclasses import field, dataclass
 import rustworkx as rx
 import rustworkx.visualization
 from typing_extensions import (
+    Dict,
     Optional,
     Any,
     List,
@@ -16,6 +17,8 @@ from typing_extensions import (
     TypeVar,
     Type,
 )
+
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 
 from coraplex.plans.plan_entity import PlanEntity
 from coraplex.plans.plan_node import (
@@ -47,6 +50,18 @@ logger = logging.getLogger(__name__)
 
 
 T = TypeVar("T")
+
+PlanNodeStateColors: Dict[LifeCycleValues, str] = {
+    LifeCycleValues.NOT_STARTED: "blue",
+    LifeCycleValues.RUNNING: "lightgreen",
+    LifeCycleValues.PAUSED: "yellow",
+    LifeCycleValues.SUCCEEDED: "green",
+    LifeCycleValues.FAILED: "red",
+    LifeCycleValues.INTERRUPTED: "orange",
+}
+"""
+The color the plan visualizer draws a node in, per state that node is in.
+"""
 
 
 @dataclass
@@ -345,7 +360,7 @@ class Plan:
             graph=self.plan_graph,
             label_getter=lambda node: node.__node_label__(),
             information_getter=lambda node: node.__node_info__(),
-            color_getter=lambda node: node.status.color.replace("-", ""),
+            color_getter=lambda node: PlanNodeStateColors[node.status],
             layout=layout,
             title=repr(self),
         )

@@ -9,7 +9,6 @@ before committing an intentional wording change.
 
 from __future__ import annotations
 
-from krrood.entity_query_language.testing.result_verification import VerbalizationResult
 from krrood.entity_query_language.factories import (
     AttributeOwnerClass,
     IsClass,
@@ -22,6 +21,7 @@ from krrood.entity_query_language.factories import (
     RuntimeType,
 )
 from krrood.entity_query_language.predicate import HasType, HasTypes, Is, Length
+from krrood.entity_query_language.testing.result_verification import VerbalizationResult
 from krrood.entity_query_language.verbalization._example_domain import (
     IsReachable,
     WorksIn,

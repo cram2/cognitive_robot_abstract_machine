@@ -5,9 +5,6 @@ Module holding all enums of CoraPlex.
 from __future__ import annotations
 
 from enum import Enum, auto, IntEnum
-from functools import cached_property
-
-from giskardpy.motion_statechart.data_types import LifeCycleValues
 
 
 class VisualizationLayout(Enum):
@@ -106,48 +103,6 @@ class Arms(IntEnum):
 
     def __repr__(self):
         return self.name
-
-
-class TaskStatus(int, Enum):
-    """
-    Enum for readable descriptions of a tasks' status.
-    """
-
-    CREATED = 0
-    RUNNING = 1
-    SUCCEEDED = 2
-    FAILED = 3
-    INTERRUPTED = 4
-    PAUSE = 5
-
-    @cached_property
-    def color(self) -> str:
-        """
-        :return: The color used to render this status in visualizations.
-        """
-        return {
-            TaskStatus.CREATED: "blue",
-            TaskStatus.RUNNING: "light-green",
-            TaskStatus.SUCCEEDED: "green",
-            TaskStatus.FAILED: "red",
-            TaskStatus.INTERRUPTED: "orange",
-            TaskStatus.PAUSE: "yellow",
-        }[self]
-
-    @classmethod
-    def from_life_cycle_state(cls, life_cycle_state: LifeCycleValues) -> TaskStatus:
-        """
-        :param life_cycle_state: The life cycle state of a motion statechart node.
-        :return: The status that state stands for.
-        """
-        return {
-            LifeCycleValues.NOT_STARTED: cls.CREATED,
-            LifeCycleValues.RUNNING: cls.RUNNING,
-            LifeCycleValues.PAUSED: cls.PAUSE,
-            LifeCycleValues.SUCCEEDED: cls.SUCCEEDED,
-            LifeCycleValues.FAILED: cls.FAILED,
-            LifeCycleValues.INTERRUPTED: cls.INTERRUPTED,
-        }[life_cycle_state]
 
 
 class JointType(Enum):

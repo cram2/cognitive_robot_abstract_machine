@@ -3,6 +3,8 @@ import time
 
 import pytest
 
+from giskardpy.motion_statechart.data_types import LifeCycleValues
+
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     ApproachDirection,
@@ -17,7 +19,7 @@ from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.factories import code, sequential, parallel, execute_single
 from coraplex.plans.failures import EmptyUnderspecified
-from coraplex.plans.plan import Plan
+from coraplex.plans.plan import Plan, PlanNodeStateColors
 from coraplex.plans.plan_node import PlanNode, ActionNode
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -835,3 +837,14 @@ def test_action_nodes_unequal(immutable_model_world):
     pick_node = plan.children[1]
 
     assert not park_node == pick_node
+
+
+# %% how a plan is drawn
+
+
+def test_every_state_a_plan_node_can_be_in_has_a_color():
+    """
+    The visualizer looks a node's color up by its state, so a state without one would
+    only show up as a failure while drawing.
+    """
+    assert set(PlanNodeStateColors) == set(LifeCycleValues)

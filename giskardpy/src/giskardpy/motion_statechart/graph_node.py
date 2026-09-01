@@ -1381,7 +1381,7 @@ class MotionStatechartNode:
     @property
     def is_interrupted(self) -> LifeCyclePredicateVariable:
         """
-        :return: True if this node was cut off by an ancestor ending, false if it ended
+        :return: True if this node ended without earning a verdict, false if it ended
             any other way, and unknown until it ends.
         """
         return self._life_cycle_predicate(LifeCyclePredicate.IS_INTERRUPTED)
