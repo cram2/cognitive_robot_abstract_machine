@@ -171,7 +171,7 @@ def test_pouring_action_poses_tilt_and_mirror(tool_action_world):
 
     right_action = PouringAction(
         target_container=container,
-        source_container=cup,
+        tool=cup,
         arm=Arms.RIGHT,
     )
     sequential([right_action], context)
@@ -190,7 +190,7 @@ def test_pouring_action_poses_tilt_and_mirror(tool_action_world):
 
     left_action = PouringAction(
         target_container=container,
-        source_container=cup,
+        tool=cup,
         arm=Arms.RIGHT,
         pour_side=Arms.LEFT,
     )
@@ -242,9 +242,7 @@ def test_pouring_action_pour_point_lands_on_target_container_center(
     )
     cup = PouringCup(root=held_source)
 
-    action = PouringAction(
-        target_container=container, source_container=cup, arm=Arms.RIGHT
-    )
+    action = PouringAction(target_container=container, tool=cup, arm=Arms.RIGHT)
     sequential([action], context)
     _, pour_pose = action._pour_poses()
 

@@ -444,9 +444,9 @@ def test_detection_corrects_a_grasp_planned_before_it(immutable_model_world):
 
     plan = execute_single(
         PickUpAction(
-            milk,
-            Arms.RIGHT,
-            GraspDescription(
+            target_object=milk,
+            arm=Arms.RIGHT,
+            grasp_description=GraspDescription(
                 ApproachDirection.FRONT,
                 VerticalAlignment.NoAlignment,
                 view.right_arm.end_effector,
@@ -456,7 +456,7 @@ def test_detection_corrects_a_grasp_planned_before_it(immutable_model_world):
     )
     plan.notify()
     targets = [
-        node.designator.target
+        node.designator.target_pose
         for node in plan.descendants
         if isinstance(node, MotionNode)
         and isinstance(node.designator, MoveToolCenterPointMotion)

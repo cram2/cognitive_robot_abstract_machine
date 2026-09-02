@@ -26,7 +26,7 @@ class HSRBMoveMotion(MoveMotion, AlternativeMotion[HSRB]):
     @property
     def _motion_chart(self) -> NavigateActionServerTask:
         return NavigateActionServerTask(
-            target_pose=self.target,
+            target_pose=self.target_location,
             base_link=self.robot.root,
             action_topic="/hsrb/move_base",
             message_type=NavigateToPose,

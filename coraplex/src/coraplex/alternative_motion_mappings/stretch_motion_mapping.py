@@ -53,7 +53,7 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
     @property
     def _motion_chart(self) -> Sequence:
         tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
-        goal_copy = deepcopy(self.target)
+        goal_copy = deepcopy(self.target_pose)
         goal_copy = self.world.transform(goal_copy, self.world.root)
         goal_point = goal_copy.to_position()
         goal_point.z = 0
@@ -72,7 +72,7 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
                         CartesianPoseStraight(
                             root_link=self.world.root,
                             tip_link=tip,
-                            goal_pose=self.target,
+                            goal_pose=self.target_pose,
                         ),
                         LocalMinimumReached(joint_convergence_threshold=0.025),
                     ],
@@ -95,7 +95,7 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
 
     @property
     def _motion_chart(self):
-        world_T_target = self.world.transform(self.target, self.world.root)
+        world_T_target = self.world.transform(self.target_location, self.world.root)
         world_T_target.z = 0
         return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.01)
 
@@ -113,12 +113,12 @@ class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
 
     @property
     def _motion_chart(self) -> DifferentialDriveBaseGoal:
-        world_T_target = self.world.transform(self.target, self.world.root)
+        world_T_target = self.world.transform(self.target_location, self.world.root)
         world_T_target.z = 0
         return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.1)
         # Commented out for now since we use the giskard goal which also works for smaller distances
         # return NavigateActionServerTask(
-        #     target_pose=self.target,
+        #     target_pose=self.target_location,
         #     base_link=self.robot.root,
         #     action_topic="/navigate_to_pose",
         #     message_type=NavigateToPose,
@@ -143,17 +143,17 @@ class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):
         tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
         cart = CartesianPose(
             name="Keep holding handle",
-            root_link=self.object_part,
+            root_link=self.handle.root,
             tip_link=tip,
             goal_pose=Pose(reference_frame=tip),
         )
         align = AlignPlanes(
             root_link=self.world.root,
             tip_link=self.robot.root,
-            goal_normal=Vector3(1, 0, 0, reference_frame=self.object_part),
+            goal_normal=Vector3(1, 0, 0, reference_frame=self.handle.root),
             tip_normal=Vector3(0, -1, 0, self.robot.root),
         )
-        close = Close(tip_link=tip, environment_link=self.object_part)
+        close = Close(tip_link=tip, environment_link=self.handle.root)
         return Parallel([cart, align, close])
 
 

@@ -18,12 +18,12 @@ from coraplex.plans.executables import (
     GiskardExecutable,
     UnderspecifiedExecutable,
 )
-from coraplex.plans.failures import PlanFailure
+from coraplex.plans.failures import MotionDidNotFinish, PlanFailure
 from coraplex.plans.plan_entity import PlanEntity
 from coraplex.utils import split_list_by_type
 
 if TYPE_CHECKING:
-    from giskardpy.motion_statechart.graph_node import Task
+    from giskardpy.motion_statechart.graph_node import MotionStatechartNode, Task
     from coraplex.robot_plans.actions.base import ActionDescription
     from coraplex.robot_plans.motions.base import BaseMotion
 
@@ -119,6 +119,17 @@ class PlanNode(PlanEntity):
             result.append(node)
             queue.extend(node.children)
 
+        return result
+
+    @property
+    def subtree(self) -> List[PlanNode]:
+        """
+        :return: This node followed by everything below it in depth-first order, which
+            is the order in which a plan executes its nodes.
+        """
+        result = [self]
+        for child in self.children:
+            result.extend(child.subtree)
         return result
 
     @property
@@ -266,26 +277,77 @@ class PlanNode(PlanEntity):
     def is_paused(self) -> bool:
         return any(parent.status == TaskStatus.PAUSE for parent in [self] + self.path)
 
+    def handle_failure(self, failure: PlanFailure) -> None:
+        """
+        Deal with a failure that occurred at this node.
+
+        The context's failure handler decides once per failure how execution continues;
+        the resolution then interprets itself at this node. Returning means the failure
+        was dealt with and the work can be run again, raising means no node up to the
+        root of the plan could deal with it.
+
+        The resolution is stamped onto the failure that escalates (by
+        :meth:`~coraplex.failure_handling.failure_handling_strategy.FailureResolution.propagate`),
+        not here, so the resolution stays with exactly one failure object.
+
+        :param failure: The failure that occurred at this node.
+        """
+        resolution = failure.resolution
+        if resolution is None:
+            resolution = self.plan.context.failure_handler.handle(failure)
+        resolution.apply(self)
+
+    def escalate(self, failure: PlanFailure) -> None:
+        """
+        Hand a failure this node could not deal with to the node above it.
+
+        Escalation follows the plan tree rather than the call stack, because most nodes
+        run inside an enclosing node's merged execution list and never get a perform
+        frame of their own.
+
+        :param failure: The failure this node could not deal with.
+        :raises PlanFailure: When this node is the root, so the failure leaves the plan.
+        """
+        if self.parent is None:
+            raise failure
+        self.parent.handle_failure(failure)
+
+    @property
+    def parent_action_node(self) -> Optional[ActionNode]:
+        """
+        :return: The nearest :class:`ActionNode` above this node, or None if there is
+            none.
+        """
+        for node in self.path:
+            if isinstance(node, ActionNode):
+                return node
+        return None
+
     def perform(self):
         """
         Perform the node and update the fields of this node.
-        """
-        for parent in self.path:
-            if parent.status == TaskStatus.INTERRUPTED:
-                self.status = TaskStatus.INTERRUPTED
-                return
 
-        self.status = TaskStatus.RUNNING
-        try:
-            self.notify()
-            self.result = self.parse().execute()
-        except PlanFailure as e:
-            self.status = TaskStatus.FAILED
-            self.reason = e
-            raise e
-        finally:
-            self.end_time = datetime.now()
-        self.status = TaskStatus.SUCCEEDED
+        A raised :class:`~coraplex.plans.failures.PlanFailure` is handed to the node it
+        occurred at, which either deals with it - in which case the work is run again -
+        or escalates it along the plan tree until it leaves the plan.
+        """
+        while True:
+            for parent in self.path:
+                if parent.status == TaskStatus.INTERRUPTED:
+                    self.status = TaskStatus.INTERRUPTED
+                    return
+
+            self.status = TaskStatus.RUNNING
+            try:
+                self.notify()
+                self.result = self.parse().execute()
+            except PlanFailure as failure:
+                failure.node.handle_failure(failure)
+                continue
+            finally:
+                self.end_time = datetime.now()
+            self.status = TaskStatus.SUCCEEDED
+            return
 
     def mount_subplan(self, root: PlanNode):
         """
@@ -599,17 +661,6 @@ class ActionNode(DesignatorNode):
             ]
         )
 
-    @property
-    def parent_action_node(self) -> Optional[ActionNode]:
-        """
-        Returns the next action node in the plan above this node, None if this is the
-        outermost action.
-        """
-        for node in self.path:
-            if isinstance(node, ActionNode):
-                return node
-        return None
-
     def notify(self):
 
         self.create_execution_data_pre_perform()
@@ -688,15 +739,16 @@ class MotionNode(DesignatorNode):
         pass
         # return self.motion.perform()
 
-    @property
-    def parent_action_node(self) -> Optional[ActionNode]:
+    def did_not_finish_failure(
+        self, failed_motions: List[MotionStatechartNode]
+    ) -> MotionDidNotFinish:
         """
-        Returns the next resolved action node in the plan above this motion node.
+        :param failed_motions: The motion state chart nodes that did not reach their
+            goal.
+        :return: The failure describing that this motion did not finish, attributed to
+            this node so it can be handled where it occurred.
         """
-        for node in self.path:
-            if isinstance(node, ActionNode):
-                return node
-        return None
+        return MotionDidNotFinish(node=self, failed_motions=failed_motions)
 
     def parse(self) -> Executable:
         task = self.motion.motion_chart

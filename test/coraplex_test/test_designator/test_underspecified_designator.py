@@ -17,6 +17,7 @@ from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
@@ -117,7 +118,7 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
             a(PickUpAction)(
                 arm=...,
                 grasp_description=grasp_description,
-                object_designator=world.get_body_by_name("milk.stl"),
+                target_object=world.get_semantic_annotations_by_type(Milk)[0],
             ),
         ],
         context=context,

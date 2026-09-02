@@ -63,6 +63,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
     Milk,
     Spoon,
 )
@@ -265,7 +266,7 @@ def mutable_multiple_robot_apartment(setup_multi_robot_apartment):
 
 def test_move_torso_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
-    plan = execute_single(MoveTorsoAction(TorsoState.HIGH), context=context)
+    plan = execute_single(MoveTorsoAction(torso_state=TorsoState.HIGH), context=context)
     with simulated_robot:
         plan.perform()
 
@@ -281,7 +282,9 @@ def test_navigate_multi(immutable_multiple_robot_apartment, rclpy_node):
 
     plan = execute_single(
         NavigateAction(
-            Pose(Point3.from_iterable(target_position), reference_frame=world.root)
+            target_location=Pose(
+                Point3.from_iterable(target_position), reference_frame=world.root
+            )
         ),
         context=context,
     )
@@ -302,7 +305,9 @@ def test_navigate_multi(immutable_multiple_robot_apartment, rclpy_node):
 def test_move_gripper_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
 
-    plan = execute_single(SetGripperAction(Arms.LEFT, GripperState.OPEN), context)
+    plan = execute_single(
+        SetGripperAction(arm=Arms.LEFT, motion=GripperState.OPEN), context
+    )
 
     with simulated_robot:
         plan.perform()
@@ -314,7 +319,9 @@ def test_move_gripper_multi(immutable_multiple_robot_apartment):
     for connection, target in open_state.items():
         assert connection.position == pytest.approx(target, abs=0.02)
 
-    plan = execute_single(SetGripperAction(Arms.LEFT, GripperState.CLOSE), context)
+    plan = execute_single(
+        SetGripperAction(arm=Arms.LEFT, motion=GripperState.CLOSE), context
+    )
 
     with simulated_robot:
         plan.perform()
@@ -325,7 +332,7 @@ def test_move_gripper_multi(immutable_multiple_robot_apartment):
 
 def test_park_arms_multi(immutable_multiple_robot_apartment):
     world, robot, context = immutable_multiple_robot_apartment
-    description = ParkArmsAction(Arms.BOTH)
+    description = ParkArmsAction(arm=Arms.BOTH)
     plan = execute_single(description, context)
     assert description.arm == Arms.BOTH
     with simulated_robot:
@@ -369,12 +376,12 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(arm=Arms.BOTH),
             ReachAction(
                 target_pose=Pose(
                     Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root
                 ),
-                object_designator=milk,
+                target_object=milk,
                 arm=Arms.LEFT,
                 grasp_description=grasp_description,
             ),
@@ -441,8 +448,8 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
     waypoints = PoseTrajectory([target_pose])
     plan = sequential(
         [
-            MoveTorsoAction(TorsoState.HIGH),
-            ParkArmsAction(Arms.BOTH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+            ParkArmsAction(arm=Arms.BOTH),
             FollowToolCenterPointPathAction(arm=Arms.LEFT, target_locations=waypoints),
         ],
         context,
@@ -465,7 +472,9 @@ def test_grasping(immutable_multiple_robot_apartment):
         left_arm.end_effector,
     )
     grasping_action = GraspingAction(
-        world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
+        arm=Arms.LEFT,
+        grasp_description=grasp_description,
     )
 
     milk_body = world.get_body_by_name("milk.stl")
@@ -479,7 +488,7 @@ def test_grasping(immutable_multiple_robot_apartment):
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(arm=Arms.BOTH),
             grasping_action,
         ],
         context,
@@ -515,11 +524,11 @@ def test_pick_up_multi(mutable_multiple_robot_apartment, rclpy_node):
 
     root = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(arm=Arms.BOTH),
             PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                grasp_description,
+                target_object=world.get_semantic_annotations_by_type(Milk)[0],
+                arm=Arms.LEFT,
+                grasp_description=grasp_description,
             ),
         ],
         context,
@@ -567,16 +576,18 @@ def test_place_multi(mutable_multiple_robot_apartment):
 
     root = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(arm=Arms.BOTH),
             PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                grasp_description,
+                target_object=world.get_semantic_annotations_by_type(Milk)[0],
+                arm=Arms.LEFT,
+                grasp_description=grasp_description,
             ),
             PlaceAction(
-                world.get_body_by_name("milk.stl"),
-                Pose(Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root),
-                Arms.LEFT,
+                target_object=world.get_semantic_annotations_by_type(Milk)[0],
+                target_location=Pose(
+                    Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root
+                ),
+                arm=Arms.LEFT,
             ),
         ],
         context,
@@ -601,10 +612,10 @@ def test_place_multi(mutable_multiple_robot_apartment):
 def test_look_at(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
     description = LookAtAction(
-        Pose(Point3.from_iterable([3, 0, 1]), reference_frame=world.root)
+        look_at_target=Pose(Point3.from_iterable([3, 0, 1]), reference_frame=world.root)
     )
     assert np.allclose(
-        description.target.to_np(),
+        description.look_at_target.to_np(),
         Pose(Point3.from_iterable([3, 0, 1]), reference_frame=world.root).to_np(),
         atol=1e-3,
     )
@@ -653,16 +664,19 @@ def test_open(immutable_multiple_robot_apartment):
 
     plan = sequential(
         [
-            MoveTorsoAction(TorsoState.HIGH),
-            ParkArmsAction(Arms.BOTH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+            ParkArmsAction(arm=Arms.BOTH),
             NavigateAction(
-                Pose(
+                target_location=Pose(
                     Point3.from_iterable([1.6, 1.9, 0]),
                     Quaternion.from_iterable([0, 0, 0.3, 1]),
                     reference_frame=world.root,
                 )
             ),
-            OpenAction(world.get_body_by_name("handle_cab10_m"), Arms.LEFT),
+            OpenAction(
+                handle=Handle(root=world.get_body_by_name("handle_cab10_m")),
+                arm=Arms.LEFT,
+            ),
         ],
         context,
     )
@@ -679,23 +693,23 @@ def test_close(immutable_multiple_robot_apartment, rclpy_node):
     world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.3
     world.notify_state_change()
 
-    handle = world.get_body_by_name("handle_cab10_m")
+    handle_body = world.get_body_by_name("handle_cab10_m")
     navigate_position = (
         [1.5, 1.85, 0] if isinstance(robot, (Tiago, Stretch)) else [1.65, 2.0, 0]
     )
 
     plan = sequential(
         [
-            MoveTorsoAction(TorsoState.HIGH),
-            ParkArmsAction(Arms.BOTH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+            ParkArmsAction(arm=Arms.BOTH),
             NavigateAction(
-                heading_towards(
+                target_location=heading_towards(
                     navigate_position,
-                    handle.global_pose.to_position().to_np(),
+                    handle_body.global_pose.to_position().to_np(),
                     world,
                 )
             ),
-            CloseAction(handle, Arms.LEFT),
+            CloseAction(handle=Handle(root=handle_body), arm=Arms.LEFT),
         ],
         context,
     )
@@ -711,7 +725,9 @@ def test_facing(immutable_multiple_robot_apartment):
 
     with simulated_robot:
         milk_pose = world.get_body_by_name("milk.stl").global_pose
-        plan = execute_single(FaceAtAction(milk_pose, True), context)
+        plan = execute_single(
+            FaceAtAction(look_at_target=milk_pose, keep_joint_states=True), context
+        )
         plan.perform()
         milk_in_base_frame = world.transform(
             world.get_body_by_name("milk.stl").global_transform,
@@ -732,7 +748,7 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = mutable_multiple_robot_apartment
 
     description = TransportAction(
-        object_designator=world.get_semantic_annotations_by_type(Milk)[0],
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
         target_location=Pose(
             Point3.from_iterable([3.1, 2.2, 0.95]),
             Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
@@ -745,7 +761,9 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
             ViewManager.get_end_effector_view(Arms.RIGHT, robot),
         ),
     )
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], context)
+    plan = sequential(
+        [MoveTorsoAction(torso_state=TorsoState.HIGH), description], context
+    )
     with simulated_robot:
         plan.perform()
     milk_position = world.get_body_by_name("milk.stl").global_transform.to_np()[:3, 3]
@@ -782,7 +800,7 @@ def test_transport_open_container(mutable_multiple_robot_apartment, rclpy_node):
     if isinstance(robot, HSRB):
         return
     description = TransportAction(
-        object_designator=world.get_semantic_annotations_by_type(Spoon)[0],
+        target_object=world.get_semantic_annotations_by_type(Spoon)[0],
         target_location=Pose.from_xyz_rpy(
             5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root
         ),
@@ -794,7 +812,11 @@ def test_transport_open_container(mutable_multiple_robot_apartment, rclpy_node):
         ),
     )
     plan = sequential(
-        [MoveTorsoAction(TorsoState.HIGH), ParkArmsAction(Arms.BOTH), description],
+        [
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+            ParkArmsAction(arm=Arms.BOTH),
+            description,
+        ],
         context,
     )
     with simulated_robot:

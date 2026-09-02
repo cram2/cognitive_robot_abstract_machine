@@ -16,8 +16,8 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 def test_ref_chain_after_copy(immutable_model_world):
@@ -38,7 +38,13 @@ def test_ref_chain_after_copy_with_execute(immutable_model_world):
     )
 
     plan = sequential(
-        [NavigateAction(Pose.from_xyz_rpy(1, -1, 0, reference_frame=copy_world.root))],
+        [
+            NavigateAction(
+                target_location=Pose.from_xyz_rpy(
+                    1, -1, 0, reference_frame=copy_world.root
+                )
+            )
+        ],
         copy_context,
     )
 
@@ -60,16 +66,20 @@ def test_ref_chain_after_copy_with_execute_complex_plan(mutable_model_world):
     )
 
     description = TransportAction(
-        copy_world.get_semantic_annotations_by_type(Milk)[0],
-        Pose.from_xyz_quaternion(3.1, 2.2, 0.95, 0.0, 0.0, 1.0, 0.0, world.root),
-        Arms.RIGHT,
-        GraspDescription(
+        target_object=copy_world.get_semantic_annotations_by_type(Milk)[0],
+        target_location=Pose.from_xyz_quaternion(
+            3.1, 2.2, 0.95, 0.0, 0.0, 1.0, 0.0, world.root
+        ),
+        arm=Arms.RIGHT,
+        grasp_description=GraspDescription(
             ApproachDirection.RIGHT,
             VerticalAlignment.NoAlignment,
             copy_robot.right_arm.end_effector,
         ),
     )
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], copy_context)
+    plan = sequential(
+        [MoveTorsoAction(torso_state=TorsoState.HIGH), description], copy_context
+    )
     with simulated_robot:
         plan.perform()
 

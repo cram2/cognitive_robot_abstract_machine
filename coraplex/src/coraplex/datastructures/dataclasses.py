@@ -17,6 +17,7 @@ from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
 )
 from krrood.class_diagrams.mocking import MockedClass, MockedModule
+from coraplex.failure_handling.failure_handler import FailureHandler
 from krrood.utils import memoize
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_entity import PlanEntity
@@ -107,6 +108,15 @@ class Context(PlanEntity):
     A motion is replaced by an alternative motion from this list if the alternative
     matches the motion type, the robot and the current execution type. If empty, motions
     use their default motion chart.
+    """
+
+    failure_handler: FailureHandler = field(default_factory=FailureHandler.baseline)
+    """
+    The handler execution consults when a node performed in this context fails.
+
+    Defaults to the baseline handler, which reproduces the pre-failure-handling
+    semantics: re-parameterize under the nearest underspecified ancestor, propagate
+    otherwise.
     """
 
     _debug: bool = field(default=False)

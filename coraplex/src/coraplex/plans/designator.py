@@ -81,5 +81,7 @@ class Designator:
 
         :return:
         """
-        global_namespace = sys.modules[cls.__module__].__dict__
+        global_namespace: Dict[str, Any] = {}
+        for klass in reversed(cls.__mro__):
+            global_namespace.update(vars(sys.modules[klass.__module__]))
         return get_type_hints(cls.__init__, globalns=global_namespace)

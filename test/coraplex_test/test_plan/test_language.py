@@ -38,8 +38,8 @@ from semantic_digital_twin.robots.pr2 import PR2Joint
 
 
 def test_factory_construction():
-    act = NavigateAction(Pose())
-    act2 = MoveTorsoAction(TorsoState.HIGH)
+    act = NavigateAction(target_location=Pose())
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(DetectionTechnique.TYPES)
 
     root = sequential([act, act2, act3])
@@ -48,8 +48,8 @@ def test_factory_construction():
 
 
 def test_simplify_tree():
-    act = NavigateAction(Pose())
-    act2 = MoveTorsoAction(TorsoState.HIGH)
+    act = NavigateAction(target_location=Pose())
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(DetectionTechnique.TYPES)
     act4 = DetectAction(DetectionTechnique.TYPES)
 
@@ -60,8 +60,8 @@ def test_simplify_tree():
 
 
 def test_parallel_construction():
-    act = NavigateAction(Pose())
-    act2 = MoveTorsoAction(TorsoState.HIGH)
+    act = NavigateAction(target_location=Pose())
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(DetectionTechnique.TYPES)
 
     root = parallel(
@@ -73,8 +73,8 @@ def test_parallel_construction():
 
 
 def test_try_in_order_construction():
-    act = NavigateAction(Pose())
-    act2 = MoveTorsoAction(TorsoState.HIGH)
+    act = NavigateAction(target_location=Pose())
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(DetectionTechnique.TYPES)
 
     root = try_in_order([act, act2, act3])
@@ -84,8 +84,8 @@ def test_try_in_order_construction():
 
 
 def test_try_all_construction():
-    act = NavigateAction(Pose())
-    act2 = MoveTorsoAction(TorsoState.HIGH)
+    act = NavigateAction(target_location=Pose())
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(DetectionTechnique.TYPES)
 
     root = try_all([act, act2, act3])
@@ -95,8 +95,8 @@ def test_try_all_construction():
 
 
 def test_combination_construction():
-    act = NavigateAction(Pose())
-    act2 = MoveTorsoAction(TorsoState.HIGH)
+    act = NavigateAction(target_location=Pose())
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(DetectionTechnique.TYPES)
     root = parallel([sequential([act, act2]), act3])
     assert isinstance(root, ParallelNode)
@@ -106,8 +106,8 @@ def test_combination_construction():
 
 
 def test_monitor_construction():
-    act = ParkArmsAction(Arms.BOTH)
-    act2 = MoveTorsoAction(TorsoState.HIGH)
+    act = ParkArmsAction(arm=Arms.BOTH)
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
 
     def monitor_func():
         return True
@@ -119,8 +119,8 @@ def test_monitor_construction():
 
 
 def test_repeat_construction():
-    act = ParkArmsAction(Arms.BOTH)
-    act2 = MoveTorsoAction(TorsoState.HIGH)
+    act = ParkArmsAction(arm=Arms.BOTH)
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
 
     root = repeat([act, act2], 10)
     assert len(root.children) == 2
@@ -129,9 +129,11 @@ def test_repeat_construction():
 
 def test_perform_execute_single(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateAction(Pose.from_xyz_rpy(0.3, -1.3, 0, reference_frame=world.root))
-    act2 = MoveTorsoAction(TorsoState.HIGH)
-    act3 = ParkArmsAction(Arms.BOTH)
+    act = NavigateAction(
+        target_location=Pose.from_xyz_rpy(0.3, -1.3, 0, reference_frame=world.root)
+    )
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
+    act3 = ParkArmsAction(arm=Arms.BOTH)
 
     plan = sequential([act, act2, act3], context).plan
     with simulated_robot:
@@ -149,7 +151,7 @@ def test_perform_execute_single(immutable_model_world):
 def test_perform_single_designator(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context).plan
+    plan = sequential([MoveTorsoAction(torso_state=TorsoState.HIGH)], context).plan
     with simulated_robot:
         plan.perform()
 
@@ -197,11 +199,15 @@ def test_perform_repeat(immutable_model_world):
 def test_exception_sequential(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
-    def raise_except():
-        raise PlanFailure()
+    act = NavigateAction(
+        target_location=Pose.from_xyz_rpy(1, -1, reference_frame=world.root)
+    )
+    act2 = code(lambda: None)
 
-    act = NavigateAction(Pose.from_xyz_rpy(1, -1, reference_frame=world.root))
-    act2 = code(raise_except)
+    def raise_except():
+        raise PlanFailure(node=act2)
+
+    act2.code = raise_except
 
     plan = sequential(
         [act, act2],
@@ -221,11 +227,15 @@ def test_exception_sequential(immutable_model_world):
 def test_exception_try_in_order(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
-    def raise_except():
-        raise PlanFailure()
+    act = NavigateAction(
+        target_location=Pose.from_xyz_rpy(1, -1, reference_frame=world.root)
+    )
+    act2 = code(lambda: None)
 
-    act = NavigateAction(Pose.from_xyz_rpy(1, -1, reference_frame=world.root))
-    act2 = code(raise_except)
+    def raise_except():
+        raise PlanFailure(node=act2)
+
+    act2.code = raise_except
 
     plan = try_in_order([act, act2], context).plan
     with simulated_robot:
@@ -234,14 +244,19 @@ def test_exception_try_in_order(immutable_model_world):
     assert plan.root.status == TaskStatus.SUCCEEDED
 
 
+
 def test_exception_try_all(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
-    def raise_except():
-        raise PlanFailure()
+    act = NavigateAction(
+        target_location=Pose.from_xyz_rpy(x=-2, reference_frame=world.root)
+    )
+    act2 = code(lambda: None)
 
-    act = NavigateAction(Pose.from_xyz_rpy(x=-2, reference_frame=world.root))
-    act2 = code(raise_except)
+    def raise_except():
+        raise PlanFailure(node=act2)
+
+    act2.code = raise_except
 
     plan = try_all([act, act2], context).plan
     with simulated_robot:
@@ -253,8 +268,8 @@ def test_exception_try_all(immutable_model_world):
 
 def test_monitor_resume(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = ParkArmsAction(Arms.BOTH)
-    act2 = MoveTorsoAction(TorsoState.HIGH)
+    act = ParkArmsAction(arm=Arms.BOTH)
+    act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
 
     def monitor_func():
         time.sleep(2)

@@ -173,27 +173,30 @@ class StretchApartmentDemonstration(RobotDemonstration):
         )
 
         cereal = world.get_semantic_annotations_by_type(CheezeIt)[0]
-        cereal_body = cereal.root
         shelf_layer_body = world.get_body_by_name(CEREAL_SHELF_LAYER_NAME)
         bedside_table_body = world.get_body_by_name("bedside_table.dae")
         CEREAL_SHELF_LAYER_T_CEREAL.reference_frame = shelf_layer_body
 
         plan = sequential(
             [
-                ParkArmsAction(Arms.BOTH),
-                SetGripperAction(Arms.BOTH, motion=GripperState.CLOSE),
+                ParkArmsAction(arm=Arms.BOTH),
+                SetGripperAction(arm=Arms.BOTH, motion=GripperState.CLOSE),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
+                    target_location=Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=shelf_layer_body)),
+                LookAtAction(
+                    look_at_target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                ),
                 a(NavigateAction)(
                     target_location=Pose.from_xyz_rpy(
                         0.8, 0.6, 0, yaw=-np.pi / 2, reference_frame=world.root
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=shelf_layer_body)),
+                LookAtAction(
+                    look_at_target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                ),
                 DetectAction(
                     DetectionTechnique.TYPES,
                     object_sem_annotation=CheezeIt,
@@ -201,16 +204,19 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     accept_first_if_multiple=True,
                 ),
                 PickUpAction(
-                    cereal, Arms.LEFT, grasp_description, perceive_before_grasp=True
+                    target_object=cereal,
+                    arm=Arms.LEFT,
+                    grasp_description=grasp_description,
+                    perceive_before_grasp=True,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
+                    target_location=Pose.from_xyz_rpy(
                         0.8, 0, 0, yaw=np.pi, reference_frame=bedside_table_body
                     )
                 ),
                 PlaceAction(
-                    object_designator=cereal_body,
+                    target_object=cereal,
                     target_location=Pose.from_xyz_rpy(
                         x=0.1,
                         z=0.56,
@@ -219,20 +225,24 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     ),
                     arm=Arms.LEFT,
                 ),
-                ParkArmsAction(Arms.BOTH),
-                SetGripperAction(Arms.BOTH, motion=GripperState.CLOSE),
+                ParkArmsAction(arm=Arms.BOTH),
+                SetGripperAction(arm=Arms.BOTH, motion=GripperState.CLOSE),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
+                    target_location=Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=shelf_layer_body)),
+                LookAtAction(
+                    look_at_target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                ),
                 a(NavigateAction)(
                     target_location=Pose.from_xyz_rpy(
                         0.8, 0, 0, yaw=np.pi, reference_frame=bedside_table_body
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=bedside_table_body)),
+                LookAtAction(
+                    look_at_target=Pose.from_xyz_rpy(reference_frame=bedside_table_body)
+                ),
                 DetectAction(
                     DetectionTechnique.TYPES,
                     object_sem_annotation=CheezeIt,
@@ -240,24 +250,24 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     accept_first_if_multiple=True,
                 ),
                 a(PickUpAction)(
-                    object_designator=cereal,
+                    target_object=cereal,
                     arm=Arms.LEFT,
                     grasp_description=grasp_description,
                     perceive_before_grasp=True,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
+                    target_location=Pose.from_xyz_rpy(
                         0.8, 0.6, 0, yaw=-np.pi / 2, reference_frame=world.root
                     )
                 ),
                 a(PlaceAction)(
-                    object_designator=cereal_body,
+                    target_object=cereal,
                     target_location=CEREAL_SHELF_LAYER_T_CEREAL.to_pose(),
                     arm=Arms.LEFT,
                 ),
-                ParkArmsAction(Arms.BOTH),
-                SetGripperAction(Arms.BOTH, motion=GripperState.CLOSE),
+                ParkArmsAction(arm=Arms.BOTH),
+                SetGripperAction(arm=Arms.BOTH, motion=GripperState.CLOSE),
             ],
             context=context,
         )

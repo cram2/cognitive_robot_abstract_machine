@@ -27,6 +27,7 @@ from semantic_digital_twin.adapters.sage_10k_dataset.utils import (
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     RoomWithWallsAndDoors,
     DoorWithType,
+    GraspableObject,
 )
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
@@ -188,36 +189,34 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
         [body] = self.world.get_bodies_by_global_position(
             self.world_P_object_of_interest, 0.1
         )
-        object_of_interest = an(
-            entity(
-                semantic_annotation := variable(
-                    HasRootBody, domain=self.world.semantic_annotations
-                )
-            ).where(semantic_annotation.root == body)
-        ).first()
-
         plan = sequential(
             [
                 open_door,
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 NavigateAction(
-                    Pose.from_xyz_rpy(2.81, -3.76, reference_frame=self.world.root)
+                    target_location=Pose.from_xyz_rpy(
+                        2.81, -3.76, reference_frame=self.world.root
+                    )
                 ),
                 NavigateAction(
-                    Pose.from_xyz_rpy(-0.75, -3.33, reference_frame=self.world.root)
+                    target_location=Pose.from_xyz_rpy(
+                        -0.75, -3.33, reference_frame=self.world.root
+                    )
                 ),
                 NavigateAction(
-                    Pose.from_xyz_rpy(0, 0.8, reference_frame=self.world.root)
+                    target_location=Pose.from_xyz_rpy(
+                        0, 0.8, reference_frame=self.world.root
+                    )
                 ),
                 MoveAndPickUpAction(
-                    object_designator=object_of_interest,
+                    target_object=GraspableObject(root=body),
                     standing_position=self.pickup_navigation_pose,
                     arm=arm,
                     grasp_description=grasp_description,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 MoveAndPlaceAction(
-                    object_designator=body,
+                    target_object=GraspableObject(root=body),
                     standing_position=self.place_navigation_pose,
                     arm=arm,
                     target_location=self.place_pose,
@@ -292,7 +291,7 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemoHSRB):
                 yaw=1.78,
                 reference_frame=self.world.root,
             ),
-            object_designator=self.book_to_pick,
+            target_object=GraspableObject(root=self.book_to_pick.root),
             arm=Arms.LEFT,
             grasp_description=grasp_description,
         )
@@ -372,7 +371,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
         )
         mpu = MoveAndPickUpAction(
             standing_position=self.pickup_navigation_pose,
-            object_designator=self.book_to_pick,
+            target_object=GraspableObject(root=self.book_to_pick.root),
             arm=Arms.LEFT,
             grasp_description=grasp_description,
         )
@@ -380,7 +379,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
             standing_position=Pose.from_xyz_rpy(
                 x=5.48, y=6.96, reference_frame=self.world.root
             ),
-            object_designator=self.book_to_pick.root,
+            target_object=GraspableObject(root=self.book_to_pick.root),
             target_location=target_pose,
             arm=Arms.LEFT,
         )
@@ -452,7 +451,7 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemoHSRB):
         )
         mpu = MoveAndPickUpAction(
             standing_position=self.pickup_navigation_pose,
-            object_designator=self.target_to_pick,
+            target_object=GraspableObject(root=self.target_to_pick.root),
             arm=Arms.LEFT,
             grasp_description=grasp_description,
         )
@@ -521,7 +520,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
         )
         mpu = MoveAndPickUpAction(
             standing_position=self.pickup_navigation_pose,
-            object_designator=self.target_to_pick,
+            target_object=GraspableObject(root=self.target_to_pick.root),
             arm=Arms.LEFT,
             grasp_description=grasp_description,
         )
@@ -536,7 +535,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
                 x=0.605, y=2.115, yaw=-1.5708, reference_frame=self.world.root
             ),
             target_location=place_target_pose,
-            object_designator=self.target_to_pick.root,
+            target_object=GraspableObject(root=self.target_to_pick.root),
             arm=Arms.LEFT,
         )
 
@@ -601,14 +600,18 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
             rotate_gripper=True,
         )
         navigate1 = NavigateAction(
-            Pose.from_xyz_rpy(x=1.27, y=4.45, reference_frame=self.world.root)
+            target_location=Pose.from_xyz_rpy(
+                x=1.27, y=4.45, reference_frame=self.world.root
+            )
         )
         navigate2 = NavigateAction(
-            Pose.from_xyz_rpy(x=1.27, y=4.45, reference_frame=self.world.root)
+            target_location=Pose.from_xyz_rpy(
+                x=1.27, y=4.45, reference_frame=self.world.root
+            )
         )
         mpu = MoveAndPickUpAction(
             standing_position=self.pickup_navigation_pose,
-            object_designator=self.target_to_pick,
+            target_object=GraspableObject(root=self.target_to_pick.root),
             arm=Arms.LEFT,
             grasp_description=grasp_description,
         )
@@ -649,31 +652,31 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
         plan = sequential(
             [
                 open_door,
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 NavigateAction(
                     target_location=Pose.from_xyz_rpy(
                         x=0.81, y=4.81, reference_frame=self.world.root
                     )
                 ),
                 MoveAndPickUpAction(
-                    object_designator=self.object_of_interest,
+                    target_object=GraspableObject(root=self.object_of_interest.root),
                     standing_position=self.pickup_navigation_pose,
                     arm=arm,
                     grasp_description=grasp_description,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 NavigateAction(
                     target_location=Pose.from_xyz_rpy(
                         x=0.81, y=4.81, reference_frame=self.world.root
                     )
                 ),
                 MoveAndPlaceAction(
-                    object_designator=self.object_of_interest.root,
+                    target_object=GraspableObject(root=self.object_of_interest.root),
                     standing_position=self.place_navigation_pose,
                     arm=arm,
                     target_location=self.place_pose,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 NavigateAction(
                     target_location=Pose.from_xyz_rpy(
                         x=0.48, y=4.81, reference_frame=self.world.root
@@ -773,21 +776,21 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
         plan = sequential(
             [
                 open_door,
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 NavigateAction(
                     target_location=Pose.from_xyz_rpy(
                         x=12, y=8.13, reference_frame=self.world.root
                     )
                 ),
                 MoveAndPickUpAction(
-                    object_designator=self.object_of_interest,
+                    target_object=GraspableObject(root=self.object_of_interest.root),
                     standing_position=self.pickup_navigation_pose,
                     arm=arm,
                     grasp_description=grasp_description,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 MoveAndPlaceAction(
-                    object_designator=self.object_of_interest.root,
+                    target_object=GraspableObject(root=self.object_of_interest.root),
                     standing_position=self.place_navigation_pose,
                     arm=arm,
                     target_location=self.place_pose,
@@ -880,17 +883,17 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
         plan = sequential(
             [
                 open_door,
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 MoveAndPickUpAction(
-                    object_designator=self.object_of_interest,
+                    target_object=GraspableObject(root=self.object_of_interest.root),
                     standing_position=self.pickup_navigation_pose,
                     arm=arm,
                     grasp_description=grasp_description,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 NavigateAction(target_location=navigate),
                 MoveAndPlaceAction(
-                    object_designator=self.object_of_interest.root,
+                    target_object=GraspableObject(root=self.object_of_interest.root),
                     standing_position=self.place_navigation_pose,
                     arm=arm,
                     target_location=self.place_pose,

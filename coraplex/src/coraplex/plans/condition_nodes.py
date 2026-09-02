@@ -10,10 +10,11 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     ThreadedPredicateMonitor,
 )
 from krrood.entity_query_language.factories import ConditionType, evaluate_condition
+from coraplex.plans.failures import ConditionNotSatisfied
 from coraplex.plans.plan_node import PlanNode, ActionNode
 
 
-@dataclass
+@dataclass(eq=False)
 class ConditionNode(PlanNode):
     """
     Node representing a pre or post condition of an action.
@@ -38,6 +39,18 @@ class ConditionNode(PlanNode):
 
     def notify(self):
         pass
+
+    def not_satisfied_failure(self) -> ConditionNotSatisfied:
+        """
+        :return: The failure describing that this condition did not hold for its
+            action.
+        """
+        return ConditionNotSatisfied(
+            node=self,
+            pre_condition=self.pre_condition,
+            action=self.action_node.action.__class__,
+            condition=self.condition,
+        )
 
     def redirect_node_reference(
         self, replaced_node: PlanNode, replacement_node: ActionNode

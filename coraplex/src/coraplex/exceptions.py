@@ -4,15 +4,16 @@ from abc import ABC
 from dataclasses import dataclass
 from typing_extensions import TYPE_CHECKING, Type, List
 
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
 from coraplex.datastructures.enums import Arms, ExecutionType
 from coraplex.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
+    from coraplex.failure_handling.failure_refiner import FailureDetector
+    from coraplex.failure_handling.failure_handling_strategy import (
+        FailureHandlingStrategy,
+    )
     from coraplex.plans.designator import Designator
-    from coraplex.robot_plans.actions.base import ActionDescription
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
@@ -146,33 +147,84 @@ class MissingToolFrame(DataclassException):
 
 
 @dataclass
-class ConditionNotSatisfied(PlanFailure):
+class AmbiguousFailureDetector(DataclassException):
+    """
+    Raised when several failure detectors are equally specific for the same failure, so
+    the refiner cannot decide which one refines it.
+    """
 
-    pre_condition: bool
-    action: Type[ActionDescription]
-    condition: ConditionType
+    failure: PlanFailure
+    """
+    The failure that several detectors claim with the same specificity.
+    """
+
+    detectors: List[FailureDetector]
+    """
+    The detectors that are equally specific for the failure.
+    """
 
     def error_message(self) -> str:
-        prefix = "Pre" if self.pre_condition else "Post"
-        if isinstance(self.condition, bool):
-            return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied"
-        false_statements = get_false_statements(self.condition)
-        return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied, following statements are false: {[s._name_ for s in false_statements]}"
+        return f"Detectors {self.detectors} are equally specific for {self.failure}"
 
     def suggest_correction(self) -> str:
-        return ""
+        return (
+            "narrow one detector down by declaring a more specific input failure type or "
+            "more required parameter mixins."
+        )
 
 
 @dataclass
-class MotionDidNotFinish(PlanFailure):
+class FailureRefinementCycle(DataclassException):
+    """
+    Raised when a chain of failure detectors refines a failure back into a failure type
+    it already produced, which would refine forever.
+    """
 
-    failed_motions: List[MotionStatechartNode]
+    failure: PlanFailure
+    """
+    The failure whose refinement cycled.
+    """
+
+    repeated_failure_type: Type[PlanFailure]
+    """
+    The failure type the chain produced for the second time.
+    """
 
     def error_message(self) -> str:
-        return f"Motion did not finish, following motions failed: {self.failed_motions}"
+        return (
+            f"Refining {self.failure} produced {self.repeated_failure_type.__name__} "
+            f"again."
+        )
 
     def suggest_correction(self) -> str:
-        return ""
+        return "ensure the detectors refine failures towards more specific types only."
+
+
+@dataclass
+class AmbiguousFailureHandlingStrategy(DataclassException):
+    """
+    Raised when several failure handling strategies are equally specific for the same
+    failure, so the handler cannot decide which one resolves it.
+    """
+
+    failure: PlanFailure
+    """
+    The failure that several strategies claim with the same specificity.
+    """
+
+    strategies: List[FailureHandlingStrategy]
+    """
+    The strategies that are equally specific for the failure.
+    """
+
+    def error_message(self) -> str:
+        return f"Strategies {self.strategies} are equally specific for {self.failure}"
+
+    def suggest_correction(self) -> str:
+        return (
+            "narrow one strategy down by declaring a more specific handled failure "
+            "type."
+        )
 
 
 @dataclass

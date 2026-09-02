@@ -34,12 +34,15 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    GraspableObject,
+)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -104,22 +107,24 @@ def robot_setup(request):
 
         # The boxes stand in for any graspable object; the plans only need an annotation
         # to name them by, not a particular kind of object.
-        world.add_semantic_annotations([HasRootBody(root=box1), HasRootBody(root=box2)])
+        world.add_semantic_annotations(
+            [GraspableObject(root=box1), GraspableObject(root=box2)]
+        )
     return world, request.param[1]
 
 
-def graspable_annotation(world: World, body: Body) -> HasRootBody:
+def graspable_annotation(world: World, body: Body) -> IsGraspable:
     """
     The annotation naming ``body`` for the actions that take one rather than a body.
 
     :param world: The world holding the annotations.
     :param body: The body the annotation is rooted at.
-    :return: The annotation rooted at ``body``.
+    :return: The graspable annotation rooted at ``body``.
     """
     return an(
         entity(
             semantic_annotation := variable(
-                HasRootBody, domain=world.semantic_annotations
+                IsGraspable, domain=world.semantic_annotations
             )
         ).where(semantic_annotation.root == body)
     ).first()
@@ -146,7 +151,7 @@ def mutable_stationary_block_world(robot_setup):
 def test_park_arms_multi(immutable_stationary_block_world):
     world, view, context = immutable_stationary_block_world
 
-    description = ParkArmsAction(Arms.BOTH)
+    description = ParkArmsAction(arm=Arms.BOTH)
     plan = execute_single(description, context=context).plan
     with simulated_robot:
         plan.perform()
@@ -182,12 +187,12 @@ def test_reach_action_multi(immutable_stationary_block_world):
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(arm=Arms.BOTH),
             ReachAction(
                 target_pose=Pose(
                     Point3.from_iterable(position), reference_frame=world.root
                 ),
-                object_designator=box,
+                target_object=box,
                 arm=Arms.LEFT,
                 grasp_description=grasp_description,
             ),
@@ -214,7 +219,7 @@ def test_move_gripper_multi(immutable_stationary_block_world):
     world, view, context = immutable_stationary_block_world
 
     plan = execute_single(
-        SetGripperAction(Arms.LEFT, GripperState.OPEN), context=context
+        SetGripperAction(arm=Arms.LEFT, motion=GripperState.OPEN), context=context
     ).plan
 
     with simulated_robot:
@@ -228,7 +233,7 @@ def test_move_gripper_multi(immutable_stationary_block_world):
         assert connection.position == pytest.approx(target, abs=0.01)
 
     plan = execute_single(
-        SetGripperAction(Arms.LEFT, GripperState.CLOSE), context=context
+        SetGripperAction(arm=Arms.LEFT, motion=GripperState.CLOSE), context=context
     ).plan
 
     with simulated_robot:
@@ -248,10 +253,12 @@ def test_grasping(immutable_stationary_block_world):
         left_arm.end_effector,
     )
     description = GraspingAction(
-        world.get_body_by_name("box1"), Arms.LEFT, grasp_description
+        target_object=graspable_annotation(world, world.get_body_by_name("box1")),
+        arm=Arms.LEFT,
+        grasp_description=grasp_description,
     )
     plan = sequential(
-        [ParkArmsAction(Arms.BOTH), description],
+        [ParkArmsAction(arm=Arms.BOTH), description],
         context=context,
     ).plan
     with simulated_robot:
@@ -273,11 +280,13 @@ def test_pick_up_multi(mutable_stationary_block_world):
     )
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(arm=Arms.BOTH),
             PickUpAction(
-                graspable_annotation(world, world.get_body_by_name("box1")),
-                Arms.LEFT,
-                grasp_description,
+                target_object=graspable_annotation(
+                    world, world.get_body_by_name("box1")
+                ),
+                arm=Arms.LEFT,
+                grasp_description=grasp_description,
             ),
         ],
         context=context,
@@ -320,16 +329,20 @@ def test_place_multi(mutable_stationary_block_world, place_position):
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(arm=Arms.BOTH),
             PickUpAction(
-                graspable_annotation(world, world.get_body_by_name("box1")),
-                Arms.LEFT,
-                grasp_description,
+                target_object=graspable_annotation(
+                    world, world.get_body_by_name("box1")
+                ),
+                arm=Arms.LEFT,
+                grasp_description=grasp_description,
             ),
             PlaceAction(
-                world.get_body_by_name("box1"),
-                Pose(place_position, reference_frame=world.root),
-                Arms.LEFT,
+                target_object=graspable_annotation(
+                    world, world.get_body_by_name("box1")
+                ),
+                target_location=Pose(place_position, reference_frame=world.root),
+                arm=Arms.LEFT,
             ),
         ],
         context=context,

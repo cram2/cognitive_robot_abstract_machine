@@ -4,6 +4,9 @@ import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
+from dataclasses import dataclass, field
+from time import sleep
+from typing import Tuple
 
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -30,9 +33,9 @@ from coraplex.datastructures.enums import (
 )
 from coraplex.exceptions import (
     MissingWaypoints,
-    MotionDidNotFinish,
     WipingTargetMissing,
 )
+from coraplex.plans.failures import MotionDidNotFinish
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
@@ -51,6 +54,8 @@ from coraplex.robot_plans.motions.gripper import (
     MoveTCPWaypointsAlignedMotion,
     MoveToolCenterPointMotion,
 )
+from coraplex.robot_plans.actions.base import ActionDescription, DescriptionType
+from coraplex.robot_plans.parameter_mixins import UsedArm, UsedTool
 
 
 @dataclass(kw_only=True)
@@ -99,18 +104,15 @@ class FullBodyControlledAction(ActionDescription, ABC):
 
 
 @dataclass(kw_only=True)
-class ToolMotionAction(FullBodyControlledAction, ABC, HasTcpGoalThresholds):
+class ToolMotionAction(
+    FullBodyControlledAction, UsedArm, UsedTool, HasTcpGoalThresholds, ABC
+):
     """
     An action that moves a tool along a sampled tool path while keeping the tool aligned
     with its target.
     """
 
-    arm: Arms
-    """
-    The arm holding the tool.
-    """
-
-    tool: Tool
+    tool: Tool = field(kw_only=True)
     """
     The tool that performs the motion.
     """
@@ -392,7 +394,7 @@ class WipingAction(ToolMotionAction):
 
 
 @dataclass(kw_only=True)
-class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
+class PouringAction(FullBodyControlledAction, UsedArm, UsedTool, HasTcpGoalThresholds):
     """
     Pour from a held source container into a target container by tilting the source next
     to the target's rim.
@@ -403,14 +405,9 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
     The container that is poured into.
     """
 
-    source_container: Tool
+    tool: Tool = field(kw_only=True)
     """
     The held container that is poured from.
-    """
-
-    arm: Arms
-    """
-    The arm holding the source container.
     """
 
     tilt_angle: float = 1.85
@@ -455,13 +452,11 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
         """
         tool_frame = ViewManager.get_end_effector_view(self.arm, self.robot).tool_frame
         tool_frame_T_source = self.world.compute_forward_kinematics_np(
-            tool_frame, self.source_container.root
+            tool_frame, self.tool.root
         )
-        bounding_box = (
-            self.source_container.root.visual.as_bounding_box_collection_in_frame(
-                self.source_container.root
-            ).bounding_box()
-        )
+        bounding_box = self.tool.root.visual.as_bounding_box_collection_in_frame(
+            self.tool.root
+        ).bounding_box()
         mouth_in_source = np.array(
             [
                 0.5 * (bounding_box.min_x + bounding_box.max_x),

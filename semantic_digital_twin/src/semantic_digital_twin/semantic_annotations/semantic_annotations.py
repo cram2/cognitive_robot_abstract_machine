@@ -36,6 +36,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     IsPerceivable,
     HasRootBody,
     IsStorageSpace,
+    IsGraspable,
     HasLegs,
     HasSink,
     HasShelfLayers,
@@ -87,7 +88,17 @@ class Furniture(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class Handle(HasRootBody):
+class GraspableObject(IsGraspable):
+    """
+    A plain object that can be grasped, without any further semantic specialization.
+
+    .. note:: Use this for bodies that should be manipulable but do not warrant a dedicated
+        household-object class.
+    """
+
+
+@dataclass(eq=False)
+class Handle(IsGraspable):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
@@ -1055,7 +1066,7 @@ class Plate(HasSupportingSurface):
 
 
 @dataclass(eq=False)
-class Bowl(HasSupportingSurface, IsPerceivable):
+class Bowl(IsGraspable, HasSupportingSurface, IsPerceivable):
     """
     A bowl.
     """
@@ -1063,7 +1074,7 @@ class Bowl(HasSupportingSurface, IsPerceivable):
 
 # Food Items
 @dataclass(eq=False)
-class Food(HasRootBody):
+class Food(IsGraspable):
     """
     A Group class for Food.
     """
@@ -1154,7 +1165,7 @@ class Milk(Food, IsPerceivable):
 
 
 @dataclass(eq=False)
-class SaltContainer(HasRootBody, IsPerceivable):
+class SaltContainer(IsGraspable, IsPerceivable):
     """
     A container of salt.
     """
@@ -1418,7 +1429,7 @@ class SaltPepperShaker(HasRootBody):
 
 
 @dataclass(eq=False)
-class Cuttlery(HasRootBody): ...
+class Cuttlery(IsGraspable): ...
 
 
 @dataclass(eq=False)

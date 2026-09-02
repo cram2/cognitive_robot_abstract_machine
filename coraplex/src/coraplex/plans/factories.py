@@ -5,12 +5,12 @@ from typing import Union, Callable
 from typing_extensions import List, assert_never, Optional, TYPE_CHECKING, Type, TypeVar
 
 from krrood.entity_query_language.query.match import Match
-from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import MonitorBehavior
 from coraplex.fluent import Fluent
 from coraplex.plans.plan import Plan
 
 if TYPE_CHECKING:
+    from coraplex.datastructures.dataclasses import Context
     from coraplex.language import (
         SequentialNode,
         LanguageNode,

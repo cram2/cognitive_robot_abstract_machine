@@ -121,7 +121,7 @@ class Plan:
 
         :return: All nodes under the root node in depth first order
         """
-        return [self.root] + self.root.descendants
+        return self.root.subtree
 
     @property
     def all_nodes(self) -> List[PlanNode]:
@@ -323,7 +323,9 @@ class Plan:
         GraphVisualizerBackend.PLOTLY: InteractiveGraphVisualizer,
         GraphVisualizerBackend.CYTOSCAPE: CytoscapeGraphVisualizer,
     }
-    """The visualizer to use for each rendering backend."""
+    """
+    The visualizer to use for each rendering backend.
+    """
 
     def visualize(
         self,
@@ -333,9 +335,9 @@ class Plan:
         """
         Open an interactive, real-time visualization of the plan graph.
 
-        Nodes appear as the plan is built, are labelled by their type, coloured by execution
-        status and reveal their status and timing when clicked. With the default physics layout
-        the nodes self-organize and bounce as the plan grows.
+        Nodes appear as the plan is built, are labelled by their type, coloured by
+        execution status and reveal their status and timing when clicked. With the
+        default physics layout the nodes self-organize and bounce as the plan grows.
 
         :param backend: The rendering technology to use.
         :param layout: The algorithm used to place the nodes.

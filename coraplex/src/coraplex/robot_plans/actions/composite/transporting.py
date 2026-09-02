@@ -26,48 +26,48 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+from coraplex.robot_plans.parameter_mixins import (
+    GraspParameters,
+    MobileManipulationParameters,
+    TargetLocationMovedTo,
+    UsedGraspDescription,
+)
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.predicates import InsideOf
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class TransportAction(ActionDescription):
+class TransportAction(
+    ActionDescription,
+    GraspParameters,
+    TargetLocationMovedTo,
+):
     """
     Transports an object to a position using an arm.
     """
 
-    object_designator: HasRootBody = field(repr=False)
+    target_object: IsGraspable = field(repr=False, kw_only=True)
     """
-    The annotation of the object that should be transported.
-    """
-
-    target_location: Pose
-    """
-    Target Location to which the object should be transported.
+    The graspable annotation describing the object that should be transported.
     """
 
-    arm: Arms
-    """
-    Arm that should be used.
-    """
-
-    grasp_description: Optional[GraspDescription] = None
+    grasp_description: Optional[GraspDescription] = field(default=None, kw_only=True)
     """
     Grasp Description that should be used for picking up the object.
     """
 
     def inside_container(self) -> List[Body]:
         bodies = []
-        object_body = self.object_designator.root
+        target_body = self.target_object.root
         for body in self.world.bodies:
-            if body == object_body:
+            if body == target_body:
                 continue
-            if InsideOf(object_body, body).compute_containment_ratio() > 0.9:
+            if InsideOf(target_body, body).compute_containment_ratio() > 0.9:
                 bodies.append(body)
         return bodies
 
@@ -84,19 +84,19 @@ class TransportAction(ActionDescription):
         drawer_annotation = list(drawer_annotation.evaluate())
         if len(drawer_annotation) == 0:
             return []
-        handle = drawer_annotation[0].handle.root
+        handle = drawer_annotation[0].handle
 
         return [
             a(NavigateAction)(
                 target_location=variable(
                     Pose,
                     domain=reachability_location(
-                        handle.global_pose, self.context, self.arm
+                        handle.root.global_pose, self.context, self.arm
                     ),
                 ),
                 keep_joint_states=True,
             ),
-            OpenAction(handle, self.arm),
+            OpenAction(handle=handle, arm=self.arm),
         ]
 
     @property
@@ -113,14 +113,14 @@ class TransportAction(ActionDescription):
 
         children.extend(
             [
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 # Tries to find a pick-up position for the robot that uses the given arm
                 a(NavigateAction)(
                     target_location=variable(
                         Pose,
                         domain=DeferredLocation(
                             lambda: reachability_location(
-                                self.object_designator.root,
+                                self.target_object.root,
                                 self.context,
                                 self.arm,
                                 self.grasp_description,
@@ -130,19 +130,19 @@ class TransportAction(ActionDescription):
                     keep_joint_states=True,
                 ),
                 a(PickUpAction)(
-                    object_designator=self.object_designator,
+                    target_object=self.target_object,
                     arm=self.arm,
                     grasp_description=self.grasp_description,
                 ),
-                ParkArmsAction(Arms.BOTH),
-                MoveTorsoAction(TorsoState.HIGH),
+                ParkArmsAction(arm=Arms.BOTH),
+                MoveTorsoAction(torso_state=TorsoState.HIGH),
                 self._make_navigate_action_for_placing(self.grasp_description),
                 a(PlaceAction)(
-                    object_designator=self.object_designator.root,
+                    target_object=self.target_object,
                     target_location=self.target_location,
                     arm=self.arm,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
             ]
         )
 
@@ -165,75 +165,50 @@ class TransportAction(ActionDescription):
 
 
 @dataclass
-class PickAndPlaceAction(ActionDescription):
+class PickAndPlaceAction(
+    ActionDescription,
+    GraspParameters,
+    TargetLocationMovedTo,
+):
     """
-    Transports an object to a position using an arm without moving the base of
-    the robot.
-    """
-
-    object_designator: HasRootBody
-    """
-    The annotation of the object that should be transported.
-    """
-
-    target_location: Pose
-    """
-    Target Location to which the object should be transported.
-    """
-
-    arm: Arms
-    """
-    Arm that should be used.
-    """
-    grasp_description: GraspDescription
-    """
-    Description of the grasp to pick up the target.
+    Transports an object to a position using an arm without moving the base of the
+    robot.
     """
 
     @property
     def _action_plan(self) -> PlanNode:
         return sequential(
             [
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 PickUpAction(
-                    self.object_designator,
-                    self.arm,
+                    target_object=self.target_object,
+                    arm=self.arm,
                     grasp_description=self.grasp_description,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
                 PlaceAction(
-                    self.object_designator.root, self.target_location, self.arm
+                    target_object=self.target_object,
+                    target_location=self.target_location,
+                    arm=self.arm,
                 ),
-                ParkArmsAction(Arms.BOTH),
+                ParkArmsAction(arm=Arms.BOTH),
             ]
         )
 
 
 @dataclass
-class MoveAndPlaceAction(ActionDescription):
+class MoveAndPlaceAction(
+    ActionDescription,
+    MobileManipulationParameters,
+    TargetLocationMovedTo,
+):
     """
-    Navigate to `standing_position`, then turn towards the target and place the
-    object.
-    """
-
-    standing_position: Pose
-    """
-    The pose to stand before trying to pick up the object.
-    """
-    object_designator: Body
-    """
-    The object to pick up.
-    """
-    target_location: Pose
-    """
-    The location to place the object.
-    """
-    arm: Arms
-    """
-    The arm to use.
+    Navigate to `standing_position`, then turn towards the target and place the object.
     """
 
-    keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
+    keep_joint_states: bool = field(
+        default=ActionConfig.navigate_keep_joint_states, kw_only=True
+    )
     """
     Keep the joint states of the robot the same during the navigation.
     """
@@ -242,50 +217,56 @@ class MoveAndPlaceAction(ActionDescription):
     def _action_plan(self) -> PlanNode:
         return sequential(
             [
-                NavigateAction(self.standing_position, self.keep_joint_states),
-                FaceAtAction(self.target_location, self.keep_joint_states),
-                PlaceAction(self.object_designator, self.target_location, self.arm),
-            ]
-        )
-
-
-@dataclass
-class MoveAndPickUpAction(ActionDescription):
-    """
-    Navigate to `standing_position`, then turn towards the object and pick it
-    up.
-    """
-
-    standing_position: Pose
-    """
-    The pose to stand before trying to pick up the object.
-    """
-    object_designator: HasRootBody
-    """
-    The annotation of the object to pick up.
-    """
-    arm: Arms
-    """
-    The arm to use.
-    """
-    grasp_description: GraspDescription
-    """
-    The grasp to use.
-    """
-
-    keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
-    """
-    Keep the joint states of the robot the same during the navigation.
-    """
-
-    @property
-    def _action_plan(self) -> PlanNode:
-        return sequential(
-            [
-                NavigateAction(self.standing_position, self.keep_joint_states),
+                NavigateAction(
+                    target_location=self.standing_position,
+                    keep_joint_states=self.keep_joint_states,
+                ),
                 FaceAtAction(
-                    self.object_designator.root.global_pose, self.keep_joint_states
+                    look_at_target=self.target_location,
+                    keep_joint_states=self.keep_joint_states,
                 ),
-                PickUpAction(self.object_designator, self.arm, self.grasp_description),
+                PlaceAction(
+                    target_object=self.target_object,
+                    target_location=self.target_location,
+                    arm=self.arm,
+                ),
+            ]
+        )
+
+
+@dataclass
+class MoveAndPickUpAction(
+    ActionDescription,
+    MobileManipulationParameters,
+    UsedGraspDescription,
+):
+    """
+    Navigate to `standing_position`, then turn towards the object and pick it up.
+    """
+
+    keep_joint_states: bool = field(
+        default=ActionConfig.navigate_keep_joint_states, kw_only=True
+    )
+    """
+    Keep the joint states of the robot the same during the navigation.
+    """
+
+    @property
+    def _action_plan(self) -> PlanNode:
+        return sequential(
+            [
+                NavigateAction(
+                    target_location=self.standing_position,
+                    keep_joint_states=self.keep_joint_states,
+                ),
+                FaceAtAction(
+                    look_at_target=self.target_object.root.global_pose,
+                    keep_joint_states=self.keep_joint_states,
+                ),
+                PickUpAction(
+                    target_object=self.target_object,
+                    arm=self.arm,
+                    grasp_description=self.grasp_description,
+                ),
             ]
         )

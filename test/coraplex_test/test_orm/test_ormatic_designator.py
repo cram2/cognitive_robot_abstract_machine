@@ -15,8 +15,8 @@ from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 @pytest.fixture()
@@ -26,13 +26,13 @@ def simple_plan(immutable_model_world):
     plan = sequential(
         [
             NavigateAction(
-                Pose.from_xyz_quaternion(
+                target_location=Pose.from_xyz_quaternion(
                     1.6, 1.9, 0, 0, 0, 0, 1, reference_frame=world.root
                 ),
-                True,
+                keep_joint_states=True,
             ),
-            MoveTorsoAction(TorsoState.HIGH),
-            ParkArmsAction(Arms.BOTH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+            ParkArmsAction(arm=Arms.BOTH),
         ],
         context=context,
     ).plan
@@ -90,7 +90,7 @@ def complex_plan(mutable_model_world):
 
     plan = execute_single(
         TransportAction(
-            object_designator=world.get_semantic_annotations_by_type(Milk)[0],
+            target_object=world.get_semantic_annotations_by_type(Milk)[0],
             target_location=Pose.from_xyz_quaternion(
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),

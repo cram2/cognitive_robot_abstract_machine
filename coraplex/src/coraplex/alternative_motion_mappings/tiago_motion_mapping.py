@@ -19,5 +19,5 @@ class TiagoMoveSim(MoveMotion, AlternativeMotion[Tiago]):
     def _motion_chart(self):
 
         return DifferentialDriveBaseGoal(
-            goal_pose=self.target,
+            goal_pose=self.target_location,
         )

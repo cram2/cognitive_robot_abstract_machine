@@ -7,12 +7,12 @@ from krrood.entity_query_language.factories import (
 )
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.exceptions import ConditionNotSatisfied, MotionDidNotFinish
+from coraplex.plans.failures import ConditionNotSatisfied, MotionDidNotFinish
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 
 def _construct_and_evaluate_condition(action, action_condition):
@@ -26,7 +26,10 @@ def _construct_and_evaluate_condition(action, action_condition):
     if evaluation:
         return True
     raise ConditionNotSatisfied(
-        pre_condition=True, action=action.__class__, condition=condition
+        node=action_condition,
+        pre_condition=True,
+        action=action.__class__,
+        condition=condition,
     )
 
 
@@ -34,9 +37,9 @@ def test_get_bound_variables(immutable_model_world):
     world, view, context = immutable_model_world
 
     pick_action = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Arms.LEFT,
-        GraspDescription(
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
+        arm=Arms.LEFT,
+        grasp_description=GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
             view.left_arm.end_effector,
@@ -56,27 +59,27 @@ def test_get_bound_variables(immutable_model_world):
         "lift_linear_velocity",
         "grasp_stall_minimum_time",
         "object_friction",
-        "object_designator",
-        "arm",
         "grasp_description",
+        "arm",
+        "target_object",
         "tolerate_grasp_stall",
         "perceive_before_grasp",
     ]
     assert list(bound_variables["arm"]._domain_) == [Arms.LEFT]
     assert bound_variables["arm"]._type_ == Arms
-    assert list(bound_variables["object_designator"]._domain_) == [
+    assert list(bound_variables["target_object"]._domain_) == [
         world.get_semantic_annotations_by_type(Milk)[0]
     ]
-    assert bound_variables["object_designator"]._type_ == Milk
+    assert bound_variables["target_object"]._type_ == Milk
 
 
 def test_pick_up_pre_conditions(mutable_model_world):
     world, view, context = mutable_model_world
 
     pick_action = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Arms.LEFT,
-        GraspDescription(
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
+        arm=Arms.LEFT,
+        grasp_description=GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
             view.left_arm.end_effector,
@@ -124,9 +127,9 @@ def test_pick_up_pre_conditions(mutable_model_world):
 def test_pick_up_post_condition(mutable_model_world):
     world, view, context = mutable_model_world
     pick_action = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Arms.LEFT,
-        GraspDescription(
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
+        arm=Arms.LEFT,
+        grasp_description=GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
             view.left_arm.end_effector,
@@ -151,3 +154,33 @@ def test_pick_up_post_condition(mutable_model_world):
     )
 
     assert _construct_and_evaluate_condition(pick_action, pick_action.post_condition)
+
+
+@pytest.mark.skip("Conditions are not fully enforced at the moment")
+def test_context_evaluate_condition(mutable_model_world):
+    world, view, context = mutable_model_world
+
+    pick_action = PickUpAction(
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
+        arm=Arms.LEFT,
+        grasp_description=GraspDescription(
+            ApproachDirection.FRONT,
+            VerticalAlignment.NoAlignment,
+            view.left_arm.end_effector,
+        ),
+    )
+    # Make action impossible
+    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        1.0, 2, 0
+    )
+
+    plan = sequential([pick_action], context)
+    with pytest.raises(ConditionNotSatisfied):
+        with simulated_robot:
+            plan.perform()
+
+    context.evaluate_conditions = False
+
+    with pytest.raises(MotionDidNotFinish):
+        with simulated_robot:
+            plan.perform()

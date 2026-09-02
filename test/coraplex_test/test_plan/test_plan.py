@@ -6,6 +6,7 @@ import pytest
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     ApproachDirection,
+    TaskStatus,
     VerticalAlignment,
     Arms,
 )
@@ -36,6 +37,7 @@ from krrood.parametrization.model_registries import (
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.orm.model import (
     Point3Mapping,
     QuaternionMapping,
@@ -154,8 +156,8 @@ def test_simplify_keeps_designators_with_different_parameters():
     type *and* the same parameters; differing parameters must be preserved.
     """
     plan = Plan()
-    parent = ActionNode(designator=MoveTorsoAction(TorsoState.HIGH))
-    different_child = ActionNode(designator=MoveTorsoAction(TorsoState.LOW))
+    parent = ActionNode(designator=MoveTorsoAction(torso_state=TorsoState.HIGH))
+    different_child = ActionNode(designator=MoveTorsoAction(torso_state=TorsoState.LOW))
     plan.add_node(parent)
     plan.add_edge(parent, different_child)
 
@@ -163,7 +165,7 @@ def test_simplify_keeps_designators_with_different_parameters():
 
     assert different_child in parent.children
 
-    equal_child = ActionNode(designator=MoveTorsoAction(TorsoState.HIGH))
+    equal_child = ActionNode(designator=MoveTorsoAction(torso_state=TorsoState.HIGH))
     plan.add_edge(parent, equal_child)
     parent.simplify()
 
@@ -219,6 +221,27 @@ def test_path_after_node_removal():
     assert n4.depth == 3
     assert root.path == []
     assert root.depth == 0
+
+
+# %% node identity
+
+
+def test_every_plan_node_is_identified_by_identity():
+    """
+    Plan nodes are vertices of a graph, so two nodes carrying the same parameters are
+    still different nodes, and every node can key a dictionary.
+
+    ``PlanNode`` says so with its own ``__hash__``, but a subclass declared with a plain
+    ``@dataclass`` regenerates ``__eq__`` and thereby drops that hash.
+    """
+    node = CodeNode(code=lambda: None)
+    twin = CodeNode(code=node.code)
+
+    attempts = {node: 1, twin: 2}
+
+    assert node != twin
+    assert attempts[node] == 1
+    assert attempts[twin] == 2
 
 
 def test_plan_node_children():
@@ -381,15 +404,28 @@ def test_get_previous_nodes():
     assert node1.right_siblings == [node3]
 
 
+def test_an_interrupted_ancestor_short_circuits_before_execution():
+    parent = code(lambda: None, context=Context(world=None, robot=None))
+    executions = []
+    child = CodeNode(code=lambda: executions.append(True))
+    parent.add_child(child)
+    parent.interrupt()
+
+    child.perform()
+
+    assert child.status == TaskStatus.INTERRUPTED
+    assert executions == []
+
+
 # ---- Tests interacting with simulated robot/world ----
 
 
 def test_interrupt_plan(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
-    act1 = MoveTorsoAction(TorsoState.HIGH)
+    act1 = MoveTorsoAction(torso_state=TorsoState.HIGH)
 
-    act3 = MoveTorsoAction(TorsoState.LOW)
+    act3 = MoveTorsoAction(torso_state=TorsoState.LOW)
 
     plan = sequential([act1, act3], context=context).plan
 
@@ -425,7 +461,7 @@ def test_pause_plan(immutable_model_world):
     code_node = code(function=lambda: None)
     code_node.code = lambda: pause_plan(code_node)
     sleep_node = code(lambda: node_sleep())
-    robot_plan = sequential([sleep_node, MoveTorsoAction(TorsoState.HIGH)])
+    robot_plan = sequential([sleep_node, MoveTorsoAction(torso_state=TorsoState.HIGH)])
     plan = parallel([code_node, robot_plan], context=context).plan
     with simulated_robot:
         plan.perform()
@@ -452,7 +488,10 @@ def test_sequence_runs_all_motions_without_interrupt(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
     plan = sequential(
-        [MoveTorsoAction(TorsoState.LOW), MoveTorsoAction(TorsoState.HIGH)],
+        [
+            MoveTorsoAction(torso_state=TorsoState.LOW),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+        ],
         context=context,
     ).plan
     with simulated_robot:
@@ -480,10 +519,10 @@ def test_interrupt_finishes_active_motion_and_skips_the_rest(immutable_model_wor
 
     plan = sequential(
         [
-            MoveTorsoAction(TorsoState.HIGH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             trigger,
-            MoveTorsoAction(TorsoState.LOW),
-            MoveTorsoAction(TorsoState.MID),
+            MoveTorsoAction(torso_state=TorsoState.LOW),
+            MoveTorsoAction(torso_state=TorsoState.MID),
         ],
         context=context,
     ).plan
@@ -509,7 +548,7 @@ def test_pause_holds_active_motion_until_resumed(immutable_model_world):
     observed = {}
 
     motion_subplan = sequential(
-        [code(lambda: time.sleep(1.0)), MoveTorsoAction(TorsoState.HIGH)]
+        [code(lambda: time.sleep(1.0)), MoveTorsoAction(torso_state=TorsoState.HIGH)]
     )
 
     def control():
@@ -559,7 +598,9 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     )
 
     # resolved_navigate = next(pm_backend.evaluate(navigate_action))
-    plan = sequential([MoveTorsoAction(TorsoState.LOW), navigate_action], context).plan
+    plan = sequential(
+        [MoveTorsoAction(torso_state=TorsoState.LOW), navigate_action], context
+    ).plan
 
     with simulated_robot:
         plan.perform()
@@ -577,7 +618,7 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
     milk_variable = variable_from([milk])
 
     pick_up_description = a(PickUpAction)(
-        object_designator=milk_variable,
+        target_object=milk_variable,
         arm=...,
         grasp_description=a(GraspDescription)(
             approach_direction=...,
@@ -625,7 +666,7 @@ def test_conditions_reference_surviving_action_node_after_merge(immutable_model_
     world, robot_view, context = immutable_model_world
 
     plan = sequential(
-        [MoveTorsoAction(TorsoState.HIGH)],
+        [MoveTorsoAction(torso_state=TorsoState.HIGH)],
         context=context,
     ).plan
     with simulated_robot:
@@ -663,9 +704,9 @@ def test_motion_order_pick_up(mutable_model_world):
     root = sequential(
         [
             PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                grasp_description,
+                target_object=world.get_semantic_annotations_by_type(Milk)[0],
+                arm=Arms.LEFT,
+                grasp_description=grasp_description,
             ),
         ],
         context,
@@ -720,9 +761,11 @@ def test_motion_order_place(mutable_model_world):
     root = sequential(
         [
             PlaceAction(
-                world.get_body_by_name("milk.stl"),
-                Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
-                Arms.LEFT,
+                target_object=world.get_semantic_annotations_by_type(Milk)[0],
+                target_location=Pose.from_xyz_rpy(
+                    0.8, -1.9, 0.7, reference_frame=world.root
+                ),
+                arm=Arms.LEFT,
             ),
         ],
         context,
@@ -757,7 +800,7 @@ def test_node_expansion(immutable_model_world):
     plan = sequential(
         [
             PickUpAction(
-                object_designator=world.get_semantic_annotations_by_type(Milk)[0],
+                target_object=world.get_semantic_annotations_by_type(Milk)[0],
                 arm=Arms.RIGHT,
                 grasp_description=GraspDescription(
                     ApproachDirection.FRONT,
@@ -779,7 +822,7 @@ def test_node_expansion(immutable_model_world):
 
 def test_expand_move_torso(immutable_model_world):
     world, view, context = immutable_model_world
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context)
+    plan = sequential([MoveTorsoAction(torso_state=TorsoState.HIGH)], context=context)
 
     plan.notify()
 
@@ -793,11 +836,11 @@ def test_context_back_reference(immutable_model_world):
 
     plan = sequential(
         [
-            MoveTorsoAction(TorsoState.HIGH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.RIGHT,
-                GraspDescription(
+                target_object=world.get_semantic_annotations_by_type(Milk)[0],
+                arm=Arms.RIGHT,
+                grasp_description=GraspDescription(
                     ApproachDirection.FRONT,
                     VerticalAlignment.NoAlignment,
                     view.right_arm.end_effector,
@@ -817,11 +860,11 @@ def test_action_nodes_unequal(immutable_model_world):
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.LEFT),
+            ParkArmsAction(arm=Arms.LEFT),
             PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                GraspDescription(
+                target_object=world.get_semantic_annotations_by_type(Milk)[0],
+                arm=Arms.LEFT,
+                grasp_description=GraspDescription(
                     ApproachDirection.FRONT,
                     VerticalAlignment.NoAlignment,
                     view.right_arm.end_effector,

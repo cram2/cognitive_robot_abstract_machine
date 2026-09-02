@@ -71,24 +71,24 @@ def test_pick_up_motion(immutable_model_world):
         view.left_arm.end_effector,
     )
     pick_up = PickUpAction(
-        test_world.get_semantic_annotations_by_type(Milk)[0],
-        Arms.LEFT,
-        grasp_description,
+        target_object=test_world.get_semantic_annotations_by_type(Milk)[0],
+        arm=Arms.LEFT,
+        grasp_description=grasp_description,
     )
 
     root = sequential(
         children=[
             ActionNode(
                 designator=NavigateAction(
-                    Pose(
+                    target_location=Pose(
                         Point3.from_iterable([1.7, 1.5, 0]),
                         Quaternion.from_iterable([0, 0, 0, 1]),
                         test_world.root,
                     ),
-                    True,
+                    keep_joint_states=True,
                 )
             ),
-            MoveTorsoAction(TorsoState.HIGH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             pick_up,
         ],
         context=Context.from_world(test_world),
@@ -114,7 +114,9 @@ def test_pick_up_motion(immutable_model_world):
 def test_move_motion_chart(immutable_model_world):
     world, view, context = immutable_model_world
     motion = MoveMotion(
-        Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+        target_location=Pose(
+            Point3.from_iterable([1, 1, 1]), reference_frame=world.root
+        )
     )
     plan = execute_single(
         motion,
@@ -138,7 +140,7 @@ def test_move_tool_center_point_motion_uses_tight_threshold(immutable_model_worl
     target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
 
     cartesian_motion = MoveToolCenterPointMotion(
-        target, Arms.LEFT, movement_type=MovementType.CARTESIAN
+        target_pose=target, arm=Arms.LEFT, movement_type=MovementType.CARTESIAN
     )
     execute_single(cartesian_motion, context=context)
     assert isinstance(cartesian_motion.motion_chart, CartesianPose)
@@ -148,7 +150,7 @@ def test_move_tool_center_point_motion_uses_tight_threshold(immutable_model_worl
     )
 
     translation_motion = MoveToolCenterPointMotion(
-        target, Arms.LEFT, movement_type=MovementType.TRANSLATION
+        target_pose=target, arm=Arms.LEFT, movement_type=MovementType.TRANSLATION
     )
     execute_single(translation_motion, context=context)
     assert (
@@ -167,7 +169,7 @@ def test_move_tcp_waypoints_motion_forwards_thresholds(immutable_model_world):
 
     motion = MoveTCPWaypointsMotion(
         waypoints,
-        Arms.LEFT,
+        arm=Arms.LEFT,
         position_threshold=0.001,
         orientation_threshold=0.05,
     )
@@ -191,7 +193,7 @@ def test_move_tcp_waypoints_motion_uses_giskard_defaults_when_unset(
     world, view, context = immutable_model_world
     waypoints = [Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)]
 
-    motion = MoveTCPWaypointsMotion(waypoints, Arms.LEFT)
+    motion = MoveTCPWaypointsMotion(waypoints, arm=Arms.LEFT)
     execute_single(motion, context=context)
 
     nodes = motion.motion_chart.nodes
@@ -242,7 +244,7 @@ def test_move_tool_center_point_motion_without_max_velocity_returns_bare_task(
     target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
 
     motion = MoveToolCenterPointMotion(
-        target, Arms.LEFT, movement_type=MovementType.CARTESIAN
+        target_pose=target, arm=Arms.LEFT, movement_type=MovementType.CARTESIAN
     )
     execute_single(motion, context=context)
     assert isinstance(motion.motion_chart, CartesianPose)
@@ -262,8 +264,8 @@ def test_move_tool_center_point_motion_max_linear_velocity_adds_real_limit(
     target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
 
     motion = MoveToolCenterPointMotion(
-        target,
-        Arms.LEFT,
+        target_pose=target,
+        arm=Arms.LEFT,
         movement_type=MovementType.CARTESIAN,
         max_linear_velocity=0.05,
     )
@@ -292,8 +294,8 @@ def test_move_tool_center_point_motion_max_angular_velocity_adds_real_limit(
     target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
 
     motion = MoveToolCenterPointMotion(
-        target,
-        Arms.LEFT,
+        target_pose=target,
+        arm=Arms.LEFT,
         movement_type=MovementType.CARTESIAN,
         max_angular_velocity=0.2,
     )
@@ -317,7 +319,7 @@ def test_move_gripper_motion_finger_velocity_adds_real_limit(immutable_model_wor
     world, view, context = immutable_model_world
 
     close_motion = MoveGripperMotion(
-        motion=GripperState.CLOSE, gripper=Arms.LEFT, finger_velocity=0.03
+        motion=GripperState.CLOSE, arm=Arms.LEFT, finger_velocity=0.03
     )
     execute_single(close_motion, context=context)
     assert isinstance(close_motion.motion_chart, Parallel)
@@ -344,7 +346,7 @@ def test_move_gripper_motion_tolerate_stall_and_finger_velocity_combine(
 
     close_motion = MoveGripperMotion(
         motion=GripperState.CLOSE,
-        gripper=Arms.LEFT,
+        arm=Arms.LEFT,
         tolerate_stall=True,
         finger_velocity=0.03,
     )
@@ -374,11 +376,11 @@ def test_move_gripper_motion_tolerate_stall_defaults_to_false(immutable_model_wo
     """
     world, view, context = immutable_model_world
 
-    close_motion = MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT)
+    close_motion = MoveGripperMotion(motion=GripperState.CLOSE, arm=Arms.LEFT)
     execute_single(close_motion, context=context)
     assert isinstance(close_motion.motion_chart, JointPositionList)
 
-    open_motion = MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT)
+    open_motion = MoveGripperMotion(motion=GripperState.OPEN, arm=Arms.LEFT)
     execute_single(open_motion, context=context)
     assert isinstance(open_motion.motion_chart, JointPositionList)
 
@@ -396,7 +398,7 @@ def test_move_gripper_motion_tolerate_stall_can_be_explicitly_enabled(
     world, view, context = immutable_model_world
 
     close_motion = MoveGripperMotion(
-        motion=GripperState.CLOSE, gripper=Arms.LEFT, tolerate_stall=True
+        motion=GripperState.CLOSE, arm=Arms.LEFT, tolerate_stall=True
     )
     execute_single(close_motion, context=context)
     assert isinstance(close_motion.motion_chart, Parallel)
@@ -422,7 +424,9 @@ def test_pick_up_action_close_motion_stall_tolerance_defaults_to_false(
         view.left_arm.end_effector,
     )
     pick_up = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0], Arms.LEFT, grasp_description
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
+        arm=Arms.LEFT,
+        grasp_description=grasp_description,
     )
     sequential([pick_up], context=context)
 
@@ -448,9 +452,9 @@ def test_pick_up_action_close_motion_tolerates_stall_when_enabled(
         view.left_arm.end_effector,
     )
     pick_up = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Arms.LEFT,
-        grasp_description,
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
+        arm=Arms.LEFT,
+        grasp_description=grasp_description,
         tolerate_grasp_stall=True,
     )
     sequential([pick_up], context=context)
@@ -477,7 +481,9 @@ def test_pick_up_action_velocity_fields_default_to_none(immutable_model_world):
     )
 
     pick_up = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0], Arms.LEFT, grasp_description
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
+        arm=Arms.LEFT,
+        grasp_description=grasp_description,
     )
 
     assert pick_up.pre_approach_linear_velocity is None
@@ -497,7 +503,11 @@ def test_place_action_velocity_fields_default_to_none(immutable_model_world):
     world, view, context = immutable_model_world
     target_location = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
 
-    place = PlaceAction(world.get_body_by_name("milk.stl"), target_location, Arms.LEFT)
+    place = PlaceAction(
+        target_object=world.get_semantic_annotations_by_type(Milk)[0],
+        target_location=target_location,
+        arm=Arms.LEFT,
+    )
 
     assert place.placing_linear_velocity is None
     assert place.transport_linear_velocity is None
@@ -510,7 +520,9 @@ def test_alternative_mapping(hsr_apartment_world):
     world, view, context = hsr_apartment_world
     context.alternative_motion_mappings = [HSRBMoveMotion]
     move_motion = MoveMotion(
-        Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+        target_location=Pose(
+            Point3.from_iterable([1, 1, 1]), reference_frame=world.root
+        )
     )
 
     plan = execute_single(move_motion, context=context)
@@ -532,7 +544,7 @@ def test_looking_motion_pointing_parameters(immutable_model_world):
     world, view, context = immutable_model_world
     camera = view.get_default_camera()
     target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
-    motion = LookingMotion(target=target, camera=camera)
+    motion = LookingMotion(look_at_target=target, camera=camera)
     execute_single(motion, context=context)
 
     pointing = motion.motion_chart
@@ -560,7 +572,7 @@ def test_stretch_tool_center_point_holds_the_base_heading(
     world, robot, context = immutable_stretch_apartment_world
     context.alternative_motion_mappings = [StretchMoveToolCenterPoint]
     motion = MoveToolCenterPointMotion(
-        target=Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root),
+        target_pose=Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root),
         arm=Arms.LEFT,
     )
     execute_single(motion, context=context)
@@ -586,7 +598,7 @@ def test_stretch_tool_center_point_accepts_a_local_minimum(
     world, robot, context = immutable_stretch_apartment_world
     context.alternative_motion_mappings = [StretchMoveToolCenterPoint]
     motion = MoveToolCenterPointMotion(
-        target=Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root),
+        target_pose=Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root),
         arm=Arms.LEFT,
     )
     execute_single(motion, context=context)
@@ -619,7 +631,9 @@ def test_stretch_base_motion_follows_the_execution_environment(
     """
     world, robot, context = immutable_stretch_apartment_world
     context.alternative_motion_mappings = [StretchMoveSim, StretchMoveReal]
-    motion = MoveMotion(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+    motion = MoveMotion(
+        target_location=Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root)
+    )
     execute_single(motion, context=context)
 
     with real_robot:
