@@ -49,6 +49,12 @@ include = ["robokudo*"]
 [tool.setuptools.dynamic]
 version = {attr = "robokudo._version.__version__"}
 
+[dependency-groups]
+workspace = [
+    "krrood",
+    "semantic_digital_twin",
+]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0,<8.0.0",

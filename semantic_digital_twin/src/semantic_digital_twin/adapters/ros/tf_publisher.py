@@ -237,6 +237,7 @@ class TFPublisher(StateChangeCallback):
 
     def __post_init__(self):
         super().__post_init__()
+
         self.tf_pub = self.node.create_publisher(TFMessage, self.tf_topic, 10)
         sleep(0.2)
         self.tf_model_callback = TfPublisherModelCallback(

@@ -75,3 +75,8 @@ dev = [
     "pytest-qt",
     "pytest-xvfb",
 ]
+
+[dependency-groups]
+workspace = [
+    "krrood",
+]

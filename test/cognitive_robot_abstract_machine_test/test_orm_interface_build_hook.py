@@ -10,8 +10,8 @@ import pytest
 from typing_extensions import List
 
 from cognitive_robot_abstract_machine.exceptions import (
-    MissingOrmBuildChoiceError,
-    UnknownOrmBuildChoiceError,
+    MissingORMBuildChoiceError,
+    UnknownORMBuildChoiceError,
 )
 from cognitive_robot_abstract_machine.orm_interfaces import (
     WORKSPACE_ORM_INTERFACES,
@@ -209,18 +209,18 @@ class TestARunStatingAChoiceThatDoesNotExist:
     """
 
     def test_the_option_without_a_choice_is_rejected(self):
-        with pytest.raises(MissingOrmBuildChoiceError):
+        with pytest.raises(MissingORMBuildChoiceError):
             OrmBuild.stated_on([PYTEST_COMMAND, ORM_BUILD_OPTION])
 
     def test_a_choice_the_option_does_not_offer_is_rejected(self):
-        with pytest.raises(UnknownOrmBuildChoiceError):
+        with pytest.raises(UnknownORMBuildChoiceError):
             OrmBuild.stated_on([PYTEST_COMMAND, f"{ORM_BUILD_OPTION}={UNKNOWN_CHOICE}"])
 
     def test_a_choice_the_environment_does_not_offer_is_rejected(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", [PYTEST_COMMAND])
         monkeypatch.setenv(PytestEnvironmentVariable.ORM_BUILD, UNKNOWN_CHOICE)
 
-        with pytest.raises(UnknownOrmBuildChoiceError):
+        with pytest.raises(UnknownORMBuildChoiceError):
             OrmBuild.requested()
 
 

@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 import numpy as np
 import pytest
 from numpy.testing import assert_raises
-from typing_extensions import Tuple
+from typing_extensions import Tuple, Type
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.joint_state import JointState
@@ -46,8 +46,10 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     RevoluteConnection,
     Connection6DoF,
+    DifferentialDrive,
     FixedConnection,
     OmniDrive,
+    WheeledDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -1880,6 +1882,71 @@ def test_move_branch_resets_free_connection_derivatives():
         assert world.state[dof.id].velocity == 0
         assert world.state[dof.id].acceleration == 0
         assert world.state[dof.id].jerk == 0
+
+
+# %% re-parenting a driven branch
+
+
+def create_world_with_driven_child(
+    drive_type: Type[WheeledDrive],
+) -> Tuple[World, Body, Body]:
+    """
+    Builds a world where ``driven_child`` hangs off the root by ``drive_type`` and
+    ``new_parent`` sits elsewhere under the root.
+
+    :param drive_type: The drive connecting the child to the root.
+    :return: The world, the driven child and the body to re-parent it onto.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    new_parent = Body(name=PrefixedName("new_parent"))
+    driven_child = Body(name=PrefixedName("driven_child"))
+    with world.modify_world():
+        for body in [root, new_parent, driven_child]:
+            world.add_kinematic_structure_entity(body)
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=new_parent,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.0, y=2.0, z=0.4, yaw=0.5
+                ),
+            )
+        )
+        world.add_connection(
+            drive_type.create_with_dofs(parent=root, child=driven_child, world=world)
+        )
+    driven_child.parent_connection.origin = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.3, y=-0.7, yaw=1.1, reference_frame=root
+        )
+    )
+    return world, driven_child, new_parent
+
+
+@pytest.mark.parametrize("drive_type", [OmniDrive, DifferentialDrive])
+def test_move_branch_preserves_drive(drive_type):
+    """
+    move_branch keeps a wheeled drive intact - same type and same degrees of freedom -
+    so a robot re-parented onto a carrier can still be driven afterwards.
+    """
+    world, driven_child, new_parent = create_world_with_driven_child(drive_type)
+    old_connection = driven_child.parent_connection
+    old_dof_ids = [
+        dof.id for dof in old_connection.active_dofs + old_connection.passive_dofs
+    ]
+    old_pose = driven_child.global_transform
+
+    with world.modify_world():
+        world.move_branch(driven_child, new_parent)
+
+    new_connection = driven_child.parent_connection
+    assert driven_child.parent_kinematic_structure_entity == new_parent
+    assert isinstance(new_connection, drive_type)
+    assert [
+        dof.id for dof in new_connection.active_dofs + new_connection.passive_dofs
+    ] == old_dof_ids
+    assert np.allclose(driven_child.global_transform, old_pose)
 
 
 def test_reset_state_context(pr2_world_state_reset):

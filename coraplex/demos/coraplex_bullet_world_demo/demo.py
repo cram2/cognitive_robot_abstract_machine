@@ -10,6 +10,7 @@ from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 
 from coraplex.testing import setup_world
+from krrood.entity_query_language.factories import an, entity, variable, the
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
@@ -96,17 +97,17 @@ plan = sequential(
         ParkArmsAction(Arms.BOTH),
         MoveTorsoAction(TorsoState.HIGH),
         TransportAction(
-            world.get_semantic_annotations_by_type(Milk)[0],
+            next(an(entity(variable(Milk, domain=world.semantic_annotations))).evaluate()),
             Pose.from_xyz_rpy(4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            world.get_semantic_annotations_by_type(Bowl)[0],
+            next(an(entity(variable(Bowl, domain=world.semantic_annotations))).evaluate()),
             Pose.from_xyz_rpy(5, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            world.get_semantic_annotations_by_type(Spoon)[0],
+            next(an(entity(variable(Spoon, domain=world.semantic_annotations))).evaluate()),
             Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
             GraspDescription(

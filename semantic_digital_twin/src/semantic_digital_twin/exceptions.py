@@ -964,7 +964,6 @@ class DuplicateWorldEntityError(UsageError):
             "to retrieve all matches."
         )
 
-
 @dataclass
 class DuplicateRobotAssignmentsError(UsageError):
     """

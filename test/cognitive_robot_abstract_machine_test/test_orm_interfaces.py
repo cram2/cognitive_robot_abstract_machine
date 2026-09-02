@@ -15,7 +15,7 @@ from typing_extensions import List, Optional, Set, Tuple
 
 from cognitive_robot_abstract_machine import orm_interfaces
 from cognitive_robot_abstract_machine.exceptions import (
-    MissingOrmGeneratorError,
+    MissingORMGeneratorError,
     OrmGenerationFailedError,
 )
 from cognitive_robot_abstract_machine.orm_interfaces import (
@@ -204,7 +204,7 @@ def test_missing_generator_names_its_package(workspace: WorkspaceOrmInterfaces):
     incomplete = workspace.interfaces[-1]
     incomplete.generator.unlink()
 
-    with pytest.raises(MissingOrmGeneratorError) as error:
+    with pytest.raises(MissingORMGeneratorError) as error:
         workspace.regenerate()
 
     assert error.value.package_name == incomplete.package_name

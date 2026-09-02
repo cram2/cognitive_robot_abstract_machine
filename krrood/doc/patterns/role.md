@@ -362,9 +362,8 @@ print("root type:", Representative.get_root_role_taker_type())
 
 ## When Not to Use the Role Pattern
 
-- The new class changes the permanent, identifying properties of the original. A `Room` that becomes a `Kitchen` does
+- - The new class changes the permanent, identifying properties of the original. A `Room` that becomes a `Kitchen` does
 not affect any of the things that makes it a `Room`, such as its size or location. But an `egg` that is boiled, changes
-its original properties like its state of matter from liquid to solid.
 - The new class has its own independent persistent identity.
 - You never need to relate the two objects back to a shared underlying entity.
 

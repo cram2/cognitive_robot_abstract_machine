@@ -237,7 +237,6 @@ class RobotDemonstration(ABC):
             world = self.build_simulated_world()
             viz = VizMarkerPublisher(node=self.ros_node, _world=world)
             return world
-
         world = self.ros_session.fetch_world()
         WorldSynchronizer(_world=world, node=self.ros_session.node)
         return world

@@ -19,8 +19,8 @@ from functools import cache
 from typing_extensions import Optional, Sequence, Tuple
 
 from cognitive_robot_abstract_machine.exceptions import (
-    MissingOrmBuildChoiceError,
-    UnknownOrmBuildChoiceError,
+    MissingORMBuildChoiceError,
+    UnknownORMBuildChoiceError,
 )
 from cognitive_robot_abstract_machine.orm_interfaces import (
     WORKSPACE_ORM_INTERFACES,
@@ -95,7 +95,7 @@ class OrmBuild(StrEnum):
         :raises UnknownOrmBuildChoiceError: If it names none.
         """
         if choice not in cls.choices():
-            raise UnknownOrmBuildChoiceError(source, choice, cls.choices())
+            raise UnknownORMBuildChoiceError(source, choice, cls.choices())
         return cls(choice)
 
     @classmethod
@@ -116,7 +116,7 @@ class OrmBuild(StrEnum):
             if separator:
                 return cls.named(choice, option)
             if position + 1 == len(arguments):
-                raise MissingOrmBuildChoiceError(option, cls.choices())
+                raise MissingORMBuildChoiceError(option, cls.choices())
             return cls.named(arguments[position + 1], option)
         return None
 

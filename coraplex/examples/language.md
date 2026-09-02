@@ -3,7 +3,7 @@ jupyter:
   jupytext:
     text_representation:
       extension: .md
-      format_name: myst
+      format_name: markdown
       format_version: '1.3'
       jupytext_version: 1.16.3
   kernelspec:
@@ -24,13 +24,13 @@ status of execution.
 There are 4 language expressions:
 
 | Name             | Description                                                                                                                                                                                                                                                                                | 
-|------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Sequential**   | Executes the designators one after another, if one of the designators raises an exception the execution is aborted and the state FAILED will be returned.                                                                                                                                  |
 | **Try In Order** | Executes the designators one after another, if one designator raises an exception the exception is caught and saved but the execution is not interrupted and the other designators are executed. Returns the state SUCCEDED if at least one designator can be executed without exception. |
 | **Repeat**       | Repeat the previous language expression a number of time. Has to be used with a language expression and an integer.                                                                                                                                                                        | 
 | **Parallel**     | Executes all designators in parallel. For each designator there will be a new thread created and the designator is executed in this thread. If one of the designators raises an exception the returned state will be FAILED.                                                               |
 | **Try All**      | Executes all designators in parallel with a designated thread for each designator. Returns the state SUCCEDED if at least one designator can be executed without an exception                                                                                                              |
-| **Monitor**      | Monitors the execution of the attached langauge expression, will interrupt the execution as soon as a given condition is fulfilled.                                                                                                                                                        | 
+| **Monitor**      | Monitors the execution of the attached langauge expression, will interrupt or pause it once a given condition is fulfilled.                                                                                                                                                                 | 
 
 The Sequential plan is the only one which aborts the execution once an error is raised.
 
@@ -42,14 +42,15 @@ designators are leafs.
 If you are performing a plan with a simulated robot, you need a BulletWorld.
 
 ```python
+from coraplex.execution_environment import simulated_robot
 from coraplex.testing import setup_world
-from semantic_digital_twin.robots.pr2 import PR2
 from coraplex.datastructures.dataclasses import Context
+from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
-pr2_view = PR2.from_world(world)
+pr2 = PR2.from_world(world)
 
-context = Context(world, pr2_view)
+context = Context(world, pr2)
 ```
 
 
@@ -61,21 +62,22 @@ the execution will be aborted and the state FAILED will be returned.
 We will start with a simple example that uses an action designator for moving the robot and parking its arms.
 
 ```python
-from coraplex.robot_plans import *
-from coraplex.datastructures.pose import PoseStamped
 from coraplex.datastructures.enums import Arms
-from coraplex.language import SequentialPlan
+from coraplex.plans.factories import sequential
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+from semantic_digital_twin.spatial_types import Pose
 
-navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0]))
-park = ParkArmsActionDescription([Arms.BOTH])
+navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+park = ParkArmsAction(Arms.BOTH)
 
-plan = SequentialPlan(context, navigate, park)
+plan = sequential([navigate, park], context=context).plan
 ```
 
-With this simple plan created we can inspect it and render the created tree structure.
+With this simple plan created we can inspect it and open an interactive visualization of the tree structure.
 
 ```python
-plan.plot_plan_structure()
+plan.visualize()
 ```
 
 As you can see there is the root node which is the language expression and then there are the leafs which are the
@@ -86,8 +88,6 @@ The plan can be executed by wrapping it inside a ```with simulated_robot``` envi
 plan.
 
 ```python
-from coraplex.process_module import simulated_robot
-
 with simulated_robot:
     plan.perform()
 ```
@@ -101,16 +101,16 @@ be returned if all designator executions raise an error.
 Besides the described difference in behaviour this language expression can be used in the same way as Sequential.
 
 ```python
-from coraplex.robot_plans import *
-from coraplex.datastructures.pose import PoseStamped
 from coraplex.datastructures.enums import Arms
-from coraplex.process_module import simulated_robot
-from coraplex.language import TryAllPLan
+from coraplex.plans.factories import try_in_order
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+from semantic_digital_twin.spatial_types import Pose
 
-navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0]))
-park = ParkArmsActionDescription([Arms.BOTH])
+navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+park = ParkArmsAction(Arms.BOTH)
 
-plan = TryAllPLan(context, navigate, park)
+plan = try_in_order([navigate, park], context=context).plan
 
 with simulated_robot:
     plan.perform()
@@ -123,31 +123,19 @@ exception is raised, this is the case since threads can not be killed from the o
 unforeseen problems. The state returned will be SUCCEDED if all designators could be executed without an exception raised
 in any other case FAILED will be returned.
 
-Since executing designators in parallel can get chaotic especially with complex actions like PickUp or Transport. For
-this reason not all action designators can be used in parallel and try all expressions. The list of action designator
-that cannot be used in language expressions can be seen in {attr}`~coraplex.language.ParallelPlan.parallel_blocklist`.
-
-Designators that cannot be used in parallel and try all:
-
-* PickUpAction
-* PlaceAction
-* OpenAction
-* CloseAction
-* TransportAction
-
 Using the parallel expressions works like Sequential and TryInOrder.
 
 ```python
-from coraplex.robot_plans import *
-from coraplex.datastructures.pose import PoseStamped
 from coraplex.datastructures.enums import Arms
-from coraplex.process_module import simulated_robot
-from coraplex.language import ParallelPlan
+from coraplex.plans.factories import parallel
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+from semantic_digital_twin.spatial_types import Pose
 
-navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0]))
-park = ParkArmsActionDescription([Arms.BOTH])
+navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+park = ParkArmsAction(Arms.BOTH)
 
-plan = ParallelPlan(context, navigate, park)
+plan = parallel([navigate, park], context=context).plan
 
 with simulated_robot:
     plan.perform()
@@ -161,16 +149,16 @@ will return SUCCEEDED if at least one designator is executed without raising an 
 TryAll can be used like any other language expression.
 
 ```python
-from coraplex.robot_plans import *
-from coraplex.datastructures.pose import PoseStamped
 from coraplex.datastructures.enums import Arms
-from coraplex.process_module import simulated_robot
-from coraplex.language import TryAllPLan
+from coraplex.plans.factories import try_all
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+from semantic_digital_twin.spatial_types import Pose
 
-navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0]))
-park = ParkArmsActionDescription([Arms.BOTH])
+navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+park = ParkArmsAction(Arms.BOTH)
 
-plan = TryAllPLan(context, navigate, park)
+plan = try_all([navigate, park], context=context).plan
 
 with simulated_robot:
     plan.perform()
@@ -178,61 +166,57 @@ with simulated_robot:
 
 ## Combination of Expressions
 
-You can also combine different language expressions to further structure your plans. If you combine sequential and
-parallel expression please keep in mind that sequential expressions bind stronger than parallel ones. For example:
-
-```
-ParallelPlan(navigate, SequentialPlan(park, move_torso))
-```
-
-In this case 'park' and 'move_torso' would form a Sequential expression and 'naviagte' would form a Parallel expression
-with Sequential. You can try this yourself in the following cell.
+You can also combine different language expressions to further structure your plans. For example, you can nest a
+Sequential expression inside a Parallel one by passing the result of one factory as a child of another.
 
 ```python
-from coraplex.robot_plans import *
-from coraplex.datastructures.pose import PoseStamped
 from coraplex.datastructures.enums import Arms
-from coraplex.process_module import simulated_robot
-from coraplex.language import SequentialPlan, ParallelPlan
+from coraplex.plans.factories import parallel, sequential
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
+from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.spatial_types import Pose
 
-navigate = NavigateActionDescription([PoseStamped.from_list([1, 1, 0])])
-park = ParkArmsActionDescription([Arms.BOTH])
-move_torso = MoveTorsoActionDescription([TorsoState.HIGH])
+navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+park = ParkArmsAction(Arms.BOTH)
+move_torso = MoveTorsoAction(TorsoState.HIGH)
 
-plan = ParallelPlan(context, navigate, SequentialPlan(context, park, move_torso))
+plan = parallel([navigate, sequential([park, move_torso])], context=context).plan
 
 with simulated_robot:
     plan.perform()
 ```
 
+In this case 'park' and 'move_torso' form a Sequential expression, and that Sequential expression forms a Parallel
+expression together with 'navigate'.
+
 ## Code Objects
 
-You can not only use designators in the plan language but also python code. For this there is the {class}`~coraplex.language.Code`  object
-which takes a callable and the arguments for this callable. This allows you to execute arbitrary code in a plan.
+You can not only use designators in the plan language but also python code. For this there is the {func}`~coraplex.plans.factories.code`
+factory which takes a callable and wraps it in a {class}`~coraplex.language.CodeNode`. This allows you to execute
+arbitrary code in a plan.
 
-The callable that is used in the {class}`~coraplex.language.Code` object can either be a lambda expression or, for more complex code, a
-function. If you use a function you can provide parameters as keyword-arguments.
+The callable can either be a lambda expression or, for more complex code, a function.
 
 Although this expression is more intended for debugging and testing purposes since the code can not really interact with 
 other parts of the plan.
 
 ```python
-from coraplex.robot_plans import *
 from coraplex.datastructures.enums import Arms
-from coraplex.process_module import simulated_robot
-from coraplex.language import CodePlan, ParallelPlan
+from coraplex.plans.factories import code, parallel
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 
 
-def code_test(param):
+def code_test():
     print("-" * 20)
-    print(param)
+    print("Code function")
 
 
-park = ParkArmsActionDescription([Arms.BOTH])
-code = CodePlan(context, lambda: print("This is from the code object"))
-code_func = CodePlan(context, code_test, {"param": "Code function"})
+park = ParkArmsAction(Arms.BOTH)
+code_lambda = code(lambda: print("This is from the code object"), context=context)
+code_func = code(code_test, context=context)
 
-plan = ParallelPlan(context, park, code, code_func)
+plan = parallel([park, code_lambda, code_func], context=context).plan
 
 with simulated_robot:
     plan.perform()
@@ -241,119 +225,122 @@ with simulated_robot:
 ## Exception Handling
 
 If an exception is raised during the execution of a designator when it is used in a language expression the exception
-will be caught and saved to a dictionary. In general all designators in a language expression are executed regardless
-of exceptions raised, the only exception from this is the Sequential expression which stops after it encountered an
-exception.
+is caught and saved on that designator's node. Sequential is the only expression that stops the rest of the plan once
+this happens; TryInOrder and TryAll continue with their remaining children and only fail the whole expression if all
+of them failed. Parallel continues running its remaining children as well, but re-raises the failure once every child
+has finished.
 
-The language will only catch exceptions that are of type {class}`~coraplex.plan_failures.PlanFailure` meaning errors that are defined in
+The language will only catch exceptions that are of type {class}`~coraplex.plans.failures.PlanFailure` meaning errors that are defined in
 plan_failures.py in CoraPlex. This also means normal Python errors, such as KeyError, will interrupt the execution of your
 designators.
 
-We will see how exceptions are handled at a simple example.
+We will see how exceptions are handled at a simple example using TryAll, so that a failing designator does not fail
+the whole plan.
 
 ```python
-from coraplex.robot_plans import *
-from coraplex.process_module import simulated_robot
-from coraplex.language import CodePlan, ParallelPlan
+from coraplex.plans.factories import code, try_all
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.plans.failures import PlanFailure
+from semantic_digital_twin.spatial_types import Pose
 
 
 def code_test():
     raise PlanFailure
 
 
-navigate = NavigateActionDescription([PoseStamped.from_list([1, 1, 0])])
-code_func = CodePlan(context, code_test)
+navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+code_func = code(code_test, context=context)
 
-plan = ParallelPlan(context, navigate, code_func)
+plan = try_all([navigate, code_func], context=context).plan
 
 with simulated_robot:
     plan.perform()
 
-print(plan.root.reason)
+print(plan.root.status)
+print(code_func.reason)
 ```
 
 ## Repeat
 
-Repeat simply repeats a language expression a number of times. As all other language expressions Repeat captures
-exceptions that occur during execution and saves them to the dictionary in the root of the plan.
-
-Since Repeat uses the \* operator you should keep in mind that it will be evaluated before any other operator, so use
-parentheses to ensure the correct structure of your plan.
+Repeat attempts a language expression again whenever an attempt fails, until it either succeeds or runs out of
+attempts. Running out of attempts raises {class}`~coraplex.plans.failures.RepetitionsExhausted`.
 
 You can see an example of how to use Repeat below.
 
 ```python
-from coraplex.robot_plans import *
-from coraplex.process_module import simulated_robot
-from coraplex.datastructures.enums import TorsoState
-from coraplex.language import SequentialPlan, RepeatPlan
+from coraplex.plans.factories import repeat
+from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
+from semantic_digital_twin.datastructures.definitions import TorsoState
 
-move_torso_up = MoveTorsoActionDescription([TorsoState.HIGH, TorsoState.MID, TorsoState.LOW])
-move_torso_down = MoveTorsoActionDescription([TorsoState.LOW, TorsoState.MID, TorsoState.HIGH])
+move_torso_up = MoveTorsoAction(TorsoState.HIGH)
+move_torso_down = MoveTorsoAction(TorsoState.LOW)
 
-plan = RepeatPlan(context, 3, SequentialPlan(context, move_torso_up, move_torso_down))
+plan = repeat([move_torso_up, move_torso_down], maximum_repetitions=3, context=context).plan
 
 with simulated_robot:
     plan.perform()
 ```
 
-## Monitor
+## Monitors
 
-Monitor allows monitoring the execution of a language expression and interrupting it as soon as a given condition is
-fulfilled. The condition can either be a Callable that returns a boolean or a Fluent.
-When executed, the Monitor will create a separate thread which will check if the condition is satisfied with a frequency
-of 10 Hz. If the condition is satisfied, the execution of the monitored plan will be interrupted and the state
-of the node will be set to INTERRUPTED.
+A monitor lets you attach a condition to a language expression that is evaluated by the control loop alongside it,
+so it can act on the expression's children while they are running. The condition is a
+{class}`~giskardpy.motion_statechart.graph_node.MotionStatechartNode`, for instance a monitor that turns True after a
+fixed amount of simulation time.
 
-For the example on how Monitors work, we will use the previous example with the robot moving up and down. We will use a
-Monitor to interrupt the execution after 2 seconds instead of executing the whole plan 5 times.
+There are three factories for this:
+
+* {func}`~coraplex.plans.factories.cancel_when` stops the children once the monitor observes True and gives up on
+  the plan with a {class}`~coraplex.plans.failures.PlanCancelled`, instead of leaving the rest of the plan waiting for
+  a subtree that will not finish.
+* {func}`~coraplex.plans.factories.pause_while` holds the children for as long as the monitor observes True.
+* {func}`~coraplex.plans.factories.pause_until` holds the children until the monitor observes True, then lets them run.
+
+For the example we will use the previous example with the robot moving up and down, and stop it after 2 seconds of
+simulation time. Since cancelling gives up on the plan, performing it raises {class}`~coraplex.plans.failures.PlanCancelled`.
 
 ```python
-from coraplex.robot_plans import *
-from coraplex.process_module import simulated_robot
-from coraplex.language import MonitorPlan, RepeatPlan, SequentialPlan
-import time
-from coraplex.datastructures.enums import TorsoState
+from coraplex.plans.factories import cancel_when, repeat
+from coraplex.plans.failures import PlanCancelled
+from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
+from giskardpy.motion_statechart.monitors.payload_monitors import CountSimulationTimeSeconds
+from semantic_digital_twin.datastructures.definitions import TorsoState
 
-move_torso_up = MoveTorsoActionDescription([TorsoState.HIGH, TorsoState.MID, TorsoState.LOW])
-move_torso_down = MoveTorsoActionDescription([TorsoState.LOW, TorsoState.MID, TorsoState.HIGH])
+move_torso_up = MoveTorsoAction(TorsoState.HIGH)
+move_torso_down = MoveTorsoAction(TorsoState.LOW)
 
+plan = cancel_when(
+    [repeat([move_torso_up, move_torso_down], maximum_repetitions=3)],
+    monitor=CountSimulationTimeSeconds(seconds=2),
+    context=context,
+).plan
 
-def monitor_func():
-    time.sleep(2)
-    return True
-
-
-plan = MonitorPlan(monitor_func, context, RepeatPlan(context, 3, SequentialPlan(context, move_torso_up, move_torso_down)))
-
-with simulated_robot:
-    plan.perform()
+try:
+    with simulated_robot:
+        plan.perform()
+except PlanCancelled as cancelled:
+    print(cancelled)
 ```
 
-Monitors can be configured to do more than just interrupt the execution of the monitored plan. You can also configure them to
-pause and resume the execution of the monitored plan. This can be achieved with the `behavior` parameter of the `MonitorPlan`.
-
-If the `behavior` is set to `resume`, the plan will be launched in a paused state and will be resumed as soon as the condition is fulfilled.
+{func}`~coraplex.plans.factories.pause_until` can be used the same way to launch a subtree in a paused state that is
+only released once the monitor's condition is fulfilled.
 
 ```python
-from coraplex.robot_plans.actions.core import MoveTorsoActionDescription
-from coraplex.process_module import simulated_robot
-from coraplex.language import MonitorPlan, RepeatPlan, SequentialPlan
-from coraplex.datastructures.enums import TorsoState
-import time
+from coraplex.plans.factories import pause_until, repeat
+from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
+from giskardpy.motion_statechart.monitors.payload_monitors import CountSimulationTimeSeconds
+from semantic_digital_twin.datastructures.definitions import TorsoState
 
-def monitor_func():
-    time.sleep(2)
-    return True
+move_torso_up = MoveTorsoAction(TorsoState.HIGH)
+move_torso_down = MoveTorsoAction(TorsoState.LOW)
 
-move_torso_up = MoveTorsoActionDescription([TorsoState.HIGH, TorsoState.MID, TorsoState.LOW])
-move_torso_down = MoveTorsoActionDescription([TorsoState.LOW, TorsoState.MID, TorsoState.HIGH])
-
-plan = MonitorPlan(monitor_func, context, RepeatPlan(context, 3, SequentialPlan(context, move_torso_up, move_torso_down)), behavior="resume")
+plan = pause_until(
+    [repeat([move_torso_up, move_torso_down], maximum_repetitions=3)],
+    monitor=CountSimulationTimeSeconds(seconds=2),
+    context=context,
+).plan
 
 with simulated_robot:
     plan.perform()
 ```
-This will resume the execution of the monitored plan as soon as the condition is fulfilled.
-
+This will hold the wrapped plan for the first 2 seconds of simulation time before letting it run.

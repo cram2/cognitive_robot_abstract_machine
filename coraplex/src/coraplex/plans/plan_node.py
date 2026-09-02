@@ -5,11 +5,15 @@ from abc import abstractmethod, ABC
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Any, List, Dict, Type, TYPE_CHECKING, Iterable, Iterator
+from itertools import groupby
+from typing import Optional, Any, List, Type, TYPE_CHECKING, Iterable, Iterator
 
 from typing_extensions import Union
 
 from coraplex.plans.designator import Designator
+from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.graph_node import Goal, MotionStatechartNode
+from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from krrood.entity_query_language.query.match import Match
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from coraplex.datastructures.execution_data import ExecutionData
@@ -20,7 +24,6 @@ from coraplex.plans.executables import (
 )
 from coraplex.plans.failures import PlanFailure
 from coraplex.plans.plan_entity import PlanEntity
-from coraplex.utils import split_list_by_type
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import Task
@@ -346,36 +349,105 @@ class PlanNode(PlanEntity):
 
     def parse(self) -> Executable: ...
 
-    def merge_motion_executables(
-        self, executables: List[Executable]
-    ) -> List[Executable]:
+    @property
+    def has_motions(self) -> bool:
         """
-        Merge consecutive giskard executables into a single one while leaving the other
-        executables untouched and in their original order.
-        """
-        result = []
-        for group in split_list_by_type(executables, GiskardExecutable):
-            if not isinstance(group[0], GiskardExecutable):
-                result.extend(group)
-                continue
-            result.append(
-                GiskardExecutable(
-                    motion_mappings=self.merge_motion_mappings(group),
-                    context=self.plan.context,
-                )
-            )
-        return result
+        Whether this subtree contributes any node to a motion state chart.
 
-    def merge_motion_mappings(
-        self, motions: List[GiskardExecutable]
-    ) -> Dict[MotionNode, Task]:
+        Used to skip nodes that would otherwise produce an empty goal.
         """
-        Combine the motion mappings of several giskard executables into one mapping.
+        return any(child.has_motions for child in self.children)
+
+    @property
+    def contains_execution_boundary(self) -> bool:
         """
-        new_mappings = {}
-        for motion in motions:
-            new_mappings.update(motion.motion_mappings)
-        return new_mappings
+        Whether this node or any of its descendants splits the plan into separate motion
+        state charts.
+        """
+        return any(
+            isinstance(node, ExecutionBoundaryNode)
+            for node in [self] + self.descendants
+        )
+
+    def add_to_motion_state_chart(
+        self, parent_goal: Goal, executable: GiskardExecutable
+    ) -> MotionStatechartNode:
+        """
+        Add this node's giskard representation to `parent_goal`, extending the motion state
+        chart the goal belongs to.
+
+        :param parent_goal: The goal this node's representation becomes a child of.
+        :param executable: The executable whose motion mappings record the added nodes.
+        :return: The node that was added.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot be added to a motion state chart."
+        )
+
+    def add_children_to_motion_state_chart(
+        self, goal: Goal, children: List[PlanNode], executable: GiskardExecutable
+    ) -> None:
+        """
+        Add every child that contributes motions below `goal`, one node at a time.
+
+        Children without motions are skipped, so they cannot leave an empty goal behind.
+        """
+        for child in children:
+            if not child.has_motions:
+                continue
+            child.add_to_motion_state_chart(goal, executable)
+
+    def parse_children(self, children: List[PlanNode]) -> Executable:
+        """
+        Parse `children` into one executable, building one motion state chart per run of
+        children that no execution boundary separates.
+
+        A child whose subtree contains an execution boundary is parsed on its own, so
+        every executable preceding it has run, and mutated the world, before it is
+        reached.
+        """
+        if not self.contains_execution_boundary:
+            return self.create_giskard_executable(children)
+
+        execution_list = []
+        for separated, group in groupby(
+            children, key=lambda child: child.contains_execution_boundary
+        ):
+            if separated:
+                execution_list.extend(child.parse() for child in group)
+            else:
+                execution_list.append(self.create_giskard_executable(list(group)))
+        if len(execution_list) == 1:
+            # a single group needs no wrapper around it
+            return execution_list[0]
+        return Executable(execution_list=execution_list, context=self.plan.context)
+
+    def create_giskard_executable(self, nodes: List[PlanNode]) -> GiskardExecutable:
+        """
+        Create an executable holding a single motion state chart, populated by adding the
+        giskard representation of every node in `nodes` one at a time.
+
+        The chart is created once here and only ever extended afterwards, because a
+        compiled chart can no longer grow.
+
+        :param nodes: The plan nodes whose motions form one motion state chart.
+        """
+        motion_state_chart = MotionStatechart()
+        root_goal = self.create_goal()
+        motion_state_chart.add_node(root_goal)
+        executable = GiskardExecutable(
+            motion_state_chart=motion_state_chart,
+            root_node=root_goal,
+            context=self.plan.context,
+        )
+        self.add_children_to_motion_state_chart(root_goal, nodes, executable)
+        return executable
+
+    def create_goal(self) -> Goal:
+        """
+        :return: An empty goal describing how this node's children are executed.
+        """
+        return Sequence(name=type(self).__name__)
 
     def __node_info__(self):
         return [
@@ -590,6 +662,9 @@ class ActionNode(DesignatorNode):
         """
         Create the ExecutionData and logs additional information about the execution of
         this node.
+
+        .. note: With the current implementation, the exact recording of execution data is not possible. So this is
+        not called at the moment.
         """
         robot_pose = self.plan.robot.root.global_pose
         exec_data = ExecutionData(robot_pose, self.plan.world.state._data)
@@ -624,9 +699,6 @@ class ActionNode(DesignatorNode):
         return None
 
     def notify(self):
-
-        self.create_execution_data_pre_perform()
-
         if not self.children:
             self.action.expand()
 
@@ -634,38 +706,47 @@ class ActionNode(DesignatorNode):
         for child in self.children:
             child.notify()
 
-        # TODO: This can't stay here
-        self.update_execution_data_post_perform()
+    @property
+    def body_children(self) -> List[PlanNode]:
+        """
+        :return: The children forming the action body, without its pre- and
+            post-condition.
+        """
+        return self.children[1:-1]
+
+    def add_to_motion_state_chart(
+        self, parent_goal: Goal, executable: GiskardExecutable
+    ) -> Goal:
+        """
+        Add this action's body as its own goal below `parent_goal`.
+
+        .. note:: A nested action's conditions are not evaluated inside the surrounding
+            motion state chart; only the conditions of the action a chart is built for
+            are, see :meth:`parse`.
+        """
+        goal = self.create_goal()
+        parent_goal.add_node(goal)
+        self.add_children_to_motion_state_chart(goal, self.body_children, executable)
+        return goal
 
     def parse(self) -> Executable:
+        """
+        Parse the action body into an executable, gating it with the action's conditions.
+
+        The pre-condition gates the first motion state chart of the body and the
+        post-condition the last one.
+        """
         children = self.children
-        pre_condition_node = children.pop(0)
-        post_condition_node = children.pop(-1)
+        pre_condition_node = children[0]
+        post_condition_node = children[-1]
 
-        child_execs = [child.parse() for child in children]
-        merged = self.merge_motion_executables(child_execs)
-
-        motion_execs = [
-            executable
-            for executable in merged
-            if isinstance(executable, GiskardExecutable)
-        ]
-        if len(motion_execs) == 1:
-            # The action body is a single motion state chart, so the conditions
-            # can be evaluated inside it (gating start/end, aborting on failure).
-            motion_exec = motion_execs[0]
-            motion_exec.pre_condition_node = pre_condition_node
-            motion_exec.post_condition_node = post_condition_node
-            return motion_exec
-
-        giskard_child_execs = [
-            executable
-            for executable in child_execs[0].execution_list
-            if isinstance(executable, GiskardExecutable)
-        ]
-        giskard_child_execs[0].pre_condition_node = pre_condition_node
-        giskard_child_execs[-1].post_condition_node = post_condition_node
-        return child_execs[0]
+        executable = self.parse_children(self.body_children)
+        giskard_executables = executable.giskard_executables
+        if not giskard_executables:
+            return executable
+        giskard_executables[0].pre_condition_node = pre_condition_node
+        giskard_executables[-1].post_condition_node = post_condition_node
+        return executable
 
     def execute(self):
         self.parse().execute()
@@ -711,12 +792,23 @@ class MotionNode(DesignatorNode):
                 return node
         return None
 
-    def parse(self) -> Executable:
-        task = self.motion.motion_chart
+    @property
+    def has_motions(self) -> bool:
+        return True
 
-        return GiskardExecutable(
-            motion_mappings={self: task}, context=self.plan.context
-        )
+    def add_to_motion_state_chart(
+        self, parent_goal: Goal, executable: GiskardExecutable
+    ) -> Task:
+        """
+        Add this motion's giskard task below `parent_goal` and record it on `executable`.
+        """
+        task = self.motion.motion_chart
+        parent_goal.add_node(task)
+        executable.motion_mappings[self] = task
+        return task
+
+    def parse(self) -> Executable:
+        return self.create_giskard_executable([self])
 
 
 ActionLike = Union[Match, Designator, PlanNode]

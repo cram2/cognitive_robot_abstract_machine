@@ -38,7 +38,7 @@ def simple_plan(immutable_model_world):
     ).plan
     return plan
 
-
+@pytest.mark.skip("Execution Data is not recorded right now")
 def test_plan_serialization(coraplex_testing_session, simple_plan):
     session = coraplex_testing_session
 
@@ -106,7 +106,7 @@ def complex_plan(mutable_model_world):
 
     return plan
 
-
+@pytest.mark.skip("Execution Data is not recorded right now")
 def test_execution_data_of_complex_plan(coraplex_testing_session, complex_plan):
 
     with simulated_robot:

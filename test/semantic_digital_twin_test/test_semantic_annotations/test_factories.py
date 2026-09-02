@@ -310,6 +310,18 @@ class TestFactories(unittest.TestCase):
         semantic_drawer_annotations = world.get_semantic_annotations_by_type(Drawer)
         self.assertEqual(len(semantic_drawer_annotations), 1)
 
+    def test_hole_direction_carries_the_entity_own_root_as_reference_frame(self):
+        world = World.create_with_root_body("root")
+        with world.modify_world():
+            drawer = Drawer.create_with_new_body_in_world(
+                name="drawer",
+                world=world,
+                scale=Scale(0.2, 0.3, 0.2),
+            )
+
+        assert drawer.hole_direction.reference_frame is drawer.root
+        np.testing.assert_allclose(drawer.hole_direction.to_np()[:3], [0, 0, 1])
+
     def test_has_slider_factory(self):
         world = World.create_with_root_body("root")
         with world.modify_world():

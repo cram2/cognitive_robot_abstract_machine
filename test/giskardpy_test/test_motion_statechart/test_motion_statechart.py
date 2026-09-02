@@ -54,7 +54,8 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     CountSeconds,
     CountControlCycles,
     CountSimulationTimeSeconds,
-    ThreadedPredicateMonitor, CheckControlCycleCount,
+    ThreadedPredicateMonitor,
+    CheckControlCycleCount,
 )
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -92,7 +93,9 @@ from krrood.symbolic_math.symbolic_math import (
     trinary_logic_or,
     FloatVariable,
 )
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -453,6 +456,69 @@ def test_each_node_is_built_exactly_once():
 
     assert goal.build_count == 1
     assert goal.child.build_count == 1
+
+
+# %% goals populated before compile
+
+
+def test_adding_the_same_node_to_a_goal_twice_registers_it_once():
+    """
+    A goal that already owns a node must not register it a second time, so a chart can
+    be populated before compile without the template's expand duplicating its children.
+    """
+    msc = MotionStatechart()
+    goal = Sequence()
+    msc.add_node(goal)
+    node = ConstTrueNode()
+
+    goal.add_node(node)
+    index_after_first_add = node.index
+    goal.add_node(node)
+
+    assert goal.nodes == [node]
+    assert msc.nodes == [goal, node]
+    assert node.index == index_after_first_add
+
+
+def test_goal_populated_before_compile_matches_one_populated_by_expand():
+    """
+    Adding a sequence's children up front yields the same children, wiring and
+    observation as passing them to the template's constructor and letting expand add
+    them.
+
+    .. note:: The charts' node order differs, because children populated up front are
+        registered before the following top level nodes rather than during compilation.
+    """
+    populated_before_compile = MotionStatechart()
+    goal = Sequence()
+    populated_before_compile.add_node(goal)
+    goal.add_node(ConstTrueNode(name="a"))
+    goal.add_node(ConstTrueNode(name="b"))
+    populated_before_compile.add_node(EndMotion.when_true(goal))
+
+    populated_by_expand = MotionStatechart()
+    expanded_goal = Sequence(nodes=[ConstTrueNode(name="a"), ConstTrueNode(name="b")])
+    populated_by_expand.add_node(expanded_goal)
+    populated_by_expand.add_node(EndMotion.when_true(expanded_goal))
+
+    for msc in (populated_before_compile, populated_by_expand):
+        executor = _compile_msc(msc)
+        while not msc.is_end_motion():
+            executor.tick()
+
+    assert [node.name for node in goal.nodes] == ["a", "b"]
+    assert [node.name for node in expanded_goal.nodes] == ["a", "b"]
+    assert sorted(node.name for node in populated_before_compile.nodes) == sorted(
+        node.name for node in populated_by_expand.nodes
+    )
+    # expand still wires the sequence: the second child waits for the first to succeed
+    for sequence in (goal, expanded_goal):
+        assert sequence.nodes[1].start_condition.free_variables() == [
+            sequence.nodes[0].is_succeeded
+        ]
+    assert goal.observation_state == expanded_goal.observation_state
+    assert populated_before_compile.is_end_motion()
+    assert populated_by_expand.is_end_motion()
 
 
 # %% build orchestration and artifact production
@@ -1904,8 +1970,9 @@ class TestTemplates:
 
         executor = Executor(MotionStatechartContext(world=hsr_world_state_reset))
         executor.compile(motion_statechart=msc)
+
         executor.tick_until_end()
-        msc.draw('/tmp/muh.pdf')
+        msc.draw("/tmp/muh.pdf")
 
         assert done.observation_state == ObservationStateValues.TRUE
         cut_life_cycle = msc.history.get_life_cycle_history_of_node(cut)

@@ -78,6 +78,15 @@ include = ["semantic_digital_twin*"]
 [tool.setuptools.dynamic]
 version = {attr = "semantic_digital_twin._version.__version__"}
 
+[dependency-groups]
+workspace = [
+    "giskardpy",
+    "krrood",
+    "physics_simulators",
+    "probabilistic_model",
+    "random_events",
+]
+
 [project.optional-dependencies]
 gui = [
     "ripple_down_rules[gui]",
