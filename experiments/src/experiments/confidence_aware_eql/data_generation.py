@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import a
+from krrood.entity_query_language.factories import a, an
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
@@ -60,7 +60,7 @@ def _generate_objects_for_distribution(distribution: MassDistribution) -> List[A
     :param distribution: The mass distribution to sample objects from.
     :return: The generated objects.
     """
-    query = a(distribution.object_class)(root=a(Body)(inertial=a(Inertial)(mass=...)))
+    query = a(distribution.object_class)(root=a(Body)(inertial=an(Inertial)(mass=...)))
     query.expression.limit(distribution.number_of_samples)
     parameters = UnderspecifiedParameters(query)
     [mass_variable] = parameters.variables.values()

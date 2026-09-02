@@ -28,6 +28,20 @@ class ObjectClass(enum.Enum):
     POT = "Pot"
 
 
+class Feature(enum.StrEnum):
+    """The columns of the feature dataframe :func:`extract_feature_dataframe` produces.
+
+    A :class:`~enum.StrEnum`, so a member equals and hashes like its string value: existing
+    code that indexes a column by its plain string name keeps working unchanged.
+    """
+
+    MASS = "mass"
+    """The object's mass, in kilograms."""
+
+    CLASS = "class"
+    """The object's semantic-annotation class."""
+
+
 def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
     """Extract the mass and class of each object as a feature dataframe.
 
@@ -50,8 +64,10 @@ def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
     mass_column = next(name for name in extracted.columns if name.endswith(".mass"))
     dataframe = pd.DataFrame(
         {
-            "mass": extracted[mass_column].to_numpy(),
-            "class": [ObjectClass(type(instance).__name__) for instance in objects],
+            Feature.MASS: extracted[mass_column].to_numpy(),
+            Feature.CLASS: [
+                ObjectClass(type(instance).__name__) for instance in objects
+            ],
         }
     )
     return dataframe

@@ -3,7 +3,7 @@ import pytest
 
 import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.factories import variable
+from krrood.entity_query_language.factories import deduced_variable, variable
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.rules.conclusion import Add
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Cup
@@ -34,7 +34,7 @@ def _concluding_rule_for(cup: Cup) -> SymbolicExpression:
     """A trivial always-true rule whose conclusion binds ``cup`` to a result variable."""
     cup_variable = variable(Cup, domain=[cup])
     condition = HasType(cup_variable, Cup)
-    concluded = variable(Cup, domain=[])
+    concluded = deduced_variable(Cup)
     with condition:
         Add(concluded, cup_variable)
     return condition
