@@ -54,7 +54,7 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     CountSeconds,
     CountControlCycles,
     CountSimulationTimeSeconds,
-    ThreadedPredicateMonitor,
+    ThreadedPredicateMonitor, CheckControlCycleCount,
 )
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -1884,22 +1884,22 @@ class TestTemplates:
             name="Cut",
         )
         # A human blocks the cut 50 cycles after the knife is in place, for 50 cycles.
-        wait_for_human = CountControlCycles(name="Human Approaching", control_cycles=50)
+        wait_for_human = CountControlCycles(name="Human Approaching", control_cycles=30)
         human_close = Pulse(name="Human Close?", length=50)
-        done = CountSimulationTimeSeconds(name="Done?", seconds=5)
+        done = CheckControlCycleCount(name="Done?", threshold=150)
         msc.add_nodes([position_knife, cut, wait_for_human, human_close, done])
 
         position_knife.end_condition = position_knife.observation_variable
         cut.start_condition = position_knife.goal_reached
+        cut.end_condition = cut.goal_reached
         wait_for_human.start_condition = position_knife.goal_reached
         human_close.start_condition = wait_for_human.observation_variable
         human_close.end_condition = done.goal_reached
-        done.start_condition = cut.observation_variable
+        done.start_condition = cut.goal_reached
+        done.reset_condition = trinary_logic_not(done.goal_reached)
         cut.pause_condition = human_close.observation_variable
         # Each finished pass restarts the cut, until the five seconds are up.
-        cut.reset_condition = trinary_logic_and(
-            cut.observation_variable, trinary_logic_not(done.goal_reached)
-        )
+        cut.reset_condition = trinary_logic_not(done.goal_reached)
         msc.add_node(EndMotion.when_true(done))
 
         executor = Executor(MotionStatechartContext(world=hsr_world_state_reset))
