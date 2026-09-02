@@ -14,7 +14,7 @@ from experiments.confidence_aware_eql.confidence_guard import (
     UnfamiliarObjectError,
     evaluate_with_confidence_guard,
 )
-from experiments.confidence_aware_eql.confidence_model import fit_confidence_model
+from experiments.confidence_aware_eql.confidence_model import ConfidenceModel
 
 # %% fixtures
 
@@ -27,7 +27,7 @@ def confidence_model():
         Cup(root=Body(inertial=Inertial(mass=float(mass))))
         for mass in np.random.normal(0.25, 0.03, 40)
     ]
-    return fit_confidence_model(cups)
+    return ConfidenceModel.fit_from_instances(cups)
 
 
 def _concluding_rule_for(cup: Cup) -> SymbolicExpression:
@@ -60,4 +60,4 @@ def test_unfamiliar_object_raises_unfamiliar_object_error(confidence_model):
 
     with pytest.raises(UnfamiliarObjectError) as excinfo:
         list(evaluate_with_confidence_guard(condition, confidence_model))
-    assert excinfo.value.obj is outlier_cup
+    assert excinfo.value.instance is outlier_cup

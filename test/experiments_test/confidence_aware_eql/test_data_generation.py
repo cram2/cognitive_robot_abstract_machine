@@ -8,10 +8,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Cup,
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.world_entity import Body
 
-from experiments.confidence_aware_eql.confidence_model import fit_confidence_model
+from experiments.confidence_aware_eql.confidence_model import ConfidenceModel
 from experiments.confidence_aware_eql.data_generation import (
     MassDistribution,
-    _mass_variable_name,
     generate_familiar_objects,
 )
 from experiments.confidence_aware_eql.feature_pipeline import (
@@ -19,20 +18,21 @@ from experiments.confidence_aware_eql.feature_pipeline import (
     extract_feature_dataframe,
 )
 
-# %% mass variable naming assumption
+# %% mass variable extraction assumption
 
 
-def test_mass_variable_name_matches_generated_query_variable():
-    """EQL names a Cup's sampled mass leaf exactly as `_mass_variable_name` predicts.
+def test_underspecified_query_has_exactly_one_mass_variable():
+    """The nested Cup query has exactly one variable to unpack the mass from.
 
-    `generate_familiar_objects` looks up the mass variable by this predicted name to
-    parameterize its sampling distribution; if EQL's naming convention ever changed,
-    that lookup would raise a loud `KeyError` instead of silently leaving the mass
-    unset, and this test would catch the change first.
+    `generate_familiar_objects` takes the mass variable directly from this single
+    entry (`[mass_variable] = parameters.variables.values()`); if EQL ever produced
+    zero or more than one underspecified variable for this query shape, that unpack
+    would raise loudly instead of silently leaving the mass unset, and this test
+    would catch the change first.
     """
     query = a(Cup)(root=a(Body)(inertial=a(Inertial)(mass=...)))
     parameters = UnderspecifiedParameters(query)
-    assert set(parameters.variables) == {_mass_variable_name(Cup)}
+    assert len(parameters.variables) == 1
 
 
 # %% generation
@@ -53,7 +53,7 @@ def test_generate_familiar_objects_returns_the_requested_count_per_class(
     """One generated object per requested sample, of the matching class, in order."""
     np.random.seed(0)
     generated = generate_familiar_objects(mass_distributions)
-    assert [type(obj) for obj in generated] == [Cup] * 20 + [Pot] * 20
+    assert [type(instance) for instance in generated] == [Cup] * 20 + [Pot] * 20
 
 
 def test_generated_masses_are_sampled_within_a_plausible_range(mass_distributions):
@@ -92,7 +92,7 @@ def test_generated_objects_flow_into_the_confidence_model_unchanged(mass_distrib
     """A model fitted on generated objects accepts a familiar probe, rejects an outlier."""
     np.random.seed(0)
     generated = generate_familiar_objects(mass_distributions)
-    model = fit_confidence_model(generated)
+    model = ConfidenceModel.fit_from_instances(generated)
 
     familiar_probe = Cup(root=Body(inertial=Inertial(mass=0.25)))
     outlier_probe = Cup(root=Body(inertial=Inertial(mass=50.0)))

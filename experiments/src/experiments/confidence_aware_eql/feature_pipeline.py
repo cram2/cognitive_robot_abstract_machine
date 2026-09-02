@@ -14,15 +14,7 @@ import enum
 import pandas as pd
 from krrood.ormatic.data_access_objects.dao import to_dao
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from random_events.variable import Variable
 from typing_extensions import Any, List
-
-MASS_FEATURE = "mass"
-"""The stable name of the mass feature after selection."""
-
-CLASS_FEATURE = "class"
-"""The name of the feature carrying the object class."""
 
 
 class ObjectClass(enum.Enum):
@@ -58,23 +50,8 @@ def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
     mass_column = next(name for name in extracted.columns if name.endswith(".mass"))
     dataframe = pd.DataFrame(
         {
-            MASS_FEATURE: extracted[mass_column].to_numpy(),
-            CLASS_FEATURE: [
-                ObjectClass(type(instance).__name__) for instance in objects
-            ],
+            "mass": extracted[mass_column].to_numpy(),
+            "class": [ObjectClass(type(instance).__name__) for instance in objects],
         }
     )
     return dataframe
-
-
-def infer_feature_variables(dataframe: pd.DataFrame) -> List[Variable]:
-    """Infer the random-event variables describing the feature dataframe.
-
-    The mass column becomes a continuous variable and the class column becomes a
-    symbolic variable, so the object class is modelled over unordered categories
-    rather than over an arbitrary numeric encoding.
-
-    :param dataframe: The feature dataframe whose columns are typed.
-    :return: One random-event variable per column.
-    """
-    return infer_variables_from_dataframe(dataframe)

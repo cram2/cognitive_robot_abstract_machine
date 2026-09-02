@@ -5,7 +5,7 @@ import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Cup, Pot
 from semantic_digital_twin.world import World
 
-from experiments.confidence_aware_eql.confidence_model import fit_confidence_model
+from experiments.confidence_aware_eql.confidence_model import ConfidenceModel
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def _light_cup(mass):
 
 def test_familiar_cup_scores_higher_than_impossible_cup(familiar_kitchen_objects):
     """A normal cup is more likely under the model than a fifty kilogram cup."""
-    model = fit_confidence_model(familiar_kitchen_objects)
+    model = ConfidenceModel.fit_from_instances(familiar_kitchen_objects)
     familiar = model.log_likelihood_of(_light_cup(0.25))
     impossible = model.log_likelihood_of(_light_cup(50.0))
     assert familiar > impossible
@@ -51,7 +51,7 @@ def test_familiar_cup_is_accepted_and_impossible_cup_is_flagged(
     familiar_kitchen_objects,
 ):
     """A normal cup is familiar and a fifty kilogram cup is unfamiliar."""
-    model = fit_confidence_model(familiar_kitchen_objects)
+    model = ConfidenceModel.fit_from_instances(familiar_kitchen_objects)
     assert model.is_familiar(_light_cup(0.25))
     assert not model.is_familiar(_light_cup(50.0))
 
@@ -63,6 +63,8 @@ def test_every_familiar_object_scores_a_finite_log_likelihood(familiar_kitchen_o
     scoring: before the pipeline aligned both sides, every familiar object,
     including the ones the model was fitted on, scored -inf.
     """
-    model = fit_confidence_model(familiar_kitchen_objects)
-    log_likelihoods = [model.log_likelihood_of(obj) for obj in familiar_kitchen_objects]
+    model = ConfidenceModel.fit_from_instances(familiar_kitchen_objects)
+    log_likelihoods = [
+        model.log_likelihood_of(instance) for instance in familiar_kitchen_objects
+    ]
     assert all(np.isfinite(log_likelihood) for log_likelihood in log_likelihoods)

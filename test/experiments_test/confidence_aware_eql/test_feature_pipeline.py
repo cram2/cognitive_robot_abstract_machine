@@ -4,12 +4,12 @@ import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Cup, Pot
 from semantic_digital_twin.world import World
 
-from experiments.confidence_aware_eql.feature_pipeline import extract_feature_dataframe
+from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
 from random_events.variable import Continuous, Symbolic
 
 from experiments.confidence_aware_eql.feature_pipeline import (
     ObjectClass,
-    infer_feature_variables,
+    extract_feature_dataframe,
 )
 
 MASS_COLUMN = "mass"
@@ -52,7 +52,7 @@ def test_dataframe_labels_each_object_with_its_class(kitchen_objects):
 def test_class_is_symbolic_and_mass_is_continuous(kitchen_objects):
     """Mass is inferred as a continuous variable and class as a symbolic one."""
     dataframe = extract_feature_dataframe(kitchen_objects)
-    annotated_variables = infer_feature_variables(dataframe)
+    annotated_variables = infer_variables_from_dataframe(dataframe)
     by_name = {
         annotated.variable.name: annotated.variable for annotated in annotated_variables
     }

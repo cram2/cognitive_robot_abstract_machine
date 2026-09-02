@@ -32,11 +32,11 @@ from experiments.confidence_aware_eql.confidence_model import ConfidenceModel
 class UnfamiliarObjectError(DataclassException):
     """Raised when a rule concludes on an object the confidence model judges unfamiliar."""
 
-    obj: Any
+    instance: Any
     """The object a rule's conclusion bound that was judged unfamiliar."""
 
     def error_message(self) -> str:
-        return f"{self.obj!r} is unfamiliar under the fitted confidence model."
+        return f"{self.instance!r} is unfamiliar under the fitted confidence model."
 
     def suggest_correction(self) -> str:
         return ""
@@ -60,11 +60,11 @@ class ConfidenceGuardObserver(EvaluationObserver):
         :raises UnfamiliarObjectError: If a conclusion's bound object is unfamiliar.
         """
         for conclusion in expression._conclusions_:
-            obj = result.bindings.get(conclusion.variable._id_)
-            if obj is None:
+            instance = result.bindings.get(conclusion.variable._id_)
+            if instance is None:
                 continue
-            if not self.confidence_model.is_familiar(obj):
-                raise UnfamiliarObjectError(obj)
+            if not self.confidence_model.is_familiar(instance):
+                raise UnfamiliarObjectError(instance)
 
 
 def evaluate_with_confidence_guard(
