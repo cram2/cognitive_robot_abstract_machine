@@ -5,6 +5,7 @@ from enum import IntEnum, Enum
 from typing import Union, FrozenSet
 
 from krrood.symbolic_math.symbolic_math import Scalar, if_eq_cases
+from semantic_digital_twin.world_description.geometry import Color
 
 goal_parameter = Union[str, float, bool, dict, list, IntEnum, None]
 
@@ -18,7 +19,7 @@ class LifeCycleValues(IntEnum):
     :class:`~giskardpy.motion_statechart.motion_statechart.MotionStatechart`.
     """
 
-    color: str
+    color: Color
     """
     The color a visualization draws a node in this state in.
     """
@@ -28,14 +29,14 @@ class LifeCycleValues(IntEnum):
     The short text a visualization labels a node in this state with.
     """
 
-    NOT_STARTED = 0, "#9CA3AF", "—"
+    NOT_STARTED = 0, Color.from_hex("#9CA3AF"), "—"
     """
     The node has not run yet.
 
     Its observation is forced back to unknown every tick.
     """
 
-    RUNNING = 1, "#3B82F6", "▶"
+    RUNNING = 1, Color.from_hex("#3B82F6"), "▶"
     """
     The node is active: its constraints carry weight, its observation expression is
     evaluated and
@@ -43,30 +44,30 @@ class LifeCycleValues(IntEnum):
     called.
     """
 
-    PAUSED = 2, "#EAB308", "<B>||</B>"
+    PAUSED = 2, Color.from_hex("#EAB308"), "<B>||</B>"
     """
     The node was running and its pause condition became true.
 
     Its constraints are deactivated and its observation is frozen at the last value.
     """
 
-    SUCCEEDED = 3, "#28A745", "✔"
+    SUCCEEDED = 3, Color.from_hex("#28A745"), "✔"
     """
     The node was ended while it was observing its goal as reached.
     """
 
-    FAILED = 4, "#EF4444", "✖"
+    FAILED = 4, Color.from_hex("#EF4444"), "✖"
     """
     The node was ended while it was not.
     """
 
-    INTERRUPTED = 5, "#F97316", "■"
+    INTERRUPTED = 5, Color.from_hex("#F97316"), "■"
     """
     The node ended without being judged, either because an ancestor ended and took it
     down with it, or because it was not observing anything decisive at the time.
     """
 
-    def __new__(cls, value: int, color: str, badge: str) -> LifeCycleValues:
+    def __new__(cls, value: int, color: Color, badge: str) -> LifeCycleValues:
         """
         :param value: The number this state is stored as.
         :param color: The color a visualization draws a node in this state in.
@@ -132,7 +133,7 @@ class ObservationStateValues(FloatEnum):
     The trinary truth values used throughout the motion statechart.
     """
 
-    color: str
+    color: Color
     """
     The color a visualization draws a node observing this in.
     """
@@ -142,11 +143,11 @@ class ObservationStateValues(FloatEnum):
     The short text a visualization labels a node observing this with.
     """
 
-    FALSE = float(Scalar.const_false()), "#FF5024", "False"
-    UNKNOWN = float(Scalar.const_trinary_unknown()), "#8F959E", "?"
-    TRUE = float(Scalar.const_true()), "#B6E5A0", "True"
+    FALSE = float(Scalar.const_false()), Color.from_hex("#FF5024"), "False"
+    UNKNOWN = float(Scalar.const_trinary_unknown()), Color.from_hex("#8F959E"), "?"
+    TRUE = float(Scalar.const_true()), Color.from_hex("#B6E5A0"), "True"
 
-    def __new__(cls, value: float, color: str, badge: str) -> ObservationStateValues:
+    def __new__(cls, value: float, color: Color, badge: str) -> ObservationStateValues:
         """
         :param value: The number this truth value is stored as.
         :param color: The color a visualization draws a node observing this in.

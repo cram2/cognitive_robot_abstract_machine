@@ -128,9 +128,9 @@ class MotionStatechartGraphviz:
         """
         obs_state = self.motion_statechart.observation_state[node]
         life_cycle_state = self.motion_statechart.life_cycle_state[node]
-        obs_color = obs_state.color
+        obs_color = obs_state.color.to_hex()
         obs_badge = obs_state.badge
-        life_color = life_cycle_state.color
+        life_color = life_cycle_state.color.to_hex()
         life_badge = life_cycle_state.badge
         label = (
             f'<<TABLE  BORDER="0" CELLBORDER="0" CELLSPACING="0">'

@@ -359,7 +359,7 @@ class Plan:
             graph=self.plan_graph,
             label_getter=lambda node: node.__node_label__(),
             information_getter=lambda node: node.__node_info__(),
-            color_getter=lambda node: node.status.color,
+            color_getter=lambda node: node.status.color.to_hex(),
             layout=layout,
             title=repr(self),
         )

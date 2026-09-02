@@ -860,4 +860,4 @@ def test_a_plan_node_is_drawn_in_the_color_of_its_state():
         backend=GraphVisualizerBackend.CYTOSCAPE, layout=GraphLayout.LAYERED
     )
 
-    assert visualizer.node_color(node.index) == LifeCycleValues.FAILED.color
+    assert visualizer.node_color(node.index) == LifeCycleValues.FAILED.color.to_hex()

@@ -14,6 +14,7 @@ from giskardpy.motion_statechart.data_types import (
 )
 from giskardpy.motion_statechart.graph_node import Goal, MotionStatechartNode
 from giskardpy.utils.utils import create_path
+from semantic_digital_twin.world_description.geometry import Color
 
 logger = logging.getLogger(__name__)
 
@@ -414,7 +415,7 @@ class HistoryGanttChartPlotter:
         node_idx,
         block_start,
         block_width,
-        color,
+        color: Color,
         top: bool,
         bar_height: float = 0.8,
     ):
@@ -440,7 +441,7 @@ class HistoryGanttChartPlotter:
             block_width,
             height=bar_height / 2,
             left=block_start,
-            color=color,
+            color=color.to_hex(),
             zorder=2,
         )
 
