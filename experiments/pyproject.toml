@@ -13,6 +13,7 @@ dependencies = [
     "coraplex",
     "giskardpy",
     "krrood",
+    "probabilistic_model",
     "random_events",
     "semantic_digital_twin",
 ]
