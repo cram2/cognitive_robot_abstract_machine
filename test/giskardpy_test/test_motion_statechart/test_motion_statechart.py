@@ -10,7 +10,7 @@ import pytest
 import giskardpy.motion_statechart.graph_node as graph_node_module
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.data_types.exceptions import DuplicateNameException
-from giskardpy.executor import Executor
+from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -92,14 +92,24 @@ from krrood.symbolic_math.symbolic_math import (
     trinary_logic_or,
     FloatVariable,
 )
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
+    Quaternion,
+    RotationMatrix,
     Vector3,
     Point3,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Box, Color, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.robots.pr2 import PR2Joint
+
+from ...semantic_digital_twin_test.test_orm.test_orm import hsr_world_state_reset
 
 # %% a clock the test advances instead of waiting
 
@@ -1771,6 +1781,142 @@ class TestEndMotion:
 
 
 class TestTemplates:
+    def test_hsr_cutting(self, hsr_world_state_reset: World, rclpy_node):
+        """
+        The HSR cuts a loaf with a knife: down, up, then a sideways shift, repeated
+        until five seconds have passed and paused while a human is close.
+        """
+        map_link = hsr_world_state_reset.root
+        gripper = hsr_world_state_reset.get_body_by_name("hand_gripper_tool_frame")
+        with hsr_world_state_reset.modify_world():
+            knife = Body(
+                name=PrefixedName("knife"),
+                visual=ShapeCollection(
+                    [
+                        Box(
+                            scale=Scale(0.05, 0.01, 0.15),
+                            color=Color(R=0.0, G=0.588, B=0.784),
+                        )
+                    ]
+                ),
+            )
+            hsr_world_state_reset.add_connection(
+                FixedConnection(
+                    parent=gripper,
+                    child=knife,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        z=0.06, reference_frame=gripper
+                    ),
+                )
+            )
+            loaf = Body(
+                name=PrefixedName("loaf"),
+                visual=ShapeCollection(
+                    [
+                        Box(
+                            scale=Scale(0.1, 0.2, 0.06),
+                            color=Color(R=0.784, G=0.588, B=0.0),
+                        )
+                    ]
+                ),
+            )
+            hsr_world_state_reset.add_connection(
+                FixedConnection(
+                    parent=map_link,
+                    child=loaf,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=0.91, y=0.25, z=0.62, reference_frame=map_link
+                    ),
+                )
+            )
+
+        depth = 0.1
+        right_shift = -0.1
+        # The knife's x axis points up in map, so its -x stroke cuts downwards.
+        pre_cut_pose = Pose(
+            position=Point3(x=0.85, y=0.2, z=0.75, reference_frame=map_link),
+            orientation=Quaternion.from_rotation_matrix(
+                RotationMatrix.from_vectors(
+                    x=Vector3(z=1, reference_frame=map_link),
+                    y=Vector3(y=-1, reference_frame=map_link),
+                )
+            ),
+            reference_frame=map_link,
+        )
+
+        msc = MotionStatechart()
+        position_knife = CartesianPose(
+            name="Position Knife",
+            root_link=map_link,
+            tip_link=knife,
+            goal_pose=pre_cut_pose,
+        )
+        cut = Sequence(
+            [
+                CartesianPose(
+                    name="Down",
+                    root_link=map_link,
+                    tip_link=knife,
+                    goal_pose=Pose(
+                        position=Point3(x=-depth, reference_frame=knife),
+                        reference_frame=knife,
+                    ),
+                ),
+                CartesianPose(
+                    name="Up",
+                    root_link=map_link,
+                    tip_link=knife,
+                    goal_pose=Pose(
+                        position=Point3(x=depth, reference_frame=knife),
+                        reference_frame=knife,
+                    ),
+                ),
+                CartesianPose(
+                    name="Move Right",
+                    root_link=map_link,
+                    tip_link=knife,
+                    goal_pose=Pose(
+                        position=Point3(y=right_shift, reference_frame=knife),
+                        reference_frame=knife,
+                    ),
+                ),
+            ],
+            name="Cut",
+        )
+        # A human blocks the cut 50 cycles after the knife is in place, for 50 cycles.
+        wait_for_human = CountControlCycles(name="Human Approaching", control_cycles=50)
+        human_close = Pulse(name="Human Close?", length=50)
+        done = CountSimulationTimeSeconds(name="Done?", seconds=5)
+        msc.add_nodes([position_knife, cut, wait_for_human, human_close, done])
+
+        position_knife.end_condition = position_knife.observation_variable
+        cut.start_condition = position_knife.goal_reached
+        wait_for_human.start_condition = position_knife.goal_reached
+        human_close.start_condition = wait_for_human.observation_variable
+        human_close.end_condition = done.goal_reached
+        done.start_condition = cut.observation_variable
+        cut.pause_condition = human_close.observation_variable
+        # Each finished pass restarts the cut, until the five seconds are up.
+        cut.reset_condition = trinary_logic_and(
+            cut.observation_variable, trinary_logic_not(done.goal_reached)
+        )
+        msc.add_node(EndMotion.when_true(done))
+
+        executor = Executor(MotionStatechartContext(world=hsr_world_state_reset))
+        executor.compile(motion_statechart=msc)
+        executor.tick_until_end()
+        msc.draw('/tmp/muh.pdf')
+
+        assert done.observation_state == ObservationStateValues.TRUE
+        cut_life_cycle = msc.history.get_life_cycle_history_of_node(cut)
+        assert LifeCycleValues.PAUSED in cut_life_cycle
+        restarts = sum(
+            1
+            for previous, current in zip(cut_life_cycle, cut_life_cycle[1:])
+            if current == LifeCycleValues.NOT_STARTED
+            and previous != LifeCycleValues.NOT_STARTED
+        )
+        assert restarts >= 1
 
     def test_sequence_goal(self, tmp_path):
         """
@@ -1791,7 +1937,7 @@ class TestTemplates:
         kin_sim = Executor(MotionStatechartContext(world=World()))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw(str(tmp_path / "muh.pdf"))
+
         cycles_to_run_the_steps = 6
         assert kin_sim.control_cycles == cycles_to_run_the_steps
         assert msc.nodes[1].life_cycle_state == LifeCycleValues.RUNNING
