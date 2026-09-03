@@ -36,6 +36,30 @@ class MassDistribution:
     number_of_samples: int
     """How many objects of this class to generate."""
 
+    def generate_objects(self) -> List[Any]:
+        """
+        Sample ``number_of_samples`` objects of ``object_class``.
+
+        The mass leaf comes directly from the query's single underspecified variable,
+        rather than a name reconstructed by hand, so it can never drift from what EQL
+        actually produces.
+
+        :return: The generated objects.
+        """
+        query = a(self.object_class)(root=a(Body)(inertial=an(Inertial)(mass=...)))
+        query.expression.limit(self.number_of_samples)
+        parameters = UnderspecifiedParameters(query)
+        [mass_variable] = parameters.variables.values()
+
+        circuit = fully_factorized(
+            parameters.variables.values(),
+            means={mass_variable: self.mean},
+            variances={mass_variable: self.standard_deviation},
+        )
+        registry = DictRegistry({self.object_class: circuit})
+        backend = ProbabilisticBackend(registry)
+        return list(backend.evaluate(query))
+
 
 def generate_familiar_objects(mass_distributions: List[MassDistribution]) -> List[Any]:
     """Generate real SDT objects with sampled masses via EQL's probabilistic backend.
@@ -45,31 +69,5 @@ def generate_familiar_objects(mass_distributions: List[MassDistribution]) -> Lis
     """
     generated_objects = []
     for distribution in mass_distributions:
-        generated_objects.extend(_generate_objects_for_distribution(distribution))
+        generated_objects.extend(distribution.generate_objects())
     return generated_objects
-
-
-def _generate_objects_for_distribution(distribution: MassDistribution) -> List[Any]:
-    """
-    Sample ``distribution.number_of_samples`` objects of ``distribution.object_class``.
-
-    The mass leaf comes directly from the query's single underspecified variable,
-    rather than a name reconstructed by hand, so it can never drift from what EQL
-    actually produces.
-
-    :param distribution: The mass distribution to sample objects from.
-    :return: The generated objects.
-    """
-    query = a(distribution.object_class)(root=a(Body)(inertial=an(Inertial)(mass=...)))
-    query.expression.limit(distribution.number_of_samples)
-    parameters = UnderspecifiedParameters(query)
-    [mass_variable] = parameters.variables.values()
-
-    circuit = fully_factorized(
-        parameters.variables.values(),
-        means={mass_variable: distribution.mean},
-        variances={mass_variable: distribution.standard_deviation},
-    )
-    registry = DictRegistry({distribution.object_class: circuit})
-    backend = ProbabilisticBackend(registry)
-    return list(backend.evaluate(query))

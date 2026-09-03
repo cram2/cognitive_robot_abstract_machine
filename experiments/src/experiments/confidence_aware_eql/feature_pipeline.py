@@ -17,9 +17,10 @@ from krrood.parametrization.feature_extraction.feature_extractor import FeatureE
 from typing_extensions import Any, List
 
 
-class ObjectClass(enum.Enum):
+class ObjectClass(enum.StrEnum):
     """The semantic-annotation classes the confidence model distinguishes.
 
+    A :class:`~enum.StrEnum`, so a member equals and hashes like its string value.
     Enum members carry the class name as their value, so an instance's class is
     looked up with ``ObjectClass(type(instance).__name__)``.
     """
