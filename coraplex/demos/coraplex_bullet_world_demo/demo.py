@@ -1,8 +1,9 @@
 import os
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
+import numpy as np
+
+from coraplex.datastructures.enums import Arms
 
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
@@ -109,11 +110,6 @@ plan = sequential(
             world.get_semantic_annotations_by_type(Spoon)[0],
             Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.TOP,
-                pr2.left_arm.end_effector,
-            ),
         ),
     ],
     context=context,

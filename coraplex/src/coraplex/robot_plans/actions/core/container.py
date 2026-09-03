@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from typing_extensions import Any, Dict
 
@@ -14,12 +14,7 @@ from krrood.entity_query_language.factories import (
 )
 from coraplex.config.action_conf import ActionConfig
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import (
-    Arms,
-    ApproachDirection,
-    VerticalAlignment,
-)
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import Arms
 from coraplex.locations.pose_validator import IsObjectReachableBy
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
@@ -33,6 +28,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -52,25 +48,21 @@ class OpenAction(ActionDescription):
     Arm that should be used for opening the container.
     """
 
-    grasping_prepose_distance: float = ActionConfig.grasping_prepose_distance
+    approach_clearance: float = ActionConfig.approach_clearance
     """
-    The distance in meters the gripper should be at in the x-axis away from the handle.
+    The gap in meters between the handle and the gripper before it closes on it.
     """
 
     @property
     def _action_plan(self) -> PlanNode:
-        arm = ViewManager.get_arm_view(self.arm, self.robot)
-        end_effector = arm.end_effector
-
-        grasp_description = GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            end_effector,
-        )
-
         return sequential(
             [
-                GraspingAction(self.object_designator, self.arm, grasp_description),
+                GraspingAction(
+                    self.object_designator,
+                    self.arm,
+                    Pose(reference_frame=self.object_designator),
+                    approach_clearance=self.approach_clearance,
+                ),
                 OpeningMotion(self.object_designator, self.arm),
                 MoveGripperMotion(
                     GripperState.OPEN, self.arm, allow_gripper_collision=True
@@ -149,26 +141,21 @@ class CloseAction(ActionDescription):
     Arm that should be used for closing.
     """
 
-    grasping_prepose_distance: float = ActionConfig.grasping_prepose_distance
+    approach_clearance: float = ActionConfig.approach_clearance
     """
-    The distance in meters between the gripper and the handle before approaching to
-    grasp.
+    The gap in meters between the handle and the gripper before it closes on it.
     """
 
     @property
     def _action_plan(self) -> PlanNode:
-        arm = ViewManager.get_arm_view(self.arm, self.robot)
-        end_effector = arm.end_effector
-
-        grasp_description = GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            end_effector,
-        )
-
         return sequential(
             [
-                GraspingAction(self.object_designator, self.arm, grasp_description),
+                GraspingAction(
+                    self.object_designator,
+                    self.arm,
+                    Pose(reference_frame=self.object_designator),
+                    approach_clearance=self.approach_clearance,
+                ),
                 ClosingMotion(self.object_designator, self.arm),
                 MoveGripperMotion(
                     GripperState.OPEN, self.arm, allow_gripper_collision=True

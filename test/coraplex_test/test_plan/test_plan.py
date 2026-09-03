@@ -5,11 +5,9 @@ import pytest
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
-    ApproachDirection,
-    VerticalAlignment,
     Arms,
 )
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.robot_plans.mixins import HasApproachesGraspPoses
 from coraplex.execution_environment import simulated_robot
 from coraplex.language import CodeNode
 from coraplex.orm.ormatic_interface import *  # type: ignore
@@ -579,25 +577,17 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
     pick_up_description = a(PickUpAction)(
         object_designator=milk_variable,
         arm=...,
-        grasp_description=a(GraspDescription)(
-            approach_direction=...,
-            vertical_alignment=...,
-            rotate_gripper=...,
-            manipulation_offset=0.05,
-            end_effector=variable(EndEffector, world.semantic_annotations),
-        ),
+        approach_clearance=0.05,
     )
 
     parameters = UnderspecifiedParameters(pick_up_description)
 
-    [end_effector_offset] = [
-        v
-        for v in parameters.variables.values()
-        if v.name.endswith("manipulation_offset")
+    [approach_clearance] = [
+        v for v in parameters.variables.values() if v.name.endswith("clearance")
     ]
 
     assert (
-        parameters.conditioning_assignments_from_literal_values[end_effector_offset]
+        parameters.conditioning_assignments_from_literal_values[approach_clearance]
         == 0.05
     )
 
@@ -643,12 +633,7 @@ def test_conditions_reference_surviving_action_node_after_merge(immutable_model_
 def test_motion_order_pick_up(mutable_model_world):
     world, robot_view, context = mutable_model_world
 
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        robot_view.left_arm.end_effector,
-    )
-
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1, -2, 0.6, reference_frame=world.root
@@ -662,11 +647,7 @@ def test_motion_order_pick_up(mutable_model_world):
 
     root = sequential(
         [
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                grasp_description,
-            ),
+            PickUpAction(milk, Arms.LEFT),
         ],
         context,
     )
@@ -753,18 +734,11 @@ def test_motion_order_place(mutable_model_world):
 
 def test_node_expansion(immutable_model_world):
     world, view, context = immutable_model_world
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = sequential(
         [
-            PickUpAction(
-                object_designator=world.get_semantic_annotations_by_type(Milk)[0],
-                arm=Arms.RIGHT,
-                grasp_description=GraspDescription(
-                    ApproachDirection.FRONT,
-                    vertical_alignment=VerticalAlignment.NoAlignment,
-                    end_effector=view.right_arm.end_effector,
-                ),
-            )
+            PickUpAction(object_designator=milk, arm=Arms.RIGHT)
         ],
         context=context,
     )
@@ -790,19 +764,12 @@ def test_expand_move_torso(immutable_model_world):
 
 def test_context_back_reference(immutable_model_world):
     world, view, context = immutable_model_world
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = sequential(
         [
             MoveTorsoAction(TorsoState.HIGH),
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.RIGHT,
-                GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
-            ),
+            PickUpAction(milk, Arms.RIGHT),
         ],
         context=context,
     )
@@ -814,19 +781,12 @@ def test_context_back_reference(immutable_model_world):
 
 def test_action_nodes_unequal(immutable_model_world):
     world, view, context = immutable_model_world
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = sequential(
         [
             ParkArmsAction(Arms.LEFT),
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
-            ),
+            PickUpAction(milk, Arms.LEFT),
         ],
         context=context,
     )

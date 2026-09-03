@@ -90,6 +90,30 @@ class Location(Iterable[Pose]):
         """
         return next(iter(self))
 
+    @staticmethod
+    def _stands_in_collision(test_world: World, test_robot: AbstractRobot) -> bool:
+        """
+        :param test_world: The world the candidate was placed in.
+        :param test_robot: The robot standing at the candidate.
+        :return: Whether the robot already touches something where it stands.
+
+        Asked with rules of its own, which are taken back down again: the reachability
+        simulation that follows has to see the rules the plan is executed with, and
+        temporary rules outrank the robot's own, so leaving these in place would answer
+        it about clearances the executed motion never has to keep.
+        """
+        collision_manager = test_world.collision_manager
+        with collision_manager.reset_temporary_rules_context():
+            collision_manager.clear_temporary_rules()
+            collision_manager.extend_temporary_rule(
+                [
+                    AvoidExternalCollisions(robot=test_robot, violated_distance=0.05),
+                    AllowSelfCollisions(robot=test_robot),
+                ]
+            )
+            collision_manager.update_collision_matrix()
+            return bool(collision_manager.compute_collisions().contacts)
+
     def __iter__(self) -> Iterator[Pose]:
         test_world = deepcopy(self.world)
         test_robot = cast(
@@ -105,7 +129,7 @@ class Location(Iterable[Pose]):
         if self.context.debug:
             VizMarkerPublisher(
                 _world=test_world, node=self.context.ros_node
-            )
+            ).with_collision_visualization()
 
         for pose_candidate in self.generator:
 
@@ -119,17 +143,7 @@ class Location(Iterable[Pose]):
                 else pose_candidate
             )
 
-            test_world.collision_manager.clear_temporary_rules()
-            test_world.collision_manager.add_temporary_rule(
-                AvoidExternalCollisions(robot=test_robot, violated_distance=0.05)
-            )
-            test_world.collision_manager.add_temporary_rule(
-                AllowSelfCollisions(robot=test_robot)
-            )
-            test_world.collision_manager.update_collision_matrix()
-            collisions = test_world.collision_manager.compute_collisions()
-
-            if collisions.contacts:
+            if self._stands_in_collision(test_world, test_robot):
                 logger.debug(f"Candidate pose in collision, skipping")
                 continue
 

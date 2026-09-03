@@ -20,6 +20,7 @@ from giskardpy.motion_statechart.data_types import (
 )
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
+    SelfCollisionAvoidance,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import CancelMotion
@@ -109,9 +110,22 @@ class GiskardExecutable(Executable):
 
     collision_avoidance: ClassVar[bool] = False
     """
-    Whether an :class:`~giskardpy.motion_statechart.goals.collision_avoidance.ExternalCo
-    llisionAvoidance` is added to the motion state chart, managed by
+    Whether the robot avoids colliding with its surroundings and with itself, managed by
     :py:class:`pycram.motion_executor.ExecutionEnvironment`.
+
+    Adds an
+    :class:`~giskardpy.motion_statechart.goals.collision_avoidance.ExternalCollisionAvoidance`
+    and a
+    :class:`~giskardpy.motion_statechart.goals.collision_avoidance.SelfCollisionAvoidance`
+    to the motion state chart.
+    """
+
+    ticks_per_motion: ClassVar[int] = 2000
+    """
+    How many ticks each motion of a chart may take before the run gives up on it.
+
+    Also the budget a reachability check gives the same motions, so a pose is not
+    rejected for running out of time sooner than the run that would perform it.
     """
 
     _current_motion_state_chart: MotionStatechart = field(init=False, default=None)
@@ -158,6 +172,7 @@ class GiskardExecutable(Executable):
 
         if GiskardExecutable.collision_avoidance:
             self._current_motion_state_chart.add_node(ExternalCollisionAvoidance())
+            self._current_motion_state_chart.add_node(SelfCollisionAvoidance())
 
         end_motion = EndMotion()
         end_motion.start_condition = end_trigger
@@ -317,7 +332,7 @@ class GiskardExecutable(Executable):
         executor.compile(motion_state_chart)
 
         counter = 0
-        while counter < len(self.motion_mappings) * 2000:
+        while counter < len(self.motion_mappings) * GiskardExecutable.ticks_per_motion:
             # Interrupting and pausing are handled inside the motion state chart by
             # per-task monitors (see motion_state_chart): an interrupt ends the
             # motion via EndMotion, a pause holds the active task via its

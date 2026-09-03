@@ -7,14 +7,13 @@ import time
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
+import numpy as np
+
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     Arms,
-    ApproachDirection,
-    VerticalAlignment,
     ExecutionType,
 )
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.execution_environment import real_robot, ExecutionEnvironment
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -35,7 +34,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspPoses
 from semantic_digital_twin.world_description.world_entity import Body
 
 giskard_process = subprocess.Popen(
@@ -102,8 +101,8 @@ with world.modify_world():
 
     # The boxes stand in for any graspable object; the plan only needs an annotation to
     # name them by, not a particular kind of object.
-    box2_annotation = HasRootBody(root=box2)
-    box3_annotation = HasRootBody(root=box3)
+    box2_annotation = HasGraspPoses(root=box2)
+    box3_annotation = HasGraspPoses(root=box3)
     world.add_semantic_annotations([box2_annotation, box3_annotation])
 
     world.add_connection(
@@ -154,11 +153,6 @@ plan = sequential(
         PickUpAction(
             box2_annotation,
             Arms.LEFT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.TOP,
-                context.robot.left_arm.end_effector,
-            ),
         ),
         PlaceAction(
             box2,
@@ -170,11 +164,6 @@ plan = sequential(
         PickUpAction(
             box3_annotation,
             Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.TOP,
-                context.robot.right_arm.end_effector,
-            ),
         ),
         PlaceAction(
             box3,

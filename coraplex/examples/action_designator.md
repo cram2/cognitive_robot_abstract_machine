@@ -170,9 +170,8 @@ To start we need an environment in which we can pick up and place things as well
 
 ```python
 from coraplex.execution_environment import simulated_robot
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from coraplex.robot_plans.actions.composite.transporting import NavigateAction, PickUpAction, PlaceAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
@@ -190,13 +189,9 @@ with simulated_robot:
              Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root)
          ),
          PickUpAction(
-             object_designator=world.get_semantic_annotations_by_type(Milk)[0],
+             object_designator=(milk := world.get_semantic_annotations_by_type(Milk)[0]),
              arm=arm,
-             grasp_description=GraspDescription(
-                 ApproachDirection.FRONT,
-                 VerticalAlignment.NoAlignment,
-                 context.robot.right_arm.end_effector,
-             ),
+             grasp_pose=next(iter(milk.grasp_poses())),
          ),
          PlaceAction(
              object_designator=world.get_body_by_name("milk.stl"),

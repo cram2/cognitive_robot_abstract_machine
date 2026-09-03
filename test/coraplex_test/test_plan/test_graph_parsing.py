@@ -6,11 +6,8 @@ from typing_extensions import List
 
 from coraplex.datastructures.enums import (
     Arms,
-    ApproachDirection,
     DetectionTechnique,
-    VerticalAlignment,
 )
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.attachment_nodes import ModelChangeNode
 from coraplex.perception import PerceptionQuery
@@ -75,11 +72,6 @@ def test_merge_motions(immutable_model_world, rclpy_node):
         ReachAction(
             Pose.from_xyz_rpy(2, 1.5, 0.7, reference_frame=world.root),
             Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
             world.get_semantic_annotations_by_type(Milk)[0],
         ),
         context=context,
@@ -101,16 +93,9 @@ def test_merge_motions(immutable_model_world, rclpy_node):
 def test_parse_pick_up(immutable_model_world):
     world, view, context = immutable_model_world
 
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan = execute_single(
-        PickUpAction(
-            world.get_semantic_annotations_by_type(Milk)[0],
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
-        ),
+        PickUpAction(milk, Arms.RIGHT),
         context=context,
     )
 
@@ -134,16 +119,9 @@ def test_parse_pick_up_merges_motions_around_model_change(immutable_model_world)
     """
     world, view, context = immutable_model_world
 
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan = execute_single(
-        PickUpAction(
-            world.get_semantic_annotations_by_type(Milk)[0],
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
-        ),
+        PickUpAction(milk, Arms.RIGHT),
         context=context,
     )
 
@@ -163,16 +141,11 @@ def test_parse_complex_plan(immutable_model_world):
         [
             ParkArmsAction(Arms.BOTH),
             ReachAction(
-                target_pose=Pose(
+                grasp_pose=Pose(
                     Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root
                 ),
                 object_designator=world.get_semantic_annotations_by_type(Milk)[0],
                 arm=Arms.LEFT,
-                grasp_description=GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
             ),
         ],
         context=context,
@@ -191,16 +164,11 @@ def test_parsing_two_actions_into_one_exec(immutable_model_world):
         [
             ParkArmsAction(Arms.BOTH),
             ReachAction(
-                target_pose=Pose(
+                grasp_pose=Pose(
                     Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root
                 ),
                 object_designator=world.get_semantic_annotations_by_type(Milk)[0],
                 arm=Arms.LEFT,
-                grasp_description=GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
             ),
         ],
         context=context,
@@ -216,17 +184,10 @@ def test_parsing_two_actions_into_one_exec(immutable_model_world):
 def test_parse_pick_place(immutable_model_world):
     world, view, context = immutable_model_world
 
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan = sequential(
         [
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.RIGHT,
-                GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
-            ),
+            PickUpAction(milk, Arms.RIGHT),
             PlaceAction(
                 world.get_body_by_name("milk.stl"),
                 Pose(reference_frame=world.root),
@@ -407,13 +368,8 @@ def reach_action(milk: Milk, view, **kwargs) -> ReachAction:
     :return: A reach at the object's own frame.
     """
     return ReachAction(
-        target_pose=Pose(reference_frame=milk.root),
+        grasp_pose=Pose(reference_frame=milk.root),
         arm=Arms.RIGHT,
-        grasp_description=GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            view.right_arm.end_effector,
-        ),
         object_designator=milk,
         **kwargs,
     )
@@ -461,14 +417,7 @@ def test_a_pick_up_passes_perceiving_on_to_its_reach(immutable_model_world):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = execute_single(
-        PickUpAction(
-            milk,
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
+        PickUpAction(milk, Arms.RIGHT,
             perceive_before_grasp=True,
         ),
         context=context,
@@ -487,13 +436,8 @@ def test_perceiving_without_an_object_to_detect_is_rejected(immutable_model_worl
     world, view, context = immutable_model_world
 
     reach = ReachAction(
-        target_pose=Pose(reference_frame=world.root),
+        grasp_pose=Pose(reference_frame=world.root),
         arm=Arms.RIGHT,
-        grasp_description=GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            view.right_arm.end_effector,
-        ),
         perceive_before_grasp=True,
     )
 
@@ -517,14 +461,7 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(immutable_model
     milk_body = milk.root
 
     plan = execute_single(
-        PickUpAction(
-            milk,
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
+        PickUpAction(milk, Arms.RIGHT,
         ),
         context=context,
     )

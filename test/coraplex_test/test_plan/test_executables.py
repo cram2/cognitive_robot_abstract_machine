@@ -9,6 +9,10 @@ condition monitors wired in.
 
 import pytest
 
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    SelfCollisionAvoidance,
+)
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import CancelMotion, EndMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import (
@@ -17,9 +21,12 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.execution_environment import real_robot, simulated_robot
+from coraplex.datastructures.enums import Arms, ExecutionType
+from coraplex.execution_environment import (
+    ExecutionEnvironment,
+    real_robot,
+    simulated_robot,
+)
 from coraplex.plans.condition_nodes import PlanNodeStatusMonitor
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
@@ -41,11 +48,6 @@ def reach_action_executable(immutable_model_world):
         ReachAction(
             Pose.from_xyz_rpy(2, 1.5, 0.7, reference_frame=world.root),
             Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
             world.get_semantic_annotations_by_type(Milk)[0],
         ),
         context=context,
@@ -96,3 +98,35 @@ def test_motion_state_chart_simulated_execution_adds_condition_and_pause_interru
 
     # one pause + one interrupt monitor per task
     assert len(chart.get_nodes_by_type(PlanNodeStatusMonitor)) == 2 * task_count
+
+
+# %% collision avoidance
+
+
+def test_motion_state_chart_avoids_the_robot_colliding_with_itself(
+    reach_action_executable,
+):
+    """
+    A run asking for collision avoidance must get both kinds: without the self-collision
+    goal nothing stops the arm from moving through the robot's own body, since the
+    robot's ``AvoidSelfCollisions`` rule only shapes the collision matrix and never
+    becomes a constraint on its own.
+    """
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+        chart = reach_action_executable.motion_state_chart
+
+    assert len(chart.get_nodes_by_type(ExternalCollisionAvoidance)) == 1
+    assert len(chart.get_nodes_by_type(SelfCollisionAvoidance)) == 1
+
+
+def test_motion_state_chart_leaves_out_collision_avoidance_when_not_asked_for(
+    reach_action_executable,
+):
+    """
+    A run that does not ask for collision avoidance gets neither goal.
+    """
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=False):
+        chart = reach_action_executable.motion_state_chart
+
+    assert chart.get_nodes_by_type(ExternalCollisionAvoidance) == []
+    assert chart.get_nodes_by_type(SelfCollisionAvoidance) == []

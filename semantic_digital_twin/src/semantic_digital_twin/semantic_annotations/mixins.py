@@ -29,6 +29,7 @@ from random_events.variable import Symbolic
 from typing_extensions import (
     TYPE_CHECKING,
     Generic,
+    Iterator,
     List,
     Optional,
     Self,
@@ -62,6 +63,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
@@ -412,6 +414,46 @@ class HasRootBody(HasRootKinematicStructureEntity[Body]):
             scale.to_simple_event().as_composite_set(),
             connection_specification=connection_specification,
         )
+
+
+# %% grasp poses
+
+
+@dataclass(eq=False)
+class HasGraspPoses(HasRootBody):
+    """
+    A mixin class for semantic annotations that can say where they may be grasped.
+
+    Only an annotation rooted in a body can be grasped at all, since a region carries
+    no collision geometry for fingers to close on.
+
+    A grasp pose is a *grasp frame* expressed in :attr:`root`'s frame: its x-axis points
+    the way the gripper travels toward the object, its y-axis is the axis the fingers
+    close along, and its z-axis completes the frame. Naming the axes rather than a
+    gripper's own tool frame keeps a grasp independent of the robot performing it; the
+    robot's end effector rotates the frame into its own convention.
+
+    ..note:: The poses are expressed in :attr:`root`'s frame so that they stay correct
+        when the annotated object moves.
+    """
+
+    grasp_pose_count: int = field(default=12, kw_only=True)
+    """
+    How many grasp poses :meth:`grasp_poses` generates.
+    """
+
+    def grasp_poses(self) -> Iterator[Pose]:
+        """
+        Generate the grasp frames this annotation offers, in no particular order.
+
+        The default grasps the object at its own origin, from evenly spaced directions
+        around its z-axis. Annotations whose geometry admits a better grip override this.
+        """
+        for yaw in np.linspace(0, 2 * np.pi, self.grasp_pose_count, endpoint=False):
+            yield Pose(
+                orientation=RotationMatrix.from_rpy(yaw=yaw).to_quaternion(),
+                reference_frame=self.root,
+            )
 
 
 @dataclass(eq=False)

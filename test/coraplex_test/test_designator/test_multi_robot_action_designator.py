@@ -16,12 +16,10 @@ from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     Arms,
     AxisIdentifier,
-    ApproachDirection,
-    VerticalAlignment,
     DetectionTechnique,
 )
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.datastructures.trajectory import PoseTrajectory
+from coraplex.robot_plans.mixins import HasApproachesGraspPoses
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.composite.facing import FaceAtAction
@@ -45,6 +43,8 @@ from coraplex.locations.base import Location, PoseGeneratorBackend, PoseValidato
 from coraplex.view_manager import ViewManager
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from rustworkx.rustworkx import NoEdgeBetweenNodes
+
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
@@ -352,12 +352,8 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
 
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        left_arm.end_effector,
-    )
     milk = world.get_semantic_annotations_by_type(Milk)[0]
+    grasp_pose = Pose(Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root)
     milk_body = milk.root
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1, -2, 0.8, reference_frame=world.root
@@ -371,12 +367,9 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
         [
             ParkArmsAction(Arms.BOTH),
             ReachAction(
-                target_pose=Pose(
-                    Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root
-                ),
+                grasp_pose=grasp_pose,
                 object_designator=milk,
                 arm=Arms.LEFT,
-                grasp_description=grasp_description,
             ),
         ],
         context=context,
@@ -389,10 +382,14 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
     end_effector_position = end_effector_pose.to_position().to_np()
     end_effector_orientation = end_effector_pose.to_quaternion().to_np()
 
-    target_orientation = grasp_description.grasp_orientation()
+    target_orientation = left_arm.end_effector.tool_frame_goal(
+        grasp_pose
+    ).to_quaternion()
 
     assert end_effector_position[:3] == pytest.approx([1, -2, 0.8], abs=0.01)
-    compare_orientations(end_effector_orientation, target_orientation, decimal=2)
+    compare_orientations(
+        end_effector_orientation, target_orientation.to_np(), decimal=2
+    )
 
 
 def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
@@ -459,13 +456,10 @@ def test_grasping(immutable_multiple_robot_apartment):
     world, robot, context = immutable_multiple_robot_apartment
     left_arm = ViewManager.get_arm_view(Arms.LEFT, robot)
 
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        left_arm.end_effector,
-    )
     grasping_action = GraspingAction(
-        world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
+        world.get_body_by_name("milk.stl"),
+        Arms.LEFT,
+        Pose(reference_frame=world.get_body_by_name("milk.stl")),
     )
 
     milk_body = world.get_body_by_name("milk.stl")
@@ -494,16 +488,9 @@ def test_grasping(immutable_multiple_robot_apartment):
 
 def test_pick_up_multi(mutable_multiple_robot_apartment, rclpy_node):
     world, view, context = mutable_multiple_robot_apartment
-
     context.evaluate_conditions = False
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        left_arm.end_effector,
-    )
-
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1, -2, 0.6, reference_frame=world.root
@@ -516,11 +503,7 @@ def test_pick_up_multi(mutable_multiple_robot_apartment, rclpy_node):
     root = sequential(
         [
             ParkArmsAction(Arms.BOTH),
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                grasp_description,
-            ),
+            PickUpAction(world.get_semantic_annotations_by_type(Milk)[0], Arms.LEFT),
         ],
         context,
     )
@@ -550,11 +533,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
     world, view, context = mutable_multiple_robot_apartment
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        left_arm.end_effector,
-    )
+    milk_body = world.get_body_by_name("milk.stl")
 
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -568,11 +547,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
     root = sequential(
         [
             ParkArmsAction(Arms.BOTH),
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                grasp_description,
-            ),
+            PickUpAction(world.get_semantic_annotations_by_type(Milk)[0], Arms.LEFT),
             PlaceAction(
                 world.get_body_by_name("milk.stl"),
                 Pose(Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root),
@@ -739,11 +714,6 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
             reference_frame=world.root,
         ),
         arm=Arms.RIGHT,
-        grasp_description=GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            ViewManager.get_end_effector_view(Arms.RIGHT, robot),
-        ),
     )
     plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], context)
     with simulated_robot:
@@ -759,16 +729,9 @@ def test_move_to_reach(immutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = immutable_multiple_robot_apartment
     move_to_reach = MoveToReach(
         target_pose_offset_robot=Pose2D(0.2, -0.55),
-        target_pose_end_effector=Pose.from_xyz_rpy(
-            x=0.7, y=-1.3, z=0.9, reference_frame=world.root
-        ),
+        grasp_pose=Pose.from_xyz_rpy(x=0.7, y=-1.3, z=0.9, reference_frame=world.root),
         hip_rotation=0.0,
-        grasp_description=GraspDescription(
-            approach_direction=ApproachDirection.FRONT,
-            vertical_alignment=VerticalAlignment.NoAlignment,
-            rotate_gripper=False,
-            end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
-        ),
+        end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
     )
 
     plan = execute_single(move_to_reach, context=context)
@@ -787,11 +750,6 @@ def test_transport_open_container(mutable_multiple_robot_apartment, rclpy_node):
             5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root
         ),
         arm=Arms.RIGHT,
-        grasp_description=GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.TOP,
-            ViewManager.get_end_effector_view(Arms.RIGHT, robot),
-        ),
     )
     plan = sequential(
         [MoveTorsoAction(TorsoState.HIGH), ParkArmsAction(Arms.BOTH), description],

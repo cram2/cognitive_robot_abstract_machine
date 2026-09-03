@@ -3,8 +3,7 @@ from dataclasses import dataclass
 import rustworkx
 
 from krrood.entity_query_language.factories import a, an, variable
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
@@ -77,13 +76,8 @@ class Sage10kOpenDoor(ActionDescription):
                 x=..., y=..., yaw=..., reference_frame=None
             ),
             hip_rotation=0.0,
-            target_pose_end_effector=pre_grasp_pose,
-            grasp_description=a(GraspDescription)(
-                approach_direction=ApproachDirection.FRONT,
-                vertical_alignment=VerticalAlignment.NoAlignment,
-                end_effector=variable(EndEffector, self.world.semantic_annotations),
-                rotate_gripper=False,
-            ),
+            grasp_pose=pre_grasp_pose,
+            end_effector=variable(EndEffector, self.world.semantic_annotations),
         )
 
         # constrain_to_free_space attaches the condition to the underlying Entity,

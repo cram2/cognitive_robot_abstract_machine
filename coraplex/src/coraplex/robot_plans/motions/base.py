@@ -14,7 +14,7 @@ from coraplex.datastructures.enums import Arms
 from coraplex.plans.designator import Designator
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.collision_checking.collision_rules import (
-    AllowCollisionBetweenGroups,
+    AllowCollisionForEndEffector,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from coraplex.alternative_motion_mapping import AlternativeMotion
@@ -77,16 +77,15 @@ class BaseMotion(Designator):
         """
         :param arm: The arm whose manipulator may collide with the environment.
         :return: Collision rules that only allow collisions between the manipulator of
-            the given arm and the environment.
+            the given arm, together with whatever it holds, and the environment.
         """
-        manipulator_bodies = (
-            ViewManager().get_end_effector_view(arm, self.robot).bodies_with_collision
-        )
         return [
             UpdateTemporaryCollisionRules(
                 temporary_rules=[
-                    AllowCollisionBetweenGroups(
-                        self.world.bodies_with_collision, manipulator_bodies
+                    AllowCollisionForEndEffector(
+                        end_effector=ViewManager().get_end_effector_view(
+                            arm, self.robot
+                        )
                     )
                 ]
             )

@@ -6,9 +6,9 @@ from rustworkx import NoEdgeBetweenNodes
 
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import Arms
 from coraplex.datastructures.trajectory import PoseTrajectory
+from coraplex.robot_plans.mixins import HasApproachesGraspPoses
 
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import execute_single, sequential
@@ -39,7 +39,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspPoses
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -104,11 +104,13 @@ def robot_setup(request):
 
         # The boxes stand in for any graspable object; the plans only need an annotation
         # to name them by, not a particular kind of object.
-        world.add_semantic_annotations([HasRootBody(root=box1), HasRootBody(root=box2)])
+        world.add_semantic_annotations(
+            [HasGraspPoses(root=box1), HasGraspPoses(root=box2)]
+        )
     return world, request.param[1]
 
 
-def graspable_annotation(world: World, body: Body) -> HasRootBody:
+def graspable_annotation(world: World, body: Body) -> HasGraspPoses:
     """
     The annotation naming ``body`` for the actions that take one rather than a body.
 
@@ -119,7 +121,7 @@ def graspable_annotation(world: World, body: Body) -> HasRootBody:
     return an(
         entity(
             semantic_annotation := variable(
-                HasRootBody, domain=world.semantic_annotations
+                HasGraspPoses, domain=world.semantic_annotations
             )
         ).where(semantic_annotation.root == body)
     ).first()
@@ -171,25 +173,20 @@ def test_reach_action_multi(immutable_stationary_block_world):
     world, view, context = immutable_stationary_block_world
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
 
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.TOP,
-        left_arm.end_effector,
-    )
     box_body = world.get_body_by_name("box1")
     box = graspable_annotation(world, box_body)
     position = box_body.global_pose.position.to_np()
+    grasp_pose = Pose.from_xyz_rpy(
+        *position[:3], pitch=np.pi / 2, reference_frame=world.root
+    )
 
     plan = sequential(
         [
             ParkArmsAction(Arms.BOTH),
             ReachAction(
-                target_pose=Pose(
-                    Point3.from_iterable(position), reference_frame=world.root
-                ),
+                grasp_pose=grasp_pose,
                 object_designator=box,
                 arm=Arms.LEFT,
-                grasp_description=grasp_description,
             ),
         ],
         context=context,
@@ -202,7 +199,9 @@ def test_reach_action_multi(immutable_stationary_block_world):
     end_effector_position = end_effector_pose.to_position().to_np()
     end_effector_orientation = end_effector_pose.to_quaternion().to_np()
 
-    target_orientation = grasp_description.grasp_orientation()
+    target_orientation = left_arm.end_effector.tool_frame_goal(
+        grasp_pose
+    ).to_quaternion()
 
     assert end_effector_position[:3] == pytest.approx(position[:3], abs=0.01)
     compare_orientations(
@@ -242,13 +241,11 @@ def test_grasping(immutable_stationary_block_world):
     world, robot_view, context = immutable_stationary_block_world
     left_arm = ViewManager.get_arm_view(Arms.LEFT, robot_view)
 
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.TOP,
-        left_arm.end_effector,
-    )
+    box_body = world.get_body_by_name("box1")
     description = GraspingAction(
-        world.get_body_by_name("box1"), Arms.LEFT, grasp_description
+        box_body,
+        Arms.LEFT,
+        Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box_body),
     )
     plan = sequential(
         [ParkArmsAction(Arms.BOTH), description],
@@ -266,18 +263,13 @@ def test_pick_up_multi(mutable_stationary_block_world):
     world, view, context = mutable_stationary_block_world
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.TOP,
-        left_arm.end_effector,
-    )
+    box_body = world.get_body_by_name("box1")
     plan = sequential(
         [
             ParkArmsAction(Arms.BOTH),
             PickUpAction(
-                graspable_annotation(world, world.get_body_by_name("box1")),
+                graspable_annotation(world, box_body),
                 Arms.LEFT,
-                grasp_description,
             ),
         ],
         context=context,
@@ -312,19 +304,14 @@ def test_place_multi(mutable_stationary_block_world, place_position):
     world, view, context = mutable_stationary_block_world
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.TOP,
-        left_arm.end_effector,
-    )
+    box_body = world.get_body_by_name("box1")
 
     plan = sequential(
         [
             ParkArmsAction(Arms.BOTH),
             PickUpAction(
-                graspable_annotation(world, world.get_body_by_name("box1")),
+                graspable_annotation(world, box_body),
                 Arms.LEFT,
-                grasp_description,
             ),
             PlaceAction(
                 world.get_body_by_name("box1"),

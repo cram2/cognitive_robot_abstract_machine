@@ -4,11 +4,18 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from typing_extensions import List
+from typing_extensions import List, Optional, Self, TYPE_CHECKING
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    SelfCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
+)
+from giskardpy.motion_statechart.exceptions import NoProgressError
 from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.monitors.progress_monitors import ProgressStalled
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
@@ -16,15 +23,22 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from coraplex.plans.plan_node import ActionNode, MotionNode
 from coraplex.alternative_motion_mapping import AlternativeMotion
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import Arms
+from coraplex.robot_plans.mixins import HasApproachesGraspPoses
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.robots.robot_parts import EndEffector
 from coraplex.exceptions import TipLinkDoesNotMatchAnyArm
 from coraplex.locations.base import PoseValidator
+from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans import MoveToolCenterPointMotion
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
+)
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import (
@@ -133,22 +147,16 @@ class IsReachableBy(PoseValidator):
     Link that should be moved to the given pose.
     """
 
-    grasp_description: GraspDescription = field(default=None)
-    """
-    The grasp description that should be used for validation.
-    """
-
     def __call__(self) -> bool:
         return AreReachableBy(
             pose_sequence=[self.pose],
             tip_link=self.tip_link,
             context=self.context,
-            grasp_description=self.grasp_description,
         ).__call__()
 
 
 @dataclass
-class AreReachableBy(PoseValidator):
+class AreReachableBy(PoseValidator, HasApproachesGraspPoses):
     """
     Validator that checks if a sequence of poses is reachable with the given robot link.
 
@@ -163,12 +171,80 @@ class AreReachableBy(PoseValidator):
     tip_link: KinematicStructureEntity
     """
     Link of the robot which should be used for reachability checking.
+
+    ..note:: The poses are goals for this link itself, so a caller checking a grasp
+        passes what
+        :meth:`~coraplex.robot_plans.mixins.HasApproachesGraspPoses.grasp_pose_sequence`
+        produced rather than the grasp frames it was built from.
     """
 
-    grasp_description: GraspDescription = field(default=None)
-    """
-    The grasp description that should be used for validation.
-    """
+    @classmethod
+    def for_grasp(
+        cls,
+        grasp_pose: Pose,
+        end_effector: EndEffector,
+        body_T_grasp: Optional[Pose],
+        context: Context,
+        **clearances,
+    ) -> Self:
+        """
+        Build a validator for reaching a grasp, rather than for a ready-made sequence.
+
+        Keeps the geometry with the validator instead of with every caller that wants to
+        know whether a grasp is within reach.
+
+        :param grasp_pose: The grasp frame to reach.
+        :param end_effector: The end effector that is to reach it.
+        :param body_T_grasp: The same grasp in the grasped body's frame, or ``None``.
+        :param context: The context the check runs in.
+        :param clearances: Overrides for :class:`HasApproachesGraspPoses`' distances.
+        :return: A validator for the poses reaching that grasp.
+        """
+        approach = HasApproachesGraspPoses(**clearances)
+        return cls(
+            pose_sequence=approach.grasp_pose_sequence(
+                grasp_pose, end_effector, body_T_grasp
+            ),
+            tip_link=end_effector.tool_frame,
+            context=context,
+            **clearances,
+        )
+
+    def _arm_reaching_with_the_tip(self) -> Optional[Arms]:
+        """
+        :return: The arm whose tool frame the sequence moves, or None when the tip is
+            not a tool frame of this robot.
+        """
+        for arm in Arms:
+            if (
+                self.tip_link
+                == ViewManager.get_end_effector_view(arm, self.robot).tool_frame
+            ):
+                return arm
+        return None
+
+    def _gripper_allowance_of_the_reach(self) -> List[UpdateTemporaryCollisionRules]:
+        """
+        :return: The rule freeing the manipulator that performs this reach, matching
+            what the reach itself is executed with. Empty when the tip is not a tool
+            frame, since nothing is being grasped with it then.
+
+        A reach onto an object ends inside the buffer zone kept around that object, so a
+        probe that does not free the manipulator never converges on the pose it is
+        asked about.
+        """
+        arm = self._arm_reaching_with_the_tip()
+        if arm is None:
+            return []
+        return [
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AllowCollisionForEndEffector(
+                        end_effector=ViewManager.get_end_effector_view(arm, self.robot)
+                    )
+                ]
+            )
+        ]
 
     def create_msc(self) -> MotionStatechart:
         """
@@ -182,21 +258,11 @@ class AreReachableBy(PoseValidator):
             self.alternative_motion_mappings, self.robot, MoveToolCenterPointMotion
         )
         if alternative_motion:
-            correct_arm = None
-            for arm in Arms:
-                if (
-                    self.tip_link
-                    == ViewManager.get_end_effector_view(arm, self.robot).tool_frame
-                ):
-                    correct_arm = arm
+            correct_arm = self._arm_reaching_with_the_tip()
             if correct_arm is None:
                 raise TipLinkDoesNotMatchAnyArm(self.tip_link, self.robot)
             sequence = []
             for pose in self.pose_sequence:
-
-                if self.grasp_description:
-                    pose = self.grasp_description.pose_sequence(pose)[1]
-
                 motion = alternative_motion(
                     pose,
                     correct_arm,
@@ -226,23 +292,29 @@ class AreReachableBy(PoseValidator):
                 else self.world.root
             )
 
-            sequence = (
-                [
-                    self.grasp_description.pose_sequence(pose)[1]
-                    for pose in self.pose_sequence
-                ]
-                if self.grasp_description
-                else self.pose_sequence
-            )
+            sequence = self.pose_sequence
 
+            tolerances = self.context.motion_tolerances
             sequence = [
-                CartesianPose(root_link=root, tip_link=self.tip_link, goal_pose=pose)
+                CartesianPose(
+                    root_link=root,
+                    tip_link=self.tip_link,
+                    goal_pose=pose,
+                    translation_threshold=tolerances.default_tcp_position_threshold,
+                    orientation_threshold=tolerances.tool_orientation_threshold,
+                )
                 for pose in sequence
             ]
 
         msc = MotionStatechart()
         msc.add_node(sequence_node := Sequence(sequence))
+        if GiskardExecutable.collision_avoidance:
+            msc.add_node(ExternalCollisionAvoidance(cancel_if_collision_violated=False))
+            msc.add_node(SelfCollisionAvoidance(cancel_if_collision_violated=False))
+            msc.add_nodes(self._gripper_allowance_of_the_reach())
         msc.add_node(EndMotion.when_true(sequence_node))
+        msc.add_node(stalled := ProgressStalled(monitored_node=sequence_node))
+        msc.add_node(stalled.cancel_motion())
 
         return msc
 
@@ -251,7 +323,10 @@ class AreReachableBy(PoseValidator):
             f"Hash of input for pose_sequence_reachability_validator: {hash((*self.pose_sequence, self.tip_link, self.robot))}"
         )
 
-        with self.world.reset_state_context():
+        with (
+            self.world.reset_state_context(),
+            self.world.collision_manager.reset_temporary_rules_context(),
+        ):
 
             msc = self.create_msc()
 
@@ -266,19 +341,25 @@ class AreReachableBy(PoseValidator):
             executor.compile(msc)
 
             try:
-                # TimeoutError from tick_until_end is an expected outcome (planner
-                # cannot find a path), not an illegal state — no non-raising API exists.
-                executor.tick_until_end(timeout=1500)
+                executor.tick_until_end(
+                    timeout=len(self.pose_sequence) * GiskardExecutable.ticks_per_motion
+                )
             except TimeoutError:
                 logger.debug(
                     f"Timeout while executing pose sequence: {self.pose_sequence}"
+                )
+                return False
+            except NoProgressError as no_progress:
+                logger.debug(
+                    f"Stopped approaching pose sequence {self.pose_sequence}: "
+                    f"{no_progress.error_message()}"
                 )
                 return False
             return True
 
 
 @dataclass
-class IsObjectReachableBy(PoseValidator):
+class IsObjectReachableBy(PoseValidator, HasApproachesGraspPoses):
     """
     Reachability check that is evaluated against a *fresh* copy of the world.
 
@@ -300,20 +381,12 @@ class IsObjectReachableBy(PoseValidator):
     The object that should be reachable.
     """
 
-    grasp_description: GraspDescription = field(default=None)
+    grasp_pose: Optional[Pose] = field(default=None)
     """
-    Grasp description used to build the pose sequence.
+    The grasp frame to reach on the object.
 
-    Required unless
-    ``as_single_grasp`` is set.
-    """
-
-    target_pose: Pose = field(default=None)
-    """
-    Optional explicit target pose.
-
-    If omitted, the object's own frame is used as the grasp target (as in
-    :meth:`GraspDescription.grasp_pose_sequence`).
+    ``None`` grasps the object at its own frame, which is what ``as_single_grasp``
+    always does since it is never given one.
     """
 
     reverse: bool = field(default=False)
@@ -332,6 +405,10 @@ class IsObjectReachableBy(PoseValidator):
         robot = world.get_semantic_annotation_by_id(self.robot.id)
         end_effector = ViewManager.get_end_effector_view(self.arm, robot)
 
+        grasp_pose = self.grasp_pose
+        if grasp_pose is None:
+            grasp_pose = Pose(reference_frame=self.object_designator)
+
         if self.as_single_grasp:
             return IsReachableBy(
                 context=Context(
@@ -339,23 +416,16 @@ class IsObjectReachableBy(PoseValidator):
                     robot=robot,
                     alternative_motion_mappings=self.alternative_motion_mappings,
                 ),
-                pose=self.object_designator.global_pose,
+                pose=end_effector.tool_frame_goal(grasp_pose),
                 tip_link=end_effector.tool_frame,
-                grasp_description=GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    end_effector,
-                ),
             ).__call__()
 
-        if self.target_pose is not None:
-            pose_sequence = self.grasp_description.pose_sequence(
-                self.target_pose, self.object_designator, reverse=self.reverse
-            )
-        else:
-            pose_sequence = self.grasp_description.grasp_pose_sequence(
-                self.object_designator
-            )
+        pose_sequence = self.grasp_pose_sequence(
+            grasp_pose,
+            end_effector,
+            self._grasp_in_body_frame(grasp_pose, self.object_designator),
+            reverse=self.reverse,
+        )
 
         return AreReachableBy(
             context=Context(

@@ -24,12 +24,9 @@ from rclpy.node import Node
 from typing_extensions import List, Tuple
 
 from coraplex.datastructures.enums import (
-    ApproachDirection,
     Arms,
     ExecutionType,
-    VerticalAlignment,
 )
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.exceptions import (
     AmbiguousDetection,
     NothingDetected,
@@ -443,15 +440,7 @@ def test_detection_corrects_a_grasp_planned_before_it(immutable_model_world):
     )
 
     plan = execute_single(
-        PickUpAction(
-            milk,
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
-        ),
+        PickUpAction(milk, Arms.RIGHT),
         context=context,
     )
     plan.notify()

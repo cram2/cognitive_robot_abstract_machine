@@ -5,12 +5,10 @@ from krrood.entity_query_language.backends import (
 from krrood.entity_query_language.factories import a, an, variable_from
 from coraplex.datastructures.enums import (
     Arms,
-    ApproachDirection,
-    VerticalAlignment,
     TaskStatus,
 )
-from coraplex.datastructures.grasp import GraspDescription
 
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from coraplex.language import SequentialNode
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential, execute_single
@@ -92,11 +90,7 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
     Test that entire plans can be underspecified.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        robot.left_arm.end_effector,
-    )
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan_generator = an(sequential, target_type=SequentialNode)(
         children=[
             a(NavigateAction)(
@@ -114,11 +108,7 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
                 ),
                 keep_joint_states=True,
             ),
-            a(PickUpAction)(
-                arm=...,
-                grasp_description=grasp_description,
-                object_designator=world.get_body_by_name("milk.stl"),
-            ),
+            a(PickUpAction)(arm=..., object_designator=milk),
         ],
         context=context,
     )

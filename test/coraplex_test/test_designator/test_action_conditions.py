@@ -5,8 +5,8 @@ from krrood.entity_query_language.factories import (
     evaluate_condition,
     ConditionType,
 )
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import Arms
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from coraplex.exceptions import ConditionNotSatisfied, MotionDidNotFinish
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
@@ -33,19 +33,12 @@ def _construct_and_evaluate_condition(action, action_condition):
 def test_get_bound_variables(immutable_model_world):
     world, view, context = immutable_model_world
 
-    pick_action = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Arms.LEFT,
-        GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            view.left_arm.end_effector,
-        ),
-    )
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    pick_action = PickUpAction(milk, Arms.LEFT)
 
     bound_variables = pick_action._create_variables()
 
-    assert len(bound_variables) == 14
+    assert len(bound_variables) == 15
     assert list(bound_variables.keys()) == [
         "position_threshold",
         "orientation_threshold",
@@ -56,9 +49,10 @@ def test_get_bound_variables(immutable_model_world):
         "lift_linear_velocity",
         "grasp_stall_minimum_time",
         "object_friction",
+        "approach_clearance",
+        "retreat_distance",
         "object_designator",
         "arm",
-        "grasp_description",
         "tolerate_grasp_stall",
         "perceive_before_grasp",
     ]
@@ -73,15 +67,8 @@ def test_get_bound_variables(immutable_model_world):
 def test_pick_up_pre_conditions(mutable_model_world):
     world, view, context = mutable_model_world
 
-    pick_action = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Arms.LEFT,
-        GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            view.left_arm.end_effector,
-        ),
-    )
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    pick_action = PickUpAction(milk, Arms.LEFT)
 
     plan = sequential([pick_action], context)
 
@@ -123,15 +110,8 @@ def test_pick_up_pre_conditions(mutable_model_world):
 
 def test_pick_up_post_condition(mutable_model_world):
     world, view, context = mutable_model_world
-    pick_action = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Arms.LEFT,
-        GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            view.left_arm.end_effector,
-        ),
-    )
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    pick_action = PickUpAction(milk, Arms.LEFT)
     # The standing pose test_pick_up_pre_condition establishes as reaching the milk.
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1.9, 1.4, 0

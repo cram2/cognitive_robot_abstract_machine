@@ -38,9 +38,10 @@ from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
 with robocasa_version_assertions_relaxed():
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
+import numpy as np
+
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import Arms
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.plans.failures import PlanFailure
@@ -379,11 +380,6 @@ def _spawn_robot_and_prepare_pick_up(
             PickUpAction(
                 apple_annotation,
                 Arms.RIGHT,
-                GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.TOP,
-                    pr2.right_arm.end_effector,
-                ),
             ),
         ],
         context=context,

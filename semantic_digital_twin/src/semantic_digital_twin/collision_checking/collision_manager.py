@@ -3,7 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from krrood.utils import memoize, clear_memoization_cache
-from typing import Dict, Any, Self
+from types import TracebackType
+from typing import Dict, Any, Optional, Self
 
 from typing_extensions import List, TYPE_CHECKING
 
@@ -74,6 +75,42 @@ class CollisionConsumer(ABC):
         """
         Called when the collision matrix is updated.
         """
+
+
+@dataclass
+class ResetTemporaryCollisionRulesContextManager:
+    """
+    A context manager that keeps the temporary collision rules installed inside it from
+    outlasting it.
+
+    Temporary rules outrank the ones a run set up for itself, so a throwaway simulation
+    that installs its own would otherwise decide what every later one is judged by. The
+    rules are given back whether the block returned or raised, since a simulation is
+    abandoned as often as it finishes.
+    """
+
+    collision_manager: CollisionManager
+    """
+    The collision manager whose temporary rules are restored on leaving the context.
+    """
+
+    entered_rules: List[CollisionRule] = field(init=False, default_factory=list)
+    """
+    The temporary rules that were in place when the context was entered.
+    """
+
+    def __enter__(self) -> None:
+        self.entered_rules = list(self.collision_manager.temporary_rules)
+
+    def __exit__(
+        self,
+        exception_type: Optional[type],
+        exception_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
+        self.collision_manager.clear_temporary_rules()
+        self.collision_manager.extend_temporary_rule(self.entered_rules)
+        self.collision_manager.update_collision_matrix()
 
 
 @dataclass(eq=False)
@@ -194,6 +231,15 @@ class CollisionManager(ModelChangeCallback):
         Call this before starting a new task.
         """
         self.temporary_rules.clear()
+
+    def reset_temporary_rules_context(
+        self,
+    ) -> ResetTemporaryCollisionRulesContextManager:
+        """
+        :return: A context that restores the temporary rules it was entered with, so a
+            simulation run inside it cannot change the rules a later one is judged by.
+        """
+        return ResetTemporaryCollisionRulesContextManager(collision_manager=self)
 
     @synchronized_attribute_modification
     def extend_max_avoided_bodies_rules(self, rules: List[MaxAvoidedCollisionsRule]):

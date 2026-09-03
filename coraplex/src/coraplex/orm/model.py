@@ -9,7 +9,7 @@ from typing_extensions import Optional
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import Arms
-from coraplex.datastructures.grasp import GraspPose, GraspDescription
+from coraplex.datastructures.grasp import GraspPose
 from coraplex.plans.plan import (
     Plan,
 )
@@ -73,8 +73,6 @@ class PlanMapping(AlternativeMapping[Plan]):
 class GrasPoseMapping(PoseMapping, AlternativeMapping[GraspPose]):
     arm: Optional[Arms]
 
-    grasp_description: Optional[GraspDescription]
-
     @classmethod
     def from_domain_object(cls, obj: GraspPose) -> Self:
         position = obj.to_position()
@@ -83,7 +81,6 @@ class GrasPoseMapping(PoseMapping, AlternativeMapping[GraspPose]):
             position=position,
             orientation=orientation,
             reference_frame=obj.reference_frame,
-            grasp_description=obj.grasp_description,
             arm=obj.arm,
         )
         return result
@@ -93,6 +90,5 @@ class GrasPoseMapping(PoseMapping, AlternativeMapping[GraspPose]):
             position=self.position,
             orientation=self.orientation,
             reference_frame=self.reference_frame,
-            grasp_description=self.grasp_description,
             arm=self.arm,
         )

@@ -5,19 +5,28 @@ from coraplex.alternative_motion_mapping import AlternativeMotion
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     Arms,
-    ApproachDirection,
-    VerticalAlignment,
 )
 from coraplex.datastructures.enums import ExecutionType
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.exceptions import TipLinkDoesNotMatchAnyArm
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import ExecutionEnvironment, simulated_robot
 from coraplex.locations.pose_validator import (
     IsReachableBy,
     AreReachableBy,
     IsObjectReachableBy,
 )
 from coraplex.robot_plans import MoveToolCenterPointMotion
+from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.monitors.progress_monitors import ProgressStalled
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    SelfCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
+)
+from coraplex.view_manager import ViewManager
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowSelfCollisions,
+)
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
@@ -146,14 +155,6 @@ def test_pose_sequence_one_not_reachable(immutable_model_world):
     )
 
 
-def _right_front_grasp(view):
-    return GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        view.right_arm.end_effector,
-    )
-
-
 def test_is_object_reachable_by_copies_current_world_lazily(
     immutable_model_world, monkeypatch
 ):
@@ -182,7 +183,6 @@ def test_is_object_reachable_by_copies_current_world_lazily(
         ),
         arm=Arms.RIGHT,
         object_designator=milk,
-        grasp_description=_right_front_grasp(view),
     )
 
     # Move the object *after* the predicate has been constructed.
@@ -206,11 +206,11 @@ def test_is_object_reachable_by_copies_current_world_lazily(
     assert captured["tip_link"]._world is captured["world"]
 
 
-def test_is_object_reachable_by_uses_target_pose_sequence(
+def test_is_object_reachable_by_uses_the_grasp_pose_sequence(
     immutable_model_world, monkeypatch
 ):
     """
-    With a target pose set, the reach pose sequence is checked.
+    With a grasp pose set, the reach pose sequence is checked.
     """
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
@@ -230,8 +230,7 @@ def test_is_object_reachable_by_uses_target_pose_sequence(
         ),
         arm=Arms.RIGHT,
         object_designator=milk,
-        grasp_description=_right_front_grasp(view),
-        target_pose=target,
+        grasp_pose=target,
     )()
 
     assert len(captured["seq"]) == 3
@@ -275,7 +274,7 @@ def test_is_object_reachable_by_single_grasp_delegates_to_is_reachable_by(
     assert not seq_calls
     assert len(single_calls) == 1
     assert np.allclose(
-        single_calls[0].to_position().to_np()[:3],
+        world.transform(single_calls[0], world.root).to_position().to_np()[:3],
         milk.global_pose.to_position().to_np()[:3],
     )
 
@@ -297,7 +296,6 @@ def test_is_object_reachable_by_reachable(immutable_model_world):
         ),
         arm=Arms.RIGHT,
         object_designator=milk,
-        grasp_description=_right_front_grasp(view),
     )
 
 
@@ -318,5 +316,144 @@ def test_is_object_reachable_by_not_reachable(immutable_model_world):
         ),
         arm=Arms.RIGHT,
         object_designator=milk,
-        grasp_description=_right_front_grasp(view),
     )
+
+
+# %% validation runs what execution runs
+
+
+def _reachability_validator(world, robot_view, context):
+    """
+    :return: A validator for a pose within the robot's reach.
+    """
+    return AreReachableBy(
+        context=Context(
+            world=world,
+            robot=robot_view,
+            alternative_motion_mappings=context.alternative_motion_mappings,
+        ),
+        pose_sequence=[
+            Pose(Point3.from_iterable([1.7, 1.4, 1]), reference_frame=world.root)
+        ],
+        tip_link=world.get_body_by_name("r_gripper_tool_frame"),
+    )
+
+
+def test_validation_avoids_collisions_when_the_run_does(immutable_model_world):
+    """
+    Collision avoidance does not only reject poses the robot would collide on, it
+    changes the trajectory the solver produces at all.
+
+    A validation run without it answers for a different trajectory than the one the plan
+    goes on to execute, so it carries the same collision goals the executed chart does.
+    """
+    world, robot_view, context = immutable_model_world
+    validator = _reachability_validator(world, robot_view, context)
+
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+        msc = validator.create_msc()
+
+    assert len(msc.get_nodes_by_type(ExternalCollisionAvoidance)) == 1
+    assert len(msc.get_nodes_by_type(SelfCollisionAvoidance)) == 1
+
+
+def test_validation_leaves_out_collision_avoidance_when_the_run_does(
+    immutable_model_world,
+):
+    """
+    A run that does not avoid collisions is validated the same way.
+    """
+    world, robot_view, context = immutable_model_world
+    validator = _reachability_validator(world, robot_view, context)
+
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=False):
+        msc = validator.create_msc()
+
+    assert msc.get_nodes_by_type(ExternalCollisionAvoidance) == []
+    assert msc.get_nodes_by_type(SelfCollisionAvoidance) == []
+
+
+def test_validation_frees_the_gripper_like_the_reach_it_validates(
+    immutable_model_world,
+):
+    """
+    The reach being validated allows the gripper to touch what it grasps, so the
+    validation has to allow it too.
+
+    Without that, the grasp pose lies inside the buffer zone the probe keeps around the
+    object, no trajectory ever converges on it, and every candidate is reported
+    unreachable.
+    """
+    world, robot_view, context = immutable_model_world
+    validator = _reachability_validator(world, robot_view, context)
+
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+        msc = validator.create_msc()
+
+    [rules_node] = msc.get_nodes_by_type(UpdateTemporaryCollisionRules)
+    (rule,) = rules_node.temporary_rules
+    assert rule.end_effector is ViewManager.get_end_effector_view(
+        Arms.RIGHT, robot_view
+    )
+
+
+def test_validation_uses_the_same_goal_tolerances_the_motions_do(
+    immutable_model_world,
+):
+    """
+    A reach is only finished once it is within the tolerance its motion was given, so a
+    probe that settles for a looser one reports poses reachable that the motion would
+    still be working towards.
+    """
+    world, robot_view, context = immutable_model_world
+    validator = _reachability_validator(world, robot_view, context)
+
+    msc = validator.create_msc()
+
+    [sequence] = msc.get_nodes_by_type(Sequence)
+    goals = [node for node in sequence.nodes if isinstance(node, CartesianPose)]
+    tolerances = validator.context.motion_tolerances
+    assert goals
+    for goal in goals:
+        assert goal.translation_threshold == tolerances.default_tcp_position_threshold
+        assert goal.orientation_threshold == tolerances.tool_orientation_threshold
+
+
+def test_validation_gives_up_on_a_pose_it_stops_approaching(immutable_model_world):
+    """
+    A probe that cannot get any closer to its goal would otherwise hold the whole tick
+    budget before being called unreachable, and a location grounds by trying candidates
+    until one works.
+
+    Watching the sequence for a stall abandons a bad candidate as soon as it stops
+    making progress.
+    """
+    world, robot_view, context = immutable_model_world
+    validator = _reachability_validator(world, robot_view, context)
+
+    msc = validator.create_msc()
+
+    [stall_monitor] = msc.get_nodes_by_type(ProgressStalled)
+    [sequence] = msc.get_nodes_by_type(Sequence)
+    assert stall_monitor.monitored_node is sequence
+
+
+def test_validation_gives_back_the_collision_rules_it_found(immutable_model_world):
+    """
+    A location judges every candidate against one world copy, so a validation run must
+    leave the collision rules exactly as it found them.
+
+    The reach installs a gripper allowance of its own while it runs, and that allowance
+    outranks the rules of the run it was probing, so a candidate evaluated after another
+    would otherwise be judged against the previous candidate's rules.
+    """
+    world, robot_view, context = immutable_model_world
+    validator = _reachability_validator(world, robot_view, context)
+    rule_of_the_run = AllowSelfCollisions(robot=robot_view)
+    world.collision_manager.clear_temporary_rules()
+    world.collision_manager.add_temporary_rule(rule_of_the_run)
+
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+        validator()
+
+    assert world.collision_manager.temporary_rules == [rule_of_the_run]

@@ -161,56 +161,6 @@ class AxisIdentifier(Enum):
         return next((axis for axis in cls if axis.value == axis_tuple), None)
 
 
-class Grasp(Enum):
-    """
-    Base class for grasp enums.
-    """
-
-    def __hash__(self):
-        return [index for index, value in enumerate(self.__class__) if self == value][0]
-
-    @classmethod
-    def from_axis_direction(cls, axis: AxisIdentifier, direction: int):
-        """
-        Get the Grasp face from an axis-index tuple.
-        """
-        return next((grasp for grasp in cls if grasp.value == (axis, direction)), None)
-
-
-class ApproachDirection(Grasp):
-    """
-    Enum for the approach direction of a gripper.
-
-    The AxisIdentifier is used to identify the axis of the gripper, and the int is used
-    to identify the direction along  that axis.
-    """
-
-    FRONT = (AxisIdentifier.X, -1)
-    BACK = (AxisIdentifier.X, 1)
-    RIGHT = (AxisIdentifier.Y, -1)
-    LEFT = (AxisIdentifier.Y, 1)
-
-    @property
-    def axis(self) -> AxisIdentifier:
-        """
-        Returns the axis of the approach direction.
-        """
-        return self.value[0]
-
-
-class VerticalAlignment(Grasp):
-    """
-    Enum for the vertical alignment of a gripper.
-
-    The AxisIdentifier is used to identify the axis of the gripper, and the int is used
-    to identify the direction along  that axis.
-    """
-
-    NoAlignment = (AxisIdentifier.Undefined, 0)
-    TOP = (AxisIdentifier.Z, -1)
-    BOTTOM = (AxisIdentifier.Z, 1)
-
-
 class GripperType(Enum):
     """
     Enum for the different types of grippers.

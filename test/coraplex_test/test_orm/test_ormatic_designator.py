@@ -5,8 +5,7 @@ from sqlalchemy import select
 import coraplex.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
 import coraplex.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 from krrood.ormatic.data_access_objects.helper import to_dao
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import Arms
 from coraplex.execution_environment import simulated_robot
 from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.plans.factories import sequential, execute_single
@@ -87,19 +86,15 @@ def test_replay_simple_plan(coraplex_testing_session, simple_plan):
 def complex_plan(mutable_model_world):
     world, robot_view, context = mutable_model_world
     context.evaluate_conditions = False
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = execute_single(
         TransportAction(
-            object_designator=world.get_semantic_annotations_by_type(Milk)[0],
+            object_designator=milk,
             target_location=Pose.from_xyz_quaternion(
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
             arm=Arms.LEFT,
-            grasp_description=GraspDescription(
-                ApproachDirection.LEFT,
-                VerticalAlignment.NoAlignment,
-                robot_view.left_arm.end_effector,
-            ),
         ),
         context=context,
     ).plan

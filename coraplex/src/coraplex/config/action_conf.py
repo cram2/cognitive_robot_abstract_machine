@@ -2,9 +2,15 @@ from datetime import timedelta
 
 
 class ActionConfig:
-    pick_up_prepose_distance = 0.03
+    approach_clearance = 0.1
+    """
+    The gap in meters between an object and the gripper waiting to close on it.
+    """
 
-    grasping_prepose_distance = 0.03
+    retreat_distance = 0.1
+    """
+    The height in meters the gripper rises by once it holds an object.
+    """
 
     navigate_keep_joint_states = True
 

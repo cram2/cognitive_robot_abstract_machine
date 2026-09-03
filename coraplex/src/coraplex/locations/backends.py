@@ -16,7 +16,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.exceptions import InfeasibleException
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from coraplex.datastructures.enums import Arms
-from coraplex.datastructures.grasp import GraspDescription, GraspPose
+from coraplex.robot_plans.mixins import HasApproachesGraspPoses
 from coraplex.locations.base import Location, PoseGeneratorBackend
 from coraplex.locations.costmaps import Costmap, OccupancyCostmap, GaussianCostmap
 from coraplex.view_manager import ViewManager
@@ -32,7 +32,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class GiskardLocationBackend(PoseGeneratorBackend):
+class GiskardLocationBackend(PoseGeneratorBackend, HasApproachesGraspPoses):
     """
     Pose generator backend that uses full-body control to steer the robot to a base pose
     from which the target should be reachable.
@@ -51,9 +51,9 @@ class GiskardLocationBackend(PoseGeneratorBackend):
     Arm of the which should be used.
     """
 
-    grasp_description: GraspDescription
+    grasp_pose: Pose
     """
-    Grasp description of how to approach the target
+    The grasp frame the end effector should reach on the target.
     """
 
     robot: AbstractRobot
@@ -63,7 +63,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
 
     world: World
     """
-    The world in which to sample 
+    The world in which to sample.
     """
 
     distance_to_obstacle: float = 0.1
@@ -183,7 +183,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
         )
 
         test_ee = ViewManager.get_end_effector_view(self.arm, self.robot)
-        target_sequence = self.grasp_description.pose_sequence(target_pose)
+        target_sequence = self.grasp_pose_sequence(self.grasp_pose, test_ee)
 
         executor = self.setup_giskard_executor(
             target_sequence, self.world, self.robot, test_ee
@@ -198,30 +198,3 @@ class GiskardLocationBackend(PoseGeneratorBackend):
                 pass
 
             yield self.robot.root.global_pose
-
-
-@dataclass
-class GraspPoseGenerator(PoseGeneratorBackend):
-    """
-    A PoseGeneratorBackend that wraps another backend and creates GraspPoses from the
-    samples poses of the backend.
-    """
-
-    generator: PoseGeneratorBackend
-    """
-    Pose generator from which to sample.
-    """
-
-    arm: Arms
-    """
-    Arm that should be used for the GraspPose.
-    """
-
-    grasp_description: GraspDescription
-    """
-    Grasp Description that should be used for the GraspPose.
-    """
-
-    def __iter__(self) -> Iterable[GraspPose]:
-        for pose_candidate in self.generator:
-            yield pose_candidate

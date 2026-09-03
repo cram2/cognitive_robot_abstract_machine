@@ -11,8 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import Arms
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan import Plan
@@ -30,7 +29,7 @@ from semantic_digital_twin.api import (
     WorldSpecification,
 )
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspPoses
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Scale
@@ -110,7 +109,7 @@ def build_world() -> World:
     # to name it by, not a particular kind of object.
     with world.modify_world():
         world.add_semantic_annotation(
-            HasRootBody(root=world.get_body_by_name("parcel"))
+            HasGraspPoses(root=world.get_body_by_name("parcel"))
         )
     return world
 
@@ -141,15 +140,11 @@ def build_plan(world: World, robot: UnitreeG1) -> Plan:
     parcel_annotation = an(
         entity(
             semantic_annotation := variable(
-                HasRootBody, domain=world.semantic_annotations
+                HasGraspPoses, domain=world.semantic_annotations
             )
         ).where(semantic_annotation.root == parcel)
     ).first()
-    grasp = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        ViewManager.get_end_effector_view(Arms.LEFT, robot),
-    )
+    grasp = Pose(reference_frame=parcel)
     context = Context(world=world, robot=robot, evaluate_conditions=False)
     place_pose = Pose(
         PLACE_POSE.to_position(), PLACE_POSE.to_quaternion(), reference_frame=world.root
@@ -196,15 +191,11 @@ def build_plan2(world: World, robot: UnitreeG1) -> Plan:
     parcel_annotation = an(
         entity(
             semantic_annotation := variable(
-                HasRootBody, domain=world.semantic_annotations
+                HasGraspPoses, domain=world.semantic_annotations
             )
         ).where(semantic_annotation.root == parcel)
     ).first()
-    grasp = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        ViewManager.get_end_effector_view(Arms.LEFT, robot),
-    )
+    grasp = Pose(reference_frame=parcel)
     context = Context(world=world, robot=robot, evaluate_conditions=False)
     place_pose = Pose(
         PLACE_POSE.to_position(), PLACE_POSE.to_quaternion(), reference_frame=world.root

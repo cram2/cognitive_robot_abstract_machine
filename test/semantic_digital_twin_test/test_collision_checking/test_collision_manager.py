@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from krrood.symbolic_math.float_variable_data import (
     FloatVariableData,
@@ -8,6 +9,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowSelfCollisions,
     AvoidCollisionBetweenGroups,
     AvoidSelfCollisions,
 )
@@ -16,6 +18,7 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     SelfCollisionVariableManager,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world import World
 
 
@@ -275,3 +278,43 @@ def test_collision_rules_survive_merge(pr2_world_copy):
     with world.modify_world():
         world.merge_world(pr2_world_copy)
     assert len(world.collision_manager.rules) == expected
+
+
+# %% temporary rule reset
+
+
+def test_temporary_rules_are_given_back_after_the_context(pr2_world_copy):
+    """
+    Rules installed inside the context do not outlast it.
+    """
+    collision_manager = pr2_world_copy.collision_manager
+    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    rule_of_the_run = AllowSelfCollisions(robot=robot)
+    collision_manager.clear_temporary_rules()
+    collision_manager.add_temporary_rule(rule_of_the_run)
+
+    with collision_manager.reset_temporary_rules_context():
+        collision_manager.clear_temporary_rules()
+        collision_manager.add_temporary_rule(AvoidSelfCollisions(robot=robot))
+
+    assert collision_manager.temporary_rules == [rule_of_the_run]
+
+
+def test_temporary_rules_are_given_back_when_the_context_raises(pr2_world_copy):
+    """
+    A simulation is abandoned as often as it finishes, so the rules come back on the way
+    out of an exception too.
+    """
+    collision_manager = pr2_world_copy.collision_manager
+    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    rule_of_the_run = AllowSelfCollisions(robot=robot)
+    collision_manager.clear_temporary_rules()
+    collision_manager.add_temporary_rule(rule_of_the_run)
+
+    with pytest.raises(TimeoutError):
+        with collision_manager.reset_temporary_rules_context():
+            collision_manager.clear_temporary_rules()
+            collision_manager.add_temporary_rule(AvoidSelfCollisions(robot=robot))
+            raise TimeoutError
+
+    assert collision_manager.temporary_rules == [rule_of_the_run]

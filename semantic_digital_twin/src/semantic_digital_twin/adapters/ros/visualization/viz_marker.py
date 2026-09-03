@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -19,6 +20,8 @@ from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.exceptions import WorldHasMultipleTfPublishersError
 from semantic_digital_twin.world_description.geometry import Shape
 from visualization_msgs.msg import MarkerArray
+
+logger = logging.getLogger(__name__)
 
 
 class ShapeSource(Enum):
@@ -132,6 +135,9 @@ class VizMarkerPublisher(ModelChangeCallback):
         )
         time.sleep(0.2)
         self.notify_model_change()
+        logger.info(
+            f"VizMarkerPublisher started. Fixed frame is {self._world.root.name}"
+        )
         time.sleep(0.2)
 
     def _tf_publisher_of_world(self) -> TFPublisher:

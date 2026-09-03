@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING, Union
+from typing import Iterable, Iterator, Optional, Self, Tuple, TYPE_CHECKING, Union
 
 import numpy as np
 from typing_extensions import List
@@ -39,13 +39,14 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasLegs,
     HasSink,
     HasShelfLayers,
+    HasGraspPoses,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
@@ -87,7 +88,7 @@ class Furniture(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class Handle(HasRootBody):
+class Handle(HasGraspPoses):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
@@ -962,7 +963,7 @@ class Wall(HasApertures):
 
 
 @dataclass(eq=False)
-class Bottle(HasRootBody):
+class Bottle(HasGraspPoses):
     """
     Abstract class for bottles.
     """
@@ -994,7 +995,7 @@ class MustardBottle(Bottle):
 
 
 @dataclass(eq=False)
-class DrinkingContainer(HasRootBody): ...
+class DrinkingContainer(HasGraspPoses): ...
 
 
 @dataclass(eq=False)
@@ -1012,11 +1013,11 @@ class Mug(DrinkingContainer):
 
 
 @dataclass(eq=False)
-class CookingContainer(HasRootBody): ...
+class CookingContainer(HasGraspPoses): ...
 
 
 @dataclass(eq=False)
-class Lid(HasRootBody): ...
+class Lid(HasGraspPoses): ...
 
 
 @dataclass(eq=False)
@@ -1048,22 +1049,94 @@ class PotLid(Lid):
 
 
 @dataclass(eq=False)
-class Plate(HasSupportingSurface):
+class Plate(HasSupportingSurface, HasGraspPoses):
     """
     A plate.
     """
 
 
+@dataclass
+class RimWallSection:
+    """
+    Where a bowl's wall runs at one point of its rim, in the bowl's own frame.
+    """
+
+    center: Point3
+    """
+    The middle of the wall, halfway between its inner and its outer surface.
+    """
+
+    outward: Vector3
+    """
+    The direction from the bowl's axis to the wall.
+    """
+
+
 @dataclass(eq=False)
-class Bowl(HasSupportingSurface, IsPerceivable):
+class Bowl(HasSupportingSurface, HasGraspPoses, IsPerceivable):
     """
     A bowl.
     """
 
+    rim_grasp_depth: float = field(default=0.01, kw_only=True)
+    """
+    How far below the highest point of the bowl the fingers grip its wall.
+    """
+
+    def grasp_poses(self) -> Iterator[Pose]:
+        """
+        Generate grasps that straddle the bowl's wall, approaching it from above.
+
+        A bowl offers nothing to grip at its own origin, which is inside it, so the wall
+        of its rim is grasped instead.
+        """
+        for section in self._rim_wall_sections():
+            yield Pose(
+                position=section.center,
+                orientation=RotationMatrix.from_vectors(
+                    x=Vector3.NEGATIVE_Z(), y=section.outward
+                ).to_quaternion(),
+                reference_frame=self.root,
+            )
+
+    def _rim_wall_sections(self) -> Iterator[RimWallSection]:
+        """
+        Trace the bowl's wall outward from its axis, once per grasp direction.
+
+        A ray outward from the axis enters and leaves the wall, so the wall lies between
+        its two hits. Read that way, each section follows the wall wherever it actually
+        runs, rather than a circle fitted through an irregular rim.
+        """
+        mesh = self.root.combined_mesh
+        yaws = np.linspace(0, 2 * np.pi, self.grasp_pose_count, endpoint=False)
+        directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
+        bowl_center = mesh.bounds.mean(axis=0)
+        axis_point = np.array(
+            [
+                bowl_center[0],
+                bowl_center[1],
+                mesh.bounds[1][2] - self.rim_grasp_depth,
+            ]
+        )
+        locations, ray_indices, _ = mesh.ray.intersects_location(
+            ray_origins=np.tile(axis_point, (len(yaws), 1)), ray_directions=directions
+        )
+        for index, direction in enumerate(directions):
+            hits = locations[ray_indices == index]
+            if len(hits) == 0:
+                continue
+            distances = np.linalg.norm(hits[:, :2] - axis_point[:2], axis=1)
+            yield RimWallSection(
+                center=Point3.from_iterable(
+                    axis_point + direction * (distances.min() + distances.max()) / 2
+                ),
+                outward=Vector3.from_iterable(direction),
+            )
+
 
 # Food Items
 @dataclass(eq=False)
-class Food(HasRootBody):
+class Food(HasGraspPoses):
     """
     A Group class for Food.
     """
@@ -1154,7 +1227,7 @@ class Milk(Food, IsPerceivable):
 
 
 @dataclass(eq=False)
-class SaltContainer(HasRootBody, IsPerceivable):
+class SaltContainer(HasGraspPoses, IsPerceivable):
     """
     A container of salt.
     """
@@ -1384,21 +1457,21 @@ class Houseplant(HasRootBody):
 
 
 @dataclass(eq=False)
-class SprayBottle(HasRootBody):
+class SprayBottle(HasGraspPoses):
     """
     A spray bottle.
     """
 
 
 @dataclass(eq=False)
-class Vase(HasRootBody):
+class Vase(HasGraspPoses):
     """
     A vase.
     """
 
 
 @dataclass(eq=False)
-class Book(HasRootBody):
+class Book(HasGraspPoses):
     """
     A book.
     """
@@ -1411,14 +1484,38 @@ class BookFront(HasRootBody): ...
 
 
 @dataclass(eq=False)
-class SaltPepperShaker(HasRootBody):
+class SaltPepperShaker(HasGraspPoses):
     """
     A salt and pepper shaker.
     """
 
 
 @dataclass(eq=False)
-class Cuttlery(HasRootBody): ...
+class Cuttlery(HasGraspPoses):
+    """
+    A piece of cutlery.
+    """
+
+    def grasp_poses(self) -> Iterator[Pose]:
+        """
+        Generate the grasp that reaches down onto the piece and closes across it.
+
+        Cutlery lies flat, so there is nothing to take hold of from the side. The
+        fingers have to come from above and close across the piece rather than along
+        it, or they close on nothing.
+        """
+        bounding_box = self.root.collision.as_bounding_box_collection_in_frame(
+            self.root
+        ).bounding_box()
+        along_x = bounding_box.x_interval.upper - bounding_box.x_interval.lower
+        along_y = bounding_box.y_interval.upper - bounding_box.y_interval.lower
+        finger_axis = Vector3.Y() if along_x >= along_y else Vector3.X()
+        yield Pose(
+            orientation=RotationMatrix.from_vectors(
+                x=Vector3.NEGATIVE_Z(), y=finger_axis
+            ).to_quaternion(),
+            reference_frame=self.root,
+        )
 
 
 @dataclass(eq=False)
@@ -1621,7 +1718,7 @@ class Cooktop(HasRootBody):
 
 
 @dataclass(eq=False)
-class Tool(HasRootBody, ABC):
+class Tool(HasGraspPoses, ABC):
     """
     A tool that is held by a robot's end effector to act on other bodies.
     """

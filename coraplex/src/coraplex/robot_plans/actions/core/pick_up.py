@@ -24,12 +24,12 @@ from coraplex.datastructures.enums import (
     MovementType,
     DetectionTechnique,
 )
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.plans.factories import sequential
 from coraplex.querying.predicates import GripperIsFree
 from coraplex.exceptions import PerceptionTargetMissing
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.mixins import (
+    HasApproachesGraspPoses,
     HasGraspDetectionThreshold,
     HasTcpGoalThresholds,
     PickUpTuningParameters,
@@ -44,7 +44,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspPoses
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -54,6 +54,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ReachAction(
     ActionDescription,
+    HasApproachesGraspPoses,
     ReachTuningParameters,
     HasGraspDetectionThreshold,
     HasTcpGoalThresholds,
@@ -62,9 +63,11 @@ class ReachAction(
     Let the robot reach a specific pose.
     """
 
-    target_pose: Pose
+    grasp_pose: Pose
     """
-    Pose that should be reached.
+    The grasp frame that should be reached, as
+    :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspPoses.grasp_poses`
+    defines it.
     """
 
     arm: Arms
@@ -72,12 +75,7 @@ class ReachAction(
     The arm that should be used for pick up.
     """
 
-    grasp_description: GraspDescription
-    """
-    The grasp description that should be used for picking up the object.
-    """
-
-    object_designator: Optional[HasRootBody] = None
+    object_designator: Optional[HasGraspPoses] = None
     """
     The annotation of the object that should be picked up.
     """
@@ -107,14 +105,17 @@ class ReachAction(
             raise PerceptionTargetMissing(self)
         object_body = self.object_designator.root if self.object_designator else None
 
-        target_pre_pose, target_pose, _ = self.grasp_description.pose_sequence(
-            self.target_pose, object_body, reverse=self.reverse_reach_order
+        target_pre_pose, target_pose, _ = self.grasp_pose_sequence(
+            self.grasp_pose,
+            ViewManager.get_end_effector_view(self.arm, self.robot),
+            self._grasp_in_body_frame(self.grasp_pose, object_body),
+            reverse=self.reverse_reach_order,
         )
         children = [
             MoveToolCenterPointMotion(
                 target_pre_pose,
                 self.arm,
-                allow_gripper_collision=False,
+                allow_gripper_collision=True,
                 max_linear_velocity=self.pre_approach_linear_velocity,
                 position_threshold=self.position_threshold,
                 orientation_threshold=self.orientation_threshold,
@@ -139,7 +140,7 @@ class ReachAction(
             MoveToolCenterPointMotion(
                 target_pose,
                 self.arm,
-                allow_gripper_collision=False,
+                allow_gripper_collision=True,
                 max_linear_velocity=self.final_approach_linear_velocity,
                 position_threshold=self.position_threshold,
                 orientation_threshold=self.orientation_threshold,
@@ -168,8 +169,7 @@ class ReachAction(
                 ),
                 arm=variables["arm"],
                 object_designator=object_designator.root if object_designator else None,
-                grasp_description=kwargs["grasp_description"],
-                target_pose=kwargs["target_pose"],
+                grasp_pose=kwargs["grasp_pose"],
                 reverse=kwargs["reverse_reach_order"],
             ),
         )
@@ -201,6 +201,7 @@ class ReachAction(
 @dataclass
 class PickUpAction(
     ActionDescription,
+    HasApproachesGraspPoses,
     PickUpTuningParameters,
     HasGraspDetectionThreshold,
     HasTcpGoalThresholds,
@@ -209,7 +210,7 @@ class PickUpAction(
     Let the robot pick up an object.
     """
 
-    object_designator: HasRootBody
+    object_designator: HasGraspPoses
     """
     The annotation of the object that should be picked up.
     """
@@ -217,11 +218,6 @@ class PickUpAction(
     arm: Arms
     """
     The arm that should be used for pick up.
-    """
-
-    grasp_description: GraspDescription
-    """
-    The GraspDescription that should be used for picking up the object.
     """
 
     tolerate_grasp_stall: bool = False
@@ -243,6 +239,21 @@ class PickUpAction(
     :attr:`ReachAction.perceive_before_grasp`.
     """
 
+    @property
+    def grasp_pose(self) -> Pose:
+        """
+        The grasp frame the object is picked up at.
+
+        Asked of the object rather than taken from the caller, so that an object which
+        knows where it may be held -- a bowl by its rim -- cannot be grasped anywhere
+        else by a caller who does not. Which of them is taken is the gripper's call.
+
+        :return: The grasp of :attr:`object_designator` the gripper is closest to.
+        """
+        return ViewManager.get_end_effector_view(
+            self.arm, self.robot
+        ).grasp_poses_by_distance(self.object_designator)[0]
+
     def _grasp_attempt_plan(self) -> PlanNode:
         """
         :return: One reach-and-close attempt at grasping :attr:`object_designator`,
@@ -253,10 +264,11 @@ class PickUpAction(
                 # defining the target_pose relative to the object ensures it stays correct even if the object pose is
                 # updated after defining the goal
                 ReachAction(
-                    target_pose=Pose(reference_frame=self.object_designator.root),
+                    grasp_pose=self.grasp_pose,
                     object_designator=self.object_designator,
                     arm=self.arm,
-                    grasp_description=self.grasp_description,
+                    approach_clearance=self.approach_clearance,
+                    retreat_distance=self.retreat_distance,
                     pre_approach_linear_velocity=self.pre_approach_linear_velocity,
                     final_approach_linear_velocity=self.final_approach_linear_velocity,
                     open_gripper_at_pre_pose=True,
@@ -267,6 +279,7 @@ class PickUpAction(
                 MoveGripperMotion(
                     motion=GripperState.CLOSE,
                     gripper=self.arm,
+                    allow_gripper_collision=True,
                     finger_velocity=self.grasp_closing_velocity,
                     stall_minimum_time=self.grasp_stall_minimum_time,
                     tolerate_stall=self.tolerate_grasp_stall,
@@ -282,8 +295,10 @@ class PickUpAction(
 
     @property
     def _action_plan(self) -> PlanNode:
-        _, _, lift_to_pose = self.grasp_description.grasp_pose_sequence(
-            self.object_designator.root
+        _, _, lift_to_pose = self.grasp_pose_sequence(
+            self.grasp_pose,
+            ViewManager.get_end_effector_view(self.arm, self.robot),
+            self._grasp_in_body_frame(self.grasp_pose, self.object_designator.root),
         )
         return sequential(
             children=[
@@ -321,7 +336,9 @@ class PickUpAction(
                 ),
                 arm=variables["arm"],
                 object_designator=kwargs["object_designator"].root,
-                grasp_description=kwargs["grasp_description"],
+                grasp_pose=end_effector.grasp_poses_by_distance(
+                    kwargs["object_designator"]
+                )[0],
             ),
         )
 
@@ -346,7 +363,7 @@ class PickUpAction(
 
 
 @dataclass
-class GraspingAction(ActionDescription, HasTcpGoalThresholds):
+class GraspingAction(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThresholds):
     """
     Grasps an object described by the given Object Designator description.
     """
@@ -361,15 +378,17 @@ class GraspingAction(ActionDescription, HasTcpGoalThresholds):
     The arm that should be used to grasp.
     """
 
-    grasp_description: GraspDescription
+    grasp_pose: Pose
     """
-    The grasp description that should be used to grasp the object.
+    The grasp frame the object is grasped at.
     """
 
     @property
     def _action_plan(self) -> PlanNode:
-        pre_pose, grasp_pose, _ = self.grasp_description.grasp_pose_sequence(
-            self.object_designator
+        pre_pose, grasp_pose, _ = self.grasp_pose_sequence(
+            self.grasp_pose,
+            ViewManager.get_end_effector_view(self.arm, self.robot),
+            self._grasp_in_body_frame(self.grasp_pose, self.object_designator),
         )
 
         return sequential(
@@ -379,6 +398,7 @@ class GraspingAction(ActionDescription, HasTcpGoalThresholds):
                     self.arm,
                     position_threshold=self.position_threshold,
                     orientation_threshold=self.orientation_threshold,
+                    allow_gripper_collision=True,
                 ),
                 MoveGripperMotion(GripperState.OPEN, self.arm),
                 MoveToolCenterPointMotion(
