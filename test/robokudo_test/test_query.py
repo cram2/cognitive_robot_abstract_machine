@@ -102,7 +102,7 @@ class TestQueryInterface:
         t.start()
 
         # Wait until ActionServer is set up and PPT ticked
-        time.sleep(0.75)
+        time.sleep(2.75)
 
         # Start the action client
         print("Starting Client Process")

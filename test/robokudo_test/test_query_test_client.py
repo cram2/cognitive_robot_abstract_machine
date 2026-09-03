@@ -1,4 +1,4 @@
-from dataclasses import dataclass, is_dataclass
+from dataclasses import dataclass, field, is_dataclass
 from typing import Any
 
 from pytest import MonkeyPatch
@@ -23,6 +23,17 @@ class NodeForActionClient:
 
     action_name: str
     """Name through which the action is reached."""
+
+    destroyed: bool = field(init=False, default=False)
+    """
+    Whether the action-client resource was destroyed.
+    """
+
+    def destroy(self) -> None:
+        """
+        Record destruction of the action-client resource.
+        """
+        self.destroyed = True
 
 
 def test_action_client_is_associated_with_supplied_node(
@@ -62,3 +73,21 @@ def test_closing_action_client_does_not_destroy_supplied_node(
     action_client.close()
 
     assert node.get_name() == node_name
+
+
+def test_closing_action_client_destroys_client_resource(
+    node: Node, monkeypatch: MonkeyPatch
+) -> None:
+    """
+    Closing the query client releases its owned action-client resource.
+    """
+    monkeypatch.setattr(
+        query_test_client,
+        "ActionClient",
+        NodeForActionClient,
+    )
+    action_client = query_test_client.RoboKudoActionClient(node=node)
+
+    action_client.close()
+
+    assert action_client._action_client.destroyed is True

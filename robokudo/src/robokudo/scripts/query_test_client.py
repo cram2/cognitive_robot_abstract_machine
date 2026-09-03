@@ -15,6 +15,7 @@ from rclpy.action import ActionClient
 from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from rclpy.node import Node
 from rosidl_runtime_py.convert import message_to_ordereddict
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 from robokudo_msgs.action import Query
 
@@ -238,10 +239,11 @@ class RoboKudoActionClient:
 
     def close(self) -> None:
         """
-        Cancel unfinished work before releasing the associated node.
+        Release owned ROS resources without destroying the associated node.
         """
         if self._goal_handle is not None and not self.done:
             self.cancel_goal()
+        self._action_client.destroy()
 
 
 def main_cli(args: Optional[List[str]] = None) -> None:
@@ -254,7 +256,9 @@ def main_cli(args: Optional[List[str]] = None) -> None:
     )
     cli_args = parser.parse_args()
     rclpy.init(args=args)
+    node_registry = ROSNodeRegistry()
     node = Node("robokudo_query_test_client")
+    node_registry.register(node)
     action_client = RoboKudoActionClient(
         node=node, preempt_timer=cli_args.preempt_timer
     )
@@ -270,6 +274,7 @@ def main_cli(args: Optional[List[str]] = None) -> None:
         pass
     finally:
         action_client.close()
+        node_registry.clear(node)
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
@@ -280,7 +285,9 @@ def main(timeout_seconds: float = 20.0, result: Optional[ResultQueue] = None) ->
     result_queue = result if result is not None else Queue()
     ros_context = Context()
     rclpy.init(context=ros_context)
+    node_registry = ROSNodeRegistry()
     node = Node("robokudo_query_test_client", context=ros_context)
+    node_registry.register(node)
     action_client = RoboKudoActionClient(node=node, preempt_timer=None)
     executor = SingleThreadedExecutor(context=ros_context)
     executor.add_node(node)
@@ -309,6 +316,7 @@ def main(timeout_seconds: float = 20.0, result: Optional[ResultQueue] = None) ->
         action_client.close()
         executor.remove_node(node)
         executor.shutdown()
+        node_registry.clear(node)
         node.destroy_node()
         if rclpy.ok(context=ros_context):
             rclpy.shutdown(context=ros_context)
