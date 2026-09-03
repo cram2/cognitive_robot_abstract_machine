@@ -64,6 +64,8 @@ from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ChangeStateOnEvents,
     GoalCuttingOffItsChild,
     GoalCuttingOffItsChildAtItsGoal,
+    GoalCuttingOffItsGrandchild,
+    GoalCuttingOffItsUndecidedChild,
     GoalWithChildFailingOnItsOwn,
     GoalWithChildStartingLate,
     NodeObservingAPredicate,
@@ -2281,12 +2283,8 @@ class TestLifeCycleTransitions:
         kin_sim.tick_until_end()
 
         assert sequence.nodes[1].cancel.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert (
-            sequence.nodes[1].ticking1.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
-        assert (
-            sequence.nodes[1].ticking2.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
+        assert sequence.nodes[1].ticking1.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert sequence.nodes[1].ticking2.life_cycle_state == LifeCycleValues.SUCCEEDED
         assert sequence.nodes[1].life_cycle_state == LifeCycleValues.SUCCEEDED
 
     def test_run_after_stop_from_pause(self):
@@ -2311,16 +2309,11 @@ class TestLifeCycleTransitions:
         kin_sim.tick_until_end()
 
         assert sequence.nodes[1].cancel.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert (
-            sequence.nodes[1].ticking1.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
-        assert (
-            sequence.nodes[1].ticking2.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
-        assert (
-            sequence.nodes[1].ticking3.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
-        assert sequence.nodes[1].pulse.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert sequence.nodes[1].ticking1.life_cycle_state == LifeCycleValues.SUCCEEDED
+        # Paused when the goal ended, so judged on the reading it was frozen at.
+        assert sequence.nodes[1].ticking2.life_cycle_state == LifeCycleValues.FAILED
+        assert sequence.nodes[1].ticking3.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert sequence.nodes[1].pulse.life_cycle_state == LifeCycleValues.FAILED
         assert sequence.nodes[1].life_cycle_state == LifeCycleValues.SUCCEEDED
 
     def test_end_before_start(self):
@@ -2846,7 +2839,7 @@ class TestLifeCycleVerdicts:
         assert node.observation_state == ObservationStateValues.UNKNOWN
         assert node.life_cycle_state == LifeCycleValues.INTERRUPTED
 
-    def test_an_ending_ancestor_interrupts_its_child(self):
+    def test_an_ending_ancestor_fails_a_child_short_of_its_goal(self):
         msc = MotionStatechart()
         msc.add_nodes([trigger := ConstTrueNode(), goal := GoalCuttingOffItsChild()])
         goal.end_condition = trigger.observation_variable
@@ -2854,12 +2847,12 @@ class TestLifeCycleVerdicts:
         self._compile(msc).tick()
 
         assert goal.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert goal.child.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert goal.child.life_cycle_state == LifeCycleValues.FAILED
 
-    def test_being_cut_off_interrupts_a_child_that_reached_its_goal(self):
+    def test_an_ending_ancestor_succeeds_a_child_at_its_goal(self):
         """
-        Collateral shutdown is never a judgement, so a child sitting at its goal is
-        interrupted rather than succeeded when its parent takes it down.
+        A parent decides when its child ends, not what the ending is worth, so a child
+        sitting at its goal succeeds rather than losing what it reached.
         """
         msc = MotionStatechart()
         msc.add_nodes(
@@ -2870,12 +2863,12 @@ class TestLifeCycleVerdicts:
         self._compile(msc).tick()
 
         assert goal.child.observation_state == ObservationStateValues.TRUE
-        assert goal.child.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert goal.child.life_cycle_state == LifeCycleValues.SUCCEEDED
 
-    def test_being_cut_off_leaves_the_goal_of_a_child_unanswered(self):
+    def test_an_ending_ancestor_keeps_the_goal_a_child_reached(self):
         """
-        A child that was never judged cannot report that it missed its goal, even though
-        the reading it was at is gone.
+        The verdict a child earns as its parent ends outlasts the observation behind it,
+        so what the child reached is still readable afterwards.
         """
         msc = MotionStatechart()
         msc.add_nodes(
@@ -2885,21 +2878,83 @@ class TestLifeCycleVerdicts:
 
         self._compile(msc).tick()
 
-        assert goal.child.goal_reached_state == ObservationStateValues.UNKNOWN
+        assert goal.child.goal_reached_state == ObservationStateValues.TRUE
 
-    def test_being_ended_outranks_being_cut_off(self):
+    def test_an_ending_ancestor_interrupts_a_child_that_observed_nothing(self):
         """
-        A node something asked to end is judged on its own terms, even if its parent
-        ends on the same tick.
+        An observation with no answer is no basis for a verdict, whichever end condition
+        ends the node.
         """
         msc = MotionStatechart()
         msc.add_nodes(
-            [trigger := ConstTrueNode(), goal := GoalWithChildFailingOnItsOwn()]
+            [trigger := ConstTrueNode(), goal := GoalCuttingOffItsUndecidedChild()]
         )
         goal.end_condition = trigger.observation_variable
 
         self._compile(msc).tick()
 
+        assert goal.child.observation_state == ObservationStateValues.UNKNOWN
+        assert goal.child.life_cycle_state == LifeCycleValues.INTERRUPTED
+
+    def test_an_ending_ancestor_judges_a_grandchild_too(self):
+        """
+        Every node below an ending one is ended, however deep, and each is judged on
+        what it observes.
+        """
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [trigger := ConstTrueNode(), goal := GoalCuttingOffItsGrandchild()]
+        )
+        goal.end_condition = trigger.observation_variable
+
+        self._compile(msc).tick()
+
+        assert goal.grandchild.life_cycle_state == LifeCycleValues.FAILED
+
+    def test_a_child_ends_the_same_way_whether_a_sibling_or_its_parent_ends_it(self):
+        """
+        What ends a node decides only when it ends, so the same observation earns the
+        same verdict either way.
+        """
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                trigger := ConstTrueNode(),
+                ended_by_a_sibling := GoalWithChildFailingOnItsOwn(),
+                ended_by_its_parent := GoalCuttingOffItsChild(),
+            ]
+        )
+        ended_by_its_parent.end_condition = trigger.observation_variable
+
+        self._compile(msc).tick()
+
+        verdict_for_missing_the_goal = LifeCycleValues.verdict_for(
+            ObservationStateValues.FALSE
+        )
+        assert ended_by_a_sibling.child.life_cycle_state == verdict_for_missing_the_goal
+        assert (
+            ended_by_its_parent.child.life_cycle_state == verdict_for_missing_the_goal
+        )
+
+    def test_a_child_that_already_ended_keeps_its_verdict(self):
+        """
+        A verdict is only left by a reset, so a parent ending later does not overwrite
+        one its child already earned.
+        """
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                trigger := CountControlCycles(control_cycles=2),
+                goal := GoalWithChildFailingOnItsOwn(),
+            ]
+        )
+        goal.end_condition = trigger.observation_variable
+
+        executor = self._compile(msc)
+        executor.tick()
+        assert goal.child.life_cycle_state == LifeCycleValues.FAILED
+
+        executor.tick()
         assert goal.life_cycle_state == LifeCycleValues.SUCCEEDED
         assert goal.child.life_cycle_state == LifeCycleValues.FAILED
 
@@ -2947,7 +3002,7 @@ class TestLifeCycleVerdicts:
             [
                 trigger := ConstTrueNode(),
                 reset := CountControlCycles(control_cycles=2),
-                goal := GoalCuttingOffItsChild(),
+                goal := GoalCuttingOffItsUndecidedChild(),
             ]
         )
         goal.end_condition = trigger.observation_variable
@@ -3546,6 +3601,50 @@ class TestLifeCyclePredicates:
         second.start_condition = first.is_failed
 
         assert second._start_condition.node_dependencies == [first]
+
+    def test_variables_are_the_variables_the_condition_reads(self):
+        msc = MotionStatechart()
+        msc.add_nodes([first := ConstTrueNode(), second := ConstFalseNode()])
+        second.start_condition = sm.trinary_logic_and(
+            first.is_failed, first.observation_variable
+        )
+
+        assert set(second._start_condition.variables) == {
+            first.is_failed,
+            first.observation_variable,
+        }
+
+    def test_an_observation_variable_resolves_to_what_its_node_observes(self):
+        msc = MotionStatechart()
+        msc.add_node(node := ConstTrueNode())
+        msc.observation_state[node] = ObservationStateValues.FALSE
+
+        assert node.observation_variable.resolve() == ObservationStateValues.FALSE
+
+    def test_a_goal_reached_variable_resolves_to_the_verdict_of_its_node(self):
+        msc = MotionStatechart()
+        msc.add_node(node := ConstTrueNode())
+        msc.life_cycle_state[node] = LifeCycleValues.FAILED
+        msc.observation_state[node] = ObservationStateValues.FALSE
+
+        assert node.goal_reached.resolve() == node.goal_reached_state
+
+    def test_a_predicate_variable_resolves_to_the_value_of_its_predicate(self):
+        """
+        A verdict predicate has no answer before its node is judged, however decisive
+        the observation of that node already is.
+        """
+        msc = MotionStatechart()
+        msc.add_node(node := ConstTrueNode())
+        msc.life_cycle_state[node] = LifeCycleValues.RUNNING
+        msc.observation_state[node] = ObservationStateValues.TRUE
+
+        assert (
+            node.is_succeeded.resolve()
+            == LifeCyclePredicate.IS_SUCCEEDED.value.truth_value(
+                LifeCycleValues.RUNNING
+            )
+        )
 
     def test_a_raw_life_cycle_variable_is_rejected_in_a_condition(self):
         """

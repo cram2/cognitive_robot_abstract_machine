@@ -6,17 +6,12 @@ from typing_extensions import (
     Any,
     Callable,
     List,
-    Dict,
-    Optional,
     TYPE_CHECKING,
-    Literal,
     Self,
 )
 
 from krrood.patterns.field_metadata import JSONMetadata
-from giskardpy.motion_statechart.data_types import TransitionKind
 from giskardpy.motion_statechart.plotters.styles import (
-    ConditionColors,
     MonitorStyle,
     MonitorShape,
     TaskShape,
@@ -105,56 +100,3 @@ def plot_specification_field(default_factory: Callable[[], NodePlotSpec]) -> Any
         init=False,
         metadata=JSONMetadata(serialize=True).as_dict(),
     )
-
-
-SrcSelector = Literal["parent", "child"]
-DstSelector = Literal["parent", "child"]
-StateSelector = Literal["parent", "child"]
-
-
-@dataclass(frozen=True)
-class EdgeSpec:
-    color: str
-    src_selector: SrcSelector
-    dst_selector: DstSelector
-    state_selector: StateSelector
-    extra_edge_kwargs: Optional[Dict[str, object]] = None
-
-    def extras(self) -> Dict[str, object]:
-        return {} if self.extra_edge_kwargs is None else dict(self.extra_edge_kwargs)
-
-
-TRANSITION_SPECS: Dict[TransitionKind, EdgeSpec] = {
-    TransitionKind.START: EdgeSpec(
-        color=ConditionColors.StartCondColor,
-        src_selector="child",
-        dst_selector="parent",
-        state_selector="parent",
-    ),
-    TransitionKind.PAUSE: EdgeSpec(
-        color=ConditionColors.PauseCondColor,
-        src_selector="child",
-        dst_selector="parent",
-        state_selector="child",
-        extra_edge_kwargs={"minlen": 0},
-    ),
-    TransitionKind.END: EdgeSpec(
-        color=ConditionColors.EndCondColor,
-        src_selector="child",
-        dst_selector="parent",
-        state_selector="child",
-        extra_edge_kwargs={},
-    ),
-    TransitionKind.RESET: EdgeSpec(
-        color=ConditionColors.ResetCondColor,
-        src_selector="parent",
-        dst_selector="child",
-        state_selector="parent",
-        extra_edge_kwargs={
-            "arrowhead": "none",
-            "arrowtail": "normal",
-            "dir": "both",
-            "minlen": 0,
-        },
-    ),
-}

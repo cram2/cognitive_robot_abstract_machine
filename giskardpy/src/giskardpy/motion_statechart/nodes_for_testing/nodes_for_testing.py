@@ -389,3 +389,51 @@ class GoalWithChildStartingLate(Goal):
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_false())
+
+
+@dataclass(repr=False, eq=False)
+class GoalCuttingOffItsUndecidedChild(Goal):
+    """
+    Goal whose child never decides what it observes, so this goal ending is the only
+    thing that ever ends it.
+    """
+
+    child: NodeObservingNothingYet = field(init=False)
+    """
+    The child that observes nothing until it is ended.
+    """
+
+    def expand(self, context: MotionStatechartContext) -> None:
+        self.child = NodeObservingNothingYet()
+        self.add_node(self.child)
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        return NodeArtifacts(observation=sm.Scalar.const_true())
+
+
+@dataclass(repr=False, eq=False)
+class GoalCuttingOffItsGrandchild(Goal):
+    """
+    Goal holding another goal, so that ending it reaches a node more than one level
+    below it.
+    """
+
+    inner_goal: GoalCuttingOffItsChild = field(init=False)
+    """
+    The goal between this one and the grandchild.
+    """
+
+    def expand(self, context: MotionStatechartContext) -> None:
+        self.inner_goal = GoalCuttingOffItsChild()
+        self.add_node(self.inner_goal)
+
+    @property
+    def grandchild(self) -> ConstFalseNode:
+        """
+        :return: The node two levels below this goal, which is short of its goal until
+            this goal ends.
+        """
+        return self.inner_goal.child
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        return NodeArtifacts(observation=sm.Scalar.const_true())

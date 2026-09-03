@@ -63,8 +63,8 @@ class LifeCycleValues(IntEnum):
 
     INTERRUPTED = 5, Color.from_hex("#F97316"), "■"
     """
-    The node ended without being judged, either because an ancestor ended and took it
-    down with it, or because it was not observing anything decisive at the time.
+    The node was ended while it was not observing anything decisive, which is no basis
+    for a judgement.
     """
 
     def __new__(cls, value: int, color: Color, badge: str) -> LifeCycleValues:
@@ -105,7 +105,7 @@ class LifeCycleValues(IntEnum):
     @classmethod
     def verdict_for(cls, observation: ObservationStateValues) -> LifeCycleValues:
         """
-        The verdict a node receives when it is ended by its own end condition.
+        The verdict a node receives when it is ended.
 
         An observation that has no answer yet is no basis for a judgement, so it leaves
         the node unjudged.
@@ -284,10 +284,11 @@ class TransitionKind(Enum):
     END = 3
     """
     Transitions nodes from RUNNING or PAUSED to a terminal state, and their descendants
-    to INTERRUPTED.
+    on the same terms.
 
-    Which terminal state the node itself reaches follows from what it observes at that
-    moment, see :meth:`LifeCycleValues.verdict_for`.
+    Which terminal state a node reaches follows from what it observes at that moment,
+    see :meth:`LifeCycleValues.verdict_for`, whether its own end condition or an
+    ancestor's ended it.
     """
 
     RESET = 4

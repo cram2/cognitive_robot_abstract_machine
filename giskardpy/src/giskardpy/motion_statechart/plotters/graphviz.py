@@ -8,11 +8,12 @@ from typing_extensions import (
     List,
     Dict,
     Optional,
+    Tuple,
     Union,
-    Set,
     TYPE_CHECKING,
 )
 
+from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     TerminalNode,
@@ -20,11 +21,6 @@ from giskardpy.motion_statechart.graph_node import (
 from giskardpy.motion_statechart.graph_node import (
     Goal,
     TrinaryCondition,
-)
-from giskardpy.motion_statechart.plotters.plot_specs import (
-    TRANSITION_SPECS,
-    EdgeSpec,
-    StateSelector,
 )
 from giskardpy.motion_statechart.plotters.styles import (
     RankSep,
@@ -34,7 +30,8 @@ from giskardpy.motion_statechart.plotters.styles import (
     FONT,
     Fontsize,
     GoalClusterStyle,
-    ObservationStateToEdgeStyle,
+    MINIMUM_RANK_DISTANCES,
+    OBSERVATION_DRAWING_STYLES,
     ArrowSize,
 )
 
@@ -42,31 +39,57 @@ if TYPE_CHECKING:
     from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 
 
-def extract_node_names_from_condition(condition: str) -> Set[str]:
+@dataclass
+class ConditionDependency:
     """
-    Collects the node names a condition expression refers to.
+    One node reading another in its transition conditions.
 
-    :param condition: The condition expression to scan.
-    :return: The names appearing in quotes inside the expression.
+    However many conditions read it, the drawing shows the pair once, because an arrow no
+    longer says which condition it feeds.
     """
-    matches = re.findall(r'"(.*?)"|\'(.*?)\'', condition)
-    return set(match for group in matches for match in group if match)
 
-
-def format_condition(condition: str) -> str:
+    condition_owner: MotionStatechartNode
     """
-    Rewrites a condition expression for display in an HTML label.
+    The node whose conditions read :attr:`observed_node`.
+    """
+
+    observed_node: MotionStatechartNode
+    """
+    The node those conditions read.
+    """
+
+    conditions: List[TrinaryCondition] = field(default_factory=list)
+    """
+    The conditions of :attr:`condition_owner` that read :attr:`observed_node`.
+    """
+
+    @property
+    def minimum_rank_distance(self) -> int:
+        """
+        A rank distance is a lower bound, so the separate arrows this one replaces already
+        left graphviz solving for the largest of them.
+
+        :return: How many rows below the observed node its owner is drawn at least.
+        """
+        return max(
+            MINIMUM_RANK_DISTANCES[condition.kind] for condition in self.conditions
+        )
+
+
+def format_condition_text(text: str) -> str:
+    """
+    Rewrites the part of a condition that is not a term for display in an HTML label.
 
     Logical operators start a new line and trinary constants are spelled out.
 
-    :param condition: The condition expression to rewrite.
-    :return: The expression with graphviz line breaks and readable constants.
+    :param text: The text to rewrite.
+    :return: The text with graphviz line breaks and readable constants.
     """
-    condition = condition.replace(" and ", "<BR/>       and ")
-    condition = condition.replace(" or ", "<BR/>       or ")
-    condition = condition.replace("1.0", "True")
-    condition = condition.replace("0.0", "False")
-    return condition
+    text = text.replace(" and ", "<BR/>       and ")
+    text = text.replace(" or ", "<BR/>       or ")
+    text = text.replace("1.0", "True")
+    text = text.replace("0.0", "False")
+    return text
 
 
 @dataclass
@@ -76,7 +99,8 @@ class MotionStatechartGraphviz:
 
     Every node becomes a labelled box showing its current observation and life cycle
     state, every :class:`~giskardpy.motion_statechart.graph_node.Goal` becomes a cluster
-    around its children, and every transition becomes a colored edge.
+    around its children, and every dependency between two nodes becomes an arrow colored
+    by what the node it leaves observes.
 
     ..note:: The drawing reflects the state the statechart is in when it is drawn.
     """
@@ -200,10 +224,10 @@ class MotionStatechartGraphviz:
         :param line_color: The color of the lines separating the rows.
         :return: The condition rows of the label.
         """
-        start_condition = format_condition(str(node._start_condition))
-        pause_condition = format_condition(str(node._pause_condition))
-        end_condition = format_condition(str(node._end_condition))
-        reset_condition = format_condition(str(node._reset_condition))
+        start_condition = self._render_condition(node._start_condition)
+        pause_condition = self._render_condition(node._pause_condition)
+        end_condition = self._render_condition(node._end_condition)
+        reset_condition = self._render_condition(node._reset_condition)
         label = (
             f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
             f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">start:{start_condition}</FONT></TD></TR>'
@@ -222,6 +246,46 @@ class MotionStatechartGraphviz:
                 f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">reset:{reset_condition}</FONT></TD></TR>'
             )
         return label
+
+    def _render_condition(self, condition: TrinaryCondition) -> str:
+        """
+        Writes a condition for display, coloring every term in the value that term takes.
+
+        The value is the term's own, not the observation of the node it names: an
+        ``is_succeeded`` term has no answer until that node is judged, however decisive
+        that node's observation already is.
+
+        The terms are cut out before the rest is reformatted, so that a node whose name
+        reads as a logical operator is still recognised as one term.
+
+        :param condition: The condition to write.
+        :return: The condition as an HTML label fragment.
+        """
+        text = str(condition)
+        values_by_term = {
+            f'"{variable.display_name}"': variable.resolve()
+            for variable in condition.variables
+        }
+        if not values_by_term:
+            return format_condition_text(text)
+        terms = re.compile(f"({'|'.join(re.escape(term) for term in values_by_term)})")
+        return "".join(
+            (
+                self._color_term(part, values_by_term[part])
+                if part in values_by_term
+                else format_condition_text(part)
+            )
+            for part in terms.split(text)
+        )
+
+    def _color_term(self, term: str, value: ObservationStateValues) -> str:
+        """
+        :param term: The term as it is written in the condition, quotes included.
+        :param value: The value that term takes.
+        :return: The term in the color of that value.
+        """
+        style = OBSERVATION_DRAWING_STYLES[value]
+        return f'<FONT COLOR="{style.color.to_hex()}">{term}</FONT>'
 
     def _escape_name(self, name: str) -> str:
         """
@@ -410,50 +474,57 @@ class MotionStatechartGraphviz:
 
     def _add_edges(self):
         """
-        Draws an edge for every transition whose endpoints are both drawn in the same
-        cluster.
-
-        :raises ValueError: If a transition has a kind that has no edge specification.
+        Draws one arrow per dependency, from the node a condition reads to the node that
+        reads it.
         """
-        transition: TrinaryCondition
-        for edge_index, (
-            parent_node_index,
-            child_node_index,
-            transition,
-        ) in self.motion_statechart.rx_graph.edge_index_map().items():
-            parent_node = self.motion_statechart.rx_graph.get_node_data(
-                parent_node_index
+        for dependency in self._dependencies_to_draw():
+            self._add_dependency_edge(dependency)
+
+    def _dependencies_to_draw(self) -> List[ConditionDependency]:
+        """
+        :return: Every dependency the drawing shows, once per pair of nodes however many
+            of the owner's conditions read it, leaving out those with an endpoint that is
+            not drawn or that sits in another cluster.
+        """
+        dependencies: Dict[
+            Tuple[MotionStatechartNode, MotionStatechartNode], ConditionDependency
+        ] = {}
+        condition: TrinaryCondition
+        for (
+            owner_index,
+            observed_index,
+            condition,
+        ) in self.motion_statechart.rx_graph.edge_index_map().values():
+            condition_owner = self.motion_statechart.rx_graph.get_node_data(owner_index)
+            observed_node = self.motion_statechart.rx_graph.get_node_data(
+                observed_index
             )
-            child_node = self.motion_statechart.rx_graph.get_node_data(child_node_index)
-
-            # Skip edges if either endpoint (or one of its ancestors) is not drawn
-            if not self._is_drawn(parent_node):
+            if not self._is_drawn(condition_owner) or not self._is_drawn(observed_node):
                 continue
-            if not self._is_drawn(child_node):
+            if not self._are_nodes_in_same_cluster(condition_owner, observed_node):
                 continue
-
-            if not self._are_nodes_in_same_cluster(parent_node, child_node):
-                continue
-            spec = TRANSITION_SPECS.get(transition.kind)
-            if spec is None:
-                raise ValueError(f"Unhandled transition kind: {transition.kind}")
-            self._add_condition_edge(parent_node, child_node, spec)
+            dependency = dependencies.setdefault(
+                (condition_owner, observed_node),
+                ConditionDependency(condition_owner, observed_node),
+            )
+            dependency.conditions.append(condition)
+        return list(dependencies.values())
 
     def _are_nodes_in_same_cluster(
-        self, parent_node: MotionStatechartNode, child_node: MotionStatechartNode
+        self, condition_owner: MotionStatechartNode, observed_node: MotionStatechartNode
     ) -> bool:
         """
-        :param parent_node: The node the transition points to.
-        :param child_node: The node the transition belongs to.
+        :param condition_owner: The node whose condition reads the other.
+        :param observed_node: The node that condition reads.
         :return: Whether both nodes are drawn in the same cluster.
         """
-        parent_node_parent = parent_node.parent_node
-        child_node_parent = child_node.parent_node
+        owner_parent = condition_owner.parent_node
+        observed_parent = observed_node.parent_node
 
-        if parent_node_parent is None or child_node_parent is None:
-            return parent_node_parent is child_node_parent
+        if owner_parent is None or observed_parent is None:
+            return owner_parent is observed_parent
 
-        return parent_node_parent.name == child_node_parent.name
+        return owner_parent.name == observed_parent.name
 
     def _edge_clusters_kwargs(
         self,
@@ -480,53 +551,30 @@ class MotionStatechartGraphviz:
             kwargs["ltail"] = src_cluster.get_name()
         return kwargs
 
-    def _add_condition_edge(
-        self,
-        parent_node: MotionStatechartNode,
-        child_node: MotionStatechartNode,
-        spec: EdgeSpec,
-    ) -> None:
+    def _add_dependency_edge(self, dependency: ConditionDependency) -> None:
         """
-        Draws the edge of a single transition.
+        Draws the arrow of a single dependency.
 
-        Its direction and color come from the edge specification, while its line style
-        reflects the observation state of the node the specification points at.
+        It carries the observation of the node it leaves and nothing else: which of the
+        owner's conditions read that node is written in the owner's condition rows.
 
-        :param parent_node: The node the transition points to.
-        :param child_node: The node the transition belongs to.
-        :param spec: The edge specification of the transition kind.
+        :param dependency: The dependency to draw.
         """
-        graph = self._cluster_map[parent_node.parent_node]
+        graph = self._cluster_map[dependency.condition_owner.parent_node]
+        source_name = str(dependency.observed_node.unique_name)
+        destination_name = str(dependency.condition_owner.unique_name)
 
-        def _select_node(
-            parent: MotionStatechartNode,
-            child: MotionStatechartNode,
-            selector: StateSelector,
-        ) -> MotionStatechartNode:
-            """
-            :return: The node the selector names.
-            """
-            return parent if selector == "parent" else child
-
-        src_node = _select_node(parent_node, child_node, spec.src_selector)
-        dst_node = _select_node(parent_node, child_node, spec.dst_selector)
-        style_node = _select_node(parent_node, child_node, spec.state_selector)
-
-        src_name = str(src_node.unique_name)
-        dst_name = str(dst_node.unique_name)
-
-        kwargs = self._edge_clusters_kwargs(graph, src_name, dst_name)
-
-        observation_state = self.motion_statechart.observation_state[style_node]
-        kwargs.update(ObservationStateToEdgeStyle[observation_state])
-
-        kwargs.update(spec.extras())
+        kwargs = self._edge_clusters_kwargs(graph, source_name, destination_name)
+        observation = self.motion_statechart.observation_state[dependency.observed_node]
+        style = OBSERVATION_DRAWING_STYLES[observation]
 
         graph.add_edge(
             pydot.Edge(
-                src=src_name,
-                dst=dst_name,
-                color=spec.color,
+                src=source_name,
+                dst=destination_name,
+                color=style.color.to_hex(),
+                penwidth=style.line_width,
+                minlen=dependency.minimum_rank_distance,
                 arrowsize=ArrowSize,
                 **kwargs,
             )

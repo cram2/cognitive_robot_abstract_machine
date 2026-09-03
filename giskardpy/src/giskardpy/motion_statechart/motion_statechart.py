@@ -576,9 +576,8 @@ class MotionStatechart(SubclassJSONSerializer):
         - PAUSED: the node is paused.
         - SUCCEEDED: the node was ended while it was observing its goal as reached.
         - FAILED: the node was ended while it was not.
-        - INTERRUPTED: the node ended without being judged, either because an ancestor
-                       ended and took it down, or because it was not observing anything
-                       decisive at the time.
+        - INTERRUPTED: the node was ended while it was not observing anything decisive,
+                       which is no basis for a judgement.
     Out of these 6 states, nodes are only "active" if they are in the RUNNING state, and
     the last 3 are terminal: they are only left by a reset.
     Observation states indicate the current observation of the node:
@@ -604,17 +603,17 @@ class MotionStatechart(SubclassJSONSerializer):
         - pause condition: If True, the node transitions from RUNNING to PAUSED.
                            If False, the node transitions from PAUSED to RUNNING.
         - end condition: If True, the node transitions from RUNNING or PAUSED to a
-                         terminal state, and its descendants to INTERRUPTED.
+                         terminal state, and its descendants on the same terms.
         - reset condition: If True, the node transitions from any state to NOT_STARTED.
     Which terminal state an ended node reaches is decided by the node itself, not by
     whatever ended it: reaching what it observes means it succeeded. Other nodes can
-    therefore only decide *when* a node ends, never whether ending counts as success.
+    therefore only decide *when* a node ends, never whether ending counts as success,
+    and an ancestor ending a node judges it exactly as its own end condition would have.
     If multiple conditions are met, the following order is used:
         1. reset condition
-        2. own end condition
-        3. an ancestor's end condition
-        4. pause condition
-        5. start condition
+        2. its own or an ancestor's end condition
+        3. pause condition
+        4. start condition
     How to use this class:
         1. initialized with a world
         2. add nodes.
