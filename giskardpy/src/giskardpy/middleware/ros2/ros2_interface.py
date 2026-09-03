@@ -64,18 +64,20 @@ def wait_for_message(
 def get_robot_description(topic: str = "/robot_description") -> str:
     qos_profile = QoSProfile(depth=10)
     qos_profile.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
-    return wait_for_message(String, rospy.node, topic, qos_profile=qos_profile)[1].data
+    return wait_for_message(String, rospy.get_node(), topic, qos_profile=qos_profile)[
+        1
+    ].data
 
 
 def search_for_publisher_of_node_with_type(node_name: str, topic_type):
-    topics = rospy.node.get_publisher_names_and_types_by_node(node_name, "/")
+    topics = rospy.get_node().get_publisher_names_and_types_by_node(node_name, "/")
     return _search_in_topic_list(
         node_name=node_name, topic_list=topics, topic_type=topic_type
     )[0]
 
 
 def search_for_subscriber_of_node_with_type(node_name: str, topic_type):
-    topics = rospy.node.get_subscriber_names_and_types_by_node(node_name, "/")
+    topics = rospy.get_node().get_subscriber_names_and_types_by_node(node_name, "/")
     return _search_in_topic_list(
         node_name=node_name, topic_list=topics, topic_type=topic_type
     )[0]
@@ -83,11 +85,11 @@ def search_for_subscriber_of_node_with_type(node_name: str, topic_type):
 
 def search_for_publishers_of_type(topic_type) -> List[str]:
     topics = _search_in_topic_list(
-        topic_list=rospy.node.get_topic_names_and_types(), topic_type=topic_type
+        topic_list=rospy.get_node().get_topic_names_and_types(), topic_type=topic_type
     )
     matches = []
     for topic_name in topics:
-        if len(rospy.node.get_publishers_info_by_topic(topic_name)) > 0:
+        if len(rospy.get_node().get_publishers_info_by_topic(topic_name)) > 0:
             matches.append(topic_name)
     return matches
 
@@ -110,11 +112,11 @@ def search_for_unique_subscriber_of_type(topic_type) -> str:
 
 def search_for_subscribers_of_type(topic_type) -> List[str]:
     topics = _search_in_topic_list(
-        topic_list=rospy.node.get_topic_names_and_types(), topic_type=topic_type
+        topic_list=rospy.get_node().get_topic_names_and_types(), topic_type=topic_type
     )
     matches = []
     for topic_name in topics:
-        if len(rospy.node.get_subscriptions_info_by_topic(topic_name)) > 0:
+        if len(rospy.get_node().get_subscriptions_info_by_topic(topic_name)) > 0:
             matches.append(topic_name)
     return matches
 
@@ -127,7 +129,7 @@ def get_parameters(
     req = GetParameters_Request()
     req.names = parameters
     return controller_manager_services.service_caller(
-        node=rospy.node,
+        node=rospy.get_node(),
         service_name=f"{node_name}/get_parameters",
         service_type=GetParameters,
         request=req,

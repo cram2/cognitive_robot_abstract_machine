@@ -100,7 +100,7 @@ class Giskard:
             self.world_config.setup_world()
             clear_memoization_cache(self.world_config.world)
             self.executor = Ros2Executor(
-                ros_node=rospy.node,
+                ros_node=rospy.get_node(),
                 context=MotionStatechartContext(
                     world=self.world_config.world,
                     qp_controller_config=self.qp_controller_config,
@@ -120,7 +120,7 @@ class Giskard:
         """
         world = self.world_config.world
         action_server = ActionServerHandler(
-            action_name=f"{rospy.node.get_name()}/command", action_type=JsonAction
+            action_name=f"{rospy.get_node().get_name()}/command", action_type=JsonAction
         )
         feedback_publisher = ActionFeedbackPublisher(
             executor=self.executor, action_server=action_server
@@ -182,7 +182,7 @@ class Giskard:
             session = sessionmaker(bind=engine)()
 
             self.model_reload_synchronizer = ModelReloadSynchronizer(
-                node=rospy.node,
+                node=rospy.get_node(),
                 _world=self.world_config.world,
                 session=session,
                 defer_incoming_reloads=True,
@@ -198,20 +198,20 @@ class Giskard:
         # keep being published through the normal callbacks.
         self.world_synchronizer = WorldSynchronizer(
             _world=self.world_config.world,
-            node=rospy.node,
+            node=rospy.get_node(),
             defer_incoming_updates=True,
         )
         self.world_fetcher = FetchWorldServer(
-            node=rospy.node, world=self.world_config.world
+            node=rospy.get_node(), world=self.world_config.world
         )
         self.tf_publisher = TFPublisher.create_with_ignore_existing_tf(
-            node=rospy.node, world=self.world_config.world
+            node=rospy.get_node(), world=self.world_config.world
         )
         self.viz_marker_publisher = VizMarkerPublisher(
-            node=rospy.node, _world=self.world_config.world
+            node=rospy.get_node(), _world=self.world_config.world
         )
         self.collision_marker_publisher = CollisionVisualizationMarkerPublisher(
-            node=rospy.node, throttle=5, world=self.world_config.world
+            node=rospy.get_node(), throttle=5, world=self.world_config.world
         )
 
     def close_world_model_ros_interface(self):
@@ -249,7 +249,7 @@ class Giskard:
         if len(controlled_joints) == 0 and len(world.connections) > 0:
             raise NoControlledJointsError()
         if len(non_controlled_joints) > 0:
-            rospy.node.get_logger().info(
+            rospy.get_node().get_logger().info(
                 f"The following joints are non-fixed according to the urdf, "
                 f"but not flagged as controlled: {[c.name for c in non_controlled_joints]}."
             )

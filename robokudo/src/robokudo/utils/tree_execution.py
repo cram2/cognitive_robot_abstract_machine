@@ -17,13 +17,15 @@ Dependencies:
 
 from __future__ import annotations
 
+import time
+from typing import Callable, TypeVar
+
 import rclpy
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.decorators import OneShot
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from typing import Callable, TypeVar
 from typing_extensions import TYPE_CHECKING, Optional
 
 from robokudo.garden import grow_tree
@@ -49,22 +51,11 @@ def _tick_tree_until(
     """
     tick_count = 0
     result = None
-    timer = None
+    tick_period_seconds = 1.0 / tick_rate
     executor = MultiThreadedExecutor(num_threads=2)
     executor_nodes = []
 
-    def tick_tree() -> None:
-        nonlocal tick_count, result, timer
-        ae_root.tick()
-        tick_count += 1
-        result = stop_condition(tick_count)
-
-        if result is not None and timer is not None:
-            timer.cancel()
-
     try:
-        timer = node.create_timer(1.0 / tick_rate, tick_tree)
-
         executor.add_node(node)
         executor_nodes.append(node)
 
@@ -77,14 +68,23 @@ def _tick_tree_until(
 
         # Spin only these nodes until we're done; don't touch global rclpy lifecycle.
         while result is None and rclpy.ok(context=node.context):
+            tick_started_at = time.monotonic()
+            ae_root.tick()
+            tick_count += 1
+            result = stop_condition(tick_count)
+
+            if result is not None:
+                break
+
             # print("spinning node", node.get_name(), id(node)) # in case of missed goal callbacks, debug spinned node
-            executor.spin_once(timeout_sec=0.1)
+            executor.spin_once(timeout_sec=tick_period_seconds)
+            elapsed_seconds = time.monotonic() - tick_started_at
+            remaining_seconds = tick_period_seconds - elapsed_seconds
+            if remaining_seconds > 0.0:
+                time.sleep(remaining_seconds)
 
         return result
     finally:
-        if timer is not None:
-            timer.cancel()
-            node.destroy_timer(timer)
         for executor_node in executor_nodes:
             executor.remove_node(executor_node)
         executor.shutdown()

@@ -16,10 +16,10 @@ def main():
     default_robot_desc = load_xacro(
         "package://iai_daisy_description/robots/daisy.urdf.xacro"
     )
-    rospy.node.declare_parameters(
+    rospy.get_node().declare_parameters(
         namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
     )
-    robot_description = rospy.node.get_parameter_or("robot_description").value
+    robot_description = rospy.get_node().get_parameter_or("robot_description").value
     if robot_description is None:
         robot_description = default_robot_desc
     giskard = Giskard(

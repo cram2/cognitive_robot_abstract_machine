@@ -111,7 +111,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
-        processing_sequence = Sequence()
+        processing_sequence = Sequence(name="Stored Data Processing", memory=True)
         processing_sequence.add_children(
             [
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
@@ -121,7 +121,10 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointCloudClusterExtractor(),
                 Redraw(),
                 ActionServerNoPreemptRequest(),
-                Inverter(SuccessEveryN("Fail Sim after 30 iter", n=30)),
+                Inverter(
+                    name="Fail after 30 iterations",
+                    child=SuccessEveryN("Fail Sim after 30 iter", n=30),
+                ),
             ]
         )
 
@@ -130,7 +133,11 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 QueryAnnotator(),
-                Condition(child=processing_sequence, status=Status.FAILURE),
+                Condition(
+                    name="Wait for Processing Failure",
+                    child=processing_sequence,
+                    status=Status.FAILURE,
+                ),
                 AbortGoal(),
             ]
         )

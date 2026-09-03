@@ -46,7 +46,7 @@ sections = [SoftTrunkSection(0.3, 0.02, 10)] * 3
 trunk_pcc = SoftTrunk.build_piecewise_constant_curvature(world_pcc, sections)
 
 # Set up visualizer with automatic TF publishing
-viz_pcc = VizMarkerPublisher(_world=world_pcc, node=rospy.node)
+viz_pcc = VizMarkerPublisher(_world=world_pcc, node=rospy.get_node())
 world_pcc.notify_state_change()
 
 print("PCC Robot Ready. Set fixed frame to 'piecewise_constant_curvature/base' in RViz.")
@@ -110,7 +110,7 @@ sections = [SoftTrunkSection(length=0.3, radius=0.02, resolution=10)] * 3
 trunk_cos = SoftTrunk.build_cosserat(world_cosserat, sections)
 
 # Set up visualizer
-viz_cos = VizMarkerPublisher(_world=world_cosserat, node=rospy.node)
+viz_cos = VizMarkerPublisher(_world=world_cosserat, node=rospy.get_node())
 world_cosserat.notify_state_change()
 
 print("Cosserat Robot Ready. Set fixed frame to 'cosserat/base' in RViz.")

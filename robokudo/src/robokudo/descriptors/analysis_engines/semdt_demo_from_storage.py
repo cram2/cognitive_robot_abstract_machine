@@ -1,6 +1,6 @@
 from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
-from robokudo.io.ros import get_node
 from robokudo.world import world_instance
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
 from robokudo.analysis_engine import AnalysisEngineInterface
@@ -29,7 +29,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         Create a tabletop segmentation pipeline that synchronizes detections to SemDT.
         """
-        tf_publisher = TFPublisher(_world=world_instance(), node=get_node())
+        tf_publisher = TFPublisher(
+            _world=world_instance(), node=ROSNodeRegistry().get()
+        )
 
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 

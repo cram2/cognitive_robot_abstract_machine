@@ -215,7 +215,7 @@ class DotGraphViewer(QWidget):
     def refresh_topics(self) -> None:
         if self.topic_selector.currentText() == "":
             # Find all topics of type ExecutionState
-            topics = rospy.node.get_topic_names_and_types()
+            topics = rospy.get_node().get_topic_names_and_types()
             target_type = "json_msgs/action/JsonAction_FeedbackMessage"
             execution_state_topics = [
                 name for name, types in topics if target_type in types
@@ -235,7 +235,7 @@ class DotGraphViewer(QWidget):
     def on_topic_selected(self, index: int) -> None:
         topic_name = self.topic_selector.currentText()
         if topic_name:
-            rospy.node.create_subscription(
+            rospy.get_node().create_subscription(
                 msg_type=JsonAction_FeedbackMessage,
                 topic=topic_name,
                 callback=self.on_new_message_received,

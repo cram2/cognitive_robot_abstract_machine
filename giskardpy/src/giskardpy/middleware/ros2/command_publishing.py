@@ -330,7 +330,7 @@ class JointVelocityCommandPublisher(CommandPublisher):
     def __post_init__(self):
         for namespace in self.namespaces:
             self.publishers.append(
-                rospy.node.create_publisher(Float64, f"/{namespace}/command", 10)
+                rospy.get_node().create_publisher(Float64, f"/{namespace}/command", 10)
             )
             joint_name = (
                 get_parameters(parameters=["joint"], node_name=namespace)
@@ -413,7 +413,7 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     """
 
     def __post_init__(self):
-        self.command_publisher = rospy.node.create_publisher(
+        self.command_publisher = rospy.get_node().create_publisher(
             Float64MultiArray, self.command_topic, 10
         )
         for connection in self.connections:
@@ -425,7 +425,7 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
             world=self.world,
             degrees_of_freedom=[connection.raw_dof for connection in self.connections],
         )
-        rospy.node.get_logger().info(
+        rospy.get_node().get_logger().info(
             f"Created publisher for {self.command_topic} for "
             f"{[connection.name.name for connection in self.connections]}"
         )
@@ -491,7 +491,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
     """
 
     def __post_init__(self):
-        self.velocity_publisher = rospy.node.create_publisher(
+        self.velocity_publisher = rospy.get_node().create_publisher(
             Twist, self.command_topic, 10
         )
         self.connection.has_hardware_interface = True
@@ -500,7 +500,9 @@ class DriveVelocityCommandPublisher(CommandPublisher):
             degrees_of_freedom=self.translation_degrees_of_freedom()
             + [self.connection.yaw],
         )
-        rospy.node.get_logger().info(f"Created publisher for {self.command_topic}.")
+        rospy.get_node().get_logger().info(
+            f"Created publisher for {self.command_topic}."
+        )
 
     def translation_degrees_of_freedom(self) -> List[DegreeOfFreedom]:
         """

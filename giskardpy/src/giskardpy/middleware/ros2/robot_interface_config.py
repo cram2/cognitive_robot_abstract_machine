@@ -288,7 +288,7 @@ class RobotInterfaceConfig(ABC):
         )
 
         controllers: ListControllers_Response = cm.list_controllers(
-            node=rospy.node, controller_manager_name=controller_manager_name
+            node=rospy.get_node(), controller_manager_name=controller_manager_name
         )
 
         controllers_to_add = self.__filter_controllers_with_whitelist(

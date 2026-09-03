@@ -575,3 +575,10 @@ class QueryActionServer(Node):
 
         goal_handle.abort()
         return None
+
+    def destroy(self) -> None:
+        """
+        Destroy the action server and its ROS node.
+        """
+        self._as.destroy()
+        super().destroy_node()

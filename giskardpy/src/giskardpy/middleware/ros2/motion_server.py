@@ -127,13 +127,13 @@ class MotionServer:
         whether that happens while idle or while a goal is running. Either way the robot
         is stopped before the interrupt is allowed to propagate further.
         """
-        rospy.node.get_logger().info("giskard is ready")
+        rospy.get_node().get_logger().info("giskard is ready")
         try:
             while rclpy.ok():
                 self.run_idle_cycle()
                 self.idle_pacer.sleep()
         except KeyboardInterrupt:
-            rospy.node.get_logger().info("Interrupted, stopping the robot.")
+            rospy.get_node().get_logger().info("Interrupted, stopping the robot.")
             self.control_loop.stop()
             raise
 
@@ -205,7 +205,7 @@ class MotionServer:
         """
         Turn the goal message into a compiled motion statechart.
         """
-        rospy.node.get_logger().info(
+        rospy.get_node().get_logger().info(
             f"Parsing goal #{self.action_server.goal_id} message."
         )
         tracker = WorldEntityWithIDKwargsTracker.from_world(self.world)
@@ -214,7 +214,7 @@ class MotionServer:
         motion_statechart = goal.parse_motion_statechart(**kwargs)
         self.executor.compile(motion_statechart)
         self.feedback_publisher.publish_structure()
-        rospy.node.get_logger().info("Done parsing goal message.")
+        rospy.get_node().get_logger().info("Done parsing goal message.")
 
     def finish_goal(self, error: Exception | None) -> None:
         """
@@ -246,13 +246,13 @@ class MotionServer:
         match error:
             case ExecutionCanceledException():
                 self.action_server.set_canceled()
-                rospy.node.get_logger().warning("Goal canceled by user.")
+                rospy.get_node().get_logger().warning("Goal canceled by user.")
             case None:
                 self.action_server.set_succeeded()
-                rospy.node.get_logger().info("Goal succeeded.")
+                rospy.get_node().get_logger().info("Goal succeeded.")
             case _:
                 self.action_server.set_aborted()
-                rospy.node.get_logger().error(f"Goal aborted: {error}")
+                rospy.get_node().get_logger().error(f"Goal aborted: {error}")
         states = self.create_states()
         if error is not None:
             states["error"] = to_json(error)
@@ -299,7 +299,7 @@ class MotionServer:
             try:
                 plotter.plot(self.action_server.goal_id)
             except Exception:
-                rospy.node.get_logger().error(
+                rospy.get_node().get_logger().error(
                     f"{type(plotter).__name__} failed to plot goal "
                     f"#{self.action_server.goal_id}:\n{traceback.format_exc()}"
                 )

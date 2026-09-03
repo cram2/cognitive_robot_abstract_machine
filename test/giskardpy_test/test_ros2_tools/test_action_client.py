@@ -58,7 +58,7 @@ def test_waiting_for_a_late_server_uses_the_given_node(rclpy_node, monkeypatch):
     A client built with an explicit node must report through that node while it waits,
     so that a server which starts late is waited out rather than turned into a crash.
     """
-    monkeypatch.setattr(rospy, "node", None)
+    monkeypatch.setattr(rospy, "get_node", None)
     monkeypatch.setattr(ros2_interface, "ActionClient", LateServerActionClient)
 
     client = MyActionClient(rclpy_node, JsonAction, "late_server_action")

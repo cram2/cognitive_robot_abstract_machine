@@ -2,9 +2,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 import multiprocessing
-import queue
 import threading
-import time
 from pathlib import Path
 
 import py_trees
@@ -33,9 +31,6 @@ from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
 from robokudo.pipeline import Pipeline
 
 import robokudo.scripts.query_test_client
-
-# def query_worker(fun):
-#     return fun()
 
 
 class QueryWorkerThread(threading.Thread):
@@ -100,26 +95,30 @@ class TestQueryInterface:
         # seq, tree_result = query_simple_pipeline(node)
         multiprocessing.set_start_method("spawn", force=True)
 
-        print("Starting QueryWorker Thread")
-        # Start the ActionServer/Query Interface PPT
-        t = QueryWorkerThread(node)
-        t.start()
-
-        # Wait until ActionServer is set up and PPT ticked
-        time.sleep(0.75)
-
-        # Start the action client
         print("Starting Client Process")
-        client_results = queue.Queue()
-        p = multiprocessing.Process(
-            target=robokudo.scripts.query_test_client.main(result=client_results)
+        client_timeout_seconds = 20.0
+        client_results = multiprocessing.Queue()
+        client_readiness = multiprocessing.Event()
+        client_process = multiprocessing.Process(
+            target=robokudo.scripts.query_test_client.main,
+            kwargs={
+                "timeout_seconds": client_timeout_seconds,
+                "result": client_results,
+                "readiness": client_readiness,
+            },
         )
-        p.start()
+        client_process.start()
+        assert client_readiness.wait(timeout=client_timeout_seconds)
 
-        t.join()
+        print("Starting QueryWorker Thread")
+        # Start the ActionServer/Query Interface PPT after its client is ready.
+        worker_thread = QueryWorkerThread(node)
+        worker_thread.start()
+
+        worker_thread.join()
         print("Thread joined")
-        seq, tree_result = t.result
-        p.join()
+        seq, tree_result = worker_thread.result
+        client_process.join()
         print("Process joined")
 
         # PPT with action server completed successfully
@@ -129,90 +128,3 @@ class TestQueryInterface:
         assert client_result["timed_out"] is False
         assert client_result["goal_status"] is GoalStatus.STATUS_SUCCEEDED
         assert len(client_result["goal_result"].res) == 1
-
-    # def test_normal_ae_run_without_query(self, node):
-    #     cr_fr_camera_config = robokudo.descriptors.camera_configs.config_filereader_playback.CameraConfig()
-    #     cr_fr_camera_config.loop = True
-    #     cr_fr_camera_config.target_ros_package = "robokudo_test_data"
-    #     cr_fr_camera_config.target_dir = "data"
-    #     cr_fr_camera_config.kinect_height_fix_mode = True
-    #     cr_fr_camera_config.color2depth_ratio = (0.5, 0.5)
-    #
-    #     cr_fr_config = CollectionReaderAnnotator.Descriptor(
-    #         camera_config=cr_fr_camera_config,
-    #         camera_interface=robokudo.io.file_reader_interface.RGBDFileReaderInterface(cr_fr_camera_config),
-    #     )
-    #
-    #     # Restrict FOV of pointcloud to robustly get only one object
-    #     pc_crop_config = PointcloudCropAnnotator.Descriptor()
-    #     pc_crop_config.parameters.min_x = -0.3
-    #     pc_crop_config.parameters.max_x = 0.3
-    #
-    #     seq = Pipeline("TestPipeline")
-    #     seq.add_children(
-    #         [
-    #             robokudo.annotators.outputs.ClearAnnotatorOutputs(),
-    #             CollectionReaderAnnotator(descriptor=cr_fr_config),
-    #             ImagePreprocessorAnnotator("ImagePreprocessor"),
-    #             PointcloudCropAnnotator(descriptor=pc_crop_config),
-    #             PlaneAnnotator(),
-    #             PointCloudClusterExtractor(),
-    #             GenerateQueryResult(),
-    #         ]
-    #     )
-    #
-    #     tree_result = robokudo.utils.tree_execution.run_tree_once(
-    #         tree=seq, node=node, max_iterations=20, tick_rate=5
-    #     )
-    #     assert (tree_result is py_trees.common.Status.SUCCESS)
-    #
-    #     # We should have found a plane and an object
-    #     assert (len(seq.cas.annotations) > 0)
-    #     types_of_annotations = list(map(type, seq.cas.annotations))
-    #
-    #     assert (types_of_annotations.count(robokudo.types.annotation.Plane) == 1)
-    #     assert (types_of_annotations.count(robokudo.types.scene.ObjectHypothesis) == 1)
-
-    #
-    # def test_run_simple_ae_successfully(self, function_setup):
-    #     rclpy.init()
-    #     node = Node(robokudo.defs.TEST_ROS_NODE_NAME)
-    #
-    #     cr_fr_camera_config = robokudo.descriptors.camera_configs.config_filereader_playback.CameraConfig()
-    #     cr_fr_camera_config.loop = True
-    #     cr_fr_camera_config.target_ros_package = 'robokudo_test_data'
-    #     cr_fr_camera_config.target_dir = 'data'
-    #     cr_fr_camera_config.kinect_height_fix_mode = True
-    #     cr_fr_camera_config.color2depth_ratio = (0.5, 0.5)
-    #
-    #     cr_fr_config = CollectionReaderAnnotator.Descriptor(
-    #         camera_config=cr_fr_camera_config,
-    #         camera_interface=robokudo.io.file_reader_interface.RGBDFileReaderInterface(cr_fr_camera_config))
-    #
-    #     # Restrict FOV of pointcloud to robustly get only one object
-    #     pc_crop_config = robokudo.annotators.pointcloud_crop.PointcloudCropAnnotator.Descriptor()
-    #     pc_crop_config.parameters.min_x = -0.3
-    #     pc_crop_config.parameters.max_x = 0.3
-    #
-    #     seq = robokudo.pipeline.Pipeline("TestPipeline")
-    #     seq.add_children(
-    #         [
-    #             robokudo.annotators.outputs.ClearAnnotatorOutputs(),
-    #             QueryAnnotator(),
-    #             CollectionReaderAnnotator(descriptor=cr_fr_config),
-    #             ImagePreprocessorAnnotator("ImagePreprocessor"),
-    #             PointcloudCropAnnotator(descriptor=pc_crop_config),
-    #             PlaneAnnotator(),
-    #             PointCloudClusterExtractor(),
-    #             GenerateQueryResult(),
-    #         ])
-    #
-    #     tree_result = robokudo.utils.tree_execution.run_tree_once(tree=seq, node=node, max_iterations=20, tick_rate=5)
-    #     assert (tree_result is py_trees.common.Status.RUNNING)
-    #
-    #     # We should have found a plane and an object
-    #     assert (len(seq.cas.annotations) > 0)
-    #     types_of_annotations = list(map(type, seq.cas.annotations))
-    #
-    #     assert (types_of_annotations.count(robokudo.types.annotation.Plane) == 1)
-    #     assert (types_of_annotations.count(robokudo.types.scene.ObjectHypothesis) == 1)

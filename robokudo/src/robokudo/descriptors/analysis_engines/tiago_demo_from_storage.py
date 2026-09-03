@@ -99,7 +99,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
-        pre = Sequence("Preprocessing")
+        pre = Sequence("Preprocessing", memory=True)
         pre.add_children(
             [
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
@@ -107,14 +107,16 @@ class AnalysisEngine(AnalysisEngineInterface):
             ]
         )
 
-        parallel = Parallel(policy=ParallelPolicy.SuccessOnAll(synchronise=True))
+        parallel = Parallel(
+            name="Color and Pose", policy=ParallelPolicy.SuccessOnAll(synchronise=True)
+        )
         parallel.add_children(
             [
                 ClusterColorAnnotator(),
                 ClusterPosePCAAnnotator(),
             ]
         )
-        annotators = Sequence("Annotators")
+        annotators = Sequence("Annotators", memory=True)
         annotators.add_children(
             [
                 PointcloudCropAnnotator(),

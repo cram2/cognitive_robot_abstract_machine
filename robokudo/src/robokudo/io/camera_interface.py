@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import struct
 import warnings
-from threading import Lock, Thread
+from threading import Lock
 
 import builtin_interfaces.msg
 import cv2
@@ -52,6 +52,7 @@ from robokudo.world import (
     update_connection_transform,
     world_instance,
 )
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 if TYPE_CHECKING:
@@ -188,7 +189,7 @@ class ROSCameraInterface(CameraInterface):
         """
         super().__init__(camera_config)
 
-        self.node = node if node is not None else Node("ros_camera_node")
+        self.node = node if node is not None else ROSNodeRegistry().get()
         """
         ROS node for communication with ROS.
         """
@@ -420,7 +421,7 @@ class KinectCameraInterface(ROSCameraInterface):
 
         :param camera_config: Configuration for the Kinect camera
         """
-        super().__init__(camera_config, node=Node("kinect_camera_node"))
+        super().__init__(camera_config)
 
         self.color_subscriber: message_filters.Subscriber = Subscriber(
             self.node,
@@ -490,16 +491,6 @@ class KinectCameraInterface(ROSCameraInterface):
 
         self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
         """NumPy-compatible replacement for cv_bridge."""
-        # rclpy.spin_once(self.node)
-
-        Thread(
-            target=rclpy.spin,
-            args=(self.node,),
-            daemon=True,
-            name="Camera Interface Thread",
-        ).start()
-
-        # Thread(target=rclpy.spin_once(self.node), args=(self.node,), daemon=True).start()
 
     def compressed_depth_configured(self) -> bool:
         """
