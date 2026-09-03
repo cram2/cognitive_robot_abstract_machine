@@ -31,6 +31,7 @@ from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphv
 from giskardpy.motion_statechart.plotters.styles import (
     MINIMUM_RANK_DISTANCES,
     OBSERVATION_DRAWING_STYLES,
+    DisabledConditionColor,
     LineWidth,
     TaskShape,
     TaskStyle,
@@ -560,3 +561,106 @@ def test_edge_targeting_terminal_node_clips_to_outer_cluster():
 
     assert end_edge.get("lhead").strip('"') == f"cluster_{end.unique_name}"
     assert cancel_edge.get("lhead").strip('"') == f"cluster_{cancel.unique_name}"
+
+
+# %% condition graying based on lifecycle state
+
+
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+def test_conditions_are_grayed_out_when_not_triggerable(
+    life_cycle_state: LifeCycleValues,
+):
+    """
+    Conditions that cannot legally trigger a transition from the node's current
+    lifecycle state are rendered in disabled gray font without individual term color
+    tags.
+    """
+    node = ConstTrueNode(name="TestNode")
+    observed = ConstTrueNode(name="ObservedNode")
+    motion_statechart = build_dependency_statechart(observed, node)
+    node.start_condition = observed.goal_reached
+    node.pause_condition = observed.is_succeeded
+    node.end_condition = observed.is_failed
+    node.reset_condition = observed.is_running
+    expand(motion_statechart)
+    motion_statechart.life_cycle_state[node] = life_cycle_state
+    motion_statechart.observation_state[observed] = ObservationStateValues.TRUE
+
+    label = find_node(draw(motion_statechart), node).get_label()
+    disabled_color = DisabledConditionColor.to_hex()
+
+    for prefix, condition, transition_kind, term in [
+        (
+            "start",
+            node._start_condition,
+            TransitionKind.START,
+            f"{observed.unique_name}.{GoalReachedVariable.attribute_name}",
+        ),
+        (
+            "pause",
+            node._pause_condition,
+            TransitionKind.PAUSE,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_SUCCEEDED.attribute_name}",
+        ),
+        (
+            "end  ",
+            node._end_condition,
+            TransitionKind.END,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_FAILED.attribute_name}",
+        ),
+        (
+            "reset",
+            node._reset_condition,
+            TransitionKind.RESET,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_RUNNING.attribute_name}",
+        ),
+    ]:
+        can_trigger = transition_kind.can_trigger_from(life_cycle_state)
+        if can_trigger:
+            assert f'<FONT FACE="monospace">{prefix}:' in label
+            assert (
+                f'<FONT FACE="monospace" COLOR="{disabled_color}">{prefix}:'
+                not in label
+            )
+            variable = condition.variables[0]
+            resolved_color = OBSERVATION_DRAWING_STYLES[
+                variable.resolve()
+            ].color.to_hex()
+            assert f'<FONT COLOR="{resolved_color}">"{term}"</FONT>' in label
+        else:
+            assert f'<FONT FACE="monospace" COLOR="{disabled_color}">{prefix}:' in label
+            assert (
+                f'<FONT FACE="monospace" COLOR="{disabled_color}">{prefix}:"{term}"</FONT>'
+                in label
+            )
+
+
+@pytest.mark.parametrize(
+    "node_factory",
+    [
+        lambda: EndMotion(),
+        lambda: CancelMotion(exception=Exception("test exception")),
+    ],
+)
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+def test_terminal_node_condition_graying(
+    node_factory, life_cycle_state: LifeCycleValues
+):
+    """
+    Terminal nodes render only the start condition, grayed out when not in NOT_STARTED.
+    """
+    terminal_node = node_factory()
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(terminal_node)
+    expand(motion_statechart)
+    motion_statechart.life_cycle_state[terminal_node] = life_cycle_state
+
+    label = find_node(draw(motion_statechart), terminal_node).get_label()
+    disabled_color = DisabledConditionColor.to_hex()
+
+    can_trigger = TransitionKind.START.can_trigger_from(life_cycle_state)
+    if can_trigger:
+        assert '<FONT FACE="monospace">start:' in label
+        assert f'<FONT FACE="monospace" COLOR="{disabled_color}">start:' not in label
+    else:
+        assert f'<FONT FACE="monospace" COLOR="{disabled_color}">start:' in label

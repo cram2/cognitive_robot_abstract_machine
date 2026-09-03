@@ -42,6 +42,7 @@ MonitorShape = "rectangle"
 TaskStyle = "filled, diagonals"
 TaskShape = "rectangle"
 ConditionFont = "monospace"
+DisabledConditionColor = Color.from_hex("#9CA3AF")
 
 
 # %% how a trinary value is drawn

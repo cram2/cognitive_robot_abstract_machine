@@ -295,3 +295,25 @@ class TransitionKind(Enum):
     """
     Transitions nodes from any state to NOT_STARTED.
     """
+
+    @property
+    def source_states(self) -> FrozenSet[LifeCycleValues]:
+        """
+        :return: The lifecycle states from which this transition kind can trigger.
+        """
+        match self:
+            case TransitionKind.START:
+                return frozenset({LifeCycleValues.NOT_STARTED})
+            case TransitionKind.PAUSE:
+                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
+            case TransitionKind.END:
+                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
+            case TransitionKind.RESET:
+                return frozenset(LifeCycleValues)
+
+    def can_trigger_from(self, life_cycle: LifeCycleValues) -> bool:
+        """
+        :param life_cycle: The lifecycle state to check.
+        :return: Whether this transition can trigger from the given lifecycle state.
+        """
+        return life_cycle in self.source_states

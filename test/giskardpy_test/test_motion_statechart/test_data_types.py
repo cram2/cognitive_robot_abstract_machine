@@ -8,6 +8,7 @@ from krrood.symbolic_math.symbolic_math import Scalar
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
+    TransitionKind,
 )
 from semantic_digital_twin.world_description.geometry import Color
 
@@ -71,3 +72,39 @@ def test_an_observation_state_is_found_by_the_number_it_stands_for():
         ObservationStateValues(float(Scalar.const_true()))
         is ObservationStateValues.TRUE
     )
+
+
+# %% transition triggerability rules
+
+
+@pytest.mark.parametrize(
+    "transition_kind, expected_states",
+    [
+        (TransitionKind.START, frozenset({LifeCycleValues.NOT_STARTED})),
+        (
+            TransitionKind.PAUSE,
+            frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
+        ),
+        (
+            TransitionKind.END,
+            frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
+        ),
+        (TransitionKind.RESET, frozenset(LifeCycleValues)),
+    ],
+)
+def test_transition_kind_source_states(transition_kind, expected_states):
+    """
+    Each transition kind declares the exact lifecycle states from which it can legally
+    trigger.
+    """
+    assert transition_kind.source_states == expected_states
+
+
+@pytest.mark.parametrize("transition_kind", list(TransitionKind))
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+def test_transition_kind_can_trigger_from(transition_kind, life_cycle_state):
+    """
+    The triggerability check matches membership in the transition kind's source states.
+    """
+    expected = life_cycle_state in transition_kind.source_states
+    assert transition_kind.can_trigger_from(life_cycle_state) is expected

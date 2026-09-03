@@ -27,6 +27,7 @@ from giskardpy.motion_statechart.plotters.styles import (
     NodeSep,
     LineWidth,
     ConditionFont,
+    DisabledConditionColor,
     FONT,
     Fontsize,
     GoalClusterStyle,
@@ -224,32 +225,66 @@ class MotionStatechartGraphviz:
         :param line_color: The color of the lines separating the rows.
         :return: The condition rows of the label.
         """
-        start_condition = self._render_condition(node._start_condition)
-        pause_condition = self._render_condition(node._pause_condition)
-        end_condition = self._render_condition(node._end_condition)
-        reset_condition = self._render_condition(node._reset_condition)
-        label = (
-            f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
-            f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">start:{start_condition}</FONT></TD></TR>'
+        life_cycle_state = self.motion_statechart.life_cycle_state[node]
+        label = self._build_condition_row(
+            prefix="start",
+            condition=node._start_condition,
+            is_active=node._start_condition.kind.can_trigger_from(life_cycle_state),
+            line_color=line_color,
         )
         if not isinstance(node, TerminalNode):
-            label += (
-                f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
-                f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">pause:{pause_condition}</FONT></TD></TR>'
+            label += self._build_condition_row(
+                prefix="pause",
+                condition=node._pause_condition,
+                is_active=node._pause_condition.kind.can_trigger_from(life_cycle_state),
+                line_color=line_color,
             )
-            label += (
-                f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
-                f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">end  :{end_condition}</FONT></TD></TR>'
+            label += self._build_condition_row(
+                prefix="end  ",
+                condition=node._end_condition,
+                is_active=node._end_condition.kind.can_trigger_from(life_cycle_state),
+                line_color=line_color,
             )
-            label += (
-                f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
-                f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">reset:{reset_condition}</FONT></TD></TR>'
+            label += self._build_condition_row(
+                prefix="reset",
+                condition=node._reset_condition,
+                is_active=node._reset_condition.kind.can_trigger_from(life_cycle_state),
+                line_color=line_color,
             )
         return label
 
-    def _render_condition(self, condition: TrinaryCondition) -> str:
+    def _build_condition_row(
+        self,
+        prefix: str,
+        condition: TrinaryCondition,
+        is_active: bool,
+        line_color: str,
+    ) -> str:
+        """
+        :param prefix: The label prefix for this condition.
+        :param condition: The condition to render.
+        :param is_active: Whether this condition can trigger from the current lifecycle state.
+        :param line_color: The color of the line separating rows.
+        :return: The HTML table rows for this condition.
+        """
+        rendered = self._render_condition(condition, grayed_out=not is_active)
+        if is_active:
+            font_tag = f'<FONT FACE="{ConditionFont}">{prefix}:{rendered}</FONT>'
+        else:
+            font_tag = f'<FONT FACE="{ConditionFont}" COLOR="{DisabledConditionColor.to_hex()}">{prefix}:{rendered}</FONT>'
+        return (
+            f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
+            f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}">{font_tag}</TD></TR>'
+        )
+
+    def _render_condition(
+        self, condition: TrinaryCondition, grayed_out: bool = False
+    ) -> str:
         """
         Writes a condition for display, coloring every term in the value that term takes.
+
+        When grayed out, individual term status coloring is omitted so the outer disabled
+        color applies uniformly.
 
         The value is the term's own, not the observation of the node it names: an
         ``is_succeeded`` term has no answer until that node is judged, however decisive
@@ -259,9 +294,12 @@ class MotionStatechartGraphviz:
         reads as a logical operator is still recognised as one term.
 
         :param condition: The condition to write.
+        :param grayed_out: Whether to render without term coloring.
         :return: The condition as an HTML label fragment.
         """
         text = str(condition)
+        if grayed_out:
+            return format_condition_text(text)
         values_by_term = {
             f'"{variable.display_name}"': variable.resolve()
             for variable in condition.variables
