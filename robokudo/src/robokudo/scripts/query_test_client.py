@@ -40,6 +40,18 @@ class ResultQueue(Protocol):
         ...
 
 
+class ReadinessSignal(Protocol):
+    """
+    Signal that the action client is ready to discover its server.
+    """
+
+    def set(self) -> None:
+        """
+        Report that client construction has completed.
+        """
+        ...
+
+
 class PrettyResultPrinter:
     def pretty_print_result(self, result: Query_Result) -> str:
         result_dict = message_to_ordereddict(result)
@@ -280,7 +292,18 @@ def main_cli(args: Optional[List[str]] = None) -> None:
             rclpy.shutdown()
 
 
-def main(timeout_seconds: float = 20.0, result: Optional[ResultQueue] = None) -> None:
+def main(
+    timeout_seconds: float = 20.0,
+    result: Optional[ResultQueue] = None,
+    readiness: Optional[ReadinessSignal] = None,
+) -> None:
+    """
+    Send one query and report its result.
+
+    :param timeout_seconds: Maximum query duration.
+    :param result: Destination for the query result.
+    :param readiness: Notification that the client can begin server discovery.
+    """
     timeout_deadline = time.monotonic() + timeout_seconds
     result_queue = result if result is not None else Queue()
     ros_context = Context()
@@ -291,6 +314,8 @@ def main(timeout_seconds: float = 20.0, result: Optional[ResultQueue] = None) ->
     action_client = RoboKudoActionClient(node=node, preempt_timer=None)
     executor = SingleThreadedExecutor(context=ros_context)
     executor.add_node(node)
+    if readiness is not None:
+        readiness.set()
     result_dict: Dict[str, Any] = dict()
     result_dict["timed_out"] = False
 

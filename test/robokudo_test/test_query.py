@@ -3,7 +3,6 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 import multiprocessing
 import threading
-import time
 from pathlib import Path
 
 import py_trees
@@ -96,27 +95,30 @@ class TestQueryInterface:
         # seq, tree_result = query_simple_pipeline(node)
         multiprocessing.set_start_method("spawn", force=True)
 
-        print("Starting QueryWorker Thread")
-        # Start the ActionServer/Query Interface PPT
-        t = QueryWorkerThread(node)
-        t.start()
-
-        # Wait until ActionServer is set up and PPT ticked
-        time.sleep(2.75)
-
-        # Start the action client
         print("Starting Client Process")
+        client_timeout_seconds = 20.0
         client_results = multiprocessing.Queue()
-        p = multiprocessing.Process(
+        client_readiness = multiprocessing.Event()
+        client_process = multiprocessing.Process(
             target=robokudo.scripts.query_test_client.main,
-            kwargs={"result": client_results},
+            kwargs={
+                "timeout_seconds": client_timeout_seconds,
+                "result": client_results,
+                "readiness": client_readiness,
+            },
         )
-        p.start()
+        client_process.start()
+        assert client_readiness.wait(timeout=client_timeout_seconds)
 
-        t.join()
+        print("Starting QueryWorker Thread")
+        # Start the ActionServer/Query Interface PPT after its client is ready.
+        worker_thread = QueryWorkerThread(node)
+        worker_thread.start()
+
+        worker_thread.join()
         print("Thread joined")
-        seq, tree_result = t.result
-        p.join()
+        seq, tree_result = worker_thread.result
+        client_process.join()
         print("Process joined")
 
         # PPT with action server completed successfully

@@ -35,6 +35,33 @@ class NodeForActionClient:
         """
         self.destroyed = True
 
+    def wait_for_server(self, timeout_sec: float) -> bool:
+        """
+        Report that no action server is available.
+
+        :param timeout_sec: Maximum server discovery duration.
+        :return: Whether an action server is available.
+        """
+        return False
+
+
+@dataclass
+class RecordedReadiness:
+    """
+    Record whether client readiness was reported.
+    """
+
+    is_ready: bool = field(init=False, default=False)
+    """
+    Whether the client reported readiness.
+    """
+
+    def set(self) -> None:
+        """
+        Record that the client is ready.
+        """
+        self.is_ready = True
+
 
 def test_action_client_is_associated_with_supplied_node(
     node: Node, monkeypatch: MonkeyPatch
@@ -91,3 +118,19 @@ def test_closing_action_client_destroys_client_resource(
     action_client.close()
 
     assert action_client._action_client.destroyed is True
+
+
+def test_main_reports_client_readiness(monkeypatch: MonkeyPatch) -> None:
+    """
+    The process entry point reports readiness after constructing its client.
+    """
+    monkeypatch.setattr(
+        query_test_client,
+        "ActionClient",
+        NodeForActionClient,
+    )
+    readiness = RecordedReadiness()
+
+    query_test_client.main(timeout_seconds=0.0, readiness=readiness)
+
+    assert readiness.is_ready is True
