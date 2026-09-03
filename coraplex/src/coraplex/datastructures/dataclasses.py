@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from coraplex.plans.plan import Plan
     from semantic_digital_twin.world import World
     from coraplex.alternative_motion_mapping import AlternativeMotion
+    from coraplex.plans.plan_transformation import PlanTransformation
 
 try:
     import rclpy
@@ -107,6 +108,14 @@ class Context(PlanEntity):
     A motion is replaced by an alternative motion from this list if the alternative
     matches the motion type, the robot and the current execution type. If empty, motions
     use their default motion chart.
+    """
+
+    plan_transformations: List[PlanTransformation] = field(default_factory=list)
+    """
+    The transformations that rewrite the plans of this context while they are expanded.
+
+    A transformation is applied to every node it applies to, right after that node
+    has been expanded. If empty, actions are performed as they describe themselves.
     """
 
     _debug: bool = field(default=False)

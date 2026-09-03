@@ -24,6 +24,7 @@ from coraplex.utils import split_list_by_type
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import Task
+    from coraplex.language import SequentialNode
     from coraplex.robot_plans.actions.base import ActionDescription
     from coraplex.robot_plans.motions.base import BaseMotion
 
@@ -341,6 +342,24 @@ class PlanNode(PlanEntity):
         Perform the node without managing the fields of this node.
         """
 
+    def notify_children(self) -> None:
+        """
+        Notifies every child, including the ones that only appear while the earlier
+        children are being notified.
+
+        A plan transformation applied to a child can put further children here, and
+        those have to be expanded too instead of staying unexpanded leaves.
+        """
+        # Keyed by identity, holding the node itself: expanding a child simplifies the
+        # plan, which can remove nodes and free their graph index for a later one.
+        notified: Dict[int, PlanNode] = {}
+        pending = self.children
+        while pending:
+            notified.update({id(child): child for child in pending})
+            for child in pending:
+                child.notify()
+            pending = [child for child in self.children if id(child) not in notified]
+
     def parse(self) -> Executable: ...
 
     def merge_motion_executables(
@@ -429,6 +448,16 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
     On failure, `advance` replaces it with the next candidate.
     """
 
+    current_attempt: Optional[SequentialNode] = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The sequence that is executed for the current candidate.
+
+    It holds the candidate itself and everything a plan transformation put beside it, so
+    that such nodes are part of what this node runs rather than being skipped.
+    """
+
     @property
     def designator_type(self) -> Type:
         return self.underspecified_action.type
@@ -440,6 +469,8 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
 
         :return: The new candidate node, or None if the iterator is exhausted.
         """
+        from coraplex.language import SequentialNode
+
         if self._action_iterator is None:
             self._action_iterator = self.plan.context.query_backend.evaluate(
                 self.underspecified_action
@@ -451,8 +482,11 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
             return None
 
         candidate = ActionNode(designator=grounded_action)
-        self.add_child(candidate)
+        attempt = SequentialNode()
+        self.add_child(attempt)
+        attempt.add_child(candidate)
         self.current_candidate = candidate
+        self.current_attempt = attempt
         return candidate
 
     def stop_grounding(self) -> None:
@@ -491,7 +525,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
         """
         if self._next_candidate() is None:
             return False
-        self.current_candidate.notify()
+        self.current_attempt.notify()
         return True
 
     def parse(self) -> Executable:
@@ -542,9 +576,19 @@ class DesignatorNode(PlanNode, ABC):
 
     def __node_info__(self):
         parent_infos = super().__node_info__()
-        designator_field = [f"{field.name}: {getattr(self.designator, field.name)}" for field in self.designator.fields]
-        parent_infos.append("---------------- Designator Parameter --------------------")
-        parent_infos.extend([f"Designator Type: {self.designator.__class__.__name__}", *designator_field])
+        designator_field = [
+            f"{field.name}: {getattr(self.designator, field.name)}"
+            for field in self.designator.fields
+        ]
+        parent_infos.append(
+            "---------------- Designator Parameter --------------------"
+        )
+        parent_infos.extend(
+            [
+                f"Designator Type: {self.designator.__class__.__name__}",
+                *designator_field,
+            ]
+        )
         return parent_infos
 
     def __node_label__(self):
@@ -616,10 +660,10 @@ class ActionNode(DesignatorNode):
 
         if not self.children:
             self.action.expand()
+            self.plan.apply_plan_transformations(self)
 
         # recursively expand nested actions, conditions are only evaluated during execution
-        for child in self.children:
-            child.notify()
+        self.notify_children()
 
         # TODO: This can't stay here
         self.update_execution_data_post_perform()

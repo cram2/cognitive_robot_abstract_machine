@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 import numpy as np
-import pytest
 from typing_extensions import List
 
 from coraplex.datastructures.enums import (
@@ -12,15 +11,14 @@ from coraplex.datastructures.enums import (
 )
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.execution_environment import simulated_robot
-from coraplex.plans.attachment_nodes import ModelChangeNode
 from coraplex.perception import PerceptionQuery
+from coraplex.plans.attachment_nodes import ModelChangeNode
 from coraplex.plans.executables import (
     Executable,
     GiskardExecutable,
     ModelChangeExecutable,
 )
 from coraplex.plans.factories import execute_single, sequential
-from coraplex.exceptions import PerceptionTargetMissing
 from coraplex.plans.plan_node import (
     ActionNode,
     ExecutionBoundaryNode,
@@ -30,16 +28,15 @@ from coraplex.plans.plan_node import (
 from coraplex.robot_plans import MoveToolCenterPointMotion
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.misc import DetectAction
+from coraplex.robot_plans.actions.core.navigation import LookAtAction
 from coraplex.robot_plans.actions.core.pick_up import ReachAction, PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from coraplex.robot_plans.motions.misc import DetectingMotion, PerceptionTask
+from coraplex.robot_plans.plan_transformations import DetectBeforeGrasp
 from coraplex.utils import split_list_by_type
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -419,10 +416,10 @@ def reach_action(milk: Milk, view, **kwargs) -> ReachAction:
     )
 
 
-def test_a_reach_does_not_perceive_by_default(immutable_model_world):
+def test_a_reach_does_not_perceive_without_a_rule(immutable_model_world):
     """
     A reach acts on the pose the world already holds, so it must not spend a detection
-    the caller did not ask for.
+    nobody asked for.
     """
     world, view, context = immutable_model_world
     milk = world.get_semantic_annotations_by_type(Milk)[0]
@@ -431,74 +428,6 @@ def test_a_reach_does_not_perceive_by_default(immutable_model_world):
     plan.notify()
 
     assert detect_actions_of(plan) == []
-
-
-def test_perceiving_before_the_grasp_detects_the_object_being_reached_for(
-    immutable_model_world,
-):
-    """
-    The detection has to ask for the object the reach was given, so that a plan grasping
-    something else does not query for the wrong thing.
-    """
-    world, view, context = immutable_model_world
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
-
-    plan = execute_single(
-        reach_action(milk, view, perceive_before_grasp=True), context=context
-    )
-    plan.notify()
-
-    [detection] = detect_actions_of(plan)
-    assert detection.object_sem_annotation is type(milk)
-
-
-def test_a_pick_up_passes_perceiving_on_to_its_reach(immutable_model_world):
-    """
-    The flag is set on the pick-up, but the detection belongs to the reach inside it, so
-    it has to survive that hand-over.
-    """
-    world, view, context = immutable_model_world
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
-
-    plan = execute_single(
-        PickUpAction(
-            milk,
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
-            perceive_before_grasp=True,
-        ),
-        context=context,
-    )
-    plan.notify()
-
-    [detection] = detect_actions_of(plan)
-    assert detection.object_sem_annotation is type(milk)
-
-
-def test_perceiving_without_an_object_to_detect_is_rejected(immutable_model_world):
-    """
-    A reach may be given a pose without an object, but then there is nothing to build
-    the detection query from, so the contradiction is reported instead of guessed away.
-    """
-    world, view, context = immutable_model_world
-
-    reach = ReachAction(
-        target_pose=Pose(reference_frame=world.root),
-        arm=Arms.RIGHT,
-        grasp_description=GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            view.right_arm.end_effector,
-        ),
-        perceive_before_grasp=True,
-    )
-
-    with pytest.raises(PerceptionTargetMissing):
-        execute_single(reach, context=context).notify()
 
 
 # %% expansion-time pose capture
@@ -533,7 +462,7 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(immutable_model
         node.designator.target
         for node in plan.descendants
         if isinstance(node, MotionNode)
-        and isinstance(node.designator, MoveToolCenterPointMotion)
+           and isinstance(node.designator, MoveToolCenterPointMotion)
     ]
     positions_before = [
         world.transform(target, world.root).to_position().to_np().flatten()[:3]
@@ -632,3 +561,17 @@ def test_split_by_type_leading_and_trailing_match(immutable_model_world):
     assert [len(group) for group in splitted_list] == [1, 1, 1]
     assert splitted_list[0] == [first_model_change]
     assert splitted_list[2] == [last_model_change]
+
+
+def test_detect_before_grasp_transformation_applies(immutable_model_world):
+    world, view, context = immutable_model_world
+
+    context.plan_transformations.append(DetectBeforeGrasp())
+
+    plan = execute_single(PickUpAction(world.get_semantic_annotations_by_type(Milk)[0], Arms.RIGHT,
+                                       GraspDescription(ApproachDirection.FRONT, VerticalAlignment.NoAlignment,
+                                                        view.right_arm.end_effector)), context=context)
+    plan.notify()
+
+    assert plan.plan.get_nodes_by_designator_type(DetectAction)
+    assert plan.plan.get_nodes_by_designator_type(LookAtAction)

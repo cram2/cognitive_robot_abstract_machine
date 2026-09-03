@@ -325,6 +325,27 @@ class MonitorBehavior(Enum):
     """
 
 
+class InsertionPosition(Enum):
+    """
+    Where an insertion rule places its nodes relative to the anchor node.
+    """
+
+    BEFORE = auto()
+    """
+    As the left neighbour of the anchor node.
+    """
+
+    AFTER = auto()
+    """
+    As the right neighbour of the anchor node.
+    """
+
+    BELOW = auto()
+    """
+    As the last child of the anchor node.
+    """
+
+
 class CuttingTechnique(Enum):
     """
     Enum for the techniques of cutting an object.

@@ -54,8 +54,7 @@ class LanguageNode(PlanNode, ABC):
             self.merge(child)
 
     def notify(self):
-        for child in self.children:
-            child.notify()
+        self.notify_children()
 
     def parse(self) -> Executable:
         # Nodes that do not parse into a single motion chart split the plan into

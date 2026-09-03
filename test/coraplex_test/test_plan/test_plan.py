@@ -16,6 +16,7 @@ from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.factories import code, sequential, parallel, execute_single
+from coraplex.exceptions import CannotInsertBesideRoot
 from coraplex.plans.failures import EmptyUnderspecified
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import PlanNode, ActionNode
@@ -361,6 +362,79 @@ def test_set_layer_index_insert_before():
     assert node4.layer_index == 1
 
 
+# %% sibling insertion
+
+
+def sequential_children_plan() -> tuple[Plan, PlanNode, list[PlanNode]]:
+    """
+    :return: A plan with a root that has three children, the root and its children.
+    """
+    root = PlanNode()
+    children = [PlanNode(), PlanNode(), PlanNode()]
+
+    plan = Plan()
+    plan.add_node(root)
+    for child in children:
+        plan.add_edge(root, child)
+
+    return plan, root, children
+
+
+def test_insert_before_makes_node_left_neighbour():
+    """
+    A node inserted before a child takes that child's position and pushes it right.
+    """
+    plan, root, (first, second, third) = sequential_children_plan()
+    inserted = PlanNode()
+
+    plan.insert_before(second, inserted)
+
+    assert root.children == [first, inserted, second, third]
+    assert inserted.right_neighbour is second
+    assert inserted.left_neighbour is first
+
+
+def test_insert_after_makes_node_right_neighbour():
+    """
+    A node inserted after a child is placed between that child and the following one.
+    """
+    plan, root, (first, second, third) = sequential_children_plan()
+    inserted = PlanNode()
+
+    plan.insert_after(second, inserted)
+
+    assert root.children == [first, second, inserted, third]
+    assert inserted.left_neighbour is second
+    assert plan.nodes == [root, first, second, inserted, third]
+
+
+def test_insert_after_last_child_appends():
+    """
+    Inserting after the rightmost child appends and keeps the plan a tree.
+    """
+    plan, root, (first, second, third) = sequential_children_plan()
+    inserted = PlanNode()
+
+    plan.insert_after(third, inserted)
+
+    assert root.children == [first, second, third, inserted]
+    assert inserted.right_neighbour is None
+    plan.validate()
+
+
+def test_insert_beside_root_raises():
+    """
+    The root has no parent that could hold a sibling.
+    """
+    plan, root, _ = sequential_children_plan()
+
+    with pytest.raises(CannotInsertBesideRoot):
+        plan.insert_before(root, PlanNode())
+
+    with pytest.raises(CannotInsertBesideRoot):
+        plan.insert_after(root, PlanNode())
+
+
 def test_get_previous_nodes():
 
     root = PlanNode()
@@ -564,8 +638,9 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     with simulated_robot:
         plan.perform()
 
-    assert isinstance(plan.root.children[1].children[0].designator, NavigateAction)
-    assert len(plan.root.children[1].children) == 1
+    underspecified = plan.root.children[1]
+    assert isinstance(underspecified.current_candidate.designator, NavigateAction)
+    assert len(underspecified.children) == 1
 
 
 def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):

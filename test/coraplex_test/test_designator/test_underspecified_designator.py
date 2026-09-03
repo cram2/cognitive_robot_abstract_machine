@@ -44,8 +44,7 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
         plan.perform()
 
     assert plan.root.status == TaskStatus.SUCCEEDED
-    candidate = plan.root.children[0]
-    assert isinstance(candidate.designator, NavigateAction)
+    assert isinstance(plan.root.current_candidate.designator, NavigateAction)
     assert plan.root.parse() is not None
     assert plan.root._action_iterator is None, (
         "the action iterator must be released once grounding succeeds, so any resources a "
@@ -82,8 +81,7 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
         plan.perform()
 
     assert plan.root.status == TaskStatus.SUCCEEDED
-    candidate = plan.root.children[-1]
-    assert isinstance(candidate.designator, NavigateAction)
+    assert isinstance(plan.root.current_candidate.designator, NavigateAction)
     assert plan.root.parse() is not None
 
 
