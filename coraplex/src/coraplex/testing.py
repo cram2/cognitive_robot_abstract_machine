@@ -130,7 +130,7 @@ def setup_world() -> World:
             parent=apartment_root, child=pr2_root, world=apartment_world
         )
         apartment_world.merge_world(pr2_sem_world, c_root_bf)
-        c_root_bf.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2.5, 0)
+        c_root_bf.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2.5, 0, reference_frame=apartment_root)
 
     apartment_world.get_body_by_name("milk.stl").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(

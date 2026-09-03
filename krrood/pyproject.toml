@@ -134,3 +134,9 @@ exclude_lines = [
 
 [tool.setuptools.dynamic]
 version = {attr = "krrood._version.__version__"}
+
+[dependency-groups]
+workspace = [
+    "probabilistic_model",
+    "random_events",
+]

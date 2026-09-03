@@ -107,7 +107,7 @@ plan = execute_single(NavigateAction(next(iter(location))), context=context)
 with simulated_robot:
     plan.perform()
 
-pr2_view.root.parent_connection.origin = origin_pose
+pr2_view.root.parent_connection.origin = origin_pose.to_homogeneous_matrix()
 ```
 
 As you can see we get a pose near the countertop where the robot can be placed without colliding with it. Furthermore,
@@ -133,7 +133,7 @@ plan = execute_single(NavigateAction(next(iter(location))), context=context)
 with simulated_robot:
     plan.perform()
 
-pr2_view.root.parent_connection.origin = origin_pose
+pr2_view.root.parent_connection.origin = origin_pose.to_homogeneous_matrix()
 ```
 
 ## Location Designator as Generator

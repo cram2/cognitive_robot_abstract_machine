@@ -66,6 +66,16 @@ doc = [
     "jupytext",
 ]
 
+[tool.uv]
+# make treon require docopt-ng instead of the unmaintained docopt
+override-dependencies = [
+    { package = { name = "treon" }, dependencies = ["docopt-ng"] },
+]
+exclude-dependencies = [
+    { package = { name = "treon" }, dependencies = ["docopt"] },
+    "pathlib",
+]
+
 [tool.uv.workspace]
 members = [
   "coraplex",

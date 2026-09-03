@@ -57,25 +57,33 @@ class SetOdometry(MotionStatechartNode):
     _odom_joints: Tuple[Type[Connection], ...] = field(default=(OmniDrive,), init=False)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        if self.odom_connection is None:
-            drive_connections = context.world.get_connections_by_type(self._odom_joints)
-            if len(drive_connections) == 0:
-                raise UnexpectedWorldEntityCountError(
-                    node=self,
-                    expected_count=1,
-                    actual_count=0,
-                    entity_type=self._odom_joints,
-                )
-            elif len(drive_connections) == 1:
-                self.odom_connection = drive_connections[0]
-            else:
-                raise UnexpectedWorldEntityCountError(
-                    node=self,
-                    expected_count=1,
-                    actual_count=len(drive_connections),
-                    entity_type=self._odom_joints,
-                )
+        self.odom_connection = self._current_odom_connection(context)
         return NodeArtifacts(observation=sm.Scalar.const_true())
+
+    def _current_odom_connection(self, context: MotionStatechartContext) -> OmniDrive:
+        """
+        The drive that moves the body this node sets the odometry of, as the world holds
+        it now.
+
+        A drive given at construction time is re-read from its child body, because a
+        world model change between then and now (re-parenting the body onto a carrier,
+        say) replaces the connection object while keeping the body.
+
+        :param context: The context holding the world to resolve against.
+        :return: The drive to write the odometry into.
+        """
+        if self.odom_connection is not None:
+            return self.odom_connection.child.parent_connection
+
+        drive_connections = context.world.get_connections_by_type(self._odom_joints)
+        if len(drive_connections) != 1:
+            raise UnexpectedWorldEntityCountError(
+                node=self,
+                expected_count=1,
+                actual_count=len(drive_connections),
+                entity_type=self._odom_joints,
+            )
+        return drive_connections[0]
 
     def on_start(self, context: MotionStatechartContext):
         parent_T_pose_ref = HomogeneousTransformationMatrix(

@@ -1,39 +1,57 @@
 # used for delayed evaluation of typing until python 3.11 becomes mainstream
 from __future__ import annotations
 
-import atexit
 import logging
 import threading
-import time
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing_extensions import (
-    Optional,
-    Callable,
     Any,
+    Callable,
     List,
-    Union,
+    Optional,
     Type,
 )
 
-from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
-from giskardpy.motion_statechart.graph_node import Goal
-from coraplex.language_giskard_templates import TryAll, TryInOrder
+from giskardpy.motion_statechart.goals.templates import (
+    Parallel,
+    RepeatOnStall,
+    RepeatUntil,
+    Sequence,
+    TryAll,
+    TryInOrder,
+    CancelledWhenTrue,
+)
+from giskardpy.motion_statechart.graph_node import (
+    CancelMotion,
+    Goal,
+    MotionStatechartNode,
+)
+from giskardpy.motion_statechart.monitors.payload_monitors import CountNodeResets
+from giskardpy.motion_statechart.monitors.templates import (
+    MonitoredGoal,
+    PausedUntilTrue,
+    PausedWhileTrue,
+)
 from coraplex.plans.executables import (
     GiskardExecutable,
     Executable,
 )
-from coraplex.datastructures.enums import TaskStatus, MonitorBehavior
-from coraplex.plans.failures import PlanFailure, AllChildrenFailed
-from coraplex.fluent import Fluent
-from coraplex.plans.plan_node import PlanNode, ExecutionBoundaryNode
-from coraplex.utils import split_list_by_type
+from coraplex.datastructures.enums import TaskStatus
+from coraplex.plans.failures import (
+    AllChildrenFailed,
+    PlanCancelled,
+    PlanFailure,
+    RepetitionsExhausted,
+)
+from coraplex.plans.motion_state_chart_building import BuildsMotionStateChart
+from coraplex.plans.plan_node import PlanNode
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(eq=False)
-class LanguageNode(PlanNode, ABC):
+class LanguageNode(PlanNode, BuildsMotionStateChart, ABC):
     """
     Base class for language nodes in a plan.
 
@@ -58,41 +76,26 @@ class LanguageNode(PlanNode, ABC):
             child.notify()
 
     def parse(self) -> Executable:
-        # Nodes that do not parse into a single motion chart split the plan into
-        # sequential execution groups instead of one merged chart.
-        if any(isinstance(child, ExecutionBoundaryNode) for child in self.descendants):
-            return self.parse_with_non_giskard_executable()
-        child_execs = [child.parse() for child in self.children]
+        return self.parse_children(self.children)
 
-        return GiskardExecutable(
-            motion_mappings=self.merge_motion_mappings(child_execs),
-            context=self.plan.context,
-        )
-
-    def parse_with_non_giskard_executable(self) -> Executable:
+    def create_goal(self) -> Goal:
         """
-        Build an executable whose execution list keeps non-giskard executables (model
-        changes, deferred underspecified nodes) as sequential boundaries, merging only
-        the consecutive giskard executables between them.
+        :return: An empty goal of this node's template, describing how its children are
+            executed inside a motion state chart.
         """
-        child_executables = [node.parse() for node in self.children]
+        return self.motion_state_chart_template(name=type(self).__name__)
 
-        giskard_exec_groups = split_list_by_type(child_executables, GiskardExecutable)
-
-        exec_list = []
-
-        for group in giskard_exec_groups:
-            if isinstance(group[0], GiskardExecutable):
-                exec_list.append(
-                    GiskardExecutable(
-                        motion_mappings=self.merge_motion_mappings(group),
-                        context=self.plan.context,
-                    )
-                )
-            else:
-                exec_list.extend(group)
-
-        return Executable(execution_list=exec_list, context=self.plan.context)
+    def add_to_motion_state_chart(
+        self, parent_goal: Goal, executable: GiskardExecutable
+    ) -> Goal:
+        """
+        Add this node as its own goal below `parent_goal` and add every child that
+        contributes motions into it, one at a time.
+        """
+        goal = self.create_goal()
+        parent_goal.add_node(goal)
+        self.add_children_to_motion_state_chart(goal, self.children, executable)
+        return goal
 
 
 @dataclass
@@ -135,7 +138,7 @@ class SequentialNode(ExecutesSequentially):
     Any failure is immediately raised.
     """
 
-    motion_state_chart_template = Sequence
+    motion_state_chart_template: Type[Goal] = field(kw_only=True, default=Sequence)
 
 
 @dataclass
@@ -147,7 +150,7 @@ class ParallelNode(ExecutesInParallel):
     All exceptions are raised after all children have finished.
     """
 
-    motion_state_chart_template = Parallel
+    motion_state_chart_template: Type[Goal] = field(kw_only=True, default=Parallel)
 
     def notify(self):
         self._perform_parallel(self.children)
@@ -159,81 +162,80 @@ class ParallelNode(ExecutesInParallel):
 @dataclass(eq=False)
 class RepeatNode(ExecutesSequentially):
     """
-    Executes all children a given number of times in sequential order.
+    Executes all children, and executes them again whenever an attempt fails.
+
+    Attempting stops as soon as the children succeed. Running out of attempts is a
+    failure, raising :class:`~coraplex.plans.failures.RepetitionsExhausted`.
+
+    .. note:: The default template treats an attempt as failed once it stops making
+        progress, which needs at least one converging task among the children.
     """
 
-    repetitions: int = 1
+    maximum_repetitions: int = 1
     """
-    The number of repetitions of the children.
-    """
-
-    def notify(self):
-        for _ in range(self.repetitions):
-            super().notify()
-
-
-@dataclass(eq=False)
-class MonitorNode(ExecutesSequentially):
-    """
-    Monitors a Language Expression and interrupts it when the given condition is
-    evaluated to True.
-
-    Behaviour:
-        Monitors start a new Thread which checks the condition while performing the nodes below it. Monitors can have
-        different behaviors, they can Interrupt, Pause or Resume the execution of the children.
-        If the behavior is set to Resume the plan will be paused until the condition is met.
+    How many times the children are attempted before the repeating is given up on.
     """
 
-    condition: Union[Callable, Fluent] = field(kw_only=True)
+    repeat_template: Callable[..., RepeatUntil] = field(
+        kw_only=True, default=RepeatOnStall
+    )
     """
-    The condition to monitor.
+    Builds the giskard goal deciding what counts as a failed attempt.
+
+    Use it for a decision derived from the children, such as a stall. It is called with
+    the children's goal, the attempt counter and :attr:`failure_monitor`, so a template
+    needing more configuration is passed pre-configured, for instance
+    ``partial(RepeatOnStall, timeout=timedelta(seconds=1))``.
     """
 
-    behavior: MonitorBehavior = field(kw_only=True, default=MonitorBehavior.INTERRUPT)
+    failure_monitor: Optional[MotionStatechartNode] = field(default=None, kw_only=True)
     """
-    What to do on the condition.
+    Node whose True observation means an attempt failed.
+
+    Use it for a decision that stands on its own, such as a force spike, together with
+    :class:`~giskardpy.motion_statechart.goals.templates.RepeatUntil` as the template.
+    Templates that derive their own reject it.
     """
 
-    _monitor_thread: Optional[threading.Thread] = field(init=False, default=None)
-    """
-    Thread for the subplan that is monitored.
-    """
+    def parse(self) -> Executable:
+        return self.create_giskard_executable([self])
 
-    kill_event: threading.Event = field(init=False, default_factory=threading.Event)
-    """
-    Event used to stop the monitoring thread once the children have finished.
-    """
+    def add_to_motion_state_chart(
+        self, parent_goal: Goal, executable: GiskardExecutable
+    ) -> Goal:
+        """
+        Add a goal below `parent_goal` that runs this node's children over and over.
 
-    def __post_init__(self):
-        if self.behavior == MonitorBehavior.RESUME:
-            self.pause()
-        if callable(self.condition):
-            self.condition = Fluent(self.condition)
-
-        self._monitor_thread = threading.Thread(
-            target=self.monitor, name=f"MonitorThread-{id(self)}"
+        The counter, the children's goal and the node that reports running out of
+        attempts all become children of that goal, because a transition condition may
+        only name a sibling.
+        """
+        children_goal = self.create_goal()
+        counter = CountNodeResets(
+            name=f"{type(self).__name__}/attempts",
+            node=children_goal,
+            target=self.maximum_repetitions,
         )
-        self._monitor_thread.start()
+        loop = self.repeat_template(
+            name=type(self).__name__,
+            task=children_goal,
+            stop_retry_monitor=counter,
+        )
+        parent_goal.add_node(loop)
+        loop.add_node(children_goal)
+        self.add_children_to_motion_state_chart(
+            children_goal, self.children, executable
+        )
 
-    def notify(self):
-        super().notify()
-        self.kill_event.set()
-        self._monitor_thread.join()
-
-    def monitor(self):
-        atexit.register(self.kill_event.set)
-        while not self.kill_event.is_set():
-            if self.condition.get_value():
-                if self.behavior == MonitorBehavior.INTERRUPT:
-                    self.interrupt()
-                    self.kill_event.set()
-                elif self.behavior == MonitorBehavior.PAUSE:
-                    self.pause()
-                    self.kill_event.set()
-                elif self.behavior == MonitorBehavior.RESUME:
-                    self.resume()
-                    self.kill_event.set()
-            time.sleep(0.1)
+        exhausted = CancelMotion(
+            name=f"{type(self).__name__}/exhausted",
+            exception=RepetitionsExhausted(
+                language_node=self, maximum_repetitions=self.maximum_repetitions
+            ),
+        )
+        exhausted.start_condition = counter.observation_variable
+        loop.add_node(exhausted)
+        return loop
 
 
 @dataclass(eq=False)
@@ -242,7 +244,7 @@ class TryInOrderNode(ExecutesSequentially):
     Tries all children in order sequentially and fails if all children fail.
     """
 
-    motion_state_chart_template = TryInOrder
+    motion_state_chart_template: Type[Goal] = field(kw_only=True, default=TryInOrder)
 
     def notify(self):
         for child in self.children:
@@ -263,13 +265,106 @@ class TryAllNode(ExecutesInParallel):
     Only raise a failure if all children fail.
     """
 
-    motion_state_chart_template = TryAll
+    motion_state_chart_template: Type[Goal] = field(kw_only=True, default=TryAll)
 
     def notify(self):
         self._perform_parallel(self.children)
         failed = all([child.status == TaskStatus.FAILED for child in self.children])
         if failed:
             raise AllChildrenFailed(self)
+
+
+@dataclass(eq=False)
+class MonitorNode(LanguageNode, ABC):
+    """
+    Executes its children under the observation of a motion state chart monitor.
+
+    The monitor is evaluated by the control loop alongside the children, so it can act
+    on them while they are running.
+    """
+
+    monitor: MotionStatechartNode = field(kw_only=True)
+    """
+    The node whose observation controls this node's children.
+    """
+
+    def parse(self) -> Executable:
+        return self.create_giskard_executable([self])
+
+    def add_to_motion_state_chart(
+        self, parent_goal: Goal, executable: GiskardExecutable
+    ) -> Goal:
+        """
+        Add a goal below `parent_goal` that runs this node's children next to its
+        monitor.
+
+        The monitor and the children's goal become siblings, which is what lets the
+        monitor's observation drive the children's life cycle.
+        """
+        monitored_goal = self.create_monitored_goal()
+        parent_goal.add_node(monitored_goal)
+        monitored_goal.add_node(self.monitor)
+        children_goal = self.create_goal()
+        monitored_goal.add_node(children_goal)
+        monitored_goal.monitored_node = children_goal
+        self.add_children_to_motion_state_chart(
+            children_goal, self.children, executable
+        )
+        return monitored_goal
+
+    @abstractmethod
+    def create_monitored_goal(self) -> MonitoredGoal:
+        """
+        :return: An empty goal that runs this node's children under its monitor.
+        """
+
+
+@dataclass(eq=False)
+class CancelMonitor(MonitorNode):
+    """
+    Cancels the plan once the monitor observes True.
+
+    Its children are stopped and the whole motion ends, raising
+    :class:`~coraplex.plans.failures.PlanCancelled`, because the state the rest of the
+    plan assumed no longer holds.
+    """
+
+    def create_monitored_goal(self) -> MonitoredGoal:
+        return CancelledWhenTrue(
+            monitor=self.monitor,
+            name=type(self).__name__,
+            exception=PlanCancelled(language_node=self),
+        )
+
+
+@dataclass(eq=False)
+class PauseMonitor(MonitorNode):
+    """
+    Holds its children for as long as the monitor observes True.
+
+    .. warning:: A monitor that never turns False again holds the children forever, so the
+        motion runs out of control cycles and fails with
+        :class:`~coraplex.exceptions.MotionDidNotFinish`. Use :class:`CancelMonitor` to
+        give up on the plan instead.
+    """
+
+    def create_monitored_goal(self) -> MonitoredGoal:
+        return PausedWhileTrue(monitor=self.monitor, name=type(self).__name__)
+
+
+@dataclass(eq=False)
+class PauseUntilMonitor(MonitorNode):
+    """
+    Holds its children until the monitor observes True.
+
+    .. warning:: A monitor that never turns True holds the children forever, so the
+        motion runs out of control cycles and fails with
+        :class:`~coraplex.exceptions.MotionDidNotFinish`. Use :class:`CancelMonitor` to
+        give up on the plan instead.
+    """
+
+    def create_monitored_goal(self) -> MonitoredGoal:
+        return PausedUntilTrue(monitor=self.monitor, name=type(self).__name__)
 
 
 @dataclass

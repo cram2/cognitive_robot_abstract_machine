@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
@@ -36,6 +37,7 @@ from semantic_digital_twin.world_description.shape_collection import (
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from typing_extensions import Self
 
 try:
     from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
@@ -466,3 +468,206 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
         world.add_semantic_annotation(chain)
 
     assert chain.connections == []
+
+
+# %% combined mesh
+
+CASE_SCALE = Scale(0.4, 0.6, 0.2)
+"""
+Extents of the drawer case used by the combined mesh tests.
+"""
+
+HANDLE_SCALE = Scale(0.02, 0.1, 0.02)
+"""
+Extents of the drawer handle used by the combined mesh tests.
+"""
+
+NEGLIGIBLE_SCALE = Scale(0.01, 0.01, 0.01)
+"""
+Extents of a box that stays below both thresholds of :meth:`Body.has_collision`.
+"""
+
+HANDLE_OFFSET_X = 0.25
+"""
+Distance along the case's x axis at which the handle sits while its joint is at zero.
+"""
+
+HANDLE_TRAVEL = 0.3
+"""
+Distance the handle is slid along the case's x axis.
+"""
+
+
+@dataclass
+class DrawerWithSlidingHandle:
+    """
+    A drawer whose handle slides along the case's x axis, together with the world
+    holding it and the connections needed to pose it.
+    """
+
+    world: World
+    """
+    The world holding the drawer.
+    """
+
+    drawer: Drawer
+    """
+    The drawer annotation under test.
+    """
+
+    base_connection: Connection6DoF
+    """
+    Connects the world root to the case, so the whole drawer can be moved.
+    """
+
+    handle_connection: PrismaticConnection
+    """
+    Connects the case to the handle body, so the handle can be moved within the drawer.
+    """
+
+    @classmethod
+    def build(
+        cls, case_collision: ShapeCollection, handle_collision: ShapeCollection
+    ) -> Self:
+        """
+        :param case_collision: Collision geometry of the drawer case.
+        :param handle_collision: Collision geometry of the handle.
+        """
+        world = World()
+        root = Body(name=PrefixedName("root", prefix="combined_mesh"))
+        case = Body(
+            name=PrefixedName("case", prefix="combined_mesh"), collision=case_collision
+        )
+        handle_body = Body(
+            name=PrefixedName("handle", prefix="combined_mesh"),
+            collision=handle_collision,
+        )
+        handle = Handle(root=handle_body)
+        drawer = Drawer(root=case, handle=handle)
+        with world.modify_world():
+            world.add_kinematic_structure_entity(root)
+            world.add_kinematic_structure_entity(case)
+            world.add_kinematic_structure_entity(handle_body)
+            base_connection = Connection6DoF.create_with_dofs(
+                world=world, parent=root, child=case
+            )
+            world.add_connection(base_connection)
+            handle_connection = PrismaticConnection.create_with_dofs(
+                world=world,
+                parent=case,
+                child=handle_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=HANDLE_OFFSET_X, reference_frame=case
+                ),
+                axis=Vector3.X(reference_frame=case),
+            )
+            world.add_connection(handle_connection)
+            world.add_semantic_annotation(handle)
+            world.add_semantic_annotation(drawer)
+        return cls(world, drawer, base_connection, handle_connection)
+
+    @classmethod
+    def with_boxes(cls) -> Self:
+        """
+        Builds the drawer with a case and a handle that both count as collidable.
+        """
+        return cls.build(
+            ShapeCollection([Box(scale=CASE_SCALE)]),
+            ShapeCollection([Box(scale=HANDLE_SCALE)]),
+        )
+
+    def expected_bounds(self, handle_position: float) -> np.ndarray:
+        """
+        The bounds the combined mesh has while the handle joint sits at
+        ``handle_position``, given that the case dominates the drawer in every direction
+        but positive x.
+        """
+        return np.array(
+            [
+                [-CASE_SCALE.x / 2, -CASE_SCALE.y / 2, -CASE_SCALE.z / 2],
+                [
+                    HANDLE_OFFSET_X + handle_position + HANDLE_SCALE.x / 2,
+                    CASE_SCALE.y / 2,
+                    CASE_SCALE.z / 2,
+                ],
+            ]
+        )
+
+    def move_drawer(self, position: float):
+        """
+        Moves the whole drawer along the world root's x axis.
+        """
+        self.world.state[self.base_connection.x.id].position = position
+        self.world.notify_state_change()
+
+    def move_handle(self, position: float):
+        """
+        Slides the handle along the case's x axis.
+        """
+        self.world.state[self.handle_connection.dof.id].position = position
+        self.world.notify_state_change()
+
+
+def test_combined_mesh_merges_every_body_of_the_annotation():
+    """
+    The mesh spans the case and the handle, not just the root body.
+    """
+    setup = DrawerWithSlidingHandle.with_boxes()
+
+    np.testing.assert_allclose(
+        setup.drawer.combined_mesh.bounds, setup.expected_bounds(handle_position=0.0)
+    )
+
+
+def test_combined_mesh_is_expressed_in_the_root_frame():
+    """
+    Moving the whole drawer through the world leaves the mesh untouched, since it is
+    expressed relative to the drawer's root body.
+    """
+    setup = DrawerWithSlidingHandle.with_boxes()
+
+    setup.move_drawer(5.0)
+
+    np.testing.assert_allclose(
+        setup.drawer.combined_mesh.bounds, setup.expected_bounds(handle_position=0.0)
+    )
+
+
+def test_combined_mesh_follows_the_bodies_of_the_annotation():
+    """
+    The mesh is rebuilt on every access, so sliding the handle within the drawer moves
+    the mesh with it.
+    """
+    setup = DrawerWithSlidingHandle.with_boxes()
+    bounds_before = setup.drawer.combined_mesh.bounds
+
+    setup.move_handle(HANDLE_TRAVEL)
+
+    bounds_after = setup.drawer.combined_mesh.bounds
+    np.testing.assert_allclose(bounds_after[0], bounds_before[0])
+    np.testing.assert_allclose(bounds_after[1][0] - bounds_before[1][0], HANDLE_TRAVEL)
+
+
+def test_combined_mesh_skips_bodies_without_collision():
+    """
+    A body too small to count as collidable contributes nothing to the mesh.
+    """
+    setup = DrawerWithSlidingHandle.build(
+        ShapeCollection([Box(scale=CASE_SCALE)]),
+        ShapeCollection([Box(scale=NEGLIGIBLE_SCALE)]),
+    )
+    assert not setup.drawer.handle.root.has_collision()
+
+    np.testing.assert_allclose(
+        setup.drawer.combined_mesh.bounds, setup.drawer.root.combined_mesh.bounds
+    )
+
+
+def test_combined_mesh_is_empty_without_collision_geometry():
+    """
+    An annotation without any collidable body yields an empty mesh, as an empty
+    :class:`ShapeCollection` does.
+    """
+    setup = DrawerWithSlidingHandle.build(ShapeCollection(), ShapeCollection())
+
+    assert len(setup.drawer.combined_mesh.vertices) == 0

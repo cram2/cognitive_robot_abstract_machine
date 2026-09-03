@@ -85,8 +85,25 @@ class RuleTreeContext:
     """
 
 
+class HasExpression(ABC):
+    """
+    Anything verbalization/build steps can resolve to a single underlying
+    :class:`SymbolicExpression` to scan or build, regardless of what kind of object
+    routes to it (a plain expression, a :class:`~krrood.entity_query_language.query.match.Match`,
+    a :class:`~krrood.entity_query_language.operators.probabilistic_queries.ProbabilisticQuery`,
+    ...). Callers use :meth:`_get_expression_` polymorphically instead of an
+    ``isinstance`` chain over every such wrapper type.
+    """
+
+    @abstractmethod
+    def _get_expression_(self) -> SymbolicExpression:
+        """
+        :return: The ``SymbolicExpression`` this object represents or wraps.
+        """
+
+
 @dataclass(eq=False)
-class SymbolicExpression(AbstractContextManager):
+class SymbolicExpression(AbstractContextManager, HasExpression):
     """
     Base class for all symbolic expressions.
 
@@ -154,6 +171,9 @@ class SymbolicExpression(AbstractContextManager):
 
     def __post_init__(self):
         self._expression_ = self
+
+    def _get_expression_(self) -> SymbolicExpression:
+        return self
 
     def _node_for_new_position_(self) -> SymbolicExpression:
         """

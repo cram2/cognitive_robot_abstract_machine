@@ -6,6 +6,7 @@ from typing import Tuple
 
 import numpy as np
 import trimesh
+from trimesh.util import concatenate
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
@@ -148,6 +149,23 @@ class HasRootKinematicStructureEntity(
     """
     The root kinematic structure entity of the semantic annotation.
     """
+
+    @property
+    def combined_mesh(self) -> trimesh.Trimesh:
+        """
+        :return: The collision geometry of every body of this annotation, merged into a single
+        mesh expressed in the frame of :attr:`root`.
+
+        ..note:: Rebuilt on every access, since the bodies move relative to each other
+            with the world state.
+        """
+        return concatenate(
+            [
+                shape.mesh_in_frame(self.root)
+                for body in self.bodies_with_collision
+                for shape in body.collision
+            ]
+        )
 
     @property
     def scale(self) -> Scale:
@@ -1245,6 +1263,17 @@ class HasCaseAsRootBody(HasSupportingSurface):
 
     @classproperty
     @abstractmethod
+    def _hole_direction_axis(cls) -> Vector3:
+        """
+        The unit vector along the direction of the physical hole of the geometry, without
+        a reference frame.
+
+        Used to build this type's default geometry before any instance/root body exists to
+        serve as a reference frame. Use :attr:`hole_direction` instead once an instance
+        exists.
+        """
+
+    @property
     def hole_direction(self) -> Vector3:
         """
         The direction of the physical hole of the geometry.
@@ -1253,6 +1282,9 @@ class HasCaseAsRootBody(HasSupportingSurface):
                 ..warning:: This does not describe the axis along, for example, a drawer opens. Its the physical opening where
                 you can put something into the drawer.
         """
+        return Vector3.from_iterable(
+            self._hole_direction_axis.to_np(), reference_frame=self.root
+        )
 
     @classmethod
     def _create_container_event(cls, scale: Scale, wall_thickness: float) -> Event:
@@ -1268,7 +1300,7 @@ class HasCaseAsRootBody(HasSupportingSurface):
             scale.x - wall_thickness,
             scale.y - wall_thickness,
             scale.z - wall_thickness,
-        ).to_simple_event(cls.hole_direction, wall_thickness)
+        ).to_simple_event(cls._hole_direction_axis, wall_thickness)
 
         container_event = outer_box.as_composite_set() - inner_box.as_composite_set()
 

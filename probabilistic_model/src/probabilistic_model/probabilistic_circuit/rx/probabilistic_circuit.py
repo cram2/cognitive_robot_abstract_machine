@@ -481,19 +481,19 @@ class SumUnit(InnerUnit):
         return result
 
     def forward(self, *args, **kwargs):
-        self.result_of_current_query = np.sum(
-            [
-                np.exp(weight) * subcircuit.result_of_current_query
-                for weight, subcircuit in self.log_weighted_subcircuits
-            ],
-            axis=0,
-        )
+        # streamed instead of building the full subcircuit-results list at once
+        result = 0.0
+        for weight, subcircuit in self.log_weighted_subcircuits:
+            result = result + np.exp(weight) * subcircuit.result_of_current_query
+        self.result_of_current_query = result
 
     def log_forward(self, *args, **kwargs):
-        result = [
-            lw + s.result_of_current_query for lw, s in self.log_weighted_subcircuits
-        ]
-        self.result_of_current_query = logsumexp(result, axis=0)
+        # streamed via logaddexp instead of building the full list for logsumexp
+        result = None
+        for log_weight, subcircuit in self.log_weighted_subcircuits:
+            value = log_weight + subcircuit.result_of_current_query
+            result = value if result is None else np.logaddexp(result, value)
+        self.result_of_current_query = result
 
     moment = forward
 
@@ -1580,6 +1580,27 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         :param new_variables: The new variables to set.
         """
         self.root.update_variables(new_variables)
+
+    def rename_variables_with_prefix(
+        self, prefix: str, excluded_variables: Iterable[Variable] = ()
+    ) -> None:
+        """
+        Rename each variable in this circuit to include ``prefix`` as a namespace.
+
+        Produces names of the form ``"{prefix}.{variable.name}"``. Variables in
+        ``excluded_variables`` are left unchanged.
+
+        :param prefix: String prefix to prepend to every variable name.
+        :param excluded_variables: Variables that should keep their current names.
+        """
+        variable_renames = {
+            variable: type(variable)(
+                f"{prefix}.{variable.name}", domain=variable.domain
+            )
+            for variable in self.variables
+            if variable not in excluded_variables
+        }
+        self.update_variables(variable_renames)
 
     def is_deterministic(self) -> bool:
         """

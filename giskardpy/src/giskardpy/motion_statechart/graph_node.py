@@ -1247,13 +1247,14 @@ class Goal(MotionStatechartNode):
     def add_node(self, node: MotionStatechartNode) -> None:
         """
         Adds a node to this goal and the motion statechart this goal belongs to.
-        Should be used in expand().
 
         :param node: The node to add as a child of this goal.
         """
         self._add_node_sanity_check(node)
         if node not in self.nodes:
             self.nodes.append(node)
+        if node._motion_statechart is self.motion_statechart:
+            return
         node.parent_node = self
         self.motion_statechart.add_node(node)
 
@@ -1277,9 +1278,9 @@ class Goal(MotionStatechartNode):
 
     def _check_node_doesnt_belong_to_different_parent(self, node: MotionStatechartNode):
         """
-        Rejects nodes that are already a child of another node.
-
-        :param node: The node to validate.
+        .. note:: A node held by a *different* motion statechart is allowed, because it is
+            moved into this goal's statechart; only two parents within one statechart are
+            an error.
         """
         if node.belongs_to_motion_statechart() and node.parent_node != self:
             raise NodeAlreadyBelongsToDifferentNodeError(node=self, new_node=node)

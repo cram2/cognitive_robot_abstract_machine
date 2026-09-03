@@ -8,7 +8,10 @@ from typing import Optional, Callable
 from typing_extensions import Self
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import ObservationStateValues
+from giskardpy.motion_statechart.data_types import (
+    LifeCycleValues,
+    ObservationStateValues,
+)
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 
 logger = logging.getLogger(__name__)
@@ -44,7 +47,7 @@ class Print(MotionStatechartNode):
         return ObservationStateValues.TRUE
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class CountSeconds(MotionStatechartNode):
     """
     This node counts X seconds and then turns True.
@@ -250,7 +253,7 @@ class ThreadedPredicateMonitor(MotionStatechartNode):
         self._thread = None
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class Pulse(MotionStatechartNode):
     """
     Will stay True for a single tick, then turn False.
@@ -275,5 +278,53 @@ class Pulse(MotionStatechartNode):
         if self._counter < self.length:
             self._triggered = True
             self._counter += 1
+            return ObservationStateValues.TRUE
+        return ObservationStateValues.FALSE
+
+
+@dataclass(eq=False, repr=False)
+class CountNodeResets(MotionStatechartNode):
+    """
+    Turns True once :attr:`node` has been reset :attr:`target` times.
+
+    Counts attempts rather than control cycles, by watching the node re-enter
+    NOT_STARTED. Its count is never cleared, unlike the counters that reset themselves
+    when they start, so it survives the resets it is counting.
+    """
+
+    node: MotionStatechartNode = field(kw_only=True)
+    """
+    The node whose resets are counted.
+    """
+
+    target: int = field(kw_only=True)
+    """
+    Number of resets after which this turns True.
+    """
+
+    resets: int = field(default=0, init=False)
+    """
+    Resets of :attr:`node` seen so far.
+    """
+
+    _previous_life_cycle: Optional[LifeCycleValues] = field(
+        default=None, init=False, repr=False
+    )
+    """
+    Life cycle state of :attr:`node` on the previous control cycle.
+    """
+
+    def on_tick(
+        self, context: MotionStatechartContext
+    ) -> Optional[ObservationStateValues]:
+        current_life_cycle = self.node.life_cycle_state
+        if (
+            self._previous_life_cycle is not None
+            and current_life_cycle == LifeCycleValues.NOT_STARTED
+            and self._previous_life_cycle != LifeCycleValues.NOT_STARTED
+        ):
+            self.resets += 1
+        self._previous_life_cycle = current_life_cycle
+        if self.resets >= self.target:
             return ObservationStateValues.TRUE
         return ObservationStateValues.FALSE

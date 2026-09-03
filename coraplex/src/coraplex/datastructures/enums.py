@@ -304,27 +304,6 @@ class FilterConfig(Enum):
     butterworth = 1
 
 
-class MonitorBehavior(Enum):
-    """
-    Enum for the different monitor behaviors.
-    """
-
-    INTERRUPT = auto()
-    """
-    Interrupt the task when the condition is met.
-    """
-
-    PAUSE = auto()
-    """
-    Pause the task when the condition is met.
-    """
-
-    RESUME = auto()
-    """
-    Resume the task when the condition is met.
-    """
-
-
 class CuttingTechnique(Enum):
     """
     Enum for the techniques of cutting an object.

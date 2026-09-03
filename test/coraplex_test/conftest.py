@@ -13,6 +13,10 @@ from functools import partial
 
 import pytest
 
+from semantic_digital_twin.predetermined_maps.building_floor import BuildingFloor
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
+
 try:
     import rclpy
 except ModuleNotFoundError:

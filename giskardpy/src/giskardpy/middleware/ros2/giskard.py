@@ -16,6 +16,7 @@ from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
+from giskardpy.middleware.ros2.graceful_shutdown import GracefulShutdownSignals
 from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from giskardpy.middleware.ros2.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.motion_server import MotionServer
@@ -257,13 +258,16 @@ class Giskard:
         """
         Start Giskard and wait for goals until ROS shuts down.
         """
-        try:
-            self.setup()
-            self.motion_server.live()
-            rospy.spinner_thread.join()
-        except Exception:
-            traceback.print_exc()
-        finally:
-            self.close_world_model_ros_interface()
-            if rclpy.ok():
-                rclpy.try_shutdown()
+        with GracefulShutdownSignals():
+            try:
+                self.setup()
+                self.motion_server.live()
+                rospy.spinner_thread.join()
+            except KeyboardInterrupt:
+                rospy.node.get_logger().info("Giskard was interrupted, shutting down.")
+            except Exception:
+                traceback.print_exc()
+            finally:
+                self.close_world_model_ros_interface()
+                if rclpy.ok():
+                    rclpy.try_shutdown()

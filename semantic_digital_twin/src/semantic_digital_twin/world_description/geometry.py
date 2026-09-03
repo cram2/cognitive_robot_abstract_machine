@@ -349,6 +349,10 @@ class Scale:
     def to_np(self) -> np.ndarray:
         return np.array([self.x, self.y, self.z])
 
+    @property
+    def xy(self) -> Scale:
+        return Scale(self.x, self.y, 0)
+
 
 @dataclass
 class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):

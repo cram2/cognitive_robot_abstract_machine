@@ -26,7 +26,6 @@ from krrood.entity_query_language.verbalization.rendering.renderer import (
     ParagraphRenderer,
 )
 from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
-from krrood.entity_query_language.query.match import Match
 from krrood.entity_query_language.query.query import Query
 
 if TYPE_CHECKING:
@@ -139,10 +138,12 @@ class VerbalizationPipeline:
         >>> VerbalizationPipeline.plain().verbalize(a(entity(variable(Robot, []))))
         'Find a Robot'
         """
-        if isinstance(expression, Match):
-            expression.expression.build()
-        elif isinstance(expression, Query):
-            expression.build()
+        # Match/Distribution/Probability all resolve, via _get_expression_, to the
+        # underlying SymbolicExpression that actually needs building -- only a Query
+        # has anything to build.
+        target = expression._get_expression_()
+        if isinstance(target, Query):
+            target.build()
         fragment = self._verbalizer.build(
             expression, services, performative=directive_for_backend(backend)
         )

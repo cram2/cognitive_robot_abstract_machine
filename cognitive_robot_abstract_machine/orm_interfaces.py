@@ -14,17 +14,17 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from krrood.class_diagrams.progress_report import (
-    ClassDiagramProgress,
-    ProgressEnvironmentVariable,
-)
 from tqdm import tqdm
 from typing_extensions import List, Optional, Sequence, Tuple
 
 from cognitive_robot_abstract_machine import orm_generation
 from cognitive_robot_abstract_machine.exceptions import (
-    MissingOrmGeneratorError,
     OrmGenerationFailedError,
+    MissingORMGeneratorError,
+)
+from krrood.class_diagrams.progress_report import (
+    ClassDiagramProgress,
+    ProgressEnvironmentVariable,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -257,7 +257,7 @@ class OrmInterface:
         :raises MissingOrmGeneratorError: If the package has no generator.
         """
         if not self.generator.exists():
-            raise MissingOrmGeneratorError(self.package_name, self.generator)
+            raise MissingORMGeneratorError(self.package_name, self.generator)
 
 
 # %% reading a run's output back

@@ -882,6 +882,24 @@ class Scalar(SymbolicMathType):
     def is_const_false(self):
         return self.is_constant() and self == False
 
+    def is_true(self) -> Scalar:
+        """
+        :return: An expression that is True wherever this one is the trinary True.
+        """
+        return Scalar(ca.eq(self.casadi_sx, True))
+
+    def is_false(self) -> Scalar:
+        """
+        :return: An expression that is True wherever this one is the trinary False.
+        """
+        return Scalar(ca.eq(self.casadi_sx, False))
+
+    def is_unknown(self) -> Scalar:
+        """
+        :return: An expression that is True wherever this one is the trinary Unknown.
+        """
+        return Scalar(ca.eq(self.casadi_sx, 0.5))
+
     def __bool__(self) -> bool:
         """
         Evaluates the object as a boolean value, implementing the `__bool__` special

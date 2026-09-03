@@ -91,6 +91,22 @@ class InductionStepTestCase(unittest.TestCase):
     def test_sum_weights_from_indices(self):
         self.assertAlmostEqual(self.induction_step.sum_weights_from_indices(3, 5), 2)
 
+    def split_side_log_likelihood(
+        self, split_index: int, connecting_point: float, is_left: bool
+    ) -> float:
+        """
+        Evaluate InductionStep._vectorized_log_likelihood_of_split_side for a single
+        split index, as a stand-in for the removed scalar log_likelihood_of_split_side.
+        """
+        split_indices = np.array([split_index])
+        split_values = (
+            self.induction_step.data[split_indices - 1]
+            + self.induction_step.data[split_indices]
+        ) / 2
+        return self.induction_step._vectorized_log_likelihood_of_split_side(
+            split_indices, split_values, connecting_point, is_left
+        )[0]
+
     def test_likelihood_of_split(self):
         """
         Test that the calculation of the likelihood of a split is correct and as it is
@@ -99,55 +115,28 @@ class InductionStepTestCase(unittest.TestCase):
         likelihood_without_split = self.induction_step.log_likelihood_without_split()
         self.assertAlmostEqual(likelihood_without_split, -12.48, delta=0.01)
 
-        # k = 1
-        likelihood_of_split_left = self.induction_step.log_likelihood_of_split_side(
-            1, 1
-        )
-        self.assertAlmostEqual(likelihood_of_split_left, -1.1, delta=0.01)
-        likelihood_of_split_right = self.induction_step.log_likelihood_of_split_side(
-            1, 9
-        )
-        self.assertAlmostEqual(likelihood_of_split_right, -10.99, delta=0.01)
-
-        # k = 2
-        likelihood_of_split_left = self.induction_step.log_likelihood_of_split_side(
-            2, 1
-        )
-        self.assertAlmostEqual(likelihood_of_split_left, -3.01, delta=0.01)
-        likelihood_of_split_right = self.induction_step.log_likelihood_of_split_side(
-            2, 9
-        )
-        self.assertAlmostEqual(likelihood_of_split_right, -9.11, delta=0.01)
-
-        # k = 3
-        likelihood_of_split_left = self.induction_step.log_likelihood_of_split_side(
-            3, 1
-        )
-        self.assertAlmostEqual(likelihood_of_split_left, -4.83, delta=0.01)
-        likelihood_of_split_right = self.induction_step.log_likelihood_of_split_side(
-            3, 9
-        )
-        self.assertAlmostEqual(likelihood_of_split_right, -7.19, delta=0.01)
-
-        # k = 4
-        likelihood_of_split_left = self.induction_step.log_likelihood_of_split_side(
-            4, 1
-        )
-        self.assertAlmostEqual(likelihood_of_split_left, -7.64, delta=0.01)
-        likelihood_of_split_right = self.induction_step.log_likelihood_of_split_side(
-            4, 9
-        )
-        self.assertAlmostEqual(likelihood_of_split_right, -4.7, delta=0.01)
-
-        # k = 5
-        likelihood_of_split_left = self.induction_step.log_likelihood_of_split_side(
-            5, 1
-        )
-        self.assertAlmostEqual(likelihood_of_split_left, -10.64, delta=0.01)
-        likelihood_of_split_right = self.induction_step.log_likelihood_of_split_side(
-            5, 9
-        )
-        self.assertAlmostEqual(likelihood_of_split_right, -1.79, delta=0.01)
+        # split_index: (expected left log likelihood, expected right log likelihood)
+        expected_by_split_index = {
+            1: (-1.1, -10.99),
+            2: (-3.01, -9.11),
+            3: (-4.83, -7.19),
+            4: (-7.64, -4.7),
+            5: (-10.64, -1.79),
+        }
+        for split_index, (
+            expected_left,
+            expected_right,
+        ) in expected_by_split_index.items():
+            likelihood_of_split_left = self.split_side_log_likelihood(
+                split_index, 1, is_left=True
+            )
+            self.assertAlmostEqual(likelihood_of_split_left, expected_left, delta=0.01)
+            likelihood_of_split_right = self.split_side_log_likelihood(
+                split_index, 9, is_left=False
+            )
+            self.assertAlmostEqual(
+                likelihood_of_split_right, expected_right, delta=0.01
+            )
 
     def test_compute_best_split(self):
         maximum, index = self.induction_step.compute_best_split()

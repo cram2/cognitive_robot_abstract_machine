@@ -191,11 +191,6 @@ def drop_database(engine: Engine) -> None:
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 
 
-class InheritanceStrategy(Enum):
-    JOINED = "joined"
-    SINGLE = "single"
-
-
 def is_direct_subclass(cls: Type, *bases: Type) -> bool:
     """
     :param cls: The class to check.

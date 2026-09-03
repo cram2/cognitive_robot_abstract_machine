@@ -316,3 +316,17 @@ class PerceptionSourceUnavailable(PerceptionException):
 
     def suggest_correction(self) -> str:
         return "start the perception pipeline before running the plan."
+
+@dataclass
+class NotOnASingleLevelException(DataclassException):
+    """
+    Raised when an entity is detected to be on None or multiple levels at the same time.
+    """
+
+    message: str
+
+    def error_message(self) -> str:
+        return self.message
+
+    def suggest_correction(self) -> str:
+        return f"Move the robot to a recognized level"

@@ -1,19 +1,19 @@
 import threading
-import time
+from datetime import timedelta
+from functools import partial
 
 import numpy as np
 import pytest
 
 from coraplex.datastructures.enums import (
     TaskStatus,
-    MonitorBehavior,
     DetectionTechnique,
 )
 
-from coraplex.plans.failures import PlanFailure
+from coraplex.plans.failures import PlanCancelled, PlanFailure, RepetitionsExhausted
 from coraplex.fluent import Fluent
 from coraplex.language import (
-    MonitorNode,
+    CancelMonitor,
     SequentialNode,
     TryAllNode,
     ParallelNode,
@@ -25,15 +25,23 @@ from coraplex.plans.factories import (
     parallel,
     try_in_order,
     try_all,
-    monitor,
+    cancel_when,
     repeat,
     code,
 )
 from coraplex.robot_plans import *
 from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from coraplex.robot_plans.motions.gripper import MoveToolCenterPointMotion
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
+from giskardpy.motion_statechart.exceptions import NoConvergingTaskError
+from giskardpy.motion_statechart.goals.templates import RepeatOnStall
+from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
+    ConstFalseNode,
+    ConstTrueNode,
+)
 from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.spatial_types import Pose
 from semantic_digital_twin.robots.pr2 import PR2Joint
 
 
@@ -105,24 +113,11 @@ def test_combination_construction():
     assert len(root.children[0].children) == 2
 
 
-def test_monitor_construction():
-    act = ParkArmsAction(Arms.BOTH)
-    act2 = MoveTorsoAction(TorsoState.HIGH)
-
-    def monitor_func():
-        return True
-
-    root = monitor(children=[sequential([act, act2])], condition=monitor_func)
-    assert len(root.children) == 1
-    assert isinstance(root, MonitorNode)
-    root.plan.validate()
-
-
 def test_repeat_construction():
     act = ParkArmsAction(Arms.BOTH)
     act2 = MoveTorsoAction(TorsoState.HIGH)
 
-    root = repeat([act, act2], 10)
+    root = repeat([act, act2], maximum_repetitions=10)
     assert len(root.children) == 2
     root.plan.validate()
 
@@ -180,18 +175,50 @@ def test_perform_parallel(immutable_model_world):
         assert node.status == TaskStatus.SUCCEEDED
 
 
-def test_perform_repeat(immutable_model_world):
+def test_perform_repeat_runs_a_succeeding_motion_once(immutable_model_world):
+    """
+    Attempting stops as soon as the children succeed, so a motion that works first time
+    is not repeated and the plan finishes normally.
+    """
     world, robot_view, context = immutable_model_world
-    test_var = Fluent(0)
 
-    def inc(var):
-        var.set_value(var.get_value() + 1)
-
-    plan = repeat([code(lambda: inc(test_var))], 10, context=context).plan
+    plan = repeat(
+        [MoveTorsoAction(TorsoState.HIGH)], maximum_repetitions=3, context=context
+    ).plan
     with simulated_robot:
         plan.perform()
-    assert test_var.get_value() == 10
+
+    assert world.state[
+        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+    ].position == pytest.approx(0.3, abs=0.05)
+    assert plan.root.status == TaskStatus.SUCCEEDED
     plan.validate()
+
+
+def test_repeat_does_not_give_up_on_a_child_that_starts_at_its_goal(
+    immutable_model_world,
+):
+    """
+    A child that is already where it should be finishes without converging on anything,
+    which must not be mistaken for an attempt that stalled.
+    """
+    world, robot_view, context = immutable_model_world
+    with simulated_robot:
+        sequential([MoveTorsoAction(TorsoState.HIGH)], context).plan.perform()
+
+    plan = repeat(
+        [MoveTorsoAction(TorsoState.HIGH), MoveTorsoAction(TorsoState.LOW)],
+        maximum_repetitions=3,
+        context=context,
+    ).plan
+    with simulated_robot:
+        plan.perform()
+
+    [torso_down] = (
+        robot_view.get_torso().get_joint_state_by_type(TorsoState.LOW).target_values
+    )
+    assert _torso_position(world) == pytest.approx(torso_down, abs=0.05)
+    assert plan.root.status == TaskStatus.SUCCEEDED
 
 
 def test_exception_sequential(immutable_model_world):
@@ -251,25 +278,120 @@ def test_exception_try_all(immutable_model_world):
     assert plan.root.status == TaskStatus.SUCCEEDED
 
 
-def test_monitor_resume(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+# %% monitored subtrees
+
+
+def test_cancel_monitor_construction():
     act = ParkArmsAction(Arms.BOTH)
     act2 = MoveTorsoAction(TorsoState.HIGH)
 
-    def monitor_func():
-        time.sleep(2)
-        return True
+    root = cancel_when([act, act2], monitor=ConstFalseNode(name="never"))
+    assert isinstance(root, CancelMonitor)
+    assert len(root.children) == 2
+    root.plan.validate()
 
-    plan = monitor(
+
+def _torso_position(world):
+    return world.state[
+        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+    ].position
+
+
+def test_cancel_monitor_stops_the_motion_it_wraps(immutable_model_world):
+    """
+    A monitor that is true from the start stops the motion before it moves.
+    """
+    world, robot_view, context = immutable_model_world
+    start_position = _torso_position(world)
+
+    plan = cancel_when(
+        [MoveTorsoAction(TorsoState.HIGH)],
+        monitor=ConstTrueNode(name="always"),
+        context=context,
+    ).plan
+    with pytest.raises(PlanCancelled):
+        with simulated_robot:
+            plan.perform()
+
+    assert _torso_position(world) == pytest.approx(start_position, abs=0.05)
+
+
+def test_cancel_monitor_gives_up_on_the_plan_instead_of_stalling(immutable_model_world):
+    """
+    Cancelling reports that the plan has to be made again, rather than leaving the
+    surrounding plan waiting for a subtree that will never succeed until the motion runs
+    out of control cycles.
+    """
+    world, robot_view, context = immutable_model_world
+
+    plan = sequential(
         [
-            sequential([act, act2]),
+            cancel_when(
+                [MoveTorsoAction(TorsoState.HIGH)],
+                monitor=ConstTrueNode(name="always"),
+            ),
+            MoveTorsoAction(TorsoState.LOW),
         ],
-        condition=monitor_func,
-        behavior=MonitorBehavior.RESUME,
+        context=context,
+    ).plan
+    with pytest.raises(PlanCancelled):
+        with simulated_robot:
+            plan.perform()
+
+
+def test_never_firing_cancel_monitor_leaves_the_motion_alone(immutable_model_world):
+    """
+    The control for the test above: the same plan with a monitor that never fires runs
+    the motion to its target.
+    """
+    world, robot_view, context = immutable_model_world
+
+    plan = cancel_when(
+        [MoveTorsoAction(TorsoState.HIGH)],
+        monitor=ConstFalseNode(name="never"),
         context=context,
     ).plan
     with simulated_robot:
         plan.perform()
-    assert len(plan.root.children) == 1
-    assert isinstance(plan.root, MonitorNode)
+
+    assert _torso_position(world) == pytest.approx(0.3, abs=0.05)
     assert plan.root.status == TaskStatus.SUCCEEDED
+
+
+def test_repeat_raises_when_it_runs_out_of_attempts(immutable_model_world):
+    """
+    A motion that can never succeed is attempted the allowed number of times and then
+    reported as a plan failure, rather than silently stalling until the motion runs out
+    of control cycles.
+    """
+    world, robot_view, context = immutable_model_world
+    unreachable = Pose.from_xyz_rpy(5, 0, 0, reference_frame=world.root)
+
+    plan = repeat(
+        [MoveToolCenterPointMotion(target=unreachable, arm=Arms.RIGHT)],
+        maximum_repetitions=2,
+        context=context,
+        repeat_template=partial(RepeatOnStall, timeout=timedelta(seconds=1)),
+    ).plan
+
+    with pytest.raises(RepetitionsExhausted):
+        with simulated_robot:
+            plan.perform()
+
+
+def test_repeat_of_a_non_converging_motion_is_rejected(immutable_model_world):
+    """
+    Retrying on a stall needs a task whose progress can be measured, so a repeat whose
+    children never converge is reported when the motion state chart is compiled.
+    """
+    world, robot_view, context = immutable_model_world
+
+    plan = repeat(
+        [NavigateAction(Pose.from_xyz_rpy(1, -1, reference_frame=world.root))],
+        maximum_repetitions=2,
+        context=context,
+    ).plan
+
+    with pytest.raises(NoConvergingTaskError):
+        with simulated_robot:
+            plan.perform()

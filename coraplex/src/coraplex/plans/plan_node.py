@@ -5,11 +5,12 @@ from abc import abstractmethod, ABC
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Any, List, Dict, Type, TYPE_CHECKING, Iterable, Iterator
+from typing import Optional, Any, List, Type, TYPE_CHECKING, Iterable, Iterator
 
 from typing_extensions import Union
 
 from coraplex.plans.designator import Designator
+from giskardpy.motion_statechart.graph_node import Goal
 from krrood.entity_query_language.query.match import Match
 from coraplex.datastructures.enums import TaskStatus
 from coraplex.datastructures.execution_data import ExecutionData
@@ -19,11 +20,12 @@ from coraplex.plans.executables import (
     UnderspecifiedExecutable,
 )
 from coraplex.plans.failures import PlanFailure
+from coraplex.plans.motion_state_chart_building import BuildsMotionStateChart
 from coraplex.plans.plan_entity import PlanEntity
-from coraplex.utils import split_list_by_type
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import Task
+    from coraplex.datastructures.dataclasses import Context
     from coraplex.robot_plans.actions.base import ActionDescription
     from coraplex.robot_plans.motions.base import BaseMotion
 
@@ -82,6 +84,13 @@ class PlanNode(PlanEntity):
     The children of a node are interpreted as a list of nodes that have order. rustworkx
     doesn't have order in the children, hence this attribute makes it possible.
     """
+
+    @property
+    def context(self) -> Context:
+        """
+        :return: The context of the plan this node belongs to.
+        """
+        return self.plan.context
 
     @property
     def parent(self) -> Optional[PlanNode]:
@@ -343,36 +352,25 @@ class PlanNode(PlanEntity):
 
     def parse(self) -> Executable: ...
 
-    def merge_motion_executables(
-        self, executables: List[Executable]
-    ) -> List[Executable]:
+    @property
+    def has_motions(self) -> bool:
         """
-        Merge consecutive giskard executables into a single one while leaving the other
-        executables untouched and in their original order.
-        """
-        result = []
-        for group in split_list_by_type(executables, GiskardExecutable):
-            if not isinstance(group[0], GiskardExecutable):
-                result.extend(group)
-                continue
-            result.append(
-                GiskardExecutable(
-                    motion_mappings=self.merge_motion_mappings(group),
-                    context=self.plan.context,
-                )
-            )
-        return result
+        Whether this subtree contributes any node to a motion state chart.
 
-    def merge_motion_mappings(
-        self, motions: List[GiskardExecutable]
-    ) -> Dict[MotionNode, Task]:
+        Used to skip nodes that would otherwise produce an empty goal.
         """
-        Combine the motion mappings of several giskard executables into one mapping.
+        return any(child.has_motions for child in self.children)
+
+    @property
+    def contains_execution_boundary(self) -> bool:
         """
-        new_mappings = {}
-        for motion in motions:
-            new_mappings.update(motion.motion_mappings)
-        return new_mappings
+        Whether this node or any of its descendants splits the plan into separate motion
+        state charts.
+        """
+        return any(
+            isinstance(node, ExecutionBoundaryNode)
+            for node in [self] + self.descendants
+        )
 
     def __node_info__(self):
         return [
@@ -441,7 +439,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
         :return: The new candidate node, or None if the iterator is exhausted.
         """
         if self._action_iterator is None:
-            self._action_iterator = self.plan.context.query_backend.evaluate(
+            self._action_iterator = self.context.query_backend.evaluate(
                 self.underspecified_action
             )
 
@@ -497,7 +495,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
     def parse(self) -> Executable:
         # Defer resolution to execution: the returned executable grounds the action
         # when it is reached, against the world state produced by the preceding nodes.
-        return UnderspecifiedExecutable(node=self, context=self.plan.context)
+        return UnderspecifiedExecutable(node=self, context=self.context)
 
     def __repr__(self):
         return f"{self.designator_type.__name__}"
@@ -542,9 +540,19 @@ class DesignatorNode(PlanNode, ABC):
 
     def __node_info__(self):
         parent_infos = super().__node_info__()
-        designator_field = [f"{field.name}: {getattr(self.designator, field.name)}" for field in self.designator.fields]
-        parent_infos.append("---------------- Designator Parameter --------------------")
-        parent_infos.extend([f"Designator Type: {self.designator.__class__.__name__}", *designator_field])
+        designator_field = [
+            f"{field.name}: {getattr(self.designator, field.name)}"
+            for field in self.designator.fields
+        ]
+        parent_infos.append(
+            "---------------- Designator Parameter --------------------"
+        )
+        parent_infos.extend(
+            [
+                f"Designator Type: {self.designator.__class__.__name__}",
+                *designator_field,
+            ]
+        )
         return parent_infos
 
     def __node_label__(self):
@@ -552,7 +560,7 @@ class DesignatorNode(PlanNode, ABC):
 
 
 @dataclass(eq=False, repr=False)
-class ActionNode(DesignatorNode):
+class ActionNode(DesignatorNode, BuildsMotionStateChart):
     """
     A node representing a fully specified action.
     """
@@ -577,6 +585,9 @@ class ActionNode(DesignatorNode):
         """
         Create the ExecutionData and logs additional information about the execution of
         this node.
+
+        .. note: With the current implementation, the exact recording of execution data is not possible. So this is
+        not called at the moment.
         """
         robot_pose = self.plan.robot.root.global_pose
         exec_data = ExecutionData(robot_pose, self.plan.world.state._data)
@@ -611,9 +622,6 @@ class ActionNode(DesignatorNode):
         return None
 
     def notify(self):
-
-        self.create_execution_data_pre_perform()
-
         if not self.children:
             self.action.expand()
 
@@ -621,45 +629,55 @@ class ActionNode(DesignatorNode):
         for child in self.children:
             child.notify()
 
-        # TODO: This can't stay here
-        self.update_execution_data_post_perform()
+    @property
+    def body_children(self) -> List[PlanNode]:
+        """
+        :return: The children forming the action body, without its pre- and
+            post-condition.
+        """
+        return self.children[1:-1]
+
+    def add_to_motion_state_chart(
+        self, parent_goal: Goal, executable: GiskardExecutable
+    ) -> Goal:
+        """
+        Add this action's body as its own goal below `parent_goal`.
+
+        .. note:: A nested action's conditions are not evaluated inside the surrounding
+            motion state chart; only the conditions of the action a chart is built for
+            are, see :meth:`parse`.
+        """
+        goal = self.create_goal()
+        parent_goal.add_node(goal)
+        self.add_children_to_motion_state_chart(goal, self.body_children, executable)
+        return goal
 
     def parse(self) -> Executable:
+        """
+        Parse the action body into an executable, gating it with the action's
+        conditions.
+
+        The pre-condition gates the first motion state chart of the body and the post-
+        condition the last one.
+        """
         children = self.children
-        pre_condition_node = children.pop(0)
-        post_condition_node = children.pop(-1)
+        pre_condition_node = children[0]
+        post_condition_node = children[-1]
 
-        child_execs = [child.parse() for child in children]
-        merged = self.merge_motion_executables(child_execs)
-
-        motion_execs = [
-            executable
-            for executable in merged
-            if isinstance(executable, GiskardExecutable)
-        ]
-        if len(motion_execs) == 1:
-            # The action body is a single motion state chart, so the conditions
-            # can be evaluated inside it (gating start/end, aborting on failure).
-            motion_exec = motion_execs[0]
-            motion_exec.pre_condition_node = pre_condition_node
-            motion_exec.post_condition_node = post_condition_node
-            return motion_exec
-
-        giskard_child_execs = [
-            executable
-            for executable in child_execs[0].execution_list
-            if isinstance(executable, GiskardExecutable)
-        ]
-        giskard_child_execs[0].pre_condition_node = pre_condition_node
-        giskard_child_execs[-1].post_condition_node = post_condition_node
-        return child_execs[0]
+        executable = self.parse_children(self.body_children)
+        giskard_executables = executable.giskard_executables
+        if not giskard_executables:
+            return executable
+        giskard_executables[0].pre_condition_node = pre_condition_node
+        giskard_executables[-1].post_condition_node = post_condition_node
+        return executable
 
     def execute(self):
         self.parse().execute()
 
 
 @dataclass(eq=False, repr=False)
-class MotionNode(DesignatorNode):
+class MotionNode(DesignatorNode, BuildsMotionStateChart):
     """
     A node in the plan representing a fully specified motion.
 
@@ -698,12 +716,24 @@ class MotionNode(DesignatorNode):
                 return node
         return None
 
-    def parse(self) -> Executable:
-        task = self.motion.motion_chart
+    @property
+    def has_motions(self) -> bool:
+        return True
 
-        return GiskardExecutable(
-            motion_mappings={self: task}, context=self.plan.context
-        )
+    def add_to_motion_state_chart(
+        self, parent_goal: Goal, executable: GiskardExecutable
+    ) -> Task:
+        """
+        Add this motion's giskard task below `parent_goal` and record it on
+        `executable`.
+        """
+        task = self.motion.motion_chart
+        parent_goal.add_node(task)
+        executable.motion_mappings[self] = task
+        return task
+
+    def parse(self) -> Executable:
+        return self.create_giskard_executable([self])
 
 
 ActionLike = Union[Match, Designator, PlanNode]

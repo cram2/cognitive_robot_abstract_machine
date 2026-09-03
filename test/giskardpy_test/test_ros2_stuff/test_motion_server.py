@@ -322,6 +322,17 @@ class BrokenInputError(Exception):
 
 
 @dataclass
+class InterruptingInputSynchronizer(InputSynchronizer):
+    """
+    Raises KeyboardInterrupt while reading its input, standing in for a process
+    interrupted mid-goal.
+    """
+
+    def apply(self) -> bool:
+        raise KeyboardInterrupt
+
+
+@dataclass
 class CycleWatchingGoalCanceler(InputSynchronizer):
     """
     Watches the completed cycles from inside the control loop and cancels the goal once
@@ -941,6 +952,41 @@ class TestStopClearsCommands:
 
     def test_publishers_are_stopped(self, motion_server: MotionServerFixture):
         motion_server.control_loop.stop()
+
+        assert motion_server.command_publisher.stop_count == 1
+
+
+class TestRobotIsStoppedOnInterrupt:
+    """
+    A KeyboardInterrupt (raised when the process is asked to shut down) always stops the
+    robot before it is allowed to propagate, whether it arrives while idle or mid-goal.
+    """
+
+    def test_the_robot_is_stopped_when_interrupted_while_idle(
+        self, motion_server: MotionServerFixture, monkeypatch: pytest.MonkeyPatch
+    ):
+        def raise_keyboard_interrupt() -> None:
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(
+            motion_server.motion_server, "run_idle_cycle", raise_keyboard_interrupt
+        )
+
+        with pytest.raises(KeyboardInterrupt):
+            motion_server.motion_server.live()
+
+        assert motion_server.command_publisher.stop_count == 1
+
+    def test_the_robot_is_stopped_when_interrupted_during_a_goal(
+        self, motion_server: MotionServerFixture
+    ):
+        motion_server.control_loop.inputs.synchronizers = [
+            InterruptingInputSynchronizer(world=motion_server.executor.context.world)
+        ]
+        motion_server.action_server.goal_json = create_goal_json()
+
+        with pytest.raises(KeyboardInterrupt):
+            motion_server.motion_server.run_idle_cycle()
 
         assert motion_server.command_publisher.stop_count == 1
 

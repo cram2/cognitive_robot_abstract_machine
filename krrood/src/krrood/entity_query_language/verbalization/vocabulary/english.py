@@ -209,16 +209,21 @@ class Keywords(VocabEnum):
     TRUE = KeyWord("true")
     WHAT_CAUSES = KeyWord("what causes")
     TO_BE = KeyWord("to be")
+    THE_PROBABILITY_THAT = KeyWord("the probability that")
 
 
 class Directive(VocabEnum):
     """
-    The imperative verb that opens a request: *"Find"* a match in the domain,
-    or *"Generate"* an underspecified one.
+    The opening phrase of a request: *"Find"* a match in the domain, *"Generate"* an
+    underspecified one, or *"The distribution over"* one whose free variables'
+    distribution is wanted instead of a concrete match -- the two imperatives ask for
+    rows, the third asks for a description of the query, so it takes the same slot
+    without being one itself.
     """
 
     FIND = KeyWord("Find")
     GENERATE = KeyWord("Generate")
+    DISTRIBUTION_OVER = KeyWord("The distribution over")
 
 
 class Logicals(VocabEnum):

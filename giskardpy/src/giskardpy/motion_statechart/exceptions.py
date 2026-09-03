@@ -242,6 +242,42 @@ class NodeNotBuiltError(NodeInitializationError):
 
 
 @dataclass
+class MissingFailureMonitorError(NodeInitializationError):
+    """
+    Raised when a repeating goal has no way of telling that an attempt failed.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.node.unique_name} is configured to repeat a task, but no failure monitor is defined to determine when an attempt has failed."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Pass a failure_monitor, or use a subclass such as RepeatOnStall that derives "
+            "the failure condition from the task."
+        )
+
+
+@dataclass
+class ConflictingFailureMonitorError(NodeInitializationError):
+    """
+    Raised when a repeating goal derives its own failure monitor but was given one as
+    well.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'"{self.node.unique_name}" derives its own failure monitor, so the one passed '
+            f"as failure_monitor would never be used."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Drop the failure_monitor argument, or use RepeatUntil itself to retry on a "
+            "monitor of your own."
+        )
+
+
+@dataclass
 class MissingErrorSignalError(NodeInitializationError):
     """
     Raised when a converging task builds artifacts that carry no error signal.

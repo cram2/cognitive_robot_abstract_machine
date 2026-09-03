@@ -29,6 +29,7 @@ from typing_extensions import (
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.core.base_expressions import (
+    HasExpression,
     Selectable,
     SymbolicExpression,
 )
@@ -196,7 +197,7 @@ class AbstractMatchExpression(Generic[T], ABC):
 
 
 @dataclass(eq=False)
-class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
+class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T], HasExpression):
     """
     Construct a query that looks for the pattern provided by the type and the keyword arguments.
     Example usage where we look for an object of type Drawer with body of type Body that has the name"drawer_1":
@@ -310,6 +311,9 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         entity_._quantify_(self._quantifier_type_)
         self._expression = entity_
         return entity_
+
+    def _get_expression_(self) -> SymbolicExpression:
+        return self.expression
 
     def _resolve(
         self,

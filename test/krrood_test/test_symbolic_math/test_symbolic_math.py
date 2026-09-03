@@ -150,6 +150,62 @@ class TestLogic3:
         assert const_expr_str == '("a" or Unknown)'
 
 
+class TestTrinaryPredicates:
+    """
+    The Scalar methods asking which trinary truth value an expression carries.
+    """
+
+    predicate_of_value = {
+        TrinaryTrue: sm.Scalar.is_true,
+        TrinaryFalse: sm.Scalar.is_false,
+        TrinaryUnknown: sm.Scalar.is_unknown,
+    }
+    """
+    The predicate that holds for each trinary truth value.
+    """
+
+    def test_each_predicate_holds_only_for_its_own_value(self):
+        for value in self.predicate_of_value:
+            for predicate_value, predicate in self.predicate_of_value.items():
+                expected = float(value == predicate_value)
+                actual = float(predicate(sm.Scalar(value)))
+                assert expected == actual, (
+                    f"{predicate.__name__} of {value}, "
+                    f"expected {expected}, actual {actual}"
+                )
+
+    def test_each_predicate_holds_over_a_variable(self):
+        """
+        The predicates decide once a value is substituted, which is what lets a
+        condition be built from a variable whose value is not known yet.
+        """
+        variable = sm.FloatVariable(name="observation")
+        for value in self.predicate_of_value:
+            for predicate_value, predicate in self.predicate_of_value.items():
+                expected = float(value == predicate_value)
+                actual = float(predicate(variable).substitute([variable], [value]))
+                assert expected == actual, (
+                    f"{predicate.__name__} of {value}, "
+                    f"expected {expected}, actual {actual}"
+                )
+
+    def test_each_predicate_builds_an_expression_over_its_input(self):
+        variable = sm.FloatVariable(name="observation")
+        for predicate in self.predicate_of_value.values():
+            expression = predicate(variable)
+            assert isinstance(expression, sm.Scalar), predicate.__name__
+            assert expression.free_variables() == [variable], predicate.__name__
+
+    def test_no_predicate_holds_for_a_value_outside_the_trinary_set(self):
+        """
+        Each predicate matches its own value exactly, rather than a range around it.
+        """
+        not_a_truth_value = sm.Scalar(2)
+        for predicate in self.predicate_of_value.values():
+            actual = float(predicate(not_a_truth_value))
+            assert actual == TrinaryFalse, f"{predicate.__name__}, actual {actual}"
+
+
 class TestIfElse:
     def test_if_one_arg(self):
         inputs = [

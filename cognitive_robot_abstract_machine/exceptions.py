@@ -12,7 +12,7 @@ from typing_extensions import Tuple
 
 
 @dataclass
-class MissingOrmGeneratorError(DataclassException, FileNotFoundError):
+class MissingORMGeneratorError(DataclassException, FileNotFoundError):
     """
     Raised when the script that generates a package's ORM interface is not there.
     """
@@ -67,7 +67,7 @@ class OrmGenerationFailedError(DataclassException, RuntimeError):
 
 
 @dataclass
-class MissingOrmBuildChoiceError(DataclassException, ValueError):
+class MissingORMBuildChoiceError(DataclassException, ValueError):
     """
     Raised when a test run names the option that says when to build the ORM interfaces
     without saying which choice it means.
@@ -91,7 +91,7 @@ class MissingOrmBuildChoiceError(DataclassException, ValueError):
 
 
 @dataclass
-class UnknownOrmBuildChoiceError(DataclassException, ValueError):
+class UnknownORMBuildChoiceError(DataclassException, ValueError):
     """
     Raised when a test run says to build the ORM interfaces at a time that does not
     exist.

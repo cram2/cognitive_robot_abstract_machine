@@ -1,4 +1,5 @@
 from copy import deepcopy
+from dataclasses import dataclass, field
 
 from dataclasses import dataclass, field
 
@@ -28,7 +29,11 @@ from coraplex.robot_plans.actions.composite.facing import FaceAtAction
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.container import OpenAction, CloseAction
 from coraplex.robot_plans.actions.core.misc import DetectAction, MoveToReach
-from coraplex.robot_plans.actions.core.navigation import NavigateAction, LookAtAction
+from coraplex.robot_plans.actions.core.navigation import (
+    NavigateAction,
+    LookAtAction,
+    ElevatorNavigation,
+)
 from coraplex.robot_plans.actions.core.pick_up import (
     ReachAction,
     GraspingAction,
@@ -45,11 +50,17 @@ from coraplex.locations.base import Location, PoseGeneratorBackend, PoseValidato
 from coraplex.view_manager import ViewManager
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from rustworkx.rustworkx import NoEdgeBetweenNodes
+
+from probabilistic_model.bayesian_network.bayesian_network import Node
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
     StaticJointState,
 )
+from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from typing_extensions import Iterable, Iterator, List, Tuple, Generator
@@ -62,6 +73,13 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Milk,
+    Door,
+    Elevator,
+    FirstFloor,
+    Level,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
@@ -153,8 +171,13 @@ def setup_multi_robot_apartment(
     _tiago_world_setup,
     _pr2_world_setup,
     _apartment_world_setup,
+    multi_story_building,
 ):
     apartment_copy = deepcopy(_apartment_world_setup)
+    apartment_copy.merge_world_at_pose(
+        deepcopy(multi_story_building),
+        HomogeneousTransformationMatrix.from_xyz_rpy(0, -5, 0),
+    )
 
     if request.param == "hsrb":
         hsr_copy = deepcopy(_hsr_world_setup)
@@ -277,7 +300,7 @@ def test_move_torso_multi(immutable_multiple_robot_apartment):
 
 def test_navigate_multi(immutable_multiple_robot_apartment, rclpy_node):
     world, view, context = immutable_multiple_robot_apartment
-    target_position = [2, -2, 0]
+    target_position = [5, 2, 0]
 
     plan = execute_single(
         NavigateAction(
@@ -620,11 +643,13 @@ def test_detect(immutable_multiple_robot_apartment):
     with world.modify_world():
         world.add_semantic_annotation(Milk(root=milk_body))
 
+    # East of the multi-storey building the fixture merges in, so that the robot looks
+    # at the milk rather than at one of the building's room walls.
     robot.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1.5, -2, 0
+        5, -2, 0
     )
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2.5, -2, 1.2, reference_frame=world.root
+        6, -2, 1.2, reference_frame=world.root
     )
 
     description = DetectAction(
@@ -643,7 +668,7 @@ def test_detect(immutable_multiple_robot_apartment):
     assert milk_body in perceived.bodies
     np.testing.assert_allclose(
         milk_body.global_pose.to_position().to_np().flatten()[:3],
-        (2.5, -2, 1.2),
+        (6, -2, 1.2),
         atol=1e-9,
     )
 
@@ -846,9 +871,9 @@ def test_a_location_validates_a_candidate_where_navigating_to_it_would_stand(
     it never stands in.
     """
     world, robot, context = mutable_multiple_robot_apartment
-    # Somewhere every robot in the fixture fits, since a candidate in collision is
-    # dropped before any validator sees it.
-    heading = Pose.from_xyz_rpy(0.3, -2.4, 0, yaw=0.7, reference_frame=world.root)
+    # Clear of the multi-storey building's floor slab, which every robot would otherwise
+    # stand on: a candidate in collision is dropped before any validator sees it.
+    heading = Pose.from_xyz_rpy(5, -2.4, 0, yaw=0.7, reference_frame=world.root)
     recorder = BasePoseRecorder()
     location = Location(context, heading, SinglePoseGenerator(heading), [recorder])
 
@@ -858,3 +883,88 @@ def test_a_location_validates_a_candidate_where_navigating_to_it_would_stand(
         robot.mobile_base.pose_facing(heading).to_homogeneous_matrix().to_np(),
         atol=1e-9,
     )
+
+
+# %% riding an elevator
+
+
+@dataclass(eq=False)
+class ElevatorOperator(ModelChangeCallback):
+    """
+    Drives an elevator to a floor as soon as a robot boards it, standing in for whatever
+    operates the elevator in the real world.
+
+    Reacting to the model change that boards the robot rather than polling for it matters
+    here: the plan runs on simulated time that advances as fast as the machine allows, so
+    every control cycle spent waiting is taken from the same budget the motions afterwards
+    need.
+    """
+
+    elevator: Elevator = field(kw_only=True)
+    """
+    The elevator this operator drives.
+    """
+
+    floor: Level = field(kw_only=True)
+    """
+    The floor the elevator is sent to once the robot is aboard.
+    """
+
+    robot: AbstractRobot = field(kw_only=True)
+    """
+    The robot whose boarding sets the elevator off.
+    """
+
+    robot_boarded: bool = field(default=False, init=False)
+    """
+    Whether the robot was ever observed aboard the elevator.
+    """
+
+    def on_model_change(self, **kwargs):
+        if self.robot.root.parent_kinematic_structure_entity is not self.elevator.root:
+            return
+        self.robot_boarded = True
+        self.elevator.close()
+        self.elevator.drive_to_floor(self.floor)
+        self.elevator.open()
+
+
+def test_elevator_navigation(mutable_multiple_robot_apartment, rclpy_node):
+    world, robot, context = mutable_multiple_robot_apartment
+
+    elevator = world.get_semantic_annotations_by_type(Elevator)[0]
+    elevator.open()
+
+    first_floor = world.get_semantic_annotations_by_type(FirstFloor)[0]
+    starting_height = float(robot.root.global_pose.to_position().z)
+    elevator_travel = float(elevator.drive_position_for_floor(first_floor)) - float(
+        elevator.mechanical_joint.position
+    )
+
+    operator = ElevatorOperator(
+        _world=world, elevator=elevator, floor=first_floor, robot=robot
+    )
+    action = ElevatorNavigation(elevator, first_floor)
+    plan = execute_single(action, context=context)
+
+    robot.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        1, -5, 0, reference_frame=world.root
+    )
+
+    with simulated_robot:
+        plan.perform()
+
+    cabin_position = elevator.root.global_transform.to_position().to_np().flatten()
+
+    # The robot ends up in front of the elevator's opening, a floor higher.
+    distance_from_cabin_center = float(elevator.scale.x) / 2 + action.exit_clearance
+    expected_position = (
+        cabin_position[:3]
+        + elevator.hole_direction.to_np().flatten()[:3] * -1 * distance_from_cabin_center
+    )
+    expected_position[2] = starting_height + elevator_travel
+
+    assert operator.robot_boarded
+    assert robot.root.global_transform.to_position().to_np().flatten()[
+        :3
+    ] == pytest.approx(expected_position, abs=0.01)

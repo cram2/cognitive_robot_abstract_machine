@@ -1,23 +1,37 @@
 from __future__ import annotations
 
 import itertools
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import EnumType
 from functools import cached_property
 from types import UnionType, EllipsisType
 
 import numpy as np
-from typing_extensions import Any, Iterable, Optional, Union, get_args
-from krrood.parametrization.exceptions import EmptyVariableDomain, InvalidEllipsis
+from typing_extensions import (
+    Any,
+    Iterable,
+    Optional,
+    TYPE_CHECKING,
+    Type,
+    Union,
+    get_args,
+)
+from krrood.parametrization.exceptions import (
+    EmptyVariableDomain,
+    InvalidEllipsis,
+    JointQueryAcrossClassesNotSupported,
+)
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.operators.causal import (
     Cause,
     CausesEffect,
     Confounder,
 )
 from krrood.entity_query_language.core.variable import Literal, Variable
-from krrood.entity_query_language.factories import and_
+from krrood.entity_query_language.factories import and_, ConditionType
 from krrood.entity_query_language.operators.core_logical_operators import (
     AND,
     flatten_operands,
@@ -38,9 +52,68 @@ from random_events.variable import (
     most_appropriate_variable_type,
 )
 
+if TYPE_CHECKING:
+    from probabilistic_model.probabilistic_model import ProbabilisticModel
+
+
+class ModelQueryParameters(ABC):
+    """
+    Shared interface between EQL constructs and ``ProbabilisticModel``: whatever a
+    :class:`~krrood.parametrization.model_registries.ModelRegistry` needs to resolve a
+    model, regardless of which EQL construct is asking. Three constructs each build
+    their own parameters this way -- :class:`UnderspecifiedParameters` for a ``Match``
+    (``distribution_of(...)`` too, which wraps one), :class:`SelectedAttributesParameters`
+    for a bare attribute selection (``average(...)``), and :class:`ConditionParameters`
+    for a bare condition (``probability_of(...)``) -- so a registry can type against
+    this one interface instead of a union of the three.
+    """
+
+    @property
+    @abstractmethod
+    def variables(self) -> dict[str, random_events.variable.Variable]:
+        """
+        :return: A dictionary that maps variable names to the random events variables
+            this query references.
+        """
+
+    @property
+    @abstractmethod
+    def queried_class(self) -> Type:
+        """
+        :return: The single class this query's model must be resolved for.
+        :raises JointQueryAcrossClassesNotSupported: If the query references
+            attributes reached from more than one owner class.
+        """
+
+    @staticmethod
+    def _single_owner_class(attributes: Iterable[Attribute]) -> Type:
+        """
+        Shared ``queried_class`` implementation for the two subclasses
+        (:class:`SelectedAttributesParameters`, :class:`ConditionParameters`) that
+        resolve their class from a plain collection of attributes rather than a
+        ``Match``'s own selected variable.
+
+        :param attributes: The attributes a subclass's ``queried_class`` was given.
+        :return: The single class every attribute is reached from -- the class of each
+            attribute chain's root ``variable(...)``, not its immediate parent (so a
+            multi-hop chain like ``x.arm.battery`` resolves to ``x``'s class, matching
+            what every :class:`ModelRegistry
+            <krrood.parametrization.model_registries.ModelRegistry>` is keyed on, not
+            ``Arm``).
+        :raises JointQueryAcrossClassesNotSupported: If the attributes are reached from
+            more than one owner class -- every :class:`ModelRegistry
+            <krrood.parametrization.model_registries.ModelRegistry>` resolves a single
+            model per class, so a query joining several classes' models is not
+            supported.
+        """
+        owner_classes = {attribute._chain_root_._type_ for attribute in attributes}
+        if len(owner_classes) != 1:
+            raise JointQueryAcrossClassesNotSupported(owner_classes)
+        return owner_classes.pop()
+
 
 @dataclass
-class UnderspecifiedParameters:
+class UnderspecifiedParameters(ModelQueryParameters):
     """
     A class that extracts all necessary information from a
     {py:class}`~krrood.entity_query_language.query.match.Match` and binds it together.
@@ -173,6 +246,63 @@ class UnderspecifiedParameters:
             result.update(self._extract_variables_from_attribute_match(attribute_match))
 
         return result
+
+    @property
+    def queried_class(self) -> type:
+        """
+        :return: The class the match's selected variable is an instance of.
+        """
+        return self.statement._expression.selected_variable._type_
+
+    def resolve_conditioned_and_truncated_model(
+        self, model: ProbabilisticModel
+    ) -> Optional[ProbabilisticModel]:
+        """
+        Apply this match's literal-value conditions, then its where-conditions, then
+        its krrood-variable-assignment truncations, to ``model``, in that order -- the
+        same sequence
+        :class:`~krrood.entity_query_language.backends.ProbabilisticBackend` already
+        applies to a non-causal match before sampling from it.
+
+        :param model: The model to condition and truncate.
+        :return: The resulting model, or ``None`` if any step leaves no solution.
+        """
+        conditioned, _ = model.conditional(
+            self.conditioning_assignments_from_literal_values
+        )
+        if conditioned is None:
+            return None
+
+        if self.truncation_assignments_from_where_conditions:
+            truncated, _ = conditioned.truncated(
+                self.truncation_assignments_from_where_conditions
+            )
+        else:
+            truncated = conditioned
+        if truncated is None:
+            return None
+
+        return self.apply_krrood_variable_truncation(truncated)
+
+    def apply_krrood_variable_truncation(
+        self, model: ProbabilisticModel
+    ) -> Optional[ProbabilisticModel]:
+        """
+        Truncate ``model`` on this match's symbolic-variable-assignment constraints
+        (e.g. ``z=variable(int, domain=[1, 2, 3])``), if any.
+
+        :param model: The model to truncate.
+        :return: ``model`` unchanged if there are no such constraints, the truncated
+            model otherwise, or ``None`` if truncating leaves no solution.
+        """
+        if not self.truncation_assignments_from_krrood_variables:
+            return model
+        complete_event = self.truncation_assignments_from_krrood_variables[0]
+        complete_event.fill_missing_variables(self.variables.values())
+        for event in self.truncation_assignments_from_krrood_variables[1:]:
+            complete_event = complete_event.intersection_with(event)
+        truncated, _ = model.truncated(complete_event, singleton_allowed=True)
+        return truncated
 
     def _extract_variables_from_attribute_match(
         self, attribute_match: AttributeMatch
@@ -585,3 +715,90 @@ class UnderspecifiedParameters:
             return most_appropriate_variable_type(types)
         else:
             return type_
+
+
+@dataclass
+class SelectedAttributesParameters(ModelQueryParameters):
+    """
+    A class that extracts all necessary information from a bare selection of
+    attributes and binds it together.
+
+    This serves the same role as :class:`UnderspecifiedParameters` does for
+    :class:`~krrood.entity_query_language.query.match.Match` -- glue between
+    `ProbabilisticModel` and EQL -- but for constructs that select attributes directly
+    rather than a structural match, since there are no where conditions, literal
+    assignments or cause/confounder markers to extract. Used to resolve a bare
+    ``average(...)`` selection under
+    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`.
+    """
+
+    attributes: tuple[Attribute, ...]
+    """
+    The attributes to extract information from.
+    """
+
+    @cached_property
+    def queried_class(self) -> Type:
+        """
+        :return: The single class every selected attribute is reached from.
+        :raises JointQueryAcrossClassesNotSupported: If the selected attributes are
+            reached from more than one owner class.
+        """
+        return self._single_owner_class(self.attributes)
+
+    @cached_property
+    def variables(self) -> dict[str, random_events.variable.Variable]:
+        """
+        :return: A dictionary that maps variable names to random events variables for
+            the selected attributes.
+        """
+        return {
+            attribute._name_: variable_from_name_and_type(
+                attribute._name_, attribute._type_
+            )
+            for attribute in self.attributes
+        }
+
+
+@dataclass
+class ConditionParameters(ModelQueryParameters):
+    """
+    A class that extracts all necessary information from a condition expression given
+    to {py:class}`~krrood.entity_query_language.operators.probabilistic_queries.Probability`
+    (``probability_of(...)``) and binds it together, reusing the same
+    :class:`~krrood.parametrization.random_events_translator.WhereExpressionToRandomEventTranslator`
+    a ``Match``'s ``where`` conditions are already translated with.
+    """
+
+    condition: ConditionType
+    """
+    The condition to extract information from.
+    """
+
+    @cached_property
+    def _translator(self) -> WhereExpressionToRandomEventTranslator:
+        return WhereExpressionToRandomEventTranslator(self.condition)
+
+    @cached_property
+    def event(self) -> Event:
+        """
+        :return: The random event the condition translates to.
+        """
+        return self._translator.translate()
+
+    @cached_property
+    def variables(self) -> dict[str, random_events.variable.Variable]:
+        """
+        :return: A dictionary that maps variable names to random events variables that
+            appear in the condition.
+        """
+        return {v.name: v for v in self._translator.variables.values()}
+
+    @cached_property
+    def queried_class(self) -> Type:
+        """
+        :return: The single class every variable in the condition is reached from.
+        :raises JointQueryAcrossClassesNotSupported: If the condition constrains
+            attributes reached from more than one owner class.
+        """
+        return self._single_owner_class(self._translator.variables.keys())

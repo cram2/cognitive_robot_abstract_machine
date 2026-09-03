@@ -31,5 +31,14 @@ include = ["segmind*"]
 [tool.setuptools.dynamic]
 version = {attr = "segmind.__version__"}
 
+[dependency-groups]
+workspace = [
+    "coraplex",
+    "giskardpy",
+    "krrood",
+    "random_events",
+    "semantic_digital_twin",
+]
+
 [project.urls]
 Homepage = "https://github.com/cram2/cognitive_robot_abstract_machine"
