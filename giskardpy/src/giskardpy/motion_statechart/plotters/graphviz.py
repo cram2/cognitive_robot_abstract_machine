@@ -614,15 +614,34 @@ class MotionStatechartGraphviz:
 
         kwargs = self._edge_clusters_kwargs(graph, source_name, destination_name)
         style = OBSERVATION_DRAWING_STYLES[ObservationStateValues.UNKNOWN]
+        color = (
+            style.color.to_hex()
+            if self._is_dependency_active(dependency)
+            else DisabledConditionColor.to_hex()
+        )
 
         graph.add_edge(
             pydot.Edge(
                 src=source_name,
                 dst=destination_name,
-                color=style.color.to_hex(),
+                color=color,
                 penwidth=style.line_width,
                 minlen=dependency.minimum_rank_distance,
                 arrowsize=ArrowSize,
                 **kwargs,
             )
+        )
+
+    def _is_dependency_active(self, dependency: ConditionDependency) -> bool:
+        """
+        :param dependency: The dependency to check.
+        :return: Whether at least one of the conditions this dependency bundles can
+            currently trigger from its owner's life cycle state.
+        """
+        life_cycle_state = self.motion_statechart.life_cycle_state[
+            dependency.condition_owner
+        ]
+        return any(
+            condition.kind.can_trigger_from(life_cycle_state)
+            for condition in dependency.conditions
         )
