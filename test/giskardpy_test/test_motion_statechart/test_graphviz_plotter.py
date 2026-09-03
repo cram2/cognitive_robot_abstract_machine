@@ -14,10 +14,12 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
     SelfCollisionAvoidance,
 )
 from giskardpy.motion_statechart.graph_node import (
+    CancelMotion,
     EndMotion,
     Goal,
     GoalReachedVariable,
     MotionStatechartNode,
+    Task,
 )
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
@@ -29,6 +31,9 @@ from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphv
 from giskardpy.motion_statechart.plotters.styles import (
     MINIMUM_RANK_DISTANCES,
     OBSERVATION_DRAWING_STYLES,
+    LineWidth,
+    TaskShape,
+    TaskStyle,
 )
 
 # %% helpers
@@ -104,13 +109,20 @@ def find_cluster_of(
     return None
 
 
-def find_node(graph: pydot.Graph, node: MotionStatechartNode) -> pydot.Node:
+def find_node(
+    graph: Union[pydot.Graph, pydot.Cluster], node: MotionStatechartNode
+) -> pydot.Node:
     """
     :return: The pydot node drawn for `node`.
     """
     for candidate in graph.get_nodes():
         if candidate.get_name().strip('"') == node.unique_name:
             return candidate
+    for subgraph in graph.get_subgraphs():
+        try:
+            return find_node(subgraph, node)
+        except AssertionError:
+            continue
     raise AssertionError(f"{node.unique_name} was not drawn in {graph.get_name()}")
 
 
@@ -239,7 +251,7 @@ def test_expanded_goal_reports_no_hidden_node_count():
 
 def test_collision_avoidance_goals_collapse_their_children():
     assert ExternalCollisionAvoidance().plot_specifications.collapse_children
-    assert SelfCollisionAvoidance().plot_specs.collapse_children
+    assert SelfCollisionAvoidance().plot_specifications.collapse_children
 
 
 # %% structure copies
@@ -486,3 +498,65 @@ def test_condition_term_and_the_arrow_it_feeds_can_differ():
         edge.get("color")
         == OBSERVATION_DRAWING_STYLES[ObservationStateValues.TRUE].color.to_hex()
     )
+
+
+# %% extra border styles for terminal nodes
+
+
+def test_terminal_nodes_and_tasks_have_correct_plot_specifications():
+    assert EndMotion().plot_specifications.extra_border_styles == ["rounded"]
+    assert CancelMotion(
+        exception=Exception()
+    ).plot_specifications.extra_border_styles == ["dashed, rounded"]
+    assert Task().plot_specifications.style == TaskStyle
+    assert Task().plot_specifications.shape == TaskShape
+
+
+def test_end_motion_renders_with_rounded_outer_cluster():
+    end = EndMotion()
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(end)
+    expand(motion_statechart)
+
+    graph = draw(motion_statechart)
+    cluster = find_cluster_of(graph, end)
+    assert cluster is not None
+    assert cluster.get("style").strip('"') == "rounded"
+    assert cluster.get("color").strip('"') == "black"
+    assert float(cluster.get("penwidth")) == LineWidth
+    assert end.unique_name in direct_node_names(cluster)
+    assert end.unique_name not in direct_node_names(graph)
+
+
+def test_cancel_motion_renders_with_dashed_outer_cluster():
+    cancel = CancelMotion(exception=Exception("fail"))
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(cancel)
+    expand(motion_statechart)
+
+    graph = draw(motion_statechart)
+    cluster = find_cluster_of(graph, cancel)
+    assert cluster is not None
+    assert cluster.get("style").strip('"') == "dashed, rounded"
+    assert cluster.get("color").strip('"') == "black"
+    assert float(cluster.get("penwidth")) == LineWidth
+    assert cancel.unique_name in direct_node_names(cluster)
+    assert cancel.unique_name not in direct_node_names(graph)
+
+
+def test_edge_targeting_terminal_node_clips_to_outer_cluster():
+    observed = ConstTrueNode(name="Observed")
+    end = EndMotion()
+    cancel = CancelMotion(exception=Exception("fail"))
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_nodes([observed, end, cancel])
+    end.start_condition = observed.goal_reached
+    cancel.start_condition = observed.goal_reached
+    expand(motion_statechart)
+
+    graph = draw(motion_statechart)
+    end_edge = find_edge(graph, observed, end)
+    cancel_edge = find_edge(graph, observed, cancel)
+
+    assert end_edge.get("lhead").strip('"') == f"cluster_{end.unique_name}"
+    assert cancel_edge.get("lhead").strip('"') == f"cluster_{cancel.unique_name}"

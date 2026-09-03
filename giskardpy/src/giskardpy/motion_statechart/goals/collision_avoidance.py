@@ -266,6 +266,7 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
     """
     The list of external collision avoidance tasks to check for collisions.
     """
+
     exception: Exception = field(init=False, default=Exception)
     """
     Set to init=False, because this class creates its own exception.
@@ -383,10 +384,12 @@ class ExternalCollisionAvoidance(Goal):
     close.
 
     ..note:: This goal expands into one node pair per collision group, so its children are
-        left out of drawings. Set `plot_specs.collapse_children` to False to draw them.
+        left out of drawings. Set `plot_specifications.collapse_children` to False to draw them.
     """
 
-    plot_specifications: NodePlotSpec = plot_specification_field(NodePlotSpec.create_collapsed_goal_style)
+    plot_specifications: NodePlotSpec = plot_specification_field(
+        NodePlotSpec.create_collapsed_goal_style
+    )
 
     robot: AbstractRobot = field(kw_only=True, default=None)
     """
@@ -653,6 +656,7 @@ class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
     """
     The list of self collision avoidance tasks to check for collisions.
     """
+
     exception: Exception = field(init=False, default=Exception)
     """
     Set to init=False, because this class creates its own exception.
@@ -699,11 +703,13 @@ class SelfCollisionAvoidance(Goal):
     active if the monitor detects that a collision is close.
 
     ..note:: This goal expands into one node pair per checked body combination, so its
-        children are left out of drawings. Set `plot_specs.collapse_children` to False to
+        children are left out of drawings. Set `plot_specifications.collapse_children` to False to
         draw them.
     """
 
-    plot_specs: NodePlotSpec = plot_specification_field(NodePlotSpec.create_collapsed_goal_style)
+    plot_specifications: NodePlotSpec = plot_specification_field(
+        NodePlotSpec.create_collapsed_goal_style
+    )
 
     robot: AbstractRobot = field(kw_only=True, default=None)
     """

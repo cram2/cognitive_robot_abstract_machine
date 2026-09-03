@@ -1511,7 +1511,9 @@ class Task(MotionStatechartNode):
     )
     """Task priority relative to other tasks."""
 
-    plot_specs: NodePlotSpec = plot_specification_field(NodePlotSpec.create_task_style)
+    plot_specifications: NodePlotSpec = plot_specification_field(
+        NodePlotSpec.create_task_style
+    )
 
 
 @dataclass(eq=False, repr=False)
@@ -1744,7 +1746,9 @@ class TerminalNode(ABC, MotionStatechartNode):
 @dataclass(eq=False, repr=False)
 class EndMotion(TerminalNode):
 
-    plot_specs: NodePlotSpec = plot_specification_field(NodePlotSpec.create_end_style)
+    plot_specifications: NodePlotSpec = plot_specification_field(
+        NodePlotSpec.create_end_style
+    )
 
     joint_convergence_threshold: float = field(default=0.01, kw_only=True)
     """
@@ -1870,7 +1874,7 @@ class CancelMotion(TerminalNode):
         default_factory=Scalar.const_true, init=False
     )
 
-    plot_specs: NodePlotSpec = plot_specification_field(
+    plot_specifications: NodePlotSpec = plot_specification_field(
         NodePlotSpec.create_cancel_style
     )
 
