@@ -358,22 +358,6 @@ def test_every_observation_state_has_a_drawing_style(observation_state):
 
 # %% arrows carry the observation of the node they leave
 
-
-def test_arrow_takes_the_observation_color_of_the_node_it_leaves():
-    observed = ConstTrueNode(name="Observed")
-    owner = ConstTrueNode(name="Owner")
-    motion_statechart = build_dependency_statechart(observed, owner)
-    owner.start_condition = observed.goal_reached
-    expand(motion_statechart)
-    motion_statechart.observation_state[observed] = ObservationStateValues.FALSE
-    motion_statechart.observation_state[owner] = ObservationStateValues.TRUE
-
-    edge = find_edge(draw(motion_statechart), observed, owner)
-
-    expected = OBSERVATION_DRAWING_STYLES[ObservationStateValues.FALSE]
-    assert edge.get("color") == expected.color.to_hex()
-
-
 def test_unknown_arrow_is_thinner_than_a_decided_arrow():
     unknown = OBSERVATION_DRAWING_STYLES[ObservationStateValues.UNKNOWN]
 
@@ -467,38 +451,46 @@ def test_condition_term_is_colored_when_its_node_name_reads_as_an_operator():
 
 def test_condition_without_terms_is_spelled_out():
     """
-    A constant condition has nothing to color, and still has to render.
+    A constant condition colors True green and False red when active, and grays them out
+    when inactive.
     """
     owner = ConstTrueNode(name="Owner")
     motion_statechart = MotionStatechart()
     motion_statechart.add_node(owner)
     expand(motion_statechart)
 
+    true_color = OBSERVATION_DRAWING_STYLES[ObservationStateValues.TRUE].color.to_hex()
+    disabled_color = DisabledConditionColor.to_hex()
+
     label = find_node(draw(motion_statechart), owner).get_label()
 
-    assert "start:True" in label
-    assert "pause:False" in label
-
-
-def test_condition_term_and_the_arrow_it_feeds_can_differ():
-    """
-    The same statechart as above seen from the arrow: it reports what the node observes,
-    while the term reports what the condition gets to read.
-    """
-    observed = ConstTrueNode(name="Observed")
-    owner = ConstTrueNode(name="Owner")
-    motion_statechart = build_dependency_statechart(observed, owner)
-    owner.start_condition = observed.is_succeeded
-    expand(motion_statechart)
-    motion_statechart.observation_state[observed] = ObservationStateValues.TRUE
-    motion_statechart.life_cycle_state[observed] = LifeCycleValues.RUNNING
-
-    edge = find_edge(draw(motion_statechart), observed, owner)
-
+    assert f'start:<FONT COLOR="{true_color}">True</FONT>' in label
     assert (
-        edge.get("color")
-        == OBSERVATION_DRAWING_STYLES[ObservationStateValues.TRUE].color.to_hex()
+        f'<FONT FACE="monospace" COLOR="{disabled_color}">pause:False</FONT>' in label
     )
+
+
+def test_condition_boolean_constants_coloring_in_running_state():
+    """
+    In RUNNING state, pause:False is active and rendered with False colored red, while
+    start:True is inactive and rendered grayed out.
+    """
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(owner)
+    expand(motion_statechart)
+    motion_statechart.life_cycle_state[owner] = LifeCycleValues.RUNNING
+
+    false_color = OBSERVATION_DRAWING_STYLES[
+        ObservationStateValues.FALSE
+    ].color.to_hex()
+    disabled_color = DisabledConditionColor.to_hex()
+
+    label = find_node(draw(motion_statechart), owner).get_label()
+
+    assert f'<FONT FACE="monospace" COLOR="{disabled_color}">start:True</FONT>' in label
+    assert f'pause:<FONT COLOR="{false_color}">False</FONT>' in label
+
 
 
 # %% extra border styles for terminal nodes

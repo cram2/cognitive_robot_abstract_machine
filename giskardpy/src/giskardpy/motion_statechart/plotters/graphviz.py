@@ -77,19 +77,29 @@ class ConditionDependency:
         )
 
 
-def format_condition_text(text: str) -> str:
+def format_condition_text(text: str, color_constants: bool = False) -> str:
     """
     Rewrites the part of a condition that is not a term for display in an HTML label.
 
     Logical operators start a new line and trinary constants are spelled out.
 
     :param text: The text to rewrite.
+    :param color_constants: Whether boolean constants should be colored with their observation color.
     :return: The text with graphviz line breaks and readable constants.
     """
     text = text.replace(" and ", "<BR/>       and ")
     text = text.replace(" or ", "<BR/>       or ")
     text = text.replace("1.0", "True")
     text = text.replace("0.0", "False")
+    if color_constants:
+        true_color = OBSERVATION_DRAWING_STYLES[
+            ObservationStateValues.TRUE
+        ].color.to_hex()
+        false_color = OBSERVATION_DRAWING_STYLES[
+            ObservationStateValues.FALSE
+        ].color.to_hex()
+        text = re.sub(r"\bTrue\b", f'<FONT COLOR="{true_color}">True</FONT>', text)
+        text = re.sub(r"\bFalse\b", f'<FONT COLOR="{false_color}">False</FONT>', text)
     return text
 
 
@@ -299,19 +309,19 @@ class MotionStatechartGraphviz:
         """
         text = str(condition)
         if grayed_out:
-            return format_condition_text(text)
+            return format_condition_text(text, color_constants=False)
         values_by_term = {
             f'"{variable.display_name}"': variable.resolve()
             for variable in condition.variables
         }
         if not values_by_term:
-            return format_condition_text(text)
+            return format_condition_text(text, color_constants=True)
         terms = re.compile(f"({'|'.join(re.escape(term) for term in values_by_term)})")
         return "".join(
             (
                 self._color_term(part, values_by_term[part])
                 if part in values_by_term
-                else format_condition_text(part)
+                else format_condition_text(part, color_constants=True)
             )
             for part in terms.split(text)
         )
@@ -603,8 +613,7 @@ class MotionStatechartGraphviz:
         destination_name = str(dependency.condition_owner.unique_name)
 
         kwargs = self._edge_clusters_kwargs(graph, source_name, destination_name)
-        observation = self.motion_statechart.observation_state[dependency.observed_node]
-        style = OBSERVATION_DRAWING_STYLES[observation]
+        style = OBSERVATION_DRAWING_STYLES[ObservationStateValues.UNKNOWN]
 
         graph.add_edge(
             pydot.Edge(
