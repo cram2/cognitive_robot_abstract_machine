@@ -4,7 +4,9 @@ from coraplex.plans.executables import (
     MoveBranchExecutable,
 )
 from coraplex.plans.plan_node import ExecutionBoundaryNode
-from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 
 
 @dataclass
@@ -36,5 +38,5 @@ class ReAttachNode(ExecutionBoundaryNode):
 
     def parse(self) -> MoveBranchExecutable:
         return MoveBranchExecutable(
-            context=self.plan.context, body=self.body, new_parent=self.new_parent
+            context=self.context, body=self.body, new_parent=self.new_parent
         )

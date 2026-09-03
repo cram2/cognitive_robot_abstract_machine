@@ -1,3 +1,4 @@
+import sys
 import unittest
 from enum import IntEnum
 
@@ -172,6 +173,31 @@ class SymbolicDistributionTestCase(unittest.TestCase):
 
         prob = self.model.probability(event)
         self.assertEqual(prob, 1)
+
+    def test_likelihood_survives_a_category_whose_hash_exceeds_the_modulus(self):
+        """A category still scores its true probability when its Python `hash()`
+        falls outside `sys.hash_info.modulus`.
+
+        `probabilities` is keyed by `hash(category)`; `log_likelihood` used to hash
+        that already-hashed key a second time. `int.__hash__` reduces any value
+        outside the modulus, so for such a category the second hash silently produced
+        a different key than the one stored, and the category's likelihood came back
+        -inf instead of its true probability.
+        """
+        modulus = sys.hash_info.modulus
+        category = next(
+            candidate
+            for candidate in (f"category_{index}" for index in range(1000))
+            if abs(hash(candidate)) >= modulus
+        )
+        x = Symbolic("category", domain=Set.from_iterable([category, "other"]))
+        probabilities = MissingDict(float, {hash(category): 1.0})
+        model = SymbolicDistribution(variable=x, probabilities=probabilities)
+
+        log_likelihood = model.log_likelihood(np.array([category]).reshape(-1, 1))
+
+        self.assertTrue(np.isfinite(log_likelihood[0]))
+        self.assertAlmostEqual(log_likelihood[0], 0.0)
 
 
 class DiracDeltaDistributionTestCase(unittest.TestCase):

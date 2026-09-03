@@ -18,6 +18,7 @@ from krrood.entity_query_language.testing.result_generation import (
     regenerate_verbalization_results,
 )
 from krrood.ormatic.data_access_objects.alternative_mappings import *  # type: ignore
+from krrood.ormatic.helper import OrmaticInterfaceInformation
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module, create_engine
@@ -99,8 +100,10 @@ def generate_sqlalchemy_interface():
 
     instance = ORMatic(
         class_dependency_graph=class_diagram,
-        type_mappings=TypeDict({KRROODPhysicalObject: ConceptType}),
-        alternative_mappings=recursive_subclasses(AlternativeMapping),
+        interface_information=OrmaticInterfaceInformation(
+            type_mappings=TypeDict({KRROODPhysicalObject: ConceptType}),
+            alternative_mappings=recursive_subclasses(AlternativeMapping),
+        ),
     )
 
     instance.make_all_tables()

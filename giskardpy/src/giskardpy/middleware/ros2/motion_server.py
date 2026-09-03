@@ -121,11 +121,21 @@ class MotionServer:
     def live(self) -> None:
         """
         Run the idle loop until ROS shuts down.
+
+        A KeyboardInterrupt is raised when the process is asked to shut down (see
+        :class:`~giskardpy.middleware.ros2.graceful_shutdown.GracefulShutdownSignals`),
+        whether that happens while idle or while a goal is running. Either way the robot
+        is stopped before the interrupt is allowed to propagate further.
         """
         rospy.node.get_logger().info("giskard is ready")
-        while rclpy.ok():
-            self.run_idle_cycle()
-            self.idle_pacer.sleep()
+        try:
+            while rclpy.ok():
+                self.run_idle_cycle()
+                self.idle_pacer.sleep()
+        except KeyboardInterrupt:
+            rospy.node.get_logger().info("Interrupted, stopping the robot.")
+            self.control_loop.stop()
+            raise
 
     def run_idle_cycle(self) -> None:
         """

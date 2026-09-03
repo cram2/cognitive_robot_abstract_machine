@@ -44,13 +44,14 @@ from coraplex.plans.failures import (
     PlanFailure,
     RepetitionsExhausted,
 )
+from coraplex.plans.motion_state_chart_building import BuildsMotionStateChart
 from coraplex.plans.plan_node import PlanNode
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(eq=False)
-class LanguageNode(PlanNode, ABC):
+class LanguageNode(PlanNode, BuildsMotionStateChart, ABC):
     """
     Base class for language nodes in a plan.
 

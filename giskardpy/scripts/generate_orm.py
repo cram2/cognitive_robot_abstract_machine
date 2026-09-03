@@ -27,7 +27,10 @@ type_mappings = {np.ndarray: NumpyType}
 
 
 ormatic = ORMatic.from_package(
-    [giskardpy], dependencies, ignored_classes, type_mappings
+    [giskardpy],
+    dependencies,
+    ignored_classes,
+    type_mappings,
 )
 logging.getLogger("krrood").setLevel(logging.DEBUG)
 

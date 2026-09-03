@@ -17,6 +17,7 @@ from typing_extensions import (
     Optional,
     Tuple,
     Type,
+    TYPE_CHECKING,
     TypeVar,
     overload,
 )
@@ -91,6 +92,12 @@ from krrood.entity_query_language.rules.conclusion_selector import (
 from krrood.entity_query_language.utils import is_iterable
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
+if TYPE_CHECKING:
+    from krrood.entity_query_language.operators.probabilistic_queries import (
+        Distribution,
+        Probability,
+    )
+
 ConditionType = Union[SymbolicExpression, bool, Predicate, TruthValueOperator]
 """
 The possible types for conditions.
@@ -117,6 +124,62 @@ def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
     :return: Set descriptor.
     """
     return SetOf(_selected_variables_=selected_variables)
+
+
+def distribution_of(
+    match: Match, *, marginalize_for: Tuple[Attribute, ...] = ()
+) -> Distribution:
+    """
+    Request the distribution a match's conditions describe -- the probabilistic
+    interpretation of :py:func:`a`/:py:func:`an`/:py:func:`the`. Literal-valued kwargs
+    condition the circuit (``arm=0.3``), ``.where(...)`` conditions truncate it, and
+    underspecified (``...``) fields are the joint's free variables, e.g.
+    ``distribution_of(a(Pick)(arm=0.3, outcome=...))``.
+
+    Unlike :py:func:`set_of`/:py:func:`entity`, this never resolves to rows: it must be
+    evaluated with a
+    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, which returns
+    the resolved
+    :class:`~probabilistic_model.probabilistic_model.ProbabilisticModel` instead of
+    sampling instances from it.
+
+    :param match: The match whose conditions describe the distribution.
+    :param marginalize_for: Optionally, a subset of the match's free variables to
+        narrow the result to (further marginalization), e.g. ``distribution_of(match,
+        marginalize_for=(match.variable.outcome,))``. Without it, every one of the
+        match's free variables is kept.
+    :return: Distribution descriptor.
+    """
+    # Local import: avoids a circular import through operators/probabilistic_queries.py.
+    from krrood.entity_query_language.operators.probabilistic_queries import (
+        Distribution,
+    )
+
+    return Distribution(match=match, marginalize_for=marginalize_for)
+
+
+def probability_of(condition: ConditionType) -> Probability:
+    """
+    Request the probability of a condition, e.g. ``probability_of(x.A > 5)`` for
+    ``x = variable(MyClass)``. The condition may be any expression a ``.where(...)``
+    condition already accepts.
+
+    Like :py:func:`distribution_of`, this never resolves to rows: it must be evaluated
+    with a
+    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, which returns
+    the resolved probability as a plain ``float``.
+
+    For the expectation of an attribute, use the existing :py:func:`average` aggregator
+    instead -- {py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend`
+    already recognizes a bare ``average(...)`` selection and answers it in closed form.
+
+    :param condition: The condition to compute the probability of.
+    :return: Probability descriptor.
+    """
+    # Local import: avoids a circular import through operators/probabilistic_queries.py.
+    from krrood.entity_query_language.operators.probabilistic_queries import Probability
+
+    return Probability(condition=condition)
 
 
 # %% Variable Declaration
@@ -736,13 +799,19 @@ def average(
     distinct: bool = False,
 ) -> Union[T, Average]:
     """
-    Computes the sum of values produced by the given variable.
+    Computes the average of values produced by the given variable.
 
-    :param variable: The variable for which the sum is calculated.
+    Evaluated bare (``average(x.A).first(backend=...)``, with no enclosing
+    ``set_of``/``grouped_by``) against a
+    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, this resolves
+    in closed form via ``ProbabilisticModel.moment`` instead of sampling and averaging
+    rows -- the same declarative call reads correctly under either backend.
+
+    :param variable: The variable for which the average is calculated.
     :param key: A function that extracts a comparison key from each variable value.
     :param default: The value returned when the iterable is empty.
     :param distinct: Whether to only consider distinct values.
-    :return: A Sum object that can be evaluated to find the sum of values.
+    :return: An Average object that can be evaluated to find the average of values.
     """
     return Average(
         variable, _key_function_=key, _default_value_=default, _distinct_=distinct

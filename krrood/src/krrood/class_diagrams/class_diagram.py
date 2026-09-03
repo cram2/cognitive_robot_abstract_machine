@@ -443,7 +443,8 @@ class ClassDiagram:
             if is_dataclass(get_origin(clazz)):
                 generics.append(clazz)
                 clazz = get_origin(clazz)
-            self.add_node(WrappedClass(clazz=clazz))
+            # pass the bare class so add_node() dedupes it against classes/generics
+            self.add_node(clazz)
         self._create_nodes_for_specialized_generic_type_hints(generics)
         self._create_all_relations()
 

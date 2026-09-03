@@ -310,7 +310,7 @@ class DiscreteDistribution(UnivariateDistribution):
         events = np.array([hash(e) for e in events])
         result = np.full(len(events), -np.inf)
         for x, p in self.probabilities.items():
-            result[events == hash(x)] = np.log(p)
+            result[events == x] = np.log(p)
         return result
 
     def fit(self, data: npt.NDArray) -> Self:

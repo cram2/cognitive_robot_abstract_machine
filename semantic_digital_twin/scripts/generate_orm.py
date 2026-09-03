@@ -48,6 +48,7 @@ ignore_classes = {
 }
 
 
+
 def generate_orm():
     """
     Generate the ORM classes for the coraplex package.

@@ -13,6 +13,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import configure_mappers, sessionmaker
 
@@ -27,41 +28,41 @@ from ..dataset.tuple_collection_classes import (
 )
 
 
-def _generate_interface(tmp_path):
+@pytest.fixture(scope="module")
+def module(tmp_path_factory):
     """
     Generate and import an ORMatic SQLAlchemy interface for the tuple-collection
-    classes.
+    classes, once, so the two tests below don't redeclare the same classes into the
+    shared registry twice.
     """
     class_diagram = ClassDiagram([TupleCollectionOwner, TupleCollectionMember])
     instance = ORMatic(class_diagram)
     instance.make_all_tables()
 
-    interface_file = tmp_path / "tuple_collection_interface.py"
+    interface_file = tmp_path_factory.mktemp("tuple_collection") / "tuple_collection_interface.py"
     with open(interface_file, "w") as f:
         instance.to_sqlalchemy_file(f)
 
     spec = importlib.util.spec_from_file_location(
         "tuple_collection_interface", interface_file
     )
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    generated_module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = generated_module
+    spec.loader.exec_module(generated_module)
+    return generated_module
 
 
-def test_ormatic_configures_a_tuple_valued_many_to_many_relationship(tmp_path):
+def test_ormatic_configures_a_tuple_valued_many_to_many_relationship(module):
     """
     Configuring the mappers of a ``tuple[X, ...]``-valued relationship must not raise,
     since SQLAlchemy cannot instrument ``tuple`` itself as a collection class.
     """
-    module = _generate_interface(tmp_path)
     get_classes_of_ormatic_interface(module)
 
     configure_mappers()
 
 
-def test_ormatic_round_trips_a_tuple_valued_many_to_many_relationship(tmp_path):
-    module = _generate_interface(tmp_path)
+def test_ormatic_round_trips_a_tuple_valued_many_to_many_relationship(module):
     get_classes_of_ormatic_interface(module)
     configure_mappers()
 

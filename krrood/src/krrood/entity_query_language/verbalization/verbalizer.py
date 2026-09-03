@@ -59,10 +59,10 @@ class EQLVerbalizer:
         """
         # A match is not a foldable EQL node but a builder; it routes to its own assembler and
         # everything inside it (selection, values, conditions) is scanned/folded through its
-        # resolved query expression.
-        scan_target = (
-            expression.expression if isinstance(expression, Match) else expression
-        )
+        # resolved query expression. Match/Distribution/Probability all implement
+        # HasExpression, so the referring-expression scan can ask any of them for the
+        # SymbolicExpression they actually wrap without an isinstance chain here.
+        scan_target = expression._get_expression_()
         if services is None:
             services = MicroplanningServices.from_expression(scan_target)
         if performative is not None:

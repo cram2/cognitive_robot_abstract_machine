@@ -19,7 +19,6 @@ import pandas as pd
 from sortedcontainers import SortedSet
 from typing_extensions import TYPE_CHECKING, Any, Optional, Type
 
-from krrood.entity_query_language.query.match import AbstractMatchExpression
 from krrood.ormatic.data_access_objects.dao import (
     DataAccessObject,
     DataAccessObjectSchema,
@@ -42,7 +41,9 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
 from probabilistic_model.probabilistic_circuit.relational.helper import (
     find_lowest_product_nodes_that_model_variables,
 )
-from krrood.utils import get_class_and_attribute_name
+from probabilistic_model.probabilistic_circuit.relational.template import (
+    RelationalDistributionTemplate,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
@@ -68,44 +69,14 @@ def _is_concrete_statistic(variable: Variable, value: Any) -> bool:
     return len(composite.simple_sets) == 1
 
 
-def _rename_variables_with_part_prefix(
-    circuit: ProbabilisticCircuit,
-    prefix: str,
-    excluded_variables: list[Variable],
-) -> None:
-    """
-    Rename each variable in the circuit to include ``prefix`` as a namespace.
-
-    Produces names of the form ``"{prefix}.{variable.name}"``. Variables listed in
-    ``excluded_variables`` are left unchanged.
-
-    :param circuit: The circuit whose variables are renamed in-place.
-    :param prefix: String prefix to prepend to every variable name.
-    :param excluded_variables: Variables that should keep their current names.
-    """
-    variable_renames = {
-        variable: type(variable)(
-            get_class_and_attribute_name(prefix, variable.name), domain=variable.domain
-        )
-        for variable in circuit.variables
-        if variable not in excluded_variables
-    }
-    circuit.update_variables(variable_renames)
-
-
 @dataclass
-class ExchangeableDistributionTemplate:
+class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
     """
     A fitted distribution template for one exchangeable (many-to-many) relation.
 
     Wraps a ``RelationalProbabilisticCircuit`` that was trained on the child objects of
     the relation together with the parent's aggregation statistics as latent context
     variables.
-    """
-
-    template_distribution: RelationalProbabilisticCircuit
-    """
-    The fitted ``RelationalProbabilisticCircuit`` representing the child distribution.
     """
 
     latent_variables: list[Variable] = field(default_factory=list)
@@ -115,7 +86,7 @@ class ExchangeableDistributionTemplate:
     """
 
     def _ground_part_circuit(
-        self, part, aggregation_statistics: dict[Variable, Any], index: int = 0
+        self, part: Match, aggregation_statistics: dict[Variable, Any], index: int = 0
     ) -> ProbabilisticCircuit:
         """
         Ground and prepare the circuit for a single exchangeable part.
@@ -124,7 +95,7 @@ class ExchangeableDistributionTemplate:
         the latent variables, renames surviving variables with the part's prefix, and
         reindexes the graph for safe mounting.
 
-        :param part: The query part (a ``Match`` or a concrete domain object).
+        :param part: The query part being grounded.
         :param aggregation_statistics: Observed aggregation values to condition on.
         :param index: Position of this part in its parent list; used as fallback prefix
             when ``part`` does not carry a symbolic variable.
@@ -142,18 +113,14 @@ class ExchangeableDistributionTemplate:
             if variable not in self.latent_variables
         ]
         part_circuit.marginal_in_place(non_latent_variables)
-        prefix = (
-            str(part.variable)
-            if isinstance(part, AbstractMatchExpression)
-            else str(index)
-        )
-        _rename_variables_with_part_prefix(part_circuit, prefix, self.latent_variables)
+        prefix = self._prefix_for_part(part, index)
+        part_circuit.rename_variables_with_prefix(prefix, self.latent_variables)
         if len(part_circuit.nodes()) == 0:
             raise ValueError("The grounding of the part failed.")
         return part_circuit
 
     def ground(
-        self, parts_to_ground: list, aggregation_statistics: dict[Variable, Any]
+        self, parts_to_ground: list[Match], aggregation_statistics: dict[Variable, Any]
     ) -> ProbabilisticCircuit:
         """
         Build a product circuit by grounding each exchangeable part independently.
@@ -169,9 +136,7 @@ class ExchangeableDistributionTemplate:
             part_circuit = self._ground_part_circuit(
                 part, aggregation_statistics, index
             )
-            part_root_index = part_circuit.root.index
-            node_index_map = result.mount(part_circuit.root)
-            root.add_subcircuit(node_index_map[part_root_index])
+            root.add_subcircuit(self._mount_part(result, part_circuit))
         return result
 
 

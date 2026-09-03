@@ -35,6 +35,9 @@ if TYPE_CHECKING:
         AbstractMatchExpression,
         AttributeMatch,
     )
+    from krrood.entity_query_language.operators.probabilistic_queries import (
+        ProbabilisticQuery,
+    )
 
 
 @dataclass
@@ -962,6 +965,38 @@ class BackendCannotEvaluateCause(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Evaluate with a ProbabilisticBackend backed by a CausalCircuit-aware model registry."
+
+
+@dataclass
+class BackendCannotEvaluateProbabilisticQuery(DataclassException):
+    """
+    Raised when a
+    :class:`~krrood.entity_query_language.operators.probabilistic_queries.ProbabilisticQuery`
+    is evaluated with any backend other than
+    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`.
+
+    Querying a probabilistic model directly is a probabilistic operation, not a data
+    selection, so most of these have no native/SQL evaluation strategy at all --
+    unlike every other query construct in this package. The one exception is
+    :class:`~krrood.entity_query_language.operators.probabilistic_queries.Probability`
+    (``probability_of(...)``), which *does* evaluate natively (counting matching rows
+    over an enumerable domain) and never raises this; ``distribution_of(...)`` still
+    does, unconditionally.
+    """
+
+    expression: ProbabilisticQuery
+    """
+    The probabilistic query that was evaluated.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.expression} cannot be evaluated natively: querying a probabilistic "
+            f"model directly is a probabilistic operation, not a data selection."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Evaluate with a ProbabilisticBackend backed by a model registry, e.g. .evaluate(backend=ProbabilisticBackend(...))."
 
 
 @dataclass
