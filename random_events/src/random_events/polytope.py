@@ -1,4 +1,6 @@
+import itertools
 from collections import deque
+from typing import Optional
 
 import numpy as np
 import polytope
@@ -104,6 +106,36 @@ class Polytope(polytope.Polytope):
         lower, upper = self.bounding_box
         return self.from_box([(a[0], b[0]) for a, b in zip(lower, upper)])
 
+    def is_box(
+        self,
+        lower: Optional[np.ndarray] = None,
+        upper: Optional[np.ndarray] = None,
+        tolerance: float = 1e-7,
+    ) -> bool:
+        """
+        Check whether this polytope is exactly its own axis-aligned bounding box.
+
+        The bounding box always contains the polytope, so it is a subset of the
+        polytope too (making the two equal) exactly when every one of the box's
+        2**n_dimensions corners already satisfies this polytope's inequalities. This
+        answers the same question as ``self.as_box_polytope() <= self``, but with a
+        single matrix multiplication instead of polytope's LP-based set-difference
+        machinery, which dominates the runtime of `outer_box_approximation`.
+
+        :param lower: The lower bounds of the bounding box. Computed from
+            `self.bounding_box` if not given.
+        :param upper: The upper bounds of the bounding box. Computed from
+            `self.bounding_box` if not given.
+        :param tolerance: The numerical tolerance for the inequality check.
+        :return: Whether this polytope equals its own bounding box.
+        """
+        if lower is None or upper is None:
+            lower, upper = self.bounding_box
+        corners = np.array(
+            list(itertools.product(*zip(lower.flatten(), upper.flatten())))
+        )
+        return bool(np.all(self.A @ corners.T <= self.b[:, None] + tolerance))
+
     def copy(self):
         return self.from_polytope(self.__copy__())
 
@@ -145,19 +177,15 @@ class Polytope(polytope.Polytope):
 
         while polytopes_to_split:
             current_polytope = polytopes_to_split.popleft()
-            bounding_box_of_current_polytope = current_polytope.as_box_polytope()
+            lower, upper = current_polytope.bounding_box
+            volume = np.prod(upper - lower)
 
-            # if the box is too small, skip
-            volume = bounding_box_of_current_polytope.volume
-            if (
-                volume < minimum_volume
-                or bounding_box_of_current_polytope <= current_polytope
-            ):
+            # if the box is too small, or the polytope is already box-shaped, skip
+            if volume < minimum_volume or current_polytope.is_box(lower, upper):
                 resulting_boxes.append(current_polytope)
                 continue
 
             # get the longest side
-            lower, upper = current_polytope.bounding_box
             side_lengths = upper - lower
             longest_side = np.argmax(side_lengths)
 
