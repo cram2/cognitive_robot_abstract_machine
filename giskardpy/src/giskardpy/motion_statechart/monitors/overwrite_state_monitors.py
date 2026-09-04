@@ -30,6 +30,10 @@ class SetSeedConfiguration(MotionStatechartNode):
     seed_configuration: JointState = field(kw_only=True)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Applying the configuration is what this node is for and it cannot fail, so it
+        counts as succeeded from the moment it runs.
+        """
         return NodeArtifacts(observation=sm.Scalar.const_true())
 
     def on_start(self, context: MotionStatechartContext):

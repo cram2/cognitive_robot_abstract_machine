@@ -13,14 +13,15 @@ from typing_extensions import (
     Type,
 )
 
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import (
+    CancelledWhenTrue,
     Parallel,
     RepeatOnStall,
     RepeatUntil,
     Sequence,
     TryAll,
     TryInOrder,
-    CancelledWhenTrue,
 )
 from giskardpy.motion_statechart.graph_node import (
     CancelMotion,
@@ -37,7 +38,6 @@ from coraplex.plans.executables import (
     GiskardExecutable,
     Executable,
 )
-from coraplex.datastructures.enums import TaskStatus
 from coraplex.plans.failures import (
     AllChildrenFailed,
     PlanCancelled,
@@ -155,7 +155,7 @@ class ParallelNode(ExecutesInParallel):
     def notify(self):
         self._perform_parallel(self.children)
         for child in self.children:
-            if child.status == TaskStatus.FAILED:
+            if child.status == LifeCycleValues.FAILED:
                 raise child.reason
 
 
@@ -216,10 +216,19 @@ class RepeatNode(ExecutesSequentially):
             node=children_goal,
             target=self.maximum_repetitions,
         )
+        # A template that derives its own failure monitor, such as RepeatOnStall,
+        # excludes failure_monitor from its constructor entirely, so it must only be
+        # passed on when one was actually given.
+        failure_monitor_kwargs = (
+            {"failure_monitor": self.failure_monitor}
+            if self.failure_monitor is not None
+            else {}
+        )
         loop = self.repeat_template(
             name=type(self).__name__,
             task=children_goal,
             stop_retry_monitor=counter,
+            **failure_monitor_kwargs,
         )
         parent_goal.add_node(loop)
         loop.add_node(children_goal)
@@ -252,7 +261,9 @@ class TryInOrderNode(ExecutesSequentially):
                 child.perform()
             except PlanFailure:
                 continue
-        failed = all([child.status == TaskStatus.FAILED for child in self.children])
+        failed = all(
+            [child.status == LifeCycleValues.FAILED for child in self.children]
+        )
         if failed:
             raise AllChildrenFailed(self)
 
@@ -269,7 +280,9 @@ class TryAllNode(ExecutesInParallel):
 
     def notify(self):
         self._perform_parallel(self.children)
-        failed = all([child.status == TaskStatus.FAILED for child in self.children])
+        failed = all(
+            [child.status == LifeCycleValues.FAILED for child in self.children]
+        )
         if failed:
             raise AllChildrenFailed(self)
 

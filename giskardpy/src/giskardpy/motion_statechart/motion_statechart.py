@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import rustworkx as rx
-from typing_extensions import Any, List, MutableMapping, ClassVar, Self, Type
+from typing_extensions import Any, Dict, List, MutableMapping, ClassVar, Self, Type
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
@@ -16,12 +16,15 @@ from krrood.symbolic_math.symbolic_math import VariableParameters
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
+    LifeCyclePredicate,
     ObservationStateValues,
 )
 from giskardpy.motion_statechart.exceptions import (
     EmptyMotionStatechartError,
     ConditionScopeError,
     CyclicNodeDependencyError,
+    CyclicPredicateDependencyError,
+    UnsupportedObservationVariableError,
 )
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
@@ -32,6 +35,9 @@ from giskardpy.motion_statechart.graph_node import (
     GenericMotionStatechartNode,
     ObservationVariable,
     LifeCycleVariable,
+    LifeCyclePredicateVariable,
+    GoalReachedVariable,
+    NodeStateVariable,
     DebugExpression,
 )
 from giskardpy.motion_statechart.graph_node import Task
@@ -207,37 +213,18 @@ class LifeCycleState(State):
         """
         Compiles updater for life cycle states.
 
-        1. Define state transitions based on current life cycle state and conditions.
+        1. Build the next life cycle state of every node, see :class:`NextLifeCycle`.
         2. Combine all node state transitions into a single expression and compile it.
         3. Bind compiled function arguments to memory views of observation and life cycle state data.
         4. Store the compiled updater for later use in updating life cycle states.
         """
-        state_updater = []
-        for node in self.motion_statechart.nodes:
-            state_symbol = node.life_cycle_variable
-
-            (
-                not_started_transitions,
-                running_transitions,
-                pause_transitions,
-                ended_transitions,
-            ) = node.create_lifecycle_transitions()
-
-            state_machine = sm.if_eq_cases(
-                a=state_symbol,
-                b_result_cases=[
-                    (LifeCycleValues.NOT_STARTED, not_started_transitions),
-                    (LifeCycleValues.RUNNING, running_transitions),
-                    (LifeCycleValues.PAUSED, pause_transitions),
-                    (LifeCycleValues.DONE, ended_transitions),
-                ],
-                else_result=sm.Scalar(state_symbol),
-            )
-            state_updater.append(state_machine)
-        state_updater = sm.Vector(state_updater)
+        state_updater = NextLifeCycle(
+            motion_statechart=self.motion_statechart
+        ).as_vector()
         self._compiled_updater = state_updater.compile(
             parameters=VariableParameters.from_lists(
-                self.observation_symbols(), self.life_cycle_symbols()
+                self.observation_symbols(),
+                self.life_cycle_symbols(),
             ),
             sparse=False,
         )
@@ -280,7 +267,7 @@ class ObservationState(State):
 
     default_value: ClassVar[ObservationStateValues] = ObservationStateValues.UNKNOWN
     """
-    A node has made no observation until it runs for the first time.
+    A node that is not running is not observing.
     """
 
     _compiled_updater: sm.CompiledFunction = field(init=False)
@@ -289,33 +276,48 @@ class ObservationState(State):
     :meth:`compile`.
     """
 
+    def __getitem__(self, node: MotionStatechartNode) -> ObservationStateValues:
+        """
+        :param node: The node to look up.
+        :return: What `node` observes, as an :class:`ObservationStateValues` member.
+        """
+        return ObservationStateValues(super().__getitem__(node))
+
     def compile(self, context: MotionStatechartContext):
         """
         Compiles the updater for observation states.
         1. For each node, build an expression that evaluates the node's observation expression while
-           RUNNING, resets to TrinaryUnknown while NOT_STARTED, and otherwise keeps the previous value.
+           RUNNING, keeps the previous value while PAUSED, and is unknown everywhere else.
         2. Combine all node expressions into a single expression and compile it.
         3. Bind compiled function arguments to memory views of the observation, life cycle, world, and
            float-variable state data.
         4. Store the compiled updater for later use in updating the observation state.
 
+        A node that is not running is not observing, which is why only a paused node keeps
+        its reading: it resumes and observes again, whereas a node in a terminal state
+        never does and has its verdict carry what it reached instead.
+
+        Runs before the life cycle update, so the life cycle state it reads is the one
+        every node entered the control cycle with.
+
         :param context: The build context whose world and float-variable data the compiled updater reads from.
         """
         observation_state_updater = []
         for node in self.motion_statechart.nodes:
+            self._check_reads_no_predicate(node)
             state_f = sm.if_eq_cases(
                 a=node.life_cycle_variable,
                 b_result_cases=[
                     (
                         int(LifeCycleValues.RUNNING),
-                        node._observation_expression,
+                        GoalReachedVariable.replace_in(node._observation_expression),
                     ),
                     (
-                        int(LifeCycleValues.NOT_STARTED),
-                        sm.Scalar.const_trinary_unknown(),
+                        int(LifeCycleValues.PAUSED),
+                        node.observation_variable,
                     ),
                 ],
-                else_result=sm.Scalar(node.observation_variable),
+                else_result=sm.Scalar.const_trinary_unknown(),
             )
             observation_state_updater.append(state_f)
         self._compiled_updater = sm.Vector(observation_state_updater).compile(
@@ -340,12 +342,124 @@ class ObservationState(State):
             arg_idx=3, numpy_array=context.float_variable_data.data
         )
 
+    @staticmethod
+    def _check_reads_no_predicate(node: MotionStatechartNode) -> None:
+        """
+        :param node: The node whose observation expression to check.
+        :raises UnsupportedObservationVariableError: If the expression reads a life cycle
+            predicate, whose value this update runs too early to know.
+        """
+        for variable in node._observation_expression.free_variables():
+            if isinstance(variable, LifeCyclePredicateVariable):
+                raise UnsupportedObservationVariableError(
+                    node=node, unsupported_variable=variable
+                )
+
     def update_state(self):
         """
         Evaluates the compiled updater created by :meth:`compile` and writes the result
         into :attr:`data`.
         """
         np.copyto(self.data, self._compiled_updater.evaluate())
+
+
+@dataclass
+class NextLifeCycle:
+    """
+    The life cycle state every node of a motion statechart reaches at the end of the
+    current control cycle, as one expression per node.
+
+    A life cycle predicate inside a transition condition reads the state its node
+    reaches in this same cycle, so a node waiting on another node's verdict starts on
+    the cycle that verdict is reached. A node reading a predicate about itself reads the
+    state it entered the cycle with, because the expression being built is what decides
+    the other one.
+    """
+
+    motion_statechart: MotionStatechart
+    """
+    The motion statechart whose nodes the expressions are built for.
+    """
+
+    _expressions: Dict[int, sm.Scalar] = field(default_factory=dict, init=False)
+    """
+    The expression already built per node index.
+    """
+
+    _nodes_being_built: List[MotionStatechartNode] = field(
+        default_factory=list, init=False
+    )
+    """
+    The nodes whose expressions are currently being built, innermost last, used to
+    report a cycle by the path that closed it.
+    """
+
+    def as_vector(self) -> sm.Vector:
+        """
+        :return: The next life cycle state of every node, in node order.
+        """
+        return sm.Vector([self.of(node) for node in self.motion_statechart.nodes])
+
+    def of(self, node: MotionStatechartNode) -> sm.Scalar:
+        """
+        :param node: The node to build the expression for.
+        :return: The life cycle state `node` reaches at the end of the control cycle.
+        :raises CyclicPredicateDependencyError: If `node` and another node read each
+            other's predicates, leaving no order in which both could be evaluated.
+        """
+        if node.index in self._expressions:
+            return self._expressions[node.index]
+        if node in self._nodes_being_built:
+            cycle_start = self._nodes_being_built.index(node)
+            raise CyclicPredicateDependencyError(
+                cycle=self._nodes_being_built[cycle_start:] + [node]
+            )
+        self._nodes_being_built.append(node)
+        transitions = GoalReachedVariable.replace_in(
+            sm.if_eq_cases(
+                a=node.life_cycle_variable,
+                b_result_cases=node.create_lifecycle_transitions().as_cases(),
+                else_result=node.life_cycle_variable,
+            )
+        )
+        expression = self._resolve_predicates_in(transitions)
+        self._nodes_being_built.pop()
+        self._expressions[node.index] = expression
+        return expression
+
+    def _resolve_predicates_in(self, expression: sm.Scalar) -> sm.Scalar:
+        """
+        Replaces every life cycle predicate in `expression` by the value it takes in the
+        state its node reaches this control cycle.
+
+        :param expression: The expression to replace them in.
+        :return:`expression` with every life cycle predicate replaced.
+        """
+        variables = [
+            variable
+            for variable in expression.free_variables()
+            if isinstance(variable, LifeCyclePredicateVariable)
+        ]
+        return expression.substitute(
+            variables,
+            [
+                variable.predicate.value.expression(
+                    self._life_cycle_of(variable.motion_statechart_node)
+                )
+                for variable in variables
+            ],
+        )
+
+    def _life_cycle_of(self, node: MotionStatechartNode) -> sm.Scalar:
+        """
+        :param node: The node whose life cycle state to read.
+        :return: The state `node` reaches this control cycle, or the one it entered with
+            if it is the node whose expression is currently being built, because that
+            expression is what decides the other one.
+        """
+        if node is self._nodes_being_built[-1]:
+            return node.life_cycle_variable
+        return self.of(node)
 
 
 @dataclass(repr=False, eq=False)
@@ -397,7 +511,7 @@ class StateHistoryItem:
         :return: Every node's name mapped to its observation state and life cycle state name.
         """
         merged = {
-            node.name: f"{self.observation_state[node]} | {life_cycle.name}"
+            node.name: f"{self.observation_state[node].name} | {life_cycle.name}"
             for node, life_cycle in self.life_cycle_state.items()
         }
         return str(merged)
@@ -460,22 +574,44 @@ class MotionStatechart(SubclassJSONSerializer):
         - NOT_STARTED: the node has not started yet.
         - RUNNING: the node is running.
         - PAUSED: the node is paused.
-        - DONE: the node has ended.
-    Out of these 4 states, nodes are only "active" if they are in the RUNNING state.
+        - SUCCEEDED: the node was ended while it was observing its goal as reached.
+        - FAILED: the node was ended while it was not.
+        - INTERRUPTED: the node was ended while it was not observing anything decisive,
+                       which is no basis for a judgement.
+    Out of these 6 states, nodes are only "active" if they are in the RUNNING state, and
+    the last 3 are terminal: they are only left by a reset.
     Observation states indicate the current observation of the node:
         - TrinaryFalse: the thing the node is observing is not True.
-        - TrinaryUnknown: the node has not yet made an observation or it cannot determine its truth value yet.
+        - TrinaryUnknown: the node cannot determine the truth value yet, or is not
+                          observing at all.
         - TrinaryTrue: the thing the node is observing is True.
+    Only a running node observes. A node that has not started or has reached a terminal
+    state reports TrinaryUnknown, while a paused node keeps its last observation because
+    it resumes and observes again.
+    An observation is re-evaluated every tick and may change in both directions, whereas a
+    verdict is latched. A condition may read either: the observation state of a node
+    through its observation variable, or its life cycle state through a predicate such as
+    `node.is_failed`. A condition that outlives the node it reads has to read the verdict,
+    since the observation behind it is gone once that node ends; `node.goal_reached`
+    answers that in one variable, holding what a node observes while it runs and the
+    verdict it earned once it has ended. A predicate reads the life cycle state its node
+    reaches at the end of the current tick, so a node waiting on another node's verdict
+    starts on the tick that verdict is reached.
     Nodes are connected with edges, or transitions.
     There are 4 types of transitions:
         - start condition: If True, the node transitions from NOT_STARTED to RUNNING.
         - pause condition: If True, the node transitions from RUNNING to PAUSED.
                            If False, the node transitions from PAUSED to RUNNING.
-        - end condition: If True, the node transitions from RUNNING or PAUSED to DONE.
+        - end condition: If True, the node transitions from RUNNING or PAUSED to a
+                         terminal state, and its descendants on the same terms.
         - reset condition: If True, the node transitions from any state to NOT_STARTED.
+    Which terminal state an ended node reaches is decided by the node itself, not by
+    whatever ended it: reaching what it observes means it succeeded. Other nodes can
+    therefore only decide *when* a node ends, never whether ending counts as success,
+    and an ancestor ending a node judges it exactly as its own end condition would have.
     If multiple conditions are met, the following order is used:
         1. reset condition
-        2. end condition
+        2. its own or an ancestor's end condition
         3. pause condition
         4. start condition
     How to use this class:
@@ -659,6 +795,26 @@ class MotionStatechart(SubclassJSONSerializer):
         for node in nodes:
             self.add_node(node)
 
+    def condition_variables(self) -> List[NodeStateVariable]:
+        """
+        Every variable a rendered condition can name, so a serialized condition can be
+        resolved back into an expression. Reading a node's predicates here also creates
+        them, which is what makes a deserialized condition able to refer to one.
+
+        :return: The observation variable, the goal reached variable and every life
+            cycle predicate of every node.
+        """
+        variables: List[NodeStateVariable] = list(
+            self.observation_state.observation_symbols()
+        )
+        for node in self.nodes:
+            variables.append(node.goal_reached)
+            variables.extend(
+                node._life_cycle_predicate(predicate)
+                for predicate in LifeCyclePredicate
+            )
+        return variables
+
     def get_node_by_index(self, index: int) -> MotionStatechartNode:
         """
         :param index: The :attr:`~MotionStatechartNode.index` of the node to look up.
@@ -668,16 +824,13 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def _add_transitions(self):
         """
-        Rebuilds the graph's edges from the current start, pause, end, and reset
-        conditions of every node.
+        Rebuilds the graph's edges from the current transition conditions of every node.
         """
         self._validate_condition_scopes()
         self.rx_graph.clear_edges()
         for node in self.nodes:
-            self._create_edge_for_condition(node, node._start_condition)
-            self._create_edge_for_condition(node, node._pause_condition)
-            self._create_edge_for_condition(node, node._end_condition)
-            self._create_edge_for_condition(node, node._reset_condition)
+            for condition in node.conditions:
+                self._create_edge_for_condition(node, condition)
 
     def _validate_condition_scopes(self):
         """
@@ -688,12 +841,7 @@ class MotionStatechart(SubclassJSONSerializer):
         :raises ConditionScopeError: If a condition references a node from a different scope level.
         """
         for node in self.nodes:
-            for condition in (
-                node._start_condition,
-                node._pause_condition,
-                node._end_condition,
-                node._reset_condition,
-            ):
+            for condition in node.conditions:
                 self._validate_condition_scope(node, condition)
 
     def _validate_condition_scope(
@@ -944,8 +1092,8 @@ class MotionStatechart(SubclassJSONSerializer):
                     node.on_unpause(context=context)
                 case (
                     (LifeCycleValues.RUNNING | LifeCycleValues.PAUSED),
-                    LifeCycleValues.DONE,
-                ):
+                    _,
+                ) if curr.is_terminal:
                     node.on_end(context=context)
                 case _:
                     pass
@@ -954,7 +1102,8 @@ class MotionStatechart(SubclassJSONSerializer):
         """
         Executes a single tick of the motion statechart.
 
-        First the observation state is updated, then the life cycle state is updated.
+        First the observation state is updated, then the life cycle state.
+
         :param context: The context required to execute the tick.
         """
         self._update_observation_state(context)

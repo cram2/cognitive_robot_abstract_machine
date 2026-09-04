@@ -12,7 +12,7 @@ from typing_extensions import Union
 from coraplex.plans.designator import Designator
 from giskardpy.motion_statechart.graph_node import Goal
 from krrood.entity_query_language.query.match import Match
-from coraplex.datastructures.enums import TaskStatus
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 from coraplex.datastructures.execution_data import ExecutionData
 from coraplex.plans.executables import (
     Executable,
@@ -47,9 +47,9 @@ class PlanNode(PlanEntity):
     A node in the plan.
     """
 
-    status: TaskStatus = TaskStatus.CREATED
+    status: LifeCycleValues = LifeCycleValues.NOT_STARTED
     """
-    The status of the node from the TaskStatus enum.
+    Where this node is in its execution.
     """
 
     start_time: Optional[datetime] = field(default_factory=datetime.now)
@@ -246,7 +246,7 @@ class PlanNode(PlanEntity):
         """
         Interrupts the execution of this node and all nodes below.
         """
-        self.status = TaskStatus.INTERRUPTED
+        self.status = LifeCycleValues.INTERRUPTED
         logger.info(f"Interrupted node: {str(self)}")
         # TODO: cancel giskard execution
 
@@ -254,13 +254,13 @@ class PlanNode(PlanEntity):
         """
         Resumes the execution of this node and all nodes below.
         """
-        self.status = TaskStatus.RUNNING
+        self.status = LifeCycleValues.RUNNING
 
     def pause(self):
         """
         Suspends the execution of this node and all nodes below.
         """
-        self.status = TaskStatus.PAUSE
+        self.status = LifeCycleValues.PAUSED
 
     def add_child(self, child: PlanNode):
         self.plan.add_edge(self, child)
@@ -268,33 +268,36 @@ class PlanNode(PlanEntity):
     @property
     def is_interrupted(self) -> bool:
         return any(
-            parent.status == TaskStatus.INTERRUPTED for parent in [self] + self.path
+            parent.status == LifeCycleValues.INTERRUPTED
+            for parent in [self] + self.path
         )
 
     @property
     def is_paused(self) -> bool:
-        return any(parent.status == TaskStatus.PAUSE for parent in [self] + self.path)
+        return any(
+            parent.status == LifeCycleValues.PAUSED for parent in [self] + self.path
+        )
 
     def perform(self):
         """
         Perform the node and update the fields of this node.
         """
         for parent in self.path:
-            if parent.status == TaskStatus.INTERRUPTED:
-                self.status = TaskStatus.INTERRUPTED
+            if parent.status == LifeCycleValues.INTERRUPTED:
+                self.status = LifeCycleValues.INTERRUPTED
                 return
 
-        self.status = TaskStatus.RUNNING
+        self.status = LifeCycleValues.RUNNING
         try:
             self.notify()
             self.result = self.parse().execute()
         except PlanFailure as e:
-            self.status = TaskStatus.FAILED
+            self.status = LifeCycleValues.FAILED
             self.reason = e
             raise e
         finally:
             self.end_time = datetime.now()
-        self.status = TaskStatus.SUCCEEDED
+        self.status = LifeCycleValues.SUCCEEDED
 
     def mount_subplan(self, root: PlanNode):
         """

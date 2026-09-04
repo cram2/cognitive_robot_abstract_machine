@@ -51,7 +51,11 @@ class MonitoredGoal(Goal, ABC):
         """
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        return NodeArtifacts(observation=self.monitored_node.observation_variable)
+        """
+        The monitored node is read through its verdict, which outlasts it, because a
+        node that ended observes nothing any more.
+        """
+        return NodeArtifacts(observation=Scalar(self.monitored_node.goal_reached))
 
 
 @dataclass(repr=False, eq=False)
@@ -62,7 +66,9 @@ class PausedWhileTrue(MonitoredGoal):
     """
 
     def wire_monitor(self) -> None:
-        self.monitored_node.pause_condition = trinary_logic_or(self.monitor.observation_variable, self.monitored_node.pause_condition)
+        self.monitored_node.pause_condition = trinary_logic_or(
+            self.monitor.observation_variable, self.monitored_node.pause_condition
+        )
 
 
 @dataclass(repr=False, eq=False)
@@ -98,10 +104,10 @@ class StoppedWhenTrue(MonitoredGoal):
             observation=if_cases(
                 [
                     (
-                        self.monitored_node.observation_variable == True,
+                        self.monitored_node.goal_reached.is_true(),
                         Scalar.const_true(),
                     ),
-                    (self.monitor.observation_variable == True, Scalar.const_false()),
+                    (self.monitor.observation_variable.is_true(), Scalar.const_false()),
                 ],
                 Scalar.const_trinary_unknown(),
             )

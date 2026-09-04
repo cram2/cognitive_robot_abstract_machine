@@ -3,6 +3,12 @@ import time
 
 import pytest
 
+from giskardpy.motion_statechart.data_types import LifeCycleValues
+from krrood.rustworkx_utils.graph_visualizer_base import (
+    GraphLayout,
+    GraphVisualizerBackend,
+)
+
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     ApproachDirection,
@@ -742,3 +748,23 @@ def test_action_nodes_unequal(immutable_model_world):
     pick_node = plan.children[1]
 
     assert not park_node == pick_node
+
+
+# %% how a plan is drawn
+
+
+def test_a_plan_node_is_drawn_in_the_color_of_its_state():
+    """
+    A plan is drawn in the same colors the motion statechart plots use, because both
+    read them off the state itself.
+    """
+    node = PlanNode()
+    plan = Plan()
+    plan.add_node(node)
+    node.status = LifeCycleValues.FAILED
+
+    visualizer = plan._create_visualizer(
+        backend=GraphVisualizerBackend.CYTOSCAPE, layout=GraphLayout.LAYERED
+    )
+
+    assert visualizer.node_color(node.index) == LifeCycleValues.FAILED.color.to_hex()

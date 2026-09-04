@@ -14,7 +14,7 @@ if TYPE_CHECKING:
         MotionStatechartNode,
         TrinaryCondition,
     )
-    from giskardpy.motion_statechart.monitors.progress_monitors import ProgressStalled
+    from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
     )
@@ -149,6 +149,19 @@ class EndMotionInGoalError(NodeInitializationError):
 
 
 @dataclass
+class GoalWithoutChildrenError(NodeInitializationError):
+    """
+    Raised when a goal that runs a list of child nodes is built without any.
+    """
+
+    def error_message(self) -> str:
+        return f'Goal "{self.node.unique_name}" was given no child nodes.'
+
+    def suggest_correction(self) -> str:
+        return "Pass at least one node to the goal, or leave the goal out entirely."
+
+
+@dataclass
 class UnexpectedWorldEntityCountError(NodeInitializationError):
     """
     Raised when a node searches the world for entities and finds a different number than
@@ -242,42 +255,6 @@ class NodeNotBuiltError(NodeInitializationError):
 
 
 @dataclass
-class MissingFailureMonitorError(NodeInitializationError):
-    """
-    Raised when a repeating goal has no way of telling that an attempt failed.
-    """
-
-    def error_message(self) -> str:
-        return f"{self.node.unique_name} is configured to repeat a task, but no failure monitor is defined to determine when an attempt has failed."
-
-    def suggest_correction(self) -> str:
-        return (
-            "Pass a failure_monitor, or use a subclass such as RepeatOnStall that derives "
-            "the failure condition from the task."
-        )
-
-
-@dataclass
-class ConflictingFailureMonitorError(NodeInitializationError):
-    """
-    Raised when a repeating goal derives its own failure monitor but was given one as
-    well.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f'"{self.node.unique_name}" derives its own failure monitor, so the one passed '
-            f"as failure_monitor would never be used."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Drop the failure_monitor argument, or use RepeatUntil itself to retry on a "
-            "monitor of your own."
-        )
-
-
-@dataclass
 class MissingErrorSignalError(NodeInitializationError):
     """
     Raised when a converging task builds artifacts that carry no error signal.
@@ -293,31 +270,6 @@ class MissingErrorSignalError(NodeInitializationError):
         return (
             "Set NodeArtifacts.error in build_artifacts to the error the task's constraints "
             "drive to zero."
-        )
-
-
-@dataclass
-class NoConvergingTaskError(NodeInitializationError):
-    """
-    Raised when a node is asked to watch the goal error of a node that contains no
-    converging task.
-    """
-
-    monitored_node: MotionStatechartNode
-    """
-    The node that was supposed to be watched.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f'"{self.monitored_node.unique_name}" contains no ConvergingTask, so it has '
-            f"no goal error whose progress could be watched."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Watch a task that converges towards a goal. Tasks that enforce an invariant, "
-            "such as a velocity limit or a collision predicate, never converge."
         )
 
 
@@ -341,12 +293,62 @@ class CyclicNodeDependencyError(NodeInitializationError):
 
 
 @dataclass
+class CyclicPredicateDependencyError(MotionStatechartError):
+    """
+    Raised when nodes read each other's life cycle predicates in a cycle, so no order
+    exists in which one control cycle could be evaluated.
+    """
+
+    cycle: list[MotionStatechartNode]
+    """
+    The nodes forming the cycle, in the order in which they read each other.
+    """
+
+    def error_message(self) -> str:
+        cycle_str = " -> ".join(node.unique_name for node in self.cycle)
+        return f"Nodes read each other's life cycle predicates in a cycle: {cycle_str}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Break the cycle, for example by reading the observation state of one of "
+            "the nodes instead of its verdict."
+        )
+
+
+@dataclass
+class UnsupportedObservationVariableError(NodeInitializationError):
+    """
+    Raised when the observation expression of a node reads a life cycle predicate.
+
+    Observations are computed before the life cycle state, so the state a predicate
+    reads does not exist yet at that point.
+    """
+
+    unsupported_variable: FloatVariable
+    """
+    The variable in the observation expression that a node may not read.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'Observation of "{self.node.unique_name}" contains '
+            f'"{self.unsupported_variable}", which an observation may not read.'
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Read the life cycle state itself, e.g. 'node.life_cycle_variable', or move "
+            "the test into a transition condition."
+        )
+
+
+@dataclass
 class NoProgressError(MotionStatechartError):
     """
     Raised when the watched tasks stopped approaching their goal for too long.
     """
 
-    progress_monitor: ProgressStalled
+    progress_monitor: StillProgressing
     """
     The monitor that detected the stall and knows which tasks are affected.
     """
@@ -356,7 +358,7 @@ class NoProgressError(MotionStatechartError):
         names = ", ".join(task.unique_name for task in stalled_tasks)
         return (
             f"{names or self.progress_monitor.monitored_node.unique_name} stopped "
-            f"approaching a goal for {self.progress_monitor.timeout} seconds."
+            f"approaching a goal for {self.progress_monitor.timeout}."
         )
 
     def suggest_correction(self) -> str:
@@ -475,22 +477,27 @@ class SelfInStartConditionError(InvalidConditionError):
 
 
 @dataclass
-class NonObservationVariableError(InvalidConditionError):
+class UnsupportedConditionVariableError(InvalidConditionError):
     """
-    Raised when a condition contains a variable that is not the observation variable of
-    a node.
+    Raised when a condition contains a variable that is neither the observation state
+    nor a life cycle predicate of a node.
     """
 
-    non_observation_variable: FloatVariable
+    unsupported_variable: FloatVariable
     """
-    The variable in the condition that does not observe a node.
+    The variable in the condition that a transition may not read.
     """
 
     def reason(self) -> str:
-        return f'Contains "{self.non_observation_variable}", which is not an observation variable.'
+        return (
+            f'Contains "{self.unsupported_variable}", which a transition may not read.'
+        )
 
     def suggest_correction(self) -> str:
-        return "Use an observation variable from a node instead, e.g. 'node.observation_variable'."
+        return (
+            "Use the observation state of a node, e.g. 'node.observation_variable', or one "
+            "of its life cycle predicates, e.g. 'node.is_failed'."
+        )
 
 
 @dataclass

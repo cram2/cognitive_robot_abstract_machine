@@ -79,10 +79,16 @@ class Open(Goal):
         )
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Build an observation that is True once both the degree of freedom and the grip
+        on the grasped part reached their goals.
+
+        This goal ends neither of them, so a part that keeps running is judged by what
+        it observes now and stops counting once it drifts away from its goal again. A
+        part something *else* ended keeps counting, because its verdict outlasts it.
+        """
         return NodeArtifacts(
-            observation=trinary_logic_and(
-                *[node.observation_variable for node in self.nodes]
-            )
+            observation=trinary_logic_and(*[node.goal_reached for node in self.nodes])
         )
 
 
@@ -146,11 +152,4 @@ class Close(Open):
                     weight=self.weight,
                 ),
             ]
-        )
-
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        return NodeArtifacts(
-            observation=trinary_logic_and(
-                *[node.observation_variable for node in self.nodes]
-            )
         )

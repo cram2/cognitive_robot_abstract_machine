@@ -1,24 +1,53 @@
 import pydot
-from typing_extensions import Optional, Set, Union
+import pytest
+from typing_extensions import List, Optional, Set, Union
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import (
+    LifeCyclePredicate,
+    LifeCycleValues,
+    ObservationStateValues,
+    TransitionKind,
+)
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
 from giskardpy.motion_statechart.graph_node import (
+    CancelMotion,
     EndMotion,
     Goal,
+    GoalReachedVariable,
     MotionStatechartNode,
+    Task,
 )
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
+    ConstTrueNode,
     TestGoal,
     TestNestedGoal,
 )
 from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
+from giskardpy.motion_statechart.plotters.styles import (
+    DISABLED_CONDITION_COLOR,
+    DRAWING_METRICS,
+    Font,
+    MINIMUM_RANK_DISTANCES,
+    NodeDrawingStyle,
+    OBSERVATION_DRAWING_STYLES,
+)
 
 # %% helpers
+
+
+def expand(motion_statechart: MotionStatechart) -> MotionStatechart:
+    """
+    Expands the goals of `motion_statechart` and rebuilds its transitions, which is as
+    far as a statechart has to be built to be drawn.
+    """
+    motion_statechart._expand_goals(MotionStatechartContext.empty())
+    motion_statechart._add_transitions()
+    return motion_statechart
 
 
 def build_motion_statechart(goal: Goal) -> MotionStatechart:
@@ -29,9 +58,7 @@ def build_motion_statechart(goal: Goal) -> MotionStatechart:
     motion_statechart = MotionStatechart()
     motion_statechart.add_node(goal)
     motion_statechart.add_node(EndMotion.when_true(goal))
-    motion_statechart._expand_goals(MotionStatechartContext.empty())
-    motion_statechart._add_transitions()
-    return motion_statechart
+    return expand(motion_statechart)
 
 
 def draw(motion_statechart: MotionStatechart) -> pydot.Graph:
@@ -83,14 +110,69 @@ def find_cluster_of(
     return None
 
 
-def find_node(graph: pydot.Graph, node: MotionStatechartNode) -> pydot.Node:
+def find_node(
+    graph: Union[pydot.Graph, pydot.Cluster], node: MotionStatechartNode
+) -> pydot.Node:
     """
     :return: The pydot node drawn for `node`.
     """
     for candidate in graph.get_nodes():
         if candidate.get_name().strip('"') == node.unique_name:
             return candidate
+    for subgraph in graph.get_subgraphs():
+        try:
+            return find_node(subgraph, node)
+        except AssertionError:
+            continue
     raise AssertionError(f"{node.unique_name} was not drawn in {graph.get_name()}")
+
+
+def find_edges(
+    graph: Union[pydot.Graph, pydot.Cluster],
+    source: MotionStatechartNode,
+    destination: MotionStatechartNode,
+) -> List[pydot.Edge]:
+    """
+    :return: Every edge drawn from `source` to `destination`, searching subgraphs too,
+        because an edge between two children of a goal is declared on that goal's cluster.
+    """
+    edges = [
+        edge
+        for edge in graph.get_edges()
+        if edge.get_source().strip('"') == source.unique_name
+        and edge.get_destination().strip('"') == destination.unique_name
+    ]
+    for subgraph in graph.get_subgraphs():
+        edges += find_edges(subgraph, source, destination)
+    return edges
+
+
+def find_edge(
+    graph: pydot.Graph,
+    source: MotionStatechartNode,
+    destination: MotionStatechartNode,
+) -> pydot.Edge:
+    """
+    :return: The single edge drawn from `source` to `destination`.
+    """
+    edges = find_edges(graph, source, destination)
+    assert len(edges) == 1
+    return edges[0]
+
+
+def build_dependency_statechart(
+    observed: MotionStatechartNode, owner: MotionStatechartNode
+) -> MotionStatechart:
+    """
+    Creates a statechart holding both nodes, so that `owner` may read `observed` in its
+    conditions.
+
+    The caller wires those conditions before drawing.
+    """
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(observed)
+    motion_statechart.add_node(owner)
+    return motion_statechart
 
 
 # %% expanded goals
@@ -170,7 +252,7 @@ def test_expanded_goal_reports_no_hidden_node_count():
 
 def test_collision_avoidance_goals_collapse_their_children():
     assert ExternalCollisionAvoidance().plot_specifications.collapse_children
-    assert SelfCollisionAvoidance().plot_specs.collapse_children
+    assert SelfCollisionAvoidance().plot_specifications.collapse_children
 
 
 # %% structure copies
@@ -185,3 +267,402 @@ def test_structure_copy_keeps_plot_specs():
 
     assert goal_copy.plot_specifications.collapse_children
     assert goal_copy.plot_specifications is not goal.plot_specifications
+
+
+# %% how far apart an arrow pushes its endpoints
+
+
+@pytest.mark.parametrize("transition_kind", list(TransitionKind))
+def test_every_transition_kind_has_a_minimum_rank_distance(transition_kind):
+    """
+    The lookup is total, so a kind missing from it only shows up as a KeyError while
+    drawing an arrow.
+    """
+    assert transition_kind in MINIMUM_RANK_DISTANCES
+
+
+def test_pause_dependency_may_sit_beside_the_node_reading_it():
+    observed = ConstTrueNode(name="Observed")
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = build_dependency_statechart(observed, owner)
+    owner.pause_condition = observed.goal_reached
+    expand(motion_statechart)
+
+    edge = find_edge(draw(motion_statechart), observed, owner)
+
+    assert int(edge.get("minlen")) == MINIMUM_RANK_DISTANCES[TransitionKind.PAUSE]
+
+
+def test_start_dependency_is_drawn_a_row_above_the_node_reading_it():
+    observed = ConstTrueNode(name="Observed")
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = build_dependency_statechart(observed, owner)
+    owner.start_condition = observed.goal_reached
+    expand(motion_statechart)
+
+    edge = find_edge(draw(motion_statechart), observed, owner)
+
+    assert int(edge.get("minlen")) == MINIMUM_RANK_DISTANCES[TransitionKind.START]
+
+
+def test_merged_arrow_keeps_the_largest_distance_its_conditions_ask_for():
+    """
+    A rank distance is a lower bound, so the two arrows this used to draw already left
+    graphviz solving for the larger of the two.
+
+    The merged arrow has to state that.
+    """
+    observed = ConstTrueNode(name="Observed")
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = build_dependency_statechart(observed, owner)
+    owner.start_condition = observed.goal_reached
+    owner.reset_condition = observed.goal_reached
+    expand(motion_statechart)
+
+    edge = find_edge(draw(motion_statechart), observed, owner)
+
+    assert int(edge.get("minlen")) == max(
+        MINIMUM_RANK_DISTANCES[TransitionKind.START],
+        MINIMUM_RANK_DISTANCES[TransitionKind.RESET],
+    )
+
+
+def test_reset_dependency_points_at_the_node_reading_it():
+    """
+    A reset arrow used to be emitted backwards and turned around with `arrowtail`; it
+    now runs the same way as every other arrow.
+    """
+    observed = ConstTrueNode(name="Observed")
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = build_dependency_statechart(observed, owner)
+    owner.reset_condition = observed.goal_reached
+    expand(motion_statechart)
+
+    graph = draw(motion_statechart)
+
+    assert len(find_edges(graph, observed, owner)) == 1
+    assert find_edges(graph, owner, observed) == []
+
+
+# %% every observation has to be drawable
+
+
+@pytest.mark.parametrize("observation_state", list(ObservationStateValues))
+def test_every_observation_state_has_a_drawing_style(observation_state):
+    """
+    The lookup is total, so a state missing from it only shows up as a KeyError while
+    drawing an edge.
+    """
+    assert observation_state in OBSERVATION_DRAWING_STYLES
+
+
+# %% arrows carry the observation of the node they leave
+
+
+def test_unknown_arrow_is_thinner_than_a_decided_arrow():
+    unknown = OBSERVATION_DRAWING_STYLES[ObservationStateValues.UNKNOWN]
+
+    assert (
+        unknown.line_width
+        < OBSERVATION_DRAWING_STYLES[ObservationStateValues.TRUE].line_width
+    )
+    assert (
+        unknown.line_width
+        < OBSERVATION_DRAWING_STYLES[ObservationStateValues.FALSE].line_width
+    )
+
+
+def test_arrow_takes_the_line_width_of_the_observation_it_carries():
+    observed = ConstTrueNode(name="Observed")
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = build_dependency_statechart(observed, owner)
+    owner.start_condition = observed.goal_reached
+    expand(motion_statechart)
+    motion_statechart.observation_state[observed] = ObservationStateValues.UNKNOWN
+
+    edge = find_edge(draw(motion_statechart), observed, owner)
+
+    expected = OBSERVATION_DRAWING_STYLES[ObservationStateValues.UNKNOWN]
+    assert float(edge.get("penwidth")) == expected.line_width
+
+
+def test_one_arrow_is_drawn_per_dependency():
+    """
+    A node read by two of another node's conditions is reached once, because an arrow no
+    longer says which condition reads it.
+    """
+    observed = ConstTrueNode(name="Observed")
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = build_dependency_statechart(observed, owner)
+    owner.end_condition = observed.goal_reached
+    owner.reset_condition = observed.goal_reached
+    expand(motion_statechart)
+
+    assert len(find_edges(draw(motion_statechart), observed, owner)) == 1
+
+
+# %% condition terms carry the value of the term
+
+
+def test_condition_term_is_colored_by_the_value_of_the_term():
+    """
+    A term is inked by what it evaluates to, not by the observation of the node it
+    names:
+
+    `is_succeeded` has no answer until a node is judged, however decisive that node's
+    observation already is.
+    """
+    observed = ConstTrueNode(name="Observed")
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = build_dependency_statechart(observed, owner)
+    owner.start_condition = observed.is_succeeded
+    expand(motion_statechart)
+    motion_statechart.observation_state[observed] = ObservationStateValues.TRUE
+    motion_statechart.life_cycle_state[observed] = LifeCycleValues.RUNNING
+
+    label = find_node(draw(motion_statechart), owner).get_label()
+
+    term_value = LifeCyclePredicate.IS_SUCCEEDED.value.truth_value(
+        LifeCycleValues.RUNNING
+    )
+    term_color = OBSERVATION_DRAWING_STYLES[term_value].color.to_hex()
+    term = f"{observed.unique_name}.{LifeCyclePredicate.IS_SUCCEEDED.attribute_name}"
+    assert f'<FONT COLOR="{term_color}">"{term}"</FONT>' in label
+
+
+def test_condition_term_is_colored_when_its_node_name_reads_as_an_operator():
+    """
+    A term is found by what it is, not by what its text looks like: a node named after a
+    logical operator still gets its own color.
+    """
+    observed = ConstTrueNode(name="open and close")
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = build_dependency_statechart(observed, owner)
+    owner.start_condition = observed.goal_reached
+    expand(motion_statechart)
+    motion_statechart.observation_state[observed] = ObservationStateValues.TRUE
+    motion_statechart.life_cycle_state[observed] = LifeCycleValues.RUNNING
+
+    label = find_node(draw(motion_statechart), owner).get_label()
+
+    term_color = OBSERVATION_DRAWING_STYLES[observed.goal_reached_state].color.to_hex()
+    term = f"{observed.unique_name}.{GoalReachedVariable.attribute_name}"
+    assert f'<FONT COLOR="{term_color}">"{term}"</FONT>' in label
+
+
+def test_condition_without_terms_is_spelled_out():
+    """
+    A constant condition colors True green and False red when active, and grays them out
+    when inactive.
+    """
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(owner)
+    expand(motion_statechart)
+
+    true_color = OBSERVATION_DRAWING_STYLES[ObservationStateValues.TRUE].color.to_hex()
+    disabled_color = DISABLED_CONDITION_COLOR.to_hex()
+
+    label = find_node(draw(motion_statechart), owner).get_label()
+
+    assert f'start:<FONT COLOR="{true_color}">True</FONT>' in label
+    assert (
+        f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">pause:False</FONT>'
+        in label
+    )
+
+
+def test_condition_boolean_constants_coloring_in_running_state():
+    """
+    In RUNNING state, pause:False is active and rendered with False colored red, while
+    start:True is inactive and rendered grayed out.
+    """
+    owner = ConstTrueNode(name="Owner")
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(owner)
+    expand(motion_statechart)
+    motion_statechart.life_cycle_state[owner] = LifeCycleValues.RUNNING
+
+    false_color = OBSERVATION_DRAWING_STYLES[
+        ObservationStateValues.FALSE
+    ].color.to_hex()
+    disabled_color = DISABLED_CONDITION_COLOR.to_hex()
+
+    label = find_node(draw(motion_statechart), owner).get_label()
+
+    assert (
+        f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">start:True</FONT>'
+        in label
+    )
+    assert f'pause:<FONT COLOR="{false_color}">False</FONT>' in label
+
+
+# %% extra border styles for terminal nodes
+
+
+def test_terminal_nodes_and_tasks_have_correct_plot_specifications():
+    assert EndMotion().plot_specifications.extra_border_styles == ["rounded"]
+    assert CancelMotion(
+        exception=Exception()
+    ).plot_specifications.extra_border_styles == ["dashed, rounded"]
+    assert Task().plot_specifications.style == NodeDrawingStyle.TASK.style
+    assert Task().plot_specifications.shape == NodeDrawingStyle.TASK.shape
+
+
+def test_end_motion_renders_with_rounded_outer_cluster():
+    end = EndMotion()
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(end)
+    expand(motion_statechart)
+
+    graph = draw(motion_statechart)
+    cluster = find_cluster_of(graph, end)
+    assert cluster is not None
+    assert cluster.get("style").strip('"') == "rounded"
+    assert cluster.get("color").strip('"') == "black"
+    assert float(cluster.get("penwidth")) == DRAWING_METRICS.line_width
+    assert end.unique_name in direct_node_names(cluster)
+    assert end.unique_name not in direct_node_names(graph)
+
+
+def test_cancel_motion_renders_with_dashed_outer_cluster():
+    cancel = CancelMotion(exception=Exception("fail"))
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(cancel)
+    expand(motion_statechart)
+
+    graph = draw(motion_statechart)
+    cluster = find_cluster_of(graph, cancel)
+    assert cluster is not None
+    assert cluster.get("style").strip('"') == "dashed, rounded"
+    assert cluster.get("color").strip('"') == "black"
+    assert float(cluster.get("penwidth")) == DRAWING_METRICS.line_width
+    assert cancel.unique_name in direct_node_names(cluster)
+    assert cancel.unique_name not in direct_node_names(graph)
+
+
+def test_edge_targeting_terminal_node_clips_to_outer_cluster():
+    observed = ConstTrueNode(name="Observed")
+    end = EndMotion()
+    cancel = CancelMotion(exception=Exception("fail"))
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_nodes([observed, end, cancel])
+    end.start_condition = observed.goal_reached
+    cancel.start_condition = observed.goal_reached
+    expand(motion_statechart)
+
+    graph = draw(motion_statechart)
+    end_edge = find_edge(graph, observed, end)
+    cancel_edge = find_edge(graph, observed, cancel)
+
+    assert end_edge.get("lhead").strip('"') == f"cluster_{end.unique_name}"
+    assert cancel_edge.get("lhead").strip('"') == f"cluster_{cancel.unique_name}"
+
+
+# %% condition graying based on lifecycle state
+
+
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+def test_conditions_are_grayed_out_when_not_triggerable(
+    life_cycle_state: LifeCycleValues,
+):
+    """
+    Conditions that cannot legally trigger a transition from the node's current
+    lifecycle state are rendered in disabled gray font without individual term color
+    tags.
+    """
+    node = ConstTrueNode(name="TestNode")
+    observed = ConstTrueNode(name="ObservedNode")
+    motion_statechart = build_dependency_statechart(observed, node)
+    node.start_condition = observed.goal_reached
+    node.pause_condition = observed.is_succeeded
+    node.end_condition = observed.is_failed
+    node.reset_condition = observed.is_running
+    expand(motion_statechart)
+    motion_statechart.life_cycle_state[node] = life_cycle_state
+    motion_statechart.observation_state[observed] = ObservationStateValues.TRUE
+
+    label = find_node(draw(motion_statechart), node).get_label()
+    disabled_color = DISABLED_CONDITION_COLOR.to_hex()
+
+    for prefix, condition, transition_kind, term in [
+        (
+            "start",
+            node._start_condition,
+            TransitionKind.START,
+            f"{observed.unique_name}.{GoalReachedVariable.attribute_name}",
+        ),
+        (
+            "pause",
+            node._pause_condition,
+            TransitionKind.PAUSE,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_SUCCEEDED.attribute_name}",
+        ),
+        (
+            "end  ",
+            node._end_condition,
+            TransitionKind.END,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_FAILED.attribute_name}",
+        ),
+        (
+            "reset",
+            node._reset_condition,
+            TransitionKind.RESET,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_RUNNING.attribute_name}",
+        ),
+    ]:
+        can_trigger = transition_kind.can_trigger_from(life_cycle_state)
+        if can_trigger:
+            assert f'<FONT FACE="{Font.MONOSPACE}">{prefix}:' in label
+            assert (
+                f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">{prefix}:'
+                not in label
+            )
+            variable = condition.variables[0]
+            resolved_color = OBSERVATION_DRAWING_STYLES[
+                variable.resolve()
+            ].color.to_hex()
+            assert f'<FONT COLOR="{resolved_color}">"{term}"</FONT>' in label
+        else:
+            assert (
+                f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">{prefix}:'
+                in label
+            )
+            assert (
+                f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">{prefix}:"{term}"</FONT>'
+                in label
+            )
+
+
+@pytest.mark.parametrize(
+    "node_factory",
+    [
+        lambda: EndMotion(),
+        lambda: CancelMotion(exception=Exception("test exception")),
+    ],
+)
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+def test_terminal_node_condition_graying(
+    node_factory, life_cycle_state: LifeCycleValues
+):
+    """
+    Terminal nodes render only the start condition, grayed out when not in NOT_STARTED.
+    """
+    terminal_node = node_factory()
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(terminal_node)
+    expand(motion_statechart)
+    motion_statechart.life_cycle_state[terminal_node] = life_cycle_state
+
+    label = find_node(draw(motion_statechart), terminal_node).get_label()
+    disabled_color = DISABLED_CONDITION_COLOR.to_hex()
+
+    can_trigger = TransitionKind.START.can_trigger_from(life_cycle_state)
+    if can_trigger:
+        assert f'<FONT FACE="{Font.MONOSPACE}">start:' in label
+        assert (
+            f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">start:'
+            not in label
+        )
+    else:
+        assert f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">start:' in label

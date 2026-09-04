@@ -5,13 +5,11 @@ from functools import partial
 import numpy as np
 import pytest
 
-from coraplex.datastructures.enums import (
-    TaskStatus,
-    DetectionTechnique,
-)
+from giskardpy.motion_statechart.data_types import LifeCycleValues
+
+from coraplex.datastructures.enums import DetectionTechnique
 
 from coraplex.plans.failures import PlanCancelled, PlanFailure, RepetitionsExhausted
-from coraplex.fluent import Fluent
 from coraplex.language import (
     CancelMonitor,
     SequentialNode,
@@ -34,7 +32,6 @@ from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.motions.gripper import MoveToolCenterPointMotion
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
-from giskardpy.motion_statechart.exceptions import NoConvergingTaskError
 from giskardpy.motion_statechart.goals.templates import RepeatOnStall
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstFalseNode,
@@ -172,7 +169,7 @@ def test_perform_parallel(immutable_model_world):
     plan.validate()
 
     for node in plan.nodes:
-        assert node.status == TaskStatus.SUCCEEDED
+        assert node.status == LifeCycleValues.SUCCEEDED
 
 
 def test_perform_repeat_runs_a_succeeding_motion_once(immutable_model_world):
@@ -191,7 +188,7 @@ def test_perform_repeat_runs_a_succeeding_motion_once(immutable_model_world):
     assert world.state[
         world.get_degree_of_freedom_by_name("torso_lift_joint").id
     ].position == pytest.approx(0.3, abs=0.05)
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
     plan.validate()
 
 
@@ -218,7 +215,7 @@ def test_repeat_does_not_give_up_on_a_child_that_starts_at_its_goal(
         robot_view.get_torso().get_joint_state_by_type(TorsoState.LOW).target_values
     )
     assert _torso_position(world) == pytest.approx(torso_down, abs=0.05)
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
 
 
 def test_exception_sequential(immutable_model_world):
@@ -242,7 +239,7 @@ def test_exception_sequential(immutable_model_world):
     with pytest.raises(PlanFailure):
         perform_plan()
     assert len(plan.root.children) == 2
-    assert plan.root.status == TaskStatus.FAILED
+    assert plan.root.status == LifeCycleValues.FAILED
 
 
 def test_exception_try_in_order(immutable_model_world):
@@ -258,7 +255,7 @@ def test_exception_try_in_order(immutable_model_world):
     with simulated_robot:
         _ = plan.perform()
     assert len(plan.root.children) == 2
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
 
 
 def test_exception_try_all(immutable_model_world):
@@ -275,7 +272,7 @@ def test_exception_try_all(immutable_model_world):
         _ = plan.perform()
 
     assert type(plan.root) is TryAllNode
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
 
 
 # %% monitored subtrees
@@ -355,7 +352,7 @@ def test_never_firing_cancel_monitor_leaves_the_motion_alone(immutable_model_wor
         plan.perform()
 
     assert _torso_position(world) == pytest.approx(0.3, abs=0.05)
-    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
 
 
 def test_repeat_raises_when_it_runs_out_of_attempts(immutable_model_world):
@@ -379,19 +376,19 @@ def test_repeat_raises_when_it_runs_out_of_attempts(immutable_model_world):
             plan.perform()
 
 
-def test_repeat_of_a_non_converging_motion_is_rejected(immutable_model_world):
+def test_repeat_of_a_non_converging_motion_is_attempted(immutable_model_world):
     """
-    Retrying on a stall needs a task whose progress can be measured, so a repeat whose
-    children never converge is reported when the motion state chart is compiled.
+    Progress is measured from a task's error, and a motion that has none is no longer
+    rejected: it is attempted until it succeeds or the attempts run out.
     """
     world, robot_view, context = immutable_model_world
+    target = Pose.from_xyz_rpy(1, -1, reference_frame=world.root)
 
-    plan = repeat(
-        [NavigateAction(Pose.from_xyz_rpy(1, -1, reference_frame=world.root))],
-        maximum_repetitions=2,
-        context=context,
-    ).plan
+    plan = repeat([NavigateAction(target)], maximum_repetitions=2, context=context).plan
+    with simulated_robot:
+        plan.perform()
 
-    with pytest.raises(NoConvergingTaskError):
-        with simulated_robot:
-            plan.perform()
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
+    np.testing.assert_almost_equal(
+        robot_view.root.global_transform.to_np()[:3, 3], [1, -1, 0], decimal=1
+    )

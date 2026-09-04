@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass, field
-from datetime import timedelta
 
 from typing_extensions import List, Dict, ClassVar, Optional, TYPE_CHECKING
 
@@ -24,28 +22,7 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
 from krrood.entity_query_language.factories import evaluate_condition
-from coraplex.datastructures.enums import ExecutionType
-from coraplex.exceptions import (
-    MotionDidNotFinish,
-    ConditionNotSatisfied,
-    UnknownExecutionType,
-)
-from semantic_digital_twin.world_description.connections import (
-    Connection6DoF,
-    FixedConnection,
-)
-from semantic_digital_twin.world_description.world_entity import Body
-
-from giskardpy.motion_statechart.graph_node import CancelMotion
 from krrood.symbolic_math.symbolic_math import Scalar, trinary_logic_not
-from krrood.symbolic_math.symbolic_math import (
-    trinary_logic_and,
-    trinary_logic_not,
-    trinary_logic_or,
-)
-from semantic_digital_twin.world_description.connections import (
-    Connection6DoF,
-)
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
@@ -166,7 +143,7 @@ class GiskardExecutable(Executable):
         execution type is only known once an
         :py:class:`~coraplex.execution_environment.ExecutionEnvironment` is entered.
         """
-        end_trigger = self.root_node.observation_variable
+        end_trigger = self.root_node.goal_reached
         if GiskardExecutable.collision_avoidance:
             self.motion_state_chart.add_node(ExternalCollisionAvoidance())
 
@@ -287,14 +264,15 @@ class GiskardExecutable(Executable):
         executor.context.cleanup()
 
         if not executor.motion_statechart.is_end_motion():
-            failed_nodes = [
+            unfinished_nodes = [
                 node
                 for node in motion_state_chart.nodes
                 if node.life_cycle_state
-                not in [LifeCycleValues.DONE, LifeCycleValues.NOT_STARTED]
+                not in [LifeCycleValues.SUCCEEDED, LifeCycleValues.NOT_STARTED]
             ]
-            logger.error(f"Failed Nodes: {failed_nodes}")
-            raise MotionDidNotFinish(failed_nodes)
+            motion_did_not_finish = MotionDidNotFinish(unfinished_nodes)
+            logger.error(motion_did_not_finish.error_message())
+            raise motion_did_not_finish
 
     def _execute_real(self) -> None:
         """
@@ -327,6 +305,7 @@ class ConditionExecutable(Executable):
             condition=self.condition_node.condition,
         )
 
+
 @dataclass
 class MoveBranchExecutable(Executable):
     """
@@ -336,7 +315,7 @@ class MoveBranchExecutable(Executable):
 
     body: Body = field(kw_only=True)
     """
-    The root of the branch in the kinematic structure that is moved 
+    The root of the branch in the kinematic structure that is moved.
     """
 
     new_parent: Body = field(kw_only=True)

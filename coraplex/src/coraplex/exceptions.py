@@ -166,10 +166,18 @@ class ConditionNotSatisfied(PlanFailure):
 @dataclass
 class MotionDidNotFinish(PlanFailure):
 
-    failed_motions: List[MotionStatechartNode]
+    unfinished_motions: List[MotionStatechartNode]
+    """
+    The nodes that did not succeed, whether they failed, were interrupted or never
+    ended.
+    """
 
     def error_message(self) -> str:
-        return f"Motion did not finish, following motions failed: {self.failed_motions}"
+        reports = ", ".join(
+            f"{motion.unique_name} ({motion.life_cycle_state.name})"
+            for motion in self.unfinished_motions
+        )
+        return f"Motion did not finish, following motions did not succeed: {reports}"
 
     def suggest_correction(self) -> str:
         return ""

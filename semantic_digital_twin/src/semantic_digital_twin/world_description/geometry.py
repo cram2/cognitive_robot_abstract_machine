@@ -4,6 +4,7 @@ import itertools
 import logging
 import math
 import os
+import re
 import shutil
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -27,7 +28,7 @@ from typing_extensions import (
     Tuple,
     TYPE_CHECKING,
     Generic,
-    TypeVar,
+    TypeVar, ClassVar,
 )
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
@@ -35,6 +36,7 @@ from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.interval import SimpleInterval, Bound, closed
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.exceptions import MalformedHexColor
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -86,6 +88,16 @@ class Color:
     Opacity of the color.
     """
 
+    HEX_COLOR_PREFIX: ClassVar[str] = field(default="#", init=False, repr=False)
+    """
+    The character a hex color is conventionally written behind.
+    """
+
+    HEX_COLOR_PATTERN: ClassVar[str] = field(default="(?:[0-9a-fA-F]{2}){3,4}", init=False, repr=False)
+    """
+    Three or four channels, each written as two hex digits.
+    """
+
     def __post_init__(self):
         """
         Make sure the color values are floats, because ros2 sucks.
@@ -95,11 +107,25 @@ class Color:
         self.B = float(self.B)
         self.A = float(self.A)
 
+    def __hash__(self):
+        return hash((self.R, self.G, self.B, self.A))
+
     def to_rgba(self) -> Tuple[float, float, float, float]:
         return (self.R, self.G, self.B, self.A)
 
     def to_rgb(self) -> Tuple[float, float, float]:
         return (self.R, self.G, self.B)
+
+    def to_hex(self) -> str:
+        """
+        :return: The color written as ``#RRGGBB``, two hex digits per channel.
+
+        ..note:: The opacity is not part of it, the same way it is not part of
+            :meth:`to_rgb`.
+        """
+        return self.HEX_COLOR_PREFIX + "".join(
+            f"{round(channel * 255):02X}" for channel in self.to_rgb()
+        )
 
     @classmethod
     def RED(self):
@@ -176,6 +202,28 @@ class Color:
         :param rgba: The list of RGBA values
         """
         return cls(*rgba)
+
+    @classmethod
+    def from_hex(cls, hex_color: str) -> Self:
+        """
+        Read a color written as two hex digits per channel, red first.
+
+        A fourth pair of digits sets the opacity; without it the color is fully opaque.
+
+        :param hex_color: The color, optionally preceded by a ``#`` and written in
+            either case.
+        :raises MalformedHexColor: If the string is not written that way.
+        :return: The color it names.
+        """
+        digits = hex_color.removeprefix(cls.HEX_COLOR_PREFIX)
+        if re.fullmatch(cls.HEX_COLOR_PATTERN, digits) is None:
+            raise MalformedHexColor(hex_color)
+        return cls.from_list(
+            [
+                int(digits[index : index + 2], 16) / 255
+                for index in range(0, len(digits), 2)
+            ]
+        )
 
     @classmethod
     def PINK(cls) -> Self:

@@ -1,3 +1,4 @@
+import copy
 import operator
 
 import casadi as ca
@@ -114,17 +115,25 @@ class TestLogic3:
                     actual
                 ), f"a={i}, b={j}, expected {expected}, actual {actual}"
 
-    def test_and3_with_too_few_arguments(self):
-        with pytest.raises(NotEnoughArgumentsError) as error:
-            sm.trinary_logic_and(sm.Scalar(TrinaryTrue))
-        assert error.value.minimum_number_of_arguments == 2
-        assert error.value.actual_number_of_arguments == 1
+    def test_and3_of_one_argument_is_that_argument(self):
+        for i in self.values:
+            assert i == sm.trinary_logic_and(sm.Scalar(i)), f"a={i}"
 
-    def test_or3_with_too_few_arguments(self):
+    def test_or3_of_one_argument_is_that_argument(self):
+        for i in self.values:
+            assert i == sm.trinary_logic_or(sm.Scalar(i)), f"a={i}"
+
+    def test_and3_without_arguments(self):
         with pytest.raises(NotEnoughArgumentsError) as error:
-            sm.trinary_logic_or(sm.Scalar(TrinaryTrue))
-        assert error.value.minimum_number_of_arguments == 2
-        assert error.value.actual_number_of_arguments == 1
+            sm.trinary_logic_and()
+        assert error.value.minimum_number_of_arguments == 1
+        assert error.value.actual_number_of_arguments == 0
+
+    def test_or3_without_arguments(self):
+        with pytest.raises(NotEnoughArgumentsError) as error:
+            sm.trinary_logic_or()
+        assert error.value.minimum_number_of_arguments == 1
+        assert error.value.actual_number_of_arguments == 0
 
     def test_not3(self):
         for i in self.values:
@@ -493,6 +502,30 @@ class TestFloatVariable:
         s = sm.FloatVariable(name="muh")
         d = {s: 1}
         assert d[s] == 1
+
+    def test_copying_yields_an_expression_over_the_same_symbol(self):
+        """
+        Every other operation on a variable yields a plain expression, and copying is no
+        different: a copy that is then changed is no longer that variable.
+        """
+        v = sm.FloatVariable(name="v")
+
+        copied = copy.copy(v)
+
+        assert type(copied) is sm.Scalar
+        assert copied.free_variables() == [v]
+
+    def test_substituting_a_variable_that_is_the_whole_expression(self):
+        """
+        A bare variable is an expression like any other, so substituting it replaces the
+        whole thing and leaves the variable itself untouched.
+        """
+        v = sm.FloatVariable(name="v")
+
+        substituted = v.substitute([v], [sm.Scalar(42)])
+
+        assert substituted.to_np() == 42
+        assert v.free_variables() == [v]
 
 
 class TestExpression:

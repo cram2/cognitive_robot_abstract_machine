@@ -888,11 +888,23 @@ class Scalar(SymbolicMathType):
         """
         return Scalar(ca.eq(self.casadi_sx, True))
 
+    def is_not_true(self) -> Scalar:
+        """
+        :return: maps True -> False, UNKNOW/False -> True
+        """
+        return trinary_logic_not(self.is_true())
+
     def is_false(self) -> Scalar:
         """
         :return: An expression that is True wherever this one is the trinary False.
         """
         return Scalar(ca.eq(self.casadi_sx, False))
+
+    def is_not_false(self) -> Scalar:
+        """
+        :return: maps False -> True, UNKNOW/True -> False
+        """
+        return trinary_logic_not(self.is_false())
 
     def is_unknown(self) -> Scalar:
         """
@@ -1090,6 +1102,16 @@ class FloatVariable(Scalar):
         casadi_sx = ca.SX.sym(self.name)
         self._registry[casadi_sx] = self
         super().__init__(casadi_sx)
+
+    def __copy__(self) -> Scalar:
+        """
+        A variable cannot be copied as a variable: a copy that is then changed is no
+        longer that variable. Copying yields a plain expression over the same symbol,
+        which is what every other operation on a variable returns.
+
+        :return: An expression over the same symbol.
+        """
+        return Scalar.from_casadi_sx(copy.copy(self.casadi_sx))
 
     @classmethod
     def create_with_resolver(cls, name: str, resolver: Callable[[], float]) -> Self:
@@ -2089,9 +2111,9 @@ def trinary_logic_and(*args: FloatVariable | Scalar) -> Scalar:
         Unknown | Unknown | Unknown | False
         False   | False   | False   | False
     """
-    if len(args) < 2:
+    if len(args) < 1:
         raise NotEnoughArgumentsError(
-            minimum_number_of_arguments=2, actual_number_of_arguments=len(args)
+            minimum_number_of_arguments=1, actual_number_of_arguments=len(args)
         )
     # if there is any False, return False
     if any(x for x in args if x.is_const_false()):
@@ -2118,15 +2140,15 @@ def trinary_logic_or(*args: FloatVariable | Scalar) -> Scalar:
         Unknown | True    | Unknown | Unknown
         False   | True    | Unknown | False
     """
-    if len(args) < 2:
+    if len(args) < 1:
         raise NotEnoughArgumentsError(
-            minimum_number_of_arguments=2, actual_number_of_arguments=len(args)
+            minimum_number_of_arguments=1, actual_number_of_arguments=len(args)
         )
-    # if there is any False, return False
+    # if there is any True, return True
     if any(x for x in args if x.is_const_true()):
         return Scalar.const_true()
-    # filter all True
-    args = [x for x in args if not x.is_const_true()]
+    # filter all False
+    args = [x for x in args if not x.is_const_false()]
     if len(args) == 0:
         return Scalar.const_false()
     if len(args) == 1:

@@ -6,23 +6,14 @@ from typing_extensions import (
     Any,
     Callable,
     List,
-    Dict,
-    Optional,
     TYPE_CHECKING,
-    Literal,
     Self,
 )
 
 from krrood.patterns.field_metadata import JSONMetadata
-from giskardpy.motion_statechart.data_types import TransitionKind
 from giskardpy.motion_statechart.plotters.styles import (
-    ConditionColors,
-    MonitorStyle,
-    MonitorShape,
-    TaskShape,
-    TaskStyle,
-    GoalNodeStyle,
-    GoalNodeShape,
+    BorderStyle,
+    NodeDrawingStyle,
 )
 
 if TYPE_CHECKING:
@@ -39,28 +30,34 @@ class NodePlotSpec:
     Only has an effect on nodes that own children, i.e. goals.
     """
 
-    style: str = "filled, rounded"
-    shape: str = "rectangle"
+    style: str = NodeDrawingStyle.MONITOR.style
+    shape: str = NodeDrawingStyle.MONITOR.shape
     extra_border_styles: List[str] = field(default_factory=list)
 
     @classmethod
     def create_monitor_style(cls) -> Self:
         return cls(
-            visible=True, style=MonitorStyle, shape=MonitorShape, extra_border_styles=[]
+            visible=True,
+            style=NodeDrawingStyle.MONITOR.style,
+            shape=NodeDrawingStyle.MONITOR.shape,
+            extra_border_styles=[],
         )
 
     @classmethod
     def create_task_style(cls) -> Self:
         return cls(
-            visible=True, style=TaskStyle, shape=TaskShape, extra_border_styles=[]
+            visible=True,
+            style=NodeDrawingStyle.TASK.style,
+            shape=NodeDrawingStyle.TASK.shape,
+            extra_border_styles=[],
         )
 
     @classmethod
     def create_goal_style(cls) -> Self:
         return cls(
             visible=True,
-            style=GoalNodeStyle,
-            shape=GoalNodeShape,
+            style=NodeDrawingStyle.GOAL.style,
+            shape=NodeDrawingStyle.GOAL.shape,
             extra_border_styles=[],
         )
 
@@ -77,18 +74,18 @@ class NodePlotSpec:
     def create_end_style(cls):
         return cls(
             visible=True,
-            style=MonitorStyle,
-            shape=MonitorShape,
-            extra_border_styles=["rounded"],
+            style=NodeDrawingStyle.MONITOR.style,
+            shape=NodeDrawingStyle.MONITOR.shape,
+            extra_border_styles=[BorderStyle.ROUNDED],
         )
 
     @classmethod
     def create_cancel_style(cls):
         return cls(
             visible=True,
-            style=MonitorStyle,
-            shape=MonitorShape,
-            extra_border_styles=["dashed, rounded"],
+            style=NodeDrawingStyle.MONITOR.style,
+            shape=NodeDrawingStyle.MONITOR.shape,
+            extra_border_styles=[BorderStyle.DASHED_ROUNDED],
         )
 
 
@@ -105,56 +102,3 @@ def plot_specification_field(default_factory: Callable[[], NodePlotSpec]) -> Any
         init=False,
         metadata=JSONMetadata(serialize=True).as_dict(),
     )
-
-
-SrcSelector = Literal["parent", "child"]
-DstSelector = Literal["parent", "child"]
-StateSelector = Literal["parent", "child"]
-
-
-@dataclass(frozen=True)
-class EdgeSpec:
-    color: str
-    src_selector: SrcSelector
-    dst_selector: DstSelector
-    state_selector: StateSelector
-    extra_edge_kwargs: Optional[Dict[str, object]] = None
-
-    def extras(self) -> Dict[str, object]:
-        return {} if self.extra_edge_kwargs is None else dict(self.extra_edge_kwargs)
-
-
-TRANSITION_SPECS: Dict[TransitionKind, EdgeSpec] = {
-    TransitionKind.START: EdgeSpec(
-        color=ConditionColors.StartCondColor,
-        src_selector="child",
-        dst_selector="parent",
-        state_selector="parent",
-    ),
-    TransitionKind.PAUSE: EdgeSpec(
-        color=ConditionColors.PauseCondColor,
-        src_selector="child",
-        dst_selector="parent",
-        state_selector="child",
-        extra_edge_kwargs={"minlen": 0},
-    ),
-    TransitionKind.END: EdgeSpec(
-        color=ConditionColors.EndCondColor,
-        src_selector="child",
-        dst_selector="parent",
-        state_selector="child",
-        extra_edge_kwargs={},
-    ),
-    TransitionKind.RESET: EdgeSpec(
-        color=ConditionColors.ResetCondColor,
-        src_selector="parent",
-        dst_selector="child",
-        state_selector="parent",
-        extra_edge_kwargs={
-            "arrowhead": "none",
-            "arrowtail": "normal",
-            "dir": "both",
-            "minlen": 0,
-        },
-    ),
-}

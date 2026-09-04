@@ -2,9 +2,9 @@
 Tests for the observation expressions built by the monitored subtree templates (see
 ``giskardpy/motion_statechart/monitors/templates.py``).
 
-``build_artifacts`` reads nothing but the observation variables of the monitor and the
-monitored node, both of which exist from construction, so each expression is evaluated
-by substituting observation values into it rather than by ticking an executor.
+``build_artifacts`` reads nothing but the monitor's observation and what the monitored
+node has reached, both of which exist as variables from construction, so each expression
+is evaluated by substituting values into it rather than by ticking an executor.
 """
 
 import pytest
@@ -49,6 +49,9 @@ def observation_for(
     """
     Evaluate the observation a goal builds for one pair of input observations.
 
+    The monitored node is read through what it has reached, which is what it observes
+    while it runs, so the same value stands for both of its variables.
+
     :param goal: The goal whose observation expression is evaluated.
     :param monitored_observation: What the monitored node observes.
     :param monitor_observation: What the monitor observes.
@@ -58,8 +61,12 @@ def observation_for(
     # A template may hand back a node's observation variable unwrapped, which cannot be
     # copied and therefore not substituted into.
     substituted = Scalar(artifacts.observation).substitute(
-        [goal.monitored_node.observation_variable, goal.monitor.observation_variable],
-        [monitored_observation, monitor_observation],
+        [
+            goal.monitored_node.observation_variable,
+            goal.monitored_node.goal_reached,
+            goal.monitor.observation_variable,
+        ],
+        [monitored_observation, monitored_observation, monitor_observation],
     )
     return ObservationStateValues(float(substituted))
 

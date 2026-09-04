@@ -40,10 +40,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionTrajectory,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from krrood.symbolic_math.symbolic_math import (
-    trinary_logic_and,
-    trinary_logic_not,
-)
+from krrood.symbolic_math.symbolic_math import trinary_logic_not
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -679,13 +676,9 @@ class TestCartesianTasks:
         motion_statechart.add_node(cart_goal2)
 
         cart_goal1.end_condition = cart_goal1.observation_variable
-        cart_goal2.start_condition = cart_goal1.observation_variable
+        cart_goal2.start_condition = cart_goal1.is_succeeded
 
-        end = EndMotion()
-        motion_statechart.add_node(end)
-        end.start_condition = trinary_logic_and(
-            cart_goal1.observation_variable, cart_goal2.observation_variable
-        )
+        motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
 
         executor = Executor(
             MotionStatechartContext(
@@ -733,13 +726,9 @@ class TestCartesianTasks:
         motion_statechart.add_node(cart_goal2)
 
         cart_goal1.end_condition = cart_goal1.observation_variable
-        cart_goal2.start_condition = cart_goal1.observation_variable
+        cart_goal2.start_condition = cart_goal1.is_succeeded
 
-        end = EndMotion()
-        motion_statechart.add_node(end)
-        end.start_condition = trinary_logic_and(
-            cart_goal1.observation_variable, cart_goal2.observation_variable
-        )
+        motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
 
         executor = Executor(
             MotionStatechartContext(
@@ -828,13 +817,9 @@ class TestCartesianTasks:
         motion_statechart.add_node(cart_goal2)
 
         cart_goal1.end_condition = cart_goal1.observation_variable
-        cart_goal2.start_condition = cart_goal1.observation_variable
+        cart_goal2.start_condition = cart_goal1.is_succeeded
 
-        end = EndMotion()
-        motion_statechart.add_node(end)
-        end.start_condition = trinary_logic_and(
-            cart_goal1.observation_variable, cart_goal2.observation_variable
-        )
+        motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
 
         executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         executor.compile(motion_statechart=motion_statechart)
@@ -883,13 +868,9 @@ class TestCartesianTasks:
         motion_statechart.add_node(cart_goal2)
 
         cart_goal1.end_condition = cart_goal1.observation_variable
-        cart_goal2.start_condition = cart_goal1.observation_variable
+        cart_goal2.start_condition = cart_goal1.is_succeeded
 
-        end = EndMotion()
-        motion_statechart.add_node(end)
-        end.start_condition = trinary_logic_and(
-            cart_goal1.observation_variable, cart_goal2.observation_variable
-        )
+        motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
 
         executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         executor.compile(motion_statechart=motion_statechart)
@@ -987,13 +968,9 @@ class TestCartesianTasks:
         motion_statechart.add_node(cart_goal2)
 
         cart_goal1.end_condition = cart_goal1.observation_variable
-        cart_goal2.start_condition = cart_goal1.observation_variable
+        cart_goal2.start_condition = cart_goal1.is_succeeded
 
-        end = EndMotion()
-        motion_statechart.add_node(end)
-        end.start_condition = trinary_logic_and(
-            cart_goal1.observation_variable, cart_goal2.observation_variable
-        )
+        motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
 
         executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         executor.compile(motion_statechart=motion_statechart)
@@ -1045,13 +1022,9 @@ class TestCartesianTasks:
         motion_statechart.add_node(cart_goal2)
 
         cart_goal1.end_condition = cart_goal1.observation_variable
-        cart_goal2.start_condition = cart_goal1.observation_variable
+        cart_goal2.start_condition = cart_goal1.is_succeeded
 
-        end = EndMotion()
-        motion_statechart.add_node(end)
-        end.start_condition = trinary_logic_and(
-            cart_goal1.observation_variable, cart_goal2.observation_variable
-        )
+        motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
 
         executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         executor.compile(motion_statechart=motion_statechart)

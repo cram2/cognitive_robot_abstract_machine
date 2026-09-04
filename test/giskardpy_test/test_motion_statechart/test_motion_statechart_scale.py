@@ -8,7 +8,10 @@ from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import ConstTrueNode, ConstFalseNode
+from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
+    ConstTrueNode,
+    ConstFalseNode,
+)
 from semantic_digital_twin.world import World
 
 
@@ -16,10 +19,10 @@ def _build_chain(
     motion_statechart: MotionStatechart, length: int
 ) -> list[MotionStatechartNode]:
     """
-    Builds a linear chain of ConstTrueNode instances directly on `motion_statechart`, wired the
-    same way :class:`Sequence` wires its children: each node starts once the previous node's
-    observation is true, and ends on its own observation, so only one node in the chain is ever
-    RUNNING at a time.
+    Builds a linear chain of ConstTrueNode instances directly on `motion_statechart`,
+    wired the same way :class:`Sequence` wires its children: each node starts once the
+    previous node's observation is true, and ends on its own observation, so only one
+    node in the chain is ever RUNNING at a time.
     """
     chain: list[MotionStatechartNode] = []
     previous = None
@@ -38,8 +41,8 @@ def _build_chain(
 @pytest.mark.parametrize("node_count", [100, 1_000, 10_000])
 def test_long_sequence_scale(node_count: int):
     """
-    Builds a single long Sequence of cheap ConstTrueNode instances, where exactly one node is
-    RUNNING at any time, and measures compile/tick time as the graph grows.
+    Builds a single long Sequence of cheap ConstTrueNode instances, where exactly one
+    node is RUNNING at any time, and measures compile/tick time as the graph grows.
     """
     msc = MotionStatechart()
     sequence = Sequence(nodes=[ConstTrueNode() for _ in range(node_count)])
@@ -69,9 +72,11 @@ def test_long_sequence_scale(node_count: int):
 @pytest.mark.parametrize("branch_length", [10, 100, 1_000])
 def test_many_alternative_branches_scale(branch_length: int):
     """
-    Builds many branches of a linear ConstTrueNode chain where only the first branch is ever
-    traveled; the remaining branches are gated off by a permanently-false condition and stay
-    NOT_STARTED. Measures compile/tick time as the total, mostly dormant, graph grows.
+    Builds many branches of a linear ConstTrueNode chain where only the first branch is
+    ever traveled; the remaining branches are gated off by a permanently-false condition
+    and stay NOT_STARTED.
+
+    Measures compile/tick time as the total, mostly dormant, graph grows.
     """
     branch_count = 10
     msc = MotionStatechart()
