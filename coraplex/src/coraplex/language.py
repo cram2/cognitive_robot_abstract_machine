@@ -216,11 +216,19 @@ class RepeatNode(ExecutesSequentially):
             node=children_goal,
             target=self.maximum_repetitions,
         )
+        # A template that derives its own failure monitor, such as RepeatOnStall,
+        # excludes failure_monitor from its constructor entirely, so it must only be
+        # passed on when one was actually given.
+        failure_monitor_kwargs = (
+            {"failure_monitor": self.failure_monitor}
+            if self.failure_monitor is not None
+            else {}
+        )
         loop = self.repeat_template(
             name=type(self).__name__,
             task=children_goal,
             stop_retry_monitor=counter,
-            failure_monitor=self.failure_monitor,
+            **failure_monitor_kwargs,
         )
         parent_goal.add_node(loop)
         loop.add_node(children_goal)

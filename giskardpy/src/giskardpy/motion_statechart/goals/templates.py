@@ -8,10 +8,6 @@ from typing_extensions import Optional
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues
-from giskardpy.motion_statechart.exceptions import (
-    ConflictingFailureMonitorError,
-    MissingFailureMonitorError,
-)
 from giskardpy.motion_statechart.graph_node import (
     CancelMotion,
     Goal,
@@ -120,7 +116,8 @@ class RepeatUntil(Goal):
     worked" from "gave up".
 
     Hand it a :attr:`failure_monitor` to decide what a failed attempt is, or subclass it
-    and derive that decision from the task in :meth:`_ensure_failure_monitor`.
+    and derive that decision from the task instead, overriding :attr:`failure_monitor`
+    with an ``init=False`` field set in :meth:`__post_init__`.
     """
 
     task: MotionStatechartNode = field(kw_only=True)
@@ -136,24 +133,13 @@ class RepeatUntil(Goal):
     Stops the retrying once it observes True, which makes this goal observe False.
     """
 
-    failure_monitor: Optional[MotionStatechartNode] = field(default=None, kw_only=True)
+    failure_monitor: MotionStatechartNode = field(kw_only=True)
     """
     Decides that an attempt failed and the task should run again.
 
-    Subclasses that derive one from the task leave this unset; it holds the node in use
-    once such a goal was constructed.
+    Subclasses that derive one from the task instead exclude this from their constructor
+    and set it themselves in :meth:`__post_init__`.
     """
-
-    def __post_init__(self):
-        super().__post_init__()
-        self._ensure_failure_monitor()
-
-    def _ensure_failure_monitor(self) -> None:
-        """
-        :raises MissingFailureMonitorError: If nothing decides that an attempt failed.
-        """
-        if self.failure_monitor is None:
-            raise MissingFailureMonitorError(node=self)
 
     @property
     def attempt_failed(self) -> Scalar:
@@ -232,6 +218,12 @@ class RepeatOnStall(RepeatUntil):
     :attr:`timeout` alone decides when such an attempt is given up on.
     """
 
+    failure_monitor: MotionStatechartNode = field(init=False, kw_only=True)
+    """
+    Watches the task's own progress; derived from it in :meth:`__post_init__` rather
+    than accepted from the caller.
+    """
+
     timeout: timedelta = field(
         default=timedelta(seconds=DEFAULT_STALL_TIMEOUT), kw_only=True
     )
@@ -245,14 +237,8 @@ class RepeatOnStall(RepeatUntil):
     task's own threshold per second.
     """
 
-    def _ensure_failure_monitor(self) -> None:
-        """
-        Watch the task's own progress, which is what a stall is read from.
-
-        :raises ConflictingFailureMonitorError: If a failure monitor was passed as well.
-        """
-        if self.failure_monitor is not None:
-            raise ConflictingFailureMonitorError(node=self)
+    def __post_init__(self) -> None:
+        super().__post_init__()
         self.failure_monitor = StillProgressing(
             name=f"{self.name}/progress",
             monitored_node=self.task,
