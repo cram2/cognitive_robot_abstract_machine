@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from typing_extensions import List, Optional
 
@@ -179,7 +180,7 @@ class AnyMonitoredTaskRunning(MotionStatechartNode):
 class StillProgressing(Goal):
     """
     Turns ``False`` once nothing under :attr:`monitored_node` has approached its goal
-    for :attr:`timeout` seconds.
+    for :attr:`timeout`.
 
     Watching each converging task separately, rather than one combined error, keeps the
     measure meaningful for a :class:`~giskardpy.motion_statechart.goals.templates.Sequence`,
@@ -194,9 +195,9 @@ class StillProgressing(Goal):
     The task or goal whose progress is watched.
     """
 
-    timeout: float = field(default=5.0, kw_only=True)
+    timeout: timedelta = field(default=timedelta(seconds=5), kw_only=True)
     """
-    Seconds of simulated time without progress after which this turns ``False``.
+    Simulated time without progress after which this turns ``False``.
     """
 
     minimum_convergence_rate: float = field(default=0.05, kw_only=True)
@@ -261,7 +262,7 @@ class StillProgressing(Goal):
     def expand(self, context: MotionStatechartContext) -> None:
         self._monitored_tasks = self._find_converging_tasks(self.monitored_node)
         self._timer = CountSimulationTimeSeconds(
-            name=f"{self.name}/timer", seconds=self.timeout
+            name=f"{self.name}/timer", seconds=self.timeout.total_seconds()
         )
         self.add_node(self._timer)
         stalled_now = self._expand_stall_detection()
@@ -303,8 +304,8 @@ class StillProgressing(Goal):
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        The timer only turns true once progress has stalled for :attr:`timeout` seconds,
-        so every other reading of it means this node has not given up yet.
+        The timer only turns true once progress has stalled for :attr:`timeout`, so
+        every other reading of it means this node has not given up yet.
 
         The timer is unknown until it starts, which a plain negation would carry through
         to a node that is in fact progressing, so the timer is compared against being

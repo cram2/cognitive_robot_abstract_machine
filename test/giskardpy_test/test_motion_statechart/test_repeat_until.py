@@ -159,16 +159,15 @@ def _repeat_on_stall(**timeout_argument) -> RepeatOnStall:
     )
 
 
-def test_stall_timeout_is_measured_in_seconds():
+def test_stall_timeout_reaches_the_progress_monitor():
     """
-    A window longer than a day reaches the progress monitor whole, rather than losing
-    its days on the way.
+    The window the loop was configured with is what its progress monitor watches.
     """
     timeout = timedelta(days=1, seconds=30)
 
     loop = _repeat_on_stall(timeout=timeout)
 
-    assert loop.failure_monitor.timeout == timeout.total_seconds()
+    assert loop.failure_monitor.timeout == timeout
 
 
 def test_default_stall_timeout_leaves_an_attempt_time_to_converge():
@@ -178,7 +177,7 @@ def test_default_stall_timeout_leaves_an_attempt_time_to_converge():
     """
     loop = _repeat_on_stall()
 
-    assert loop.failure_monitor.timeout == timedelta(seconds=5).total_seconds()
+    assert loop.failure_monitor.timeout == timedelta(seconds=5)
 
 
 # %% retrying a motion that stops making progress

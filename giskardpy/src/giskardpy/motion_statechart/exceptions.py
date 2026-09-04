@@ -358,7 +358,7 @@ class NoProgressError(MotionStatechartError):
         names = ", ".join(task.unique_name for task in stalled_tasks)
         return (
             f"{names or self.progress_monitor.monitored_node.unique_name} stopped "
-            f"approaching a goal for {self.progress_monitor.timeout} seconds."
+            f"approaching a goal for {self.progress_monitor.timeout}."
         )
 
     def suggest_correction(self) -> str:

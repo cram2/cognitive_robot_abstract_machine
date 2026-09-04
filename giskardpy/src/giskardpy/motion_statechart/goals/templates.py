@@ -15,10 +15,7 @@ from giskardpy.motion_statechart.graph_node import (
     NodeArtifacts,
     TerminalNode,
 )
-from giskardpy.motion_statechart.monitors.progress_monitors import (
-    DEFAULT_STALL_TIMEOUT,
-    StillProgressing,
-)
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.monitors.templates import StoppedWhenTrue
 from krrood.exceptions import DataclassException
 from krrood.symbolic_math.symbolic_math import (
@@ -224,9 +221,7 @@ class RepeatOnStall(RepeatUntil):
     than accepted from the caller.
     """
 
-    timeout: timedelta = field(
-        default=timedelta(seconds=DEFAULT_STALL_TIMEOUT), kw_only=True
-    )
+    timeout: timedelta = field(default=timedelta(seconds=5), kw_only=True)
     """
     Simulated time without progress after which an attempt counts as failed.
     """
@@ -242,7 +237,7 @@ class RepeatOnStall(RepeatUntil):
         self.failure_monitor = StillProgressing(
             name=f"{self.name}/progress",
             monitored_node=self.task,
-            timeout=self.timeout.total_seconds(),
+            timeout=self.timeout,
             minimum_convergence_rate=self.minimum_convergence_rate,
         )
 
@@ -315,10 +310,10 @@ class TryInOrder(Goal):
     monitor per alternative to :attr:`nodes` alongside them.
     """
 
-    give_up_after: float = field(default=DEFAULT_STALL_TIMEOUT, kw_only=True)
+    give_up_after: timedelta = field(default=timedelta(seconds=5), kw_only=True)
     """
-    Seconds of simulated time an alternative may make no progress before it is abandoned
-    and the next one is tried.
+    Simulated time an alternative may make no progress before it is abandoned and the
+    next one is tried.
     """
 
     def expand(self, context: MotionStatechartContext) -> None:

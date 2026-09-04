@@ -8,6 +8,7 @@ ticking the executor, asserting the resulting observation and life cycle states.
 succeed / fail.
 """
 
+from datetime import timedelta
 from math import ceil
 
 import pytest
@@ -43,9 +44,9 @@ from coraplex.language import TryAllNode, TryInOrderNode
 # Number of ticks after which the templates below have settled into their final observation.
 SETTLE_TICKS = 6
 
-# Simulated seconds an alternative is given before it is abandoned. Short so that a test
+# Simulated time an alternative is given before it is abandoned. Short so that a test
 # that has to wait out the give-up budget stays fast.
-GIVE_UP_AFTER = 0.2
+GIVE_UP_AFTER = timedelta(seconds=0.2)
 
 
 def _compile_and_tick(
@@ -69,7 +70,7 @@ def _compile_and_tick(
     executor = Executor(context)
     executor.compile(motion_statechart=msc)
     cycles_per_alternative = ceil(
-        GIVE_UP_AFTER / context.qp_controller_config.control_dt
+        GIVE_UP_AFTER.total_seconds() / context.qp_controller_config.control_dt
     )
     for _ in range(ticks + alternatives_to_abandon * cycles_per_alternative):
         executor.tick()
@@ -238,7 +239,7 @@ def test_the_next_alternative_starts_on_the_cycle_the_previous_one_fails():
     executor.compile(motion_statechart=msc)
 
     cycles_to_abandon_an_alternative = ceil(
-        GIVE_UP_AFTER / context.qp_controller_config.control_dt
+        GIVE_UP_AFTER.total_seconds() / context.qp_controller_config.control_dt
     )
     for _ in range(cycles_to_abandon_an_alternative + SETTLE_TICKS):
         executor.tick()
