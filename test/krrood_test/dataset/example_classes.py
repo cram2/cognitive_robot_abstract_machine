@@ -896,6 +896,69 @@ class TestExPartsAggregations(SceneObjectAggregationBase[TestExParts]):
         return cou
 
 
+# %% Relational causal experiment (skill-confounded grasp attempts)
+
+
+@dataclass
+class GraspAttempt:
+    """
+    A single grasp attempt, whose arm position and outcome may be confounded by
+    the robot's shared skill level.
+    """
+
+    arm: float
+    """
+    The arm's position at the time of this attempt.
+    """
+
+    grasped: bool
+    """
+    Whether this attempt succeeded.
+    """
+
+
+@dataclass
+class PickingRobot:
+    """
+    A robot performing a series of grasp attempts, with a skill level shared
+    across every attempt it makes.
+    """
+
+    skill: float
+    """
+    The robot's skill level, generated independently of any single attempt.
+    """
+
+    attempts: List[GraspAttempt]
+    """
+    The robot's grasp attempts.
+    """
+
+
+@dataclass
+class PickingRobotAggregations(AggregationStatistic[PickingRobot]):
+    """
+    Aggregation statistics for :class:`PickingRobot` over its ``attempts`` field.
+    """
+
+    @aggregation_statistic("attempts")
+    def success_count(self) -> int:
+        """
+        Count of successful grasp attempts.
+        """
+        grasped_var = variable(GraspAttempt, self.instance.attempts).grasped
+        [cou] = entity(count_range(grasped_var)).where(grasped_var == True).tolist()
+        return cou
+
+    @aggregation_statistic("attempts")
+    def total_count(self) -> int:
+        """
+        Total number of grasp attempts.
+        """
+        [cou] = count(variable(GraspAttempt, self.instance.attempts)).tolist()
+        return cou
+
+
 @dataclass
 class ExampleInt:
     attribute: int
