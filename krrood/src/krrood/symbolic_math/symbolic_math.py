@@ -888,11 +888,23 @@ class Scalar(SymbolicMathType):
         """
         return Scalar(ca.eq(self.casadi_sx, True))
 
+    def is_not_true(self) -> Scalar:
+        """
+        :return: maps True -> False, UNKNOW/False -> True
+        """
+        return trinary_logic_not(self.is_true())
+
     def is_false(self) -> Scalar:
         """
         :return: An expression that is True wherever this one is the trinary False.
         """
         return Scalar(ca.eq(self.casadi_sx, False))
+
+    def is_not_false(self) -> Scalar:
+        """
+        :return: maps False -> True, UNKNOW/True -> False
+        """
+        return trinary_logic_not(self.is_false())
 
     def is_unknown(self) -> Scalar:
         """

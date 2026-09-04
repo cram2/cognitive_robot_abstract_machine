@@ -5,7 +5,7 @@ import logging
 import threading
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import field, dataclass, fields
+from dataclasses import field, dataclass
 from functools import cached_property
 
 import numpy as np
@@ -22,26 +22,7 @@ from typing_extensions import (
 )
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.adapters.json_serializer import (
-    SubclassJSONSerializer,
-    JSON_TYPE_NAME,
-    to_json,
-    from_json,
-)
-from krrood.patterns.field_metadata import JSONMetadata
-from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
-from krrood.exceptions import DataclassException
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.spatial_types import (
-    Point3,
-    Vector3,
-    Quaternion,
-    RotationMatrix,
-    HomogeneousTransformationMatrix,
-    Pose,
-)
-from semantic_digital_twin.world_description.geometry import Color
+from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
@@ -50,6 +31,7 @@ from giskardpy.motion_statechart.data_types import (
     TransitionKind,
     DefaultWeights,
 )
+from giskardpy.motion_statechart.error_signals import ErrorSignal
 from giskardpy.motion_statechart.exceptions import (
     NotInMotionStatechartError,
     EndMotionInGoalError,
@@ -62,14 +44,29 @@ from giskardpy.motion_statechart.exceptions import (
     TerminalNodeInConditionError,
     MissingErrorSignalError,
 )
-from giskardpy.motion_statechart.error_signals import ErrorSignal
 from giskardpy.motion_statechart.plotters.plot_specs import (
     NodePlotSpec,
     plot_specification_field,
 )
-from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.utils.utils import string_shortener
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+)
+from krrood.exceptions import DataclassException
+from krrood.patterns.field_metadata import JSONMetadata
+from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import (
+    Point3,
+    Vector3,
+    Quaternion,
+    RotationMatrix,
+    HomogeneousTransformationMatrix,
+    Pose,
+)
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.geometry import Color
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -892,7 +889,7 @@ class MotionStatechartNode:
         :param transition_kind: The transition whose condition to read.
         :return: 1 while this node's own condition of that kind is true, 0 otherwise.
         """
-        return sm.Scalar(self.get_condition(transition_kind) == sm.Scalar.const_true())
+        return self.get_condition(transition_kind).is_true()
 
     def _create_verdict(self) -> sm.Scalar:
         """
@@ -978,7 +975,7 @@ class MotionStatechartNode:
         return sm.if_else(
             condition=any_reset_condition_true,
             if_result=sm.Scalar(LifeCycleValues.NOT_STARTED),
-            else_result=sm.Scalar(self.life_cycle_variable),
+            else_result=self.life_cycle_variable,
         )
 
     def _create_pause_transitions(
@@ -989,13 +986,13 @@ class MotionStatechartNode:
         :param any_reset_condition_true: The combined reset condition for this node and its parents. Combined using trinary_logic_or.
         :return: The LifeCycleState transitions for the PAUSED state.
         """
-        unpause_condition = sm.Scalar(self.pause_condition != sm.Scalar.const_true())
+        unpause_condition = self.pause_condition.is_not_true()
         current = self
         while current.parent_node is not None:
             parent = current.parent_node
             unpause_condition = sm.trinary_logic_and(
                 unpause_condition,
-                sm.Scalar(parent.pause_condition != sm.Scalar.const_true()),
+                parent.pause_condition.is_not_true()
             )
             current = parent
 
