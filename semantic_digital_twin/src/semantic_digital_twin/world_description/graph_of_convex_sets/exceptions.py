@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
-
 from semantic_digital_twin.exceptions import UsageError
-from semantic_digital_twin.spatial_types import Point2, Point3
+from semantic_digital_twin.spatial_types import Point2, Point3, Point
+from semantic_digital_twin.world_description.geometry import AxisAlignedBox
 
 
 @dataclass
@@ -40,12 +40,12 @@ class UnreachableGoalError(UsageError):
     goal.
     """
 
-    start: Point3 | Point2
+    start: Point
     """
     Where the queried path was supposed to begin.
     """
 
-    goal: Point3 | Point2
+    goal: Point
     """
     Where the queried path was supposed to end.
     """
@@ -128,3 +128,32 @@ class UnboundedSearchSpaceError(UsageError):
 
     def suggest_correction(self) -> str:
         return "pass an explicit, finite search_space with a single bounding box."
+
+
+@dataclass
+class PointOutsideSearchSpaceError(UsageError):
+    """
+    Raised when a queried point lies beyond the region a graph of convex sets was built
+    over, so nothing is known about whether it is free.
+    """
+
+    point: Point3 | Point2
+    """
+    The point that lies outside the search space.
+    """
+
+    search_space: AxisAlignedBox
+    """
+    The extent that was decomposed, which does not cover the point.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The point {self.point} lies outside the search space {self.search_space}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "widen the search space so that it covers the point, or query a point "
+            "within it."
+        )

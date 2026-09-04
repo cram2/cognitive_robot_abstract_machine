@@ -33,6 +33,9 @@ class DifferentialDriveBaseGoal(Sequence):
     1. Orient to goal position
     2. Drive to goal position
     3. Orient to goal orientation
+
+    The direction to the goal is an expression over the base's forward kinematics, so
+    steps 1 and 2 follow the base as it drives.
     """
 
     diff_drive_connection: DifferentialDrive | None = field(kw_only=True, default=None)
@@ -83,7 +86,7 @@ class DifferentialDriveBaseGoal(Sequence):
         tip = self.diff_drive_connection.child
 
         root_T_goal = context.world.transform(self.goal_pose, map)
-        root_T_current = tip.global_transform
+        root_T_current = context.world.compose_forward_kinematics_expression(map, tip)
         root_V_current_to_goal = (
             root_T_goal.to_position() - root_T_current.to_position()
         )

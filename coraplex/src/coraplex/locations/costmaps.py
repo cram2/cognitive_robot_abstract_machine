@@ -583,7 +583,7 @@ class OccupancyCostmap(Costmap):
             width=200,
             height=200,
             world=context.world,
-            distance_to_obstacle=(base_bb.depth / 2 + base_bb.width / 2) / 2 + 0.1,
+            distance_to_obstacle=context.robot.mobile_base.base_radius,
             robot_view=context.robot,
             origin=ground_pose,
         )

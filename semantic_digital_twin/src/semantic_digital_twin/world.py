@@ -70,7 +70,6 @@ from semantic_digital_twin.spatial_computations.ik_solver import InverseKinemati
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
-    Quaternion,
     Point3,
 )
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
@@ -2507,20 +2506,14 @@ class World(HasSimulatorProperties):
         """
         Transform a given spatial object from its reference frame to a target frame.
 
-        Calculate the transformation from the reference frame of the provided
-        spatial object to the specified target frame. Apply the transformation
-        differently depending on the type of the spatial object:
-
-        - If the object is a Quaternion, compute its rotation matrix, transform it, and
-          convert back to a Quaternion.
-        - For other types, apply the transformation matrix directly.
+        How the transformation applies is the spatial type's own business -- see
+        :meth:`~semantic_digital_twin.spatial_types.spatial_types.SpatialType.transform`
+        -- so a type that needs more than a matrix multiplication says so itself.
 
         :param spatial_object: The spatial object to be transformed.
         :param target_frame: The target KinematicStructureEntity frame to which the spatial object should
             be transformed.
-        :return: The spatial object transformed to the target frame. If the input object
-            is a Quaternion, the returned object is a Quaternion. Otherwise, it is the
-            transformed spatial object.
+        :return: The spatial object, of the same type, expressed in the target frame.
         """
         if spatial_object.reference_frame is None:
             raise MissingReferenceFrameError(spatial_object)
@@ -2530,13 +2523,7 @@ class World(HasSimulatorProperties):
             root=target_frame, tip=spatial_object.reference_frame
         )
 
-        match spatial_object:
-            case Quaternion():
-                reference_frame_R = spatial_object.to_rotation_matrix()
-                target_frame_R = target_frame_T_reference_frame @ reference_frame_R
-                return target_frame_R.to_quaternion()
-            case _:
-                return target_frame_T_reference_frame @ spatial_object
+        return spatial_object.transform(target_frame_T_reference_frame)
 
     def __deepcopy__(self, memo):
         memo = {} if memo is None else memo

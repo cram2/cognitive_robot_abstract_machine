@@ -38,6 +38,7 @@ from semantic_digital_twin.spatial_types.derivatives import Derivatives, Derivat
 # from semantic_digital_twin.spatial_types.math import rotation_matrix_from_rpy
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Pose2D,
     RotationMatrix,
 )
 from semantic_digital_twin.testing import StateChangeCounter, world_setup
@@ -546,6 +547,28 @@ def test_compute_relative_pose(world_setup):
     )
 
     np.testing.assert_array_almost_equal(relative_pose.to_np(), expected_pose.to_np())
+
+
+def test_transform_a_pose_2d(world_setup):
+    """
+    A Pose2D carries no z, roll or pitch, so transforming one answers with the
+    transformed 3D pose flattened back onto the target frame's plane.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: PrismaticConnection = world.get_connection(l1, l2)
+    world.state[connection.dof.id].position = 1.0
+    world.notify_state_change()
+
+    pose_2d = Pose2D(x=2.0, y=0.5, yaw=0.3, reference_frame=l2)
+
+    relative_pose_2d = world.transform(pose_2d, l1)
+
+    assert isinstance(relative_pose_2d, Pose2D)
+    assert relative_pose_2d.reference_frame == l1
+    np.testing.assert_array_almost_equal(
+        relative_pose_2d.to_np(),
+        Pose2D.from_pose(world.transform(pose_2d.to_pose(), l1)).to_np(),
+    )
 
 
 def test_compute_relative_pose_both(world_setup):

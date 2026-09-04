@@ -38,6 +38,7 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
+    Point,
     Point2,
     Point3,
     Vector3,
@@ -1189,8 +1190,17 @@ class Bounds(Generic[T], SubClassSafeGeneric):
         return SimpleInterval.from_data(t_min, t_max, Bound.CLOSED, Bound.CLOSED)
 
 
+PointT = TypeVar("PointT", bound=Point)
+"""
+The point type an :class:`AxisAlignedBox` subclass is asked about --
+:class:`~semantic_digital_twin.spatial_types.Point3` for a box expressed over three
+axes, :class:`~semantic_digital_twin.spatial_types.Point2` for one expressed over a
+plane.
+"""
+
+
 @dataclass(eq=False)
-class AxisAlignedBox(ABC):
+class AxisAlignedBox(Generic[PointT], SubClassSafeGeneric, ABC):
     """
     Shared behaviour for an axis-aligned box expressed over a fixed set of spatial axes.
 
@@ -1243,10 +1253,19 @@ class AxisAlignedBox(ABC):
         return len(cls.axes())
 
     @abstractmethod
-    def get_points(self) -> List[Point3] | List[Point2]:
+    def contains(self, point: PointT) -> bool:
         """
-        :return: This box's corners, in its own local frame -- ``Point3`` for
-            :class:`VolumetricBoundingBox`, ``Point2`` for :class:`PlanarBoundingBox`.
+        Check whether this box contains a point.
+
+        :param point: The point to check, in any reference frame.
+        :return: True if the box contains the point.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_points(self) -> List[PointT]:
+        """
+        :return: This box's corners, in its own local frame.
         """
         raise NotImplementedError
 
@@ -1376,7 +1395,7 @@ class AxisAlignedBox(ABC):
 
 
 @dataclass(eq=False)
-class VolumetricBoundingBox(AxisAlignedBox):
+class VolumetricBoundingBox(AxisAlignedBox[Point3]):
     """
     An axis-aligned box in three-dimensional space.
     """
@@ -1687,7 +1706,7 @@ class VolumetricBoundingBox(AxisAlignedBox):
 
 
 @dataclass(eq=False)
-class PlanarBoundingBox(AxisAlignedBox):
+class PlanarBoundingBox(AxisAlignedBox[Point2]):
     """
     An axis-aligned box in the x-y plane, with no z-extent.
 

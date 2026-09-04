@@ -22,7 +22,6 @@ from typing_extensions import (
     Sequence,
     Self,
     Type,
-    TypeVar,
 )
 
 from krrood.entity_query_language.core.mapped_variable import (
@@ -44,7 +43,6 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
-    AxisAlignedBox,
     VolumetricBoundingBox,
     PlanarBoundingBox,
     Bounds,
@@ -55,20 +53,15 @@ from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
 )
 from semantic_digital_twin.world_description.graph_of_convex_sets.exceptions import (
     AmbiguousSelectedVariableError,
+    PointOutsideSearchSpaceError,
 )
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
+    BoxT,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
-
-BoxT = TypeVar("BoxT", bound=AxisAlignedBox)
-"""
-The bounding-box type a :class:`GraphOfBoundingBoxes` subclass decomposes free space
-into -- :class:`VolumetricBoundingBox` for a volumetric decomposition,
-:class:`PlanarBoundingBox` for a planar one.
-"""
 
 
 @dataclass
@@ -95,7 +88,7 @@ class BoundingBoxAdjacency(Generic[BoxT]):
 @dataclass
 class GraphOfBoundingBoxes(
     Generic[BoxT, PointT],
-    GraphOfConvexSets[PointT, BoundingBoxCollection[BoxT]],
+    GraphOfConvexSets[PointT, BoundingBoxCollection[BoxT, PointT]],
 ):
     """
     Abstract base for graphs of convex sets whose nodes are axis-aligned bounding boxes.
@@ -268,9 +261,27 @@ class GraphOfBoundingBoxes(
                 return node
         return None
 
+    def free_node_of_point(self, point: PointT) -> BoxT:
+        """
+        Find the free-space node that contains a point.
+
+        :param point: The point to locate, in any reference frame.
+        :return: The node that contains the point.
+        :raises PointOutsideSearchSpaceError: If the point lies beyond the region this
+            graph was built over, so whether it is free was never determined.
+        :raises PointOccupiedError: If the point lies within that region but in none of
+            its free-space nodes.
+        """
+        if not self.search_space.contains(point):
+            raise PointOutsideSearchSpaceError(point, self.search_space.bounding_box())
+        node = self.node_of_point(point)
+        if node is None:
+            raise PointOccupiedError(point)
+        return node
+
     def path_from_to(self, start: PointT, goal: PointT) -> Optional[List[PointT]]:
         """
-        Calculate a connected path from a start pose to a goal pose.
+        Calculate a connected path from a start point to a goal point.
 
         .. note::
             Uses a single-source Dijkstra search, weighted by the Euclidean distance
@@ -285,20 +296,21 @@ class GraphOfBoundingBoxes(
             straight line can bypass without leaving free space is dropped. See
             :meth:`_shortcut_waypoints`.
 
-        :param start: The start pose.
-        :param goal: The goal pose.
-        :return: The path as a sequence of points to navigate to or None if no path
-            exists.
+        :param start: The start point, in any reference frame.
+        :param goal: The goal point, in any reference frame.
+        :return: The path as a sequence of points to navigate to, in the search space's
+            reference frame, or None if no path exists.
+        :raises PointOutsideSearchSpaceError: If either point lies beyond the region
+            this graph was built over.
+        :raises PointOccupiedError: If either point lies within that region but in none
+            of its free-space nodes.
         """
-        # get poses from params
-        start_node = self.node_of_point(start)
-        goal_node = self.node_of_point(goal)
+        reference_frame = self.search_space.reference_frame
+        start = self.world.transform(start, reference_frame)
+        goal = self.world.transform(goal, reference_frame)
 
-        # validate if the poses are part of the graph
-        if start_node is None:
-            raise PointOccupiedError(start)
-        if goal_node is None:
-            raise PointOccupiedError(goal)
+        start_node = self.free_node_of_point(start)
+        goal_node = self.free_node_of_point(goal)
 
         if start_node == goal_node:
             return [start, goal]
@@ -319,31 +331,23 @@ class GraphOfBoundingBoxes(
 
         path = paths[goal_index]
 
-        # build the path
-        reference_frame = self.search_space.reference_frame
-        waypoints = [self.world.transform(start, reference_frame)]
-
+        waypoints = [start]
         for source, target in zip(path, path[1:]):
             intersection = self.graph.get_edge_data(source, target).intersection
             waypoints.append(intersection.center)
+        waypoints.append(goal)
 
-        waypoints.append(self.world.transform(goal, reference_frame))
-        waypoints = self._shortcut_waypoints(waypoints)
-
-        result = [start]
-        result.extend(waypoints[1:-1])
-        result.append(goal)
-        return result
+        return self._shortcut_waypoints(waypoints)
 
     def _shortcut_waypoints(self, waypoints: List[PointT]) -> List[PointT]:
         """
         Drop waypoints that a straight line can bypass without leaving free space.
 
-        Greedily extends the current anchor waypoint forward as far as a straight
-        line to it stays collision-free, then commits the farthest waypoint still
-        visible from it and continues from there (classic "string pulling"). Each
-        waypoint is tested against the current anchor at most once, so this is
-        linear in the number of waypoints rather than quadratic.
+        Greedily extends the current anchor waypoint forward as far as a straight line
+        to it stays collision-free, then commits the farthest waypoint still visible
+        from it and continues from there (classic "string pulling"). Each waypoint is
+        tested against the current anchor at most once, so this is linear in the number
+        of waypoints rather than quadratic.
 
         :param waypoints: The waypoints of a path, in the search space's reference
             frame.
@@ -400,8 +404,8 @@ class GraphOfBoundingBoxes(
 
     def constrain_to_free_space(self, variable: MappedVariable) -> ConditionType:
         """
-        Add a where condition to ``variable``'s query, restricting it to lie within
-        this graph's free space.
+        Add a where condition to ``variable``'s query, restricting it to lie within this
+        graph's free space.
 
         The free space is a union of boxes, so the condition is an ``OR`` over one
         ``AND`` per box, each conjoining a lower and an upper bound per coordinate.
@@ -519,7 +523,9 @@ class VolumetricGraphOfBoundingBoxes(
     free space in all three dimensions.
     """
 
-    def _default_search_space(self) -> BoundingBoxCollection[VolumetricBoundingBox]:
+    def _default_search_space(
+        self,
+    ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3]:
         """
         :return: A search space spanning the entire three-dimensional space around
             ``self.world.root``.
@@ -544,7 +550,7 @@ class VolumetricGraphOfBoundingBoxes(
     @classmethod
     def free_space_from_bounding_boxes(
         cls,
-        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox],
+        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         search_space_event: Event,
     ) -> Event:
         """
@@ -575,7 +581,7 @@ class VolumetricGraphOfBoundingBoxes(
     @classmethod
     def free_space_from_semantic_annotation(
         cls,
-        search_space: BoundingBoxCollection[VolumetricBoundingBox],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         semantic_obstacle_annotation: SemanticEnvironmentAnnotation,
         semantic_wall_annotation: Optional[Wall] = None,
         tolerance=0.001,
@@ -589,8 +595,8 @@ class VolumetricGraphOfBoundingBoxes(
         :param search_space: The search space for the connectivity graph.
         :param semantic_obstacle_annotation: The semantic annotation containing the
             obstacles.
-        :param semantic_wall_annotation: An optional wall annotation to be considered
-            as an obstacle.
+        :param semantic_wall_annotation: An optional wall annotation to be considered as
+            an obstacle.
         :param tolerance: The tolerance for the intersection when calculating the
             connectivity.
         :param bloat_obstacles: The amount to bloat the obstacles.
@@ -641,7 +647,7 @@ class VolumetricGraphOfBoundingBoxes(
     def free_space_from_world(
         cls,
         world: World,
-        search_space: BoundingBoxCollection[VolumetricBoundingBox],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         tolerance=0.001,
         bloat_obstacles: float = 0.0,
     ) -> Self:
@@ -680,7 +686,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
     space above it, not just its floor-level silhouette.
     """
 
-    def _default_search_space(self) -> BoundingBoxCollection[PlanarBoundingBox]:
+    def _default_search_space(self) -> BoundingBoxCollection[PlanarBoundingBox, Point2]:
         """
         :return: A search space spanning the entire two-dimensional plane around
             ``self.world.root``.
@@ -703,7 +709,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
     @classmethod
     def free_space_from_bounding_boxes(
         cls,
-        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox],
+        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         search_space_event: Event,
     ) -> Event:
         """
@@ -744,7 +750,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
     @classmethod
     def free_space_from_semantic_annotation(
         cls,
-        search_space: BoundingBoxCollection[VolumetricBoundingBox],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         semantic_obstacle_annotation: SemanticEnvironmentAnnotation,
         semantic_wall_annotation: Optional[Wall] = None,
         tolerance=0.001,
@@ -814,7 +820,9 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
         cls,
         world: World,
         tolerance=0.001,
-        search_space: Optional[BoundingBoxCollection[VolumetricBoundingBox]] = None,
+        search_space: Optional[
+            BoundingBoxCollection[VolumetricBoundingBox, Point3]
+        ] = None,
         bloat_obstacles: float = 0.0,
     ) -> Self:
         """

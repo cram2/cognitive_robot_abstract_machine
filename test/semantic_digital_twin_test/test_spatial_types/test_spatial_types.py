@@ -20,7 +20,7 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point2, Pose2D
 from semantic_digital_twin.world_description.world_entity import Body
 from .reference_implementations import (
     rotation_matrix_from_quaternion,
@@ -103,12 +103,13 @@ class TestRotationMatrix:
             rotation_matrix,
             HomogeneousTransformationMatrix(),
             Pose(),
+            Quaternion(),
         ]
         does_not_work = [
             sm.FloatVariable(name="s"),
             sm.Scalar(1),
+            np.eye(3),
             Point3(x=1, y=1, z=1),
-            Quaternion(),
         ]
 
         for other in works:
@@ -1351,11 +1352,16 @@ class TestTransformationMatrix:
             RotationMatrix(),
             Pose(),
             Point3(x=1, y=1, z=1),
+            Quaternion(),
         ]
+        # A 2D type is transformable, but multiplying a 4x4 by a 2- or 3-vector is not
+        # an operation, so only its transform() answers -- not the operator.
         does_not_work = [
             sm.FloatVariable(name="s"),
             sm.Scalar(1),
-            Quaternion(),
+            np.eye(4),
+            Point2(x=1, y=1),
+            Pose2D(x=1, y=1, yaw=1),
         ]
 
         for other in works:
@@ -1364,6 +1370,83 @@ class TestTransformationMatrix:
             with pytest.raises(UnsupportedOperationError):
                 # noinspection PyTypeChecker
                 transform @ other
+
+    # %% re-expressing a spatial type in another frame
+
+    @staticmethod
+    def _transformation() -> HomogeneousTransformationMatrix:
+        """
+        A transformation that rotates about all three axes, so that dropping z, roll or
+        pitch is visible in the result.
+        """
+        return HomogeneousTransformationMatrix.from_xyz_rpy(
+            1, 2, 3, roll=0.3, pitch=-0.2, yaw=0.5
+        )
+
+    def test_transforming_a_quaternion_composes_the_rotations(self):
+        """
+        Composing a rotation onto a quaternion is the Hamilton product, so that is what
+        the operator means.
+        """
+        transformation = self._transformation()
+        quaternion = Quaternion.from_rpy(0.1, 0.2, 0.3)
+
+        composed = transformation @ quaternion
+
+        assert isinstance(composed, Quaternion)
+        np.testing.assert_allclose(
+            composed.to_np(),
+            transformation.to_quaternion().multiply(quaternion).to_np(),
+            atol=1e-12,
+        )
+
+    def test_a_quaternion_transforms_the_way_the_operator_multiplies(self):
+        """
+        The frame change and the algebraic product are written for different reasons but
+        must not drift apart.
+        """
+        transformation = self._transformation()
+        quaternion = Quaternion.from_rpy(0.1, 0.2, 0.3)
+
+        np.testing.assert_allclose(
+            quaternion.transform(transformation).to_np(),
+            (transformation @ quaternion).to_np(),
+            atol=1e-12,
+        )
+
+    def test_transforming_a_point_2d_projects_onto_the_target_plane(self):
+        """
+        A Point2 carries no z, so it comes back as the transformed 3D point with its z
+        dropped.
+        """
+        transformation = self._transformation()
+        point = Point2(x=1, y=2)
+
+        transformed = point.transform(transformation)
+
+        assert isinstance(transformed, Point2)
+        np.testing.assert_allclose(
+            transformed.to_np(),
+            (transformation @ point.to_point3()).to_np()[:2],
+            atol=1e-12,
+        )
+
+    def test_transforming_a_pose_2d_projects_onto_the_target_plane(self):
+        """
+        A Pose2D carries no z, roll or pitch, so it comes back as the transformed 3D
+        pose with those dropped.
+        """
+        transformation = self._transformation()
+        pose_2d = Pose2D(x=1, y=2, yaw=0.4)
+
+        transformed = pose_2d.transform(transformation)
+
+        assert isinstance(transformed, Pose2D)
+        np.testing.assert_allclose(
+            transformed.to_np(),
+            Pose2D.from_pose(transformation @ pose_2d.to_pose()).to_np(),
+            atol=1e-12,
+        )
 
     @pytest.mark.parametrize("x", numbers)
     @pytest.mark.parametrize("y", numbers)

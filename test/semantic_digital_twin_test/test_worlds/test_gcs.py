@@ -37,6 +37,7 @@ from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
 )
 from semantic_digital_twin.world_description.graph_of_convex_sets.exceptions import (
     AmbiguousSelectedVariableError,
+    PointOutsideSearchSpaceError,
 )
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -170,10 +171,10 @@ def test_from_world(table_world: World):
     assert path is not None
     assert len(path) > 1
 
-    with pytest.raises(PointOccupiedError):
-        start_occupied = Point3(-10, -10, -10, reference_frame=table_world.root)
-        target_occupied = Point3(10, 10, 10, reference_frame=table_world.root)
-        graph_of_convex_sets.path_from_to(start_occupied, target_occupied)
+    with pytest.raises(PointOutsideSearchSpaceError):
+        start_unsearched = Point3(-10, -10, -10, reference_frame=table_world.root)
+        target_unsearched = Point3(10, 10, 10, reference_frame=table_world.root)
+        graph_of_convex_sets.path_from_to(start_unsearched, target_unsearched)
 
 
 def test_constrain_to_free_space_requires_floatlike_fields(table_world: World):
@@ -592,3 +593,91 @@ def test_planar_free_space_uses_the_supporting_surface_as_search_space():
     assert search_box.min_y == pytest.approx(-2.0)
     assert search_box.max_y == pytest.approx(2.0)
     assert len(graph.graph.nodes()) > 0
+
+
+# %% what path_from_to rejects, and which frame it answers in
+
+
+def _navigation_map_around_the_table(
+    table_world: World,
+) -> PlanarGraphOfBoundingBoxes:
+    """
+    The floor plan of the region the table stands in.
+
+    :param table_world: The world holding the table.
+    :return: The navigation map.
+    """
+    search_space = BoundingBoxCollection(
+        [
+            VolumetricBoundingBox(
+                min_x=-5,
+                max_x=-2,
+                min_y=-1,
+                max_y=2,
+                min_z=0,
+                max_z=2,
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=table_world.root
+                ),
+            )
+        ],
+        table_world.root,
+    )
+    return PlanarGraphOfBoundingBoxes.navigation_map_from_world(
+        table_world, search_space=search_space
+    )
+
+
+def test_path_from_to_rejects_a_point_outside_the_search_space(table_world: World):
+    """
+    A point the decomposition never covered is reported as outside the search space, not
+    as occupied: nothing is known about what stands there.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    free = Point2(-4.5, -0.5, reference_frame=table_world.root)
+    unsearched = Point2(10, 10, reference_frame=table_world.root)
+
+    with pytest.raises(PointOutsideSearchSpaceError):
+        navigation_map.path_from_to(free, unsearched)
+
+
+def test_path_from_to_rejects_a_point_inside_an_obstacle(table_world: World):
+    """
+    A point the decomposition covered but left out of its free space is occupied.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    free = Point2(-4.5, -0.5, reference_frame=table_world.root)
+    under_the_table = Point2(-3.5, 0.5, reference_frame=table_world.root)
+
+    with pytest.raises(PointOccupiedError):
+        navigation_map.path_from_to(free, under_the_table)
+
+
+def test_path_from_to_accepts_points_in_another_reference_frame(table_world: World):
+    """
+    Start and goal may be given in any frame, and the waypoints come back in the search
+    space's own frame rather than in a mix of the two.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+    table_top = table_world.get_body_by_name("top")
+
+    world_P_start = Point2(-4.5, -0.5, reference_frame=table_world.root)
+    world_P_goal = Point2(-2.5, 1.5, reference_frame=table_world.root)
+
+    path = navigation_map.path_from_to(
+        table_world.transform(world_P_start, table_top),
+        table_world.transform(world_P_goal, table_top),
+    )
+
+    assert all(
+        waypoint.reference_frame == navigation_map.search_space.reference_frame
+        for waypoint in path
+    )
+    np.testing.assert_allclose(
+        path[0].to_np().flatten(), world_P_start.to_np().flatten(), atol=1e-9
+    )
+    np.testing.assert_allclose(
+        path[-1].to_np().flatten(), world_P_goal.to_np().flatten(), atol=1e-9
+    )

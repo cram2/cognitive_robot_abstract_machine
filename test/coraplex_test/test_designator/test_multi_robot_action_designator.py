@@ -1,10 +1,11 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from dataclasses import dataclass, field
-
 import numpy as np
 import pytest
+from rustworkx.rustworkx import NoEdgeBetweenNodes
+from typing_extensions import Iterable, Iterator, List, Tuple, Generator
+
 from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
     StretchMoveToolCenterPoint,
@@ -24,11 +25,15 @@ from coraplex.datastructures.enums import (
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.execution_environment import simulated_robot
+from coraplex.locations.base import Location, PoseGeneratorBackend, PoseValidator
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.composite.facing import FaceAtAction
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.container import OpenAction, CloseAction
 from coraplex.robot_plans.actions.core.misc import DetectAction, MoveToReach
+from coraplex.robot_plans.actions.core.navigation import (
+    GCSNavigateAction,
+)
 from coraplex.robot_plans.actions.core.navigation import (
     NavigateAction,
     LookAtAction,
@@ -46,24 +51,16 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     FollowToolCenterPointPathAction,
 )
-from coraplex.locations.base import Location, PoseGeneratorBackend, PoseValidator
 from coraplex.view_manager import ViewManager
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
-from rustworkx.rustworkx import NoEdgeBetweenNodes
-
-from probabilistic_model.bayesian_network.bayesian_network import Node
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
+from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
     StaticJointState,
 )
-from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
-from typing_extensions import Iterable, Iterator, List, Tuple, Generator
 
 try:
     from semantic_digital_twin.robots.garmi import Garmi
@@ -74,8 +71,6 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Milk,
-    Door,
     Elevator,
     FirstFloor,
     Level,
@@ -108,7 +103,7 @@ ALTERNATIVE_MOTION_MAPPINGS = [
 
 
 def heading_towards(
-    world_P_stand: Iterable[float], world_P_target: Iterable[float], world: World
+        world_P_stand: Iterable[float], world_P_target: Iterable[float], world: World
 ) -> Pose:
     """
     A pose at ``world_P_stand`` whose x-axis points at ``world_P_target``.
@@ -129,10 +124,10 @@ def heading_towards(
 
 
 def stand_facing(
-    robot: AbstractRobot,
-    world_P_stand: Iterable[float],
-    world_P_target: Iterable[float],
-    world: World,
+        robot: AbstractRobot,
+        world_P_stand: Iterable[float],
+        world_P_target: Iterable[float],
+        world: World,
 ) -> HomogeneousTransformationMatrix:
     """
     The base pose from which ``robot`` works on ``world_P_target``, standing at
@@ -165,13 +160,13 @@ def stand_facing(
     ],
 )
 def setup_multi_robot_apartment(
-    request,
-    _hsr_world_setup,
-    _stretch_world_setup,
-    _tiago_world_setup,
-    _pr2_world_setup,
-    _apartment_world_setup,
-    multi_story_building,
+        request,
+        _hsr_world_setup,
+        _stretch_world_setup,
+        _tiago_world_setup,
+        _pr2_world_setup,
+        _apartment_world_setup,
+        multi_story_building,
 ):
     apartment_copy = deepcopy(_apartment_world_setup)
     apartment_copy.merge_world_at_pose(
@@ -253,7 +248,7 @@ def setup_multi_robot_apartment(
 
 @pytest.fixture
 def immutable_multiple_robot_apartment(
-    setup_multi_robot_apartment,
+        setup_multi_robot_apartment,
 ) -> Generator[Tuple[World, AbstractRobot, Context]]:
     world, view = setup_multi_robot_apartment
     state = deepcopy(world.state._data)
@@ -552,11 +547,11 @@ def test_pick_up_multi(mutable_multiple_robot_apartment, rclpy_node):
         root.perform()
 
     assert (
-        world.get_connection(
-            left_arm.end_effector.tool_frame,
-            world.get_body_by_name("milk.stl"),
-        )
-        is not None
+            world.get_connection(
+                left_arm.end_effector.tool_frame,
+                world.get_body_by_name("milk.stl"),
+            )
+            is not None
     )
 
     assert np.allclose(
@@ -860,7 +855,7 @@ class BasePoseRecorder(PoseValidator):
 
 
 def test_a_location_validates_a_candidate_where_navigating_to_it_would_stand(
-    mutable_multiple_robot_apartment,
+        mutable_multiple_robot_apartment,
 ):
     """
     A candidate is a heading, the same form
@@ -883,6 +878,59 @@ def test_a_location_validates_a_candidate_where_navigating_to_it_would_stand(
         robot.mobile_base.pose_facing(heading).to_homogeneous_matrix().to_np(),
         atol=1e-9,
     )
+
+
+def test_multi_robot_gcs_navigation(immutable_multiple_robot_apartment, rclpy_node):
+    """
+    The robot ends up at the target, having driven around the furniture between it and
+    where it started rather than through it.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+    target_position = [5, 1]
+
+    plan = execute_single(
+        GCSNavigateAction(
+            Pose.from_xyz_rpy(*target_position, 0, reference_frame=world.root)
+        ),
+        context=context,
+    )
+
+    with simulated_robot:
+        plan.perform()
+
+    robot_base_position = robot.global_transform.to_position().to_np().flatten()
+
+    assert robot_base_position[:2] == pytest.approx(target_position, abs=0.01)
+
+
+def test_gcs_navigation_arrives_at_each_waypoint_facing_the_next_one(
+        immutable_multiple_robot_apartment,
+):
+    """
+    Lining a waypoint's orientation up with the leg leaving it saves the next leg the
+    turn it would otherwise start with, which is what a differential drive pays for.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+
+    action = GCSNavigateAction(Pose.from_xyz_rpy(5, 1, 0, reference_frame=world.root))
+    execute_single(action, context=context)
+
+    waypoints = action._waypoints()
+    path = action._path()
+
+    # The path starts at the first waypoint the robot has to travel to, not at the
+    # waypoint it is already standing on.
+    assert len(path) == len(waypoints) - 1
+
+    for pose, waypoint, next_waypoint in zip(path, waypoints[1:], waypoints[2:]):
+        world_V_travel = np.array(
+            [float(next_waypoint.x - waypoint.x), float(next_waypoint.y - waypoint.y)]
+        )
+        world_V_facing = pose.to_rotation_matrix().to_np()[:2, 0]
+
+        assert world_V_facing == pytest.approx(
+            world_V_travel / np.linalg.norm(world_V_travel), abs=0.01
+        )
 
 
 # %% riding an elevator
@@ -959,12 +1007,12 @@ def test_elevator_navigation(mutable_multiple_robot_apartment, rclpy_node):
     # The robot ends up in front of the elevator's opening, a floor higher.
     distance_from_cabin_center = float(elevator.scale.x) / 2 + action.exit_clearance
     expected_position = (
-        cabin_position[:3]
-        + elevator.hole_direction.to_np().flatten()[:3] * -1 * distance_from_cabin_center
+            cabin_position[:3]
+            + elevator.hole_direction.to_np().flatten()[:3] * -1 * distance_from_cabin_center
     )
     expected_position[2] = starting_height + elevator_travel
 
     assert operator.robot_boarded
     assert robot.root.global_transform.to_position().to_np().flatten()[
-        :3
-    ] == pytest.approx(expected_position, abs=0.01)
+               :3
+           ] == pytest.approx(expected_position, abs=0.01)

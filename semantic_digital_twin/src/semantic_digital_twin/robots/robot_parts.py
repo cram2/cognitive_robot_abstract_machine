@@ -637,6 +637,14 @@ class MobileBase(AbstractRobotPart, Generic[TGenericDrive], ABC):
             self._world.root
         ).bounding_box()
 
+    @property
+    def base_radius(self) -> float:
+        """
+        Approximates the radius of the mobile base, as the average between the radius in the x and y axis.
+
+        :return: The approximate radius of the mobile base, in meters.
+        """
+        return (self.bounding_box.depth / 2 + self.bounding_box.width / 2) / 2
 
 @dataclass(eq=False)
 class AbstractRobot(Agent, HasRobotParts, ABC):

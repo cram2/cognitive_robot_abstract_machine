@@ -16,7 +16,10 @@ from semantic_digital_twin.spatial_types import (
     Point3,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import Shape
+from semantic_digital_twin.world_description.geometry import (
+    Shape,
+    VolumetricBoundingBox,
+)
 from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
     GraphOfConvexSets,
 )
@@ -204,7 +207,9 @@ class IrisSeedingSettings:
         ]
 
 
-def _validate_and_convert_domain(search_space: BoundingBoxCollection) -> HPolyhedron:
+def _validate_and_convert_domain(
+    search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
+) -> HPolyhedron:
     """
     Convert a search space into the single, finite ``HPolyhedron`` domain IRIS grows
     regions within.
@@ -278,7 +283,9 @@ def _shape_to_convex_set(
 
 
 @dataclass
-class GraphOfConvexPolygons(GraphOfConvexSets[Point3, BoundingBoxCollection]):
+class GraphOfConvexPolygons(
+    GraphOfConvexSets[Point3, BoundingBoxCollection[VolumetricBoundingBox, Point3]]
+):
     """
     A graph of convex sets whose regions are grown by Drake's IRIS algorithm and solved
     with Drake's ``GcsTrajectoryOptimization`` (:cite:t:`marcucci2022shortest`).
@@ -341,7 +348,7 @@ class GraphOfConvexPolygons(GraphOfConvexSets[Point3, BoundingBoxCollection]):
     def from_world(
         cls,
         world: World,
-        search_space: BoundingBoxCollection,
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         bloat_obstacles: float = 0.0,
         seeding_settings: Optional[IrisSeedingSettings] = None,
         extra_seed_points: Sequence[Point3] = (),

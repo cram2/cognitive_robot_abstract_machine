@@ -1152,7 +1152,7 @@ class HasSupportingSurface(IsStorageSpace):
 
     def spawn_bounding_boxes_as_region(
         self,
-        boxes: BoundingBoxCollection[VolumetricBoundingBox],
+        boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         name: Optional[PrefixedName] = None,
         color: Optional[Color] = None,
     ) -> Region:

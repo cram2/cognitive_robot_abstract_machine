@@ -1339,6 +1339,48 @@ class TestDiffDriveBaseGoal:
             assert step.translation_threshold == 0.3
             assert step.orientation_threshold == 0.3
 
+    def test_second_goal_drives_from_where_the_first_one_ended(
+        self, cylinder_bot_diff_world
+    ):
+        """
+        Every goal in a statechart is expanded before any of them runs, so a goal that
+        reads the base pose while expanding reads where the base started rather than
+        where its own leg begins.
+
+        The two legs turn a corner, so the direction the second leg has to drive in
+        differs from the direction it would have had from the start pose -- a heading
+        taken at expansion time asks a differential drive to translate sideways, which
+        it cannot do.
+        """
+        first_goal_pose = Pose.from_xyz_rpy(
+            x=1, y=0, reference_frame=cylinder_bot_diff_world.root
+        )
+        second_goal_pose = Pose.from_xyz_rpy(
+            x=1, y=1, reference_frame=cylinder_bot_diff_world.root
+        )
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_node(
+            first_leg := DifferentialDriveBaseGoal(goal_pose=first_goal_pose)
+        )
+        motion_statechart.add_node(
+            second_leg := DifferentialDriveBaseGoal(goal_pose=second_goal_pose)
+        )
+        second_leg.start_condition = first_leg.observation_variable
+        motion_statechart.add_node(EndMotion.when_true(second_leg))
+
+        executor = Executor(MotionStatechartContext(world=cylinder_bot_diff_world))
+        executor.compile(motion_statechart=motion_statechart)
+        executor.tick_until_end()
+
+        assert np.allclose(
+            cylinder_bot_diff_world.compute_forward_kinematics(
+                cylinder_bot_diff_world.root,
+                cylinder_bot_diff_world.get_body_by_name("bot"),
+            ),
+            second_goal_pose,
+            atol=1e-2,
+        )
+
 
 class TestVelocityTasks:
     def _build_msc(self, goal_node, limit_node) -> MotionStatechart:
