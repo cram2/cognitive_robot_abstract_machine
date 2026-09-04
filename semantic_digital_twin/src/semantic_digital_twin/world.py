@@ -1639,6 +1639,27 @@ class World(HasSimulatorProperties):
             and semantic_annotation in self.semantic_annotations
         )
 
+    def get_semantic_annotation_equal_to(
+        self, semantic_annotation: SemanticAnnotation
+    ) -> Optional[SemanticAnnotation]:
+        """
+        The annotation this world holds that describes the same thing, if it holds one.
+
+        An annotation is equal to another when it is of the same type and refers to the
+        same entities, so an annotation built separately can stand for one the world
+        already holds. Use this before adding a freshly built annotation, and wire up
+        the result rather than the argument, or the wiring lands on an annotation the
+        world does not hold.
+        """
+        return next(
+            (
+                held_annotation
+                for held_annotation in self.semantic_annotations
+                if held_annotation == semantic_annotation
+            ),
+            None,
+        )
+
     def is_body_in_world(self, body: Body) -> bool:
         return self._is_world_entity_with_hash_in_world_from_iterable(hash(body))
 

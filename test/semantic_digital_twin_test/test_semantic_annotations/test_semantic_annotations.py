@@ -250,6 +250,37 @@ def test_semantic_annotation_hash(apartment_world_copy):
     assert semantic_annotation1 == semantic_annotation2
 
 
+def test_the_world_finds_the_annotation_equal_to_a_freshly_built_one(
+    apartment_world_copy,
+):
+    """
+    An annotation is identified by its type and what it refers to, so one built
+    separately stands for the one the world already holds.
+    """
+    body = apartment_world_copy.bodies[0]
+    held = Handle(root=body)
+    with apartment_world_copy.modify_world():
+        apartment_world_copy.add_semantic_annotation(held)
+
+    assert (
+        apartment_world_copy.get_semantic_annotation_equal_to(Handle(root=body)) is held
+    )
+
+
+def test_the_world_finds_no_annotation_equal_to_one_it_does_not_hold(
+    apartment_world_copy,
+):
+    """
+    Nothing is returned for an annotation the world has never been given.
+    """
+    assert (
+        apartment_world_copy.get_semantic_annotation_equal_to(
+            Handle(root=apartment_world_copy.bodies[1])
+        )
+        is None
+    )
+
+
 def test_handle_semantic_annotation_eql(apartment_world_copy):
     body = variable(type_=Body, domain=apartment_world_copy.bodies)
     query = an(
@@ -259,29 +290,6 @@ def test_handle_semantic_annotation_eql(apartment_world_copy):
     )
     handles = list(query.evaluate())
     assert len(handles) > 0
-
-
-@pytest.mark.parametrize(
-    "semantic_annotation_type, update_existing_semantic_annotations, expected_number",
-    [
-        (Handle, False, 29),
-        (Drawer, False, 19),
-        (Wardrobe, False, 8),
-        (Door, False, 8),  # Should be 11 as there are prismatically connected doors.
-    ],
-)
-def test_infer_apartment_semantic_annotation(
-    semantic_annotation_type,
-    update_existing_semantic_annotations,
-    expected_number,
-    apartment_world_copy,
-):
-    fit_rules_and_assert_semantic_annotations(
-        apartment_world_copy,
-        semantic_annotation_type,
-        update_existing_semantic_annotations,
-        expected_number,
-    )
 
 
 @pytest.mark.skipif(world_rdr is None, reason="requires world_rdr")
@@ -294,36 +302,42 @@ def test_generated_semantic_annotations(kitchen_world):
         for v in found_semantic_annotations
         if isinstance(v, HasCaseAsRootBody)
     ]
-    assert len(drawer_container_names) == 19
+    assert len(drawer_container_names) == 17
 
 
-@pytest.mark.order("third_to_last")
-def test_apartment_semantic_annotations(apartment_world_copy):
-    world_reasoner = WorldReasoner(apartment_world_copy)
-    world_reasoner.fit_semantic_annotations(
-        [Handle, Drawer, Wardrobe],
+HANDLED_DRAWER_BODY_NAME = "cabinet5_drawer_top"
+"""
+A drawer of the apartment that carries a handle.
+
+Named so that the explanation tests always explain the same rule, since a drawer with a
+handle and one without are inferred by different rules.
+"""
+
+
+def inferred_handled_drawer(world) -> Drawer:
+    """
+    The drawer of :data:`HANDLED_DRAWER_BODY_NAME`, as the reasoner infers it.
+    """
+    return next(
+        annotation
+        for annotation in WorldReasoner(world).infer_semantic_annotations()
+        if isinstance(annotation, Drawer)
+        and annotation.root.name.name == HANDLED_DRAWER_BODY_NAME
     )
-
-    found_semantic_annotations = world_reasoner.infer_semantic_annotations()
-    drawer_container_names = [
-        v.root.name.name
-        for v in found_semantic_annotations
-        if isinstance(v, HasCaseAsRootBody)
-    ]
-    assert len(drawer_container_names) == 27
 
 
 @pytest.mark.order("second_to_last")
 def test_explain_inferred_semantic_annotations(apartment_world_copy):
-    world_reasoner = WorldReasoner(apartment_world_copy)
-    found_semantic_annotations = list(world_reasoner.infer_semantic_annotations())
-    drawer = next(ann for ann in found_semantic_annotations if isinstance(ann, Drawer))
+    drawer = inferred_handled_drawer(apartment_world_copy)
     explanation = explain_inference(drawer)
     assert explanation is not None
     assert isinstance(explanation.query_root, SymbolicExpression)
     assert explanation.get_satisfied_conditions_as_string() == (
-        "(Handle.root == FixedConnection.child)"
+        "PrismaticConnection.child.has_collision()"
+        " (PrismaticConnection.child.has_collision)"
+        "\nAND is_not_part_of_a_robot (PrismaticConnection.child)"
         "\nAND (FixedConnection.parent == PrismaticConnection.child)"
+        "\nAND (FixedConnection.child == Handle.root)"
     )
     visualize = False
     if visualize:
@@ -332,55 +346,32 @@ def test_explain_inferred_semantic_annotations(apartment_world_copy):
 
 @pytest.mark.order("fourth_to_last")
 def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_copy):
-    world_reasoner = WorldReasoner(apartment_world_copy)
-    found_semantic_annotations = list(world_reasoner.infer_semantic_annotations())
-    drawer = next(ann for ann in found_semantic_annotations if isinstance(ann, Drawer))
+    drawer = inferred_handled_drawer(apartment_world_copy)
     explanation = explain_inference(drawer)
     verbalization_paragraph = verbalize_expression(explanation.query_root)
     verbalization_hierarchical = VerbalizationPipeline(
         HierarchicalRenderer()
     ).verbalize(explanation.query_root)
     assert verbalization_paragraph == (
-        "If there's a FixedConnection whose parent is the child of a PrismaticConnection,"
-        " there's a Handle whose root is the child of the FixedConnection,"
-        " then there's a Drawer whose root is the parent of the FixedConnection,"
+        "If the () of the has_collision of the child of a PrismaticConnection,"
+        " an is_not_part_of_a_robot, where the body of the is_not_part_of_a_robot is"
+        " the child of the PrismaticConnection,"
+        " the parent of a FixedConnection is the body of the is_not_part_of_a_robot,"
+        " the child of the FixedConnection is the root of a Handle,"
+        " then there's a Drawer whose root is the body of the is_not_part_of_a_robot,"
         " and whose handle is the Handle"
     )
     assert verbalization_hierarchical == (
         "If\n"
-        "  there's a FixedConnection\n"
-        "    - whose parent is the child of a PrismaticConnection\n"
-        "  there's a Handle\n"
-        "    - whose root is the child of the FixedConnection\n"
+        "  - the () of the has_collision of the child of a PrismaticConnection\n"
+        "  - an is_not_part_of_a_robot, where the body of the is_not_part_of_a_robot is"
+        " the child of the PrismaticConnection\n"
+        "  - the parent of a FixedConnection is the body of the is_not_part_of_a_robot\n"
+        "  - the child of the FixedConnection is the root of a Handle\n"
         "then\n"
         "  there's a Drawer\n"
-        "    - whose root is the parent of the FixedConnection\n"
+        "    - whose root is the body of the is_not_part_of_a_robot\n"
         "    - whose handle is the Handle"
-    )
-
-
-def fit_rules_and_assert_semantic_annotations(
-    world,
-    semantic_annotation_type,
-    update_existing_semantic_annotations,
-    expected_number: int,
-):
-    world_reasoner = WorldReasoner(world)
-    world_reasoner.fit_semantic_annotations(
-        [semantic_annotation_type],
-        update_existing_semantic_annotations=update_existing_semantic_annotations,
-    )
-
-    found_semantic_annotations = world_reasoner.infer_semantic_annotations()
-    assert (
-        len(
-            [
-                v
-                for v in found_semantic_annotations
-                if isinstance(v, semantic_annotation_type)
-            ]
-        )
-        == expected_number
     )
 
 

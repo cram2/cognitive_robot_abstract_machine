@@ -13,6 +13,5 @@ Semantic annotations can be inferred automatically by specifying rules that make
 Semantic annotations and any other attribute of the world that can be inferred or should be inferred through reasoning can be used
 through the world reasoner, you can check how to use the world reasoner [here](world_reasoner.md).
 
-Some helper methods exist in the world reasoner just for the semantic annotations like {py:func}`semantic_digital_twin.reasoner.WorldReasoner.infer_semantic_annotations`
-and {py:func}`semantic_digital_twin.reasoner.WorldReasoner.fit_semantic_annotations`.
+Some helper methods exist in the world reasoner just for the semantic annotations like {py:func}`semantic_digital_twin.reasoning.world_reasoner.WorldReasoner.infer_semantic_annotations`.
 

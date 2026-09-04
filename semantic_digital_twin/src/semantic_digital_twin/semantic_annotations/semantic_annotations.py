@@ -721,6 +721,8 @@ class ShelfLayer(HasSupportingSurface):
     walls.
     """
 
+    _synonyms = {"level", "board"}
+
 
 @dataclass(eq=False)
 class Table(Furniture, HasSupportingSurface):
@@ -734,6 +736,8 @@ class CounterTop(Furniture, HasSupportingSurface, HasSink):
     """
     A semantic annotation that represents a counter top.
     """
+
+    _synonyms = {"countertop"}
 
 
 @dataclass(eq=False)
@@ -886,6 +890,8 @@ class Wall(HasApertures):
 
     Doors are a computed property.
     """
+
+    _synonyms = {"walls"}
 
     @property
     def doors(self) -> Iterable[Door]:
@@ -1263,6 +1269,8 @@ class SideTable(Table):
     """
     A side table.
     """
+
+    _synonyms = {"bedside"}
 
 
 @dataclass(eq=False)
@@ -1828,3 +1836,5 @@ class CoffeeMachine(HasRootBody):
     """
     A countertop appliance that brews coffee.
     """
+
+    _synonyms = {"coffe"}

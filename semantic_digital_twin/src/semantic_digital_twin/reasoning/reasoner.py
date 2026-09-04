@@ -6,16 +6,13 @@ from os.path import dirname
 
 from typing_extensions import (
     ClassVar,
-    List,
     Dict,
     Any,
-    TYPE_CHECKING,
     Optional,
     Type,
 )
 
 from krrood.ripple_down_rules.rdr import GeneralRDR
-from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 
 
 class ReasoningResult(UserDict[str, Any]): ...
@@ -27,17 +24,14 @@ class CaseRDRs(UserDict[Type, GeneralRDR]): ...
 @dataclass
 class CaseReasoner:
     """
-    The case reasoner is a class that uses Ripple Down Rules to reason on case related concepts.
-    The reasoner can be used in two ways:
-    1. Classification mode, where the reasoner infers all concepts that it has rules for at that time.
+    Uses Ripple Down Rules to infer concepts about a case.
+
+    The rules are read from the model directory and applied to the case, inferring every
+    concept they have a rule for:
+
     >>> reasoner = CaseReasoner(case)
     >>> inferred_concepts = reasoner.reason()
     >>> inferred_attribute_values = inferred_concepts['attribute_name']
-    2. Fitting mode, where the reasoner prompts the expert for answers given a query on a world concept. This allows
-    incremental knowledge gain, improved reasoning capabilities, and an increased breadth of application with more
-     usage.
-     >>> reasoner = CaseReasoner(case)
-     >>> reasoner.fit_attribute("attribute_name", [attribute_types,...], False)
     """
 
     case: Any
@@ -86,29 +80,3 @@ class CaseReasoner:
         """
         self.result = self.rdr.classify(self.case, modify_case=True)
         return self.result
-
-    def fit_attribute(
-        self,
-        attribute_name: str,
-        attribute_types: List[Type[Any]],
-        mutually_exclusive: bool,
-        update_existing_rules: bool = False,
-    ) -> None:
-        """
-        Fit the semantic annotation RDR to the required attribute types.
-
-        :param attribute_name: The attribute name that the RDR should be fitted to.
-        :param attribute_types: A list of attribute types that the RDR should be fitted
-            to.
-        :param mutually_exclusive: whether the attribute values are mutually exclusive
-            or not.
-        :param update_existing_rules: If True, existing rules of the given types will be
-            updated with new rules, else they will be skipped.
-        """
-        case_query = CaseQuery(
-            self.case,
-            attribute_name,
-            tuple(attribute_types),
-            mutually_exclusive,
-        )
-        self.rdr.fit_case(case_query, update_existing_rules=update_existing_rules)
