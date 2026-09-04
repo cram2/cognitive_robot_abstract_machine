@@ -14,6 +14,7 @@ from semantic_digital_twin.reasoning.predicates import LeftOf
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import (
     PR2,
+    PR2BaseLaser,
     PR2Joint,
     PR2MobileBase,
     PR2Torso,
@@ -436,12 +437,13 @@ def test_pr2_semantic_annotation(pr2_world_state_reset):
 
     assert len(pr2.get_end_effectors()) == 2
     assert len(pr2.get_arms()) == 2
-    assert len(pr2.get_sensors()) == 1
+    assert len(pr2.get_sensors()) == 2
     assert pr2.torso.name.name == "PR2Torso"
     assert len(pr2.torso.neck.sensors) == 1
     assert pr2.left_arm and pr2.right_arm
     assert pr2.left_arm != pr2.right_arm
-    assert pr2.get_sensors()[0] == pr2.get_default_camera()
+    assert pr2.get_default_camera() in pr2.get_sensors()
+    assert pr2.mobile_base.laser in pr2.get_sensors()
 
 
 def test_has_left_right_arm_mixin(pr2_world_state_reset):
@@ -480,7 +482,7 @@ def test_hsrb_semantic_annotation(_hsr_world_setup):
     assert len(hsrb.get_end_effectors()) == 1
     assert len(hsrb.get_arms()) == 1
 
-    assert len(hsrb.get_sensors()) == 5
+    assert len(hsrb.get_sensors()) == 6
     assert hsrb.mobile_base.torso is not None
 
 
@@ -704,24 +706,27 @@ def test_pr2_automatic_setup_correctly(pr2_world_state_reset):
     torso = verify_part(mobile_base.torso, PR2Torso, robot)
     assert robot.torso == torso, "PR2.torso property shortcut mismatch"
 
-    # 3. Torso -> Neck (via HasNeck mixin)
+    # 3. MobileBase -> Laser (via HasLaser mixin)
+    verify_part(mobile_base.laser, PR2BaseLaser, robot)
+
+    # 4. Torso -> Neck (via HasNeck mixin)
     neck = verify_part(torso.neck, PR2Neck, robot)
 
-    # 4. Neck -> Sensors (via HasSensors mixin)
+    # 5. Neck -> Sensors (via HasSensors mixin)
     assert len(neck.sensors) == 1, "Neck should have exactly one sensor"
     verify_part(neck.sensors[0], PR2KinectV1, robot)
 
-    # 5. Torso -> Arms (via HasLeftRightArm mixin)
+    # 6. Torso -> Arms (via HasLeftRightArm mixin)
     left_arm = verify_part(torso.left_arm, PR2LeftArm, robot)
     right_arm = verify_part(torso.right_arm, PR2RightArm, robot)
     assert robot.left_arm == left_arm, "PR2.left_arm property shortcut mismatch"
     assert robot.right_arm == right_arm, "PR2.right_arm property shortcut mismatch"
 
-    # 6. Arms -> EndEffectors (via HasEndEffector mixin)
+    # 7. Arms -> EndEffectors (via HasEndEffector mixin)
     left_gripper = verify_part(left_arm.end_effector, PR2LeftGripper, robot)
     right_gripper = verify_part(right_arm.end_effector, PR2RightGripper, robot)
 
-    # 7. Grippers -> Fingers (via HasTwoFingers -> HasFingers mixin)
+    # 8. Grippers -> Fingers (via HasTwoFingers -> HasFingers mixin)
     assert (
         len(left_gripper.fingers) == 2
     ), "Left gripper should have exactly two fingers"
@@ -746,7 +751,7 @@ def test_pr2_automatic_setup_correctly(pr2_world_state_reset):
     verify_part(r_l_finger, PR2RightGripperLeftFinger, robot)
     verify_part(r_r_finger, PR2RightGripperRightFinger, robot)
 
-    # 8. Final Coverage Verification
+    # 9. Final Coverage Verification
     # Ensure that all robot parts discovered via automated introspection (robot._robot_parts)
     # have been explicitly checked in this test.
     all_discovered_parts = set(robot._robot_parts)

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.geometry import Scale
+    from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
     from semantic_digital_twin.world_description.world_entity import (
         SemanticAnnotation,
         WorldEntity,
@@ -1230,6 +1231,65 @@ class MissingDefaultCameraError(UsageError):
 
     def error_message(self) -> str:
         return f"Robot {self.robot.name} does not have a default camera."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class NoLaserScanReceived(UsageError):
+    """
+    Raised when reading a laser that has not received a scan yet.
+    """
+
+    topic_name: str
+    """
+    The topic the laser is waiting for a scan on.
+    """
+
+    def error_message(self) -> str:
+        return f"No laser scan has been received on '{self.topic_name}' yet."
+
+    def suggest_correction(self) -> str:
+        return f"check that something publishes on '{self.topic_name}' and that the node has been spun since."
+
+
+@dataclass
+class InvalidBeamCount(UsageError):
+    """
+    Raised when deriving a scan pattern from a beam count too small to space beams by.
+    """
+
+    beam_count: int
+    """
+    The beam count that was rejected.
+    """
+
+    def error_message(self) -> str:
+        return f"A scan pattern cannot be derived from {self.beam_count} beams."
+
+    def suggest_correction(self) -> str:
+        return "give at least two beams, or state the angle increment directly."
+
+
+@dataclass
+class InvalidScanPattern(UsageError):
+    """
+    Raised when a scan pattern describes a sweep a scanner cannot perform.
+    """
+
+    pattern: ScanPattern
+    """
+    The pattern that was rejected.
+    """
+
+    reason: str
+    """
+    What about the pattern is wrong.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid scan pattern {self.pattern}: {self.reason}."
 
     def suggest_correction(self) -> str:
         return ""

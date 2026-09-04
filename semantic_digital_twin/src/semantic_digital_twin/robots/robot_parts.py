@@ -33,6 +33,8 @@ from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.laser_reading import LaserReading
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.exceptions import (
     NoJointStateWithType,
     UselessConceptError,
@@ -510,6 +512,32 @@ class Camera(Sensor, ABC):
 
 
 @dataclass(eq=False)
+class Laser(Sensor, ABC):
+    """
+    A laser is a sensor that measures the distance to the surfaces around it along a fan
+    of beams.
+    """
+
+    scan_pattern: ScanPattern = field(kw_only=True)
+    """
+    The directions this laser sweeps and the distances it can measure.
+    """
+
+    @property
+    def beam_directions(self) -> List[Vector3]:
+        """
+        :return: A unit vector along every beam, expressed in this laser's own frame.
+        """
+        return self.scan_pattern.beam_directions_in_frame(self.root)
+
+    @abstractmethod
+    def get_laser_reading(self) -> LaserReading:
+        """
+        :return: The most recent sweep of this laser.
+        """
+
+
+@dataclass(eq=False)
 class Finger(KinematicChain, ABC):
     """
     A finger is a kinematic chain attached to a gripper to manipulate objects.
@@ -807,7 +835,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             1. Deepcopy the resulting world to ensure that all parts of the robot are initialized in the correct order
             2. Assert that the copied world is the same as the original world
             3. Assert that the robot semantic annotation has a default camera.
-            4. Call validate method on all robot parts inheriting froma RobotPartMixin
+            4. Check the assumptions of every mixin each robot part combines
 
         :return: True if the robot semantic annotation is valid, False otherwise.
         """
@@ -828,7 +856,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             assert part._robot == self, f"Part {part} refers to wrong robot"
 
             if isinstance(part, RobotPartMixin):
-                part.validate()
+                part.validate_assumptions()
 
         return True
 
