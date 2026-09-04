@@ -174,11 +174,6 @@ class AnyMonitoredTaskRunning(MotionStatechartNode):
 
 # %% watching a whole goal
 
-DEFAULT_STALL_TIMEOUT = 5.0
-"""
-Seconds of simulated time without progress after which a watched node counts as stalled.
-"""
-
 
 @dataclass(eq=False, repr=False)
 class StillProgressing(Goal):
@@ -199,7 +194,7 @@ class StillProgressing(Goal):
     The task or goal whose progress is watched.
     """
 
-    timeout: float = field(default=DEFAULT_STALL_TIMEOUT, kw_only=True)
+    timeout: float = field(default=5.0, kw_only=True)
     """
     Seconds of simulated time without progress after which this turns ``False``.
     """
