@@ -314,7 +314,7 @@ class ObservationState(State):
                     ),
                     (
                         int(LifeCycleValues.PAUSED),
-                        sm.Scalar(node.observation_variable),
+                        node.observation_variable,
                     ),
                 ],
                 else_result=sm.Scalar.const_trinary_unknown(),
@@ -419,7 +419,7 @@ class NextLifeCycle:
             sm.if_eq_cases(
                 a=node.life_cycle_variable,
                 b_result_cases=node.create_lifecycle_transitions().as_cases(),
-                else_result=sm.Scalar(node.life_cycle_variable),
+                else_result=node.life_cycle_variable,
             )
         )
         expression = self._resolve_predicates_in(transitions)
