@@ -244,6 +244,26 @@ def test_causal_sampled_grounding_is_valid(rpc, room_query_4):
     assert model.is_valid()
 
 
+def _causal_circuit_for(model):
+    """
+    Build a CausalCircuit registering ``chair_count()`` as the cause and
+    ``objects[0].type`` as the effect over a grounded circuit, the pair every
+    GroundingMode.CAUSAL_SAMPLED/CAUSAL_EXACT causal-registration test below exercises.
+    """
+    chair_count_variable = next(
+        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
+    )
+    object_type_variable = next(
+        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
+    )
+    tree = MarginalDeterminismTreeNode.from_causal_graph(
+        [chair_count_variable], [object_type_variable]
+    )
+    return CausalCircuit.from_probabilistic_circuit(
+        model, tree, [chair_count_variable], [object_type_variable]
+    )
+
+
 def test_causal_sampled_grounding_supports_causal_circuit_registration(
     rpc, room_query_4
 ):
@@ -255,19 +275,7 @@ def test_causal_sampled_grounding_supports_causal_circuit_registration(
     """
     np.random.seed(0)
     model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
-    chair_count_variable = next(
-        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
-    )
-    object_type_variable = next(
-        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
-    )
-
-    tree = MarginalDeterminismTreeNode.from_causal_graph(
-        [chair_count_variable], [object_type_variable]
-    )
-    causal_circuit = CausalCircuit.from_probabilistic_circuit(
-        model, tree, [chair_count_variable], [object_type_variable]
-    )
+    causal_circuit = _causal_circuit_for(model)
 
     result = causal_circuit.verify_support_determinism()
     assert result.passed
@@ -283,22 +291,11 @@ def test_causal_sampled_grounding_backdoor_adjustment_runs(rpc, room_query_4):
     """
     np.random.seed(0)
     model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
-    chair_count_variable = next(
-        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
-    )
-    object_type_variable = next(
-        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
-    )
-
-    tree = MarginalDeterminismTreeNode.from_causal_graph(
-        [chair_count_variable], [object_type_variable]
-    )
-    causal_circuit = CausalCircuit.from_probabilistic_circuit(
-        model, tree, [chair_count_variable], [object_type_variable]
-    )
+    causal_circuit = _causal_circuit_for(model)
 
     interventional_circuit = causal_circuit.backdoor_adjustment(
-        cause_variable=chair_count_variable, effect_variable=object_type_variable
+        cause_variable=causal_circuit.causal_variables[0],
+        effect_variable=causal_circuit.effect_variables[0],
     )
     assert interventional_circuit.is_valid()
 
@@ -345,19 +342,7 @@ def test_causal_exact_grounding_is_reproducible_across_calls(rpc, room_query_4):
 
 def test_causal_exact_grounding_supports_causal_circuit_registration(rpc, room_query_4):
     model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
-    chair_count_variable = next(
-        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
-    )
-    object_type_variable = next(
-        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
-    )
-
-    tree = MarginalDeterminismTreeNode.from_causal_graph(
-        [chair_count_variable], [object_type_variable]
-    )
-    causal_circuit = CausalCircuit.from_probabilistic_circuit(
-        model, tree, [chair_count_variable], [object_type_variable]
-    )
+    causal_circuit = _causal_circuit_for(model)
 
     result = causal_circuit.verify_support_determinism()
     assert result.passed
@@ -365,22 +350,11 @@ def test_causal_exact_grounding_supports_causal_circuit_registration(rpc, room_q
 
 def test_causal_exact_grounding_backdoor_adjustment_runs(rpc, room_query_4):
     model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
-    chair_count_variable = next(
-        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
-    )
-    object_type_variable = next(
-        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
-    )
-
-    tree = MarginalDeterminismTreeNode.from_causal_graph(
-        [chair_count_variable], [object_type_variable]
-    )
-    causal_circuit = CausalCircuit.from_probabilistic_circuit(
-        model, tree, [chair_count_variable], [object_type_variable]
-    )
+    causal_circuit = _causal_circuit_for(model)
 
     interventional_circuit = causal_circuit.backdoor_adjustment(
-        cause_variable=chair_count_variable, effect_variable=object_type_variable
+        cause_variable=causal_circuit.causal_variables[0],
+        effect_variable=causal_circuit.effect_variables[0],
     )
     assert interventional_circuit.is_valid()
 

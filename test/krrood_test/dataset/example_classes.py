@@ -27,6 +27,7 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 )
 from krrood.symbol_graph.symbol_graph import Symbol
 from krrood import logger
+
 try:
     from random_events.interval import Bound, SimpleInterval
     from krrood.parametrization.feature_extraction.aggregations import (
@@ -36,8 +37,9 @@ try:
 except ImportError as e:
     # Was added to allow this to work on Windows which random_events does not support.
     logger.debug(f"Could not import random_events: {e}")
-    class AggregationStatistic(MockedClass, Generic[T]):
-        ...
+
+    class AggregationStatistic(MockedClass, Generic[T]): ...
+
     aggregation_statistic = lambda *args: lambda *args2: args2
     Bound = NoneType
     SimpleInterval = NoneType
@@ -947,16 +949,16 @@ class PickingRobotAggregations(AggregationStatistic[PickingRobot]):
         Count of successful grasp attempts.
         """
         grasped_var = variable(GraspAttempt, self.instance.attempts).grasped
-        [cou] = entity(count_range(grasped_var)).where(grasped_var == True).tolist()
-        return cou
+        [result] = entity(count_range(grasped_var)).where(grasped_var == True).tolist()
+        return result
 
     @aggregation_statistic("attempts")
     def total_count(self) -> int:
         """
         Total number of grasp attempts.
         """
-        [cou] = count(variable(GraspAttempt, self.instance.attempts)).tolist()
-        return cou
+        [result] = count(variable(GraspAttempt, self.instance.attempts)).tolist()
+        return result
 
 
 @dataclass

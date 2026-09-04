@@ -10,16 +10,12 @@ from __future__ import annotations
 import numpy as np
 
 from krrood.entity_query_language.factories import a, cause
-from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
 )
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
-    RelationalProbabilisticCircuit,
-)
-from ...dataset import ormatic_interface  # type: ignore
+from probabilistic_model.probabilistic_circuit.relational.rspn import GroundingMode
 from ...dataset.example_classes import (
     KRROODOrientation,
     KRROODPosition,
@@ -27,28 +23,7 @@ from ...dataset.example_classes import (
     SceneObjectType,
     SceneRoom,
 )
-
-
-def _fitted_scene_room_model() -> RelationalProbabilisticCircuit:
-    objects = [
-        SceneObject(type=SceneObjectType.TABLE),
-        SceneObject(type=SceneObjectType.CHAIR),
-        SceneObject(type=SceneObjectType.CHAIR),
-        SceneObject(type=SceneObjectType.CHAIR),
-    ]
-    room = SceneRoom(
-        position=KRROODPosition(x=2.0, y=1.0, z=0.0),
-        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
-        objects=objects[:3],
-    )
-    room2 = SceneRoom(
-        position=KRROODPosition(x=4.0, y=3.0, z=0.0),
-        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
-        objects=objects,
-    )
-    model = RelationalProbabilisticCircuit(SceneRoom)
-    model.fit([to_dao(room), to_dao(room2)])
-    return model
+from ...test_feature_extraction.test_rspns import rpc, scenario  # noqa: F401
 
 
 def _cause_and_effect_query():
@@ -61,14 +36,13 @@ def _cause_and_effect_query():
     return query
 
 
-def test_registry_returns_a_causal_circuit_for_a_cause_query():
+def test_registry_returns_a_causal_circuit_for_a_cause_query(rpc):
     """
     A relational Match query with cause/causes_effect markers must resolve to a
     CausalCircuit, not the plain grounded circuit DoRequiresCausalCircuitModel would
     otherwise reject.
     """
-    model = _fitted_scene_room_model()
-    registry = RelationalCircuitRegistry(relational_probabilistic_circuit=model)
+    registry = RelationalCircuitRegistry(relational_probabilistic_circuit=rpc)
     parameters = UnderspecifiedParameters(_cause_and_effect_query())
 
     np.random.seed(0)
@@ -77,9 +51,8 @@ def test_registry_returns_a_causal_circuit_for_a_cause_query():
     assert isinstance(result, CausalCircuit)
 
 
-def test_registered_causal_circuit_has_the_queried_cause_and_effect_variables():
-    model = _fitted_scene_room_model()
-    registry = RelationalCircuitRegistry(relational_probabilistic_circuit=model)
+def test_registered_causal_circuit_has_the_queried_cause_and_effect_variables(rpc):
+    registry = RelationalCircuitRegistry(relational_probabilistic_circuit=rpc)
     parameters = UnderspecifiedParameters(_cause_and_effect_query())
 
     np.random.seed(0)
@@ -89,9 +62,8 @@ def test_registered_causal_circuit_has_the_queried_cause_and_effect_variables():
     assert [v.name for v in result.effect_variables] == ["SceneRoom.objects[0].type"]
 
 
-def test_registered_causal_circuit_supports_backdoor_adjustment():
-    model = _fitted_scene_room_model()
-    registry = RelationalCircuitRegistry(relational_probabilistic_circuit=model)
+def test_registered_causal_circuit_supports_backdoor_adjustment(rpc):
+    registry = RelationalCircuitRegistry(relational_probabilistic_circuit=rpc)
     parameters = UnderspecifiedParameters(_cause_and_effect_query())
 
     np.random.seed(0)
@@ -104,13 +76,12 @@ def test_registered_causal_circuit_supports_backdoor_adjustment():
     assert interventional_circuit.is_valid()
 
 
-def test_non_causal_query_is_unaffected():
+def test_non_causal_query_is_unaffected(rpc):
     """
     A plain (non-cause) relational query must still return the grounded circuit
     directly, exactly as before this registry gained causal support.
     """
-    model = _fitted_scene_room_model()
-    registry = RelationalCircuitRegistry(relational_probabilistic_circuit=model)
+    registry = RelationalCircuitRegistry(relational_probabilistic_circuit=rpc)
     query = a(SceneRoom)(
         position=a(KRROODPosition)(x=..., y=..., z=...),
         orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
@@ -121,3 +92,30 @@ def test_non_causal_query_is_unaffected():
     result = registry.get_model(parameters)
 
     assert not isinstance(result, CausalCircuit)
+
+
+def test_causal_grounding_mode_field_is_actually_used(rpc):
+    """
+    Regression test for the ``causal_grounding_mode`` field: overriding it to
+    ``GroundingMode.CAUSAL_EXACT`` must actually change grounding behaviour, not be
+    silently ignored in favour of a hardcoded ``CAUSAL_SAMPLED``.
+
+    Both modes retain the latent as a variable and ground a valid circuit, but only
+    exact-partition grounding (or its fallback, which still retains the latent) is
+    reproducible across calls under different random state -- exactly what
+    ``CAUSAL_SAMPLED`` alone is not guaranteed to be.
+    """
+    registry = RelationalCircuitRegistry(
+        relational_probabilistic_circuit=rpc,
+        causal_grounding_mode=GroundingMode.CAUSAL_EXACT,
+    )
+
+    np.random.seed(0)
+    first = registry.get_model(UnderspecifiedParameters(_cause_and_effect_query()))
+    np.random.seed(123)
+    second = registry.get_model(UnderspecifiedParameters(_cause_and_effect_query()))
+
+    assert isinstance(first, CausalCircuit)
+    assert {v.name for v in first.probabilistic_circuit.variables} == {
+        v.name for v in second.probabilistic_circuit.variables
+    }

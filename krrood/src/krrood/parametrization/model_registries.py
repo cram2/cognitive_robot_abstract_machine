@@ -74,14 +74,16 @@ class RelationalCircuitRegistry(ModelRegistry):
     :class:`~krrood.parametrization.exceptions.RelationalCircuitRegistryRequiresMatch`
     rather than failing on a missing attribute.
 
-    When the query also declares ``cause``/``causes_effect``/``confounder`` markers,
-    grounding uses :attr:`causal_grounding_mode` instead of
+    When the query also declares a ``cause`` marker, grounding uses
+    :attr:`causal_grounding_mode` instead of
     :attr:`~probabilistic_model.probabilistic_circuit.relational.rspn.GroundingMode.PREDICTIVE`,
-    so the aggregation latents those markers name survive grounding instead of being
+    so the aggregation latents that marker names survive grounding instead of being
     integrated out, and the result is wrapped as a verified
     :class:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`
     instead of a plain circuit -- one more kind of cause this same registry can answer
-    about, not a parallel system. Non-causal queries are unaffected.
+    about, not a parallel system. Any accompanying ``causes_effect``/``confounder``
+    markers are read later, by ``ProbabilisticBackend``, once it has this
+    ``CausalCircuit`` in hand. Non-causal queries are unaffected.
     """
 
     relational_probabilistic_circuit: RelationalProbabilisticCircuit

@@ -12,7 +12,7 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
 )
 from probabilistic_model.probabilistic_circuit.relational.causal import (
-    RelationalCausalCircuit,
+    ground_relational_causal_circuit,
     resolve_variable,
 )
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
@@ -64,14 +64,12 @@ def test_resolve_variable_raises_for_ambiguous_suffix(rpc, room_query_4):
         resolve_variable(grounded, "type")
 
 
-# %% RelationalCausalCircuit.from_relational_probabilistic_circuit
+# %% ground_relational_causal_circuit
 
 
-def test_from_relational_probabilistic_circuit_returns_a_causal_circuit(
-    rpc, room_query_4
-):
+def test_ground_relational_causal_circuit_returns_a_causal_circuit(rpc, room_query_4):
     np.random.seed(0)
-    causal_circuit = RelationalCausalCircuit.from_relational_probabilistic_circuit(
+    causal_circuit = ground_relational_causal_circuit(
         rpc,
         room_query_4,
         causal_variables=["chair_count()"],
@@ -80,9 +78,7 @@ def test_from_relational_probabilistic_circuit_returns_a_causal_circuit(
     assert isinstance(causal_circuit, CausalCircuit)
 
 
-def test_from_relational_probabilistic_circuit_accepts_resolved_variables(
-    rpc, room_query_4
-):
+def test_ground_relational_causal_circuit_accepts_resolved_variables(rpc, room_query_4):
     """
     Callers may pass already-resolved Variable objects instead of path strings.
     """
@@ -92,7 +88,7 @@ def test_from_relational_probabilistic_circuit_accepts_resolved_variables(
     object_type_variable = resolve_variable(grounded, "objects[0].type")
 
     np.random.seed(0)
-    causal_circuit = RelationalCausalCircuit.from_relational_probabilistic_circuit(
+    causal_circuit = ground_relational_causal_circuit(
         rpc,
         room_query_4,
         causal_variables=[chair_count_variable],
@@ -101,16 +97,14 @@ def test_from_relational_probabilistic_circuit_accepts_resolved_variables(
     assert isinstance(causal_circuit, CausalCircuit)
 
 
-def test_from_relational_probabilistic_circuit_defaults_to_causal_sampled(
-    rpc, room_query_4
-):
+def test_ground_relational_causal_circuit_defaults_to_causal_sampled(rpc, room_query_4):
     """
     The default grounding mode must retain undetermined latents (unlike
-    GroundingMode.PREDICTIVE), since that is the entire point of building a
-    RelationalCausalCircuit around one.
+    GroundingMode.PREDICTIVE), since that is the entire point of grounding a
+    CausalCircuit this way.
     """
     np.random.seed(0)
-    causal_circuit = RelationalCausalCircuit.from_relational_probabilistic_circuit(
+    causal_circuit = ground_relational_causal_circuit(
         rpc,
         room_query_4,
         causal_variables=["chair_count()"],
@@ -120,11 +114,9 @@ def test_from_relational_probabilistic_circuit_defaults_to_causal_sampled(
     assert "SceneRoomAggregations.chair_count()" in names
 
 
-def test_from_relational_probabilistic_circuit_backdoor_adjustment_runs(
-    rpc, room_query_4
-):
+def test_ground_relational_causal_circuit_backdoor_adjustment_runs(rpc, room_query_4):
     np.random.seed(0)
-    causal_circuit = RelationalCausalCircuit.from_relational_probabilistic_circuit(
+    causal_circuit = ground_relational_causal_circuit(
         rpc,
         room_query_4,
         causal_variables=["chair_count()"],
@@ -142,7 +134,7 @@ def test_from_relational_probabilistic_circuit_backdoor_adjustment_runs(
     assert interventional_circuit.is_valid()
 
 
-def test_from_relational_probabilistic_circuit_warns_on_expensive_adjustment_set(
+def test_ground_relational_causal_circuit_warns_on_expensive_adjustment_set(
     rpc, room_query_4, caplog
 ):
     """
@@ -151,7 +143,7 @@ def test_from_relational_probabilistic_circuit_warns_on_expensive_adjustment_set
     threshold, rather than waiting to discover the cost at query time.
     """
     with caplog.at_level("WARNING"):
-        RelationalCausalCircuit.from_relational_probabilistic_circuit(
+        ground_relational_causal_circuit(
             rpc,
             room_query_4,
             causal_variables=["objects[0].type"],
@@ -163,11 +155,11 @@ def test_from_relational_probabilistic_circuit_warns_on_expensive_adjustment_set
     assert any("leaf regions" in message for message in caplog.messages)
 
 
-def test_from_relational_probabilistic_circuit_does_not_warn_below_threshold(
+def test_ground_relational_causal_circuit_does_not_warn_below_threshold(
     rpc, room_query_4, caplog
 ):
     with caplog.at_level("WARNING"):
-        RelationalCausalCircuit.from_relational_probabilistic_circuit(
+        ground_relational_causal_circuit(
             rpc,
             room_query_4,
             causal_variables=["objects[0].type"],
