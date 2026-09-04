@@ -286,7 +286,7 @@ class LeafUnit(Unit):
 
     @property
     def leaves(self) -> List[LeafUnit]:
-        return []
+        return [self]
 
     def log_likelihood(self, events: npt.NDArray):
         self.result_of_current_query = self.distribution.log_likelihood(events)
@@ -560,7 +560,7 @@ class SumUnit(InnerUnit):
     def mount_with_interaction_terms(
         self, other: Self, interaction_model: ProbabilisticModel
     ):
-        """
+        r"""
         Create a distribution that factorizes as follows:
 
         .. math::

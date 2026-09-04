@@ -257,3 +257,33 @@ def test_causal_sampled_grounding_supports_causal_circuit_registration(
 
     result = causal_circuit.verify_support_determinism()
     assert result.passed
+
+
+def test_causal_sampled_grounding_backdoor_adjustment_runs(rpc, room_query_4):
+    """
+    End-to-end regression test: computing ``P(effect | do(cause))`` on a
+    ``CAUSAL_SAMPLED``-grounded circuit must not raise.
+
+    This exercises every renamed exchangeable-instance leaf, including any query part
+    whose grounded circuit happens to collapse to a single leaf as its own root.
+    """
+    np.random.seed(0)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    chair_count_variable = next(
+        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
+    )
+    object_type_variable = next(
+        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
+    )
+
+    tree = MarginalDeterminismTreeNode.from_causal_graph(
+        [chair_count_variable], [object_type_variable]
+    )
+    causal_circuit = CausalCircuit.from_probabilistic_circuit(
+        model, tree, [chair_count_variable], [object_type_variable]
+    )
+
+    interventional_circuit = causal_circuit.backdoor_adjustment(
+        cause_variable=chair_count_variable, effect_variable=object_type_variable
+    )
+    assert interventional_circuit.is_valid()

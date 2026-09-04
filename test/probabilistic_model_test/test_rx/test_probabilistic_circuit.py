@@ -441,5 +441,36 @@ class MixedLeafTruncationTestCase(unittest.TestCase):
         self.assertAlmostEqual(truncated.probability(event), 1.0, places=9)
 
 
+# %% a leaf is its own only leaf
+
+
+class SingleLeafCircuitTestCase(unittest.TestCase):
+    """
+    A circuit whose root is itself a leaf, with no wrapping product or sum unit.
+    """
+
+    x = Continuous("x")
+
+    def setUp(self):
+        self.circuit = ProbabilisticCircuit()
+        self.leaf = leaf(
+            UniformDistribution(
+                variable=self.x, interval=SimpleInterval.from_data(0, 1)
+            ),
+            self.circuit,
+        )
+
+    def test_leaf_unit_lists_itself_as_its_own_leaf(self):
+        self.assertEqual(self.leaf.leaves, [self.leaf])
+
+    def test_circuit_rooted_at_a_single_leaf_lists_that_leaf(self):
+        self.assertEqual(self.circuit.leaves, [self.leaf])
+
+    def test_update_variables_renames_a_single_leaf_root(self):
+        renamed_x = Continuous("renamed_x")
+        self.circuit.update_variables({self.x: renamed_x})
+        self.assertEqual(self.leaf.distribution.variable, renamed_x)
+
+
 if __name__ == "__main__":
     unittest.main()
