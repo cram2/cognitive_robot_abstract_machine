@@ -1244,6 +1244,13 @@ class Goal(MotionStatechartNode):
         :param context: The context that contains data that can be used to expand this goal.
         """
 
+    @property
+    def non_terminal_nodes(self) -> List[MotionStatechartNode]:
+        """
+        :return: The child nodes this goal orchestrates, without the ones that end the motion.
+        """
+        return [node for node in self.nodes if not isinstance(node, TerminalNode)]
+
     def add_node(self, node: MotionStatechartNode) -> None:
         """
         Adds a node to this goal and the motion statechart this goal belongs to.
@@ -1504,6 +1511,41 @@ class CancelMotion(TerminalNode):
         end = cls(exception=exception)
         end.start_condition = node.observation_variable
         return end
+
+    @classmethod
+    def when_false(cls, node: MotionStatechartNode, exception: Exception) -> Self:
+        """
+        Factory method for creating a CancelMotion node that activates when the given node has a false observation state.
+
+        :param node: The node whose observation state activates the created node.
+        :param exception: The exception raised on activation.
+        :return: The new CancelMotion node.
+        """
+        cancel = cls(exception=exception)
+        cancel.start_condition = trinary_logic_not(node.observation_variable)
+        return cancel
+
+    @classmethod
+    def when_all_false(
+        cls, nodes: List[MotionStatechartNode], exception: Exception
+    ) -> Self:
+        """
+        Factory method for creating a CancelMotion node that activates when *all* of the given nodes have a false observation state.
+
+        A node that has not decided yet observes Unknown, and so does its negation, so this
+        only activates once every node has decided against its goal.
+
+        :param nodes: The nodes whose observation states activate the created node.
+        :param exception: The exception raised on activation.
+        :return: The new CancelMotion node.
+        """
+        if len(nodes) == 1:
+            return cls.when_false(node=nodes[0], exception=exception)
+        cancel = cls(exception=exception)
+        cancel.start_condition = sm.trinary_logic_and(
+            *[trinary_logic_not(node.observation_variable) for node in nodes]
+        )
+        return cancel
 
     @classmethod
     def when_all_true(

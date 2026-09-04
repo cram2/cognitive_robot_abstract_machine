@@ -8,18 +8,23 @@ ticking the executor, asserting the resulting observation and life cycle states.
 succeed / fail.
 """
 
+from dataclasses import dataclass
+
+import pytest
+
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.graph_node import CancelMotion, MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstFalseNode,
     ConstTrueNode,
 )
+from krrood.exceptions import DataclassException
 from semantic_digital_twin.world import World
 
 from giskardpy.motion_statechart.monitors.payload_monitors import (
@@ -277,3 +282,81 @@ def test_monitored_goals_observe_the_monitored_node_when_the_monitor_never_fires
         assert goal.monitored_node.life_cycle_state == LifeCycleValues.RUNNING
         assert goal.observation_state == goal.monitored_node.observation_state
         assert goal.observation_state == ObservationStateValues.TRUE
+
+
+# %% ending the motion once every alternative failed
+
+
+@dataclass
+class AlternativesExhausted(DataclassException):
+    """
+    The failure a cancelling node carries, so a test can tell it from any other.
+    """
+
+    def error_message(self) -> str:
+        return "every alternative failed"
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+def test_alternatives_that_all_failed_cancel_the_motion():
+    """
+    Nothing waits for a goal whose every alternative failed, so the node watching them
+    ends the motion with the failure it carries.
+    """
+    first = ConstFalseNode(name="first")
+    second = ConstFalseNode(name="second")
+    goal = TryInOrder(
+        nodes=[
+            first,
+            second,
+            CancelMotion.when_all_false([first, second], AlternativesExhausted()),
+        ]
+    )
+
+    with pytest.raises(AlternativesExhausted):
+        _compile_and_tick(goal)
+
+
+def test_a_cancel_motion_does_not_fire_while_an_alternative_is_undecided():
+    """
+    An alternative the short-circuit never started has not decided against its goal, so
+    it must not read as one that failed.
+    """
+    first = ConstTrueNode(name="first")
+    second = ConstFalseNode(name="second")
+    goal = TryInOrder(
+        nodes=[
+            first,
+            second,
+            CancelMotion.when_all_false([first, second], AlternativesExhausted()),
+        ]
+    )
+
+    _compile_and_tick(goal)
+
+    assert second.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert goal.observation_state == ObservationStateValues.TRUE
+
+
+def test_a_node_that_ends_the_motion_is_not_one_of_the_alternatives():
+    """
+    A node that ends the motion is not something to choose between, so a goal whose
+    every alternative failed still reports that it failed rather than staying undecided.
+    """
+    first = ConstFalseNode(name="first")
+    second = ConstFalseNode(name="second")
+    goal = TryAll(
+        nodes=[
+            first,
+            second,
+            # Waits for an alternative that stays False, so it never fires and the
+            # goal's own observation is what is under test.
+            CancelMotion.when_true(first, AlternativesExhausted()),
+        ]
+    )
+
+    _compile_and_tick(goal)
+
+    assert goal.observation_state == ObservationStateValues.FALSE

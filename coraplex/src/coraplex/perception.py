@@ -251,11 +251,19 @@ class PerceptionInterface(ABC):
     """
 
     @abstractmethod
+    def look_for(self, query: PerceptionQuery) -> List[Detection]:
+        """
+        Report every object this source sees for a perception query.
+
+        :param query: What to look for and where.
+        :return: One detection per object seen, empty when the source saw nothing.
+        """
+
     def detect(
         self, query: PerceptionQuery, accept_first_if_multiple: bool = False
     ) -> Detection:
         """
-        Answer a perception query.
+        Answer a perception query with the one object it asked about.
 
         :param query: What to look for and where.
         :param accept_first_if_multiple: Whether several candidates may be resolved by
@@ -267,6 +275,9 @@ class PerceptionInterface(ABC):
         :raises UnidentifiedDetections: If several candidates were seen and none of them
             may be picked.
         """
+        return self.narrow_to_single_detection(
+            self.look_for(query), query, accept_first_if_multiple
+        )
 
     @staticmethod
     def narrow_to_single_detection(
@@ -324,26 +335,20 @@ class WorldPerception(PerceptionInterface):
     already holds.
     """
 
-    def detect(
-        self, query: PerceptionQuery, accept_first_if_multiple: bool = False
-    ) -> Detection:
+    def look_for(self, query: PerceptionQuery) -> List[Detection]:
         annotation_by_body = {}
         for annotation in query.world.get_semantic_annotations_by_type(
             query.semantic_annotation
         ):
             annotation_by_body.setdefault(annotation.root, type(annotation))
 
-        detections = [
+        return [
             Detection(
                 semantic_annotation=annotation_by_body[body], pose=body.global_pose
             )
             for body in query.from_world()
             if body in annotation_by_body
         ]
-
-        return self.narrow_to_single_detection(
-            detections, query, accept_first_if_multiple
-        )
 
 
 @dataclass
@@ -367,9 +372,7 @@ class RoboKudoPerception(PerceptionInterface):
     How long to wait for the action server before giving up.
     """
 
-    def detect(
-        self, query: PerceptionQuery, accept_first_if_multiple: bool = False
-    ) -> Detection:
+    def look_for(self, query: PerceptionQuery) -> List[Detection]:
         # RoboKudo's messages only exist where its pipeline is installed, so they are
         # imported here rather than at module level: reading the world in simulation must
         # not depend on them.
@@ -384,15 +387,11 @@ class RoboKudoPerception(PerceptionInterface):
             obj=ObjectDesignator(type=query.semantic_annotation.__name__.lower())
         )
         result = client.send_goal(goal).result
-        detections = [
+        return [
             self._to_detection(designator, query)
             for designator in result.res
             if designator.pose and self._can_be_requested_object(designator, query)
         ]
-
-        return self.narrow_to_single_detection(
-            detections, query, accept_first_if_multiple
-        )
 
     @staticmethod
     def _can_be_requested_object(

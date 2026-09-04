@@ -26,6 +26,7 @@ from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.composite.facing import FaceAtAction
+from coraplex.robot_plans.actions.composite.searching import SearchAction
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.container import OpenAction, CloseAction
 from coraplex.robot_plans.actions.core.misc import DetectAction, MoveToReach
@@ -90,6 +91,7 @@ from semantic_digital_twin.spatial_types import (
     Quaternion,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
+from semantic_digital_twin.reasoning.predicates import visible
 from semantic_digital_twin.world import World
 
 # The alternative motion mappings that should be available to the plans in this test module.
@@ -960,7 +962,9 @@ def test_elevator_navigation(mutable_multiple_robot_apartment, rclpy_node):
     distance_from_cabin_center = float(elevator.scale.x) / 2 + action.exit_clearance
     expected_position = (
         cabin_position[:3]
-        + elevator.hole_direction.to_np().flatten()[:3] * -1 * distance_from_cabin_center
+        + elevator.hole_direction.to_np().flatten()[:3]
+        * -1
+        * distance_from_cabin_center
     )
     expected_position[2] = starting_height + elevator_travel
 
@@ -968,3 +972,42 @@ def test_elevator_navigation(mutable_multiple_robot_apartment, rclpy_node):
     assert robot.root.global_transform.to_position().to_np().flatten()[
         :3
     ] == pytest.approx(expected_position, abs=0.01)
+
+
+# %% searching for an object
+
+
+def test_search_action(immutable_multiple_robot_apartment, rclpy_node):
+    """
+    The search ends with the robot standing where it can see the object, and with the
+    object's annotation carrying what was seen.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk_body = milk.root
+    # East of the multi-storey building the fixture merges in, where every robot has the
+    # clearance to stand somewhere the milk is visible from.
+    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        6, -2, 1.2, reference_frame=world.root
+    )
+    world.notify_state_change()
+    spawned_position = milk_body.global_pose.to_position().to_np().flatten()[:3]
+
+    plan = execute_single(
+        SearchAction(milk_body.global_pose, object_semantic_annotation=Milk),
+        context=context,
+    )
+
+    with simulated_robot:
+        plan.perform()
+
+    assert visible(robot.get_default_camera(), milk_body)
+    # A perfect simulated sensor reports where the object already is, so detecting it
+    # confirms where it stands rather than moving it.
+    np.testing.assert_allclose(
+        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        spawned_position,
+        atol=1e-9,
+    )
+
+    plan.plan.validate()
