@@ -91,7 +91,7 @@ class Parallel(Goal):
         what it observes now and stops counting once it drifts away from its goal again.
         A node something *else* ended keeps counting, because its verdict outlasts it.
         """
-        nodes_at_their_goal = [node.goal_reached == True for node in self.nodes]
+        nodes_at_their_goal = [node.goal_reached.is_true() for node in self.nodes]
         minimum_success = (
             self.minimum_success
             if self.minimum_success is not None
