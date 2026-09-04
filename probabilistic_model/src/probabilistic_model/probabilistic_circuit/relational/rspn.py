@@ -359,26 +359,20 @@ class RelationalProbabilisticCircuit:
         :param aggregation_statistics: Observed aggregation values to condition on.
         :param latent_variables: Variables that link the class circuit to the
             exchangeable distribution template.
-        :return: The conditioned circuit and the surviving product nodes that will be
-            extended with the grounded exchangeable distribution.
+        :return: The conditioned circuit and the product nodes that will be extended
+            with the grounded exchangeable distribution.
         """
-        product_nodes_to_extend = find_lowest_product_nodes_that_model_variables(
-            circuit, SortedSet(latent_variables)
-        )
         conditioning_result, _ = circuit.log_conditional_in_place(
             aggregation_statistics
         )
         if conditioning_result is None:
             circuit = self.class_probabilistic_circuit.__deepcopy__()
-            product_nodes_to_extend = find_lowest_product_nodes_that_model_variables(
-                circuit, SortedSet(latent_variables)
-            )
         if len(circuit.nodes()) == 0:
             raise ValueError("The grounding of the class failed.")
-        surviving_product_nodes = [
-            node for node in product_nodes_to_extend if node.index is not None
-        ]
-        return circuit, surviving_product_nodes
+        product_nodes_to_extend = find_lowest_product_nodes_that_model_variables(
+            circuit, SortedSet(latent_variables)
+        )
+        return circuit, product_nodes_to_extend
 
     def ground(self, query: Match) -> ProbabilisticCircuit:
         """

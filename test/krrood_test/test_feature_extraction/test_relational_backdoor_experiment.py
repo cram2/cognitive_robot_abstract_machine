@@ -1,23 +1,18 @@
 """
-Experiment: can :class:`~probabilistic_model.probabilistic_circuit.relational.rspn.RelationalProbabilisticCircuit`
-ground a query whose backdoor-adjustment set is a confounder shared across an
-exchangeable relation, so that the result could be wrapped in
-:class:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`
-for relational ``do()`` reasoning?
+Grounding a scalar confounder alongside an exchangeable relation.
 
 The scenario: a :class:`~test.krrood_test.dataset.example_classes.PickingRobot` has a
 ``skill`` level that confounds its :class:`~test.krrood_test.dataset.example_classes.GraspAttempt`
 attempts — skill affects both the arm position chosen (the cause) and the grasp
 outcome (the effect) directly, so the naive (non-adjusted) correlation between arm and
-outcome is biased and only backdoor-adjusting for skill recovers the true causal effect.
+outcome is biased and only backdoor-adjusting for skill recovers the true causal
+effect. This is the shape any relational causal query needs before a
+:class:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`
+could be built on top of it: a class-level scalar alongside an exchangeable relation
+whose own aggregation statistics may or may not be determined by the query.
 
-Grounding this relation — the step every relational causal query would need before a
-:class:`CausalCircuit` could even be built — never reaches the causal machinery at all:
-the resulting circuit is either structurally disconnected or the grounding call itself
-raises, in both cases from ``RelationalProbabilisticCircuit.ground()``'s own
-node-mounting logic. A relational ``do()`` query is therefore not currently possible
-through this API, independently of any further question about backdoor-criterion
-validity.
+These tests exercise ``RelationalProbabilisticCircuit.ground()`` for that shape,
+independently of any further question about backdoor-criterion validity.
 """
 
 from __future__ import annotations
@@ -56,7 +51,9 @@ def _sample_confounded_robot(rng: np.random.Generator) -> PickingRobot:
     for _ in range(ATTEMPTS_PER_ROBOT):
         arm = 1.0 if rng.random() < arm_probability else 0.0
         grasp_probability = 0.2 + 0.5 * arm + 0.3 * skill
-        attempts.append(GraspAttempt(arm=arm, grasped=bool(rng.random() < grasp_probability)))
+        attempts.append(
+            GraspAttempt(arm=arm, grasped=bool(rng.random() < grasp_probability))
+        )
     return PickingRobot(skill=skill, attempts=attempts)
 
 
@@ -67,6 +64,14 @@ def confounded_model() -> RelationalProbabilisticCircuit:
     model = RelationalProbabilisticCircuit(PickingRobot)
     model.fit([to_dao(robot) for robot in robots])
     return model
+
+
+def _attempt_variable_names(count: int) -> set[str]:
+    names = set()
+    for index in range(count):
+        names.add(f"PickingRobot.attempts[{index}].arm")
+        names.add(f"PickingRobot.attempts[{index}].grasped")
+    return names
 
 
 # %% the class-level circuit does capture the confound (sanity check on the fit itself)
@@ -80,17 +85,16 @@ def test_class_circuit_models_both_skill_and_the_aggregate_it_confounds(
     assert "PickingRobotAggregations.success_count()" in names
 
 
-# %% grounding breaks before a CausalCircuit could ever be built
+# %% grounding a scalar confounder alongside a fully determined exchangeable relation
 
 
-def test_grounding_a_fully_observed_query_yields_a_disconnected_circuit(
+def test_grounding_a_fully_observed_query_yields_one_connected_circuit(
     confounded_model,
 ):
     """
     A backdoor-adjustment query needs the adjustment set concrete, so every attempt is
-    given a concrete arm/grasped value here (making ``success_count`` fully
-    determined, avoiding the Monte-Carlo integration path). ``ground()`` does not
-    raise, but the circuit it returns has two disconnected roots instead of one.
+    given a concrete arm/grasped value here (making ``success_count`` fully determined,
+    avoiding the Monte-Carlo integration path).
     """
     query = a(PickingRobot)(
         skill=...,
@@ -105,23 +109,41 @@ def test_grounding_a_fully_observed_query_yields_a_disconnected_circuit(
 
     grounded = confounded_model.ground(query)
 
-    with pytest.raises(ValueError, match="More than one root"):
-        grounded.variables
+    assert grounded.is_valid()
+    names = {v.name for v in grounded.variables}
+    assert names == _attempt_variable_names(ATTEMPTS_PER_ROBOT) | {
+        "PickingRobot.skill",
+        "PickingRobotAggregations.success_count()",
+        "PickingRobotAggregations.total_count()",
+    }
 
 
-def test_grounding_an_underspecified_query_raises_immediately(confounded_model):
+# %% grounding a scalar confounder alongside an underspecified exchangeable relation
+
+
+def test_grounding_an_underspecified_query_yields_one_connected_circuit(
+    confounded_model,
+):
     """
-    The Monte-Carlo path (every attempt field left underspecified) is the pattern the
-    RSPN test suite already exercises successfully for a richer class circuit
-    (``SceneRoom``). For this relation, mounting a sampled exchangeable instance onto
-    the conditioned class circuit fails outright.
+    Every attempt field is left underspecified, so ``success_count`` cannot be
+    determined from the query and must be integrated out via the Monte-Carlo path, while
+    ``total_count`` is determined directly from the query's attempt count.
     """
     query = a(PickingRobot)(
         skill=...,
-        attempts=[a(GraspAttempt)(arm=..., grasped=...) for _ in range(ATTEMPTS_PER_ROBOT)],
+        attempts=[
+            a(GraspAttempt)(arm=..., grasped=...) for _ in range(ATTEMPTS_PER_ROBOT)
+        ],
     )
     query.resolve()
 
     np.random.seed(0)
-    with pytest.raises(AttributeError, match="add_edge"):
-        confounded_model.ground(query)
+    grounded = confounded_model.ground(query)
+
+    assert grounded.is_valid()
+    names = {v.name for v in grounded.variables}
+    assert names == _attempt_variable_names(ATTEMPTS_PER_ROBOT) | {
+        "PickingRobot.skill",
+        "PickingRobotAggregations.total_count()",
+    }
+    assert "PickingRobotAggregations.success_count()" not in names
