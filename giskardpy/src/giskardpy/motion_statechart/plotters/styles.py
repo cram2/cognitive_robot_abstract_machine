@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum, StrEnum
 
-from typing_extensions import (
-    Dict,
-    TYPE_CHECKING,
-)
+from typing_extensions import Dict
 
 from semantic_digital_twin.world_description.geometry import Color
 from giskardpy.motion_statechart.data_types import (
@@ -13,36 +11,124 @@ from giskardpy.motion_statechart.data_types import (
     TransitionKind,
 )
 
-if TYPE_CHECKING:
-    pass
+# %% fonts
 
-NotStartedColor = "#9F9F9F"
-MyBLUE = "#0000DD"
-MyGREEN = "#006600"
-MyRED = "#993000"
-MyGRAY = "#E0E0E0"
 
-ChatGPTGreen = "#28A745"
-ChatGPTOrange = "#E6AC00"
-ChatGPTRed = "#DC3545"
-ChatGPTBlue = "#007BFF"
-ChatGPTGray = "#8F959E"
+class Font(StrEnum):
+    """
+    The font families the drawing writes its text in.
+    """
 
-FONT = "sans-serif"
-LineWidth = 4
-NodeSep = 1
-RankSep = 1
-ArrowSize = 1
-Fontsize = 15
-GoalNodeStyle = "filled"
-GoalNodeShape = "none"
-GoalClusterStyle = "filled"
-MonitorStyle = "filled, rounded"
-MonitorShape = "rectangle"
-TaskStyle = "filled, diagonals"
-TaskShape = "rectangle"
-ConditionFont = "monospace"
-DisabledConditionColor = Color.from_hex("#9CA3AF")
+    SANS_SERIF = "sans-serif"
+    """
+    The proportional family used for the names of nodes and goals.
+    """
+
+    MONOSPACE = "monospace"
+    """
+    The fixed width family used for text taken verbatim from the statechart, such as
+    conditions and state badges.
+    """
+
+
+# %% how a node is drawn
+
+
+class NodeDrawingStyle(Enum):
+    """
+    The graphviz style and shape each kind of node is drawn with.
+    """
+
+    style: str
+    """
+    The graphviz style of a node of this kind.
+    """
+
+    shape: str
+    """
+    The graphviz shape of a node of this kind.
+    """
+
+    MONITOR = "filled, rounded", "rectangle"
+    TASK = "filled, diagonals", "rectangle"
+    GOAL = "filled", "none"
+
+    def __init__(self, style: str, shape: str) -> None:
+        """
+        :param style: The graphviz style of a node of this kind.
+        :param shape: The graphviz shape of a node of this kind.
+        """
+        self.style = style
+        self.shape = shape
+
+
+class BorderStyle(StrEnum):
+    """
+    The graphviz styles of the extra borders drawn around a node.
+    """
+
+    ROUNDED = "rounded"
+    DASHED_ROUNDED = "dashed, rounded"
+
+
+# %% sizes
+
+
+@dataclass(frozen=True)
+class DrawingMetrics:
+    """
+    The measurements the drawing is laid out with.
+    """
+
+    line_width: float = 4
+    """
+    The thickness in points of every drawn border and edge.
+    """
+
+    font_size: int = 15
+    """
+    The size in points of the text in nodes and goals.
+    """
+
+    rank_separation: float = 1
+    """
+    The distance in inches between two consecutive rows of nodes.
+    """
+
+    node_separation: float = 1
+    """
+    The distance in inches between two nodes of the same row.
+    """
+
+    arrow_size: float = 1
+    """
+    The size of the arrow head of a transition, relative to the graphviz default.
+    """
+
+    compact_separation_factor: float = 0.5
+    """
+    The multiple of both separations the drawing keeps in compact mode.
+    """
+
+    compact_bottom_padding_factor: float = 2.5
+    """
+    The multiple of :attr:`line_width` a node reserves below its badges in compact mode,
+    where no conditions follow them.
+    """
+
+
+DRAWING_METRICS = DrawingMetrics()
+"""
+The measurements every drawing is laid out with.
+"""
+
+
+# %% conditions
+
+DISABLED_CONDITION_COLOR = Color.from_hex("#9CA3AF")
+"""
+The color a condition that cannot become true any more is written in.
+"""
 
 
 # %% how a trinary value is drawn
@@ -71,13 +157,13 @@ class ObservationDrawingStyle:
 
 OBSERVATION_DRAWING_STYLES: Dict[ObservationStateValues, ObservationDrawingStyle] = {
     ObservationStateValues.TRUE: ObservationDrawingStyle(
-        color=Color.from_hex("#2E7D32"), line_width=LineWidth * 1.25
+        color=Color.from_hex("#2E7D32"), line_width=DRAWING_METRICS.line_width * 1.25
     ),
     ObservationStateValues.FALSE: ObservationDrawingStyle(
-        color=Color.from_hex("#C62828"), line_width=LineWidth * 1.25
+        color=Color.from_hex("#C62828"), line_width=DRAWING_METRICS.line_width * 1.25
     ),
     ObservationStateValues.UNKNOWN: ObservationDrawingStyle(
-        color=Color.from_hex("#000000"), line_width=LineWidth * 0.5
+        color=Color.from_hex("#000000"), line_width=DRAWING_METRICS.line_width * 0.5
     ),
 }
 """

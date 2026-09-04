@@ -23,17 +23,12 @@ from giskardpy.motion_statechart.graph_node import (
     TrinaryCondition,
 )
 from giskardpy.motion_statechart.plotters.styles import (
-    RankSep,
-    NodeSep,
-    LineWidth,
-    ConditionFont,
-    DisabledConditionColor,
-    FONT,
-    Fontsize,
-    GoalClusterStyle,
+    DISABLED_CONDITION_COLOR,
+    DRAWING_METRICS,
+    Font,
     MINIMUM_RANK_DISTANCES,
+    NodeDrawingStyle,
     OBSERVATION_DRAWING_STYLES,
-    ArrowSize,
 )
 
 if TYPE_CHECKING:
@@ -45,8 +40,8 @@ class ConditionDependency:
     """
     One node reading another in its transition conditions.
 
-    However many conditions read it, the drawing shows the pair once, because an arrow no
-    longer says which condition it feeds.
+    However many conditions read it, the drawing shows the pair once, because an arrow
+    no longer says which condition it feeds.
     """
 
     condition_owner: MotionStatechartNode
@@ -67,8 +62,8 @@ class ConditionDependency:
     @property
     def minimum_rank_distance(self) -> int:
         """
-        A rank distance is a lower bound, so the separate arrows this one replaces already
-        left graphviz solving for the largest of them.
+        A rank distance is a lower bound, so the separate arrows this one replaces
+        already left graphviz solving for the largest of them.
 
         :return: How many rows below the observed node its owner is drawn at least.
         """
@@ -84,7 +79,8 @@ def format_condition_text(text: str, color_constants: bool = False) -> str:
     Logical operators start a new line and trinary constants are spelled out.
 
     :param text: The text to rewrite.
-    :param color_constants: Whether boolean constants should be colored with their observation color.
+    :param color_constants: Whether boolean constants should be colored with their
+        observation color.
     :return: The text with graphviz line breaks and readable constants.
     """
     text = text.replace(" and ", "<BR/>       and ")
@@ -146,8 +142,18 @@ class MotionStatechartGraphviz:
         self.graph = pydot.Dot(
             graph_type="digraph",
             graph_name="",
-            ranksep=RankSep if not self.compact else RankSep * 0.5,
-            nodesep=NodeSep if not self.compact else NodeSep * 0.5,
+            ranksep=(
+                DRAWING_METRICS.rank_separation
+                if not self.compact
+                else DRAWING_METRICS.rank_separation
+                * DRAWING_METRICS.compact_separation_factor
+            ),
+            nodesep=(
+                DRAWING_METRICS.node_separation
+                if not self.compact
+                else DRAWING_METRICS.node_separation
+                * DRAWING_METRICS.compact_separation_factor
+            ),
             compound=True,
             ratio="compress",
         )
@@ -170,7 +176,7 @@ class MotionStatechartGraphviz:
         label = (
             f'<<TABLE  BORDER="0" CELLBORDER="0" CELLSPACING="0">'
             f"<TR>"
-            f'  <TD WIDTH="100%" HEIGHT="{LineWidth}"></TD>'
+            f'  <TD WIDTH="100%" HEIGHT="{DRAWING_METRICS.line_width}"></TD>'
             f"</TR>"
             f"<TR>"
             f"  <TD><B> {node.unique_name} </B></TD>"
@@ -179,9 +185,9 @@ class MotionStatechartGraphviz:
             f'  <TD CELLPADDING="0">'
             f'    <TABLE BORDER="0" CELLBORDER="2" CELLSPACING="0" WIDTH="100%">'
             f"      <TR>"
-            f'        <TD BGCOLOR="{obs_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{obs_badge}</FONT></TD>'
+            f'        <TD BGCOLOR="{obs_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="{Font.MONOSPACE}">{obs_badge}</FONT></TD>'
             f"        <VR/>"
-            f'        <TD BGCOLOR="{life_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{life_badge}</FONT></TD>'
+            f'        <TD BGCOLOR="{life_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="{Font.MONOSPACE}">{life_badge}</FONT></TD>'
             f"      </TR>"
             f"    </TABLE>"
             f"  </TD>"
@@ -191,7 +197,9 @@ class MotionStatechartGraphviz:
             label += self._build_hidden_node_count_block(node)
         if self.compact:
             label += (
-                f"<TR>" f'  <TD WIDTH="100%" HEIGHT="{LineWidth*2.5}"></TD>' f"</TR>"
+                f"<TR>"
+                f'  <TD WIDTH="100%" HEIGHT="{DRAWING_METRICS.line_width * DRAWING_METRICS.compact_bottom_padding_factor}"></TD>'
+                f"</TR>"
             )
         else:
             label += self._build_condition_block(node)
@@ -207,7 +215,7 @@ class MotionStatechartGraphviz:
         plural = "s" if hidden_node_count != 1 else ""
         return (
             f"<TR>"
-            f'  <TD><FONT FACE="{ConditionFont}">'
+            f'  <TD><FONT FACE="{Font.MONOSPACE}">'
             f"[+] {hidden_node_count} node{plural} hidden"
             f"</FONT></TD>"
             f"</TR>"
@@ -279,22 +287,23 @@ class MotionStatechartGraphviz:
         """
         rendered = self._render_condition(condition, grayed_out=not is_active)
         if is_active:
-            font_tag = f'<FONT FACE="{ConditionFont}">{prefix}:{rendered}</FONT>'
+            font_tag = f'<FONT FACE="{Font.MONOSPACE}">{prefix}:{rendered}</FONT>'
         else:
-            font_tag = f'<FONT FACE="{ConditionFont}" COLOR="{DisabledConditionColor.to_hex()}">{prefix}:{rendered}</FONT>'
+            font_tag = f'<FONT FACE="{Font.MONOSPACE}" COLOR="{DISABLED_CONDITION_COLOR.to_hex()}">{prefix}:{rendered}</FONT>'
         return (
-            f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
-            f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}">{font_tag}</TD></TR>'
+            f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{DRAWING_METRICS.line_width}"></TD></TR>'
+            f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{DRAWING_METRICS.line_width}">{font_tag}</TD></TR>'
         )
 
     def _render_condition(
         self, condition: TrinaryCondition, grayed_out: bool = False
     ) -> str:
         """
-        Writes a condition for display, coloring every term in the value that term takes.
+        Writes a condition for display, coloring every term in the value that term
+        takes.
 
-        When grayed out, individual term status coloring is omitted so the outer disabled
-        color applies uniformly.
+        When grayed out, individual term status coloring is omitted so the outer
+        disabled color applies uniformly.
 
         The value is the term's own, not the observation of the node it names: an
         ``is_succeeded`` term has no answer until that node is judged, however decisive
@@ -381,7 +390,7 @@ class MotionStatechartGraphviz:
         for index, style in enumerate(node.plot_specifications.extra_border_styles):
             c = pydot.Cluster(
                 graph_name=f"{node.unique_name}",
-                penwidth=LineWidth,
+                penwidth=DRAWING_METRICS.line_width,
                 style=node.plot_specifications.extra_border_styles[index],
                 color="black",
             )
@@ -409,9 +418,9 @@ class MotionStatechartGraphviz:
             style=node.plot_specifications.style,
             margin=0,
             fillcolor="white",
-            fontname=FONT,
-            fontsize=Fontsize,
-            penwidth=LineWidth,
+            fontname=Font.SANS_SERIF,
+            fontsize=DRAWING_METRICS.font_size,
+            penwidth=DRAWING_METRICS.line_width,
         )
         return pydot_node
 
@@ -509,12 +518,12 @@ class MotionStatechartGraphviz:
         """
         goal_cluster = pydot.Cluster(
             graph_name=str(node.unique_name),
-            fontname=FONT,
-            fontsize=Fontsize,
-            style=GoalClusterStyle,
+            fontname=Font.SANS_SERIF,
+            fontsize=DRAWING_METRICS.font_size,
+            style=NodeDrawingStyle.GOAL.style,
             color="black",
             fillcolor="white",
-            penwidth=LineWidth,
+            penwidth=DRAWING_METRICS.line_width,
         )
         parent_cluster.add_subgraph(goal_cluster)
         self._cluster_map[node] = goal_cluster
@@ -617,7 +626,7 @@ class MotionStatechartGraphviz:
         color = (
             style.color.to_hex()
             if self._is_dependency_active(dependency)
-            else DisabledConditionColor.to_hex()
+            else DISABLED_CONDITION_COLOR.to_hex()
         )
 
         graph.add_edge(
@@ -627,7 +636,7 @@ class MotionStatechartGraphviz:
                 color=color,
                 penwidth=style.line_width,
                 minlen=dependency.minimum_rank_distance,
-                arrowsize=ArrowSize,
+                arrowsize=DRAWING_METRICS.arrow_size,
                 **kwargs,
             )
         )

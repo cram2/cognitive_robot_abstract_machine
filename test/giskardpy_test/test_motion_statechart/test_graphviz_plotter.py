@@ -29,12 +29,12 @@ from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
 )
 from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
 from giskardpy.motion_statechart.plotters.styles import (
+    DISABLED_CONDITION_COLOR,
+    DRAWING_METRICS,
+    Font,
     MINIMUM_RANK_DISTANCES,
+    NodeDrawingStyle,
     OBSERVATION_DRAWING_STYLES,
-    DisabledConditionColor,
-    LineWidth,
-    TaskShape,
-    TaskStyle,
 )
 
 # %% helpers
@@ -358,6 +358,7 @@ def test_every_observation_state_has_a_drawing_style(observation_state):
 
 # %% arrows carry the observation of the node they leave
 
+
 def test_unknown_arrow_is_thinner_than_a_decided_arrow():
     unknown = OBSERVATION_DRAWING_STYLES[ObservationStateValues.UNKNOWN]
 
@@ -460,13 +461,14 @@ def test_condition_without_terms_is_spelled_out():
     expand(motion_statechart)
 
     true_color = OBSERVATION_DRAWING_STYLES[ObservationStateValues.TRUE].color.to_hex()
-    disabled_color = DisabledConditionColor.to_hex()
+    disabled_color = DISABLED_CONDITION_COLOR.to_hex()
 
     label = find_node(draw(motion_statechart), owner).get_label()
 
     assert f'start:<FONT COLOR="{true_color}">True</FONT>' in label
     assert (
-        f'<FONT FACE="monospace" COLOR="{disabled_color}">pause:False</FONT>' in label
+        f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">pause:False</FONT>'
+        in label
     )
 
 
@@ -484,13 +486,15 @@ def test_condition_boolean_constants_coloring_in_running_state():
     false_color = OBSERVATION_DRAWING_STYLES[
         ObservationStateValues.FALSE
     ].color.to_hex()
-    disabled_color = DisabledConditionColor.to_hex()
+    disabled_color = DISABLED_CONDITION_COLOR.to_hex()
 
     label = find_node(draw(motion_statechart), owner).get_label()
 
-    assert f'<FONT FACE="monospace" COLOR="{disabled_color}">start:True</FONT>' in label
+    assert (
+        f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">start:True</FONT>'
+        in label
+    )
     assert f'pause:<FONT COLOR="{false_color}">False</FONT>' in label
-
 
 
 # %% extra border styles for terminal nodes
@@ -501,8 +505,8 @@ def test_terminal_nodes_and_tasks_have_correct_plot_specifications():
     assert CancelMotion(
         exception=Exception()
     ).plot_specifications.extra_border_styles == ["dashed, rounded"]
-    assert Task().plot_specifications.style == TaskStyle
-    assert Task().plot_specifications.shape == TaskShape
+    assert Task().plot_specifications.style == NodeDrawingStyle.TASK.style
+    assert Task().plot_specifications.shape == NodeDrawingStyle.TASK.shape
 
 
 def test_end_motion_renders_with_rounded_outer_cluster():
@@ -516,7 +520,7 @@ def test_end_motion_renders_with_rounded_outer_cluster():
     assert cluster is not None
     assert cluster.get("style").strip('"') == "rounded"
     assert cluster.get("color").strip('"') == "black"
-    assert float(cluster.get("penwidth")) == LineWidth
+    assert float(cluster.get("penwidth")) == DRAWING_METRICS.line_width
     assert end.unique_name in direct_node_names(cluster)
     assert end.unique_name not in direct_node_names(graph)
 
@@ -532,7 +536,7 @@ def test_cancel_motion_renders_with_dashed_outer_cluster():
     assert cluster is not None
     assert cluster.get("style").strip('"') == "dashed, rounded"
     assert cluster.get("color").strip('"') == "black"
-    assert float(cluster.get("penwidth")) == LineWidth
+    assert float(cluster.get("penwidth")) == DRAWING_METRICS.line_width
     assert cancel.unique_name in direct_node_names(cluster)
     assert cancel.unique_name not in direct_node_names(graph)
 
@@ -579,7 +583,7 @@ def test_conditions_are_grayed_out_when_not_triggerable(
     motion_statechart.observation_state[observed] = ObservationStateValues.TRUE
 
     label = find_node(draw(motion_statechart), node).get_label()
-    disabled_color = DisabledConditionColor.to_hex()
+    disabled_color = DISABLED_CONDITION_COLOR.to_hex()
 
     for prefix, condition, transition_kind, term in [
         (
@@ -609,9 +613,9 @@ def test_conditions_are_grayed_out_when_not_triggerable(
     ]:
         can_trigger = transition_kind.can_trigger_from(life_cycle_state)
         if can_trigger:
-            assert f'<FONT FACE="monospace">{prefix}:' in label
+            assert f'<FONT FACE="{Font.MONOSPACE}">{prefix}:' in label
             assert (
-                f'<FONT FACE="monospace" COLOR="{disabled_color}">{prefix}:'
+                f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">{prefix}:'
                 not in label
             )
             variable = condition.variables[0]
@@ -620,9 +624,12 @@ def test_conditions_are_grayed_out_when_not_triggerable(
             ].color.to_hex()
             assert f'<FONT COLOR="{resolved_color}">"{term}"</FONT>' in label
         else:
-            assert f'<FONT FACE="monospace" COLOR="{disabled_color}">{prefix}:' in label
             assert (
-                f'<FONT FACE="monospace" COLOR="{disabled_color}">{prefix}:"{term}"</FONT>'
+                f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">{prefix}:'
+                in label
+            )
+            assert (
+                f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">{prefix}:"{term}"</FONT>'
                 in label
             )
 
@@ -648,11 +655,14 @@ def test_terminal_node_condition_graying(
     motion_statechart.life_cycle_state[terminal_node] = life_cycle_state
 
     label = find_node(draw(motion_statechart), terminal_node).get_label()
-    disabled_color = DisabledConditionColor.to_hex()
+    disabled_color = DISABLED_CONDITION_COLOR.to_hex()
 
     can_trigger = TransitionKind.START.can_trigger_from(life_cycle_state)
     if can_trigger:
-        assert '<FONT FACE="monospace">start:' in label
-        assert f'<FONT FACE="monospace" COLOR="{disabled_color}">start:' not in label
+        assert f'<FONT FACE="{Font.MONOSPACE}">start:' in label
+        assert (
+            f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">start:'
+            not in label
+        )
     else:
-        assert f'<FONT FACE="monospace" COLOR="{disabled_color}">start:' in label
+        assert f'<FONT FACE="{Font.MONOSPACE}" COLOR="{disabled_color}">start:' in label

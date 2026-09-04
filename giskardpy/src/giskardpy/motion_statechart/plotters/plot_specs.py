@@ -12,12 +12,8 @@ from typing_extensions import (
 
 from krrood.patterns.field_metadata import JSONMetadata
 from giskardpy.motion_statechart.plotters.styles import (
-    MonitorStyle,
-    MonitorShape,
-    TaskShape,
-    TaskStyle,
-    GoalNodeStyle,
-    GoalNodeShape,
+    BorderStyle,
+    NodeDrawingStyle,
 )
 
 if TYPE_CHECKING:
@@ -34,28 +30,34 @@ class NodePlotSpec:
     Only has an effect on nodes that own children, i.e. goals.
     """
 
-    style: str = "filled, rounded"
-    shape: str = "rectangle"
+    style: str = NodeDrawingStyle.MONITOR.style
+    shape: str = NodeDrawingStyle.MONITOR.shape
     extra_border_styles: List[str] = field(default_factory=list)
 
     @classmethod
     def create_monitor_style(cls) -> Self:
         return cls(
-            visible=True, style=MonitorStyle, shape=MonitorShape, extra_border_styles=[]
+            visible=True,
+            style=NodeDrawingStyle.MONITOR.style,
+            shape=NodeDrawingStyle.MONITOR.shape,
+            extra_border_styles=[],
         )
 
     @classmethod
     def create_task_style(cls) -> Self:
         return cls(
-            visible=True, style=TaskStyle, shape=TaskShape, extra_border_styles=[]
+            visible=True,
+            style=NodeDrawingStyle.TASK.style,
+            shape=NodeDrawingStyle.TASK.shape,
+            extra_border_styles=[],
         )
 
     @classmethod
     def create_goal_style(cls) -> Self:
         return cls(
             visible=True,
-            style=GoalNodeStyle,
-            shape=GoalNodeShape,
+            style=NodeDrawingStyle.GOAL.style,
+            shape=NodeDrawingStyle.GOAL.shape,
             extra_border_styles=[],
         )
 
@@ -72,18 +74,18 @@ class NodePlotSpec:
     def create_end_style(cls):
         return cls(
             visible=True,
-            style=MonitorStyle,
-            shape=MonitorShape,
-            extra_border_styles=["rounded"],
+            style=NodeDrawingStyle.MONITOR.style,
+            shape=NodeDrawingStyle.MONITOR.shape,
+            extra_border_styles=[BorderStyle.ROUNDED],
         )
 
     @classmethod
     def create_cancel_style(cls):
         return cls(
             visible=True,
-            style=MonitorStyle,
-            shape=MonitorShape,
-            extra_border_styles=["dashed, rounded"],
+            style=NodeDrawingStyle.MONITOR.style,
+            shape=NodeDrawingStyle.MONITOR.shape,
+            extra_border_styles=[BorderStyle.DASHED_ROUNDED],
         )
 
 
