@@ -43,6 +43,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
+    AlreadyBelongsToAWorldError,
     ReferenceFrameMismatchError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
@@ -110,6 +111,18 @@ class WorldEntity(Symbol):
         return hash(self) == hash(other)
 
     def add_to_world(self, world: World):
+        """
+        Register this entity as part of the given world.
+
+        :param world: The world this entity becomes part of.
+        :raises AlreadyBelongsToAWorldError: If this entity belongs to another world,
+            which has to release it first. Re-registering it would leave it in the
+            previous world's lookup table under a world it no longer reports.
+        """
+        if self._world is not None and self._world is not world:
+            raise AlreadyBelongsToAWorldError(
+                world=self._world, type_trying_to_add=type(self)
+            )
         self._world = world
         world._world_entity_hash_table[hash(self)] = self
 

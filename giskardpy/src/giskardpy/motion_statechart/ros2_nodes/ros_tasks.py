@@ -178,7 +178,7 @@ class NavigateActionServerTask(
         position_error = root_T_goal.to_position().euclidean_distance(
             root_T_current.to_position()
         )
-        rotation_error = root_T_goal.to_rotation_matrix().rotational_error(
+        rotation_error = root_T_goal.to_rotation_matrix().rotational_distance(
             root_T_current.to_rotation_matrix()
         )
 

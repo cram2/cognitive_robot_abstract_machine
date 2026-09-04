@@ -24,6 +24,8 @@ from semantic_digital_twin.exceptions import (
     NonMonotonicTimeError,
     BrokenWorldModificationHistoryError,
     WorldEntityNotFoundError,
+    WorldEntityWithIDBelongsToAnotherWorld,
+    AlreadyBelongsToAWorldError,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
@@ -1247,6 +1249,199 @@ def test_copy_id(pr2_world_state_reset):
     pr2_copy = deepcopy(pr2_world_state_reset)
     for body in pr2_world_state_reset.bodies:
         assert body.id == pr2_copy.get_kinematic_structure_entity_by_name(body.name).id
+
+
+def test_rebind_body(world_setup):
+    """
+    A directly-held body reference is rebound onto the target world's own body, found by
+    id rather than by identity or name.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    assert world_copy.rebind_world_entities(l1) is world_copy.get_body_by_name(l1.name)
+
+
+def test_rebind_connection(world_setup):
+    """
+    A connection, which has no id of its own, is rebound through its parent and child.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    connection = world.get_connection(l1, l2)
+    assert world_copy.rebind_world_entities(connection) is world_copy.get_connection(
+        world_copy.get_body_by_name(l1.name), world_copy.get_body_by_name(l2.name)
+    )
+
+
+def test_rebind_nested_dataclass(world_setup):
+    """
+    A world entity nested in a dataclass field is rebound, and sibling fields keep their
+    values.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+
+    @dataclass
+    class BodyReference:
+        body: Body
+        label: str
+
+    rebound = world_copy.rebind_world_entities(BodyReference(body=l1, label="target"))
+    assert rebound.body is world_copy.get_body_by_name(l1.name)
+    assert rebound.label == "target"
+
+
+def test_rebind_list_and_plain_value(world_setup):
+    """
+    A list rebinds elementwise, and a value holding no world entity keeps its value.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+
+    assert world_copy.rebind_world_entities([l1, l2, "not a world entity"]) == [
+        world_copy.get_body_by_name(l1.name),
+        world_copy.get_body_by_name(l2.name),
+        "not a world entity",
+    ]
+    assert world_copy.rebind_world_entities(1.5) == 1.5
+
+
+def test_rebind_leaves_an_entity_this_world_does_not_contain(world_setup):
+    """
+    An entity the target world does not contain is left as it is, since it is not that
+    world's state to rebind.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    assert World().rebind_world_entities(l1) is l1
+
+
+def test_lookup_by_id_finds_an_annotation_sharing_a_hash_table_key(world_setup):
+    """
+    An annotation stays findable by its id after a later annotation of the same type
+    over the same entities takes over its key in the world's hash table.
+
+    A semantic annotation hashes by its content, so both annotations land on one key and
+    only the last one added remains in the table, while both remain part of the world.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    first, second = Handle(root=l1), Handle(root=l1)
+    with world.modify_world():
+        world.add_semantic_annotation(first)
+        world.add_semantic_annotation(second)
+
+    assert first.id != second.id
+    assert hash(first) == hash(second)
+    assert world.get_world_entity_with_id_by_id(first.id) is first
+    assert world.get_world_entity_with_id_by_id(second.id) is second
+
+
+def test_rebind_annotation_sharing_a_hash_table_key(world_setup):
+    """
+    An annotation whose hash table key a later same-content annotation took over is
+    still rebound onto the target world's own instance, rather than left pointing at the
+    world it came from.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    first, second = Handle(root=l1), Handle(root=l1)
+    with world.modify_world():
+        world.add_semantic_annotation(first)
+        world.add_semantic_annotation(second)
+    world_copy = deepcopy(world)
+
+    rebound = world_copy.rebind_world_entities(first)
+    assert rebound.id == first.id
+    assert rebound._world is world_copy
+
+
+def test_rebound_annotation_sharing_a_hash_table_key_can_modify_the_copy(world_setup):
+    """
+    A rebound annotation whose hash table key a same-content annotation took over is
+    usable for modifying the world it was rebound into.
+
+    Model modification is what a rebound reference is needed for, and what a reference
+    left pointing at the world it came from fails at, with a `MismatchingWorld`.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    first, second = Handle(root=l1), Handle(root=l1)
+    with world.modify_world():
+        world.add_semantic_annotation(first)
+        world.add_semantic_annotation(second)
+    world_copy = deepcopy(world)
+
+    rebound = world_copy.rebind_world_entities(first)
+    new_parent = world_copy.get_body_by_name(r1.name)
+    world_copy.move_branch(rebound.root, new_parent)
+
+    assert rebound.root.parent_connection.parent is new_parent
+
+
+def test_adding_an_entity_that_belongs_to_another_world_raises(world_setup):
+    """
+    An entity cannot be registered with a second world while it still belongs to the
+    first, which would leave it in that world's lookup table under a world it no longer
+    reports.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    with pytest.raises(AlreadyBelongsToAWorldError):
+        l1.add_to_world(World())
+
+    assert l1._world is world
+    assert world.get_kinematic_structure_entity_by_id(l1.id) is l1
+
+
+def test_adding_an_entity_to_the_world_it_belongs_to_re_registers_it(world_setup):
+    """
+    Registering an entity with the world it already belongs to stays allowed, since it
+    only refreshes the entry that world already holds.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    l1.add_to_world(world)
+
+    assert l1._world is world
+    assert world.get_kinematic_structure_entity_by_id(l1.id) is l1
+
+
+def test_rebind_rejects_an_entity_registered_here_but_owned_elsewhere(world_setup):
+    """
+    An entity left registered in this world while reporting another one is reported,
+    rather than handed back to fail later wherever it is used.
+
+    :meth:`WorldEntity.add_to_world` refuses to create this state, so the test writes
+    the inconsistent lookup table entry the guard exists for directly.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    other_world = World()
+    l1._world = other_world
+    world._world_entity_hash_table[hash(l1)] = l1
+
+    with pytest.raises(WorldEntityWithIDBelongsToAnotherWorld):
+        world.rebind_world_entities(l1)
+
+
+def test_rebind_copies_mutable_leaf_values(world_setup):
+    """
+    A mutable value that is neither a world entity nor a recognized container is copied,
+    not shared.
+
+    Mutating the rebound copy must not affect the original, the way sharing a `Pose`'s
+    underlying `casadi_sx` matrix would.
+    """
+
+    class MutableLeaf:
+        def __init__(self, value):
+            self.value = value
+
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+
+    leaf = MutableLeaf(value=1)
+    rebound = world_copy.rebind_world_entities(leaf)
+    assert rebound is not leaf
+
+    rebound.value = 2
+    assert leaf.value == 1
 
 
 def test_world_entity_with_class_id():

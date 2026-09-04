@@ -103,7 +103,7 @@ class PoseReached(RootRelativeGoalMonitor):
         root_R_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         ).to_rotation_matrix()
-        rotation_error = root_R_current.rotational_error(root_R_goal)
+        rotation_error = root_R_current.rotational_distance(root_R_goal)
         orientation_reached = sm.abs(rotation_error) < self.orientation_threshold
 
         return NodeArtifacts(
@@ -161,7 +161,7 @@ class OrientationReached(RootRelativeGoalMonitor):
         root_R_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         ).to_rotation_matrix()
-        rotation_error = root_R_current.rotational_error(root_R_goal)
+        rotation_error = root_R_current.rotational_distance(root_R_goal)
         return NodeArtifacts(observation=sm.abs(rotation_error) < self.threshold)
 
 

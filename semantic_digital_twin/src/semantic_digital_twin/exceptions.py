@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import (
         SemanticAnnotation,
         WorldEntity,
+        WorldEntityWithID,
         KinematicStructureEntity,
     )
     from semantic_digital_twin.spatial_types.spatial_types import (
@@ -398,6 +399,37 @@ class WorldContainsOrphanedDegreeOfFreedom(WorldValidationError):
 
     def suggest_correction(self) -> str:
         return "did you forget to call self.delete_orphaned_dofs()?"
+
+
+@dataclass
+class WorldEntityWithIDBelongsToAnotherWorld(WorldValidationError):
+    """
+    Raised when looking an id up in a world answers with an entity that reports
+    belonging to a different world.
+
+    A world's lookup tables are meant to hold only its own entities, so this means one
+    was left registered here after being added elsewhere. Only a
+    :class:`~semantic_digital_twin.world_description.world_entity.WorldEntityWithID` is
+    looked up by id, which is why an entity without one cannot reach this.
+    """
+
+    world_entity: WorldEntityWithID
+    """
+    The entity that was found under this world but reports another one.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Looking up id {self.world_entity.id} in world '{self.world.name}' returned "
+            f"'{self.world_entity.name}', which belongs to world "
+            f"'{self.world_entity._world.name if self.world_entity._world else None}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "The entity was left registered in this world after being added to another "
+            "one; remove it from this world before adding it elsewhere."
+        )
 
 
 @dataclass

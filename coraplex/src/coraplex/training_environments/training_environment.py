@@ -29,7 +29,7 @@ from coraplex.plans.failures import (
     EmptyUnderspecified,
 )
 from coraplex.plans.plan import Plan
-from coraplex.plans.plan_node import UnderspecifiedNode
+from coraplex.plans.underspecified import UnderspecifiedNode
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.misc import MoveToReach
 from random_events.interval import closed

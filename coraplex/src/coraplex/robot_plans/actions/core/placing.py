@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Any, Dict
+from typing_extensions import Any, Dict, TYPE_CHECKING
 
 from coraplex.plans.attachment_nodes import ReAttachNode
 from coraplex.plans.plan_node import PlanNode
@@ -15,12 +15,9 @@ from krrood.entity_query_language.factories import (
     ConditionType,
 )
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import (
-    Arms,
-    ApproachDirection,
-    VerticalAlignment,
-)
+from coraplex.datastructures.enums import Arms
 from coraplex.datastructures.grasp import GraspDescription
+from coraplex.exceptions import BodyIsNotHeld
 from coraplex.plans.factories import sequential
 from coraplex.querying.predicates import GripperIsFree
 from coraplex.robot_plans.actions.base import ActionDescription
@@ -40,6 +37,9 @@ from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.robots.robot_parts import EndEffector
 
 
 @dataclass
@@ -92,23 +92,40 @@ class PlaceAction(
             ],
         )
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        end_effector = ViewManager.get_arm_view(self.arm, self.robot).end_effector
+    def _grasp_description(self, end_effector: EndEffector) -> GraspDescription:
+        """
+        Describe how the object to place is held.
+
+        Read from the world whenever the object is really in the gripper, which is the
+        ground truth and needs no earlier action to have recorded it. A plan is built
+        before it runs, though, so an action plan built ahead of the pick-up that fills
+        the gripper has nothing to measure yet; the grasp that pick-up intends is used
+        then.
+
+        :param end_effector: The end effector holding the object.
+        :return: The grasp the object is held in.
+        """
+        if (
+            self.object_designator
+            in end_effector.tool_frame.child_kinematic_structure_entities
+        ):
+            return GraspDescription.from_attachment(
+                end_effector, self.object_designator
+            )
+
         previous_pick = self.plan_node.get_previous_node_by_designator_type(
             PickUpAction
         )
-        previous_grasp_description = (
-            previous_pick.designator.grasp_description
-            if previous_pick
-            else GraspDescription(
-                ApproachDirection.FRONT, VerticalAlignment.NoAlignment, end_effector
-            )
-        )
-        transport_pose, placing_pose, retract_pose = (
-            previous_grasp_description.pose_sequence(
-                self.target_location, self.object_designator, reverse=True
-            )
+        if previous_pick is None:
+            raise BodyIsNotHeld(self.object_designator, end_effector)
+        return previous_pick.designator.grasp_description
+
+    @property
+    def _action_plan(self) -> PlanNode:
+        end_effector = ViewManager.get_arm_view(self.arm, self.robot).end_effector
+        grasp_description = self._grasp_description(end_effector)
+        transport_pose, placing_pose, retract_pose = grasp_description.pose_sequence(
+            self.target_location, self.object_designator, reverse=True
         )
 
         return sequential(

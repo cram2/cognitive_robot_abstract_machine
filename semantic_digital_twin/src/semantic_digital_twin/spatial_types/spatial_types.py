@@ -913,7 +913,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def T(self) -> RotationMatrix:
         return RotationMatrix(self.casadi_sx.T, reference_frame=self.reference_frame)
 
-    def rotational_error(self, other: RotationMatrix) -> sm.Scalar:
+    def rotational_distance(self, other: RotationMatrix) -> sm.Scalar:
         """
         Calculate the rotational error between two rotation matrices.
 
@@ -1942,6 +1942,19 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         if isinstance(other, Quaternion):
             return sm.Scalar(ca.mtimes(self.casadi_sx.T, other.casadi_sx))
         return NotImplemented
+
+    def rotational_distance(self, other: Quaternion) -> sm.Scalar:
+        """
+        Calculate the rotational error between two orientations.
+
+        The dot product is taken as an absolute value, so the two quaternions that
+        describe every rotation count as the same orientation.
+
+        :param other: The second orientation.
+        :return: The angle between the two orientations, 0 when they describe the same
+            rotation.
+        """
+        return 2 * sm.safe_acos(abs(self.dot(other)))
 
     def slerp(self, other: Quaternion, t: sm.ScalarData) -> Quaternion:
         """

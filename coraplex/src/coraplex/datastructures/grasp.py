@@ -20,6 +20,7 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
 from coraplex.datastructures.rotations import Rotations
+from coraplex.exceptions import BodyIsNotHeld
 from coraplex.datastructures.enums import (
     AxisIdentifier,
     ApproachDirection,
@@ -65,6 +66,55 @@ class GraspDescription:
     """
     The offset between the center of the pose in the grasp sequence.
     """
+
+    @classmethod
+    def from_attachment(cls, end_effector: EndEffector, body: Body) -> GraspDescription:
+        """
+        Describe how `end_effector` currently holds `body`.
+
+        The grasp is read from the world, so it reflects how the body is really held
+        rather than how some earlier action intended to hold it.
+
+        :param end_effector: The end effector holding the body.
+        :param body: The body being held.
+        :return: The description whose grasp orientation matches the held body's
+            measured orientation most closely.
+        """
+        if body not in end_effector.tool_frame.child_kinematic_structure_entities:
+            raise BodyIsNotHeld(body, end_effector)
+
+        measured_orientation = cls._measured_grasp_orientation(end_effector, body)
+        candidates = [
+            cls(
+                approach_direction=approach_direction,
+                vertical_alignment=vertical_alignment,
+                end_effector=end_effector,
+                rotate_gripper=rotate_gripper,
+            )
+            for approach_direction in Rotations.SIDE_ROTATIONS
+            for vertical_alignment in Rotations.VERTICAL_ROTATIONS
+            for rotate_gripper in Rotations.HORIZONTAL_ROTATIONS
+        ]
+        return min(
+            candidates,
+            key=lambda candidate: candidate.grasp_orientation().rotational_distance(
+                measured_orientation
+            ),
+        )
+
+    @staticmethod
+    def _measured_grasp_orientation(
+        end_effector: EndEffector, body: Body
+    ) -> Quaternion:
+        """
+        :return: The orientation of `end_effector`'s tool frame in the frame of `body`,
+            which is what :meth:`grasp_orientation` describes for a held body.
+        """
+        body_R_tool = (
+            body.global_pose.to_rotation_matrix().inverse()
+            @ end_effector.tool_frame.global_pose.to_rotation_matrix()
+        )
+        return body_R_tool.to_quaternion()
 
     def pose_sequence(
         self, target_T_grasp_pose: Pose, body: Body = None, reverse: bool = False

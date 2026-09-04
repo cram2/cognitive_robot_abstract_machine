@@ -224,10 +224,10 @@ def _make_plan_from_type_and_children(
 def make_node(action_like: ActionLike) -> PlanNode:
     from coraplex.plans.plan_node import (
         PlanNode,
-        UnderspecifiedNode,
         ActionNode,
         MotionNode,
     )
+    from coraplex.plans.underspecified import UnderspecifiedNode
     from coraplex.robot_plans.actions.base import ActionDescription
     from coraplex.robot_plans import BaseMotion
 

@@ -52,7 +52,8 @@ if TYPE_CHECKING:
     from coraplex.robot_plans.actions.base import ActionDescription
 
     from coraplex.plans.condition_nodes import ConditionNode
-    from coraplex.plans.plan_node import MotionNode, UnderspecifiedNode
+    from coraplex.plans.plan_node import MotionNode
+    from coraplex.plans.underspecified import UnderspecifiedNode
     from coraplex.datastructures.dataclasses import Context
 
 logger = logging.getLogger(__name__)
@@ -327,6 +328,7 @@ class ConditionExecutable(Executable):
             condition=self.condition_node.condition,
         )
 
+
 @dataclass
 class MoveBranchExecutable(Executable):
     """
@@ -336,7 +338,7 @@ class MoveBranchExecutable(Executable):
 
     body: Body = field(kw_only=True)
     """
-    The root of the branch in the kinematic structure that is moved 
+    The root of the branch in the kinematic structure that is moved.
     """
 
     new_parent: Body = field(kw_only=True)
