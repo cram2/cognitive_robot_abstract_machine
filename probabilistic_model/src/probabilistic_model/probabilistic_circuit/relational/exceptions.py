@@ -80,28 +80,32 @@ class UndeterminedLatentsNotModeledError(DataclassException):
 
 
 @dataclass
-class UndeterminedLatentsPartitionOverlapsError(DataclassException):
+class UndeterminedLatentsNotPartitionedError(DataclassException):
     """
-    Raised when the undetermined latents' exact partition -- their marginal support,
-    grouped by the fitted circuit's own mixture branches -- has overlapping branches.
+    Raised when the undetermined latents' marginal support -- grouped by the fitted
+    circuit's own mixture branches -- is not a genuine, pairwise-disjoint partition:
+    either the fitted circuit never actually split on these latents at all (a single,
+    undifferentiated branch), or the branches it did split into overlap.
 
-    Exact-partition grounding requires those branches to be mutually exclusive so the
-    resulting mixture stays support-deterministic. This is caught internally by
-    ``RelationalProbabilisticCircuit`` and triggers a fall back to
-    ``GroundingMode.CAUSAL_SAMPLED``; it is not expected to reach a caller of
-    ``ground``.
+    Exact-partition grounding requires at least two mutually exclusive branches so each
+    grounded exchangeable instance stays tied to the latent value its own branch
+    represents. This is caught internally by ``RelationalProbabilisticCircuit`` and
+    triggers a fall back to ``GroundingMode.CAUSAL_SAMPLED``; it is not expected to
+    reach a caller of ``ground``.
     """
 
     undetermined_latents: List[Variable]
     """
-    The undetermined latent variables whose exact partition overlaps.
+    The undetermined latent variables whose marginal support is not a genuine, disjoint
+    partition.
     """
 
     def error_message(self) -> str:
         names = ", ".join(latent.name for latent in self.undetermined_latents)
         return (
-            f"The exact partition of undetermined latents [{names}] has overlapping "
-            f"branches, so exact-partition grounding would not be support-deterministic."
+            f"The marginal support of undetermined latents [{names}] is not a "
+            f"genuine, pairwise-disjoint partition, so exact-partition grounding "
+            f"would not be support-deterministic."
         )
 
     def suggest_correction(self) -> str:

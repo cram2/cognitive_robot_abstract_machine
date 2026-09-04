@@ -40,7 +40,7 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
     InvalidMonteCarloSampleCountError,
     UndeterminedLatentsNotModeledError,
-    UndeterminedLatentsPartitionOverlapsError,
+    UndeterminedLatentsNotPartitionedError,
 )
 from probabilistic_model.probabilistic_circuit.relational.helper import (
     find_lowest_product_nodes_that_model_variables,
@@ -523,7 +523,7 @@ class RelationalProbabilisticCircuit:
                     undetermined_latents,
                 )
                 return circuit
-            except UndeterminedLatentsPartitionOverlapsError:
+            except UndeterminedLatentsNotPartitionedError:
                 logger.warning(
                     "Exact-partition grounding for latents [%s] is not support-"
                     "deterministic; falling back to GroundingMode.CAUSAL_SAMPLED.",
@@ -799,7 +799,7 @@ class RelationalProbabilisticCircuit:
         :param undetermined_latents: The latents to retain via exact partition.
         :raises UndeterminedLatentsNotModeledError: If ``circuit`` does not model
             ``undetermined_latents`` and thus has no partition over them.
-        :raises UndeterminedLatentsPartitionOverlapsError: If that partition's branches
+        :raises UndeterminedLatentsNotPartitionedError: If that partition's branches
             are not pairwise disjoint, so exact-partition grounding would not be
             support-deterministic.
         """
@@ -807,19 +807,28 @@ class RelationalProbabilisticCircuit:
         if proposal is None:
             raise UndeterminedLatentsNotModeledError(list(undetermined_latents))
         if not self._undetermined_latents_partition_disjointly(proposal):
-            raise UndeterminedLatentsPartitionOverlapsError(list(undetermined_latents))
+            raise UndeterminedLatentsNotPartitionedError(list(undetermined_latents))
+
+        # the precondition just verified guarantees proposal.root is a SumUnit with at
+        # least two branches
+        branches = proposal.root.log_weighted_subcircuits
+        _ = proposal.support
+        branch_regions = [branch.result_of_current_query for _, branch in branches]
+
+        # each node's weights must be read off circuit before undetermined_latents are
+        # stripped from it below -- product_node stops modeling them afterward
+        log_weights_per_node = [
+            self._node_local_branch_log_probabilities(
+                product_node, undetermined_latents, branch_regions
+            )
+            for product_node in product_nodes_to_extend
+        ]
 
         retained_variables = SortedSet(circuit.variables) - undetermined_latents
         circuit.marginal_in_place(retained_variables)
 
-        branches = (
-            proposal.root.log_weighted_subcircuits
-            if isinstance(proposal.root, SumUnit)
-            else [(0.0, proposal.root)]
-        )
         mounted_roots = []
-        log_weights = []
-        for log_weight, latent_branch in branches:
+        for _, latent_branch in branches:
             representative_value = self._representative_value(
                 latent_branch, undetermined_latents
             )
@@ -834,35 +843,72 @@ class RelationalProbabilisticCircuit:
             mounted_branch_nodes = circuit.mount(latent_branch)
             branch_root.add_subcircuit(mounted_branch_nodes[latent_branch.index])
             mounted_roots.append(branch_root)
-            log_weights.append(log_weight)
 
-        for product_node in product_nodes_to_extend:
+        for product_node, log_weights in zip(
+            product_nodes_to_extend, log_weights_per_node
+        ):
             self._attach_mixture_to_node(
                 circuit, product_node, mounted_roots, log_weights
             )
+
+    @staticmethod
+    def _node_local_branch_log_probabilities(
+        product_node: ProductUnit,
+        undetermined_latents: SortedSet[Variable],
+        branch_regions: list,
+    ) -> list[float]:
+        """
+        Log-probability of each partition branch's region, local to a mounting product
+        node.
+
+        Different product nodes can correlate ``undetermined_latents`` with the
+        variables that distinguish them, so each node's weights over the same global
+        partition must be computed from its own local marginal, mirroring
+        :meth:`_node_local_latent_log_likelihoods`'s per-node handling for the Monte-
+        Carlo mixture.
+
+        :param product_node: The mounting product node.
+        :param undetermined_latents: The latent variables the partition covers.
+        :param branch_regions: Each partition branch's own support region, in the same
+            order as the branches being weighted.
+        :return: One log-probability per region, in input order.
+        """
+        subcircuit = ProbabilisticCircuit()
+        subcircuit.mount(product_node)
+        subcircuit.marginal_in_place(undetermined_latents)
+        with np.errstate(divide="ignore"):
+            return [
+                float(np.log(subcircuit.probability(region)))
+                for region in branch_regions
+            ]
 
     @staticmethod
     def _undetermined_latents_partition_disjointly(
         proposal: ProbabilisticCircuit,
     ) -> bool:
         """
-        Check whether ``proposal``'s branches, if more than one, have disjoint support.
+        Check whether ``proposal`` is a genuine, pairwise-disjoint partition over the
+        undetermined latents: a mixture of at least two branches, no two of which
+        overlap.
 
         ``JointProbabilityTree`` does not retain which variables it actually split on
         after fitting, so this checks the invariant exact-partition grounding actually
         needs directly on the marginalized circuit, rather than trying to infer it from
-        fitting-time bookkeeping the tree does not expose: whether the branches of
-        ``proposal``'s own mixture over ``undetermined_latents`` overlap.
+        fitting-time bookkeeping the tree does not expose. A single, undifferentiated
+        branch fails this precondition rather than trivially passing it: grounding
+        would still retain the latents as a real distribution, but every exchangeable
+        instance would be grounded from the same representative point regardless of
+        which latent value the region actually corresponds to, silently discarding any
+        correlation between the latents and the rest of the circuit.
 
         :param proposal: ``circuit`` marginalized down to exactly the undetermined
             latents.
-        :return:``True`` if ``proposal``'s root is not a mixture (a single branch is
-            trivially disjoint), or if every pair of its branches has non-overlapping
-            support.
+        :return:``True`` only if ``proposal``'s root is a mixture of at least two
+            branches, every pair of which has non-overlapping support.
         """
         root = proposal.root
         if not isinstance(root, SumUnit) or len(root.subcircuits) < 2:
-            return True
+            return False
         _ = proposal.support
         branch_supports = [child.result_of_current_query for child in root.subcircuits]
         return all(
@@ -875,23 +921,32 @@ class RelationalProbabilisticCircuit:
         latent_branch: Unit, undetermined_latents: SortedSet[Variable]
     ) -> dict[Variable, Any]:
         """
-        Extract one conditioning value per undetermined latent from a partition branch.
+        Extract one concrete point per undetermined latent from a partition branch.
 
-        Uses each leaf's own mode. Any value within the branch's support would do for
-        grounding purposes here, since the branch's actual probability mass is retained
-        separately via :meth:`ProductUnit.attach_marginal_circuit`, not narrowed by this
-        choice -- a discrete leaf's mode is effectively a representative point, while a
-        continuous leaf's mode may itself be a sub-interval.
+        Uses each leaf's own mode, collapsed to a single point of that mode region.
+        Any point within the branch's support would do for grounding purposes here,
+        since the branch's actual probability mass is retained separately by mounting
+        the branch itself, not narrowed by this choice. A single point is required
+        because conditioning a leaf's distribution on a whole region -- rather than one
+        point -- is not supported by :meth:`~probabilistic_model.distributions.distributions.ContinuousDistribution.log_conditional`,
+        which every leaf here resolves to (including :class:`IntegerDistribution`,
+        through its continuous base).
 
         :param latent_branch: One branch of ``undetermined_latents``' exact partition.
         :param undetermined_latents: The latent variables to extract a value for.
-        :return: One conditioning value per variable in ``undetermined_latents``.
+        :return: One conditioning point per variable in ``undetermined_latents``.
         """
-        return {
-            leaf_node.variable: leaf_node.distribution.univariate_log_mode()[0]
-            for leaf_node in latent_branch.leaves
-            if leaf_node.variable in undetermined_latents
-        }
+        values = {}
+        for leaf_node in latent_branch.leaves:
+            if leaf_node.variable not in undetermined_latents:
+                continue
+            mode, _ = leaf_node.distribution.univariate_log_mode()
+            values[leaf_node.variable] = (
+                mode.simple_sets[0].lower
+                if isinstance(mode, Interval)
+                else next(iter(mode))
+            )
+        return values
 
     @staticmethod
     def _attach_mixture_to_node(
