@@ -9,6 +9,10 @@ nodes that terminate the chart, which depend on the execution type.
 
 import pytest
 
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    SelfCollisionAvoidance,
+)
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import CancelMotion, EndMotion, Task
 from giskardpy.motion_statechart.monitors.payload_monitors import (
@@ -20,7 +24,13 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.execution_environment import real_robot, simulated_robot
+from coraplex.datastructures.enums import ExecutionType
+from coraplex.execution_environment import (
+    ExecutionEnvironment,
+    real_robot,
+    simulated_robot,
+)
+from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
@@ -76,10 +86,14 @@ def test_parsing_populates_the_chart_with_the_motions(reach_action_executable):
     chart = reach_action_executable.motion_state_chart
 
     assert len(tasks) == 2
-    assert chart.get_nodes_by_type(CartesianPose) == tasks
     assert reach_action_executable.root_node in chart.nodes
     for task in tasks:
         assert task in chart.nodes
+        # A reach that frees its gripper carries its Cartesian goal alongside the
+        # collision rules, so the mapped node is the pair rather than the goal itself.
+        assert (
+            len([node for node in task.nodes if isinstance(node, CartesianPose)]) == 1
+        )
 
 
 def test_parsing_mirrors_the_plan_tree_as_nested_goals(reach_action_executable):
@@ -176,3 +190,49 @@ def test_pre_condition_monitor_gates_the_root_goal(reach_action_executable):
     assert root_goal.start_condition.free_variables() == [
         pre_monitor.observation_variable
     ]
+
+
+# %% collision avoidance
+
+
+def test_prepare_for_execution_avoids_the_robot_colliding_with_itself(
+    reach_action_executable,
+):
+    """
+    A run asking for collision avoidance must get both kinds: without the self-collision
+    goal nothing stops the arm from moving through the robot's own body, since the
+    robot's ``AvoidSelfCollisions`` rule only shapes the collision matrix and never
+    becomes a constraint on its own.
+    """
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+        reach_action_executable.prepare_for_execution()
+
+    chart = reach_action_executable.motion_state_chart
+    assert len(chart.get_nodes_by_type(ExternalCollisionAvoidance)) == 1
+    assert len(chart.get_nodes_by_type(SelfCollisionAvoidance)) == 1
+
+
+def test_prepare_for_execution_leaves_out_collision_avoidance_when_not_asked_for(
+    reach_action_executable,
+):
+    """
+    A run that does not ask for collision avoidance gets neither goal.
+    """
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=False):
+        reach_action_executable.prepare_for_execution()
+
+    chart = reach_action_executable.motion_state_chart
+    assert chart.get_nodes_by_type(ExternalCollisionAvoidance) == []
+    assert chart.get_nodes_by_type(SelfCollisionAvoidance) == []
+
+
+# %% how long a motion may take
+
+
+def test_the_tick_budget_is_not_class_state(reach_action_executable):
+    """
+    The budget is a policy of the run, carried by its context, so two runs in one
+    process cannot be given different budgets by class state that outlives them.
+    """
+    assert not hasattr(GiskardExecutable, "ticks_per_motion")
+    assert reach_action_executable.context.ticks_per_motion

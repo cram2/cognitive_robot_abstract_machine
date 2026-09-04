@@ -116,7 +116,7 @@ class PlaceAction(
                 MoveToolCenterPointMotion(
                     transport_pose,
                     self.arm,
-                    allow_gripper_collision=False,
+                    allow_gripper_collision=True,
                     max_linear_velocity=self.transport_linear_velocity,
                     position_threshold=self.position_threshold,
                     orientation_threshold=self.orientation_threshold,
@@ -124,7 +124,7 @@ class PlaceAction(
                 MoveToolCenterPointMotion(
                     placing_pose,
                     self.arm,
-                    allow_gripper_collision=False,
+                    allow_gripper_collision=True,
                     max_linear_velocity=self.placing_linear_velocity,
                     position_threshold=self.position_threshold,
                     orientation_threshold=self.orientation_threshold,
@@ -132,6 +132,7 @@ class PlaceAction(
                 MoveGripperMotion(
                     GripperState.OPEN,
                     self.arm,
+                    allow_gripper_collision=True,
                     finger_velocity=self.release_opening_velocity,
                 ),
                 self._retract_plan(retract_pose),

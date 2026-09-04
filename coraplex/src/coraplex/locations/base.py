@@ -37,6 +37,7 @@ try:
     )
 except ImportError:
     VizMarkerPublisher = None
+from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AllowSelfCollisions,
@@ -76,6 +77,12 @@ class Location(Iterable[Pose]):
     Validators that are used to check if a generated pose is valid.
     """
 
+    standing_violated_distance: float = 0.05
+    """
+    How close in meters the robot may come to its surroundings at a candidate pose
+    before that pose counts as in collision.
+    """
+
     @property
     def world(self):
         return self.context.world
@@ -90,6 +97,23 @@ class Location(Iterable[Pose]):
         """
         return next(iter(self))
 
+    def _standing_clearance(self, robot: AbstractRobot) -> List[CollisionRule]:
+        """
+        :param robot: The robot standing at a candidate pose.
+        :return: The rules a candidate is judged in collision under.
+
+        A standing pose only has to be clear of the surroundings; the arms are wherever
+        the previous motion left them, so the robot touching itself says nothing about
+        the pose.
+        """
+        return [
+            AvoidExternalCollisions(
+                robot=robot,
+                violated_distance=self.standing_violated_distance,
+            ),
+            AllowSelfCollisions(robot=robot),
+        ]
+
     def __iter__(self) -> Iterator[Pose]:
         test_world = deepcopy(self.world)
         test_robot = cast(
@@ -100,12 +124,14 @@ class Location(Iterable[Pose]):
                 world=test_world,
                 robot=test_robot,
                 alternative_motion_mappings=self.context.alternative_motion_mappings,
+                motion_tolerances=self.context.motion_tolerances,
+                ticks_per_motion=self.context.ticks_per_motion,
             )
 
         if self.context.debug:
             VizMarkerPublisher(
                 _world=test_world, node=self.context.ros_node
-            )
+            ).with_collision_visualization()
 
         for pose_candidate in self.generator:
 
@@ -119,17 +145,24 @@ class Location(Iterable[Pose]):
                 else pose_candidate
             )
 
-            test_world.collision_manager.clear_temporary_rules()
-            test_world.collision_manager.add_temporary_rule(
-                AvoidExternalCollisions(robot=test_robot, violated_distance=0.05)
+            # Asked under rules of its own, which are taken back down again: the
+            # reachability simulation that follows has to see the rules the plan is
+            # executed with, and temporary rules outrank the robot's own.
+            collision_manager = test_world.collision_manager
+            rules_of_the_run = list(collision_manager.temporary_rules)
+            collision_manager.clear_temporary_rules()
+            collision_manager.extend_temporary_rule(
+                self._standing_clearance(test_robot)
             )
-            test_world.collision_manager.add_temporary_rule(
-                AllowSelfCollisions(robot=test_robot)
-            )
-            test_world.collision_manager.update_collision_matrix()
-            collisions = test_world.collision_manager.compute_collisions()
+            collision_manager.update_collision_matrix()
 
-            if collisions.contacts:
+            stands_in_collision = test_robot.is_in_collision
+
+            collision_manager.clear_temporary_rules()
+            collision_manager.extend_temporary_rule(rules_of_the_run)
+            collision_manager.update_collision_matrix()
+
+            if stands_in_collision:
                 logger.debug(f"Candidate pose in collision, skipping")
                 continue
 

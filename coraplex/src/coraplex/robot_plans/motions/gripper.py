@@ -3,7 +3,7 @@ from typing import Optional, List
 
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
-from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode, Task
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
@@ -168,14 +168,21 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
                 [joint_task, stall_monitor], minimum_success=1, name=name
             )
 
-        if self.finger_velocity is None:
+        accompanying_nodes: List[MotionStatechartNode] = []
+        if self.finger_velocity is not None:
+            accompanying_nodes.append(
+                JointVelocityLimit(
+                    connections=list(goal_state.connections),
+                    max_velocity=self.finger_velocity,
+                )
+            )
+        if self.allow_gripper_collision:
+            accompanying_nodes.extend(
+                self._only_allow_gripper_collision_rules(self.gripper)
+            )
+        if not accompanying_nodes:
             return done_node
-
-        velocity_limit = JointVelocityLimit(
-            connections=list(goal_state.connections),
-            max_velocity=self.finger_velocity,
-        )
-        return Parallel([done_node, velocity_limit], name=name)
+        return Parallel([done_node, *accompanying_nodes], name=name)
 
 
 @dataclass
@@ -265,10 +272,16 @@ class MoveToolCenterPointMotion(
                 translation_threshold=self.resolved_position_threshold(),
                 orientation_threshold=self.resolved_orientation_threshold(),
             )
-        velocity_limit_nodes = self._velocity_limit_nodes(root, tip)
-        if not velocity_limit_nodes:
+        accompanying_nodes: List[MotionStatechartNode] = list(
+            self._velocity_limit_nodes(root, tip)
+        )
+        if self.allow_gripper_collision:
+            accompanying_nodes.extend(
+                self._only_allow_gripper_collision_rules(self.arm)
+            )
+        if not accompanying_nodes:
             return task
-        return Parallel([task, *velocity_limit_nodes], name="MoveTCP")
+        return Parallel([task, *accompanying_nodes], name="MoveTCP")
 
 
 @dataclass

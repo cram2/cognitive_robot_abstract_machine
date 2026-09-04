@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from time import sleep
 
+import pytest
+
 from rclpy.node import Node
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import OmniDrive
@@ -8,6 +10,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from semantic_digital_twin.adapters.ros.visualization.collision_viz_marker import (
     CollisionVisualizationMarkerPublisher,
+    ContactProximity,
 )
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -183,3 +186,105 @@ def test_with_collision_visualization_wires_consumer(rclpy_node, cylinder_bot_wo
     collision_manager.compute_collisions()
     _wait_for_message(recorder)
     assert recorder.last_msg.markers[0].type == Marker.LINE_LIST
+
+
+# %% contact labels
+
+
+def _label_markers(msg: MarkerArray, publisher: CollisionVisualizationMarkerPublisher):
+    return [marker for marker in msg.markers if marker.ns == publisher.label_namespace]
+
+
+def test_labels_name_the_bodies_of_contacts_inside_the_buffer_zone(
+    rclpy_node, cylinder_bot_world
+):
+    collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
+    publisher = CollisionVisualizationMarkerPublisher(
+        node=rclpy_node, world=cylinder_bot_world
+    )
+    recorder = _subscribe(rclpy_node, publisher)
+
+    collisions = collision_manager.compute_collisions()
+
+    _wait_for_message(recorder)
+    contacts_by_body_names = {
+        (str(contact.body_a.name), str(contact.body_b.name)): contact
+        for contact in collisions.contacts
+    }
+    labels = _label_markers(recorder.last_msg, publisher)
+    assert len(labels) == len(contacts_by_body_names)
+    for label in labels:
+        assert label.type == Marker.TEXT_VIEW_FACING
+        assert label.header.frame_id == str(cylinder_bot_world.root.name)
+        assert label.scale.z == publisher.label_height
+        name_a, name_b, distance = label.text.splitlines()
+        assert (name_a, name_b) in contacts_by_body_names
+        assert float(distance) == pytest.approx(
+            contacts_by_body_names[(name_a, name_b)].distance, abs=1e-3
+        )
+
+
+def test_label_is_colored_like_the_contact_it_names(rclpy_node, cylinder_bot_world):
+    collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
+    publisher = CollisionVisualizationMarkerPublisher(
+        node=rclpy_node, world=cylinder_bot_world
+    )
+    recorder = _subscribe(rclpy_node, publisher)
+
+    collision_manager.compute_collisions()
+
+    _wait_for_message(recorder)
+    labels = _label_markers(recorder.last_msg, publisher)
+    assert labels
+    for label in labels:
+        assert label.color == ContactProximity.INSIDE_BUFFER_ZONE.color
+
+
+def test_no_labels_for_contacts_outside_the_buffer_zone(rclpy_node, cylinder_bot_world):
+    collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
+    publisher = CollisionVisualizationMarkerPublisher(
+        node=rclpy_node, world=cylinder_bot_world
+    )
+    recorder = _subscribe(rclpy_node, publisher)
+
+    # put robot to 10.3 to be above buffer threshold but close enough to still get checked.
+    cylinder_bot_world.get_connections_by_type(OmniDrive)[0].origin = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(x=-10.3)
+    )
+
+    collision_manager.compute_collisions()
+
+    _wait_for_message(recorder)
+    labels = _label_markers(recorder.last_msg, publisher)
+    assert [label for label in labels if label.action == Marker.ADD] == []
+
+
+def test_labels_of_contacts_that_left_the_buffer_zone_are_deleted(
+    rclpy_node, cylinder_bot_world
+):
+    collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
+    publisher = CollisionVisualizationMarkerPublisher(
+        node=rclpy_node, world=cylinder_bot_world
+    )
+    recorder = _subscribe(rclpy_node, publisher)
+
+    collision_manager.compute_collisions()
+    _wait_for_message(recorder)
+    published_label_ids = {
+        label.id for label in _label_markers(recorder.last_msg, publisher)
+    }
+    assert published_label_ids
+    recorder.last_msg = None
+
+    cylinder_bot_world.get_connections_by_type(OmniDrive)[0].origin = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(x=-10.3)
+    )
+    collision_manager.compute_collisions()
+
+    _wait_for_message(recorder)
+    deleted_label_ids = {
+        label.id
+        for label in _label_markers(recorder.last_msg, publisher)
+        if label.action == Marker.DELETE
+    }
+    assert deleted_label_ids == published_label_ids

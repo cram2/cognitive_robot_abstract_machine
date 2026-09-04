@@ -705,6 +705,21 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     filled and that the robot can be synchronized without issues.
     """
 
+    @property
+    def is_in_collision(self) -> bool:
+        """
+        :return: Whether any body of this robot touches something under the collision
+            rules currently in force.
+
+        The rules the question is asked under are the caller's to set, so that the same
+        robot can be asked about the clearances of a plan or of a standing pose.
+        """
+        own_bodies = set(self.bodies_with_collision)
+        return any(
+            contact.body_a in own_bodies or contact.body_b in own_bodies
+            for contact in self._world.collision_manager.compute_collisions().contacts
+        )
+
     @classmethod
     @abstractmethod
     def get_ros_file_path(cls) -> str:

@@ -122,6 +122,14 @@ class Context(PlanEntity):
     thresholds unset.
     """
 
+    ticks_per_motion: int = 2000
+    """
+    How many ticks each motion of a chart may take before the run gives up on it.
+
+    Also the budget a reachability check gives the same motions, so a pose is not
+    rejected for running out of time sooner than the run that would perform it.
+    """
+
     def __post_init__(self):
         self.debug = self._debug
 
