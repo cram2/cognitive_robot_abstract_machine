@@ -64,7 +64,7 @@ class Sequence(Goal):
             last_node = node
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        return NodeArtifacts(observation=Scalar(self.nodes[-1].goal_reached))
+        return NodeArtifacts(observation=self.nodes[-1].goal_reached)
 
 
 @dataclass(repr=False, eq=False)
