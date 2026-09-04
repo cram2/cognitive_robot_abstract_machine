@@ -39,31 +39,17 @@ class Polytope(polytope.Polytope):
         return cls(polytope_.A, polytope_.b)
 
     @classmethod
-    def from_2d_points(cls, points: np.ndarray) -> Self:
+    def from_points(cls, points: np.ndarray) -> Self:
         """
-        Create a polytope from a set of 2D points, by computing the convex hull of the
-        points and then creating the linear inequalities from the convex hull.
+        Create a polytope from a set of points, by computing the convex hull of the
+        points and using the hull's facet equations as the polytope's inequalities.
 
-        :param points: A numpy array with shape (n, 2) containing the points.
+        :param points: A numpy array with shape (n, dimensions) containing the points.
         """
-        # create the convexhull
         convex_hull = ConvexHull(points)
-        hull_points = np.vstack(
-            [points[convex_hull.vertices], points[convex_hull.vertices[0]]]
-        )
-
-        # calculate the inequalities
-        constraints = []
-        for i in range(hull_points.shape[0] - 1):
-            p1 = hull_points[i]
-            p2 = hull_points[i + 1]
-            a = p2[1] - p1[1]
-            b = p1[0] - p2[0]
-            c = a * p1[0] + b * p1[1]
-            constraints.append((a, b, c))
-        constraints = np.array(constraints)
-        result = cls(constraints[:, :2], constraints[:, 2])
-        return result
+        a = convex_hull.equations[:, :-1]
+        b = -convex_hull.equations[:, -1]
+        return cls(a, b)
 
     def inner_box_approximation(self, minimum_volume: float = 0.1) -> Event:
         """
@@ -99,12 +85,35 @@ class Polytope(polytope.Polytope):
             *[box.to_simple_event() for box in resulting_boxes]
         ).make_disjoint()
 
+    @classmethod
+    def _box_polytope_from_bounds(cls, lower: np.ndarray, upper: np.ndarray) -> Self:
+        """
+        Build a box-shaped polytope from already-known per-dimension bounds, and
+        pre-populate its bounding-box and volume caches (`bbox`/`_volume`, read by the
+        `bounding_box`/`volume` properties inherited from the `polytope` library).
+
+        Without this, a box built via `from_box` still recomputes its bounding box
+        via `2 * n_dimensions` LP solves and its volume via randomized Monte-Carlo
+        sampling the first time either is accessed, even though both are already known
+        exactly at construction time here.
+
+        :param lower: The lower bound per dimension.
+        :param upper: The upper bound per dimension.
+        :return: The box polytope, with `.bounding_box` and `.volume` pre-cached.
+        """
+        lower = np.asarray(lower).reshape(-1, 1)
+        upper = np.asarray(upper).reshape(-1, 1)
+        result = cls.from_box(list(zip(lower.flatten(), upper.flatten())))
+        result.bbox = (lower, upper)
+        result._set_volume(float(np.prod(upper - lower)))
+        return result
+
     def as_box_polytope(self) -> Self:
         """
         :return: The polytope as box polytope.
         """
         lower, upper = self.bounding_box
-        return self.from_box([(a[0], b[0]) for a, b in zip(lower, upper)])
+        return self._box_polytope_from_bounds(lower, upper)
 
     def is_box(
         self,
@@ -250,15 +259,9 @@ class Polytope(polytope.Polytope):
             )
 
         # calculate the inner box
-        box = [
-            [
-                dimension.solution_value(),
-                dimension.solution_value()
-                + scale_of_dimension * scale.solution_value(),
-            ]
-            for dimension, scale_of_dimension in zip(dimension_variables, scale_of_box)
-        ]
-        return self.__class__.from_box(box)
+        box_lower = np.array([dimension.solution_value() for dimension in dimension_variables])
+        box_upper = box_lower + scale_of_box * scale.solution_value()
+        return self.__class__._box_polytope_from_bounds(box_lower, box_upper)
 
     def to_simple_event(self) -> SimpleEvent:
         """

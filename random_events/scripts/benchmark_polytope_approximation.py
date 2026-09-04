@@ -12,25 +12,12 @@ Usage:
 """
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List
 
 import numpy as np
-from scipy.spatial import ConvexHull
 
 from random_events.polytope import Polytope
-
-
-def polytope_from_nd_points(points: np.ndarray) -> Polytope:
-    """
-    Build a Polytope's H-representation (A, b) directly from scipy's ConvexHull facet
-    equations. Works for any dimension >= 2, unlike Polytope.from_2d_points which relies
-    on the 2D-only trick of walking hull vertices in cyclic order.
-    """
-    hull = ConvexHull(points)
-    a = hull.equations[:, :-1]
-    b = -hull.equations[:, -1]
-    return Polytope(a, b)
 
 
 def random_hull_points(n: int, dim: int, seed: int) -> np.ndarray:
@@ -43,9 +30,7 @@ def random_hull_points(n: int, dim: int, seed: int) -> np.ndarray:
 
 def make_polytope(n: int, dim: int, seed: int) -> Polytope:
     points = random_hull_points(n, dim, seed)
-    if dim == 2:
-        return Polytope.from_2d_points(points)
-    return polytope_from_nd_points(points)
+    return Polytope.from_points(points)
 
 
 @dataclass
