@@ -6,7 +6,7 @@ from datetime import timedelta
 from typing_extensions import List, Optional
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.symbolic_math.symbolic_math import Scalar
+from krrood.symbolic_math.symbolic_math import Scalar, trinary_logic_not
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
@@ -312,9 +312,7 @@ class StillProgressing(Goal):
         true rather than negated.
         """
         return NodeArtifacts(
-            observation=sm.Scalar(
-                self._timer.observation_variable != float(ObservationStateValues.TRUE)
-            )
+            observation=trinary_logic_not(self._timer.observation_variable.is_true())
         )
 
     def _find_converging_tasks(

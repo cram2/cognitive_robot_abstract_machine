@@ -104,10 +104,10 @@ class StoppedWhenTrue(MonitoredGoal):
             observation=if_cases(
                 [
                     (
-                        self.monitored_node.goal_reached == True,
+                        self.monitored_node.goal_reached.is_true(),
                         Scalar.const_true(),
                     ),
-                    (self.monitor.observation_variable == True, Scalar.const_false()),
+                    (self.monitor.observation_variable.is_true(), Scalar.const_false()),
                 ],
                 Scalar.const_trinary_unknown(),
             )
