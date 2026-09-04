@@ -11,6 +11,7 @@ Relational probabilistic circuits ("RSPNs").
 
 from __future__ import annotations
 
+import enum
 import itertools
 from dataclasses import dataclass, field
 
@@ -31,6 +32,7 @@ from krrood.parametrization.feature_extraction.feature_extractor import FeatureE
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import Match
+from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
@@ -49,9 +51,33 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProductUnit,
     SumUnit,
     Unit,
+    leaf,
 )
 from random_events.interval import Interval
 from random_events.variable import Variable
+
+
+class GroundingMode(enum.Enum):
+    """
+    Selects how ``RelationalProbabilisticCircuit.ground`` treats an exchangeable
+    relation's aggregation latents that a query leaves undetermined.
+    """
+
+    PREDICTIVE = enum.auto()
+    """
+    Integrate undetermined latents out of the grounded circuit by Monte-Carlo mixture,
+    discarding them.
+
+    Default behaviour.
+    """
+
+    CAUSAL_SAMPLED = enum.auto()
+    """
+    Retain each undetermined latent as a point-valued variable at its Monte-Carlo
+    sampled value instead of discarding it, so it can be registered as a cause or
+    effect in a :class:`CausalCircuit
+    <probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit>`.
+    """
 
 
 def _is_concrete_statistic(variable: Variable, value: Any) -> bool:
@@ -374,7 +400,11 @@ class RelationalProbabilisticCircuit:
         )
         return circuit, product_nodes_to_extend
 
-    def ground(self, query: Match) -> ProbabilisticCircuit:
+    def ground(
+        self,
+        query: Match,
+        grounding_mode: GroundingMode = GroundingMode.PREDICTIVE,
+    ) -> ProbabilisticCircuit:
         """
         Ground the relational circuit for a specific query.
 
@@ -385,6 +415,8 @@ class RelationalProbabilisticCircuit:
         :param query: An underspecified, resolved query instance whose structure
             determines which parts are grounded and how many child objects each
             exchangeable relation contains.
+        :param grounding_mode: How to treat aggregation latents the query leaves
+            undetermined. See :class:`GroundingMode`.
         :return: A concrete ``ProbabilisticCircuit`` over all variables implied by the
             query.
         :raises CircuitNotFittedError: If ``ground`` is called before ``fit``.
@@ -398,7 +430,12 @@ class RelationalProbabilisticCircuit:
             template,
         ) in self.exchangeable_distribution_templates.items():
             circuit = self._ground_exchangeable_part(
-                circuit, exchangeable_part_name, template, query, instance
+                circuit,
+                exchangeable_part_name,
+                template,
+                query,
+                instance,
+                grounding_mode,
             )
         return circuit
 
@@ -409,6 +446,7 @@ class RelationalProbabilisticCircuit:
         template: ExchangeableDistributionTemplate,
         query: Match,
         instance: Any,
+        grounding_mode: GroundingMode,
     ) -> ProbabilisticCircuit:
         """
         Ground one exchangeable part and attach it to the class circuit.
@@ -423,6 +461,8 @@ class RelationalProbabilisticCircuit:
         :param template: The fitted template for this relation.
         :param query: The grounding query.
         :param instance: The concrete instance constructed from the query.
+        :param grounding_mode: How to treat aggregation latents the query leaves
+            undetermined. See :class:`GroundingMode`.
         :return: The class circuit extended with the grounded exchangeable part.
         """
         aggregation_statistics = compute_aggregation_statistics(
@@ -466,6 +506,7 @@ class RelationalProbabilisticCircuit:
             determined_statistics,
             undetermined_latents,
             sampled_assignments,
+            grounding_mode,
         )
         return circuit
 
@@ -594,6 +635,7 @@ class RelationalProbabilisticCircuit:
         determined_statistics: dict[Variable, Any],
         undetermined_latents: SortedSet[Variable],
         sampled_assignments: list[dict[Variable, Any]],
+        grounding_mode: GroundingMode,
     ) -> None:
         """
         Attach a Monte-Carlo mixture over undetermined aggregation statistics.
@@ -603,7 +645,9 @@ class RelationalProbabilisticCircuit:
         marginalized out of the class circuit so their distribution is carried solely by
         the mixture weights, which are the node-local likelihoods of the sampled values.
         Each mounting product node receives its own normalized sum unit over the
-        instances.
+        instances. Under :attr:`GroundingMode.CAUSAL_SAMPLED`, each instance
+        additionally carries its sampled latent values back as point-valued variables
+        instead of leaving them discarded.
 
         :param circuit: The working class circuit.
         :param product_nodes_to_extend: The mounting product nodes.
@@ -612,6 +656,8 @@ class RelationalProbabilisticCircuit:
         :param determined_statistics: Statistics determinable from the query.
         :param undetermined_latents: The latents integrated out by Monte-Carlo.
         :param sampled_assignments: Distinct sampled values of the undetermined latents.
+        :param grounding_mode: How to treat ``undetermined_latents``. See
+            :class:`GroundingMode`.
         """
         log_weights_per_node = [
             self._node_local_latent_log_likelihoods(
@@ -621,18 +667,73 @@ class RelationalProbabilisticCircuit:
         ]
         retained_variables = SortedSet(circuit.variables) - undetermined_latents
         circuit.marginal_in_place(retained_variables)
-        mounted_roots = [
-            self._mount_instance(
-                circuit, template, query_parts, {**determined_statistics, **assignment}
-            )
-            for assignment in sampled_assignments
-        ]
+        if grounding_mode is GroundingMode.CAUSAL_SAMPLED:
+            mounted_roots = [
+                self._mount_instance_with_retained_latents(
+                    circuit,
+                    template,
+                    query_parts,
+                    determined_statistics,
+                    assignment,
+                    undetermined_latents,
+                )
+                for assignment in sampled_assignments
+            ]
+        else:
+            mounted_roots = [
+                self._mount_instance(
+                    circuit,
+                    template,
+                    query_parts,
+                    {**determined_statistics, **assignment},
+                )
+                for assignment in sampled_assignments
+            ]
         for product_node, log_weights in zip(
             product_nodes_to_extend, log_weights_per_node
         ):
             self._attach_mixture_to_node(
                 circuit, product_node, mounted_roots, log_weights
             )
+
+    @staticmethod
+    def _mount_instance_with_retained_latents(
+        circuit: ProbabilisticCircuit,
+        template: ExchangeableDistributionTemplate,
+        query_parts: list,
+        determined_statistics: dict[Variable, Any],
+        assignment: dict[Variable, Any],
+        undetermined_latents: SortedSet[Variable],
+    ) -> Unit:
+        """
+        Ground one exchangeable instance and retain its sampled latents as variables.
+
+        Same grounding as :meth:`_mount_instance`, but each variable in
+        ``undetermined_latents`` is additionally mounted as a point-valued sibling leaf
+        at its sampled value, instead of leaving it to be marginalized away. Distinct
+        sampled values produce disjoint singleton supports by construction, so the
+        resulting mixture stays support-deterministic on the retained latents.
+
+        :param circuit: The working class circuit to mount into.
+        :param template: The fitted template for this relation.
+        :param query_parts: The query parts, one per child object.
+        :param determined_statistics: Statistics determinable from the query.
+        :param assignment: The sampled values of ``undetermined_latents`` for this
+            instance.
+        :param undetermined_latents: The latent variables to retain.
+        :return: The root of a product uniting the mounted instance with a point leaf
+            per retained latent, owned by ``circuit``.
+        """
+        instance_root = RelationalProbabilisticCircuit._mount_instance(
+            circuit, template, query_parts, {**determined_statistics, **assignment}
+        )
+        wrapper = ProductUnit(probabilistic_circuit=circuit)
+        wrapper.add_subcircuit(instance_root)
+        for variable in undetermined_latents:
+            wrapper.add_subcircuit(
+                leaf(make_dirac(variable, assignment[variable]), circuit)
+            )
+        return wrapper
 
     @staticmethod
     def _attach_mixture_to_node(

@@ -3,11 +3,16 @@ import pytest
 
 from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.helper import to_dao
+from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
+    CausalCircuit,
+    MarginalDeterminismTreeNode,
+)
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
     InvalidMonteCarloSampleCountError,
 )
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
+    GroundingMode,
     RelationalProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import SumUnit
@@ -183,3 +188,72 @@ def test_ground_variable_count_scales_with_query_size(rpc):
     )
     query_4.resolve()
     assert len(rpc.ground(query_4).variables) > len(rpc.ground(query_2).variables)
+
+
+# %% GroundingMode.CAUSAL_SAMPLED retains undetermined latents instead of discarding them
+
+
+def test_predictive_grounding_is_unaffected_by_the_explicit_default(rpc, room_query_4):
+    np.random.seed(0)
+    implicit_default = {v.name for v in rpc.ground(room_query_4).variables}
+    np.random.seed(0)
+    explicit_predictive = {
+        v.name
+        for v in rpc.ground(
+            room_query_4, grounding_mode=GroundingMode.PREDICTIVE
+        ).variables
+    }
+    assert implicit_default == explicit_predictive
+
+
+def test_causal_sampled_grounding_retains_undetermined_latents_as_variables(
+    rpc, room_query_4
+):
+    np.random.seed(0)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    names = {v.name for v in model.variables}
+    assert "SceneRoomAggregations.chair_count()" in names
+    assert "SceneRoomAggregations.table_count()" in names
+
+
+def test_causal_sampled_grounding_preserves_object_type_variables(rpc, room_query_4):
+    np.random.seed(0)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    names = {v.name for v in model.variables}
+    for i in range(4):
+        assert f"SceneRoom.objects[{i}].type" in names
+
+
+def test_causal_sampled_grounding_is_valid(rpc, room_query_4):
+    np.random.seed(0)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    assert model.is_valid()
+
+
+def test_causal_sampled_grounding_supports_causal_circuit_registration(
+    rpc, room_query_4
+):
+    """
+    The whole point of ``GroundingMode.CAUSAL_SAMPLED``: a latent that predictive
+    grounding would have discarded must be usable as a registered cause in a
+    ``CausalCircuit`` -- i.e. verified support-deterministic against it, the structural
+    precondition ``backdoor_adjustment`` relies on.
+    """
+    np.random.seed(0)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    chair_count_variable = next(
+        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
+    )
+    object_type_variable = next(
+        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
+    )
+
+    tree = MarginalDeterminismTreeNode.from_causal_graph(
+        [chair_count_variable], [object_type_variable]
+    )
+    causal_circuit = CausalCircuit.from_probabilistic_circuit(
+        model, tree, [chair_count_variable], [object_type_variable]
+    )
+
+    result = causal_circuit.verify_support_determinism()
+    assert result.passed
