@@ -77,3 +77,35 @@ class UndeterminedLatentsNotModeledError(DataclassException):
             "Ensure the class circuit is fitted with these aggregation statistics "
             "as latent variables before grounding."
         )
+
+
+@dataclass
+class UndeterminedLatentsPartitionOverlapsError(DataclassException):
+    """
+    Raised when the undetermined latents' exact partition -- their marginal support,
+    grouped by the fitted circuit's own mixture branches -- has overlapping branches.
+
+    Exact-partition grounding requires those branches to be mutually exclusive so the
+    resulting mixture stays support-deterministic. This is caught internally by
+    ``RelationalProbabilisticCircuit`` and triggers a fall back to
+    ``GroundingMode.CAUSAL_SAMPLED``; it is not expected to reach a caller of
+    ``ground``.
+    """
+
+    undetermined_latents: List[Variable]
+    """
+    The undetermined latent variables whose exact partition overlaps.
+    """
+
+    def error_message(self) -> str:
+        names = ", ".join(latent.name for latent in self.undetermined_latents)
+        return (
+            f"The exact partition of undetermined latents [{names}] has overlapping "
+            f"branches, so exact-partition grounding would not be support-deterministic."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Refit the template so these latents are split on, or use "
+            "GroundingMode.CAUSAL_SAMPLED instead."
+        )

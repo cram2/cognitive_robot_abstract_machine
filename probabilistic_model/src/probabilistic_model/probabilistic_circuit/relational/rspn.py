@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import enum
 import itertools
+import logging
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -39,6 +40,7 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
     InvalidMonteCarloSampleCountError,
     UndeterminedLatentsNotModeledError,
+    UndeterminedLatentsPartitionOverlapsError,
 )
 from probabilistic_model.probabilistic_circuit.relational.helper import (
     find_lowest_product_nodes_that_model_variables,
@@ -55,6 +57,8 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from random_events.interval import Interval
 from random_events.variable import Variable
+
+logger = logging.getLogger(__name__)
 
 
 class GroundingMode(enum.Enum):
@@ -74,9 +78,20 @@ class GroundingMode(enum.Enum):
     CAUSAL_SAMPLED = enum.auto()
     """
     Retain each undetermined latent as a point-valued variable at its Monte-Carlo
-    sampled value instead of discarding it, so it can be registered as a cause or
-    effect in a :class:`CausalCircuit
+    sampled value instead of discarding it, so it can be registered as a cause or effect
+    in a :class:`CausalCircuit
     <probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit>`.
+    """
+
+    CAUSAL_EXACT = enum.auto()
+    """
+    Retain undetermined latents by enumerating the fitted circuit's own exact, disjoint
+    partition over them instead of sampling.
+
+    Reproducible across calls and covers the whole domain the model learned about,
+    unlike :attr:`CAUSAL_SAMPLED`. Falls back to :attr:`CAUSAL_SAMPLED`, with a logged
+    warning, when the fitted circuit's partition over the undetermined latents is not
+    itself disjoint.
     """
 
 
@@ -452,9 +467,11 @@ class RelationalProbabilisticCircuit:
         Ground one exchangeable part and attach it to the class circuit.
 
         Aggregation statistics determinable from the query condition the class circuit
-        directly. Monte-Carlo integrates out undetermined statistics: they are sampled
-        from the conditioned class circuit and each sampled value yields its own
-        exchangeable distribution instance.
+        directly. Undetermined statistics are integrated out: by Monte-Carlo sampling
+        (:attr:`GroundingMode.PREDICTIVE`, :attr:`GroundingMode.CAUSAL_SAMPLED`) or by
+        enumerating the fitted circuit's own exact partition over them
+        (:attr:`GroundingMode.CAUSAL_EXACT`, falling back to
+        :attr:`GroundingMode.CAUSAL_SAMPLED` if that partition is not disjoint).
 
         :param circuit: The current working copy of the class circuit.
         :param exchangeable_part_name: Field name of the exchangeable relation.
@@ -485,10 +502,7 @@ class RelationalProbabilisticCircuit:
         )
         query_parts = query.kwargs[exchangeable_part_name]
 
-        sampled_assignments = self._sample_undetermined_latents(
-            circuit, undetermined_latents
-        )
-        if not sampled_assignments:
+        if not undetermined_latents:
             self._attach_single_exchangeable_instance(
                 circuit,
                 product_nodes_to_extend,
@@ -498,6 +512,28 @@ class RelationalProbabilisticCircuit:
             )
             return circuit
 
+        if grounding_mode is GroundingMode.CAUSAL_EXACT:
+            try:
+                self._attach_exact_partition_mixture(
+                    circuit,
+                    product_nodes_to_extend,
+                    template,
+                    query_parts,
+                    determined_statistics,
+                    undetermined_latents,
+                )
+                return circuit
+            except UndeterminedLatentsPartitionOverlapsError:
+                logger.warning(
+                    "Exact-partition grounding for latents [%s] is not support-"
+                    "deterministic; falling back to GroundingMode.CAUSAL_SAMPLED.",
+                    ", ".join(variable.name for variable in undetermined_latents),
+                )
+                grounding_mode = GroundingMode.CAUSAL_SAMPLED
+
+        sampled_assignments = self._sample_undetermined_latents(
+            circuit, undetermined_latents
+        )
         self._attach_monte_carlo_mixture(
             circuit,
             product_nodes_to_extend,
@@ -734,6 +770,128 @@ class RelationalProbabilisticCircuit:
                 leaf(make_dirac(variable, assignment[variable]), circuit)
             )
         return wrapper
+
+    def _attach_exact_partition_mixture(
+        self,
+        circuit: ProbabilisticCircuit,
+        product_nodes_to_extend: list[ProductUnit],
+        template: ExchangeableDistributionTemplate,
+        query_parts: list,
+        determined_statistics: dict[Variable, Any],
+        undetermined_latents: SortedSet[Variable],
+    ) -> None:
+        """
+        Attach a mixture over the undetermined latents' own exact partition.
+
+        Unlike Monte-Carlo sampling, this enumerates ``circuit``'s already-fitted,
+        exact partition over ``undetermined_latents`` (the branches of
+        ``circuit.marginal(undetermined_latents)``'s root) instead of drawing samples
+        from it: reproducible across calls, and covers every value the model learned
+        about rather than only whichever points got sampled. One exchangeable instance
+        is grounded per branch and retains that branch's full region -- not narrowed to
+        a point -- by mounting the branch itself alongside the grounded instance.
+
+        :param circuit: The working class circuit.
+        :param product_nodes_to_extend: The mounting product nodes.
+        :param template: The fitted template for this relation.
+        :param query_parts: The query parts, one per child object.
+        :param determined_statistics: Statistics determinable from the query.
+        :param undetermined_latents: The latents to retain via exact partition.
+        :raises UndeterminedLatentsNotModeledError: If ``circuit`` does not model
+            ``undetermined_latents`` and thus has no partition over them.
+        :raises UndeterminedLatentsPartitionOverlapsError: If that partition's branches
+            are not pairwise disjoint, so exact-partition grounding would not be
+            support-deterministic.
+        """
+        proposal = circuit.marginal(undetermined_latents)
+        if proposal is None:
+            raise UndeterminedLatentsNotModeledError(list(undetermined_latents))
+        if not self._undetermined_latents_partition_disjointly(proposal):
+            raise UndeterminedLatentsPartitionOverlapsError(list(undetermined_latents))
+
+        retained_variables = SortedSet(circuit.variables) - undetermined_latents
+        circuit.marginal_in_place(retained_variables)
+
+        branches = (
+            proposal.root.log_weighted_subcircuits
+            if isinstance(proposal.root, SumUnit)
+            else [(0.0, proposal.root)]
+        )
+        mounted_roots = []
+        log_weights = []
+        for log_weight, latent_branch in branches:
+            representative_value = self._representative_value(
+                latent_branch, undetermined_latents
+            )
+            instance_root = self._mount_instance(
+                circuit,
+                template,
+                query_parts,
+                {**determined_statistics, **representative_value},
+            )
+            branch_root = ProductUnit(probabilistic_circuit=circuit)
+            branch_root.add_subcircuit(instance_root)
+            mounted_branch_nodes = circuit.mount(latent_branch)
+            branch_root.add_subcircuit(mounted_branch_nodes[latent_branch.index])
+            mounted_roots.append(branch_root)
+            log_weights.append(log_weight)
+
+        for product_node in product_nodes_to_extend:
+            self._attach_mixture_to_node(
+                circuit, product_node, mounted_roots, log_weights
+            )
+
+    @staticmethod
+    def _undetermined_latents_partition_disjointly(
+        proposal: ProbabilisticCircuit,
+    ) -> bool:
+        """
+        Check whether ``proposal``'s branches, if more than one, have disjoint support.
+
+        ``JointProbabilityTree`` does not retain which variables it actually split on
+        after fitting, so this checks the invariant exact-partition grounding actually
+        needs directly on the marginalized circuit, rather than trying to infer it from
+        fitting-time bookkeeping the tree does not expose: whether the branches of
+        ``proposal``'s own mixture over ``undetermined_latents`` overlap.
+
+        :param proposal: ``circuit`` marginalized down to exactly the undetermined
+            latents.
+        :return:``True`` if ``proposal``'s root is not a mixture (a single branch is
+            trivially disjoint), or if every pair of its branches has non-overlapping
+            support.
+        """
+        root = proposal.root
+        if not isinstance(root, SumUnit) or len(root.subcircuits) < 2:
+            return True
+        _ = proposal.support
+        branch_supports = [child.result_of_current_query for child in root.subcircuits]
+        return all(
+            left.intersection_with(right).is_empty()
+            for left, right in itertools.combinations(branch_supports, 2)
+        )
+
+    @staticmethod
+    def _representative_value(
+        latent_branch: Unit, undetermined_latents: SortedSet[Variable]
+    ) -> dict[Variable, Any]:
+        """
+        Extract one conditioning value per undetermined latent from a partition branch.
+
+        Uses each leaf's own mode. Any value within the branch's support would do for
+        grounding purposes here, since the branch's actual probability mass is retained
+        separately via :meth:`ProductUnit.attach_marginal_circuit`, not narrowed by this
+        choice -- a discrete leaf's mode is effectively a representative point, while a
+        continuous leaf's mode may itself be a sub-interval.
+
+        :param latent_branch: One branch of ``undetermined_latents``' exact partition.
+        :param undetermined_latents: The latent variables to extract a value for.
+        :return: One conditioning value per variable in ``undetermined_latents``.
+        """
+        return {
+            leaf_node.variable: leaf_node.distribution.univariate_log_mode()[0]
+            for leaf_node in latent_branch.leaves
+            if leaf_node.variable in undetermined_latents
+        }
 
     @staticmethod
     def _attach_mixture_to_node(

@@ -1,8 +1,11 @@
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 
 from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.helper import to_dao
+from probabilistic_model.distributions.distributions import IntegerDistribution
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
     MarginalDeterminismTreeNode,
@@ -15,7 +18,13 @@ from probabilistic_model.probabilistic_circuit.relational.rspn import (
     GroundingMode,
     RelationalProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import SumUnit
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit,
+    SumUnit,
+    leaf,
+)
+from probabilistic_model.utils import MissingDict
+from random_events.variable import Integer
 from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
     KRROODOrientation,
@@ -287,3 +296,155 @@ def test_causal_sampled_grounding_backdoor_adjustment_runs(rpc, room_query_4):
         cause_variable=chair_count_variable, effect_variable=object_type_variable
     )
     assert interventional_circuit.is_valid()
+
+
+# %% GroundingMode.CAUSAL_EXACT retains undetermined latents via exact partition
+
+
+def test_causal_exact_grounding_retains_undetermined_latents_as_variables(
+    rpc, room_query_4
+):
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+    names = {v.name for v in model.variables}
+    assert "SceneRoomAggregations.chair_count()" in names
+    assert "SceneRoomAggregations.table_count()" in names
+
+
+def test_causal_exact_grounding_is_valid(rpc, room_query_4):
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+    assert model.is_valid()
+
+
+def test_causal_exact_grounding_is_reproducible_across_calls(rpc, room_query_4):
+    """
+    Unlike ``CAUSAL_SAMPLED``, exact-partition grounding enumerates the model's own
+    partition rather than sampling from it, so repeated calls -- even under different
+    random state -- must ground the identical set of variables.
+    """
+    np.random.seed(0)
+    first = {
+        v.name
+        for v in rpc.ground(
+            room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT
+        ).variables
+    }
+    np.random.seed(123)
+    second = {
+        v.name
+        for v in rpc.ground(
+            room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT
+        ).variables
+    }
+    assert first == second
+
+
+def test_causal_exact_grounding_supports_causal_circuit_registration(rpc, room_query_4):
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+    chair_count_variable = next(
+        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
+    )
+    object_type_variable = next(
+        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
+    )
+
+    tree = MarginalDeterminismTreeNode.from_causal_graph(
+        [chair_count_variable], [object_type_variable]
+    )
+    causal_circuit = CausalCircuit.from_probabilistic_circuit(
+        model, tree, [chair_count_variable], [object_type_variable]
+    )
+
+    result = causal_circuit.verify_support_determinism()
+    assert result.passed
+
+
+def test_causal_exact_grounding_backdoor_adjustment_runs(rpc, room_query_4):
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+    chair_count_variable = next(
+        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
+    )
+    object_type_variable = next(
+        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
+    )
+
+    tree = MarginalDeterminismTreeNode.from_causal_graph(
+        [chair_count_variable], [object_type_variable]
+    )
+    causal_circuit = CausalCircuit.from_probabilistic_circuit(
+        model, tree, [chair_count_variable], [object_type_variable]
+    )
+
+    interventional_circuit = causal_circuit.backdoor_adjustment(
+        cause_variable=chair_count_variable, effect_variable=object_type_variable
+    )
+    assert interventional_circuit.is_valid()
+
+
+def test_causal_exact_grounding_falls_back_to_causal_sampled_when_partition_overlaps(
+    rpc, room_query_4, caplog
+):
+    """
+    When the fitted circuit's partition over the undetermined latents is not disjoint,
+    ``CAUSAL_EXACT`` must fall back to ``CAUSAL_SAMPLED`` rather than raise or produce
+    an unsound circuit.
+    """
+    np.random.seed(0)
+    with patch.object(
+        RelationalProbabilisticCircuit,
+        "_undetermined_latents_partition_disjointly",
+        return_value=False,
+    ):
+        with caplog.at_level("WARNING"):
+            model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+
+    assert model.is_valid()
+    names = {v.name for v in model.variables}
+    assert "SceneRoomAggregations.chair_count()" in names
+    assert any("falling back" in message.lower() for message in caplog.messages)
+
+
+# %% RelationalProbabilisticCircuit._undetermined_latents_partition_disjointly
+
+
+def _integer_leaf(variable, probabilities, circuit):
+    return leaf(
+        IntegerDistribution(
+            variable=variable, probabilities=MissingDict(float, probabilities)
+        ),
+        circuit,
+    )
+
+
+def test_partition_disjointly_true_for_a_single_branch():
+    variable = Integer("value")
+    circuit = ProbabilisticCircuit()
+    _integer_leaf(variable, {1: 1.0}, circuit)
+    assert RelationalProbabilisticCircuit._undetermined_latents_partition_disjointly(
+        circuit
+    )
+
+
+def test_partition_disjointly_true_for_disjoint_branches():
+    variable = Integer("value")
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    root.add_subcircuit(_integer_leaf(variable, {1: 1.0}, circuit), 0.0)
+    root.add_subcircuit(_integer_leaf(variable, {2: 1.0}, circuit), 0.0)
+    root.normalize()
+    assert RelationalProbabilisticCircuit._undetermined_latents_partition_disjointly(
+        circuit
+    )
+
+
+def test_partition_disjointly_false_for_overlapping_branches():
+    variable = Integer("value")
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    root.add_subcircuit(_integer_leaf(variable, {1: 0.5, 2: 0.5}, circuit), 0.0)
+    root.add_subcircuit(_integer_leaf(variable, {2: 0.5, 3: 0.5}, circuit), 0.0)
+    root.normalize()
+    assert (
+        not RelationalProbabilisticCircuit._undetermined_latents_partition_disjointly(
+            circuit
+        )
+    )
