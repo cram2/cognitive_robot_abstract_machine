@@ -12,8 +12,7 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
 )
 from probabilistic_model.probabilistic_circuit.relational.causal import (
-    ground_relational_causal_circuit,
-    resolve_variable,
+    RelationalCausalCircuit,
 )
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     AmbiguousVariablePathError,
@@ -27,30 +26,32 @@ from .test_rspns import rpc, room_query_4, scenario  # noqa: F401
 
 def test_resolve_variable_matches_the_full_name(rpc, room_query_4):
     np.random.seed(0)
-    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
-    variable = resolve_variable(grounded, "SceneRoomAggregations.chair_count()")
+    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
+    variable = RelationalCausalCircuit.resolve_variable(
+        grounded, "SceneRoomAggregations.chair_count()"
+    )
     assert variable.name == "SceneRoomAggregations.chair_count()"
 
 
 def test_resolve_variable_matches_an_unambiguous_suffix(rpc, room_query_4):
     np.random.seed(0)
-    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
-    variable = resolve_variable(grounded, "chair_count()")
+    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
+    variable = RelationalCausalCircuit.resolve_variable(grounded, "chair_count()")
     assert variable.name == "SceneRoomAggregations.chair_count()"
 
 
 def test_resolve_variable_matches_a_relational_index_suffix(rpc, room_query_4):
     np.random.seed(0)
-    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
-    variable = resolve_variable(grounded, "objects[2].type")
+    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
+    variable = RelationalCausalCircuit.resolve_variable(grounded, "objects[2].type")
     assert variable.name == "SceneRoom.objects[2].type"
 
 
 def test_resolve_variable_raises_for_no_match(rpc, room_query_4):
     np.random.seed(0)
-    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
     with pytest.raises(VariableNotFoundError):
-        resolve_variable(grounded, "not_a_real_variable")
+        RelationalCausalCircuit.resolve_variable(grounded, "not_a_real_variable")
 
 
 def test_resolve_variable_raises_for_ambiguous_suffix(rpc, room_query_4):
@@ -59,17 +60,17 @@ def test_resolve_variable_raises_for_ambiguous_suffix(rpc, room_query_4):
     silently picking one.
     """
     np.random.seed(0)
-    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
     with pytest.raises(AmbiguousVariablePathError):
-        resolve_variable(grounded, "type")
+        RelationalCausalCircuit.resolve_variable(grounded, "type")
 
 
-# %% ground_relational_causal_circuit
+# %% RelationalCausalCircuit.ground
 
 
-def test_ground_relational_causal_circuit_returns_a_causal_circuit(rpc, room_query_4):
+def test_relational_causal_circuit_ground_returns_a_causal_circuit(rpc, room_query_4):
     np.random.seed(0)
-    causal_circuit = ground_relational_causal_circuit(
+    causal_circuit = RelationalCausalCircuit.ground(
         rpc,
         room_query_4,
         causal_variables=["chair_count()"],
@@ -78,17 +79,21 @@ def test_ground_relational_causal_circuit_returns_a_causal_circuit(rpc, room_que
     assert isinstance(causal_circuit, CausalCircuit)
 
 
-def test_ground_relational_causal_circuit_accepts_resolved_variables(rpc, room_query_4):
+def test_relational_causal_circuit_ground_accepts_resolved_variables(rpc, room_query_4):
     """
     Callers may pass already-resolved Variable objects instead of path strings.
     """
     np.random.seed(0)
-    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
-    chair_count_variable = resolve_variable(grounded, "chair_count()")
-    object_type_variable = resolve_variable(grounded, "objects[0].type")
+    grounded = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
+    chair_count_variable = RelationalCausalCircuit.resolve_variable(
+        grounded, "chair_count()"
+    )
+    object_type_variable = RelationalCausalCircuit.resolve_variable(
+        grounded, "objects[0].type"
+    )
 
     np.random.seed(0)
-    causal_circuit = ground_relational_causal_circuit(
+    causal_circuit = RelationalCausalCircuit.ground(
         rpc,
         room_query_4,
         causal_variables=[chair_count_variable],
@@ -97,14 +102,13 @@ def test_ground_relational_causal_circuit_accepts_resolved_variables(rpc, room_q
     assert isinstance(causal_circuit, CausalCircuit)
 
 
-def test_ground_relational_causal_circuit_defaults_to_causal_sampled(rpc, room_query_4):
+def test_relational_causal_circuit_ground_defaults_to_causal_sampled(rpc, room_query_4):
     """
-    The default grounding mode must retain undetermined latents (unlike
-    GroundingMode.PREDICTIVE), since that is the entire point of grounding a
-    CausalCircuit this way.
+    The default grounding mode must retain undetermined latents, since that is the
+    entire point of grounding a CausalCircuit this way.
     """
     np.random.seed(0)
-    causal_circuit = ground_relational_causal_circuit(
+    causal_circuit = RelationalCausalCircuit.ground(
         rpc,
         room_query_4,
         causal_variables=["chair_count()"],
@@ -114,18 +118,18 @@ def test_ground_relational_causal_circuit_defaults_to_causal_sampled(rpc, room_q
     assert "SceneRoomAggregations.chair_count()" in names
 
 
-def test_ground_relational_causal_circuit_backdoor_adjustment_runs(rpc, room_query_4):
+def test_relational_causal_circuit_ground_backdoor_adjustment_runs(rpc, room_query_4):
     np.random.seed(0)
-    causal_circuit = ground_relational_causal_circuit(
+    causal_circuit = RelationalCausalCircuit.ground(
         rpc,
         room_query_4,
         causal_variables=["chair_count()"],
         effect_variables=["objects[0].type"],
     )
-    chair_count_variable = resolve_variable(
+    chair_count_variable = RelationalCausalCircuit.resolve_variable(
         causal_circuit.probabilistic_circuit, "chair_count()"
     )
-    object_type_variable = resolve_variable(
+    object_type_variable = RelationalCausalCircuit.resolve_variable(
         causal_circuit.probabilistic_circuit, "objects[0].type"
     )
     interventional_circuit = causal_circuit.backdoor_adjustment(
@@ -134,38 +138,38 @@ def test_ground_relational_causal_circuit_backdoor_adjustment_runs(rpc, room_que
     assert interventional_circuit.is_valid()
 
 
-def test_ground_relational_causal_circuit_warns_on_expensive_adjustment_set(
+def test_relational_causal_circuit_ground_warns_on_expensive_adjustment_set(
     rpc, room_query_4, caplog
 ):
     """
-    Under GroundingMode.CAUSAL_EXACT, registering more than one relational adjustment
-    variable together must warn once their leaf-region product exceeds the configured
-    threshold, rather than waiting to discover the cost at query time.
+    Under GroundingMode.EXACT, registering more than one relational adjustment variable
+    together must warn once their leaf-region product exceeds the configured threshold,
+    rather than waiting to discover the cost at query time.
     """
     with caplog.at_level("WARNING"):
-        ground_relational_causal_circuit(
+        RelationalCausalCircuit.ground(
             rpc,
             room_query_4,
             causal_variables=["objects[0].type"],
             effect_variables=["objects[1].type"],
             adjustment_variables=["chair_count()", "table_count()"],
-            grounding_mode=GroundingMode.CAUSAL_EXACT,
+            grounding_mode=GroundingMode.EXACT,
             adjustment_region_count_warning_threshold=0,
         )
     assert any("leaf regions" in message for message in caplog.messages)
 
 
-def test_ground_relational_causal_circuit_does_not_warn_below_threshold(
+def test_relational_causal_circuit_ground_does_not_warn_below_threshold(
     rpc, room_query_4, caplog
 ):
     with caplog.at_level("WARNING"):
-        ground_relational_causal_circuit(
+        RelationalCausalCircuit.ground(
             rpc,
             room_query_4,
             causal_variables=["objects[0].type"],
             effect_variables=["objects[1].type"],
             adjustment_variables=["chair_count()", "table_count()"],
-            grounding_mode=GroundingMode.CAUSAL_EXACT,
+            grounding_mode=GroundingMode.EXACT,
             adjustment_region_count_warning_threshold=10_000,
         )
     assert not any("leaf regions" in message for message in caplog.messages)

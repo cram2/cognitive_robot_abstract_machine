@@ -1,7 +1,7 @@
 """
 Tests for ``RelationalCircuitRegistry``'s causal query support: registering relational
-grounded variables (retained via ``GroundingMode.CAUSAL_SAMPLED``/``CAUSAL_EXACT``) as
-causes or effects through the same ``cause``/``causes_effect`` EQL machinery
+grounded variables (retained via ``GroundingMode.SAMPLED``/``EXACT``) as causes or
+effects through the same ``cause``/``causes_effect`` EQL machinery
 ``CausalCircuitRegistry`` already supports for static, non-relational circuits.
 """
 
@@ -94,20 +94,20 @@ def test_non_causal_query_is_unaffected(rpc):
     assert not isinstance(result, CausalCircuit)
 
 
-def test_causal_grounding_mode_field_is_actually_used(rpc):
+def test_grounding_mode_field_is_actually_used(rpc):
     """
-    Regression test for the ``causal_grounding_mode`` field: overriding it to
-    ``GroundingMode.CAUSAL_EXACT`` must actually change grounding behaviour, not be
-    silently ignored in favour of a hardcoded ``CAUSAL_SAMPLED``.
+    Regression test for the ``grounding_mode`` field: overriding it to
+    ``GroundingMode.EXACT`` must actually change grounding behaviour, not be silently
+    ignored in favour of a hardcoded ``SAMPLED``.
 
     Both modes retain the latent as a variable and ground a valid circuit, but only
     exact-partition grounding (or its fallback, which still retains the latent) is
-    reproducible across calls under different random state -- exactly what
-    ``CAUSAL_SAMPLED`` alone is not guaranteed to be.
+    reproducible across calls under different random state -- exactly what ``SAMPLED``
+    alone is not guaranteed to be.
     """
     registry = RelationalCircuitRegistry(
         relational_probabilistic_circuit=rpc,
-        causal_grounding_mode=GroundingMode.CAUSAL_EXACT,
+        grounding_mode=GroundingMode.EXACT,
     )
 
     np.random.seed(0)

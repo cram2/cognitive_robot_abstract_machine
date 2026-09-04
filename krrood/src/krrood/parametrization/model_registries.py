@@ -10,13 +10,18 @@ from krrood.parametrization.parameterizer import (
 from krrood.utils import get_class_and_attribute_name
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
-    MarginalDeterminismTreeNode,
+)
+from probabilistic_model.probabilistic_circuit.relational.causal import (
+    RelationalCausalCircuit,
 )
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     GroundingMode,
     RelationalProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit,
+)
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
@@ -74,16 +79,16 @@ class RelationalCircuitRegistry(ModelRegistry):
     :class:`~krrood.parametrization.exceptions.RelationalCircuitRegistryRequiresMatch`
     rather than failing on a missing attribute.
 
-    When the query also declares a ``cause`` marker, grounding uses
-    :attr:`causal_grounding_mode` instead of
-    :attr:`~probabilistic_model.probabilistic_circuit.relational.rspn.GroundingMode.PREDICTIVE`,
-    so the aggregation latents that marker names survive grounding instead of being
-    integrated out, and the result is wrapped as a verified
+    Every query grounds the same way, with :attr:`grounding_mode`: undetermined
+    aggregation latents are always retained, never integrated out. Whether the query
+    also declares a ``cause`` marker only decides what happens to the grounded circuit
+    afterward -- a postprocessing step, not a different way of grounding. A causal
+    query is wrapped as a verified
     :class:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`
-    instead of a plain circuit -- one more kind of cause this same registry can answer
-    about, not a parallel system. Any accompanying ``causes_effect``/``confounder``
+    registering the marked variables; any accompanying ``causes_effect``/``confounder``
     markers are read later, by ``ProbabilisticBackend``, once it has this
-    ``CausalCircuit`` in hand. Non-causal queries are unaffected.
+    ``CausalCircuit`` in hand. A non-causal query gets the grounded circuit back
+    unchanged, retained latents included.
     """
 
     relational_probabilistic_circuit: RelationalProbabilisticCircuit
@@ -91,22 +96,34 @@ class RelationalCircuitRegistry(ModelRegistry):
     The trained relational probabilistic circuit to ground.
     """
 
-    causal_grounding_mode: GroundingMode = GroundingMode.CAUSAL_SAMPLED
+    grounding_mode: GroundingMode = GroundingMode.SAMPLED
     """
-    Grounding mode used only when the query declares
-    ``cause``/``causes_effect``/``confounder`` markers. Non-causal queries always
-    ground with ``GroundingMode.PREDICTIVE``, unchanged from before.
+    How undetermined aggregation latents are represented during grounding.
+
+    See
+    :class:`~probabilistic_model.probabilistic_circuit.relational.rspn.GroundingMode`.
     """
 
     def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:
         if not isinstance(parameters, UnderspecifiedParameters):
             raise RelationalCircuitRegistryRequiresMatch(parameters)
-        is_causal_query = bool(parameters.search_cause_variables)
-        grounding_mode = (
-            self.causal_grounding_mode if is_causal_query else GroundingMode.PREDICTIVE
-        )
+        grounded = self._ground_and_rename(parameters)
+        if not parameters.search_cause_variables:
+            return grounded
+        return self._as_causal_circuit(grounded, parameters)
+
+    def _ground_and_rename(
+        self, parameters: UnderspecifiedParameters
+    ) -> ProbabilisticCircuit:
+        """
+        Ground the relational circuit for ``parameters.statement`` and align its
+        variable names to the ``UnderspecifiedParameters`` convention.
+
+        :param parameters: The parameters extracted from the queried statement.
+        :return: The grounded, renamed circuit.
+        """
         grounded = self.relational_probabilistic_circuit.ground(
-            parameters.statement, grounding_mode
+            parameters.statement, self.grounding_mode
         )
         class_prefix = self.relational_probabilistic_circuit.class_.__name__
         rename_map = {}
@@ -117,18 +134,26 @@ class RelationalCircuitRegistry(ModelRegistry):
             if qualified_name in parameters.variables:
                 rename_map[circuit_var] = parameters.variables[qualified_name]
         grounded.update_variables(rename_map)
-        if not is_causal_query:
-            return grounded
+        return grounded
 
-        effect_variables = list(parameters.effect_variables_from_causes_effect)
-        tree = MarginalDeterminismTreeNode.from_causal_graph(
-            parameters.search_cause_variables, effect_variables
+    @staticmethod
+    def _as_causal_circuit(
+        grounded: ProbabilisticCircuit, parameters: UnderspecifiedParameters
+    ) -> CausalCircuit:
+        """
+        Wrap an already-grounded, already-renamed circuit as a verified
+        ``CausalCircuit`` registering the query's declared cause and effect variables.
+
+        :param grounded: The grounded, renamed circuit to wrap.
+        :param parameters: The parameters extracted from the queried statement, carrying
+            the declared cause and effect variables.
+        :return: A verified, support-deterministic ``CausalCircuit``.
+        """
+        return RelationalCausalCircuit.from_grounded_circuit(
+            grounded,
+            parameters.search_cause_variables,
+            list(parameters.effect_variables_from_causes_effect),
         )
-        causal_circuit = CausalCircuit.from_probabilistic_circuit(
-            grounded, tree, parameters.search_cause_variables, effect_variables
-        )
-        causal_circuit.verify_support_determinism()
-        return causal_circuit
 
 
 @dataclass

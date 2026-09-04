@@ -145,16 +145,17 @@ def test_ground_preserves_room_scalar_variables(rpc, room_query_4):
     assert "SceneRoom.orientation.w" in names
 
 
-def test_ground_integrates_out_unavailable_aggregates(rpc, room_query_4):
+def test_ground_retains_unavailable_aggregates_by_default(rpc, room_query_4):
     """
     ``chair_count`` and ``table_count`` cannot be determined from the underspecified
-    query, so the Monte-Carlo path must integrate them out: they must not survive as
-    variables, while the object-type variables remain.
+    query, so the Monte-Carlo path must retain them as variables (grounding never
+    integrates undetermined latents out), alongside the object-type variables.
     """
+    np.random.seed(0)
     model = rpc.ground(room_query_4)
     names = {v.name for v in model.variables}
-    assert "SceneRoomAggregations.chair_count()" not in names
-    assert "SceneRoomAggregations.table_count()" not in names
+    assert "SceneRoomAggregations.chair_count()" in names
+    assert "SceneRoomAggregations.table_count()" in names
     for i in range(4):
         assert f"SceneRoom.objects[{i}].type" in names
 
@@ -204,43 +205,28 @@ def test_ground_variable_count_scales_with_query_size(rpc):
     assert len(rpc.ground(query_4).variables) > len(rpc.ground(query_2).variables)
 
 
-# %% GroundingMode.CAUSAL_SAMPLED retains undetermined latents instead of discarding them
+# %% GroundingMode.SAMPLED retains undetermined latents instead of discarding them
 
 
-def test_predictive_grounding_is_unaffected_by_the_explicit_default(rpc, room_query_4):
+def test_sampled_grounding_retains_undetermined_latents_as_variables(rpc, room_query_4):
     np.random.seed(0)
-    implicit_default = {v.name for v in rpc.ground(room_query_4).variables}
-    np.random.seed(0)
-    explicit_predictive = {
-        v.name
-        for v in rpc.ground(
-            room_query_4, grounding_mode=GroundingMode.PREDICTIVE
-        ).variables
-    }
-    assert implicit_default == explicit_predictive
-
-
-def test_causal_sampled_grounding_retains_undetermined_latents_as_variables(
-    rpc, room_query_4
-):
-    np.random.seed(0)
-    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
     names = {v.name for v in model.variables}
     assert "SceneRoomAggregations.chair_count()" in names
     assert "SceneRoomAggregations.table_count()" in names
 
 
-def test_causal_sampled_grounding_preserves_object_type_variables(rpc, room_query_4):
+def test_sampled_grounding_preserves_object_type_variables(rpc, room_query_4):
     np.random.seed(0)
-    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
     names = {v.name for v in model.variables}
     for i in range(4):
         assert f"SceneRoom.objects[{i}].type" in names
 
 
-def test_causal_sampled_grounding_is_valid(rpc, room_query_4):
+def test_sampled_grounding_is_valid(rpc, room_query_4):
     np.random.seed(0)
-    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
     assert model.is_valid()
 
 
@@ -248,7 +234,7 @@ def _causal_circuit_for(model):
     """
     Build a CausalCircuit registering ``chair_count()`` as the cause and
     ``objects[0].type`` as the effect over a grounded circuit, the pair every
-    GroundingMode.CAUSAL_SAMPLED/CAUSAL_EXACT causal-registration test below exercises.
+    GroundingMode.SAMPLED/EXACT causal-registration test below exercises.
     """
     chair_count_variable = next(
         v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
@@ -264,33 +250,31 @@ def _causal_circuit_for(model):
     )
 
 
-def test_causal_sampled_grounding_supports_causal_circuit_registration(
-    rpc, room_query_4
-):
+def test_sampled_grounding_supports_causal_circuit_registration(rpc, room_query_4):
     """
-    The whole point of ``GroundingMode.CAUSAL_SAMPLED``: a latent that predictive
+    The whole point of ``GroundingMode.SAMPLED``: a latent that predictive
     grounding would have discarded must be usable as a registered cause in a
     ``CausalCircuit`` -- i.e. verified support-deterministic against it, the structural
     precondition ``backdoor_adjustment`` relies on.
     """
     np.random.seed(0)
-    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
     causal_circuit = _causal_circuit_for(model)
 
     result = causal_circuit.verify_support_determinism()
     assert result.passed
 
 
-def test_causal_sampled_grounding_backdoor_adjustment_runs(rpc, room_query_4):
+def test_sampled_grounding_backdoor_adjustment_runs(rpc, room_query_4):
     """
     End-to-end regression test: computing ``P(effect | do(cause))`` on a
-    ``CAUSAL_SAMPLED``-grounded circuit must not raise.
+    ``SAMPLED``-grounded circuit must not raise.
 
     This exercises every renamed exchangeable-instance leaf, including any query part
     whose grounded circuit happens to collapse to a single leaf as its own root.
     """
     np.random.seed(0)
-    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_SAMPLED)
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
     causal_circuit = _causal_circuit_for(model)
 
     interventional_circuit = causal_circuit.backdoor_adjustment(
@@ -300,56 +284,50 @@ def test_causal_sampled_grounding_backdoor_adjustment_runs(rpc, room_query_4):
     assert interventional_circuit.is_valid()
 
 
-# %% GroundingMode.CAUSAL_EXACT retains undetermined latents via exact partition
+# %% GroundingMode.EXACT retains undetermined latents via exact partition
 
 
-def test_causal_exact_grounding_retains_undetermined_latents_as_variables(
-    rpc, room_query_4
-):
-    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+def test_exact_grounding_retains_undetermined_latents_as_variables(rpc, room_query_4):
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.EXACT)
     names = {v.name for v in model.variables}
     assert "SceneRoomAggregations.chair_count()" in names
     assert "SceneRoomAggregations.table_count()" in names
 
 
-def test_causal_exact_grounding_is_valid(rpc, room_query_4):
-    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+def test_exact_grounding_is_valid(rpc, room_query_4):
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.EXACT)
     assert model.is_valid()
 
 
-def test_causal_exact_grounding_is_reproducible_across_calls(rpc, room_query_4):
+def test_exact_grounding_is_reproducible_across_calls(rpc, room_query_4):
     """
-    ``CAUSAL_EXACT`` grounding -- whether it takes its own exact-partition path or falls
-    back to ``CAUSAL_SAMPLED`` -- must ground the identical set of variables across
-    calls, even under different random state.
+    ``EXACT`` grounding -- whether it takes its own exact-partition path or falls back
+    to ``SAMPLED`` -- must ground the identical set of variables across calls, even
+    under different random state.
     """
     np.random.seed(0)
     first = {
         v.name
-        for v in rpc.ground(
-            room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT
-        ).variables
+        for v in rpc.ground(room_query_4, grounding_mode=GroundingMode.EXACT).variables
     }
     np.random.seed(123)
     second = {
         v.name
-        for v in rpc.ground(
-            room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT
-        ).variables
+        for v in rpc.ground(room_query_4, grounding_mode=GroundingMode.EXACT).variables
     }
     assert first == second
 
 
-def test_causal_exact_grounding_supports_causal_circuit_registration(rpc, room_query_4):
-    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+def test_exact_grounding_supports_causal_circuit_registration(rpc, room_query_4):
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.EXACT)
     causal_circuit = _causal_circuit_for(model)
 
     result = causal_circuit.verify_support_determinism()
     assert result.passed
 
 
-def test_causal_exact_grounding_backdoor_adjustment_runs(rpc, room_query_4):
-    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+def test_exact_grounding_backdoor_adjustment_runs(rpc, room_query_4):
+    model = rpc.ground(room_query_4, grounding_mode=GroundingMode.EXACT)
     causal_circuit = _causal_circuit_for(model)
 
     interventional_circuit = causal_circuit.backdoor_adjustment(
@@ -359,13 +337,13 @@ def test_causal_exact_grounding_backdoor_adjustment_runs(rpc, room_query_4):
     assert interventional_circuit.is_valid()
 
 
-def test_causal_exact_grounding_falls_back_to_causal_sampled_when_partition_overlaps(
+def test_exact_grounding_falls_back_to_sampled_when_partition_overlaps(
     rpc, room_query_4, caplog
 ):
     """
     When the fitted circuit's partition over the undetermined latents is not disjoint,
-    ``CAUSAL_EXACT`` must fall back to ``CAUSAL_SAMPLED`` rather than raise or produce
-    an unsound circuit.
+    ``EXACT`` must fall back to ``SAMPLED`` rather than raise or produce an unsound
+    circuit.
     """
     np.random.seed(0)
     with patch.object(
@@ -374,7 +352,7 @@ def test_causal_exact_grounding_falls_back_to_causal_sampled_when_partition_over
         return_value=False,
     ):
         with caplog.at_level("WARNING"):
-            model = rpc.ground(room_query_4, grounding_mode=GroundingMode.CAUSAL_EXACT)
+            model = rpc.ground(room_query_4, grounding_mode=GroundingMode.EXACT)
 
     assert model.is_valid()
     names = {v.name for v in model.variables}
@@ -382,7 +360,7 @@ def test_causal_exact_grounding_falls_back_to_causal_sampled_when_partition_over
     assert any("falling back" in message.lower() for message in caplog.messages)
 
 
-# %% GroundingMode.CAUSAL_EXACT preserves the actual correlation between the retained
+# %% GroundingMode.EXACT preserves the actual correlation between the retained
 # latent and the exchangeable relation's own attributes, not just its variable set
 
 
@@ -433,7 +411,7 @@ def correlated_room_query():
     return query
 
 
-def test_causal_exact_grounding_preserves_correlation_with_the_retained_latent(
+def test_exact_grounding_preserves_correlation_with_the_retained_latent(
     correlated_rpc, correlated_room_query
 ):
     """
@@ -452,7 +430,7 @@ def test_causal_exact_grounding_preserves_correlation_with_the_retained_latent(
     """
     np.random.seed(0)
     grounded = correlated_rpc.ground(
-        correlated_room_query, grounding_mode=GroundingMode.CAUSAL_EXACT
+        correlated_room_query, grounding_mode=GroundingMode.EXACT
     )
     chair_count_variable = next(
         v for v in grounded.variables if v.name == "SceneRoomAggregations.chair_count()"
@@ -500,7 +478,7 @@ def test_representative_value_returns_a_point_not_a_region():
     point.
 
     Passing the mode region itself into conditioning always fails silently (see
-    test_causal_exact_grounding_preserves_correlation_with_the_retained_latent).
+    test_exact_grounding_preserves_correlation_with_the_retained_latent).
     """
     variable = Integer("value")
     circuit = ProbabilisticCircuit()

@@ -63,35 +63,34 @@ logger = logging.getLogger(__name__)
 
 class GroundingMode(enum.Enum):
     """
-    Selects how ``RelationalProbabilisticCircuit.ground`` treats an exchangeable
+    Selects how ``RelationalProbabilisticCircuit.ground`` represents an exchangeable
     relation's aggregation latents that a query leaves undetermined.
+
+    Undetermined latents are always retained as variables of the grounded circuit --
+    never integrated out -- so any caller that only wants the query's own variables
+    marginalizes the ones it does not need afterward, as a postprocessing step, rather
+    than grounding deciding that for it. Registering a retained latent as a cause or
+    effect in a :class:`CausalCircuit
+    <probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit>` is
+    one such postprocessing step, not a distinct grounding behaviour.
     """
 
-    PREDICTIVE = enum.auto()
+    SAMPLED = enum.auto()
     """
-    Integrate undetermined latents out of the grounded circuit by Monte-Carlo mixture,
-    discarding them.
+    Retain each undetermined latent as a point-valued variable at its Monte-Carlo
+    sampled value.
 
     Default behaviour.
     """
 
-    CAUSAL_SAMPLED = enum.auto()
-    """
-    Retain each undetermined latent as a point-valued variable at its Monte-Carlo
-    sampled value instead of discarding it, so it can be registered as a cause or effect
-    in a :class:`CausalCircuit
-    <probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit>`.
-    """
-
-    CAUSAL_EXACT = enum.auto()
+    EXACT = enum.auto()
     """
     Retain undetermined latents by enumerating the fitted circuit's own exact, disjoint
     partition over them instead of sampling.
 
     Reproducible across calls and covers the whole domain the model learned about,
-    unlike :attr:`CAUSAL_SAMPLED`. Falls back to :attr:`CAUSAL_SAMPLED`, with a logged
-    warning, when the fitted circuit's partition over the undetermined latents is not
-    itself disjoint.
+    unlike :attr:`SAMPLED`. Falls back to :attr:`SAMPLED`, with a logged warning, when
+    the fitted circuit's partition over the undetermined latents is not itself disjoint.
     """
 
 
@@ -418,7 +417,7 @@ class RelationalProbabilisticCircuit:
     def ground(
         self,
         query: Match,
-        grounding_mode: GroundingMode = GroundingMode.PREDICTIVE,
+        grounding_mode: GroundingMode = GroundingMode.SAMPLED,
     ) -> ProbabilisticCircuit:
         """
         Ground the relational circuit for a specific query.
@@ -467,11 +466,11 @@ class RelationalProbabilisticCircuit:
         Ground one exchangeable part and attach it to the class circuit.
 
         Aggregation statistics determinable from the query condition the class circuit
-        directly. Undetermined statistics are integrated out: by Monte-Carlo sampling
-        (:attr:`GroundingMode.PREDICTIVE`, :attr:`GroundingMode.CAUSAL_SAMPLED`) or by
-        enumerating the fitted circuit's own exact partition over them
-        (:attr:`GroundingMode.CAUSAL_EXACT`, falling back to
-        :attr:`GroundingMode.CAUSAL_SAMPLED` if that partition is not disjoint).
+        directly. Undetermined statistics are retained as variables, represented either
+        by Monte-Carlo sampling (:attr:`GroundingMode.SAMPLED`) or by enumerating the
+        fitted circuit's own exact partition over them (:attr:`GroundingMode.EXACT`,
+        falling back to :attr:`GroundingMode.SAMPLED` if that partition is not
+        disjoint).
 
         :param circuit: The current working copy of the class circuit.
         :param exchangeable_part_name: Field name of the exchangeable relation.
@@ -512,7 +511,7 @@ class RelationalProbabilisticCircuit:
             )
             return circuit
 
-        if grounding_mode is GroundingMode.CAUSAL_EXACT:
+        if grounding_mode is GroundingMode.EXACT:
             try:
                 self._attach_exact_partition_mixture(
                     circuit,
@@ -526,10 +525,9 @@ class RelationalProbabilisticCircuit:
             except UndeterminedLatentsNotPartitionedError:
                 logger.warning(
                     "Exact-partition grounding for latents [%s] is not support-"
-                    "deterministic; falling back to GroundingMode.CAUSAL_SAMPLED.",
+                    "deterministic; falling back to GroundingMode.SAMPLED.",
                     ", ".join(variable.name for variable in undetermined_latents),
                 )
-                grounding_mode = GroundingMode.CAUSAL_SAMPLED
 
         sampled_assignments = self._sample_undetermined_latents(
             circuit, undetermined_latents
@@ -542,7 +540,6 @@ class RelationalProbabilisticCircuit:
             determined_statistics,
             undetermined_latents,
             sampled_assignments,
-            grounding_mode,
         )
         return circuit
 
@@ -671,29 +668,23 @@ class RelationalProbabilisticCircuit:
         determined_statistics: dict[Variable, Any],
         undetermined_latents: SortedSet[Variable],
         sampled_assignments: list[dict[Variable, Any]],
-        grounding_mode: GroundingMode,
     ) -> None:
         """
         Attach a Monte-Carlo mixture over undetermined aggregation statistics.
 
         For every sampled assignment one exchangeable instance is grounded on the
-        determined plus sampled statistics. The undetermined latents are then
-        marginalized out of the class circuit so their distribution is carried solely by
-        the mixture weights, which are the node-local likelihoods of the sampled values.
-        Each mounting product node receives its own normalized sum unit over the
-        instances. Under :attr:`GroundingMode.CAUSAL_SAMPLED`, each instance
-        additionally carries its sampled latent values back as point-valued variables
-        instead of leaving them discarded.
+        determined plus sampled statistics, and additionally carries its sampled latent
+        values back as point-valued variables instead of leaving them discarded. Each
+        mounting product node receives its own normalized sum unit over the instances,
+        weighted by the node-local likelihoods of the sampled values.
 
         :param circuit: The working class circuit.
         :param product_nodes_to_extend: The mounting product nodes.
         :param template: The fitted template for this relation.
         :param query_parts: The query parts, one per child object.
         :param determined_statistics: Statistics determinable from the query.
-        :param undetermined_latents: The latents integrated out by Monte-Carlo.
+        :param undetermined_latents: The latents represented by Monte-Carlo sampling.
         :param sampled_assignments: Distinct sampled values of the undetermined latents.
-        :param grounding_mode: How to treat ``undetermined_latents``. See
-            :class:`GroundingMode`.
         """
         log_weights_per_node = [
             self._node_local_latent_log_likelihoods(
@@ -703,28 +694,17 @@ class RelationalProbabilisticCircuit:
         ]
         retained_variables = SortedSet(circuit.variables) - undetermined_latents
         circuit.marginal_in_place(retained_variables)
-        if grounding_mode is GroundingMode.CAUSAL_SAMPLED:
-            mounted_roots = [
-                self._mount_instance_with_retained_latents(
-                    circuit,
-                    template,
-                    query_parts,
-                    determined_statistics,
-                    assignment,
-                    undetermined_latents,
-                )
-                for assignment in sampled_assignments
-            ]
-        else:
-            mounted_roots = [
-                self._mount_instance(
-                    circuit,
-                    template,
-                    query_parts,
-                    {**determined_statistics, **assignment},
-                )
-                for assignment in sampled_assignments
-            ]
+        mounted_roots = [
+            self._mount_instance_with_retained_latents(
+                circuit,
+                template,
+                query_parts,
+                determined_statistics,
+                assignment,
+                undetermined_latents,
+            )
+            for assignment in sampled_assignments
+        ]
         for product_node, log_weights in zip(
             product_nodes_to_extend, log_weights_per_node
         ):

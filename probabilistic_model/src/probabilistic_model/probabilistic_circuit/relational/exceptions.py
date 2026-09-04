@@ -90,8 +90,8 @@ class UndeterminedLatentsNotPartitionedError(DataclassException):
     Exact-partition grounding requires at least two mutually exclusive branches so each
     grounded exchangeable instance stays tied to the latent value its own branch
     represents. This is caught internally by ``RelationalProbabilisticCircuit`` and
-    triggers a fall back to ``GroundingMode.CAUSAL_SAMPLED``; it is not expected to
-    reach a caller of ``ground``.
+    triggers a fall back to ``GroundingMode.SAMPLED``; it is not expected to reach a
+    caller of ``ground``.
     """
 
     undetermined_latents: List[Variable]
@@ -111,7 +111,7 @@ class UndeterminedLatentsNotPartitionedError(DataclassException):
     def suggest_correction(self) -> str:
         return (
             "Refit the template so these latents are split on, or use "
-            "GroundingMode.CAUSAL_SAMPLED instead."
+            "GroundingMode.SAMPLED instead."
         )
 
 
