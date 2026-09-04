@@ -43,8 +43,10 @@ class BenchmarkResult:
     maximum_inner_box_time: float
     inner_box_approximation_time: float
     inner_box_count: int
+    inner_volume_diff: float
     outer_box_approximation_time: float
     outer_box_count: int
+    outer_volume_diff: float
 
 
 def time_call(fn, *args, **kwargs):
@@ -62,6 +64,13 @@ def run_benchmark(dim: int, n_points: int, min_volume_fraction: float, seed: int
     t_inner, inner_event = time_call(poly.inner_box_approximation, min_volume)
     t_outer, outer_event = time_call(poly.outer_box_approximation, min_volume)
 
+    # inner_event is a subset of the polytope, so it can only ever cover less volume;
+    # outer_event is a superset, so it can only ever cover more. Event.size is the exact
+    # volume of the (disjoint) box union, unlike Polytope.volume which is a Monte-Carlo
+    # estimate -- so these diffs also carry that estimate's noise.
+    inner_volume_diff = volume - inner_event.size
+    outer_volume_diff = outer_event.size - volume
+
     return BenchmarkResult(
         dim=dim,
         n_points=n_points,
@@ -71,8 +80,10 @@ def run_benchmark(dim: int, n_points: int, min_volume_fraction: float, seed: int
         maximum_inner_box_time=t_max_inner,
         inner_box_approximation_time=t_inner,
         inner_box_count=len(inner_event.simple_sets),
+        inner_volume_diff=inner_volume_diff,
         outer_box_approximation_time=t_outer,
         outer_box_count=len(outer_event.simple_sets),
+        outer_volume_diff=outer_volume_diff,
     )
 
 
@@ -90,16 +101,16 @@ def main():
 
     header = (
         f"{'dim':>3} {'n_pts':>6} {'facets':>6} {'volume':>8} {'min_vol_frac':>12} "
-        f"{'max_inner_box[s]':>17} {'inner_approx[s]':>16} {'#boxes':>7} "
-        f"{'outer_approx[s]':>16} {'#boxes':>7}"
+        f"{'max_inner_box[s]':>17} {'inner_approx[s]':>16} {'#boxes':>7} {'inner_vol_diff':>14} "
+        f"{'outer_approx[s]':>16} {'#boxes':>7} {'outer_vol_diff':>14}"
     )
     print(header)
     print("-" * len(header))
     for r in results:
         print(
             f"{r.dim:>3} {r.n_points:>6} {r.n_facets:>6} {r.volume:>8.3f} {r.min_volume_fraction:>12.2f} "
-            f"{r.maximum_inner_box_time:>17.4f} {r.inner_box_approximation_time:>16.4f} {r.inner_box_count:>7} "
-            f"{r.outer_box_approximation_time:>16.4f} {r.outer_box_count:>7}"
+            f"{r.maximum_inner_box_time:>17.4f} {r.inner_box_approximation_time:>16.4f} {r.inner_box_count:>7} {r.inner_volume_diff:>14.4f} "
+            f"{r.outer_box_approximation_time:>16.4f} {r.outer_box_count:>7} {r.outer_volume_diff:>14.4f}"
         )
 
 
