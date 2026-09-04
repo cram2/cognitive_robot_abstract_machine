@@ -857,9 +857,12 @@ class ProductUnit(InnerUnit):
                 # type hinting
                 subcircuit: Self
 
-                # mount the children of that circuit directly
+                # mount the children of that circuit directly onto this one
                 for sub_subcircuit in subcircuit.subcircuits:
-                    subcircuit.add_subcircuit(sub_subcircuit)
+                    self.add_subcircuit(sub_subcircuit)
+
+                # remove the now-redundant nested product unit
+                self.probabilistic_circuit.remove_node(subcircuit)
 
     def sample(self, *args, **kwargs):
         """
