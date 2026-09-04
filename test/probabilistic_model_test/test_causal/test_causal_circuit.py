@@ -299,6 +299,65 @@ def _build_unnormalized_circuit() -> tuple:
     return circuit, x, y
 
 
+def _build_shared_cause_subcircuit_circuit() -> tuple:
+    """
+    A DAG, not a tree: the SumUnit over the cause x is mounted as a shared child of two
+    different ProductUnits, matching the mounting pattern RSPN grounding uses when one
+    exchangeable instance is attached under several class-level product nodes.
+
+        SumUnit(root)
+          ProductUnit_a(SumUnit_x [shared], leaf y∈[0,1])
+          ProductUnit_b(SumUnit_x [shared], leaf y∈[2,3])
+
+        SumUnit_x [x∈[0,1] w=0.6, x∈[1,2] w=0.4]  -- same node object under both parents
+
+    Ground truth: x's two branches are disjoint regardless of which parent reaches
+    them, so verify_support_determinism must pass.
+    """
+    x = Continuous("x")
+    y = Continuous("y")
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+
+    shared_sum_x = SumUnit(probabilistic_circuit=circuit)
+    shared_sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.6),
+    )
+    shared_sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(1, 2).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.4),
+    )
+
+    product_a = ProductUnit(probabilistic_circuit=circuit)
+    product_a.add_subcircuit(shared_sum_x)
+    product_a.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        )
+    )
+
+    product_b = ProductUnit(probabilistic_circuit=circuit)
+    product_b.add_subcircuit(shared_sum_x)
+    product_b.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(2, 3).simple_sets[0]),
+            circuit,
+        )
+    )
+
+    root.add_subcircuit(product_a, math.log(0.5))
+    root.add_subcircuit(product_b, math.log(0.5))
+    return circuit, x, y
+
+
 def _marginal_probability(
     circuit: ProbabilisticCircuit,
     variable: Continuous,
@@ -619,6 +678,31 @@ class VerifySupportDeterminismDisjointnessTestCase(unittest.TestCase):
         cc = CausalCircuit.from_probabilistic_circuit(circuit, tree, [x], [y])
         result = cc.verify_support_determinism()
         self.assertTrue(result.passed, msg=f"Violations: {result.violations}")
+
+
+class VerifySupportDeterminismSharedSubcircuitTestCase(unittest.TestCase):
+    """
+    A shared child (a node with more than one parent) must be visited once by
+    _check_support_disjointness's traversal and its disjointness result attributed
+    correctly to every parent -- the pattern RSPN's exact-partition and Monte-Carlo
+    grounding both rely on when one grounded instance is mounted under several class-
+    level product nodes.
+    """
+
+    def test_shared_cause_subcircuit_passes(self):
+        circuit, x, y = _build_shared_cause_subcircuit_circuit()
+        tree = MarginalDeterminismTreeNode.from_causal_graph([x], [y])
+        cc = CausalCircuit.from_probabilistic_circuit(circuit, tree, [x], [y])
+        result = cc.verify_support_determinism()
+        self.assertTrue(result.passed, msg=f"Violations: {result.violations}")
+
+    def test_backdoor_adjustment_runs_on_a_shared_cause_subcircuit(self):
+        circuit, x, y = _build_shared_cause_subcircuit_circuit()
+        tree = MarginalDeterminismTreeNode.from_causal_graph([x], [y])
+        cc = CausalCircuit.from_probabilistic_circuit(circuit, tree, [x], [y])
+        interventional_circuit = cc.backdoor_adjustment(x, y, [])
+        self.assertIsInstance(interventional_circuit, ProbabilisticCircuit)
+        self.assertTrue(interventional_circuit.is_valid())
 
 
 class BackdoorAdjustmentStructuralTestCase(unittest.TestCase):

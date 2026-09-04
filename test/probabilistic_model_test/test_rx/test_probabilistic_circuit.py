@@ -441,5 +441,82 @@ class MixedLeafTruncationTestCase(unittest.TestCase):
         self.assertAlmostEqual(truncated.probability(event), 1.0, places=9)
 
 
+# %% a leaf is its own only leaf
+
+
+class SingleLeafCircuitTestCase(unittest.TestCase):
+    """
+    A circuit whose root is itself a leaf, with no wrapping product or sum unit.
+    """
+
+    x = Continuous("x")
+
+    def setUp(self):
+        self.circuit = ProbabilisticCircuit()
+        self.leaf = leaf(
+            UniformDistribution(
+                variable=self.x, interval=SimpleInterval.from_data(0, 1)
+            ),
+            self.circuit,
+        )
+
+    def test_leaf_unit_lists_itself_as_its_own_leaf(self):
+        self.assertEqual(self.leaf.leaves, [self.leaf])
+
+    def test_circuit_rooted_at_a_single_leaf_lists_that_leaf(self):
+        self.assertEqual(self.circuit.leaves, [self.leaf])
+
+    def test_update_variables_renames_a_single_leaf_root(self):
+        renamed_x = Continuous("renamed_x")
+        self.circuit.update_variables({self.x: renamed_x})
+        self.assertEqual(self.leaf.distribution.variable, renamed_x)
+
+
+class NestedProductUnitSimplifyTestCase(unittest.TestCase):
+    """
+    A ProductUnit whose own child is another ProductUnit -- the same-type nesting
+    ProductUnit.simplify() is meant to flatten.
+    """
+
+    x = Continuous("x")
+    y = Continuous("y")
+    z = Continuous("z")
+
+    def setUp(self):
+        self.circuit = ProbabilisticCircuit()
+        self.outer = ProductUnit(probabilistic_circuit=self.circuit)
+        self.inner = ProductUnit(probabilistic_circuit=self.circuit)
+        self.leaf_x = leaf(
+            UniformDistribution(
+                variable=self.x, interval=SimpleInterval.from_data(0, 1)
+            ),
+            self.circuit,
+        )
+        self.leaf_y = leaf(
+            UniformDistribution(
+                variable=self.y, interval=SimpleInterval.from_data(0, 1)
+            ),
+            self.circuit,
+        )
+        self.leaf_z = leaf(
+            UniformDistribution(
+                variable=self.z, interval=SimpleInterval.from_data(0, 1)
+            ),
+            self.circuit,
+        )
+        self.inner.add_subcircuit(self.leaf_x)
+        self.inner.add_subcircuit(self.leaf_y)
+        self.outer.add_subcircuit(self.inner)
+        self.outer.add_subcircuit(self.leaf_z)
+
+    def test_simplify_flattens_the_nested_product_unit(self):
+        self.circuit.simplify()
+        self.assertEqual(
+            set(self.outer.subcircuits), {self.leaf_x, self.leaf_y, self.leaf_z}
+        )
+        self.assertIsNone(self.inner.probabilistic_circuit)
+        self.assertEqual(len(self.circuit.nodes()), 4)
+
+
 if __name__ == "__main__":
     unittest.main()
