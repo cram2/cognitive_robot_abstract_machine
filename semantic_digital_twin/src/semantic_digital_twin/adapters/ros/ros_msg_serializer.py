@@ -16,6 +16,9 @@ from krrood.adapters.json_serializer import (
 )
 from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.ros.utils import is_ros2_message_class
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 
 
 @dataclass
@@ -36,6 +39,13 @@ class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
 
     @classmethod
     def from_json(cls, data: Dict[str, Any], clazz: Type, **kwargs) -> Any:
+        # convert_dictionary_to_ros_message does not accept the tracker that from_json threads
+        # through for resolving world entity ids, since ROS messages never reference them
+        kwargs = {
+            key: value
+            for key, value in kwargs.items()
+            if not isinstance(value, WorldEntityWithIDKwargsTracker)
+        }
         return convert_dictionary_to_ros_message(clazz, data["data"], **kwargs)
 
     @classmethod
