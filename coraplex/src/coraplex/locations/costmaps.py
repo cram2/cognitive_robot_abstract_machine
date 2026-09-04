@@ -14,6 +14,7 @@ from skimage.measure import label
 from typing_extensions import Tuple, List, Optional, Iterator, Callable, TYPE_CHECKING
 
 from coraplex.locations.base import PoseGeneratorBackend
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import (
@@ -629,7 +630,12 @@ class VisibilityCostmap(Costmap):
             )
             images.append(
                 r_t.create_depth_map(
-                    origin_copy, resolution=self.width, min_distance=0.1
+                    origin_copy,
+                    resolution=CameraResolution(
+                        width=self.width,
+                        height=self.width,
+                    ),
+                    min_distance=0.1,
                 )
             )
 

@@ -332,7 +332,11 @@ def _compute_attribute_diff(
     if not isinstance(original_values, list_like_classes):
         if original_values == new_values:
             return None
-        return JSONAttributeDiff(attribute_name=key, added_values=[new_values])
+        return JSONAttributeDiff(
+            attribute_name=key,
+            added_values=[new_values],
+            removed_values=[original_values],
+        )
 
     add = [new_value for new_value in new_values if new_value not in original_values]
     remove = [

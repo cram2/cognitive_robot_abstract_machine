@@ -59,6 +59,8 @@ from semantic_digital_twin.exceptions import (
     WorldContainsOrphanedDegreeOfFreedom,
     BrokenWorldModificationHistoryError,
     MismatchingWorld,
+    InsufficientModificationHistoryError,
+    InvalidRollbackVersionError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
@@ -2612,6 +2614,60 @@ class World(HasSimulatorProperties):
 
     def get_world_model_manager(self) -> WorldModelManager:
         return self._model_manager
+
+    def rollback_modification_blocks(
+        self, count: int = 1
+    ) -> List[WorldModelModificationBlock]:
+        """
+        Revert the most recently completed modification blocks, restoring the world to
+        the state it was in before they were applied.
+
+        Reverting a block is itself recorded as a new modification block (see
+        :meth:`WorldModification.revert`), so the history retains a full account of what
+        happened, including the rollback.
+
+        :param count: How many of the most recently completed modification blocks to
+            revert, starting with the most recent.
+        :return: The modification blocks that were rolled back, most recent first.
+        :raises InsufficientModificationHistoryError: If the history contains fewer than
+            ``count`` completed modification blocks.
+        """
+        model_modification_blocks = self._model_manager.model_modification_blocks
+        if count > len(model_modification_blocks):
+            raise InsufficientModificationHistoryError(
+                world=self,
+                requested_count=count,
+                available_count=len(model_modification_blocks),
+            )
+        # count == 0 has to be handled explicitly: model_modification_blocks[-0:] is
+        # model_modification_blocks[0:], i.e. the whole list, not an empty slice.
+        blocks_to_roll_back = (
+            list(reversed(model_modification_blocks[-count:])) if count else []
+        )
+        for block in blocks_to_roll_back:
+            with self.modify_world():
+                block.revert(self)
+        return blocks_to_roll_back
+
+    def rollback_to_version(self, version: int) -> List[WorldModelModificationBlock]:
+        """
+        Roll back the world's modification history to the given version, undoing every
+        modification block completed since.
+
+        :param version: The target :attr:`WorldModelManager.version` to roll back to,
+            e.g. taken from an earlier :attr:`WorldModelManager.revision`.
+        :return: The modification blocks that were rolled back, most recent first.
+        :raises InvalidRollbackVersionError: If ``version`` is not a version the world
+            has already reached.
+        """
+        current_version = self._model_manager.version
+        if not 0 <= version <= current_version:
+            raise InvalidRollbackVersionError(
+                world=self,
+                target_version=version,
+                current_version=current_version,
+            )
+        return self.rollback_modification_blocks(current_version - version)
 
     @cached_property
     def ray_tracer(self) -> RayTracer:

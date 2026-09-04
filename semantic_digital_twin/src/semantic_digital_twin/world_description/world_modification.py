@@ -62,6 +62,18 @@ class WorldModification(ABC):
         :param world: The world to modify.
         """
 
+    @abstractmethod
+    def revert(self, world: World):
+        """
+        Apply the inverse of this change to the given world, restoring it to the state
+        it was in before this modification was applied.
+
+        Like :meth:`apply`, reverting a modification is itself recorded in the world's
+        modification history, so the history retains a full account of what happened.
+
+        :param world: The world to modify.
+        """
+
     @classmethod
     @abstractmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]) -> Self:
@@ -138,6 +150,9 @@ class AddKinematicStructureEntityModification(
             )
         world.add_kinematic_structure_entity(self.kinematic_structure_entity)
 
+    def revert(self, world: World):
+        world.remove_kinematic_structure_entity(self.kinematic_structure_entity)
+
     def update_reference_for_world(self, world: World) -> Self:
         return self.__class__(self.kinematic_structure_entity.copy_for_world(world))
 
@@ -153,14 +168,25 @@ class RemoveKinematicStructureEntityModification(WorldModification):
     The UUID of the body that was removed.
     """
 
+    kinematic_structure_entity: Optional[KinematicStructureEntity] = field(
+        default=None, repr=False
+    )
+    """
+    The body that was removed, kept so this modification can be reverted.
+    """
+
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
-        return cls(kwargs["kinematic_structure_entity"].id)
+        kinematic_structure_entity = kwargs["kinematic_structure_entity"]
+        return cls(kinematic_structure_entity.id, kinematic_structure_entity)
 
     def apply(self, world: World):
         world.remove_kinematic_structure_entity(
             world.get_kinematic_structure_entity_by_id(self.kinematic_structure_id)
         )
+
+    def revert(self, world: World):
+        world.add_kinematic_structure_entity(self.kinematic_structure_entity)
 
 
 @dataclass
@@ -197,6 +223,9 @@ class AddConnectionModification(WorldModificationWithWorldEntityReference):
             )
         world.add_connection(self.connection.copy_for_world(world))
 
+    def revert(self, world: World):
+        world.remove_connection(self.connection)
+
     def update_reference_for_world(self, world: World) -> Self:
         return self.__class__(self.connection.copy_for_world(world))
 
@@ -217,14 +246,23 @@ class RemoveConnectionModification(WorldModification):
     The UUIDs of the entities connected by the removed connection.
     """
 
+    connection: Optional[Connection] = field(default=None, repr=False)
+    """
+    The connection that was removed, kept so this modification can be reverted.
+    """
+
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
-        return cls(kwargs["connection"].parent.id, kwargs["connection"].child.id)
+        connection = kwargs["connection"]
+        return cls(connection.parent.id, connection.child.id, connection)
 
     def apply(self, world: World):
         parent = world.get_kinematic_structure_entity_by_id(self.parent_id)
         child = world.get_kinematic_structure_entity_by_id(self.child_id)
         world.remove_connection(world.get_connection(parent, child))
+
+    def revert(self, world: World):
+        world.add_connection(self.connection)
 
 
 @dataclass
@@ -256,6 +294,9 @@ class AddDegreeOfFreedomModification(WorldModificationWithWorldEntityReference):
             )
         world.add_degree_of_freedom(self.degree_of_freedom)
 
+    def revert(self, world: World):
+        world.remove_degree_of_freedom(self.degree_of_freedom)
+
     def update_reference_for_world(self, world: World) -> Self:
         return self.__class__(self.degree_of_freedom.copy_for_world(world))
 
@@ -263,29 +304,103 @@ class AddDegreeOfFreedomModification(WorldModificationWithWorldEntityReference):
 @dataclass
 class RemoveDegreeOfFreedomModification(WorldModification):
 
-    dof_id: UUID
+    degree_of_freedom_id: UUID
+
+    degree_of_freedom: Optional[DegreeOfFreedom] = field(default=None, repr=False)
+    """
+    The degree of freedom that was removed, kept so this modification can be reverted.
+    """
 
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
-        return cls(dof_id=kwargs["dof"].id)
+        dof = kwargs["dof"]
+        return cls(degree_of_freedom_id=dof.id, degree_of_freedom=dof)
 
     def apply(self, world: World):
-        world.remove_degree_of_freedom(world.get_degree_of_freedom_by_id(self.dof_id))
+        world.remove_degree_of_freedom(
+            world.get_degree_of_freedom_by_id(self.degree_of_freedom_id)
+        )
+
+    def revert(self, world: World):
+        world.add_degree_of_freedom(self.degree_of_freedom)
 
 
 @dataclass
 class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerializer):
     semantic_annotation_json: JSONData
 
+    semantic_annotation_id: Optional[UUID] = field(default=None)
+    """
+    The ID of the semantic annotation that was added, kept so this modification can be
+    reverted.
+    """
+
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
-        return cls(semantic_annotation_json=to_json(kwargs["semantic_annotation"]))
+        semantic_annotation = kwargs["semantic_annotation"]
+        return cls(
+            semantic_annotation_json=to_json(semantic_annotation),
+            semantic_annotation_id=semantic_annotation.id,
+        )
 
     @classmethod
     def from_domain_object(cls, domain_object: SemanticAnnotation):
-        return cls(semantic_annotation_json=to_json(domain_object))
+        return cls(
+            semantic_annotation_json=to_json(domain_object),
+            semantic_annotation_id=domain_object.id,
+        )
 
     def apply(self, world: World):
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+        kwargs = tracker.create_kwargs()
+        world.add_semantic_annotation(
+            from_json(self.semantic_annotation_json, **kwargs)
+        )
+
+    def revert(self, world: World):
+        world.remove_semantic_annotation(
+            world.get_semantic_annotation_by_id(self.semantic_annotation_id)
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "semantic_annotation_json": self.semantic_annotation_json,
+            "semantic_annotation_id": to_json(self.semantic_annotation_id),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            semantic_annotation_json=data["semantic_annotation_json"],
+            semantic_annotation_id=from_json(data["semantic_annotation_id"], **kwargs),
+        )
+
+
+@dataclass
+class RemoveSemanticAnnotationModification(WorldModification, SubclassJSONSerializer):
+
+    semantic_annotation_id: UUID
+
+    semantic_annotation_json: Optional[JSONData] = field(default=None)
+    """
+    The semantic annotation that was removed, kept so this modification can be reverted.
+    """
+
+    @classmethod
+    def from_kwargs(cls, kwargs: Dict[str, Any]):
+        semantic_annotation = kwargs["semantic_annotation"]
+        return cls(
+            semantic_annotation_id=semantic_annotation.id,
+            semantic_annotation_json=to_json(semantic_annotation),
+        )
+
+    def apply(self, world: World):
+        world.remove_semantic_annotation(
+            world.get_semantic_annotation_by_id(self.semantic_annotation_id)
+        )
+
+    def revert(self, world: World):
         tracker = WorldEntityWithIDKwargsTracker.from_world(world)
         kwargs = tracker.create_kwargs()
         world.add_semantic_annotation(
@@ -295,26 +410,15 @@ class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerialize
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
+            "semantic_annotation_id": to_json(self.semantic_annotation_id),
             "semantic_annotation_json": self.semantic_annotation_json,
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(semantic_annotation_json=data["semantic_annotation_json"])
-
-
-@dataclass
-class RemoveSemanticAnnotationModification(WorldModification):
-
-    semantic_annotation_id: UUID
-
-    @classmethod
-    def from_kwargs(cls, kwargs: Dict[str, Any]):
-        return cls(semantic_annotation_id=kwargs["semantic_annotation"].id)
-
-    def apply(self, world: World):
-        world.remove_semantic_annotation(
-            world.get_semantic_annotation_by_id(self.semantic_annotation_id)
+        return cls(
+            semantic_annotation_id=from_json(data["semantic_annotation_id"], **kwargs),
+            semantic_annotation_json=data["semantic_annotation_json"],
         )
 
 
@@ -341,6 +445,9 @@ class AddActuatorModification(WorldModificationWithWorldEntityReference):
 
         world.add_actuator(self.actuator)
 
+    def revert(self, world: World):
+        world.remove_actuator(self.actuator)
+
     def update_reference_for_world(self, world: World) -> Self:
         return self.__class__(self.actuator.copy_for_world(world))
 
@@ -349,12 +456,21 @@ class AddActuatorModification(WorldModificationWithWorldEntityReference):
 class RemoveActuatorModification(WorldModification):
     actuator_id: UUID
 
+    actuator: Optional[Actuator] = field(default=None, repr=False)
+    """
+    The actuator that was removed, kept so this modification can be reverted.
+    """
+
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
-        return cls(actuator_id=kwargs["actuator"].id)
+        actuator = kwargs["actuator"]
+        return cls(actuator_id=actuator.id, actuator=actuator)
 
     def apply(self, world: World):
         world.remove_actuator(world.get_actuator_by_id(self.actuator_id))
+
+    def revert(self, world: World):
+        world.add_actuator(self.actuator)
 
 
 @dataclass
@@ -372,6 +488,16 @@ class WorldModelModificationBlock:
     def apply(self, world: World):
         for modification in self.modifications:
             modification.apply(world)
+
+    def revert(self, world: World):
+        """
+        Revert all modifications in this block, most recently applied first, restoring
+        the world to the state it was in before this block was applied.
+
+        :param world: The world to modify.
+        """
+        for modification in reversed(self.modifications):
+            modification.revert(world)
 
     def update_references_for_world_and_apply(self, world: World):
         """
@@ -413,9 +539,34 @@ class WorldModelModificationBlock:
 
 
 @dataclass
+class DegreeOfFreedomHardwareInterfaceValue:
+    """
+    The ``has_hardware_interface`` flag one degree of freedom had at some point in time.
+    """
+
+    degree_of_freedom_id: UUID
+    """
+    The UUID of the degree of freedom.
+    """
+
+    has_hardware_interface: bool
+    """
+    Whether the degree of freedom had a hardware interface.
+    """
+
+
+@dataclass
 class SetDofHasHardwareInterface(WorldModification):
     degree_of_freedom_ids: List[UUID]
     value: bool
+
+    previous_values: List[DegreeOfFreedomHardwareInterfaceValue] = field(
+        default_factory=list
+    )
+    """
+    The ``has_hardware_interface`` value of every affected degree of freedom before this
+    modification was applied, kept so this modification can be reverted.
+    """
 
     def apply(self, world: World):
         for dof_id in self.degree_of_freedom_ids:
@@ -423,11 +574,29 @@ class SetDofHasHardwareInterface(WorldModification):
                 self.value
             )
 
+    def revert(self, world: World):
+        dofs_by_previous_value: Dict[bool, List[DegreeOfFreedom]] = {}
+        for previous_value in self.previous_values:
+            dof = world.get_degree_of_freedom_by_id(previous_value.degree_of_freedom_id)
+            dofs_by_previous_value.setdefault(
+                previous_value.has_hardware_interface, []
+            ).append(dof)
+        for value, dofs in dofs_by_previous_value.items():
+            world.set_dofs_has_hardware_interface(dofs, value)
+
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]) -> Self:
-        dofs = kwargs["dofs"]
-        degree_of_freedom_ids = [dof.id for dof in dofs]
-        return cls(degree_of_freedom_ids=degree_of_freedom_ids, value=kwargs["value"])
+        dofs = list(kwargs["dofs"])
+        return cls(
+            degree_of_freedom_ids=[dof.id for dof in dofs],
+            value=kwargs["value"],
+            previous_values=[
+                DegreeOfFreedomHardwareInterfaceValue(
+                    dof.id, dof.has_hardware_interface
+                )
+                for dof in dofs
+            ],
+        )
 
     def to_json(self) -> Dict[str, Any]:
         return {
@@ -436,6 +605,7 @@ class SetDofHasHardwareInterface(WorldModification):
                 to_json(dof_id) for dof_id in self.degree_of_freedom_ids
             ],
             "value": self.value,
+            "previous_values": to_json(self.previous_values),
         }
 
     @classmethod
@@ -445,6 +615,7 @@ class SetDofHasHardwareInterface(WorldModification):
                 from_json(_id) for _id in data["degree_of_freedom_ids"]
             ],
             value=data["value"],
+            previous_values=from_json(data["previous_values"], **kwargs),
         )
 
 
@@ -484,6 +655,26 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
             else:
                 obj = self._resolve_item(
                     world, from_json(diff.added_values[0], **kwargs)
+                )
+                setattr(entity, diff.attribute_name, obj)
+        world._model_manager.current_model_modification_block.append(self)
+
+    def revert(self, world: World):
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+        kwargs = tracker.create_kwargs()
+        entity = world.get_world_entity_with_id_by_id(self.entity_id)
+        for diff in self.updated_kwargs_json_list:
+            current_value = getattr(entity, diff.attribute_name)
+            if isinstance(current_value, list_like_classes):
+                inverse_diff = JSONAttributeDiff(
+                    attribute_name=diff.attribute_name,
+                    added_values=diff.removed_values,
+                    removed_values=diff.added_values,
+                )
+                self._apply_to_list(current_value, inverse_diff, **kwargs)
+            else:
+                obj = self._resolve_item(
+                    world, from_json(diff.removed_values[0], **kwargs)
                 )
                 setattr(entity, diff.attribute_name, obj)
         world._model_manager.current_model_modification_block.append(self)

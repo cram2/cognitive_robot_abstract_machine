@@ -21,6 +21,7 @@ from robokudo.utils.camera_model import (
     pinhole_camera_parameters_from_horizontal_field_of_view,
 )
 from robokudo.utils.module_loader import ModuleLoader
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
@@ -78,7 +79,8 @@ class SemDTRayTracerCameraInterface(CameraInterface):
             optical_camera_to_world,
         ) = self._set_camera_pose(world, world_frame_body, camera_body)
 
-        resolution = int(self.camera_config.resolution)
+        image_size = int(self.camera_config.resolution)
+        resolution = CameraResolution(width=image_size, height=image_size)
         fov_deg = float(self.camera_config.fov_deg)
         field_of_view = FieldOfView(
             horizontal_angle=np.radians(fov_deg), vertical_angle=np.radians(fov_deg)
@@ -108,7 +110,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
 
         camera_info, camera_intrinsic = self._build_camera_models(
             frame_id=self.camera_config.camera_frame,
-            resolution=resolution,
+            resolution=image_size,
             fov_deg=fov_deg,
         )
 
@@ -266,7 +268,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
     def _render_segmentation_and_depth(
         ray_tracer: RayTracer,
         camera_to_world: HomogeneousTransformationMatrix,
-        resolution: int,
+        resolution: CameraResolution,
         field_of_view: FieldOfView,
         min_distance: float,
         max_distance: float,
@@ -277,14 +279,18 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         :param ray_tracer: Renderer that creates camera rays and returns their scene
             intersections.
         :param camera_to_world: Camera pose used by the RayTracer renderer.
-        :param resolution: Square image resolution.
+        :param resolution: Image resolution.
         :param field_of_view: Camera field of view.
         :param min_distance: Minimum valid ray-hit distance.
         :param max_distance: Maximum valid ray-hit distance.
         :return: Segmentation indices and depth image in meters.
         """
-        segmentation = np.zeros((resolution, resolution), dtype=np.int32) - 1
-        depth_m = np.zeros((resolution, resolution), dtype=np.float32) - 1.0
+        segmentation = (
+            np.zeros((resolution.width, resolution.height), dtype=np.int32) - 1
+        )
+        depth_m = (
+            np.zeros((resolution.width, resolution.height), dtype=np.float32) - 1.0
+        )
 
         ray_origins, ray_directions, pixels = ray_tracer.create_camera_rays(
             camera_to_world, resolution=resolution, field_of_view=field_of_view
@@ -334,7 +340,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         ray_tracer,
         camera_to_world: HomogeneousTransformationMatrix,
         segmentation: np.ndarray,
-        resolution: int,
+        resolution: CameraResolution,
         field_of_view: FieldOfView,
     ) -> Tuple[np.ndarray, Dict[str, str]]:
         """
@@ -344,7 +350,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         :param ray_tracer: SemDT ray tracer used for optional mesh rendering.
         :param camera_to_world: Camera pose used by the RayTracer renderer.
         :param segmentation: Body-index segmentation image.
-        :param resolution: Square image resolution.
+        :param resolution: Image resolution.
         :param field_of_view: Camera field of view.
         :return: BGR image and optional RGB-to-object-name color map.
         """
@@ -371,7 +377,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         self,
         ray_tracer,
         camera_to_world: HomogeneousTransformationMatrix,
-        resolution: int,
+        resolution: CameraResolution,
         field_of_view: FieldOfView,
     ) -> np.ndarray | None:
         """
@@ -379,7 +385,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
 
         :param ray_tracer: SemDT ray tracer that owns the Trimesh scene.
         :param camera_to_world: Camera pose used by the RayTracer renderer.
-        :param resolution: Square image resolution.
+        :param resolution: Image resolution.
         :param field_of_view: Camera field of view.
         :return: BGR image when rendering succeeds, otherwise ``None``.
         """
@@ -389,7 +395,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
                 camera_to_world, resolution=resolution, field_of_view=field_of_view
             )
             png_data = ray_tracer.scene.save_image(
-                resolution=(resolution, resolution), visible=False
+                resolution=(resolution.width, resolution.height), visible=False
             )
             image = np.array(PILImage.open(io.BytesIO(png_data)).convert("RGB"))
             return image[:, :, ::-1].copy()

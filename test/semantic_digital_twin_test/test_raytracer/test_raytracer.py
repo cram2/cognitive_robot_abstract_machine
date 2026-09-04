@@ -1,5 +1,8 @@
 import numpy as np
+import pytest
 
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.exceptions import InvalidCameraResolutionError
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -27,11 +30,12 @@ def test_create_segmentation_mask(ray_test_world):
         child_frame=body2,
     )
 
+    resolution = CameraResolution(width=256, height=256)
     seg = rt.create_segmentation_mask(
         HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
-        resolution=256,
+        resolution=resolution,
     )
-    assert seg.shape == (256, 256)  # Assuming a standard resolution
+    assert seg.shape == (resolution.width, resolution.height)
 
     hit, index, body = rt.ray_test(np.array([1, 0, 1]), np.array([-1, 0, 1]))
     assert hit is not None
@@ -55,15 +59,95 @@ def test_create_depth_map(ray_test_world):
         ]
     )
 
+    resolution = CameraResolution(width=512, height=512)
     depth_map = rt.create_depth_map(
         HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
-        resolution=512,
+        resolution=resolution,
     )
     assert depth_map is not None
     assert depth_map[0, 0] == -1  # Assuming no objects are hit at the upper left corner
-    assert depth_map.shape == (512, 512)
+    assert depth_map.shape == (resolution.width, resolution.height)
     assert depth_map.max() <= 2.5
     assert depth_map[depth_map > 0].min() >= 2.375
+
+
+def test_create_camera_rays_with_rectangular_resolution(ray_test_world):
+    world, *_ = ray_test_world
+    ray_tracer = RayTracer(world)
+
+    camera_pose = np.eye(4, dtype=float)
+    camera_pose[:3, 3] = [-2.5, 0.0, 0.0]
+
+    resolution = CameraResolution(width=128, height=64)
+    ray_origins, ray_directions, pixels = ray_tracer.create_camera_rays(
+        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        resolution=resolution,
+    )
+
+    assert ray_origins.shape == (resolution.width * resolution.height, 3)
+    assert ray_directions.shape == (resolution.width * resolution.height, 3)
+    assert pixels.shape == (resolution.width * resolution.height, 2)
+    assert set(pixels[:, 0]) == set(range(resolution.width))
+    assert set(pixels[:, 1]) == set(range(resolution.height))
+
+
+def test_create_segmentation_mask_with_rectangular_resolution(ray_test_world):
+    world, *_ = ray_test_world
+    ray_tracer = RayTracer(world)
+
+    camera_pose = np.array(
+        [
+            [1.0, 0.0, 0.0, -2.5],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.2],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+
+    resolution = CameraResolution(width=128, height=64)
+    segmentation_mask = ray_tracer.create_segmentation_mask(
+        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        resolution=resolution,
+    )
+
+    assert segmentation_mask.shape == (resolution.width, resolution.height)
+
+
+def test_create_depth_map_with_rectangular_resolution(ray_test_world):
+    world, *_ = ray_test_world
+    ray_tracer = RayTracer(world)
+
+    camera_pose = np.array(
+        [
+            [1.0, 0.0, 0.0, -2.5],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+
+    resolution = CameraResolution(width=128, height=64)
+    depth_map = ray_tracer.create_depth_map(
+        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        resolution=resolution,
+    )
+
+    assert depth_map.shape == (resolution.width, resolution.height)
+
+
+def test_camera_resolution_defaults_to_square_resolution():
+    resolution = CameraResolution()
+
+    assert resolution == CameraResolution(width=512, height=512)
+
+
+@pytest.mark.parametrize(
+    ("width", "height"),
+    [(0, 64), (-1, 64), (64, 0), (64, -1)],
+)
+def test_non_positive_camera_resolution_raises_domain_exception(width, height):
+    with pytest.raises(InvalidCameraResolutionError):
+        CameraResolution(width=width, height=height)
 
 
 def test_ray_test(ray_test_world):
