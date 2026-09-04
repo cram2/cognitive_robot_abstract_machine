@@ -109,3 +109,57 @@ class UndeterminedLatentsPartitionOverlapsError(DataclassException):
             "Refit the template so these latents are split on, or use "
             "GroundingMode.CAUSAL_SAMPLED instead."
         )
+
+
+@dataclass
+class VariableNotFoundError(DataclassException):
+    """
+    Raised when a dotted access path does not match any variable in a grounded circuit.
+    """
+
+    path: str
+    """
+    The access path that failed to resolve.
+    """
+
+    available_variables: List[Variable]
+    """
+    The variables the grounded circuit actually has, for diagnosis.
+    """
+
+    def error_message(self) -> str:
+        names = ", ".join(variable.name for variable in self.available_variables)
+        return (
+            f"No variable's name matches '{self.path}'. Available variables: [{names}]."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check the access path against the grounded circuit's actual variable "
+            "names, e.g. 'objects[0].type' or 'chair_count()'."
+        )
+
+
+@dataclass
+class AmbiguousVariablePathError(DataclassException):
+    """
+    Raised when a dotted access path matches more than one variable in a grounded
+    circuit.
+    """
+
+    path: str
+    """
+    The access path that matched more than one variable.
+    """
+
+    matches: List[Variable]
+    """
+    The variables that matched.
+    """
+
+    def error_message(self) -> str:
+        names = ", ".join(variable.name for variable in self.matches)
+        return f"'{self.path}' matches more than one variable: [{names}]."
+
+    def suggest_correction(self) -> str:
+        return "Use a longer, more specific suffix of the variable's full name."
