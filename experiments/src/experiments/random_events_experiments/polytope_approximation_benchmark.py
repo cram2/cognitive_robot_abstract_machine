@@ -17,6 +17,7 @@ import time
 from dataclasses import dataclass
 
 import numpy as np
+import numpy.typing as npt
 import tqdm
 
 from experiments.experiment_definitions import (
@@ -27,29 +28,38 @@ from experiments.experiment_definitions import (
 from random_events.polytope import Polytope
 
 
-def random_hull_points(n: int, dim: int, seed: int) -> np.ndarray:
+def random_hull_points(
+    number_of_points: int, number_of_dimensions: int, seed: int
+) -> npt.NDArray[np.float64]:
     """
-    :param n: Number of points to sample.
-    :param dim: Dimensionality of each point.
+    :param number_of_points: Number of points to sample.
+    :param number_of_dimensions: Dimensionality of each point.
     :param seed: Seed for the random number generator.
-    :return: ``n`` points sampled on/within a sphere shell in ``dim`` dimensions,
-        whose convex hull is a well-conditioned full-dimensional polytope.
+    :return: ``number_of_points`` points sampled on/within a sphere shell in
+        ``number_of_dimensions`` dimensions, whose convex hull is a well-conditioned
+        full-dimensional polytope.
     """
-    rng = np.random.default_rng(seed)
-    points = rng.normal(size=(n, dim))
+    random_number_generator = np.random.default_rng(seed)
+    points = random_number_generator.normal(
+        size=(number_of_points, number_of_dimensions)
+    )
     points /= np.linalg.norm(points, axis=1, keepdims=True)
-    points *= rng.uniform(0.5, 1.0, size=(n, 1))
+    points *= random_number_generator.uniform(0.5, 1.0, size=(number_of_points, 1))
     return points
 
 
-def make_polytope(n: int, dim: int, seed: int) -> Polytope:
+def make_polytope(
+    number_of_points: int, number_of_dimensions: int, seed: int
+) -> Polytope:
     """
-    :param n: Number of points the polytope's convex hull is built from.
-    :param dim: Dimensionality of the polytope.
+    :param number_of_points: Number of points the polytope's convex hull is built from.
+    :param number_of_dimensions: Dimensionality of the polytope.
     :param seed: Seed for the random number generator.
     :return: A random polytope, see :func:`random_hull_points`.
     """
-    return Polytope.from_points(random_hull_points(n, dim, seed))
+    return Polytope.from_points(
+        random_hull_points(number_of_points, number_of_dimensions, seed)
+    )
 
 
 @dataclass
@@ -61,17 +71,17 @@ class PolytopeApproximationBenchmarkResult(ExperimentResult):
     randomly generated polytope.
     """
 
-    dim: int
+    number_of_dimensions: int
     """
     Dimensionality of the measured polytope.
     """
 
-    n_points: int
+    number_of_points: int
     """
     Number of points the polytope's convex hull was built from.
     """
 
-    n_facets: int
+    number_of_facets: int
     """
     Number of facets (inequalities) of the polytope.
     """
@@ -128,19 +138,22 @@ class PolytopeApproximationBenchmarkResult(ExperimentResult):
 
 
 def run_benchmark(
-    dim: int, n_points: int, min_volume_fraction: float, seed: int = 42
+    number_of_dimensions: int,
+    number_of_points: int,
+    min_volume_fraction: float,
+    seed: int = 42,
 ) -> PolytopeApproximationBenchmarkResult:
     """
     Measure a single randomly generated polytope.
 
-    :param dim: Dimensionality of the polytope to generate.
-    :param n_points: Number of points the polytope's convex hull is built from.
+    :param number_of_dimensions: Dimensionality of the polytope to generate.
+    :param number_of_points: Number of points the polytope's convex hull is built from.
     :param min_volume_fraction: ``min_volume`` passed to ``inner_box_approximation``/
         ``outer_box_approximation``, as a fraction of the polytope's volume.
     :param seed: Seed for the random number generator the polytope is sampled with.
     :return: Timing and approximation-quality measurements for this polytope.
     """
-    polytope = make_polytope(n_points, dim, seed)
+    polytope = make_polytope(number_of_points, number_of_dimensions, seed)
     volume = polytope.volume
     min_volume = volume * min_volume_fraction
 
@@ -157,9 +170,9 @@ def run_benchmark(
     outer_box_approximation_duration = time.perf_counter() - begin
 
     return PolytopeApproximationBenchmarkResult(
-        dim=dim,
-        n_points=n_points,
-        n_facets=polytope.A.shape[0],
+        number_of_dimensions=number_of_dimensions,
+        number_of_points=number_of_points,
+        number_of_facets=polytope.A.shape[0],
         volume=volume,
         min_volume_fraction=min_volume_fraction,
         maximum_inner_box_duration=maximum_inner_box_duration,
@@ -172,17 +185,54 @@ def run_benchmark(
     )
 
 
+@dataclass
+class PolytopeApproximationBenchmarkSweep:
+    """
+    One sweep of :func:`run_benchmark` over a range of point counts, at a fixed
+    dimensionality and minimum-volume fraction.
+    """
+
+    number_of_dimensions: int
+    """
+    Dimensionality of every polytope generated in this sweep.
+    """
+
+    point_counts: list[int]
+    """
+    Point counts to run :func:`run_benchmark` with, one measurement each.
+    """
+
+    min_volume_fraction: float
+    """
+    ``min_volume_fraction`` passed to every measurement in this sweep.
+    """
+
+
 def main():
-    configs = [
-        # (dim, [n_points...], min_volume_fraction)
-        (2, [10, 25, 50, 100], 0.1),
-        (3, [10, 20, 30], 0.2),
+    sweeps = [
+        PolytopeApproximationBenchmarkSweep(
+            number_of_dimensions=2,
+            point_counts=[10, 25, 50, 100],
+            min_volume_fraction=0.1,
+        ),
+        PolytopeApproximationBenchmarkSweep(
+            number_of_dimensions=3,
+            point_counts=[10, 20, 30],
+            min_volume_fraction=0.2,
+        ),
     ]
 
     results = []
-    for dim, sizes, min_volume_fraction in configs:
-        for n_points in tqdm.tqdm(sizes, desc=f"{dim}D polytopes"):
-            results.append(run_benchmark(dim, n_points, min_volume_fraction))
+    for sweep in sweeps:
+        description = f"{sweep.number_of_dimensions}D polytopes"
+        for number_of_points in tqdm.tqdm(sweep.point_counts, desc=description):
+            results.append(
+                run_benchmark(
+                    sweep.number_of_dimensions,
+                    number_of_points,
+                    sweep.min_volume_fraction,
+                )
+            )
     table = ExperimentsTable(results)
 
     print(
