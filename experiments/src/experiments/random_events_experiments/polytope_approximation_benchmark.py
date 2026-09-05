@@ -1,6 +1,5 @@
 """
-Benchmark for :meth:`~random_events.polytope.Polytope.maximum_inner_box`,
-:meth:`~random_events.polytope.Polytope.inner_box_approximation` and
+Benchmark for :meth:`~random_events.polytope.Polytope.inner_box_approximation` and
 :meth:`~random_events.polytope.Polytope.outer_box_approximation` on 2D and 3D
 polytopes.
 
@@ -67,46 +66,25 @@ def exact_volume(points: npt.NDArray[np.float64]) -> float:
 @dataclass
 class PolytopeApproximationBenchmarkResult(ExperimentResult):
     """
-    One measurement of :meth:`~random_events.polytope.Polytope.maximum_inner_box`,
-    :meth:`~random_events.polytope.Polytope.inner_box_approximation` and
-    :meth:`~random_events.polytope.Polytope.outer_box_approximation` on a single
+    One measurement of :meth:`~random_events.polytope.Polytope.inner_box_approximation`
+    and :meth:`~random_events.polytope.Polytope.outer_box_approximation` on a single
     randomly generated polytope.
-    """
-
-    number_of_dimensions: int
-    """
-    Dimensionality of the measured polytope.
-    """
-
-    number_of_points: int
-    """
-    Number of points the polytope's convex hull was built from.
     """
 
     number_of_facets: int
     """
-    Number of facets (inequalities) of the polytope.
+    Number of facets (inequalities) of the measured polytope.
     """
 
     volume: float
     """
-    Exact volume of the polytope, see :func:`exact_volume`.
+    Exact volume of the measured polytope, see :func:`exact_volume`.
     """
 
-    min_volume_fraction: float
+    min_volume: float
     """
-    ``min_volume`` passed to ``inner_box_approximation``/``outer_box_approximation``,
-    as a fraction of :attr:`volume`.
-    """
-
-    maximum_inner_box_duration: float
-    """
-    Time spent computing the single largest inscribed box, in seconds.
-    """
-
-    inner_box_approximation_duration: float
-    """
-    Time spent computing the inner box approximation, in seconds.
+    The minimum-volume threshold passed to both ``inner_box_approximation`` and
+    ``outer_box_approximation``.
     """
 
     inner_box_count: int
@@ -121,9 +99,9 @@ class PolytopeApproximationBenchmarkResult(ExperimentResult):
     a subset of the polytope.
     """
 
-    outer_box_approximation_duration: float
+    inner_box_approximation_duration: float
     """
-    Time spent computing the outer box approximation, in seconds.
+    Time spent computing the inner box approximation, in seconds.
     """
 
     outer_box_count: int
@@ -138,6 +116,11 @@ class PolytopeApproximationBenchmarkResult(ExperimentResult):
     approximation is a superset of the polytope.
     """
 
+    outer_box_approximation_duration: float
+    """
+    Time spent computing the outer box approximation, in seconds.
+    """
+
 
 def run_benchmark(
     number_of_dimensions: int,
@@ -150,8 +133,9 @@ def run_benchmark(
 
     :param number_of_dimensions: Dimensionality of the polytope to generate.
     :param number_of_points: Number of points the polytope's convex hull is built from.
-    :param min_volume_fraction: ``min_volume`` passed to ``inner_box_approximation``/
-        ``outer_box_approximation``, as a fraction of the polytope's volume.
+    :param min_volume_fraction: The minimum-volume threshold passed to
+        ``inner_box_approximation``/``outer_box_approximation``, as a fraction of the
+        polytope's volume.
     :param seed: Seed for the random number generator the polytope is sampled with.
     :return: Timing and approximation-quality measurements for this polytope.
     """
@@ -159,10 +143,6 @@ def run_benchmark(
     polytope = Polytope.from_points(points)
     volume = exact_volume(points)
     min_volume = volume * min_volume_fraction
-
-    begin = time.perf_counter()
-    polytope.maximum_inner_box()
-    maximum_inner_box_duration = time.perf_counter() - begin
 
     begin = time.perf_counter()
     inner_event = polytope.inner_box_approximation(min_volume)
@@ -173,18 +153,15 @@ def run_benchmark(
     outer_box_approximation_duration = time.perf_counter() - begin
 
     return PolytopeApproximationBenchmarkResult(
-        number_of_dimensions=number_of_dimensions,
-        number_of_points=number_of_points,
         number_of_facets=polytope.A.shape[0],
         volume=volume,
-        min_volume_fraction=min_volume_fraction,
-        maximum_inner_box_duration=maximum_inner_box_duration,
-        inner_box_approximation_duration=inner_box_approximation_duration,
+        min_volume=min_volume,
         inner_box_count=len(inner_event.simple_sets),
         inner_volume_diff=volume - inner_event.size,
-        outer_box_approximation_duration=outer_box_approximation_duration,
+        inner_box_approximation_duration=inner_box_approximation_duration,
         outer_box_count=len(outer_event.simple_sets),
         outer_volume_diff=outer_event.size - volume,
+        outer_box_approximation_duration=outer_box_approximation_duration,
     )
 
 
@@ -240,14 +217,14 @@ def main():
 
     print(
         TypstRenderer(table, reported_decimals=4).render_figure(
-            "Timings and approximation quality of Polytope.maximum_inner_box, "
-            "inner_box_approximation and outer_box_approximation on convex hulls of "
-            "random point clouds in 2D and 3D, with min_volume set to "
-            "min_volume_fraction times the polytope's volume. inner_volume_diff and "
-            "outer_volume_diff are the exact gap between the polytope's volume and "
-            "the volume covered by its box approximation: inner_box_approximation is "
-            "a subset of the polytope so it can only under-cover, and "
-            "outer_box_approximation is a superset so it can only over-cover."
+            "Timings and approximation quality of inner_box_approximation and "
+            "outer_box_approximation on convex hulls of random point clouds in 2D "
+            "and 3D. min_volume is the minimum-volume threshold passed to both "
+            "algorithms. inner_volume_diff and outer_volume_diff are the exact gap "
+            "between the polytope's volume and the volume covered by its box "
+            "approximation: inner_box_approximation is a subset of the polytope so "
+            "it can only under-cover, and outer_box_approximation is a superset so "
+            "it can only over-cover."
         )
     )
 
