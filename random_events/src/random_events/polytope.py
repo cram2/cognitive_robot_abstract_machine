@@ -1,6 +1,5 @@
 import itertools
 from collections import deque
-from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -120,9 +119,8 @@ class Polytope(polytope.Polytope):
 
     def is_box(
         self,
-        bounds: Optional[
-            Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]
-        ] = None,
+        lower: npt.NDArray[np.float64],
+        upper: npt.NDArray[np.float64],
         tolerance: float = 1e-7,
     ) -> bool:
         """
@@ -135,18 +133,11 @@ class Polytope(polytope.Polytope):
         single matrix multiplication instead of polytope's LP-based set-difference
         machinery, which dominates the runtime of `outer_box_approximation`.
 
-        :param bounds: The polytope's bounding box, as the ``(lower, upper)`` tuple
-            `self.bounding_box` returns. Computed from `self.bounding_box` if not
-            given. Bundled into a single tuple (rather than two independent
-            ``lower``/``upper`` parameters) since the two are never meaningful on
-            their own: a caller cannot supply just one without the other silently
-            being recomputed and the supplied one discarded.
+        :param lower: The lower bounds of the polytope's bounding box.
+        :param upper: The upper bounds of the polytope's bounding box.
         :param tolerance: The numerical tolerance for the inequality check.
         :return: Whether this polytope equals its own bounding box.
         """
-        if bounds is None:
-            bounds = self.bounding_box
-        lower, upper = bounds
         corners = np.array(
             list(itertools.product(*zip(lower.flatten(), upper.flatten())))
         )
@@ -197,7 +188,7 @@ class Polytope(polytope.Polytope):
             volume = np.prod(upper - lower)
 
             # if the box is too small, or the polytope is already box-shaped, skip
-            if volume < minimum_volume or current_polytope.is_box((lower, upper)):
+            if volume < minimum_volume or current_polytope.is_box(lower, upper):
                 resulting_boxes.append(current_polytope)
                 continue
 
