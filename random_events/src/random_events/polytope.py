@@ -220,33 +220,44 @@ class Polytope(polytope.Polytope):
         minima, maxima = self.bounding_box
         minima = minima.flatten()
         maxima = maxima.flatten()
+        number_of_dimensions = len(minima)
 
         solver = pywraplp.Solver.CreateSolver("GLOP")
+        infinity = solver.infinity()
 
         # create variables for the dimensions of the inner box approximation (x_0, x_1, ..., x_n)
         dimension_variables = [
-            solver.NumVar(minimum, maximum, f"x_{i}")
-            for i, (minimum, maximum) in enumerate(zip(minima, maxima))
+            solver.NumVar(minima[i], maxima[i], "") for i in range(number_of_dimensions)
         ]
 
         # create the scale variable (lambda in the paper)
-        scale = solver.NumVar(0, 1, "scale")
+        scale = solver.NumVar(0, 1, "")
 
         # set the goal to maximize lambda
-        solver.Maximize(scale)
+        objective = solver.Objective()
+        objective.SetCoefficient(scale, 1.0)
+        objective.SetMaximization()
 
         # create the guess for the r vector
         scale_of_box = maxima - minima
 
-        # create the matrix A^+
+        # create the matrix A^+ and, per facet, the scalar coefficient on `scale`
+        # (a_positive_row . scale_of_box)
         a_positive = np.maximum(0, self.A)
+        scale_coefficients = a_positive @ scale_of_box
 
-        # create the constraints from proposition 2
-        for a, a_positive, b in zip(self.A, a_positive, self.b):
-            solver.Add(
-                sum(a * dimension_variables) + sum(a_positive * scale_of_box * scale)
-                <= b
-            )
+        # create the constraints from proposition 2, via the low-level Constraint API
+        # (SetCoefficient per nonzero term) instead of OR-Tools' operator-overloaded
+        # LinearExpr API (`sum(a * dimension_variables) + ...`). Building one constraint
+        # per facet this way avoids most of the per-call Python-level LinearExpr object
+        # construction/dispatch overhead of the operator-overloaded form, which
+        # dominates this function's runtime -- the LP solve itself is fast either way.
+        for row, scale_coefficient, b in zip(self.A, scale_coefficients, self.b):
+            constraint = solver.Constraint(-infinity, float(b))
+            for j in range(number_of_dimensions):
+                if row[j] != 0.0:
+                    constraint.SetCoefficient(dimension_variables[j], float(row[j]))
+            constraint.SetCoefficient(scale, float(scale_coefficient))
 
         # solve the problem
         status = solver.Solve()
