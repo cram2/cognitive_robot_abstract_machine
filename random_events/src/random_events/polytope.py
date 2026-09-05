@@ -3,6 +3,7 @@ from collections import deque
 from typing import Optional
 
 import numpy as np
+import numpy.typing as npt
 import polytope
 from ortools.linear_solver import pywraplp
 from scipy.spatial import ConvexHull
@@ -39,7 +40,7 @@ class Polytope(polytope.Polytope):
         return cls(polytope_.A, polytope_.b)
 
     @classmethod
-    def from_points(cls, points: np.ndarray) -> Self:
+    def from_points(cls, points: npt.NDArray[np.float64]) -> Self:
         """
         Create a polytope from a set of points, by computing the convex hull of the
         points and using the hull's facet equations as the polytope's inequalities.
@@ -86,7 +87,9 @@ class Polytope(polytope.Polytope):
         ).make_disjoint()
 
     @classmethod
-    def _box_polytope_from_bounds(cls, lower: np.ndarray, upper: np.ndarray) -> Self:
+    def _box_polytope_from_bounds(
+        cls, lower: npt.NDArray[np.float64], upper: npt.NDArray[np.float64]
+    ) -> Self:
         """
         Build a box-shaped polytope from already-known per-dimension bounds, and
         pre-populate its bounding-box and volume caches (`bbox`/`_volume`, read by the
@@ -117,8 +120,9 @@ class Polytope(polytope.Polytope):
 
     def is_box(
         self,
-        lower: Optional[np.ndarray] = None,
-        upper: Optional[np.ndarray] = None,
+        bounds: Optional[
+            Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]
+        ] = None,
         tolerance: float = 1e-7,
     ) -> bool:
         """
@@ -131,15 +135,18 @@ class Polytope(polytope.Polytope):
         single matrix multiplication instead of polytope's LP-based set-difference
         machinery, which dominates the runtime of `outer_box_approximation`.
 
-        :param lower: The lower bounds of the bounding box. Computed from
-            `self.bounding_box` if not given.
-        :param upper: The upper bounds of the bounding box. Computed from
-            `self.bounding_box` if not given.
+        :param bounds: The polytope's bounding box, as the ``(lower, upper)`` tuple
+            `self.bounding_box` returns. Computed from `self.bounding_box` if not
+            given. Bundled into a single tuple (rather than two independent
+            ``lower``/``upper`` parameters) since the two are never meaningful on
+            their own: a caller cannot supply just one without the other silently
+            being recomputed and the supplied one discarded.
         :param tolerance: The numerical tolerance for the inequality check.
         :return: Whether this polytope equals its own bounding box.
         """
-        if lower is None or upper is None:
-            lower, upper = self.bounding_box
+        if bounds is None:
+            bounds = self.bounding_box
+        lower, upper = bounds
         corners = np.array(
             list(itertools.product(*zip(lower.flatten(), upper.flatten())))
         )
@@ -190,7 +197,7 @@ class Polytope(polytope.Polytope):
             volume = np.prod(upper - lower)
 
             # if the box is too small, or the polytope is already box-shaped, skip
-            if volume < minimum_volume or current_polytope.is_box(lower, upper):
+            if volume < minimum_volume or current_polytope.is_box((lower, upper)):
                 resulting_boxes.append(current_polytope)
                 continue
 
