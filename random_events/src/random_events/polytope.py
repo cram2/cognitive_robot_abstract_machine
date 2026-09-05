@@ -6,7 +6,7 @@ import numpy.typing as npt
 import polytope
 from ortools.linear_solver import pywraplp
 from scipy.spatial import ConvexHull
-from typing_extensions import Self, Tuple
+from typing_extensions import List, Self, Tuple
 
 from random_events.interval import closed_open
 from random_events.product_algebra import Event, SimpleEvent, Continuous
@@ -207,6 +207,46 @@ class Polytope(polytope.Polytope):
             *[box.to_simple_event() for box in resulting_boxes]
         ).make_disjoint()
 
+    def _create_maximum_inner_box_constraints(
+        self,
+        solver: pywraplp.Solver,
+        dimension_variables: List[pywraplp.Variable],
+        scale: pywraplp.Variable,
+        scale_of_box: npt.NDArray[np.float64],
+    ) -> None:
+        """
+        Add `maximum_inner_box`'s per-facet constraints (Proposition 2 of the paper
+        referenced there) to `solver`.
+
+        For every facet ``a . x <= b`` of this polytope, adds the constraint::
+
+            a . dimension_variables + (max(a, 0) . scale_of_box) * scale <= b
+
+        Built via OR-Tools' low-level ``Constraint`` API (``SetCoefficient`` per
+        nonzero term) rather than its operator-overloaded ``LinearExpr`` API
+        (``sum(a * dimension_variables) + ...``): rebuilding one constraint per facet
+        with the latter spends most of its time in Python-level ``LinearExpr`` object
+        construction and dispatch rather than in the LP solve itself, which dominates
+        `maximum_inner_box`'s runtime.
+
+        :param solver: The solver the constraints are added to.
+        :param dimension_variables: One LP variable per dimension of this polytope,
+            representing the inner box's lower corner.
+        :param scale: The LP variable scaling `scale_of_box` from that lower corner to
+            the inner box's upper corner (lambda in the paper).
+        :param scale_of_box: The bounding box's per-dimension side length, i.e.
+            ``maxima - minima``.
+        """
+        infinity = solver.infinity()
+        a_positive = np.maximum(0, self.A)
+        scale_coefficients = a_positive @ scale_of_box
+        for row, scale_coefficient, b in zip(self.A, scale_coefficients, self.b):
+            constraint = solver.Constraint(-infinity, float(b))
+            for j, coefficient in enumerate(row):
+                if coefficient != 0.0:
+                    constraint.SetCoefficient(dimension_variables[j], float(coefficient))
+            constraint.SetCoefficient(scale, float(scale_coefficient))
+
     def maximum_inner_box(self) -> Self:
         """
         Compute the maximum single inner box approximation of the polytope.
@@ -223,7 +263,6 @@ class Polytope(polytope.Polytope):
         number_of_dimensions = len(minima)
 
         solver = pywraplp.Solver.CreateSolver("GLOP")
-        infinity = solver.infinity()
 
         # create variables for the dimensions of the inner box approximation (x_0, x_1, ..., x_n)
         dimension_variables = [
@@ -241,23 +280,9 @@ class Polytope(polytope.Polytope):
         # create the guess for the r vector
         scale_of_box = maxima - minima
 
-        # create the matrix A^+ and, per facet, the scalar coefficient on `scale`
-        # (a_positive_row . scale_of_box)
-        a_positive = np.maximum(0, self.A)
-        scale_coefficients = a_positive @ scale_of_box
-
-        # create the constraints from proposition 2, via the low-level Constraint API
-        # (SetCoefficient per nonzero term) instead of OR-Tools' operator-overloaded
-        # LinearExpr API (`sum(a * dimension_variables) + ...`). Building one constraint
-        # per facet this way avoids most of the per-call Python-level LinearExpr object
-        # construction/dispatch overhead of the operator-overloaded form, which
-        # dominates this function's runtime -- the LP solve itself is fast either way.
-        for row, scale_coefficient, b in zip(self.A, scale_coefficients, self.b):
-            constraint = solver.Constraint(-infinity, float(b))
-            for j in range(number_of_dimensions):
-                if row[j] != 0.0:
-                    constraint.SetCoefficient(dimension_variables[j], float(row[j]))
-            constraint.SetCoefficient(scale, float(scale_coefficient))
+        self._create_maximum_inner_box_constraints(
+            solver, dimension_variables, scale, scale_of_box
+        )
 
         # solve the problem
         status = solver.Solve()
