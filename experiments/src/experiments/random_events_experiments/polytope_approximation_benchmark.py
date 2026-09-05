@@ -19,6 +19,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 import tqdm
+from scipy.spatial import ConvexHull
 
 from experiments.experiment_definitions import (
     ExperimentResult,
@@ -48,18 +49,19 @@ def random_hull_points(
     return points
 
 
-def make_polytope(
-    number_of_points: int, number_of_dimensions: int, seed: int
-) -> Polytope:
+def exact_volume(points: npt.NDArray[np.float64]) -> float:
     """
-    :param number_of_points: Number of points the polytope's convex hull is built from.
-    :param number_of_dimensions: Dimensionality of the polytope.
-    :param seed: Seed for the random number generator.
-    :return: A random polytope, see :func:`random_hull_points`.
+    :param points: The points a polytope's convex hull was built from.
+    :return: The exact volume of the convex hull of ``points``, computed by scipy's
+        ``ConvexHull`` (a deterministic simplicial decomposition) rather than
+        ``Polytope.volume``, which is a randomized Monte-Carlo estimate. This is the
+        ground truth :attr:`PolytopeApproximationBenchmarkResult.inner_volume_diff`
+        and :attr:`PolytopeApproximationBenchmarkResult.outer_volume_diff` are measured
+        against, so it needs to be exact rather than approximate: any noise in it would
+        otherwise leak into both diffs and make them unreliable as a measure of the box
+        approximations' own error.
     """
-    return Polytope.from_points(
-        random_hull_points(number_of_points, number_of_dimensions, seed)
-    )
+    return ConvexHull(points).volume
 
 
 @dataclass
@@ -88,7 +90,7 @@ class PolytopeApproximationBenchmarkResult(ExperimentResult):
 
     volume: float
     """
-    Monte-Carlo estimate of the polytope's volume (``Polytope.volume``).
+    Exact volume of the polytope, see :func:`exact_volume`.
     """
 
     min_volume_fraction: float
@@ -153,8 +155,9 @@ def run_benchmark(
     :param seed: Seed for the random number generator the polytope is sampled with.
     :return: Timing and approximation-quality measurements for this polytope.
     """
-    polytope = make_polytope(number_of_points, number_of_dimensions, seed)
-    volume = polytope.volume
+    points = random_hull_points(number_of_points, number_of_dimensions, seed)
+    polytope = Polytope.from_points(points)
+    volume = exact_volume(points)
     min_volume = volume * min_volume_fraction
 
     begin = time.perf_counter()
@@ -212,12 +215,12 @@ def main():
     sweeps = [
         PolytopeApproximationBenchmarkSweep(
             number_of_dimensions=2,
-            point_counts=[10, 25, 50, 100],
+            point_counts=[10, 25, 50, 100, 200, 400, 800],
             min_volume_fraction=0.1,
         ),
         PolytopeApproximationBenchmarkSweep(
             number_of_dimensions=3,
-            point_counts=[10, 20, 30],
+            point_counts=[10, 20, 30, 50, 75, 100, 150, 200],
             min_volume_fraction=0.2,
         ),
     ]
