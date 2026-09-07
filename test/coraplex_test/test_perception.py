@@ -26,7 +26,9 @@ from typing_extensions import List, Tuple
 from coraplex.datastructures.enums import (
     ApproachDirection,
     Arms,
+    DetectionTechnique,
     ExecutionType,
+    TaskStatus,
     VerticalAlignment,
 )
 from coraplex.datastructures.grasp import GraspDescription
@@ -47,9 +49,10 @@ from coraplex.perception import (
     RoboKudoPerception,
     WorldPerception,
 )
-from coraplex.plans.factories import execute_single
+from coraplex.plans.factories import execute_single, try_in_order
 from coraplex.plans.plan_node import MotionNode
 from coraplex.robot_plans import MoveToolCenterPointMotion
+from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.motions.misc import DetectingMotion, PerceptionTask
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -66,7 +69,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 PERCEIVED_MILK_POSITION = (2.6, 2.2, 1.05)
 """
@@ -357,21 +359,12 @@ def test_world_perception_follows_the_robots_head(
 
 
 def test_world_perception_reports_nothing_outside_the_queried_region(
-    immutable_model_world,
+    immutable_model_world, empty_region
 ):
     """
     The region is part of the question, so a body outside it is not an answer.
     """
     world, view, context = immutable_model_world
-    empty_region = VolumetricBoundingBox(
-        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
-        min_x=-10,
-        min_y=-10,
-        min_z=-10,
-        max_x=-9,
-        max_y=-9,
-        max_z=-9,
-    )
     query = PerceptionQuery(Milk, empty_region, view, world)
 
     with pytest.raises(NothingDetected):
@@ -807,6 +800,28 @@ def test_perception_task_moves_the_detected_body(
     )
 
 
+def test_a_source_that_sees_nothing_leaves_the_task_observing_false(
+    immutable_model_world, empty_region, rclpy_node
+):
+    """
+    Seeing nothing is an answer the plan can act on, so it has to reach the chart as a
+    failed observation rather than as a raise that unwinds it.
+
+    Only then can the goal around the task go and look somewhere else.
+    """
+    world, view, context = immutable_model_world
+    milk_body = world.get_body_by_name("milk.stl")
+    spawned_pose = milk_body.global_pose.to_np()
+    query = PerceptionQuery(Milk, empty_region, view, world)
+    task = PerceptionTask(query=query, execution_type=ExecutionType.SIMULATED)
+    build_context = build_perception_task(task, world, rclpy_node)
+
+    task.on_start(build_context)
+
+    assert task.on_tick(build_context) == ObservationStateValues.FALSE
+    np.testing.assert_allclose(milk_body.global_pose.to_np(), spawned_pose, atol=1e-9)
+
+
 @dataclass
 class UnanswerablePerception(PerceptionInterface):
     """
@@ -821,9 +836,7 @@ class UnanswerablePerception(PerceptionInterface):
     What answering the query raises.
     """
 
-    def detect(
-        self, query: PerceptionQuery, accept_first_if_multiple: bool = False
-    ) -> Detection:
+    def look_for(self, query: PerceptionQuery) -> List[Detection]:
         raise self.failure
 
 
@@ -1002,6 +1015,41 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
 
     np.testing.assert_allclose(
         reach.root_T_goal_reference_frame.to_position().evaluate().flatten()[:3],
+        PERCEIVED_MILK_POSITION,
+        atol=1e-9,
+    )
+
+
+# %% a failed detection inside a plan
+
+
+def test_a_detection_that_sees_nothing_lets_the_next_alternative_run(
+    immutable_model_world,
+):
+    """
+    What a search is built on: a look that found nothing has to leave the plan able to
+    run the next alternative, so the object is still found by the one that does see it.
+    """
+    world, view, context = immutable_model_world
+    milk_body = world.get_body_by_name("milk.stl")
+    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        *PERCEIVED_MILK_POSITION, reference_frame=world.root
+    )
+    world.notify_state_change()
+
+    plan = try_in_order(
+        [
+            DetectAction(DetectionTechnique.TYPES, object_sem_annotation=Bowl),
+            DetectAction(DetectionTechnique.TYPES, object_sem_annotation=Milk),
+        ],
+        context=context,
+    )
+    with simulated_robot:
+        plan.perform()
+
+    assert plan.status is TaskStatus.SUCCEEDED
+    np.testing.assert_allclose(
+        milk_body.global_pose.to_position().to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )

@@ -9,10 +9,11 @@ from typing_extensions import Optional
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import (
+    CancelMotion,
     Goal,
     MotionStatechartNode,
     NodeArtifacts,
-    TerminalNode, CancelMotion,
+    TerminalNode,
 )
 from giskardpy.motion_statechart.monitors.progress_monitors import ProgressStalled
 from giskardpy.motion_statechart.monitors.templates import StoppedWhenTrue
@@ -250,7 +251,7 @@ class TryAll(Goal):
         """
         Build an observation that is True as soon as any child node is True.
         """
-        observations = [node.observation_variable for node in self.nodes]
+        observations = [node.observation_variable for node in self.non_terminal_nodes]
         observation = (
             observations[0]
             if len(observations) == 1
@@ -280,9 +281,10 @@ class TryInOrder(Goal):
         Add the child nodes and wire them so each one starts only after the previous one
         failed, short-circuiting on the first success.
         """
-        last_node: Optional[MotionStatechartNode] = None
         for node in self.nodes:
             self.add_node(node)
+        last_node: Optional[MotionStatechartNode] = None
+        for node in self.non_terminal_nodes:
             if last_node is not None:
                 # Start the next node only if the previous one failed (short-circuit on success).
                 node.start_condition = trinary_logic_not(last_node.observation_variable)
@@ -296,7 +298,7 @@ class TryInOrder(Goal):
         """
         Build an observation that is True as soon as any child node is True.
         """
-        observations = [node.observation_variable for node in self.nodes]
+        observations = [node.observation_variable for node in self.non_terminal_nodes]
         observation = (
             observations[0]
             if len(observations) == 1

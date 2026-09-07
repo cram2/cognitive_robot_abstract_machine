@@ -1,5 +1,4 @@
 import os
-import time
 
 import pytest
 
@@ -8,13 +7,14 @@ from coraplex.datastructures.enums import (
     ApproachDirection,
     VerticalAlignment,
     Arms,
+    TaskStatus,
 )
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.execution_environment import simulated_robot
 from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.executables import GiskardExecutable
-from coraplex.plans.factories import code, sequential, parallel, execute_single
+from coraplex.plans.factories import sequential, execute_single
 from coraplex.plans.failures import EmptyUnderspecified
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import PlanNode, ActionNode
@@ -380,39 +380,28 @@ def test_get_previous_nodes():
     assert node1.right_siblings == [node3]
 
 
+def test_pausing_a_node_pauses_everything_below_it():
+    """
+    Pausing a node marks it and the nodes below it as paused; resuming clears it again.
+    """
+    root = PlanNode()
+    child = PlanNode()
+    grand_child = PlanNode()
+
+    plan = Plan()
+    plan.add_edge(root, child)
+    plan.add_edge(child, grand_child)
+
+    root.pause()
+    assert root.status == TaskStatus.PAUSE
+    assert grand_child.is_paused
+
+    root.resume()
+    assert root.status == TaskStatus.RUNNING
+    assert not grand_child.is_paused
+
+
 # ---- Tests interacting with simulated robot/world ----
-
-
-def test_pause_plan(immutable_model_world):
-    world, robot_view, context = immutable_model_world
-
-    def node_sleep():
-        time.sleep(1)
-
-    def pause_plan(node):
-        node.pause()
-        assert world.state[
-            world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
-        ].position == pytest.approx(0.0, abs=0.1)
-        node.resume()
-
-        time.sleep(3)
-
-        assert world.state[
-            world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
-        ].position == pytest.approx(0.3, abs=0.1)
-
-    code_node = code(function=lambda: None)
-    code_node.code = lambda: pause_plan(code_node)
-    sleep_node = code(lambda: node_sleep())
-    robot_plan = sequential([sleep_node, MoveTorsoAction(TorsoState.HIGH)])
-    plan = parallel([code_node, robot_plan], context=context).plan
-    with simulated_robot:
-        plan.perform()
-
-    assert world.state[
-        world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
-    ].position == pytest.approx(0.3, abs=0.1)
 
 
 def _torso_position(world):
@@ -423,8 +412,8 @@ def _torso_position(world):
 
 def test_sequence_runs_all_motions(immutable_model_world):
     """
-    Every motion of a sequence is executed, so the torso ends at the target of the *last*
-    motion.
+    Every motion of a sequence is executed, so the torso ends at the target of the
+    *last* motion.
 
     The robot starts in the LOW configuration, so a final HIGH motion proves the second
     motion actually ran.

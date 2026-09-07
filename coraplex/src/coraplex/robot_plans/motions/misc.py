@@ -24,7 +24,10 @@ class PerceptionTask(Task):
 
     The node adds no motion constraints. The query is answered on the node's first tick,
     so the whole detection takes one tick however long the source needs to reply, and the
-    node then observes ``TRUE`` so the surrounding sequence continues.
+    node then observes ``TRUE`` so the surrounding sequence continues. A source that saw
+    nothing leaves it observing ``FALSE``, which is what lets a surrounding
+    :class:`~giskardpy.motion_statechart.goals.templates.TryInOrder` go and look
+    somewhere else.
 
     ..warning:: That tick blocks until the source replies, which on the real robot holds
         up the control loop for as long as the pipeline takes to answer.
@@ -50,9 +53,11 @@ class PerceptionTask(Task):
     The source answering the query, resolved during :meth:`build`.
     """
 
-    _detections_applied: bool = field(init=False, default=False, repr=False)
+    _observation: Optional[ObservationStateValues] = field(
+        init=False, default=None, repr=False
+    )
     """
-    Whether the query has already been answered and written into the world.
+    The observation this node keeps once the query has been answered, None before that.
     """
 
     accept_first_if_multiple: bool = False
@@ -71,20 +76,30 @@ class PerceptionTask(Task):
         return NodeArtifacts()
 
     def on_start(self, context: MotionStatechartContext) -> None:
-        self._detections_applied = False
+        self._observation = None
 
     def on_tick(
         self, context: MotionStatechartContext
     ) -> Optional[ObservationStateValues]:
-        if self._detections_applied:
-            return ObservationStateValues.TRUE
-        detection = self.perception_source.detect(
-            self.query, self.accept_first_if_multiple
+        if self._observation is None:
+            self._observation = self._answer_query()
+        return self._observation
+
+    def _answer_query(self) -> ObservationStateValues:
+        """
+        Answer the query once and write what was seen into the world.
+
+        :return: True once the object was seen, False when the source saw nothing.
+        """
+        detections = self.perception_source.look_for(self.query)
+        if not detections:
+            return ObservationStateValues.FALSE
+        detection = self.perception_source.narrow_to_single_detection(
+            detections, self.query, self.accept_first_if_multiple
         )
         detection.apply_to(
             self.query.world, trust_orientation=self.query.trust_detected_orientation
         )
-        self._detections_applied = True
         return ObservationStateValues.TRUE
 
 

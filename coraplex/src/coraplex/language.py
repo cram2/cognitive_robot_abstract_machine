@@ -2,13 +2,11 @@
 from __future__ import annotations
 
 import logging
-import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing_extensions import (
     Any,
     Callable,
-    List,
     Optional,
     Type,
 )
@@ -37,11 +35,9 @@ from coraplex.plans.executables import (
     GiskardExecutable,
     Executable,
 )
-from coraplex.datastructures.enums import TaskStatus
 from coraplex.plans.failures import (
     AllChildrenFailed,
     PlanCancelled,
-    PlanFailure,
     RepetitionsExhausted,
 )
 from coraplex.plans.motion_state_chart_building import BuildsMotionStateChart
@@ -72,6 +68,12 @@ class LanguageNode(PlanNode, BuildsMotionStateChart, ABC):
             self.merge(child)
 
     def notify(self):
+        """
+        Expand every child.
+
+        Which child runs, and when, is decided while the plan executes, by the goal this
+        node becomes, so expanding one here must not execute it.
+        """
         for child in self.children:
             child.notify()
 
@@ -111,24 +113,6 @@ class ExecutesInParallel(LanguageNode, ABC):
     Base class for nodes that execute their children in parallel.
     """
 
-    @classmethod
-    def _perform_parallel(cls, nodes: List[PlanNode]):
-        """
-        Open threads for all nodes and wait for them to finish.
-
-        :param nodes: A list of nodes which should be performed in parallel
-        """
-        threads = []
-        for child in nodes:
-            thread = threading.Thread(
-                target=child.perform,
-            )
-            thread.start()
-            threads.append(thread)
-
-        for thread in threads:
-            thread.join()
-
 
 @dataclass
 class SequentialNode(ExecutesSequentially):
@@ -151,12 +135,6 @@ class ParallelNode(ExecutesInParallel):
     """
 
     motion_state_chart_template: Type[Goal] = field(kw_only=True, default=Parallel)
-
-    def notify(self):
-        self._perform_parallel(self.children)
-        for child in self.children:
-            if child.status == TaskStatus.FAILED:
-                raise child.reason
 
 
 @dataclass(eq=False)
@@ -239,39 +217,65 @@ class RepeatNode(ExecutesSequentially):
 
 
 @dataclass(eq=False)
-class TryInOrderNode(ExecutesSequentially):
+class TriesAlternatives(LanguageNode, ABC):
     """
-    Tries all children in order sequentially and fails if all children fail.
+    Runs its children as alternatives to one another.
+
+    It succeeds as soon as one of them succeeds, and fails only once all of them have
+    failed.
+    """
+
+    def parse(self) -> Executable:
+        """
+        Parse into a motion state chart holding this node, so that the alternatives are
+        built by :meth:`add_to_motion_state_chart` here too and not only where this node
+        is nested in another one.
+
+        An alternative that is separated by an execution boundary is parsed on its own,
+        as for every other language node, and is then not part of one chart to give up
+        on.
+        """
+        if self.contains_execution_boundary:
+            return super().parse()
+        return self.create_giskard_executable([self])
+
+    def add_to_motion_state_chart(
+        self, parent_goal: Goal, executable: GiskardExecutable
+    ) -> Goal:
+        """
+        Add the alternatives below a goal that ends the motion with
+        :class:`~coraplex.plans.failures.AllChildrenFailed` once every one of them has
+        failed.
+
+        The node ending the motion sits among the alternatives and watches them, because
+        a transition condition may only name the owning node or a sibling of it.
+        """
+        goal = super().add_to_motion_state_chart(parent_goal, executable)
+        goal.add_node(
+            CancelMotion.when_all_false(
+                goal.non_terminal_nodes, AllChildrenFailed(self)
+            )
+        )
+        return goal
+
+
+@dataclass(eq=False)
+class TryInOrderNode(TriesAlternatives, ExecutesSequentially):
+    """
+    Tries all children in order, starting the next one only once the previous one
+    failed.
     """
 
     motion_state_chart_template: Type[Goal] = field(kw_only=True, default=TryInOrder)
 
-    def notify(self):
-        for child in self.children:
-            try:
-                child.perform()
-            except PlanFailure:
-                continue
-        failed = all([child.status == TaskStatus.FAILED for child in self.children])
-        if failed:
-            raise AllChildrenFailed(self)
-
 
 @dataclass(eq=False)
-class TryAllNode(ExecutesInParallel):
+class TryAllNode(TriesAlternatives, ExecutesInParallel):
     """
-    Executes all children in parallel.
-
-    Only raise a failure if all children fail.
+    Tries all children in parallel.
     """
 
     motion_state_chart_template: Type[Goal] = field(kw_only=True, default=TryAll)
-
-    def notify(self):
-        self._perform_parallel(self.children)
-        failed = all([child.status == TaskStatus.FAILED for child in self.children])
-        if failed:
-            raise AllChildrenFailed(self)
 
 
 @dataclass(eq=False)

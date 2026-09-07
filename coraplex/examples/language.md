@@ -15,8 +15,8 @@ jupyter:
 # Plan Language
 
 The CoraPlex plan language is a way to structure the execution of your plan. In generally the plan language allows to
-execute designators either sequential or in parallel. Furthermore, exceptions that occur during execution of a plan with
-the plan language do not interrupt the execution instead they are caught and handed to the failure handling module.
+execute designators either sequential or in parallel. Furthermore, a child that fails does not have to interrupt the
+execution: which expression you wrap it in decides whether the rest of the plan carries on without it.
 The language create a tree structure of the plan where the language expressions one kine of nodes among designators
 these nodes store additional information about the execution of the plan including the exceptions that occurred and the 
 status of execution.
@@ -26,13 +26,13 @@ There are 4 language expressions:
 | Name             | Description                                                                                                                                                                                                                                                                                | 
 |------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Sequential**   | Executes the designators one after another, if one of the designators raises an exception the execution is aborted and the state FAILED will be returned.                                                                                                                                  |
-| **Try In Order** | Executes the designators one after another, if one designator raises an exception the exception is caught and saved but the execution is not interrupted and the other designators are executed. Returns the state SUCCEDED if at least one designator can be executed without exception. |
-| **Repeat**       | Repeat the previous language expression a number of time. Has to be used with a language expression and an integer.                                                                                                                                                                        | 
-| **Parallel**     | Executes all designators in parallel. For each designator there will be a new thread created and the designator is executed in this thread. If one of the designators raises an exception the returned state will be FAILED.                                                               |
-| **Try All**      | Executes all designators in parallel with a designated thread for each designator. Returns the state SUCCEDED if at least one designator can be executed without an exception                                                                                                              |
+| **Try In Order** | Tries the designators one after another, starting the next one only once the previous one failed. Returns the state SUCCEDED as soon as one of them succeeds, and FAILED only once all of them failed. |
+| **Repeat**       | Attempts a language expression again whenever an attempt fails, until it succeeds or the given number of attempts is used up.                                                                                                                                                                        | 
+| **Parallel**     | Executes all designators at once, as one goal of the motion state chart the plan is executed in. If one of the designators fails the returned state will be FAILED.                                                               |
+| **Try All**      | Tries all designators at once. Returns the state SUCCEDED if at least one of them succeeds                                                                                                              |
 | **Monitor**      | Monitors the execution of the attached langauge expression, will interrupt or pause it once a given condition is fulfilled.                                                                                                                                                                 | 
 
-The Sequential plan is the only one which aborts the execution once an error is raised.
+Sequential and Parallel are the expressions that give up on the plan once one of their children failed.
 
 When using the plan language a tree structure of the plan is created where the language expressions are nodes and
 designators are leafs. 
@@ -95,8 +95,8 @@ with simulated_robot:
 ## Try In Order
 
 Try in order is similar to Sequential, it also executes all designators one after another but the key difference is that
-an exception in one of the designators does not terminate the whole execution. Furthermore, the state FAILED will only
-be returned if all designator executions raise an error.
+a designator that fails does not terminate the whole execution: the next one is started instead, and the one after it
+is skipped as soon as one succeeds. Furthermore, the state FAILED will only be returned if all of them failed.
 
 Besides the described difference in behaviour this language expression can be used in the same way as Sequential.
 
@@ -118,10 +118,9 @@ with simulated_robot:
 
 ## Parallel
 
-Parallel executes all designator at once in dedicated threads. The execution of other designators is not aborted when a
-exception is raised, this is the case since threads can not be killed from the outside and this would also cause
-unforeseen problems. The state returned will be SUCCEDED if all designators could be executed without an exception raised
-in any other case FAILED will be returned.
+Parallel executes all designators at once: they become one goal of the motion state chart the plan is executed in, so
+their motions run alongside each other in the same control loop. The state returned will be SUCCEDED if all designators
+reached their goal, in any other case FAILED will be returned.
 
 Using the parallel expressions works like Sequential and TryInOrder.
 
@@ -143,8 +142,8 @@ with simulated_robot:
 
 ## Try All
 
-TryAll is to Parallel what TryInOrder is to Sequential, meaning TryAll will also execute all designators in parallel but
-will return SUCCEEDED if at least one designator is executed without raising an exception.
+TryAll is to Parallel what TryInOrder is to Sequential, meaning TryAll will also execute all designators at once but
+will return SUCCEEDED as soon as one of them reaches its goal.
 
 TryAll can be used like any other language expression.
 
@@ -224,40 +223,36 @@ with simulated_robot:
 
 ## Exception Handling
 
-If an exception is raised during the execution of a designator when it is used in a language expression the exception
-is caught and saved on that designator's node. Sequential is the only expression that stops the rest of the plan once
-this happens; TryInOrder and TryAll continue with their remaining children and only fail the whole expression if all
-of them failed. Parallel continues running its remaining children as well, but re-raises the failure once every child
-has finished.
+A child fails by not reaching its goal while the motion state chart runs. Sequential and Parallel fail with it, while
+TryInOrder and TryAll succeed as long as one of their alternatives reaches its goal, and only fail once none of them
+did, with an {class}`~coraplex.plans.failures.AllChildrenFailed`.
 
-The language will only catch exceptions that are of type {class}`~coraplex.plans.failures.PlanFailure` meaning errors that are defined in
-plan_failures.py in CoraPlex. This also means normal Python errors, such as KeyError, will interrupt the execution of your
-designators.
+A {class}`~coraplex.plans.failures.PlanFailure` raised while the plan is being built, as a {func}`~coraplex.plans.factories.code`
+object does when its callable raises, fails the plan wherever that object sits: building the plan happens before any
+alternative is tried, so it is not one of the failures the alternatives protect you from. Normal Python errors, such as
+a KeyError, end the execution the same way.
 
-We will see how exceptions are handled at a simple example using TryAll, so that a failing designator does not fail
-the whole plan.
+We will see this at a simple example using TryAll, where an arm is sent somewhere it cannot reach while the robot
+drives to a pose it can reach. The unreachable motion does not fail the plan, because the other alternative carried it.
 
 ```python
-from coraplex.plans.factories import code, try_all
+from coraplex.datastructures.enums import Arms
+from coraplex.plans.factories import try_all
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
-from coraplex.plans.failures import PlanFailure
+from coraplex.robot_plans.motions.gripper import MoveToolCenterPointMotion
 from semantic_digital_twin.spatial_types import Pose
 
-
-def code_test():
-    raise PlanFailure
-
-
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-code_func = code(code_test, context=context)
+out_of_reach = MoveToolCenterPointMotion(
+    target=Pose.from_xyz_rpy(5, 0, 0, reference_frame=world.root), arm=Arms.RIGHT
+)
 
-plan = try_all([navigate, code_func], context=context).plan
+plan = try_all([navigate, out_of_reach], context=context).plan
 
 with simulated_robot:
     plan.perform()
 
 print(plan.root.status)
-print(code_func.reason)
 ```
 
 ## Repeat

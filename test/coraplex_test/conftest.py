@@ -114,6 +114,25 @@ def immutable_stretch_apartment_world(stretch_apartment_world):
 
 
 @pytest.fixture
+def empty_region(immutable_model_world) -> VolumetricBoundingBox:
+    """
+    A region well clear of everything in the apartment fixture.
+
+    Lets a perception test say "look where nothing is" without restating the extents.
+    """
+    world, _, _ = immutable_model_world
+    return VolumetricBoundingBox(
+        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+        min_x=-10,
+        min_y=-10,
+        min_z=-10,
+        max_x=-9,
+        max_y=-9,
+        max_z=-9,
+    )
+
+
+@pytest.fixture
 def whole_scene_region(immutable_model_world) -> VolumetricBoundingBox:
     """
     A region large enough to contain everything in the apartment fixture.
