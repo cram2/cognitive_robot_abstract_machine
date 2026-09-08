@@ -7,6 +7,7 @@ from typing import List
 from typing_extensions import Optional
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
     CancelMotion,
     Goal,
@@ -130,6 +131,112 @@ class Parallel(Goal):
             else len(self.nodes)
         )
         return NodeArtifacts(observation=minimum_success <= sum(*nodes_at_their_goal))
+
+
+# %% giving a motion an outcome
+
+
+@dataclass(repr=False, eq=False)
+class Attempt(Goal):
+    """
+    Runs a motion that would never end on its own and decides it, one way or the other.
+
+    A constraint holds itself against the world and observes only whether it is at its
+    goal right now, so nothing about it ever concludes. This goal concludes instead: it
+    observes True once the task is at its goal, False once one of :attr:`failure_monitors`
+    fires, and ends itself as soon as it observes either. That is what lets a maintained
+    motion be one step of a plan.
+
+    .. note:: The task is never ended from here. It keeps exerting itself after first
+        reaching its goal and comes down only with this goal, so a constraint that was
+        pushed off its goal again is still being held.
+    """
+
+    task: MotionStatechartNode = field(kw_only=True)
+    """
+    The motion run until this goal is decided.
+    """
+
+    failure_monitors: List[MotionStatechartNode] = field(kw_only=True)
+    """
+    The nodes whose observing True gives up on the task, any one of which is enough.
+
+    An empty list states that this motion cannot fail, leaving reaching its goal as the
+    only way it ends. A monitor is read the way it is written, so one that observes
+    being *well* has to be negated before it can be passed here.
+    """
+
+    @property
+    def any_failure_monitor_fired(self) -> Scalar:
+        """
+        :return: True once a failure monitor fired, and false while none has or there
+            are none to fire.
+        """
+        if not self.failure_monitors:
+            return Scalar.const_false()
+        return trinary_logic_or(
+            *[monitor.goal_reached.is_true() for monitor in self.failure_monitors]
+        )
+
+    @property
+    def failure_reasons(self) -> List[MotionStatechartNode]:
+        """
+        Which monitors gave up on the task, which is what turns a failure into a reason.
+
+        They are read through their verdicts, because ending this goal ends them too and
+        a node that ended observes nothing any more.
+
+        :return: The failure monitors that fired, in the order they were given, and
+            nothing at all unless this goal ended short of its own goal.
+        """
+        if self.goal_reached_state != ObservationStateValues.FALSE:
+            return []
+        return [
+            monitor
+            for monitor in self.failure_monitors
+            if monitor.goal_reached_state == ObservationStateValues.TRUE
+        ]
+
+    def expand(self, context: MotionStatechartContext) -> None:
+        """
+        Add the task and the monitors, and end this goal once it has an answer.
+
+        A condition may only read its own node or a sibling, so this goal reaches that
+        answer through its own observation rather than through its children.
+
+        A monitor ends on the control cycle it fires, which keeps what it saw as its
+        verdict. A goal reads its children a cycle late, so a monitor that fires only
+        briefly would otherwise be indistinguishable afterwards from one that never
+        fired at all.
+        """
+        self.add_node(self.task)
+        self.add_nodes(self.failure_monitors)
+        for failure_monitor in self.failure_monitors:
+            failure_monitor.end_condition = trinary_logic_or(
+                failure_monitor.end_condition, failure_monitor.observation_variable
+            )
+        self.end_condition = trinary_logic_or(
+            self.end_condition,
+            trinary_logic_not(self.observation_variable.is_unknown()),
+        )
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Report reaching the goal, being given up on, or neither.
+
+        Reaching the goal outranks a monitor firing on the same control cycle: a task
+        that arrived did what it was asked, whatever else was true at that moment. The
+        task is read through its verdict, so one that something else ended still counts.
+        """
+        return NodeArtifacts(
+            observation=if_cases(
+                cases=[
+                    (self.task.goal_reached.is_true(), Scalar.const_true()),
+                    (self.any_failure_monitor_fired, Scalar.const_false()),
+                ],
+                else_result=Scalar.const_trinary_unknown(),
+            )
+        )
 
 
 # %% repeating a task
