@@ -945,14 +945,23 @@ class Scalar(SymbolicMathType):
     def const_true(cls) -> Self:
         return cls(True)
 
-    def is_const_true(self):
-        return self.is_constant() and self == True
+    def is_constant_true(self) -> bool:
+        """
+        Determine whether the scalar is constantly true.
+        """
+        return self.is_constant() and bool(self == True)
 
-    def is_const_unknown(self):
-        return self.is_constant() and self == 0.5
+    def is_constant_unknown(self) -> bool:
+        """
+        Determine whether the scalar is constantly unknown.
+        """
+        return self.is_constant() and bool(self == 0.5)
 
-    def is_const_false(self):
-        return self.is_constant() and self == False
+    def is_constant_false(self) -> bool:
+        """
+        Determine whether the scalar is constantly false.
+        """
+        return self.is_constant() and bool(self == False)
 
     def is_true(self) -> Scalar:
         """
@@ -1016,50 +1025,85 @@ class Scalar(SymbolicMathType):
         return Scalar.from_casadi_sx(ca.logic_not(self.casadi_sx))
 
     def __and__(self, other: Scalar | FloatVariable) -> Scalar:
-        if is_const_false(self):
+        if is_constant_false(self):
             return self
-        if is_const_false(other):
+        if is_constant_false(other):
             return other
         return Scalar.from_casadi_sx(ca.logic_and(to_sx(self), to_sx(other)))
 
     def __or__(self, other: Scalar | FloatVariable) -> Scalar:
-        if is_const_true(self):
+        if is_constant_true(self):
             return self
-        if is_const_true(other):
+        if is_constant_true(other):
             return other
         return Scalar.from_casadi_sx(ca.logic_or(to_sx(self), to_sx(other)))
 
     # %% Comparison operations
-    def _compare(
-        self, other: Scalar | FloatVariable | NumericalScalar | bool, op_f: Callable
-    ) -> Scalar | bool:
+    def _compare(self, other: ScalarData, op_f: Callable) -> Scalar:
+        """
+        Compare this scalar with another value using the given operator function.
+
+        :param other: Value to compare with.
+        :param op_f: Operator function to apply.
+        :return: A scalar expression representing the result of the comparison.
+        """
         left = to_sx(self)
         right = to_sx(other)
         result = op_f(left, right)
-        if result.is_constant():
-            return bool(result)
         return Scalar.from_casadi_sx(result)
 
-    def __eq__(
-        self, other: Scalar | FloatVariable | NumericalScalar | bool
-    ) -> Scalar | bool:
+    def __eq__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for equality.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the equality comparison.
+        """
         return self._compare(other, operator.eq)
 
-    def __ne__(
-        self, other: Scalar | FloatVariable | NumericalScalar | bool
-    ) -> Scalar | bool:
+    def __ne__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for inequality.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the inequality comparison.
+        """
         return self._compare(other, operator.ne)
 
-    def __le__(self, other: Scalar | FloatVariable) -> Scalar | bool:
+    def __le__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for less than or equal to.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the comparison result.
+        """
         return self._compare(other, operator.le)
 
-    def __lt__(self, other: Scalar | FloatVariable) -> Scalar | bool:
+    def __lt__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for less than.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the comparison result.
+        """
         return self._compare(other, operator.lt)
 
-    def __ge__(self, other: Scalar | FloatVariable) -> Scalar | bool:
+    def __ge__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for greater than or equal to.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the comparison result.
+        """
         return self._compare(other, operator.ge)
 
-    def __gt__(self, other: Scalar | FloatVariable) -> Scalar | bool:
+    def __gt__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for greater than.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the comparison result.
+        """
         return self._compare(other, operator.gt)
 
     # %% Arithmatic operations
@@ -2093,7 +2137,7 @@ def gauss(n: ScalarData) -> Scalar:
 
 
 # %% binary logic
-def is_const_true(expression: Scalar) -> bool:
+def is_constant_true(expression: Scalar) -> bool:
     """
     Checks whether a scalar expression is the constant truth value.
 
@@ -2103,7 +2147,7 @@ def is_const_true(expression: Scalar) -> bool:
     return bool(expression == 1)
 
 
-def is_const_false(expression: Scalar) -> bool:
+def is_constant_false(expression: Scalar) -> bool:
     """
     Checks whether a scalar expression is the constant false value.
 
@@ -2188,10 +2232,10 @@ def trinary_logic_and(*args: FloatVariable | Scalar) -> Scalar:
             minimum_number_of_arguments=1, actual_number_of_arguments=len(args)
         )
     # if there is any False, return False
-    if any(x for x in args if x.is_const_false()):
+    if any(x for x in args if x.is_constant_false()):
         return Scalar.const_false()
     # filter all True
-    args = [x for x in args if not x.is_const_true()]
+    args = [x for x in args if not x.is_constant_true()]
     if len(args) == 0:
         return Scalar.const_true()
     if len(args) == 1:
@@ -2217,10 +2261,10 @@ def trinary_logic_or(*args: FloatVariable | Scalar) -> Scalar:
             minimum_number_of_arguments=1, actual_number_of_arguments=len(args)
         )
     # if there is any True, return True
-    if any(x for x in args if x.is_const_true()):
+    if any(x for x in args if x.is_constant_true()):
         return Scalar.const_true()
     # filter all False
-    args = [x for x in args if not x.is_const_false()]
+    args = [x for x in args if not x.is_constant_false()]
     if len(args) == 0:
         return Scalar.const_false()
     if len(args) == 1:

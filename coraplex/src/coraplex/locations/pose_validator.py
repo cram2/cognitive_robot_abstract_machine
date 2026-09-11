@@ -8,7 +8,14 @@ from typing_extensions import List
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    SelfCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
+)
+from giskardpy.motion_statechart.exceptions import NoProgressError
 from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
@@ -20,11 +27,15 @@ from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlign
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.exceptions import TipLinkDoesNotMatchAnyArm
 from coraplex.locations.base import PoseValidator
+from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans import MoveToolCenterPointMotion
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
+)
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import (
@@ -170,6 +181,29 @@ class AreReachableBy(PoseValidator):
     The grasp description that should be used for validation.
     """
 
+    def _gripper_allowance_of_the_reach(self) -> List[UpdateTemporaryCollisionRules]:
+        """
+        :return: The rule freeing the manipulator that performs this reach, matching
+            what the reach itself is executed with. Empty when the tip is not a tool
+            frame, since nothing is being grasped with it then.
+
+        A reach onto an object ends inside the buffer zone kept around that object, so a
+        probe that does not free the manipulator never converges on the pose it is
+        asked about.
+        """
+        arm = ViewManager.get_arm_by_tool_frame(self.tip_link, self.robot)
+        if arm is None:
+            return []
+        return [
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AllowCollisionForEndEffector(
+                        end_effector=ViewManager.get_end_effector_view(arm, self.robot)
+                    )
+                ]
+            )
+        ]
+
     def create_msc(self) -> MotionStatechart:
         """
         Creates the Motion state chart to reach the given pose sequence with the given
@@ -182,13 +216,7 @@ class AreReachableBy(PoseValidator):
             self.alternative_motion_mappings, self.robot, MoveToolCenterPointMotion
         )
         if alternative_motion:
-            correct_arm = None
-            for arm in Arms:
-                if (
-                    self.tip_link
-                    == ViewManager.get_end_effector_view(arm, self.robot).tool_frame
-                ):
-                    correct_arm = arm
+            correct_arm = ViewManager.get_arm_by_tool_frame(self.tip_link, self.robot)
             if correct_arm is None:
                 raise TipLinkDoesNotMatchAnyArm(self.tip_link, self.robot)
             sequence = []
@@ -235,16 +263,48 @@ class AreReachableBy(PoseValidator):
                 else self.pose_sequence
             )
 
+            tolerances = self.context.motion_tolerances
             sequence = [
-                CartesianPose(root_link=root, tip_link=self.tip_link, goal_pose=pose)
+                CartesianPose(
+                    root_link=root,
+                    tip_link=self.tip_link,
+                    goal_pose=pose,
+                    translation_threshold=tolerances.default_tcp_position_threshold,
+                    orientation_threshold=tolerances.tool_orientation_threshold,
+                )
                 for pose in sequence
             ]
 
         msc = MotionStatechart()
         msc.add_node(sequence_node := Sequence(sequence))
+        if GiskardExecutable.collision_avoidance:
+            msc.add_node(ExternalCollisionAvoidance(cancel_if_collision_violated=False))
+            msc.add_node(SelfCollisionAvoidance(cancel_if_collision_violated=False))
+            msc.add_nodes(self._gripper_allowance_of_the_reach())
         msc.add_node(EndMotion.when_true(sequence_node))
+        msc.add_node(
+            still_progressing := StillProgressing(monitored_node=sequence_node)
+        )
+        msc.add_node(still_progressing.cancel_motion())
 
         return msc
+
+    def create_executor(self, msc: MotionStatechart) -> Executor:
+        """
+        Creates the executor that runs a probe of this validator.
+
+        :param msc: The motion statechart the executor is compiled against.
+        """
+        executor = Executor(
+            context=MotionStatechartContext(
+                world=self.world,
+                qp_controller_config=QPControllerConfig(
+                    target_frequency=50, prediction_horizon=4, verbose=False
+                ),
+            ),
+        )
+        executor.compile(msc)
+        return executor
 
     def __call__(self, *args, **kwargs) -> bool:
         logger.debug(
@@ -253,25 +313,19 @@ class AreReachableBy(PoseValidator):
 
         with self.world.reset_state_context():
 
-            msc = self.create_msc()
-
-            executor = Executor(
-                context=MotionStatechartContext(
-                    world=self.world,
-                    qp_controller_config=QPControllerConfig(
-                        target_frequency=50, prediction_horizon=4, verbose=False
-                    ),
-                ),
-            )
-            executor.compile(msc)
+            executor = self.create_executor(self.create_msc())
 
             try:
-                # TimeoutError from tick_until_end is an expected outcome (planner
-                # cannot find a path), not an illegal state — no non-raising API exists.
-                executor.tick_until_end(timeout=1500)
+                executor.tick_until_end()
             except TimeoutError:
                 logger.debug(
                     f"Timeout while executing pose sequence: {self.pose_sequence}"
+                )
+                return False
+            except NoProgressError as no_progress:
+                logger.debug(
+                    f"Stopped approaching pose sequence {self.pose_sequence}: "
+                    f"{no_progress.error_message()}"
                 )
                 return False
             return True

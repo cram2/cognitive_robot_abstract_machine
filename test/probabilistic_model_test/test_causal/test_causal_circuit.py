@@ -299,6 +299,65 @@ def _build_unnormalized_circuit() -> tuple:
     return circuit, x, y
 
 
+def _build_shared_cause_subcircuit_circuit() -> tuple:
+    """
+    A DAG, not a tree: the SumUnit over the cause x is mounted as a shared child of two
+    different ProductUnits, matching the mounting pattern RSPN grounding uses when one
+    exchangeable instance is attached under several class-level product nodes.
+
+        SumUnit(root)
+          ProductUnit_a(SumUnit_x [shared], leaf y∈[0,1])
+          ProductUnit_b(SumUnit_x [shared], leaf y∈[2,3])
+
+        SumUnit_x [x∈[0,1] w=0.6, x∈[1,2] w=0.4]  -- same node object under both parents
+
+    Ground truth: x's two branches are disjoint regardless of which parent reaches
+    them, so verify_support_determinism must pass.
+    """
+    x = Continuous("x")
+    y = Continuous("y")
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+
+    shared_sum_x = SumUnit(probabilistic_circuit=circuit)
+    shared_sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.6),
+    )
+    shared_sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(1, 2).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.4),
+    )
+
+    product_a = ProductUnit(probabilistic_circuit=circuit)
+    product_a.add_subcircuit(shared_sum_x)
+    product_a.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        )
+    )
+
+    product_b = ProductUnit(probabilistic_circuit=circuit)
+    product_b.add_subcircuit(shared_sum_x)
+    product_b.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(2, 3).simple_sets[0]),
+            circuit,
+        )
+    )
+
+    root.add_subcircuit(product_a, math.log(0.5))
+    root.add_subcircuit(product_b, math.log(0.5))
+    return circuit, x, y
+
+
 def _marginal_probability(
     circuit: ProbabilisticCircuit,
     variable: Continuous,
@@ -619,6 +678,31 @@ class VerifySupportDeterminismDisjointnessTestCase(unittest.TestCase):
         cc = CausalCircuit.from_probabilistic_circuit(circuit, tree, [x], [y])
         result = cc.verify_support_determinism()
         self.assertTrue(result.passed, msg=f"Violations: {result.violations}")
+
+
+class VerifySupportDeterminismSharedSubcircuitTestCase(unittest.TestCase):
+    """
+    A shared child (a node with more than one parent) must be visited once by
+    _check_support_disjointness's traversal and its disjointness result attributed
+    correctly to every parent -- the pattern RSPN's exact-partition and Monte-Carlo
+    grounding both rely on when one grounded instance is mounted under several class-
+    level product nodes.
+    """
+
+    def test_shared_cause_subcircuit_passes(self):
+        circuit, x, y = _build_shared_cause_subcircuit_circuit()
+        tree = MarginalDeterminismTreeNode.from_causal_graph([x], [y])
+        cc = CausalCircuit.from_probabilistic_circuit(circuit, tree, [x], [y])
+        result = cc.verify_support_determinism()
+        self.assertTrue(result.passed, msg=f"Violations: {result.violations}")
+
+    def test_backdoor_adjustment_runs_on_a_shared_cause_subcircuit(self):
+        circuit, x, y = _build_shared_cause_subcircuit_circuit()
+        tree = MarginalDeterminismTreeNode.from_causal_graph([x], [y])
+        cc = CausalCircuit.from_probabilistic_circuit(circuit, tree, [x], [y])
+        interventional_circuit = cc.backdoor_adjustment(x, y, [])
+        self.assertIsInstance(interventional_circuit, ProbabilisticCircuit)
+        self.assertTrue(interventional_circuit.is_valid())
 
 
 class BackdoorAdjustmentStructuralTestCase(unittest.TestCase):
@@ -995,6 +1079,126 @@ class DiscreteConfounderAdjustmentTestCase(unittest.TestCase):
         )
         # P(treatment=HIGH) = P(WARM)*0.8 + P(COLD)*0.3 = 0.6*0.8 + 0.4*0.3 = 0.6
         self.assertAlmostEqual(high_mass, 0.6, delta=0.01)
+
+
+def _build_cause_specific_effect_circuit() -> tuple:
+    """
+    Circuit where treatment has a real, differentiated causal effect on outcome within
+    each season stratum -- unlike `_build_discrete_confounded_circuit`'s null-effect
+    fixture, where P(outcome | do(treatment)) happens to be identical for every
+    treatment value by construction, so it cannot distinguish a correctly cause-
+    restricted adjustment from one that silently drops the cause restriction.
+
+    Two equal-weight strata, each further split by treatment:
+        Warm stratum (p=0.6): P(treatment=HIGH)=0.8; treatment=HIGH pairs with
+            outcome=GOOD (deterministic), treatment=LOW pairs with outcome=BAD.
+        Cold stratum (p=0.4): P(treatment=HIGH)=0.3; same treatment/outcome pairing.
+
+    Ground truth:
+        P(outcome=GOOD | do(treatment=HIGH)) = 1.0
+        P(outcome=GOOD | do(treatment=LOW)) = 0.0
+    """
+    season = Symbolic("season", domain=Set.from_iterable(Season))
+    treatment = Symbolic("treatment", domain=Set.from_iterable(Treatment))
+    outcome = Symbolic("outcome", domain=Set.from_iterable(Outcome))
+
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    for season_value, treatment_high_probability, stratum_weight in [
+        (Season.WARM, 0.8, 0.6),
+        (Season.COLD, 0.3, 0.4),
+    ]:
+        component = ProductUnit(probabilistic_circuit=circuit)
+        component.add_subcircuit(
+            leaf(
+                SymbolicDistribution(
+                    variable=season,
+                    probabilities=MissingDict(float, {hash(season_value): 1.0}),
+                ),
+                circuit,
+            )
+        )
+        treatment_outcome = SumUnit(probabilistic_circuit=circuit)
+        for treatment_value, outcome_value, branch_weight in [
+            (Treatment.HIGH, Outcome.GOOD, treatment_high_probability),
+            (Treatment.LOW, Outcome.BAD, 1 - treatment_high_probability),
+        ]:
+            branch = ProductUnit(probabilistic_circuit=circuit)
+            branch.add_subcircuit(
+                leaf(
+                    SymbolicDistribution(
+                        variable=treatment,
+                        probabilities=MissingDict(float, {hash(treatment_value): 1.0}),
+                    ),
+                    circuit,
+                )
+            )
+            branch.add_subcircuit(
+                leaf(
+                    SymbolicDistribution(
+                        variable=outcome,
+                        probabilities=MissingDict(float, {hash(outcome_value): 1.0}),
+                    ),
+                    circuit,
+                )
+            )
+            treatment_outcome.add_subcircuit(branch, math.log(branch_weight))
+        component.add_subcircuit(treatment_outcome)
+        root.add_subcircuit(component, math.log(stratum_weight))
+
+    return circuit, treatment, season, outcome
+
+
+class CauseSpecificAdjustmentTestCase(unittest.TestCase):
+    """
+    Regression coverage for the joint-truncation bug in `_add_region_for_cause_value`:
+
+    it intersected the adjustment partition's event with the cause region's event
+    before filling either to the full variable set, so `intersection_with` kept only
+    the variables already present on its left operand and silently dropped the cause
+    region's own variable -- every cause value then received the same, cause-
+    unrestricted adjusted probability. `_build_discrete_confounded_circuit` cannot
+    catch this: its true adjusted probability happens to be identical for every
+    treatment value by construction, so a cause-blind computation reproduces it by
+    coincidence.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.circuit, cls.treatment, cls.season, cls.outcome = (
+            _build_cause_specific_effect_circuit()
+        )
+        cls.cc = CausalCircuit.from_probabilistic_circuit(
+            cls.circuit,
+            MarginalDeterminismTreeNode.from_causal_graph(
+                [cls.treatment, cls.season], [cls.outcome]
+            ),
+            [cls.treatment, cls.season],
+            [cls.outcome],
+        )
+
+    def test_adjusted_probability_differs_by_cause_value(self):
+        adjusted = self.cc.backdoor_adjustment(
+            self.treatment, self.outcome, [self.season]
+        )
+        for treatment_value, expected in (
+            (Treatment.HIGH, 1.0),
+            (Treatment.LOW, 0.0),
+        ):
+            with self.subTest(treatment=treatment_value):
+                narrowed, region_probability = adjusted.truncated(
+                    SimpleEvent.from_data(
+                        {self.treatment: Set.from_iterable([treatment_value])}
+                    )
+                    .as_composite_set()
+                    .fill_missing_variables_pure(adjusted.variables)
+                )
+                self.assertGreater(region_probability, 0.0)
+                self.assertAlmostEqual(
+                    _symbolic_probability(narrowed, self.outcome, Outcome.GOOD),
+                    expected,
+                    delta=0.01,
+                )
 
 
 class SplitIntoAtomicValuesTestCase(unittest.TestCase):

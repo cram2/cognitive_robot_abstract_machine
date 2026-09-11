@@ -7,15 +7,70 @@ from uuid import UUID
 from typing_extensions import Dict, Any
 from typing_extensions import Optional, TYPE_CHECKING, Self, ClassVar
 
+from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.exceptions import (
     WorldEntityWithIDNotInKwargs,
     WorldEntityWithIDNotFoundError,
     MissingWorldError,
 )
 
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
+
+
+@dataclass
+class WorldEntityReference:
+    """
+    How a serialized object points at a world entity: by the id that identifies it, and
+    by the name it went by, which says which entity was meant where it cannot be found.
+
+    The name is never looked up with, so two entities sharing one name stay apart.
+    """
+
+    subject: str
+    """
+    What the referring object calls the entity, for example ``parent`` or ``dof``.
+    """
+
+    @property
+    def id_key(self) -> str:
+        """
+        Where the id of the entity sits in the serialized object.
+        """
+        return f"{self.subject}_id"
+
+    @property
+    def name_key(self) -> str:
+        """
+        Where the name of the entity sits in the serialized object.
+        """
+        return f"{self.subject}_name"
+
+    def write(self, data: Dict[str, Any], entity: WorldEntityWithID) -> None:
+        """
+        Put the reference to an entity into a serialized object.
+
+        :param data: The json of the object that refers to it.
+        :param entity: The entity it refers to.
+        """
+        data[self.id_key] = to_json(entity.id)
+        data[self.name_key] = to_json(entity.name)
+
+    def resolve(self, data: Dict[str, Any], **kwargs) -> WorldEntityWithID:
+        """
+        The entity a serialized object refers to.
+
+        :param data: The json of the object that refers to it.
+        :param kwargs: The kwargs of the ``_from_json`` that is reading it.
+        :raises WorldEntityWithIDNotInKwargs: If nothing known carries that id.
+        """
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        return tracker.get_world_entity_with_id(
+            id=from_json(data[self.id_key]), name=from_json(data.get(self.name_key))
+        )
 
 
 @dataclass
@@ -106,7 +161,9 @@ class WorldEntityWithIDKwargsTracker:
         except (WorldEntityWithIDNotInKwargs, MissingWorldError):
             return False
 
-    def get_world_entity_with_id(self, id: UUID) -> WorldEntityWithID:
+    def get_world_entity_with_id(
+        self, id: UUID, name: Optional[PrefixedName] = None
+    ) -> WorldEntityWithID:
         """
         Retrieve a world entity by its UUID.
 
@@ -115,6 +172,8 @@ class WorldEntityWithIDKwargsTracker:
         entity by its UUID from the world object.
 
         :param id: The UUID of the world entity to retrieve.
+        :param name: The name the reference to that entity went by, which says which
+            entity was meant when it cannot be found.
         :return: The world entity corresponding to the specified UUID, or None if not
             found.
         """
@@ -127,4 +186,4 @@ class WorldEntityWithIDKwargsTracker:
             return self._world.get_world_entity_with_id_by_id(id)
         except WorldEntityWithIDNotFoundError:
             pass
-        raise WorldEntityWithIDNotInKwargs(id)
+        raise WorldEntityWithIDNotInKwargs(world_entity_id=id, world_entity_name=name)

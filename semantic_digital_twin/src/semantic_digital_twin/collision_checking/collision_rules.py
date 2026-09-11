@@ -32,7 +32,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.robots.robot_parts import AbstractRobot
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
     from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -292,6 +292,26 @@ class AllowCollisionBetweenGroups(AllowCollisionRule):
                     body_a=body_a, body_b=body_b
                 )
                 self.allowed_collision_pairs.add(collision_check)
+
+
+@dataclass
+class AllowCollisionForEndEffector(AllowCollisionRule):
+    """
+    Removes all collision checks that include the given end effector, or anything it
+    holds, from the collision matrix.
+
+    The bodies are read from the end effector every time the world model changes, so a
+    body grasped after this rule was created is freed together with the fingers holding
+    it.
+    """
+
+    end_effector: EndEffector = field(kw_only=True)
+    """
+    The end effector that may touch anything.
+    """
+
+    def _update(self, world: World):
+        self.allowed_collision_bodies = set(self.end_effector.bodies_with_collision)
 
 
 @dataclass

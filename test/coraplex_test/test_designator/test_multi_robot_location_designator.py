@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import numpy as np
 import pytest
 import rclpy
 from typing_extensions import Generator, List, Tuple
@@ -340,18 +341,13 @@ def test_visibility_location_body(immutable_multiple_robot_simple_apartment):
     assert len(pose.to_quaternion().to_list()) == 4
 
 
-def test_visibility_reachability_merge(
-    immutable_multiple_robot_simple_apartment, rclpy_node
-):
+def test_visibility_reachability_merge(immutable_multiple_robot_simple_apartment):
     world, robot, context = immutable_multiple_robot_simple_apartment
 
     plan = sequential(
         [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
-
-    context.ros_node = rclpy_node
-    context.debug = True
 
     with simulated_robot:
         plan.perform()
@@ -432,3 +428,48 @@ def test_giskard_location_pose(immutable_multiple_robot_simple_apartment):
 
     assert len(pose.to_position().to_list()) == 4
     assert len(pose.to_quaternion().to_list()) == 4
+
+
+def test_accessing_location_validates_the_poses_the_grasp_will_reach(
+    immutable_model_world,
+):
+    """
+    Opening a container reaches a pre-pose set off the handle's own geometry.
+
+    Handing the location the handle's pose rather than the handle drops that geometry,
+    which collapses the pre-pose onto the grasp pose, so every candidate is validated
+    for a reach the plan never performs.
+    """
+    world, robot, context = immutable_model_world
+
+    with world.modify_world():
+        world.add_semantic_annotation_recursively(
+            drawer := Drawer(
+                root=world.get_body_by_name("cabinet10_drawer_middle"),
+                handle=Handle(root=world.get_body_by_name("handle_cab10_m")),
+            )
+        )
+
+    [validator] = accessing_location(drawer, context=context, arm=Arms.RIGHT).validators
+    reached = GraspDescription(
+        ApproachDirection.FRONT,
+        VerticalAlignment.NoAlignment,
+        ViewManager.get_end_effector_view(Arms.BOTH, robot),
+    ).grasp_pose_sequence(drawer.handle.root)
+
+    def in_world(pose):
+        """
+        :return: ``pose`` expressed in the world frame, since the two sequences are
+            given relative to different frames.
+        """
+        if pose.reference_frame is world.root:
+            return pose
+        return world.compute_forward_kinematics(world.root, pose.reference_frame) @ pose
+
+    assert len(validator.pose_sequence) == len(reached)
+    for validated_pose, reached_pose in zip(validator.pose_sequence, reached):
+        np.testing.assert_allclose(
+            in_world(validated_pose).to_position().to_np(),
+            in_world(reached_pose).to_position().to_np(),
+            atol=1e-6,
+        )

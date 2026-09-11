@@ -8,6 +8,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowAllCollisions,
     AvoidCollisionBetweenGroups,
     AvoidSelfCollisions,
 )
@@ -275,3 +276,42 @@ def test_collision_rules_survive_merge(pr2_world_copy):
     with world.modify_world():
         world.merge_world(pr2_world_copy)
     assert len(world.collision_manager.rules) == expected
+
+
+# %% whether a robot touches anything
+
+
+def test_robot_is_in_collision_reports_a_contact_of_its_own(cylinder_bot_world):
+    """
+    The robot answers for its own bodies, under whichever rules the caller set.
+    """
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+        "environment"
+    )
+    collision_manager = cylinder_bot_world.collision_manager
+    collision_manager.extend_temporary_rule(
+        [
+            AvoidCollisionBetweenGroups(
+                buffer_zone_distance=10,
+                violated_distance=0.0,
+                body_group_a=[robot.root],
+                body_group_b=[environment],
+            )
+        ]
+    )
+    collision_manager.update_collision_matrix()
+
+    assert robot.is_in_collision
+
+
+def test_robot_is_not_in_collision_when_nothing_is_checked(cylinder_bot_world):
+    """
+    With every collision of the robot allowed, no contact is reported for it.
+    """
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    collision_manager = cylinder_bot_world.collision_manager
+    collision_manager.extend_temporary_rule([AllowAllCollisions()])
+    collision_manager.update_collision_matrix()
+
+    assert not robot.is_in_collision

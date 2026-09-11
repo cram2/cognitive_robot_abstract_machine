@@ -14,6 +14,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
     Box,
+    Color,
     Cylinder,
     Mesh,
     Scale,
@@ -456,3 +457,32 @@ def test_mesh_in_frame_in_the_shapes_own_frame_matches_its_local_mesh():
     world_mesh = shape.mesh_in_frame(obstacle)
 
     np.testing.assert_allclose(world_mesh.bounds, shape.mesh.bounds)
+
+
+# %% json round trips
+
+
+@pytest.mark.parametrize(
+    "shape",
+    [
+        Sphere(radius=0.3),
+        Cylinder(width=0.2, height=0.4),
+        Box(scale=Scale(1.0, 2.0, 3.0)),
+        Box(
+            scale=Scale(1.0, 1.0, 1.0),
+            color=Color(0.1, 0.2, 0.3, 0.4),
+            texture=Texture(file_path="/textures/wood.png"),
+        ),
+    ],
+)
+def test_a_shape_survives_a_json_round_trip(shape):
+    """
+    Shapes are read back by the same code that writes them, so what one half spells and
+    the other half looks for can drift apart with nothing else noticing.
+    """
+    payload = shape.to_json()
+
+    restored = from_json(payload)
+
+    assert restored == shape
+    assert restored.to_json() == payload

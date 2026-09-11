@@ -1,3 +1,4 @@
+import inspect
 from copy import deepcopy
 from dataclasses import dataclass, field
 
@@ -28,12 +29,26 @@ class HasFactoryAndKwargs(Generic[T]):
         """
         Construct a python object from the CallableAndKwargs instance.
 
+        Keyword arguments that name no parameter of :attr:`factory` are dropped rather
+        than passed on, unless :attr:`factory` itself accepts arbitrary keywords (a
+        ``**kwargs`` parameter). This lets a keyword carry meaning for something other
+        than construction -- for instance a query marker on an aggregate rather than a
+        field -- without :attr:`factory` ever seeing it.
+
         ..note:: This method may work with ellipsis, but it's not guaranteed to work with all types.
 
         :return: The constructed object.
         """
+        parameters = inspect.signature(self.factory).parameters.values()
+        accepts_arbitrary_keywords = any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
+        )
+        parameter_names = {parameter.name for parameter in parameters}
+
         constructed_kwargs = {}
         for key, value in self.kwargs.items():
+            if not accepts_arbitrary_keywords and key not in parameter_names:
+                continue
             if isinstance(value, list_like_classes):
                 constructed_kwargs[key] = type(value)(
                     self._recurse_construct_instance_and_get_value(element)

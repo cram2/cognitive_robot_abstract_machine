@@ -1,6 +1,7 @@
 import uuid
 from abc import ABC
 from dataclasses import dataclass, field
+from enum import StrEnum
 from krrood.patterns.caching import memoize
 from uuid import UUID
 
@@ -147,6 +148,33 @@ class LoadModel(Message):
     """The primary key identifying the model to be loaded."""
 
 
+class MessageField(StrEnum):
+    """
+    The parts of a serialized message that are read without building it.
+    """
+
+    META_DATA = "meta_data"
+    """The origin of the message."""
+
+
+class SnapshotField(StrEnum):
+    """
+    The parts a serialized world snapshot is made of.
+    """
+
+    MODIFICATIONS = "modifications"
+    """The modification blocks the world was built from."""
+
+    STATE = "state"
+    """The free variables and their values."""
+
+    IDS = "ids"
+    """The ids of the free variables, inside the state."""
+
+    STATES = "states"
+    """The values of the free variables, inside the state."""
+
+
 @dataclass
 class WorldModelSnapshot(SubclassJSONSerializer):
     """
@@ -165,23 +193,23 @@ class WorldModelSnapshot(SubclassJSONSerializer):
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
-            "modifications": to_json(self.modifications),
-            "state": {
-                "ids": to_json(self.ids),
-                "states": list(self.states),
+            SnapshotField.MODIFICATIONS: to_json(self.modifications),
+            SnapshotField.STATE: {
+                SnapshotField.IDS: to_json(self.ids),
+                SnapshotField.STATES: list(self.states),
             },
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        state = data.get("state", {})
+        state = data.get(SnapshotField.STATE, {})
         return cls(
             modifications=[
                 WorldModelModificationBlock.from_json(m, **kwargs)
-                for m in data.get("modifications", [])
+                for m in data.get(SnapshotField.MODIFICATIONS, [])
             ],
-            ids=from_json(state["ids"]),
-            states=state.get("states", []),
+            ids=from_json(state[SnapshotField.IDS]),
+            states=state.get(SnapshotField.STATES, []),
         )
 
     @staticmethod
@@ -198,14 +226,14 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         :param json_data: The JSON data containing the snapshot.
         """
         with world.modify_world():
-            for modification in json_data.get("modifications", []):
+            for modification in json_data.get(SnapshotField.MODIFICATIONS, []):
                 WorldModelModificationBlock.apply_from_json(
                     world, modification, **kwargs
                 )
 
-        state = json_data.get("state", {})
-        ids = from_json(state["ids"])
-        states = state.get("states", [])
+        state = json_data.get(SnapshotField.STATE, {})
+        ids = from_json(state[SnapshotField.IDS])
+        states = state.get(SnapshotField.STATES, [])
         WorldModelSnapshot._apply_json_state(world, ids, states)
 
     @staticmethod

@@ -88,8 +88,8 @@ def test_features_extraction():
 
 def test_feature_extraction_with_aggregations(scenario):
     room, room2, room_dao, room2_dao, feature_extractor = scenario
-    rpc = RelationalProbabilisticCircuit(SceneRoom)
-    rpc.fit([room_dao, room2_dao])
+    relational_probabilistic_circuit = RelationalProbabilisticCircuit(SceneRoom)
+    relational_probabilistic_circuit.fit([room_dao, room2_dao])
 
     room_query = a(SceneRoom)(
         position=a(KRROODPosition)(x=..., y=..., z=...),
@@ -97,7 +97,7 @@ def test_feature_extraction_with_aggregations(scenario):
         objects=[a(SceneObject)(type=...) for _ in range(4)],
     )
     room_query.resolve()
-    model = rpc.ground(room_query)
+    model = relational_probabilistic_circuit.ground(room_query)
     model = model.simplify()
 
     assert model.is_valid()

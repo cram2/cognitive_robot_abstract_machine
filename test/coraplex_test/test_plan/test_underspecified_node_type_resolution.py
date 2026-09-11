@@ -5,7 +5,7 @@ hints resolving under ``krrood``'s class-diagram introspection.
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 
-from coraplex.plans.plan_node import UnderspecifiedNode
+from coraplex.plans.underspecified import UnderspecifiedNode
 
 
 def test_class_diagram_resolves_underspecified_node():

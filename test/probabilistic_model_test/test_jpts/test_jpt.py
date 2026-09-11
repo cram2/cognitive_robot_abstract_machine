@@ -104,6 +104,23 @@ class InferFromDataFrameTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             infer_variables_from_dataframe(df)
 
+    def test_string_dtype_column_is_treated_as_symbolic(self):
+        """
+        Regression test: with pandas' ``future.infer_string`` option enabled (the
+        default from pandas 3.0 onward), a string column's dtype no longer equals
+        ``object``, so relying on that equality alone stops recognizing it.
+        """
+        previous_infer_string = pd.options.future.infer_string
+        pd.options.future.infer_string = True
+        try:
+            df = pd.DataFrame({"symbol": ["a", "b", "c"]})
+            (annotated_variable,) = infer_variables_from_dataframe(df)
+        finally:
+            pd.options.future.infer_string = previous_infer_string
+
+        self.assertEqual(annotated_variable.variable.name, "symbol")
+        self.assertIsInstance(annotated_variable.variable, Symbolic)
+
 
 class JPTTestCase(unittest.TestCase):
     data: pd.DataFrame

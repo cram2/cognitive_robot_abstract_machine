@@ -3,13 +3,10 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from typing_extensions import Dict, Any, Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    WorldEntityWithIDKwargsTracker,
-)
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -193,30 +190,6 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             return lower_limit is not None or upper_limit is not None
         except KeyError:
             return False
-
-    def to_json(self) -> Dict[str, Any]:
-        return {
-            **super().to_json(),
-            "lower_limits": to_json(self.limits.lower),
-            "upper_limits": to_json(self.limits.upper),
-            "name": to_json(self.name),
-            "has_hardware_interface": self.has_hardware_interface,
-        }
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> DegreeOfFreedom:
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
-        uuid = from_json(data["id"])
-        lower_limits = from_json(data["lower_limits"], **kwargs)
-        upper_limits = from_json(data["upper_limits"], **kwargs)
-        self = cls(
-            name=from_json(data["name"]),
-            limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
-            id=uuid,
-            has_hardware_interface=data["has_hardware_interface"],
-        )
-        tracker.add_world_entity_with_id(self)
-        return self
 
     def __deepcopy__(self, memo):
         result = DegreeOfFreedom(

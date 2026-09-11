@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
+from itertools import islice
 
 import numpy as np
 import pytest
@@ -10,8 +11,15 @@ from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlign
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.locations.backends import GiskardLocationBackend
 from coraplex.locations.base import Location, PoseGeneratorBackend, PoseValidator
+from coraplex.locations.factories import (
+    reachability_location,
+)
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.api import RobotSpecification, WorldSpecification
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowSelfCollisions,
+    CollisionRule,
+)
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -56,6 +64,25 @@ class RecordsEvaluatedRobot(PoseValidator):
     def __call__(self, *args, **kwargs) -> bool:
         self.evaluated_robots.append(self.robot)
         self.evaluated_root_poses.append(self.robot.root.global_pose)
+        return True
+
+
+@dataclass
+class RecordsCollisionRules(PoseValidator):
+    """
+    Accepts every candidate and records the temporary collision rules in force while it
+    was evaluated.
+    """
+
+    temporary_rules_seen: List[List[CollisionRule]] = field(default_factory=list)
+    """
+    The world's temporary collision rules at each evaluation, in evaluation order.
+    """
+
+    def __call__(self, *args, **kwargs) -> bool:
+        self.temporary_rules_seen.append(
+            list(self.world.collision_manager.temporary_rules)
+        )
         return True
 
 
@@ -174,6 +201,65 @@ def test_location_evaluates_the_robot_of_its_context(two_robot_world):
     assert recorder.evaluated_robots[0].id == second_robot.id
 
 
+# %% how far a reachability location stands from its target
+
+
+REACHABILITY_TARGET_POSITION = (2.0, 2.0, 0.9)
+"""
+Position of the target a reachability location is built around, clear of the robot.
+"""
+
+STANDING_DISTANCE_TOLERANCE = 0.05
+"""
+Tolerance of a sampled standing distance, in meter.
+
+Candidates land on the cell centres of a 0.02 m costmap grid, so a sample sits a
+fraction of a cell off the ring it was drawn from.
+"""
+
+CANDIDATES_TO_SAMPLE = 20
+"""
+Number of candidates whose distance to the target is asserted.
+"""
+
+
+def test_reachability_location_stands_at_the_arm_length_fraction_from_its_target(
+    single_robot_world,
+):
+    """
+    The standing distance follows the constant, so tuning it moves the robot.
+
+    Standing too close puts the arms inside whatever the target rests on, which the
+    collision check on candidate poses then rejects.
+    """
+    world, robot, context = single_robot_world
+    target = Pose.from_xyz_rpy(
+        *REACHABILITY_TARGET_POSITION, reference_frame=world.root
+    )
+    # approximate_length returns a symbolic scalar, which compares as unequal to a float
+    # under pytest.approx no matter the tolerance.
+    expected_distance = (
+        float(ViewManager.get_arm_view(Arms.RIGHT, robot).approximate_length()) * 0.66
+    )
+    target_position = target.to_position().to_np()[:2]
+
+    candidates = list(
+        islice(
+            reachability_location(target, context, Arms.RIGHT).generator,
+            CANDIDATES_TO_SAMPLE,
+        )
+    )
+
+    assert len(candidates) == CANDIDATES_TO_SAMPLE
+    distances = [
+        np.linalg.norm(candidate.to_position().to_np()[:2] - target_position)
+        for candidate in candidates
+    ]
+    assert distances == pytest.approx(
+        [expected_distance] * len(distances), abs=STANDING_DISTANCE_TOLERANCE
+    )
+
+
 # %% the giskard backend reports the pose it placed the robot at
 
 
@@ -205,3 +291,45 @@ def test_giskard_backend_yields_the_candidate_it_placed_the_robot_at(
 
     assert len(yielded_poses) == 1
     np.testing.assert_allclose(yielded_poses[0].to_np(), candidate.to_np(), atol=1e-9)
+
+
+def test_location_validates_against_the_rules_the_plan_runs_with(single_robot_world):
+    """
+    Deciding whether a standing pose is already in collision needs collision rules of
+    its own, but they are the wrong ones for the reachability simulation that follows:
+
+    left in place they override the distances the robot actually has to keep, and a pose
+    validates against clearances the executed motion is never given.
+    """
+    world, robot, context = single_robot_world
+    candidate = _candidate(world)
+    recorder = RecordsCollisionRules()
+
+    list(Location(context, candidate, FixedPoseGenerator([candidate]), [recorder]))
+
+    assert recorder.temporary_rules_seen
+    assert not any(
+        isinstance(rule, AllowSelfCollisions)
+        for rule in recorder.temporary_rules_seen[0]
+    )
+
+
+def test_location_validates_with_the_motion_policy_of_its_own_context(
+    single_robot_world,
+):
+    """
+    Validators run against a copy of the world and so are handed a context of their own.
+
+    That context has to carry the tolerances and the tick budget of the run, or a
+    candidate is judged by defaults the plan itself is never held to.
+    """
+    world, robot, context = single_robot_world
+    context.ticks_per_motion = 11
+    context.motion_tolerances.default_tcp_position_threshold = 0.123
+    candidate = _candidate(world)
+    recorder = RecordsEvaluatedRobot()
+
+    list(Location(context, candidate, FixedPoseGenerator([candidate]), [recorder]))
+
+    assert recorder.context.ticks_per_motion == context.ticks_per_motion
+    assert recorder.context.motion_tolerances is context.motion_tolerances

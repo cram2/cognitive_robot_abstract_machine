@@ -135,7 +135,7 @@ def accessing_location(
     :returns: A location that is accessible from the container.
     """
     return reachability_location(
-        container.handle.root.global_pose,
+        container.handle.root,
         context,
         arm,
         GraspDescription(

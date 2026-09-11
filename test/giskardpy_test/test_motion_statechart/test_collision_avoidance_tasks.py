@@ -516,7 +516,7 @@ def test_cancel_node_without_tasks_never_starts():
 
     cancel.build(MotionStatechartContext.empty())
 
-    assert cancel.start_condition.is_const_false()
+    assert cancel.start_condition.is_constant_false()
 
 
 def test_self_collision_avoidance_without_checked_body_combinations(

@@ -173,6 +173,52 @@ class TestTrinaryPredicates:
     The predicate that holds for each trinary truth value.
     """
 
+    def test_or3_accepts_a_constant_comparison_result(self):
+        constant_comparison = sm.Scalar(0) <= 0.05
+        assert isinstance(constant_comparison, sm.Scalar)
+        result = sm.trinary_logic_or(sm.Scalar(0), constant_comparison)
+        assert isinstance(result, sm.Scalar)
+        assert bool(result) is True
+
+    def test_and3_accepts_a_constant_comparison_result(self):
+        constant_comparison = sm.Scalar(0) <= 0.05
+        assert isinstance(constant_comparison, sm.Scalar)
+        result = sm.trinary_logic_and(sm.Scalar(1), constant_comparison)
+        assert isinstance(result, sm.Scalar)
+        assert bool(result) is True
+
+    def test_predicate_return_types_are_primitive_bool(self):
+        """
+        Verify that is_const_true, is_const_false, and is_const_unknown return primitive
+        bool values rather than Scalar expressions.
+        """
+        s_true = sm.Scalar(0) <= 0.05
+        s_false = sm.Scalar(1) <= 0.05
+        s_unknown = sm.Scalar(0.5)
+
+        assert isinstance(s_true.is_constant_true(), bool)
+        assert s_true.is_constant_true() is True
+        assert isinstance(s_true.is_constant_false(), bool)
+        assert s_true.is_constant_false() is False
+
+        assert isinstance(s_false.is_constant_true(), bool)
+        assert s_false.is_constant_true() is False
+        assert isinstance(s_false.is_constant_false(), bool)
+        assert s_false.is_constant_false() is True
+
+        assert isinstance(s_unknown.is_constant_unknown(), bool)
+        assert s_unknown.is_constant_unknown() is True
+        assert isinstance(s_true.is_constant_unknown(), bool)
+        assert s_true.is_constant_unknown() is False
+
+        v = sm.FloatVariable(name="v")
+        assert isinstance(v.is_constant_true(), bool)
+        assert v.is_constant_true() is False
+        assert isinstance(v.is_constant_false(), bool)
+        assert v.is_constant_false() is False
+        assert isinstance(v.is_constant_unknown(), bool)
+        assert v.is_constant_unknown() is False
+
     def test_each_predicate_holds_only_for_its_own_value(self):
         for value in self.predicate_of_value:
             for predicate_value, predicate in self.predicate_of_value.items():
@@ -908,6 +954,7 @@ class TestScalar:
             operator.lt,
             operator.le,
             operator.eq,
+            operator.ne,
             operator.ge,
             operator.gt,
         ]
@@ -918,8 +965,8 @@ class TestScalar:
         for f in operators:
             r_np = f(f1, f2)
             r_cas = f(e1_cas, e2_cas)
-            assert isinstance(r_cas, bool), f"{f.__name__} result is not Scalar"
-            assert r_np == r_cas, f"{f.__name__} result is wrong"
+            assert isinstance(r_cas, sm.Scalar), f"{f.__name__} result is not Scalar"
+            assert bool(r_cas) == r_np, f"{f.__name__} result is wrong"
 
     def test_comparisons_with_variable(self):
         operators = [

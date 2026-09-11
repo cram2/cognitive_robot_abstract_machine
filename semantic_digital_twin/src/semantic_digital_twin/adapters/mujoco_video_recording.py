@@ -261,10 +261,6 @@ class MujocoVideoRecorder:
         steps_per_frame = max(1, round((1.0 / self.frames_per_second) / step_size))
         previous_decimation = self.capture_every_n_state_changes
         self.capture_every_n_state_changes = steps_per_frame
-        # Restart the decimation period cleanly so the first frame of this call lands
-        # exactly steps_per_frame steps in, rather than wherever the previous decimation
-        # period's phase happened to leave off.
-        self._state_change_count = 0
         try:
             for _ in range(max(1, round(duration / step_size))):
                 self._multi_sim.simulator.step()

@@ -362,6 +362,9 @@ class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerialize
             world.get_semantic_annotation_by_id(self.semantic_annotation_id)
         )
 
+    # Written by hand rather than from the fields: the annotation stays json until
+    # :meth:`apply` builds it against the world it is applied to, which the generic
+    # serialization would rob it of by building it while reading the modification.
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
@@ -700,6 +703,9 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
             return world.get_world_entity_with_id_by_id(item)
         return item
 
+    # Written by hand rather than from the fields: the values an attribute gained and
+    # lost stay json until :meth:`apply` builds them against the world it is applied to,
+    # which the generic serialization would rob them of.
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),

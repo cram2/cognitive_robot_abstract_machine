@@ -13,6 +13,7 @@ parts:
     chapters:
     - file: probability_theory
     - file: queries
+    - file: causal_reasoning
   - caption: Probabilistic Models
     chapters:
     - file: graphical_models

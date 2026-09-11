@@ -14,9 +14,11 @@ from itertools import product
 from typing import TYPE_CHECKING, NamedTuple
 from uuid import UUID
 
+import numpy as np
+import numpy.typing as npt
+
 import giskardpy.utils.math as gm
 import krrood.symbolic_math.symbolic_math as sm
-import numpy as np
 from giskardpy.qp.exceptions import (
     InfeasibleException,
     MismatchedLimitLengthsError,
@@ -30,7 +32,6 @@ from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.math import model_predictive_control
 from krrood.symbolic_math.symbolic_math import Scalar, FloatVariable
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
-from semantic_digital_twin.world_description import degree_of_freedom
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -312,7 +313,7 @@ class DegreeOfFreedomLimitProfiler:
         time_step: float,
         prediction_horizon: int,
         solver_class: type[QPSolver],
-    ) -> tuple[sm.Vector, sm.Vector]:
+    ) -> tuple[npt.NDArray, npt.NDArray]:
         """
         Solves an MPC that drives the degree of freedom from full velocity to rest,
         returning the nominal velocity and acceleration braking profiles.
@@ -343,8 +344,8 @@ class DegreeOfFreedomLimitProfiler:
 
     def _directional_velocity_bound(
         self,
-        velocity_profile: sm.Vector,
-        acceleration_profile: sm.Vector,
+        velocity_profile: npt.NDArray,
+        acceleration_profile: npt.NDArray,
         position_error: sm.Scalar,
         jerk_limit: float,
         velocity_limit: float,

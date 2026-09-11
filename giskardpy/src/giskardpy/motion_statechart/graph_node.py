@@ -259,7 +259,7 @@ class TrinaryCondition(SubclassJSONSerializer):
         """
         free_symbols = self.expression.free_variables()
         if not free_symbols:
-            return str(self.expression.is_const_true())
+            return str(self.expression.is_constant_true())
         str_representation = sm.trinary_logic_to_str(self.expression)
         for variable in free_symbols:
             str_representation = str_representation.replace(

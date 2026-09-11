@@ -205,6 +205,39 @@ def test_captured_frame_count_tracks_frames_kept_so_far(ray_test_world):
 
 
 @requires_mujoco_ci
+def test_many_short_advances_still_respect_the_configured_frame_rate(ray_test_world):
+    """
+    A caller that drives the recorder through many short calls -- exactly how
+    :class:`~experiments.montessori.scenarios.SimulatedScene`'s own ``advance()`` is
+    used by settling and by trajectory-following, each call far shorter than one frame
+    period -- must still get roughly ``frames_per_second`` frames per simulated second
+    overall, not one guaranteed frame per call. A decimation counter reset at the start
+    of every call always satisfies its own "already at the boundary" check, so many short
+    calls would otherwise capture close to one frame each regardless of how low
+    ``frames_per_second`` is asked to be -- defeating the whole point of asking for a
+    lower one.
+    """
+    world, *_ = ray_test_world
+    recorder = MujocoVideoRecorder(world=world, frames_per_second=1)
+
+    recorder.start()
+    try:
+        step_size = recorder._multi_sim.simulator.step_size
+        short_call_duration = step_size * 5
+        number_of_calls = 200
+        for _ in range(number_of_calls):
+            recorder.advance_simulation(duration=short_call_duration)
+        frame_count = recorder.captured_frame_count
+    finally:
+        recorder.stop()
+
+    total_simulated_time = number_of_calls * short_call_duration
+    expected_frames = total_simulated_time * recorder.frames_per_second
+    assert frame_count < number_of_calls
+    assert frame_count <= expected_frames + 2
+
+
+@requires_mujoco_ci
 def test_start_twice_raises(ray_test_world):
     world, *_ = ray_test_world
     recorder = MujocoVideoRecorder(world=world)

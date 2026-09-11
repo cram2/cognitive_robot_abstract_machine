@@ -8,7 +8,7 @@ import re
 import shutil
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, Field
 from functools import cached_property
 from pathlib import Path
 
@@ -461,13 +461,31 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         world_mesh.apply_transform(world.transform(self.origin, target_frame).to_np())
         return world_mesh
 
+    @classmethod
+    def _serialized_fields(cls) -> List[Field]:
+        """
+        The fields a shape carries in its json: everything its constructor takes.
+        """
+        return [field_ for field_ in fields(cls) if field_.init]
+
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
-            "origin": to_json(self.origin),
-            "color": to_json(self.color),
-            "texture": to_json(self.texture) if self.texture is not None else None,
+            **{
+                field_.name: to_json(getattr(self, field_.name))
+                for field_ in self._serialized_fields()
+            },
         }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            **{
+                field_.name: from_json(data[field_.name], **kwargs)
+                for field_ in cls._serialized_fields()
+                if field_.name in data
+            }
+        )
 
     def __eq__(self, other: Shape) -> bool:
         """
@@ -593,6 +611,18 @@ class Mesh(Shape):
         if mesh.units is not None:
             mesh.convert_units("meters")
         return mesh
+
+    @classmethod
+    def _serialized_fields(cls) -> List[Field]:
+        """
+        A mesh carries its geometry rather than the file it was read from, which the
+        process reading the json may not have.
+        """
+        return [
+            field_
+            for field_ in super()._serialized_fields()
+            if field_.name != "filename"
+        ]
 
     def to_json(self) -> Dict[str, Any]:
         # Serialize the unscaled geometry and the scale separately. This is the same
@@ -1038,19 +1068,6 @@ class Sphere(Shape):
             self.origin,
         )
 
-    def to_json(self) -> Dict[str, Any]:
-        return {**super().to_json(), "radius": self.radius}
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        texture = data.get("texture")
-        return cls(
-            radius=data["radius"],
-            origin=from_json(data["origin"], **kwargs),
-            color=from_json(data["color"], **kwargs),
-            texture=from_json(texture, **kwargs) if texture is not None else None,
-        )
-
 
 @dataclass(eq=False)
 class Cylinder(Shape):
@@ -1102,20 +1119,6 @@ class Cylinder(Shape):
             self.origin,
         )
 
-    def to_json(self) -> Dict[str, Any]:
-        return {**super().to_json(), "width": self.width, "height": self.height}
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        texture = data.get("texture")
-        return cls(
-            width=data["width"],
-            height=data["height"],
-            origin=from_json(data["origin"], **kwargs),
-            color=from_json(data["color"], **kwargs),
-            texture=from_json(texture, **kwargs) if texture is not None else None,
-        )
-
 
 @dataclass(eq=False)
 class Box(Shape):
@@ -1160,19 +1163,6 @@ class Box(Shape):
             half_y,
             half_z,
             self.origin,
-        )
-
-    def to_json(self) -> Dict[str, Any]:
-        return {**super().to_json(), "scale": to_json(self.scale)}
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        texture = data.get("texture")
-        return cls(
-            scale=from_json(data["scale"], **kwargs),
-            origin=from_json(data["origin"], **kwargs),
-            color=from_json(data["color"], **kwargs),
-            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
 
 

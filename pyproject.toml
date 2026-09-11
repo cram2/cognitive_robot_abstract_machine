@@ -39,6 +39,7 @@ dev = [
     "treon",
     "bokeh",
     "mypy>=1.8",
+    "docformatter",
 ]
 
 doc = [

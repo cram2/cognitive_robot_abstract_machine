@@ -32,6 +32,51 @@ class CircuitNotFittedError(DataclassException):
 
 
 @dataclass
+class ClassCircuitGroundingFailedError(DataclassException):
+    """
+    Raised when conditioning the class circuit on aggregation statistics leaves it with
+    no nodes at all.
+    """
+
+    class_: Type
+    """The domain class whose class circuit failed to ground."""
+
+    def error_message(self) -> str:
+        return (
+            f"Grounding the class circuit for {self.class_.__name__} produced an "
+            f"empty circuit."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that the conditioning aggregation statistics are consistent with "
+            "the fitted circuit's support."
+        )
+
+
+@dataclass
+class PartCircuitGroundingFailedError(DataclassException):
+    """
+    Raised when grounding one exchangeable part leaves its circuit with no nodes at all.
+    """
+
+    class_: Type
+    """The domain class of the exchangeable part that failed to ground."""
+
+    def error_message(self) -> str:
+        return (
+            f"Grounding the exchangeable part circuit for {self.class_.__name__} "
+            f"produced an empty circuit."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that the conditioning aggregation statistics are consistent with "
+            "the fitted template's support."
+        )
+
+
+@dataclass
 class InvalidMonteCarloSampleCountError(DataclassException):
     """
     Raised when grounding must integrate out undetermined aggregation statistics but the
@@ -77,3 +122,93 @@ class UndeterminedLatentsNotModeledError(DataclassException):
             "Ensure the class circuit is fitted with these aggregation statistics "
             "as latent variables before grounding."
         )
+
+
+@dataclass
+class UndeterminedLatentsNotPartitionedError(DataclassException):
+    """
+    Raised when the undetermined latents' marginal support -- grouped by the fitted
+    circuit's own mixture branches -- is not a genuine, pairwise-disjoint partition:
+    either the fitted circuit never actually split on these latents at all (a single,
+    undifferentiated branch), or the branches it did split into overlap.
+
+    Exact-partition grounding requires at least two mutually exclusive branches so each
+    grounded exchangeable instance stays tied to the latent value its own branch
+    represents. This is caught internally by ``RelationalProbabilisticCircuit`` and
+    triggers a fall back to ``GroundingMode.SAMPLED``; it is not expected to reach a
+    caller of ``ground``.
+    """
+
+    undetermined_latents: List[Variable]
+    """
+    The undetermined latent variables whose marginal support is not a genuine, disjoint
+    partition.
+    """
+
+    def error_message(self) -> str:
+        names = ", ".join(latent.name for latent in self.undetermined_latents)
+        return (
+            f"The marginal support of undetermined latents [{names}] is not a "
+            f"genuine, pairwise-disjoint partition, so exact-partition grounding "
+            f"would not be support-deterministic."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Refit the template so these latents are split on, or use "
+            "GroundingMode.SAMPLED instead."
+        )
+
+
+@dataclass
+class VariableNotFoundError(DataclassException):
+    """
+    Raised when a dotted access path does not match any variable in a grounded circuit.
+    """
+
+    path: str
+    """
+    The access path that failed to resolve.
+    """
+
+    available_variables: List[Variable]
+    """
+    The variables the grounded circuit actually has, for diagnosis.
+    """
+
+    def error_message(self) -> str:
+        names = ", ".join(variable.name for variable in self.available_variables)
+        return (
+            f"No variable's name matches '{self.path}'. Available variables: [{names}]."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check the access path against the grounded circuit's actual variable "
+            "names, e.g. 'objects[0].type' or 'chair_count()'."
+        )
+
+
+@dataclass
+class AmbiguousVariablePathError(DataclassException):
+    """
+    Raised when a dotted access path matches more than one variable in a grounded
+    circuit.
+    """
+
+    path: str
+    """
+    The access path that matched more than one variable.
+    """
+
+    matches: List[Variable]
+    """
+    The variables that matched.
+    """
+
+    def error_message(self) -> str:
+        names = ", ".join(variable.name for variable in self.matches)
+        return f"'{self.path}' matches more than one variable: [{names}]."
+
+    def suggest_correction(self) -> str:
+        return "Use a longer, more specific suffix of the variable's full name."

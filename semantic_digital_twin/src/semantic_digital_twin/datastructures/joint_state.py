@@ -137,6 +137,9 @@ class JointState(SubclassJSONSerializer):
             "child_ids": [
                 to_json(connection.child.id) for connection in self.connections
             ],
+            "child_names": [
+                to_json(connection.child.name) for connection in self.connections
+            ],
             "target_values": self.target_values,
             "joint_state_type": to_json(self.state_type),
             "name": to_json(self.name),
@@ -149,9 +152,12 @@ class JointState(SubclassJSONSerializer):
         # not do, since two instances of the same robot description name their joints
         # identically.
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        child_names = data.get("child_names") or [None] * len(data["child_ids"])
         connections = [
-            tracker.get_world_entity_with_id(from_json(child_id)).parent_connection
-            for child_id in data["child_ids"]
+            tracker.get_world_entity_with_id(
+                from_json(child_id), name=from_json(child_name)
+            ).parent_connection
+            for child_id, child_name in zip(data["child_ids"], child_names)
         ]
         target_values = from_json(data["target_values"])
         state_type = from_json(data["joint_state_type"])

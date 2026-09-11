@@ -5,6 +5,10 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
+from krrood.adapters.json_serializer import from_json
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.exceptions import (
@@ -596,3 +600,44 @@ def test_joint_dynamics_custom_values():
     assert_allclose(joint_prop_dict["armature"], armature)
     assert_allclose(joint_prop_dict["dry_friction"], dry_friction)
     assert_allclose(joint_prop_dict["damping"], damping)
+
+
+# %% json round trips
+
+
+@pytest.mark.parametrize(
+    "connection_type, additional_arguments",
+    [
+        (FixedConnection, {}),
+        (Connection6DoF, {}),
+        (OmniDrive, {}),
+        (DifferentialDrive, {}),
+        (PrismaticConnection, {"axis": Vector3.Y(), "multiplier": 2.0, "offset": 0.5}),
+        (RevoluteConnection, {"axis": Vector3.Y(), "multiplier": 2.0, "offset": 0.5}),
+        (ScrewConnection, {"axis": Vector3.Y(), "screw_pitch": 0.25}),
+    ],
+)
+def test_a_connection_survives_a_json_round_trip(
+    world_with_two_bodies, connection_type, additional_arguments
+):
+    """
+    Every connection type writes its own json and reads it back itself, so the keys of
+    the two halves can drift apart with nothing else noticing.
+
+    The arguments are given values other than the default ones, so a value that is
+    written but never read back shows up as a difference rather than as a default.
+    """
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = connection_type.create_with_dofs(
+            world, parent, child, **additional_arguments
+        )
+        world.add_connection(connection)
+    payload = connection.to_json()
+
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    parsed_connection = from_json(payload, **tracker.create_kwargs())
+
+    assert parsed_connection.to_json() == payload
+    assert parsed_connection.parent is parent
+    assert parsed_connection.child is child

@@ -22,8 +22,8 @@ from coraplex.plans.plan_node import (
     ActionNode,
     MotionNode,
     PlanNode,
-    UnderspecifiedNode,
 )
+from coraplex.plans.underspecified import UnderspecifiedNode
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import Goal
 

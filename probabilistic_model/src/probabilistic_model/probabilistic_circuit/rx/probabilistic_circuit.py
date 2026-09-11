@@ -286,7 +286,7 @@ class LeafUnit(Unit):
 
     @property
     def leaves(self) -> List[LeafUnit]:
-        return []
+        return [self]
 
     def log_likelihood(self, events: npt.NDArray):
         self.result_of_current_query = self.distribution.log_likelihood(events)
@@ -560,7 +560,7 @@ class SumUnit(InnerUnit):
     def mount_with_interaction_terms(
         self, other: Self, interaction_model: ProbabilisticModel
     ):
-        """
+        r"""
         Create a distribution that factorizes as follows:
 
         .. math::
@@ -708,8 +708,12 @@ class SumUnit(InnerUnit):
                     # add an edge to that subcircuit
                     self.add_subcircuit(sub_subcircuit, new_weight)
 
-                # remove the old node
-                self.probabilistic_circuit.remove_node(subcircuit)
+                if self.probabilistic_circuit.graph.has_edge(
+                    self.index, subcircuit.index
+                ):
+                    self.probabilistic_circuit.remove_edge(self, subcircuit)
+                if not self.probabilistic_circuit.in_edges(subcircuit):
+                    self.probabilistic_circuit.remove_node(subcircuit)
 
     def normalize(self):
         """
@@ -857,9 +861,16 @@ class ProductUnit(InnerUnit):
                 # type hinting
                 subcircuit: Self
 
-                # mount the children of that circuit directly
+                # mount the children of that circuit directly onto this one
                 for sub_subcircuit in subcircuit.subcircuits:
-                    subcircuit.add_subcircuit(sub_subcircuit)
+                    self.add_subcircuit(sub_subcircuit)
+
+                if self.probabilistic_circuit.graph.has_edge(
+                    self.index, subcircuit.index
+                ):
+                    self.probabilistic_circuit.remove_edge(self, subcircuit)
+                if not self.probabilistic_circuit.in_edges(subcircuit):
+                    self.probabilistic_circuit.remove_node(subcircuit)
 
     def sample(self, *args, **kwargs):
         """
@@ -1339,17 +1350,37 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         return result.log_truncated_in_place(event, singleton_allowed)
 
     def marginal_in_place(self, variables: Iterable[Variable]) -> Optional[Self]:
+        result = self.restrict_to_variables_in_place(variables)
+        if result is None:
+            return None
+        self.simplify()
+        return self
+
+    def restrict_to_variables_in_place(
+        self, variables: Iterable[Variable]
+    ) -> Optional[Self]:
+        """
+        Restrict the circuit to variables in place, without ``simplify()``'s same-type
+        merge.
+
+        :meth:`marginal_in_place` is this plus a trailing ``simplify()`` call: that call
+        flattens nested SumUnits into their parent, which leaves the represented
+        distribution unchanged but can erase branch boundaries a caller relies on -- for
+        instance ``CausalCircuit.verify_support_determinism`` inspecting whether a
+        support-deterministic circuit's own branches stay disjoint.
+
+        :param variables: The variables to keep.
+        :return:``self``, or ``None`` if none of ``variables`` are modeled.
+        """
         result = [
             node.marginal(variables)
             for layer in reversed(self.layers)
             for node in layer
         ][-1]
-        if result is not None:
-            self.remove_unreachable_nodes(result)
-            self.simplify()
-            return self
-        else:
+        if result is None:
             return None
+        self.remove_unreachable_nodes(result)
+        return self
 
     def log_conditional_in_place(
         self, point: Dict[Variable, Any]
@@ -1414,8 +1445,22 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         return result.log_conditional_in_place(point)
 
     def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
+        result = self.restrict_to_variables(variables)
+        if result is None:
+            return None
+        result.simplify()
+        return result
+
+    def restrict_to_variables(self, variables: Iterable[Variable]) -> Optional[Self]:
+        """
+        Restrict a copy of the circuit to variables, without ``simplify()``'s same-type
+        merge. See :meth:`restrict_to_variables_in_place`.
+
+        :param variables: The variables to keep.
+        :return: The restricted copy, or ``None`` if none of ``variables`` are modeled.
+        """
         result = self.__deepcopy__()
-        return result.marginal_in_place(variables)
+        return result.restrict_to_variables_in_place(variables)
 
     def sample(self, amount: int) -> npt.NDArray:
         # initialize all results

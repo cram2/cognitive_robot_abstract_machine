@@ -29,9 +29,8 @@ class ExecutionEnvironment:
 
     collision_avoidance: bool = False
     """
-    Whether an :class:`~giskardpy.motion_statechart.goals.collision_avoidance.ExternalCo
-    llisionAvoidance` is added to every motion state chart created within this
-    environment.
+    Whether the robot avoids colliding with its surroundings and with itself in every
+    motion state chart created within this environment.
     """
 
     previous_type: ExecutionType = field(init=False, default=None)

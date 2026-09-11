@@ -27,6 +27,7 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 )
 from krrood.symbol_graph.symbol_graph import Symbol
 from krrood import logger
+
 try:
     from random_events.interval import Bound, SimpleInterval
     from krrood.parametrization.feature_extraction.aggregations import (
@@ -36,8 +37,9 @@ try:
 except ImportError as e:
     # Was added to allow this to work on Windows which random_events does not support.
     logger.debug(f"Could not import random_events: {e}")
-    class AggregationStatistic(MockedClass, Generic[T]):
-        ...
+
+    class AggregationStatistic(MockedClass, Generic[T]): ...
+
     aggregation_statistic = lambda *args: lambda *args2: args2
     Bound = NoneType
     SimpleInterval = NoneType
@@ -894,6 +896,69 @@ class TestExPartsAggregations(SceneObjectAggregationBase[TestExParts]):
         """
         [cou] = count(variable(SceneRoom, self.instance.rooms)).tolist()
         return cou
+
+
+# %% Relational causal experiment (skill-confounded grasp attempts)
+
+
+@dataclass
+class GraspAttempt:
+    """
+    A single grasp attempt, whose arm position and outcome may be confounded by
+    the robot's shared skill level.
+    """
+
+    arm: float
+    """
+    The arm's position at the time of this attempt.
+    """
+
+    grasped: bool
+    """
+    Whether this attempt succeeded.
+    """
+
+
+@dataclass
+class PickingRobot:
+    """
+    A robot performing a series of grasp attempts, with a skill level shared
+    across every attempt it makes.
+    """
+
+    skill: float
+    """
+    The robot's skill level, generated independently of any single attempt.
+    """
+
+    attempts: List[GraspAttempt]
+    """
+    The robot's grasp attempts.
+    """
+
+
+@dataclass
+class PickingRobotAggregations(AggregationStatistic[PickingRobot]):
+    """
+    Aggregation statistics for :class:`PickingRobot` over its ``attempts`` field.
+    """
+
+    @aggregation_statistic("attempts")
+    def success_count(self) -> int:
+        """
+        Count of successful grasp attempts.
+        """
+        grasped_var = variable(GraspAttempt, self.instance.attempts).grasped
+        [result] = entity(count_range(grasped_var)).where(grasped_var == True).tolist()
+        return result
+
+    @aggregation_statistic("attempts")
+    def total_count(self) -> int:
+        """
+        Total number of grasp attempts.
+        """
+        [result] = count(variable(GraspAttempt, self.instance.attempts)).tolist()
+        return result
 
 
 @dataclass

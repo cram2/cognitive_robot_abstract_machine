@@ -631,7 +631,7 @@ class CartesianOrientation(CartesianTask):
         )
 
         artifacts.error = SymbolicErrorSignal(
-            sm.abs(root_R_current.rotational_error(root_R_goal))
+            sm.abs(root_R_current.rotational_distance(root_R_goal))
         )
         return artifacts
 

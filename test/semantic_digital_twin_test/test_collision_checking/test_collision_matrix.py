@@ -22,6 +22,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowAllCollisions,
     AllowCollisionForBodies,
+    AllowCollisionForEndEffector,
     AvoidCollisionBetweenGroups,
     AllowCollisionBetweenGroups,
     AllowNonRobotCollisions,
@@ -281,6 +282,30 @@ class TestCollisionRules:
                 and body_b_is_robot
             )
 
+    def test_AllowCollisionForEndEffector_with_attached_body(self, pr2_world_copy):
+        """
+        The rule resolves the end effector's bodies whenever the world model changes, so
+        a body grasped after the rule was created is freed together with the fingers
+        holding it -- a rule that captured body lists when it was made would not be.
+        """
+        pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        end_effector = pr2.right_arm.end_effector
+        rule = AllowCollisionForEndEffector(end_effector=end_effector)
+        rule.update(pr2_world_copy)
+        assert rule.allowed_collision_bodies == set(end_effector.bodies_with_collision)
+
+        with pr2_world_copy.modify_world():
+            grasped_body = Body(
+                name=PrefixedName("grasped"),
+                collision=ShapeCollection(shapes=[Sphere(radius=0.05)]),
+            )
+            pr2_world_copy.add_connection(
+                FixedConnection(parent=end_effector.tool_frame, child=grasped_body)
+            )
+
+        rule.update(pr2_world_copy)
+        assert grasped_body in rule.allowed_collision_bodies
+
     def test_AvoidExternalCollisions_with_attached_body(self, pr2_apartment_world):
         pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
         collision_matrix = CollisionMatrix()
@@ -351,9 +376,7 @@ class TestCollisionRules:
         )
 
     def test_compute_self_collision_matrix(self, pr2_world_state_reset, rclpy_node):
-        VizMarkerPublisher(
-            _world=pr2_world_state_reset, node=rclpy_node
-        )
+        VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
         pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
         base_link = pr2_world_state_reset.get_body_by_name("base_link")
         head_pan_link = pr2_world_state_reset.get_body_by_name("head_pan_link")

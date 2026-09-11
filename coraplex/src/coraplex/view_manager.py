@@ -10,6 +10,7 @@ from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Neck,
 )
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -22,6 +23,26 @@ class ViewManager:
     ) -> Optional[EndEffector]:
         arm = ViewManager.get_arm_view(arm, robot_view)
         return arm.end_effector
+
+    @staticmethod
+    def get_arm_by_tool_frame(
+        tool_frame: Body, robot_view: AbstractRobot
+    ) -> Optional[Arms]:
+        """
+        Look up which arm reaches with a given tool frame.
+
+        :param tool_frame: The tool frame to identify.
+        :param robot_view: The robot view to search in.
+        :return: The arm whose end effector holds the tool frame, or None when no arm of
+            this robot does.
+        """
+        for arm in Arms:
+            if (
+                tool_frame
+                == ViewManager.get_end_effector_view(arm, robot_view).tool_frame
+            ):
+                return arm
+        return None
 
     @staticmethod
     def get_arm_view(arm: Arms, robot_view: AbstractRobot) -> Optional[KinematicChain]:

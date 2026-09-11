@@ -275,8 +275,14 @@ class FeatureExtractor:
 
     def preprocess_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Preprocess the dataframe for JointProbabilityTrees by converting boolean columns
-        to integers and enum columns to hashes.
+        Preprocess the dataframe for JointProbabilityTrees by converting enum columns to
+        hashes.
+
+        Boolean columns are left as ``bool``, not converted to ``int``:
+        ``infer_variables_from_dataframe`` types a ``bool`` column as a two-valued
+        ``Symbolic`` variable, which is what JPT needs to split on it by category rather
+        than by a numeric threshold over an otherwise-unbounded domain a plain ``int``
+        column would infer as.
 
         :param df: The dataframe to preprocess.
         :return: The dataframe in a JPT compatible format.
@@ -284,9 +290,7 @@ class FeatureExtractor:
         feature_map = dict(zip(df.columns, self.features))
         for column in df.columns:
             feature = feature_map[column]
-            if feature._type_ is bool:
-                df[column] = df[column].astype(int)
-            elif isinstance(feature._type_, enum.EnumType):
+            if isinstance(feature._type_, enum.EnumType):
                 df[column] = df[column].apply(lambda x: hash(x))
             elif feature._type_ not in compatible_types and feature._type_ is not None:
                 raise UnsupportedFeatureTypeError(
