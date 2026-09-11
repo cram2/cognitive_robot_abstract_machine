@@ -15,6 +15,7 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, t
 from krrood.symbolic_math.symbolic_math import VariableParameters
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
+    TransitionKind,
     LifeCycleValues,
     LifeCyclePredicate,
     ObservationStateValues,
@@ -40,7 +41,7 @@ from giskardpy.motion_statechart.graph_node import (
     NodeStateVariable,
     DebugExpression,
 )
-from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.graph_node import SelfDecidingNode, Task
 from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
 from giskardpy.qp.constraint_collection import ConstraintCollection
 
@@ -598,22 +599,25 @@ class MotionStatechart(SubclassJSONSerializer):
     reaches at the end of the current tick, so a node waiting on another node's verdict
     starts on the tick that verdict is reached.
     Nodes are connected with edges, or transitions.
-    There are 4 types of transitions:
+    There are 6 types of transitions:
         - start condition: If True, the node transitions from NOT_STARTED to RUNNING.
         - pause condition: If True, the node transitions from RUNNING to PAUSED.
                            If False, the node transitions from PAUSED to RUNNING.
-        - end condition: If True, the node transitions from RUNNING or PAUSED to a
-                         terminal state, and its descendants on the same terms.
+        - success condition: If True, the node ends from RUNNING or PAUSED as SUCCEEDED.
+        - fail condition: If True, the node ends from RUNNING or PAUSED as FAILED.
+        - interrupt condition: If True, the node ends from RUNNING or PAUSED as
+                               INTERRUPTED.
         - reset condition: If True, the node transitions from any state to NOT_STARTED.
-    Which terminal state an ended node reaches is decided by the node itself, not by
-    whatever ended it: reaching what it observes means it succeeded. Other nodes can
-    therefore only decide *when* a node ends, never whether ending counts as success,
-    and an ancestor ending a node judges it exactly as its own end condition would have.
+    The condition that ends a node decides its verdict; what the node observes at that
+    moment has no say in it. A node ending takes its descendants down with it, and each
+    of them is INTERRUPTED, however the node ended.
     If multiple conditions are met, the following order is used:
         1. reset condition
-        2. its own or an ancestor's end condition
-        3. pause condition
-        4. start condition
+        2. its own success condition
+        3. its own fail condition
+        4. its own interrupt condition, or any ending condition of an ancestor
+        5. pause condition
+        6. start condition
     How to use this class:
         1. initialized with a world
         2. add nodes.
@@ -719,10 +723,10 @@ class MotionStatechart(SubclassJSONSerializer):
         for node in self.nodes:
             node_copy = motion_statechart_copy.get_node_by_index(node.index)
             node_copy.plot_specifications = deepcopy(node.plot_specifications)
-            node_copy.start_condition = node.start_condition
-            node_copy.pause_condition = node.pause_condition
-            node_copy.end_condition = node.end_condition
-            node_copy.reset_condition = node.reset_condition
+            for transition_kind in TransitionKind:
+                node_copy.set_condition(
+                    transition_kind, node.get_condition(transition_kind)
+                )
         return motion_statechart_copy
 
     @property
@@ -961,6 +965,7 @@ class MotionStatechart(SubclassJSONSerializer):
         """
         self.sanity_check()
         self._expand_goals(context=context)
+        self._succeed_self_deciding_nodes_at_their_goal()
         self._build_nodes(context=context)
         self._add_transitions()
         self.observation_state.compile(context=context)
@@ -972,6 +977,20 @@ class MotionStatechart(SubclassJSONSerializer):
                 observation_state=self.observation_state,
             )
         )
+
+    def _succeed_self_deciding_nodes_at_their_goal(self):
+        """
+        Gives every :class:`SelfDecidingNode` the success its contract promises, on top
+        of whatever else already ends it.
+
+        Runs once every goal has expanded, so no template can wire this away, and late
+        enough that the conditions are still the ones a caller wrote while the templates
+        were checking them.
+        """
+        for node in self.get_nodes_by_type(SelfDecidingNode):
+            node.success_condition = sm.trinary_logic_or(
+                node.success_condition, node.goal_reached
+            )
 
     def _expand_goals(self, context: MotionStatechartContext):
         """

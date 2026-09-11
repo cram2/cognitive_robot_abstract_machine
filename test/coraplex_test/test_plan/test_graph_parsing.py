@@ -56,7 +56,10 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.templates import (
     Parallel,
     RepeatOnStall,
-    Sequence, TryAll, TryInOrder, CancelledWhenTrue,
+    Sequence,
+    TryAll,
+    TryInOrder,
+    CancelledWhenTrue,
 )
 from giskardpy.motion_statechart.graph_node import CancelMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import CountNodeResets
@@ -138,10 +141,13 @@ def test_sequential_plan_nests_a_goal_per_plan_node(immutable_model_world):
 
 def _monitored_goal_of(executable):
     """
+    A monitored goal is a maintenance node, so the sequence that runs it wraps it in an
+    attempt to give it an ending.
+
     :return: The single monitored goal below the executable's root goal.
     """
-    [monitored_goal] = executable.root_node.nodes
-    return monitored_goal
+    [step] = executable.root_node.nodes
+    return step.task
 
 
 def _parse_and_compile(plan, world, context):
@@ -218,9 +224,12 @@ def test_cancel_monitor_ends_the_children_goal(immutable_model_world, rclpy_node
     monitored_goal = _monitored_goal_of(executable)
     assert type(monitored_goal) is CancelledWhenTrue
     assert monitored_goal.nodes[:2] == [monitor, monitored_goal.monitored_node]
-    assert monitored_goal.monitored_node.end_condition.free_variables() == [
-        monitor.observation_variable
-    ]
+    # The children's goal already ends itself once it succeeds, so the monitor firing is
+    # a reason to interrupt it on top of that. It is read through its verdict, which
+    # outlasts a monitor that ends itself on firing.
+    assert monitor.goal_reached in (
+        monitored_goal.monitored_node.interrupt_condition.free_variables()
+    )
 
 
 def test_cancel_monitor_ends_the_motion_when_the_monitor_fires(

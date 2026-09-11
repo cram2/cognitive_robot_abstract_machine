@@ -179,12 +179,14 @@ thin, so it recedes instead of presenting itself as a third value color.
 MINIMUM_RANK_DISTANCES: Dict[TransitionKind, int] = {
     TransitionKind.START: 1,
     TransitionKind.PAUSE: 0,
-    TransitionKind.END: 1,
+    TransitionKind.SUCCEED: 1,
     TransitionKind.RESET: 0,
+    TransitionKind.FAIL: 1,
+    TransitionKind.INTERRUPT: 1,
 }
 """
 How many rows apart a dependency of each transition kind draws its endpoints at least.
 
 A node read by a pause or a reset condition may sit beside the node reading it; the
-other two kinds are drawn a row above it.
+other kinds are drawn a row above it.
 """

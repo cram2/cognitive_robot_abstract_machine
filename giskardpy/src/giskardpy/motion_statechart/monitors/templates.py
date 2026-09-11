@@ -7,6 +7,7 @@ from typing import Optional
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import (
     Goal,
+    MaintenanceNode,
     MotionStatechartNode,
     NodeArtifacts,
 )
@@ -19,9 +20,12 @@ from krrood.symbolic_math.symbolic_math import (
 
 
 @dataclass(repr=False, eq=False)
-class MonitoredGoal(Goal, ABC):
+class MonitoredGoal(MaintenanceNode, Goal, ABC):
     """
     Runs a monitored node next to the monitor observing it.
+
+    What it observes is what the monitored node has reached, so nothing here ever
+    concludes either: a plan step built from one is an attempt wrapping it.
 
     The two are siblings, which is what lets the monitor's observation drive the
     monitored node's life cycle: a transition condition may only reference the owning
@@ -88,15 +92,19 @@ class PausedUntilTrue(MonitoredGoal):
 @dataclass(repr=False, eq=False)
 class StoppedWhenTrue(MonitoredGoal):
     """
-    Ends the monitored node as soon as the monitor observes True.
+    Interrupts the monitored node as soon as the monitor observes True.
 
-    It observes True once the monitored node reached its goal, False once the monitor
-    stopped it before that, and Unknown while the monitored node is still running.
+    It observes True while the monitored node is at its goal or once it succeeded, False
+    once the monitor stopped it, however close to its goal it was, and Unknown
+    otherwise.
+
+    The monitor is read through its verdict, which outlasts a monitor that ends itself
+    on firing, unlike the pausing goals, which need the reading it takes right now.
     """
 
     def wire_monitor(self) -> None:
-        self.monitored_node.end_condition = trinary_logic_or(
-            self.monitored_node.end_condition, self.monitor.observation_variable
+        self.monitored_node.interrupt_condition = trinary_logic_or(
+            self.monitored_node.interrupt_condition, self.monitor.goal_reached
         )
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -107,7 +115,7 @@ class StoppedWhenTrue(MonitoredGoal):
                         self.monitored_node.goal_reached.is_true(),
                         Scalar.const_true(),
                     ),
-                    (self.monitor.observation_variable.is_true(), Scalar.const_false()),
+                    (self.monitor.goal_reached.is_true(), Scalar.const_false()),
                 ],
                 Scalar.const_trinary_unknown(),
             )

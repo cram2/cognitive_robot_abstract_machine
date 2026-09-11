@@ -79,7 +79,8 @@ def test_an_attempt_succeeds_once_its_task_reaches_its_goal():
     rather than leaving the caller to read the task.
 
     The verdict is read rather than the observation behind it, because only the verdict
-    outlasts the goal that reached it.
+    outlasts the goal that reached it. The verdict belongs to the attempt: the task it
+    held open is only taken down with it.
     """
     task = ConstTrueNode(name="task")
     attempt = Attempt(task=task, failure_monitors=[])
@@ -88,10 +89,10 @@ def test_an_attempt_succeeds_once_its_task_reaches_its_goal():
 
     assert attempt.goal_reached_state == ObservationStateValues.TRUE
     assert attempt.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert task.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert task.life_cycle_state == LifeCycleValues.INTERRUPTED
 
 
-def test_an_attempt_ends_itself_without_anything_wiring_an_end_condition():
+def test_an_attempt_ends_itself_without_anything_wiring_a_success_condition():
     """
     Supplying the ending a motion cannot produce is the whole point of the template, so
     it must not depend on a parent having wired one.
@@ -123,7 +124,8 @@ def test_an_attempt_fails_once_a_failure_monitor_fires():
 
     assert attempt.goal_reached_state == ObservationStateValues.FALSE
     assert attempt.life_cycle_state == LifeCycleValues.FAILED
-    assert task.life_cycle_state == LifeCycleValues.FAILED
+    # The attempt is what gave up; the task was only taken down with it.
+    assert task.life_cycle_state == LifeCycleValues.INTERRUPTED
 
 
 def test_an_attempt_holds_its_task_open_until_it_is_decided():
@@ -335,4 +337,4 @@ def test_a_failed_attempt_makes_its_sequence_report_a_failure():
     _compile_and_tick(sequence)
 
     assert failing_step.life_cycle_state == LifeCycleValues.FAILED
-    assert sequence.observation_state == ObservationStateValues.FALSE
+    assert sequence.goal_reached_state == ObservationStateValues.FALSE

@@ -13,7 +13,10 @@ from typing_extensions import (
     TYPE_CHECKING,
 )
 
-from giskardpy.motion_statechart.data_types import ObservationStateValues
+from giskardpy.motion_statechart.data_types import (
+    ObservationStateValues,
+    TransitionKind,
+)
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     TerminalNode,
@@ -244,32 +247,25 @@ class MotionStatechartGraphviz:
         :return: The condition rows of the label.
         """
         life_cycle_state = self.motion_statechart.life_cycle_state[node]
-        label = self._build_condition_row(
-            prefix="start",
-            condition=node._start_condition,
-            is_active=node._start_condition.kind.can_trigger_from(life_cycle_state),
-            line_color=line_color,
+        return "".join(
+            self._build_condition_row(
+                prefix=self.condition_prefix(condition.kind),
+                condition=condition,
+                is_active=condition.kind.can_trigger_from(life_cycle_state),
+                line_color=line_color,
+            )
+            for condition in node.conditions
+            if condition.kind is TransitionKind.START
+            or not isinstance(node, TerminalNode)
         )
-        if not isinstance(node, TerminalNode):
-            label += self._build_condition_row(
-                prefix="pause",
-                condition=node._pause_condition,
-                is_active=node._pause_condition.kind.can_trigger_from(life_cycle_state),
-                line_color=line_color,
-            )
-            label += self._build_condition_row(
-                prefix="end  ",
-                condition=node._end_condition,
-                is_active=node._end_condition.kind.can_trigger_from(life_cycle_state),
-                line_color=line_color,
-            )
-            label += self._build_condition_row(
-                prefix="reset",
-                condition=node._reset_condition,
-                is_active=node._reset_condition.kind.can_trigger_from(life_cycle_state),
-                line_color=line_color,
-            )
-        return label
+
+    @staticmethod
+    def condition_prefix(transition_kind: TransitionKind) -> str:
+        """
+        :param transition_kind: The transition whose condition a row lists.
+        :return: The text a condition row starts with.
+        """
+        return transition_kind.name.lower()
 
     def _build_condition_row(
         self,

@@ -13,10 +13,11 @@ from giskardpy.motion_statechart.exceptions import (
     CollisionViolatedError,
 )
 from giskardpy.motion_statechart.graph_node import (
+    MaintenanceNode,
     Goal,
-    MotionStatechartNode,
     NodeArtifacts,
     CancelMotion,
+    SelfDecidingNode,
 )
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.plotters.plot_specs import (
@@ -306,7 +307,7 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
 
 
 @dataclass(eq=False, repr=False)
-class UpdateTemporaryCollisionRules(MotionStatechartNode):
+class UpdateTemporaryCollisionRules(SelfDecidingNode):
     """
     Updates the temporary collision rules for the robot.
     """
@@ -339,7 +340,7 @@ class UpdateTemporaryCollisionRules(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class SetInitialTemporaryCollisionRules(MotionStatechartNode):
+class SetInitialTemporaryCollisionRules(SelfDecidingNode):
     """
     Updates the temporary collision rules for the robot.
     """
@@ -467,7 +468,7 @@ class ExternalCollisionAvoidance(Goal):
 
 
 @dataclass(eq=False, repr=False)
-class ExternalCollisionDistanceMonitor(MotionStatechartNode):
+class ExternalCollisionDistanceMonitor(MaintenanceNode):
     """
     Monitors the distance to the closest external object for a specific collision group
     of a body. Turns True if the distance falls below a given threshold.
@@ -818,7 +819,7 @@ class SelfCollisionAvoidance(Goal):
 
 
 @dataclass(eq=False, repr=False)
-class SelfCollisionDistanceMonitor(MotionStatechartNode):
+class SelfCollisionDistanceMonitor(MaintenanceNode):
     """
     Monitors the distance to the closest external object for the group of a body.
 

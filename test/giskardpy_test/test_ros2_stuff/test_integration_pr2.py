@@ -396,14 +396,14 @@ class TestJointGoals:
             )
         )
         msc.add_node(min_joint_goal)
-        min_joint_goal.end_condition = min_joint_goal.observation_variable
+        min_joint_goal.success_condition = min_joint_goal.observation_variable
 
         torso_joint_goal = JointPositionList(
             goal_state=JointState.from_mapping(mapping={torso_lift_joint: 3.2})
         )
         msc.add_node(torso_joint_goal)
         torso_joint_goal.start_condition = min_joint_goal.observation_variable
-        torso_joint_goal.end_condition = torso_joint_goal.observation_variable
+        torso_joint_goal.success_condition = torso_joint_goal.observation_variable
 
         max_joint_goal = JointPositionList(
             goal_state=JointState.from_mapping(

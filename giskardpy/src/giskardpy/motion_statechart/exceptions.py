@@ -10,6 +10,7 @@ from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
 from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
 
 if TYPE_CHECKING:
+    from giskardpy.motion_statechart.data_types import TransitionKind
     from giskardpy.motion_statechart.graph_node import (
         MotionStatechartNode,
         TrinaryCondition,
@@ -146,6 +147,83 @@ class EndMotionInGoalError(NodeInitializationError):
 
     def suggest_correction(self) -> str:
         return "Use a different node type or move the EndMotion node outside the Goal."
+
+
+@dataclass
+class NodeCannotDecideItselfError(NodeInitializationError):
+    """
+    Raised when a template is handed a child that never reaches a terminal state on its
+    own, so nothing would ever move the template past it.
+    """
+
+    child: MotionStatechartNode
+    """
+    The child that would run forever.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'Node "{self.child.unique_name}" of "{self.node.unique_name}" never ends '
+            f"on its own."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Wrap it in an Attempt, stating what counts as failure, or declare it a "
+            "SelfDecidingNode if it already reaches a terminal state by itself."
+        )
+
+
+@dataclass
+class ChildTransitionAlreadyWiredError(NodeInitializationError):
+    """
+    Raised when a child handed to a template already has one of its life cycle
+    transitions wired, which is the template's to decide.
+    """
+
+    child: MotionStatechartNode
+    """
+    The child whose transition was already wired.
+    """
+
+    transition_kind: TransitionKind
+    """
+    The transition that was already wired.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The {self.transition_kind.name.lower()} condition of "
+            f'"{self.child.unique_name}" was wired before it was passed to '
+            f'"{self.node.unique_name}", which decides it.'
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Leave the child's life cycle to the template, or express the condition "
+            "where the template cannot: a fail condition stays with the node itself."
+        )
+
+
+@dataclass
+class TransitionHasNoVerdictError(MotionStatechartError):
+    """
+    Raised when the verdict of a transition that does not end a node is asked for.
+    """
+
+    transition_kind: TransitionKind
+    """
+    The transition whose verdict was asked for.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The {self.transition_kind.name.lower()} transition does not end a node, "
+            f"so it has no verdict."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Only ask the transitions that end a node for their verdict."
 
 
 @dataclass
