@@ -193,10 +193,9 @@ class RepeatNode(ExecutesSequentially):
     """
     Node whose True observation means an attempt failed.
 
-    Use it for a decision that stands on its own, such as a force spike, together with
-    :class:`~giskardpy.motion_statechart.goals.templates.RepeatUntil` as the template,
-    which leaves the decision to whatever it is handed. It turns the children's goal
-    into an attempt that gives up when this monitor fires.
+    Use it for a decision that stands on its own, such as a force spike. It turns the
+    children's goal into an attempt that gives up when this monitor fires, and the
+    default template makes that attempt give up on a stall as well.
     """
 
     def parse(self) -> Executable:
@@ -218,8 +217,9 @@ class RepeatNode(ExecutesSequentially):
             node=children_goal,
             target=self.maximum_repetitions,
         )
-        # A monitor that stands on its own is what makes an attempt out of the children;
-        # a template deriving its own, such as RepeatOnStall, is handed them raw.
+        # A monitor that stands on its own makes an attempt out of the children, and a
+        # template with ways of failing of its own, such as RepeatOnStall, adds them to
+        # that attempt.
         attempted_children = (
             Attempt(
                 name=f"{type(self).__name__}/attempt",

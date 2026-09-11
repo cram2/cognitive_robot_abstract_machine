@@ -199,11 +199,11 @@ class GoalOverSelfDecidingNodes(SelfDecidingNode, Goal, ABC):
         if not isinstance(node, MaintenanceNode):
             raise NodeCannotDecideItselfError(node=self, child=node)
         attempt = Attempt(name=f"{node.name}/attempt", task=node, failure_monitors=[])
+        # The attempt takes the node's place among the children and becomes its parent,
+        # so the children stay in the order the caller wrote them in.
+        if node in self.nodes:
+            self.nodes[self.nodes.index(node)] = attempt
         self.add_node(attempt)
-        # The attempt takes the node's place here and becomes its parent, so the children
-        # stay in the order the caller wrote them in.
-        self.nodes.remove(attempt)
-        self.nodes[self.nodes.index(node)] = attempt
         node.parent_node = attempt
         return attempt
 
@@ -349,7 +349,9 @@ class RepeatUntil(GoalOverSelfDecidingNodes):
 
     What counts as a failed attempt is stated on the task itself: hand it an
     :class:`Attempt` carrying the failure monitors that decide it, or see
-    :class:`RepeatOnStall`, which derives that decision from the task's own progress.
+    :class:`RepeatOnStall`, which derives that decision from the task's own progress. A
+    task that never ends on its own is attempted with no way of failing, so it is never
+    retried and ends only by succeeding or once :attr:`stop_retry_monitor` fires.
     """
 
     task: MotionStatechartNode = field(kw_only=True)
@@ -439,19 +441,33 @@ class RepeatOnStall(RepeatUntil):
         """
         Turn the task into an attempt that gives up on a stall, which is the decision
         this subclass exists to make for the caller.
+
+        A task that already is an :class:`Attempt` keeps its own failure monitors and
+        gives up on a stall as well.
         """
         super().__post_init__()
+        if isinstance(self.task, Attempt):
+            self.task.failure_monitors.append(
+                self._create_stall_monitor(self.task.task)
+            )
+            return
         self.task = Attempt(
             name=f"{self.name}/attempt",
             task=self.task,
-            failure_monitors=[
-                Stalled(
-                    name=f"{self.name}/progress",
-                    monitored_node=self.task,
-                    timeout=self.timeout,
-                    minimum_convergence_rate=self.minimum_convergence_rate,
-                )
-            ],
+            failure_monitors=[self._create_stall_monitor(self.task)],
+        )
+
+    def _create_stall_monitor(self, monitored_node: MotionStatechartNode) -> Stalled:
+        """
+        :param monitored_node: The node whose progress is measured.
+        :return: A monitor that fires once nothing under `monitored_node` has approached
+            its goal for :attr:`timeout`.
+        """
+        return Stalled(
+            name=f"{self.name}/progress",
+            monitored_node=monitored_node,
+            timeout=self.timeout,
+            minimum_convergence_rate=self.minimum_convergence_rate,
         )
 
 
