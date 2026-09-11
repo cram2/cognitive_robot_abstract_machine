@@ -5,8 +5,9 @@ import logging
 import os
 import shutil
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import ClassVar, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -37,31 +38,19 @@ except ImportError:
     py7zr = None
 
 
-MODEL_ARCHIVE_VARIANTS = (
-    "models",
-    "models_eval",
-    "models_m",
-    "models_obj",
-    "models_obj_eval",
-    "models_obj_m",
-)
-"""
-The dataset's model archives: millimeter- and meter-unit point-cloud (`.ply`) and mesh
-(`.obj`) variants, plus a simplified/watertight `_eval` variant used for pose-error
-metrics. See :meth:`GraspClutter6DDatasetLoader.download_models`.
-"""
+class GraspClutter6DModelVariant(StrEnum):
+    """
+    The dataset's model archives: millimeter- and meter-unit point-cloud (`.ply`) and mesh
+    (`.obj`) variants, plus a simplified/watertight `EVAL` variant used for pose-error
+    metrics. See :meth:`GraspClutter6DDatasetLoader.download_models`.
+    """
 
-_SCENES_ARCHIVE_PARTS = (
-    "scenes.7z.001",
-    "scenes.7z.002",
-    "scenes.7z.003",
-    "scenes.7z.004",
-    "scenes.7z.005",
-)
-"""
-The 5 volumes of the dataset's one combined scenes archive (~203 GB total), split because
-Hugging Face Hub caps individual file size.
-"""
+    MODELS = "models"
+    EVAL = "models_eval"
+    METERS = "models_m"
+    OBJ = "models_obj"
+    OBJ_EVAL = "models_obj_eval"
+    OBJ_METERS = "models_obj_m"
 
 
 @dataclass
@@ -102,6 +91,18 @@ class GraspClutter6DDatasetLoader:
 
     repository_id: str = "GraspClutter6D/GraspClutter6D"
     """The Hugging Face dataset repository ID."""
+
+    _SCENES_ARCHIVE_PARTS: ClassVar[Tuple[str, ...]] = (
+        "scenes.7z.001",
+        "scenes.7z.002",
+        "scenes.7z.003",
+        "scenes.7z.004",
+        "scenes.7z.005",
+    )
+    """
+    The 5 volumes of the dataset's one combined scenes archive (~203 GB total), split
+    because Hugging Face Hub caps individual file size.
+    """
 
     def _download_archive(self, filename: str) -> Path:
         """
@@ -171,27 +172,23 @@ class GraspClutter6DDatasetLoader:
         archive_path = self._download_archive("split_info.7z")
         return self._extract_archive(archive_path, self.directory, "split_info")
 
-    def download_models(self, variant: str = "models_eval") -> Path:
+    def download_models(
+        self, variant: GraspClutter6DModelVariant = GraspClutter6DModelVariant.EVAL
+    ) -> Path:
         """
         Download and extract one of the dataset's model archives.
 
-        :param variant: One of :data:`MODEL_ARCHIVE_VARIANTS`. Defaults to
-            ``"models_eval"`` (~87 MB, simplified/watertight meshes) as the cheapest
-            variant to fetch; pass ``"models"`` for the full-detail millimeter-unit
-            meshes, or ``"models_m"`` for the meter-unit variant (pair this with
-            ``mesh_unit_scale=1.0`` on
+        :param variant: Defaults to :attr:`~GraspClutter6DModelVariant.EVAL` (~87 MB,
+            simplified/watertight meshes) as the cheapest variant to fetch; pass
+            :attr:`~GraspClutter6DModelVariant.MODELS` for the full-detail millimeter-
+            unit meshes, or :attr:`~GraspClutter6DModelVariant.METERS` for the meter-unit
+            variant (pair this with ``mesh_unit_scale=1.0`` on
             :meth:`~semantic_digital_twin.adapters.grasp_clutter_6d_dataset.schema.GraspClutter6DScene.create_world`).
-        :raises ValueError: if `variant` is not one of :data:`MODEL_ARCHIVE_VARIANTS`.
         :return: The extracted directory, containing `obj_%06d.ply`/`.obj` files and
             `models_info.json`.
         """
-        if variant not in MODEL_ARCHIVE_VARIANTS:
-            raise ValueError(
-                f"Unknown model archive variant '{variant}', expected one of "
-                f"{MODEL_ARCHIVE_VARIANTS}."
-            )
-        archive_path = self._download_archive(f"{variant}.7z")
-        return self._extract_archive(archive_path, self.directory, variant)
+        archive_path = self._download_archive(f"{variant.value}.7z")
+        return self._extract_archive(archive_path, self.directory, variant.value)
 
     def download_scenes(self) -> Path:
         """
@@ -207,7 +204,7 @@ class GraspClutter6DDatasetLoader:
         if expected_directory.exists():
             return expected_directory
         part_paths = [
-            self._download_archive(name) for name in _SCENES_ARCHIVE_PARTS
+            self._download_archive(name) for name in self._SCENES_ARCHIVE_PARTS
         ]
         return self._extract_archive(part_paths[0], self.directory, "scenes")
 

@@ -60,7 +60,7 @@ def _write_scene(directory: Path):
     (directory / "scene_gt.json").write_text(json.dumps(scene_gt))
 
 
-def _write_object_mesh(models_directory: Path, obj_id: int = 1):
+def _write_object_mesh(models_directory: Path, object_id: int = 1):
     """
     Write a synthetic object mesh in millimeter-scale units, like the real dataset's
     `.ply` files - `create_world`'s default `mesh_unit_scale` converts mm to meters, so a
@@ -69,7 +69,7 @@ def _write_object_mesh(models_directory: Path, obj_id: int = 1):
     """
     models_directory.mkdir(parents=True, exist_ok=True)
     box = trimesh.creation.box(extents=(100.0, 100.0, 100.0))
-    box.export(str(models_directory / f"obj_{obj_id:06d}.ply"), file_type="ply")
+    box.export(str(models_directory / f"obj_{object_id:06d}.ply"), file_type="ply")
 
 
 def test_from_directory_missing_files_raises(tmp_path):
@@ -83,12 +83,19 @@ def test_from_directory_parses_frames_and_poses(tmp_path):
 
     assert set(scene.frames.keys()) == {"1", "2"}
     assert len(scene.frames["1"].object_poses) == 2
-    assert scene.frames["1"].object_poses[0].obj_id == 1
+    assert scene.frames["1"].object_poses[0].object_id == 1
+    # cam_t_m2c is in millimeters; camera_t_object is already converted to meters.
+    translation = scene.frames["1"].object_poses[0].camera_t_object
     np.testing.assert_allclose(
-        scene.frames["1"].object_poses[0].camera_t_object, [1000.0, 2000.0, 3000.0]
+        [float(translation.x), float(translation.y), float(translation.z)],
+        [1.0, 2.0, 3.0],
     )
     assert scene.frames["2"].camera.world_R_camera is not None
-    np.testing.assert_allclose(scene.frames["2"].camera.world_t_camera, [500.0, 0.0, 0.0])
+    world_translation = scene.frames["2"].camera.world_t_camera
+    np.testing.assert_allclose(
+        [float(world_translation.x), float(world_translation.y), float(world_translation.z)],
+        [0.5, 0.0, 0.0],
+    )
     # frame "1" has no world-to-camera transform in the fixture.
     assert scene.frames["1"].camera.world_R_camera is None
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import ClassVar, Dict, List, Optional
 
 import numpy as np
 import trimesh
@@ -14,7 +14,10 @@ from semantic_digital_twin.adapters.grasp_clutter_6d_dataset.exceptions import (
     GraspClutter6DObjectModelNotFoundError,
     GraspClutter6DSceneFilesMissingError,
 )
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
@@ -22,6 +25,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     RotationMatrix,
+    Vector3,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -30,14 +34,10 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
-
-MILLIMETERS_TO_METERS = 1e-3
-"""
-GraspClutter6D's BOP-format JSON files give every translation in millimeters; the rest of
-this package works in meters (SI), so every translation parsed from the dataset is
-converted with this factor.
-"""
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+)
 
 
 @dataclass
@@ -48,21 +48,30 @@ class GraspClutter6DCameraInfo:
     (https://github.com/thodan/bop_toolkit).
     """
 
+    MILLIMETERS_TO_METERS: ClassVar[float] = 1e-3
+    """
+    GraspClutter6D's BOP-format JSON files give every translation in millimeters; the
+    rest of this package works in meters (SI), so every translation parsed from the
+    dataset is converted with this factor.
+    """
+
     intrinsics: np.ndarray
     """The 3x3 camera intrinsic matrix (`cam_K`), in pixels."""
 
     depth_scale: float
     """Multiply this frame's raw depth image values by this factor to get millimeters."""
 
-    world_R_camera: Optional[np.ndarray] = None
+    world_R_camera: Optional[RotationMatrix] = None
     """
-    3x3 rotation (`cam_R_w2c`) that rotates a point given in the dataset's world frame
-    into this camera's frame. `None` if the scene defines no world frame, in which case
-    object poses are only meaningful relative to the camera.
+    Rotation (`cam_R_w2c`) that rotates a point given in the dataset's world frame into
+    this camera's frame. Not yet bound to a reference frame - that only exists once a
+    world is being built (see :meth:`GraspClutter6DScene._add_world_frame`). `None` if
+    the scene defines no world frame, in which case object poses are only meaningful
+    relative to the camera.
     """
 
-    world_t_camera: Optional[np.ndarray] = None
-    """Translation (`cam_t_w2c`) paired with `world_R_camera`, in millimeters."""
+    world_t_camera: Optional[Point3] = None
+    """Translation (`cam_t_w2c`) paired with `world_R_camera`, already converted to meters."""
 
     @classmethod
     def from_json(cls, data: Dict) -> Self:
@@ -72,15 +81,64 @@ class GraspClutter6DCameraInfo:
             intrinsics=np.array(data["cam_K"], dtype=float).reshape(3, 3),
             depth_scale=float(data["depth_scale"]),
             world_R_camera=(
-                np.array(rotation, dtype=float).reshape(3, 3)
+                RotationMatrix(data=np.array(rotation, dtype=float).reshape(3, 3))
                 if rotation is not None
                 else None
             ),
             world_t_camera=(
-                np.array(translation, dtype=float)
+                Point3(
+                    *(np.array(translation, dtype=float) * cls.MILLIMETERS_TO_METERS)
+                )
                 if translation is not None
                 else None
             ),
+        )
+
+    @property
+    def field_of_view(self) -> FieldOfView:
+        """
+        :return: This camera's field of view, estimated from `intrinsics`. The dataset's
+            `scene_camera.json` does not give the image resolution directly, so this
+            assumes the principal point sits at the image center (``width = 2 * cx``,
+            ``height = 2 * cy``) - a common approximation, not a value read from the
+            dataset itself.
+        """
+        focal_x, focal_y = self.intrinsics[0, 0], self.intrinsics[1, 1]
+        principal_x, principal_y = self.intrinsics[0, 2], self.intrinsics[1, 2]
+        return FieldOfView(
+            horizontal_angle=2 * np.arctan(principal_x / focal_x),
+            vertical_angle=2 * np.arctan(principal_y / focal_y),
+        )
+
+
+@dataclass(eq=False)
+class GraspClutter6DCamera(Camera):
+    """
+    A GraspClutter6D frame's camera, represented with the same
+    :class:`~semantic_digital_twin.robots.robot_parts.Camera` semantic annotation used
+    for every other camera in this package, instead of a bare, unannotated
+    :class:`~semantic_digital_twin.world_description.world_entity.Body`.
+
+    .. note::
+        Unlike every other :class:`Camera` subclass in this package, this one is not
+        attached to any robot -
+        :meth:`setup_default_configuration_in_world_below_robot_root` is not
+        implemented.
+    """
+
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self) -> List[JointState]:
+        return []
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        raise NotImplementedError(
+            "GraspClutter6DCamera is not attached to a robot; construct it directly "
+            "instead."
         )
 
 
@@ -91,38 +149,49 @@ class GraspClutter6DObjectPose:
     `scene_gt.json`, following the BOP dataset format.
     """
 
-    obj_id: int
+    object_id: int
     """
     1-indexed object id, matching the `obj_%06d` numbering of the dataset's model files
     and `models_info.json` keys.
     """
 
-    camera_R_object: np.ndarray
+    camera_R_object: RotationMatrix
     """
-    3x3 rotation (`cam_R_m2c`) that rotates a point given in the object's own model frame
-    into the camera frame.
+    Rotation (`cam_R_m2c`) that rotates a point given in the object's own model frame
+    into the camera frame. Not yet bound to a reference frame - see
+    :meth:`camera_T_object`.
     """
 
-    camera_t_object: np.ndarray
-    """Translation (`cam_t_m2c`) paired with `camera_R_object`, in millimeters."""
+    camera_t_object: Point3
+    """Translation (`cam_t_m2c`) paired with `camera_R_object`, already converted to meters."""
 
     @classmethod
     def from_json(cls, data: Dict) -> Self:
         return cls(
-            obj_id=int(data["obj_id"]),
-            camera_R_object=np.array(data["cam_R_m2c"], dtype=float).reshape(3, 3),
-            camera_t_object=np.array(data["cam_t_m2c"], dtype=float),
+            object_id=int(data["obj_id"]),
+            camera_R_object=RotationMatrix(
+                data=np.array(data["cam_R_m2c"], dtype=float).reshape(3, 3)
+            ),
+            camera_t_object=Point3(
+                *(
+                    np.array(data["cam_t_m2c"], dtype=float)
+                    * GraspClutter6DCameraInfo.MILLIMETERS_TO_METERS
+                )
+            ),
         )
 
     def camera_T_object(self, camera: Body, obj: Body) -> HomogeneousTransformationMatrix:
         """
         :param camera: The camera body to use as the transform's reference frame.
         :param obj: The object body to use as the transform's child frame.
-        :return: This object's pose relative to `camera`, in meters.
+        :return: This object's pose relative to `camera`.
         """
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=Point3(
-                *(self.camera_t_object * MILLIMETERS_TO_METERS), reference_frame=camera
+                self.camera_t_object.x,
+                self.camera_t_object.y,
+                self.camera_t_object.z,
+                reference_frame=camera,
             ),
             rotation_matrix=RotationMatrix(
                 data=self.camera_R_object, reference_frame=camera
@@ -214,7 +283,7 @@ class GraspClutter6DScene:
         models_directory: Path,
         *,
         with_world_frame: bool = False,
-        mesh_unit_scale: float = MILLIMETERS_TO_METERS,
+        mesh_unit_scale: float = GraspClutter6DCameraInfo.MILLIMETERS_TO_METERS,
         object_names: Optional[Dict[int, str]] = None,
     ) -> World:
         """
@@ -240,10 +309,10 @@ class GraspClutter6DScene:
         :param mesh_unit_scale: Factor applied to every loaded mesh's vertices. The
             default assumes millimeter-unit meshes (the `models`/`models_eval` archives);
             pass ``1.0`` when using the meter-unit `models_m`/`models_obj_m` archives.
-        :param object_names: Optional ``obj_id -> name`` lookup for the semantic
+        :param object_names: Optional ``object_id -> name`` lookup for the semantic
             annotation added to each object (see the class docstring for why this is not
             in the dataset itself). Objects without an entry get a generic
-            ``f"object_{obj_id:06d}"`` name.
+            ``f"object_{object_id:06d}"`` name.
         :raises GraspClutter6DImageNotFoundError: if `image_id` is not in `self.frames`.
         :raises GraspClutter6DObjectModelNotFoundError: if an object's mesh file is not
             found in `models_directory`.
@@ -262,6 +331,14 @@ class GraspClutter6DScene:
         )
         with world.modify_world():
             world.add_body(camera_body)
+        with world.modify_world():
+            world.add_semantic_annotation(
+                GraspClutter6DCamera(
+                    root=camera_body,
+                    forward_facing_axis=Vector3.Z(),
+                    field_of_view=frame.camera.field_of_view,
+                )
+            )
 
         root_body = camera_body
         if with_world_frame and frame.camera.world_R_camera is not None:
@@ -303,7 +380,9 @@ class GraspClutter6DScene:
         # pose in the map frame is that transform's inverse.
         camera_T_map = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=Point3(
-                *(camera_info.world_t_camera * MILLIMETERS_TO_METERS),
+                camera_info.world_t_camera.x,
+                camera_info.world_t_camera.y,
+                camera_info.world_t_camera.z,
                 reference_frame=camera_body,
             ),
             rotation_matrix=RotationMatrix(
@@ -355,15 +434,15 @@ class GraspClutter6DScene:
             a separate `map` body is the actual root) raises "free joint can only be used
             on top level".
         :param index: This object's position in the frame's `object_poses`, used to keep
-            two instances of the same `obj_id` in one frame distinct.
+            two instances of the same `object_id` in one frame distinct.
         """
-        mesh_path = models_directory / f"obj_{pose.obj_id:06d}.ply"
+        mesh_path = models_directory / f"obj_{pose.object_id:06d}.ply"
         if not mesh_path.is_file():
             raise GraspClutter6DObjectModelNotFoundError(
-                obj_id=pose.obj_id, models_directory=models_directory
+                object_id=pose.object_id, models_directory=models_directory
             )
 
-        name = (object_names or {}).get(pose.obj_id, f"object_{pose.obj_id:06d}")
+        name = (object_names or {}).get(pose.object_id, f"object_{pose.object_id:06d}")
 
         body = Body()
         body.name = PrefixedName(

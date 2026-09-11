@@ -6,7 +6,7 @@ from requests import HTTPError
 
 from semantic_digital_twin.adapters.grasp_clutter_6d_dataset.loader import (
     GraspClutter6DDatasetLoader,
-    MODEL_ARCHIVE_VARIANTS,
+    GraspClutter6DModelVariant,
 )
 
 SCENE_ID_PATTERN = re.compile(r"^\d{6}$")
@@ -25,9 +25,15 @@ def _skip_on_network_error(callable_):
         pytest.skip(f"GraspClutter6D dataset not available: {e}")
 
 
-def test_download_models_unknown_variant_raises(loader):
-    with pytest.raises(ValueError):
-        loader.download_models("not-a-real-variant")
+def test_model_variant_enum_has_the_expected_members():
+    assert {v.value for v in GraspClutter6DModelVariant} == {
+        "models",
+        "models_eval",
+        "models_m",
+        "models_obj",
+        "models_obj_eval",
+        "models_obj_m",
+    }
 
 
 @pytest.mark.parametrize("object_set,split", [("grasp", "train"), ("ycbv", "test")])
@@ -47,12 +53,12 @@ def test_object_ids_for_scene(loader):
         lambda: loader.object_ids_for_scene(scene_ids[0])
     )
     assert len(object_ids) > 0
-    assert all(isinstance(obj_id, int) for obj_id in object_ids)
+    assert all(isinstance(object_id, int) for object_id in object_ids)
 
 
 def test_download_models_eval(loader):
     models_directory = _skip_on_network_error(
-        lambda: loader.download_models("models_eval")
+        lambda: loader.download_models(GraspClutter6DModelVariant.EVAL)
     )
     assert (models_directory / "models_info.json").is_file()
     mesh_files = list(models_directory.glob("obj_*.ply"))

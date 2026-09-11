@@ -58,7 +58,7 @@ class GraspClutter6DObjectModelNotFoundError(DataclassException, LookupError):
     Raised when an object's mesh file is not found in the given models directory.
     """
 
-    obj_id: int
+    object_id: int
     """The object id that was searched for."""
 
     models_directory: Path
@@ -66,8 +66,8 @@ class GraspClutter6DObjectModelNotFoundError(DataclassException, LookupError):
 
     def error_message(self) -> str:
         return (
-            f"No mesh file for object id {self.obj_id} found in "
-            f"'{self.models_directory}' (expected 'obj_{self.obj_id:06d}.ply')."
+            f"No mesh file for object id {self.object_id} found in "
+            f"'{self.models_directory}' (expected 'obj_{self.object_id:06d}.ply')."
         )
 
     def suggest_correction(self) -> str:
