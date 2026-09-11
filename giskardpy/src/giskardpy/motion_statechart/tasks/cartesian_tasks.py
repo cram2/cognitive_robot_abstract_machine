@@ -5,7 +5,7 @@ from dataclasses import field, dataclass
 from functools import cached_property
 
 import numpy as np
-from typing_extensions import ClassVar, List
+from typing_extensions import ClassVar, List, Optional
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import (
@@ -225,9 +225,6 @@ class CartesianPositionTrajectory(CartesianTask):
     )
     """Reference velocity for normalization in m/s."""
 
-    goal_reference_frame_P_current_target_point: Point3 = field(init=False, repr=False)
-    """Symbolic expression representing the current target point in the goal reference frame."""
-
     remaining_distance: FloatVariable = field(init=False, repr=False)
     """Distance left to travel along the trajectory, rewritten every control cycle."""
 
@@ -251,6 +248,21 @@ class CartesianPositionTrajectory(CartesianTask):
                 )
         return reference_frame
 
+    @cached_property
+    def goal_reference_frame_P_current_target_point(self) -> Point3:
+        """
+        Per-tick target point on the trajectory, riding ``look_ahead_distance`` ahead of the
+        tip along the path, expressed in the goal reference frame.
+
+        It is created lazily so a velocity limit can reference it before the trajectory is
+        built. Its value is registered and updated during execution.
+        """
+        target_point = Point3.create_with_variables(
+            "goal_reference_frame_P_current_target_point"
+        )
+        target_point.reference_frame = self.goal_reference_frame
+        return target_point
+
     def _goal_points_to_np(self):
         self._goal_points_np = np.array(
             [point.to_np()[:-1] for point in self.goal_points]
@@ -270,7 +282,7 @@ class CartesianPositionTrajectory(CartesianTask):
             trajectory the tip already is.
         """
         artifacts = NodeArtifacts()
-        self._init_goal_reference_frame_P_current_target_point(
+        self._register_goal_reference_frame_P_current_target_point(
             context.float_variable_data
         )
         self._init_remaining_distance(context.float_variable_data)
@@ -357,12 +369,25 @@ class CartesianPositionTrajectory(CartesianTask):
             ),
             sparse=False,
         )
+        self._bind_compiled_point_to_memory(context)
+
+    def _bind_compiled_point_to_memory(self, context: MotionStatechartContext):
+        """
+        Point the compiled tip expression at the live state buffers.
+
+        Registering float variables reallocates the data array, so this is repeated in
+        :meth:`on_start` once every node has been built and the array is final.
+        """
         self._compiled_goal_reference_frame_P_tip.bind_args_to_memory_view(
             0, context.world.state.positions
         )
         self._compiled_goal_reference_frame_P_tip.bind_args_to_memory_view(
             1, context.float_variable_data.data
         )
+
+    def on_start(self, context: MotionStatechartContext):
+        super().on_start(context)
+        self._bind_compiled_point_to_memory(context)
 
     def _update_trajectory_index(self, goal_reference_frame_P_tip_np: np.ndarray):
         """
@@ -439,19 +464,13 @@ class CartesianPositionTrajectory(CartesianTask):
         )
         return None
 
-    def _init_goal_reference_frame_P_current_target_point(
+    def _register_goal_reference_frame_P_current_target_point(
         self, float_variable_data: FloatVariableData
     ):
         """
-        Initialize the symbolic expression representing the current target point in the goal reference frame.
+        Register the current target point with the data store and seed its value.
         :param float_variable_data: The FloatVariableData instance to register the expression with.
         """
-        self.goal_reference_frame_P_current_target_point = Point3.create_with_variables(
-            "goal_reference_frame_P_current_target_point"
-        )
-        self.goal_reference_frame_P_current_target_point.reference_frame = (
-            self.goal_reference_frame
-        )
         float_variable_data.register_expression(
             self.goal_reference_frame_P_current_target_point
         )
@@ -718,14 +737,68 @@ class CartesianPose(Parallel):
 
 
 @dataclass(eq=False, repr=False)
-class CartesianPositionVelocityLimit(Task):
+class CartesianVelocityLimitTask(Task, ABC):
+    """
+    Base class for the strict Cartesian velocity limits.
+
+    Bounding the tip's true speed requires measuring how fast it approaches the goal it is
+    driven toward. This class freezes that goal into the root frame at bind time, so that
+    from the optimizer's perspective it is a fixed reference and the constrained quantity
+    is the rate at which the tip closes on it.
+    """
+
+    root_link: KinematicStructureEntity = field(kw_only=True)
+    """Root link of the kinematic chain. Defines the reference frame from which the tip's motion is measured."""
+    tip_link: KinematicStructureEntity = field(kw_only=True)
+    """Tip link of the kinematic chain whose velocity (expressed in the root link frame) is constrained."""
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
+    """Optimization weight determining how strongly the velocity limit is enforced.
+    Higher weights give this constraint soft priority over lower weighted constraints when conflicts occur."""
+
+    _goal_binding: Optional[ForwardKinematicsBinding] = field(
+        default=None, init=False, repr=False
+    )
+    """Freezes the transform from the root to the goal reference frame, or ``None`` when no goal is set."""
+
+    def _root_frame_goal(
+        self, context: MotionStatechartContext, goal: Optional[SpatialType]
+    ) -> Optional[SpatialType]:
+        """
+        Express goal in the root frame, frozen at bind time, or ``None`` when unset.
+
+        The goal's reference frame is captured through a ForwardKinematicsBinding so that a
+        goal given relative to a moving frame (for example the tip) does not travel with
+        that frame during execution.
+        """
+        if goal is None:
+            self._goal_binding = None
+            return None
+        self._goal_binding = ForwardKinematicsBinding(
+            name=PrefixedName("root_T_velocity_limit_goal", str(self.name)),
+            root=self.root_link,
+            tip=goal.reference_frame,
+            float_variable_data=context.float_variable_data,
+        )
+        self._goal_binding.bind(context.world)
+        return self._goal_binding.root_T_tip @ goal
+
+    def on_start(self, context: MotionStatechartContext):
+        if self._goal_binding is not None:
+            self._goal_binding.bind(context.world)
+
+
+@dataclass(eq=False, repr=False)
+class CartesianPositionVelocityLimit(CartesianVelocityLimitTask):
     """
     Limit the Cartesian (translational) velocity of a tip link relative to a root link.
 
-    This goal enforces a strict cap on the linear speed of the frame defined by
-    the kinematic transform from `root_link` to `tip_link`. Enforcement is performed
-    by adding constraints to the optimizer and by providing an observation expression
-    that evaluates whether the current translational speed is within the limit.
+    With a `goal_point` the limit is a strict cap on the Euclidean norm of the tip
+    velocity: the tip moves straight at its goal, so the rate at which its distance to the
+    goal shrinks equals its speed. Without a goal the limit only bounds the radial speed
+    away from the root origin, which coincides with the true speed solely when the tip
+    moves along the root direction.
 
     .. warning::
        Strict Cartesian velocity limits require as many constraints as the prediction
@@ -734,29 +807,19 @@ class CartesianPositionVelocityLimit(Task):
        consider using larger limits or reducing the prediction horizon.
     """
 
-    root_link: KinematicStructureEntity = field(kw_only=True)
+    goal_point: Optional[Point3] = field(default=None, kw_only=True)
     """
-    Root link of the kinematic chain. 
-    Defines the reference frame from which the tip's motion is measured.
-    """
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    Tip link of the kinematic chain. 
-    The translational velocity of this link (expressed in the root link frame) is constrained.
+    Point the tip is driven toward by its goal task. When given, the limit bounds the tip's
+    actual speed toward this point. When ``None`` the limit falls back to bounding only the
+    radial speed away from the root origin, which is correct solely when the tip moves along
+    the root direction.
     """
     max_linear_velocity: float = field(default=0.1, kw_only=True)
     """
     Maximum allowed linear speed of the tip in meters per second (m/s).
-    Default: 0.1 m/s. The enforcement ensures the Euclidean norm of the
-    tip-frame translational velocity does not exceed this value.
-    """
-    weight: float = field(
-        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
-    )
-    """
-    Optimization weight determining how strongly the linear velocity
-    limit is enforced. Higher weights give this constraint soft priority
-    over lower weighted constraints when conflicts occur.
+    Default: 0.1 m/s. With ``goal_point`` set the enforcement ensures the Euclidean norm of
+    the tip velocity does not exceed this value; without it only the radial speed away from
+    the root origin is bounded.
     """
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -766,6 +829,7 @@ class CartesianPositionVelocityLimit(Task):
         ).to_position()
         artifacts.geometry.add_translational_velocity_limit(
             frame_P_current=root_P_tip,
+            frame_P_goal=self._root_frame_goal(context, self.goal_point),
             max_velocity=self.max_linear_velocity,
             quadratic_weight=self.weight,
         )
@@ -783,16 +847,15 @@ class CartesianPositionVelocityLimit(Task):
 
 
 @dataclass(eq=False, repr=False)
-class CartesianRotationVelocityLimit(Task):
+class CartesianRotationVelocityLimit(CartesianVelocityLimitTask):
     """
-    Represents a Cartesian rotational velocity limit task within a kinematic chain.
+    Limit the Cartesian (rotational) velocity of a tip link relative to a root link.
 
-    This task constrains the angular velocity of a specified tip link relative
-    to a root link to not exceed a maximum allowed angular velocity. It uses
-    optimization weights to prioritize its enforcement in solving problems
-    involving kinematic motion. The task calculates and enforces constraints
-    based on the rotation matrix between the root and tip links, ensuring
-    compliance with the defined angular velocity limits.
+    With a `goal_orientation` the limit bounds the tip's actual angular speed: the tip
+    turns straight at its goal, so the rate at which its angle to the goal shrinks equals
+    its angular speed. Without a goal the limit only bounds the rate of the current-to-root
+    angle, which coincides with the true angular speed solely when the tip turns about that
+    same axis.
 
     .. warning::
        Strict Cartesian velocity limits require as many constraints as the prediction
@@ -801,20 +864,15 @@ class CartesianRotationVelocityLimit(Task):
        consider using larger limits or reducing the prediction horizon.
     """
 
-    root_link: KinematicStructureEntity = field(kw_only=True)
-    """Root link of the kinematic chain. Defines the reference frame from which the tip's motion is measured."""
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """Tip link of the kinematic chain. The translational velocity of this link (expressed in the root link frame) is constrained."""
+    goal_orientation: Optional[RotationMatrix] = field(default=None, kw_only=True)
+    """Orientation the tip is driven toward by its goal task. When given, the limit bounds
+    the tip's actual angular speed toward this orientation. When ``None`` the limit falls
+    back to bounding only the current-to-root angle rate, which is correct solely when the
+    tip turns about the current-to-root axis."""
     max_angular_velocity: float = field(default=0.4, kw_only=True)
     """Maximum allowed angular speed. Interpreted in radians per second (rad/s).
-    The enforcement ensures the magnitude of the instantaneous
-    rotation rate does not exceed this threshold."""
-    weight: float = field(
-        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
-    )
-    """Optimization weight determining how strongly the rotational velocity
-    limit is enforced. Higher weights give this constraint soft priority
-    over lower weighted constraints when conflicts occur."""
+    With ``goal_orientation`` set the enforcement ensures the tip's angular speed does not
+    exceed this threshold; without it only the current-to-root angle rate is bounded."""
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
@@ -822,14 +880,19 @@ class CartesianRotationVelocityLimit(Task):
         root_R_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         ).to_rotation_matrix()
+        root_R_goal = self._root_frame_goal(context, self.goal_orientation)
 
         artifacts.geometry.add_rotational_velocity_limit(
             frame_R_current=root_R_tip,
+            frame_R_goal=root_R_goal,
             max_velocity=self.max_angular_velocity,
             quadratic_weight=self.weight,
         )
 
-        _, angle = root_R_tip.to_axis_angle()
+        if root_R_goal is None:
+            angle = root_R_tip.to_axis_angle()[1]
+        else:
+            angle = root_R_tip.rotational_error(root_R_goal)
         angle_dot = time_derivative_from_joint_motion(angle)
 
         artifacts.observation = sm.abs(angle_dot) <= self.max_angular_velocity
@@ -857,14 +920,20 @@ class CartesianVelocityLimit(Parallel):
     """Root link of the kinematic chain. Defines the reference frame from which the tip's motion is measured."""
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Tip link of the kinematic chain. Both translational and rotational velocities of this link (expressed in the root link frame) are constrained."""
+    goal_point: Optional[Point3] = field(default=None, kw_only=True)
+    """Point the tip is driven toward. Forwarded to the linear limit so it bounds the tip's
+    actual speed. When ``None`` the linear limit falls back to bounding only the radial speed."""
+    goal_orientation: Optional[RotationMatrix] = field(default=None, kw_only=True)
+    """Orientation the tip is driven toward. Forwarded to the angular limit so it bounds the
+    tip's actual angular speed. When ``None`` the angular limit falls back to the current-to-root angle rate."""
     max_linear_velocity: float = field(default=0.1, kw_only=True)
     """Maximum allowed linear speed of the tip in meters per second (m/s).
-    Default: 0.1 m/s. The enforcement ensures the Euclidean norm of the
-    tip-frame translational velocity does not exceed this value."""
+    Default: 0.1 m/s. With ``goal_point`` set the enforcement ensures the Euclidean norm of
+    the tip velocity does not exceed this value; without it only the radial speed is bounded."""
     max_angular_velocity: float = field(default=0.4, kw_only=True)
     """Maximum allowed angular speed. Interpreted in radians per second (rad/s).
-    Default: 0.5 rad/s. The enforcement ensures the magnitude of the instantaneous
-    rotation rate does not exceed this threshold."""
+    Default: 0.4 rad/s. With ``goal_orientation`` set the enforcement ensures the tip's
+    angular speed does not exceed this value; without it only the current-to-root angle rate is bounded."""
     weight: float = field(
         default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
     )
@@ -873,7 +942,7 @@ class CartesianVelocityLimit(Parallel):
     over lower weighted constraints when conflicts occur."""
     nodes: List[MotionStatechartNode] = field(default_factory=list, init=False)
     """List of motion nodes that run in parallel and enforce the velocity limits.
-    Contains a CartesianPositionVelocityLimit and CartesianRotationVelocityLimit node 
+    Contains a CartesianPositionVelocityLimit and CartesianRotationVelocityLimit node
     by default. Populated in __post_init__()."""
 
     def __post_init__(self):
@@ -882,12 +951,14 @@ class CartesianVelocityLimit(Parallel):
         translational = CartesianPositionVelocityLimit(
             root_link=self.root_link,
             tip_link=self.tip_link,
+            goal_point=self.goal_point,
             max_linear_velocity=self.max_linear_velocity,
             weight=self.weight,
         )
         rotational = CartesianRotationVelocityLimit(
             root_link=self.root_link,
             tip_link=self.tip_link,
+            goal_orientation=self.goal_orientation,
             max_angular_velocity=self.max_angular_velocity,
             weight=self.weight,
         )
