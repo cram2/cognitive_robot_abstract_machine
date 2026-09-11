@@ -200,10 +200,13 @@ class SubclassJSONSerializer:
         """
         current_value = getattr(self, diff.attribute_name)
         if isinstance(current_value, list):
-            for item in diff.removed_values:
-                current_value.remove(from_json(item, **kwargs))
-            for item in diff.added_values:
-                current_value.append(from_json(item, **kwargs))
+            diff.apply_to_list(
+                current_value,
+                removed_items=[
+                    from_json(item, **kwargs) for item in diff.removed_values
+                ],
+                added_items=[from_json(item, **kwargs) for item in diff.added_values],
+            )
         else:
             setattr(
                 self,
@@ -266,13 +269,35 @@ class JSONAttributeDiff(SubclassJSONSerializer):
 
     added_values: List[JSONData] = field(default_factory=list)
     """
-    The items that have been added to the attribute.
+    The items that have been added to the attribute, appended at its end.
     """
 
     removed_values: List[JSONData] = field(default_factory=list)
     """
-    The items that have been removed from the attribute.
+    The items that have been removed from the attribute, each taking out its last equal
+    occurrence.
     """
+
+    def apply_to_list(
+        self, items: List[Any], removed_items: List[Any], added_items: List[Any]
+    ) -> None:
+        """
+        Applies the diff to a list, given its removed and added values as objects.
+
+        Each removed item takes out its last equal occurrence and is skipped if the list
+        does not contain it. Added items are appended.
+
+        :param items: The list to change.
+        :param removed_items: The deserialized :attr:`removed_values`.
+        :param added_items: The deserialized :attr:`added_values`.
+        """
+        for removed_item in removed_items:
+            positions = [
+                position for position, item in enumerate(items) if item == removed_item
+            ]
+            if positions:
+                del items[positions[-1]]
+        items.extend(added_items)
 
     def to_json(self) -> Dict[str, Any]:
         super().to_json()
@@ -339,12 +364,13 @@ def _compute_attribute_diff(
             removed_values=[original_values],
         )
 
-    add = [new_value for new_value in new_values if new_value not in original_values]
-    remove = [
-        original_value
-        for original_value in original_values
-        if original_value not in new_values
-    ]
+    remove = list(original_values)
+    add = []
+    for new_value in new_values:
+        if new_value in remove:
+            remove.remove(new_value)
+        else:
+            add.append(new_value)
     if not (add or remove):
         return None
     return JSONAttributeDiff(

@@ -1,10 +1,15 @@
+from copy import deepcopy
 from dataclasses import dataclass
 from itertools import combinations
 
 import pytest
 
+from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
+)
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheckingResult,
@@ -864,3 +869,433 @@ class TestGeometryInspectionWhileBuildingRules:
         AvoidAllCollisions().update(world)
 
         assert counter.inspections == len(world.bodies)
+
+
+# %% rules covering the same body pair
+
+
+def distance_in_collision_matrix(
+    collision_matrix: CollisionMatrix, body_a: Body, body_b: Body
+) -> float:
+    """
+    The distance the collision matrix checks the two bodies at.
+    """
+    return next(
+        check.distance
+        for check in collision_matrix.collision_checks
+        if set(check.bodies()) == {body_a, body_b}
+    )
+
+
+def distances_from_matrix_and_lookup(
+    collision_manager: CollisionManager,
+) -> tuple[dict[tuple[str, str], float], dict[tuple[str, str], float]]:
+    """
+    The distance of every body pair in the collision matrix, once as the matrix holds it
+    and once as the distance lookup of the collision manager reports it.
+
+    Both are keyed by the names of the two bodies, so a mismatch reads well in a failed
+    assertion.
+    """
+    collision_checks = collision_manager.collision_matrix.collision_checks
+    matrix_distances = {
+        (str(check.body_a.name), str(check.body_b.name)): check.distance
+        for check in collision_checks
+    }
+    lookup_distances = {
+        (
+            str(check.body_a.name),
+            str(check.body_b.name),
+        ): collision_manager.get_buffer_zone_distance(check.body_a, check.body_b)
+        for check in collision_checks
+    }
+    return matrix_distances, lookup_distances
+
+
+class TestOverlappingCollisionChecks:
+    """
+    A collision matrix holds one check per body pair, so adding a check for a pair it
+    already contains replaces the distance of that pair.
+    """
+
+    def test_added_check_replaces_the_distance_of_the_same_pair(self):
+        body_a = create_body_with_collision("a")
+        body_b = create_body_with_collision("b")
+        earlier_check = CollisionCheck.create_for_bodies_with_collision(
+            body_a, body_b, distance=0.05
+        )
+        later_check = CollisionCheck.create_for_bodies_with_collision(
+            body_a, body_b, distance=0.5
+        )
+        collision_matrix = CollisionMatrix({earlier_check})
+
+        collision_matrix.add_collision_checks({later_check})
+
+        (check,) = collision_matrix.collision_checks
+        assert check.distance == later_check.distance
+
+
+class TestOverlappingCollisionRules:
+    """
+    When several rules cover the same body pair, the rule applied last decides its
+    distance, in the collision matrix as well as in the distance lookup of the collision
+    manager.
+    """
+
+    def test_temporary_rule_overrides_the_distance_of_a_default_rule(
+        self, cylinder_bot_world
+    ):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        robot_body = cylinder_bot_world.get_body_by_name("bot")
+        environment = cylinder_bot_world.get_body_by_name("environment")
+        collision_manager = cylinder_bot_world.collision_manager
+        with cylinder_bot_world.modify_world():
+            collision_manager.add_default_rule(
+                AvoidExternalCollisions(buffer_zone_distance=0.05, robot=robot)
+            )
+        temporary_rule = AvoidAllCollisions(buffer_zone_distance=0.5)
+        collision_manager.add_temporary_rule(temporary_rule)
+
+        collision_manager.update_collision_matrix(buffer=0.0)
+
+        assert (
+            distance_in_collision_matrix(
+                collision_manager.collision_matrix, robot_body, environment
+            )
+            == temporary_rule.buffer_zone_distance
+        )
+
+    def test_specific_default_rule_overrides_an_earlier_general_one(
+        self, cylinder_bot_world
+    ):
+        """
+        Robot configurations list a general distance for external collisions first and
+        more specific ones for single bodies after it.
+        """
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        robot_body = cylinder_bot_world.get_body_by_name("bot")
+        environment = cylinder_bot_world.get_body_by_name("environment")
+        collision_manager = cylinder_bot_world.collision_manager
+        specific_rule = AvoidExternalCollisions(
+            buffer_zone_distance=0.2, robot=robot, body_subset={robot_body}
+        )
+        with cylinder_bot_world.modify_world():
+            collision_manager.extend_default_rules(
+                [
+                    AvoidExternalCollisions(buffer_zone_distance=0.1, robot=robot),
+                    specific_rule,
+                ]
+            )
+
+        collision_manager.update_collision_matrix(buffer=0.0)
+
+        assert (
+            distance_in_collision_matrix(
+                collision_manager.collision_matrix, robot_body, environment
+            )
+            == specific_rule.buffer_zone_distance
+        )
+
+    def test_matrix_distances_agree_with_the_distance_lookup(self, cylinder_bot_world):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        collision_manager = cylinder_bot_world.collision_manager
+        with cylinder_bot_world.modify_world():
+            collision_manager.add_default_rule(
+                AvoidExternalCollisions(buffer_zone_distance=0.05, robot=robot)
+            )
+        collision_manager.add_temporary_rule(
+            AvoidAllCollisions(buffer_zone_distance=0.5)
+        )
+
+        collision_manager.update_collision_matrix(buffer=0.0)
+
+        matrix_distances, lookup_distances = distances_from_matrix_and_lookup(
+            collision_manager
+        )
+        assert matrix_distances == lookup_distances
+
+    def test_pr2_matrix_distances_agree_with_the_distance_lookup(self, pr2_world_copy):
+        """
+        The PR2 configures a general distance for external collisions, followed by more
+        specific ones for its arms and its base.
+        """
+        with pr2_world_copy.modify_world():
+            pr2_world_copy.add_connection(
+                FixedConnection(
+                    parent=pr2_world_copy.root,
+                    child=create_body_with_collision("environment"),
+                )
+            )
+        collision_manager = pr2_world_copy.collision_manager
+
+        collision_manager.update_collision_matrix(buffer=0.0)
+
+        matrix_distances, lookup_distances = distances_from_matrix_and_lookup(
+            collision_manager
+        )
+        assert matrix_distances == lookup_distances
+
+
+# %% rules keep their distances when copied
+
+
+class TestCollisionRuleDistancesSurviveCopy:
+    """
+    A copied world rebuilds its default rules from the same serialized modifications
+    that synchronize worlds, so every rule arrives with the distances it was configured
+    with.
+    """
+
+    @pytest.mark.parametrize(
+        "create_rule",
+        [
+            pytest.param(
+                lambda robot, robot_body: AvoidExternalCollisions(
+                    buffer_zone_distance=0.3, violated_distance=0.02, robot=robot
+                ),
+                id="external",
+            ),
+            pytest.param(
+                lambda robot, robot_body: AvoidExternalCollisions(
+                    buffer_zone_distance=0.3,
+                    violated_distance=0.02,
+                    robot=robot,
+                    body_subset={robot_body},
+                ),
+                id="external_with_body_subset",
+            ),
+            pytest.param(
+                lambda robot, robot_body: AvoidSelfCollisions(
+                    buffer_zone_distance=0.3, violated_distance=0.02, robot=robot
+                ),
+                id="self",
+            ),
+        ],
+    )
+    def test_default_rule_keeps_its_distances(self, cylinder_bot_world, create_rule):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        rule = create_rule(robot, cylinder_bot_world.get_body_by_name("bot"))
+        with cylinder_bot_world.modify_world():
+            cylinder_bot_world.collision_manager.add_default_rule(rule)
+
+        copied_world = deepcopy(cylinder_bot_world)
+
+        (copied_rule,) = copied_world.collision_manager.default_rules
+        assert (copied_rule.buffer_zone_distance, copied_rule.violated_distance) == (
+            rule.buffer_zone_distance,
+            rule.violated_distance,
+        )
+
+    def test_copied_pr2_world_keeps_its_default_rule_distances(
+        self, _pr2_world_setup, pr2_world_copy
+    ):
+        def distances_of_default_rules(world: World) -> list[tuple[type, float, float]]:
+            return [
+                (type(rule), rule.buffer_zone_distance, rule.violated_distance)
+                for rule in world.collision_manager.default_rules
+            ]
+
+        assert distances_of_default_rules(pr2_world_copy) == distances_of_default_rules(
+            _pr2_world_setup
+        )
+
+
+# %% external collisions of a body subset
+
+
+class TestExternalCollisionsOfBodySubset:
+    """
+    A rule avoiding external collisions for a subset of a robot's bodies checks that
+    subset against bodies outside the robot only, never against the rest of the robot.
+    """
+
+    def test_body_subset_is_paired_only_with_bodies_outside_its_robot(
+        self, pr2_apartment_world
+    ):
+        pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
+        arm_bodies = set(pr2.right_arm.bodies_with_collision) - set(
+            pr2.right_arm.end_effector.bodies_with_collision
+        )
+        external_bodies = set(pr2_apartment_world.bodies_with_collision) - set(
+            pr2.bodies_with_collision
+        )
+        rule = AvoidExternalCollisions(robot=pr2, body_subset=arm_bodies)
+
+        rule.update(pr2_apartment_world)
+
+        assert rule.added_collision_checks == {
+            CollisionCheck.create_for_bodies_with_collision(arm_body, external_body)
+            for arm_body in arm_bodies
+            for external_body in external_bodies
+        }
+
+    def test_temporary_body_subset_rule_does_not_restore_allowed_self_collisions(
+        self, pr2_world_state_reset
+    ):
+        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+        collision_manager = pr2_world_state_reset.collision_manager
+        collision_manager.extend_temporary_rule(
+            [
+                AllowSelfCollisions(robot=pr2),
+                AvoidExternalCollisions(
+                    robot=pr2,
+                    body_subset={pr2_world_state_reset.get_body_by_name("base_link")},
+                ),
+            ]
+        )
+
+        collision_manager.update_collision_matrix()
+
+        pr2_bodies = set(pr2.bodies_with_collision)
+        assert {
+            check
+            for check in collision_manager.collision_matrix.collision_checks
+            if set(check.bodies()) <= pr2_bodies
+        } == set()
+
+
+# %% rules are found again after the collision matrix was computed
+
+
+class TestRolledBackCollisionRules:
+    """
+    Rolling back the addition of a rule removes it, even after the rule computed its
+    collision checks.
+    """
+
+    @pytest.mark.parametrize(
+        "add_rule",
+        [
+            pytest.param(
+                lambda collision_manager, robot: collision_manager.add_default_rule(
+                    AvoidSelfCollisions(robot=robot, buffer_zone_distance=0.3)
+                ),
+                id="avoid_self",
+            ),
+            pytest.param(
+                lambda collision_manager, robot: collision_manager.add_default_rule(
+                    AllowSelfCollisions(robot=robot)
+                ),
+                id="allow_self",
+            ),
+            pytest.param(
+                lambda collision_manager, robot: collision_manager.add_default_rule(
+                    AvoidExternalCollisions(robot=robot, buffer_zone_distance=0.3)
+                ),
+                id="external",
+            ),
+            pytest.param(
+                lambda collision_manager, robot: collision_manager.add_ignore_collision_rule(
+                    AllowAllCollisions()
+                ),
+                id="ignore_all",
+            ),
+        ],
+    )
+    def test_rollback_removes_a_rule_the_matrix_was_computed_with(
+        self, cylinder_bot_world, add_rule
+    ):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        collision_manager = cylinder_bot_world.collision_manager
+        rules_before = list(collision_manager.rules)
+        with cylinder_bot_world.modify_world():
+            add_rule(collision_manager, robot)
+        collision_manager.update_collision_matrix()
+
+        cylinder_bot_world.rollback_modification_blocks()
+
+        assert collision_manager.rules == rules_before
+
+
+class TestCollisionRuleEquality:
+    """
+    Rules are equal when they are configured the same, regardless of the collision
+    checks they computed.
+    """
+
+    @pytest.mark.parametrize(
+        "create_rule",
+        [
+            pytest.param(
+                lambda robot: AvoidSelfCollisions(robot=robot), id="avoid_self"
+            ),
+            pytest.param(
+                lambda robot: AllowSelfCollisions(robot=robot), id="allow_self"
+            ),
+            pytest.param(
+                lambda robot: AvoidExternalCollisions(robot=robot), id="external"
+            ),
+            pytest.param(
+                lambda robot: AllowCollisionForAdjacentPairs(), id="adjacent_pairs"
+            ),
+        ],
+    )
+    def test_rule_equals_its_json_copy_after_an_update(
+        self, cylinder_bot_world, create_rule
+    ):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        rule = create_rule(robot)
+        rule.update(cylinder_bot_world)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
+
+        copied_rule = from_json(to_json(rule), **tracker.create_kwargs())
+
+        assert copied_rule == rule
+
+    def test_rules_with_different_distances_are_not_equal(self, cylinder_bot_world):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+
+        assert AvoidSelfCollisions(
+            robot=robot, buffer_zone_distance=0.3
+        ) != AvoidSelfCollisions(robot=robot, buffer_zone_distance=0.2)
+
+
+# %% a rule listed again after another rule
+
+
+def add_self_collision_rules(world: World, buffer_zone_distances: list[float]):
+    """
+    Adds one default self-collision rule per distance, each in its own modification
+    block.
+    """
+    robot = world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    for buffer_zone_distance in buffer_zone_distances:
+        with world.modify_world():
+            world.collision_manager.add_default_rule(
+                AvoidSelfCollisions(
+                    robot=robot, buffer_zone_distance=buffer_zone_distance
+                )
+            )
+
+
+def default_rule_distances(world: World) -> list[float]:
+    """
+    :return: The buffer zone distance of every default rule, in the order they apply.
+    """
+    return [rule.buffer_zone_distance for rule in world.collision_manager.default_rules]
+
+
+class TestRuleListedAgain:
+    """
+    A rule listed again after another rule stays listed in copies of the world, and
+    rolling it back removes that last listing only.
+    """
+
+    def test_copied_world_keeps_a_rule_listed_again(self, cylinder_bot_world):
+        add_self_collision_rules(cylinder_bot_world, [0.3, 0.2, 0.3])
+
+        copied_world = deepcopy(cylinder_bot_world)
+
+        assert default_rule_distances(copied_world) == default_rule_distances(
+            cylinder_bot_world
+        )
+
+    def test_rollback_removes_only_the_rule_listed_last(self, cylinder_bot_world):
+        add_self_collision_rules(cylinder_bot_world, [0.3, 0.2])
+        distances_before = default_rule_distances(cylinder_bot_world)
+        add_self_collision_rules(cylinder_bot_world, [0.3])
+        cylinder_bot_world.collision_manager.update_collision_matrix()
+
+        cylinder_bot_world.rollback_modification_blocks()
+
+        assert default_rule_distances(cylinder_bot_world) == distances_before

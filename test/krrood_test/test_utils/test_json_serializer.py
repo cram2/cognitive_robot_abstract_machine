@@ -414,3 +414,38 @@ def test_timedelta_field_of_a_dataclass_roundtrips():
     obj = HasDuration()
     result = from_json(to_json(obj))
     assert result == obj
+
+
+# %% list diffs with repeated items
+
+
+class TestListDiffWithRepeatedItems:
+    """
+    A list diff counts how often an item occurs, so applying it reproduces lists that
+    hold an item more than once.
+    """
+
+    def test_diff_records_an_item_added_again(self):
+        diffs = shallow_diff_json({"owners": ["Alice"]}, {"owners": ["Alice", "Alice"]})
+
+        assert diffs == [
+            JSONAttributeDiff(attribute_name="owners", added_values=["Alice"])
+        ]
+
+    def test_update_appends_an_item_added_again(self):
+        dog = Dog(name="Rex", age=5, owners=["Alice", "Bob"])
+        original_json = dog.to_json()
+        new_json = {**original_json, "owners": ["Alice", "Bob", "Alice"]}
+
+        dog.update_from_json_diff(shallow_diff_json(original_json, new_json))
+
+        assert dog.owners == new_json["owners"]
+
+    def test_update_removes_the_last_occurrence_of_a_removed_item(self):
+        dog = Dog(name="Rex", age=5, owners=["Alice", "Bob", "Alice"])
+        original_json = dog.to_json()
+        new_json = {**original_json, "owners": ["Alice", "Bob"]}
+
+        dog.update_from_json_diff(shallow_diff_json(original_json, new_json))
+
+        assert dog.owners == new_json["owners"]

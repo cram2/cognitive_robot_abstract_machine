@@ -689,17 +689,17 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         diff: JSONAttributeDiff,
         **kwargs,
     ):
-        for raw_json in diff.removed_values:
-            raw = from_json(raw_json, **kwargs)
-            obj = self._resolve_item(world, raw)
-            if obj in current_value:
-                current_value.remove(obj)
-
-        for raw_json in diff.added_values:
-            raw = from_json(raw_json, **kwargs)
-            obj = self._resolve_item(world, raw)
-            if obj not in current_value:
-                current_value.append(obj)
+        diff.apply_to_list(
+            current_value,
+            removed_items=[
+                self._resolve_item(world, from_json(raw_json, **kwargs))
+                for raw_json in diff.removed_values
+            ],
+            added_items=[
+                self._resolve_item(world, from_json(raw_json, **kwargs))
+                for raw_json in diff.added_values
+            ],
+        )
 
     def _resolve_item(self, world: World, item: Any):
         if isinstance(item, UUID):
