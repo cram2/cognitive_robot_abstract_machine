@@ -14,17 +14,20 @@ from giskardpy.executor import Executor, RealTimePacer
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.control_loop import ControlLoop
+from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from giskardpy.middleware.ros2.exceptions import (
     ExecutionCanceledException,
     RequiredWorldUpdateNotReceivedError,
+    UnserializableGoalError,
 )
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
-from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from giskardpy.middleware.ros2.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.post_goal_plotters import PostGoalPlotter
 from giskardpy.middleware.ros2.world_updates import IncomingWorldUpdates
+from krrood.adapters.exceptions import JSONSerializationError
 from krrood.adapters.json_serializer import to_json
+from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.ros.messages import StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import PublicationProgress
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -241,7 +244,8 @@ class MotionServer:
 
         A failed goal also reports the error itself, because the ROS action status alone
         cannot tell a client whether sending the goal again would help. The error is
-        serialized so that the client can rebuild and raise the very same exception.
+        serialized so that the client can rebuild and raise the very same exception, see
+        :meth:`serialize_error`.
         """
         match error:
             case ExecutionCanceledException():
@@ -255,13 +259,35 @@ class MotionServer:
                 rospy.get_node().get_logger().error(f"Goal aborted: {error}")
         states = self.create_states()
         if error is not None:
-            states["error"] = to_json(error)
+            states["error"] = self.serialize_error(error)
         published_position = self.published_position_of_goal()
         if published_position is not None:
             states["published_position"] = to_json(published_position)
         result = JsonAction.Result()
         result.result = json.dumps(states)
         return result
+
+    def serialize_error(self, error: Exception) -> Dict[str, Any]:
+        """
+        Serialize the error a goal failed with, so that the client can rebuild it.
+
+        An error that cannot be serialized, for instance because it holds expressions of
+        the motion statechart, is reported as :class:`UnserializableGoalError` carrying
+        its message, so that the client is answered either way.
+        """
+        try:
+            return to_json(error)
+        except JSONSerializationError as serialization_error:
+            rospy.get_node().get_logger().error(
+                f"Cannot send {type(error).__name__} to the client: "
+                f"{serialization_error}"
+            )
+            return to_json(
+                UnserializableGoalError(
+                    error_class_name=get_full_class_name(type(error)),
+                    message=str(error),
+                )
+            )
 
     def published_position_of_goal(self) -> StreamPosition | None:
         """

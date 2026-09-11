@@ -17,9 +17,9 @@ from typing_extensions import (
     Any,
 )
 
-from krrood.adapters.exceptions import JSONSerializationError
+from krrood.adapters.exceptions import JSONSerializationError, UntrackedObjectError
+from krrood.symbolic_math.exceptions import SymbolicMathNotJsonSerializableError
 from krrood.exceptions import DataclassException
-from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -1448,24 +1448,24 @@ class NotJsonSerializable(JSONSerializationError): ...
 
 
 @dataclass
-class SpatialTypeNotJsonSerializable(NotJsonSerializable):
-    spatial_object: SymbolicMathType
-
-    def error_message(self) -> str:
-        return (
-            f"Object of type '{self.spatial_object.__class__.__name__}' is not JSON serializable, because it has "
-            f"free variables: {self.spatial_object.free_variables()}"
-        )
-
-    def suggest_correction(self) -> str:
-        return ""
+class SpatialTypeNotJsonSerializable(
+    NotJsonSerializable, SymbolicMathNotJsonSerializableError
+):
+    """
+    Raised when a spatial type that depends on variables is serialized to JSON.
+    """
 
 
 @dataclass
-class WorldEntityWithIDNotInKwargs(JSONSerializationError):
-    world_entity_id: UUID
+class WorldEntityWithIDNotInKwargs(UntrackedObjectError):
     """
-    The entity that was asked for.
+    Raised when a JSON document refers to a world entity that was neither deserialized
+    from it nor is part of the world it is deserialized into.
+    """
+
+    key: UUID
+    """
+    The id of the world entity the document refers to.
     """
 
     world_entity_name: Optional[PrefixedName] = None
@@ -1479,9 +1479,9 @@ class WorldEntityWithIDNotInKwargs(JSONSerializationError):
 
     def error_message(self) -> str:
         named_entity = (
-            f"World entity '{self.world_entity_name}' ({self.world_entity_id})"
+            f"World entity '{self.world_entity_name}' ({self.key})"
             if self.world_entity_name is not None
-            else f"World entity '{self.world_entity_id}'"
+            else f"World entity '{self.key}'"
         )
         return f"{named_entity} is not in the kwargs of the method that created it."
 

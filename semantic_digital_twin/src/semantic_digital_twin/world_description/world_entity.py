@@ -205,7 +205,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
         :return: The instance of WorldEntityWithIDKwargsTracker.
         """
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs)
-        tracker.add_world_entity_with_id(self)
+        tracker.add(self.id, self)
         return tracker
 
     @classmethod
@@ -221,9 +221,9 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
 
         half_initialized_instance = cls.__new__(cls)
         half_initialized_instance.id = from_json(data["id"], **kwargs)
-        if tracker.has_world_entity_with_id(half_initialized_instance.id):
-            return tracker.get_world_entity_with_id(half_initialized_instance.id)
-        tracker.add_world_entity_with_id(half_initialized_instance)
+        if tracker.has(half_initialized_instance.id):
+            return tracker.get(half_initialized_instance.id)
+        tracker.add(half_initialized_instance.id, half_initialized_instance)
 
         fields_ = {f.name: f for f in fields(cls)}
 
@@ -261,7 +261,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
 
         if isinstance(obj, uuid.UUID):
             obj = from_json(data, **kwargs)
-            return state.get_world_entity_with_id(obj)
+            return state.get(obj)
         else:
             return obj
 

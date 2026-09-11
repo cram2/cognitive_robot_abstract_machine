@@ -445,7 +445,7 @@ class ExternalCollisionAvoidance(Goal):
                     collision_index=index,
                     external_collision_manager=self.external_collision_manager,
                 )
-                self.add_node(distance_monitor)
+                self._add_child_to_motion_statechart(distance_monitor)
 
                 task = _ExternalCollisionAvoidanceTask(
                     name=f"{self.name}/task({group.root.name.name, index})",
@@ -454,12 +454,12 @@ class ExternalCollisionAvoidance(Goal):
                     collision_index=index,
                     external_collision_manager=self.external_collision_manager,
                 )
-                self.add_node(task)
+                self._add_child_to_motion_statechart(task)
                 task.pause_condition = distance_monitor.observation_variable
                 tasks.append(task)
 
         if self.cancel_if_collision_violated:
-            self.add_node(
+            self._add_child_to_motion_statechart(
                 _CancelBecauseExternalCollisionViolated(
                     tasks=tasks,
                     name="External Collision Violated",
@@ -797,7 +797,7 @@ class SelfCollisionAvoidance(Goal):
                 collision_group_b=group_b,
                 self_collision_manager=self.self_collision_manager,
             )
-            self.add_node(distance_monitor)
+            self._add_child_to_motion_statechart(distance_monitor)
 
             task = _SelfCollisionAvoidanceTask(
                 name=f"{self.name}/{group_a.root.name.name, group_b.root.name.name}/task",
@@ -806,12 +806,12 @@ class SelfCollisionAvoidance(Goal):
                 max_velocity=self.max_velocity,
                 self_collision_manager=self.self_collision_manager,
             )
-            self.add_node(task)
+            self._add_child_to_motion_statechart(task)
             task.pause_condition = distance_monitor.observation_variable
             tasks.append(task)
 
         if self.cancel_if_collision_violated:
-            self.add_node(
+            self._add_child_to_motion_statechart(
                 _CancelBecauseSelfCollisionViolated(
                     name="self collision violated", tasks=tasks
                 )

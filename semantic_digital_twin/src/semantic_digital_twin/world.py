@@ -1599,7 +1599,20 @@ class World(HasSimulatorProperties):
 
     def get_world_entity_with_id_by_id(self, id: UUID) -> WorldEntityWithID:
         """
-        Find this world's entity with the given id.
+        Get this world's entity with the given id.
+
+        :param id: The id of the entity to get.
+        :return: The entity of this world carrying that id.
+        :raises WorldEntityWithIDNotFoundError: If this world holds no such entity.
+        """
+        entity = self.find_world_entity_with_id(id)
+        if entity is None:
+            raise WorldEntityWithIDNotFoundError(id)
+        return entity
+
+    def find_world_entity_with_id(self, entity_id: UUID) -> Optional[WorldEntityWithID]:
+        """
+        Find this world's entity with the given id, if it holds one.
 
         .. note:: Semantic annotations are searched in :attr:`semantic_annotations`
             rather than in the hash table. Their hash describes their content instead
@@ -1607,16 +1620,19 @@ class World(HasSimulatorProperties):
             structure entities share one table key and all but the last one added are
             missing from it.
 
-        :param id: The id of the entity to find.
-        :return: The entity of this world carrying that id.
-        :raises WorldEntityWithIDNotFoundError: If this world holds no such entity.
+        :param entity_id: The id of the entity to find.
+        :return: The entity of this world carrying that id, or None if it holds none.
         """
-        for entity in chain(
-            self._world_entity_hash_table.values(), self.semantic_annotations
-        ):
-            if isinstance(entity, WorldEntityWithID) and entity.id == id:
-                return entity
-        raise WorldEntityWithIDNotFoundError(id)
+        return next(
+            (
+                entity
+                for entity in chain(
+                    self._world_entity_hash_table.values(), self.semantic_annotations
+                )
+                if isinstance(entity, WorldEntityWithID) and entity.id == entity_id
+            ),
+            None,
+        )
 
     def rebind_world_entities(self, obj: RelocatableType) -> RelocatableType:
         """

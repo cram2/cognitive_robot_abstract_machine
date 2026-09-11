@@ -265,7 +265,7 @@ class StillProgressing(Goal):
         self._timer = CountSimulationTimeSeconds(
             name=f"{self.name}/timer", seconds=self.timeout.total_seconds()
         )
-        self.add_node(self._timer)
+        self._add_child_to_motion_statechart(self._timer)
         stalled_now = self._expand_stall_detection()
         self._timer.start_condition = stalled_now
         self._timer.reset_condition = sm.trinary_logic_not(stalled_now)
@@ -294,7 +294,9 @@ class StillProgressing(Goal):
         any_running = AnyMonitoredTaskRunning(
             name=f"{self.name}/any_running", monitored_tasks=self._monitored_tasks
         )
-        self.add_nodes(self._not_approaching_monitors + [any_running])
+        self._add_children_to_motion_statechart(
+            self._not_approaching_monitors + [any_running]
+        )
         return sm.trinary_logic_and(
             any_running.observation_variable,
             *[

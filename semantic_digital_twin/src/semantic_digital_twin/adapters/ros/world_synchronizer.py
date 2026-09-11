@@ -231,7 +231,7 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
                 # More concrete exception for synchronizer
                 raise WorldUpdateReferencesUnknownEntityError(
                     publisher=from_json(content[MessageField.META_DATA]),
-                    entity_id=unknown_entity.world_entity_id,
+                    entity_id=unknown_entity.key,
                     entity_name=unknown_entity.world_entity_name,
                 ) from unknown_entity
 

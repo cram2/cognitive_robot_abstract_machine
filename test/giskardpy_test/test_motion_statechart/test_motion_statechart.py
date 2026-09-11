@@ -439,7 +439,7 @@ class _BuildCountingGoal(Goal):
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.child = _BuildCountingNode(name="counting_child")
-        self.add_node(self.child)
+        self._add_child_to_motion_statechart(self.child)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.build_count += 1
@@ -467,23 +467,36 @@ def test_each_node_is_built_exactly_once():
 # %% goals populated before compile
 
 
-def test_adding_the_same_node_to_a_goal_twice_registers_it_once():
+def test_adding_the_same_node_to_a_goal_twice_makes_it_its_child_once():
     """
-    A goal that already owns a node must not register it a second time, so a chart can
-    be populated before compile without the template's expand duplicating its children.
+    A goal that already holds a node does not hold it a second time.
     """
     msc = MotionStatechart()
-    goal = Sequence()
-    msc.add_node(goal)
+    msc.add_node(goal := Sequence())
     node = ConstTrueNode()
 
     goal.add_node(node)
-    index_after_first_add = node.index
     goal.add_node(node)
 
     assert goal.nodes == [node]
-    assert msc.nodes == [goal, node]
-    assert node.index == index_after_first_add
+
+
+def test_node_added_to_a_goal_joins_the_motion_statechart_when_compiled():
+    """
+    A node added to a goal before compilation is only a child of the goal, so it is
+    serialized once; compiling adds it to the motion statechart below the goal.
+    """
+    msc = MotionStatechart()
+    msc.add_node(goal := Sequence())
+    goal.add_node(node := Attempt(task=ConstTrueNode(), failure_monitors=[]))
+    msc.add_node(end := EndMotion.when_true(goal))
+
+    assert msc.nodes == [goal, end]
+
+    _compile_msc(msc)
+
+    assert node in msc.nodes
+    assert node.parent_node is goal
 
 
 def test_goal_populated_before_compile_matches_one_populated_by_expand():
@@ -491,9 +504,6 @@ def test_goal_populated_before_compile_matches_one_populated_by_expand():
     Adding a sequence's children up front yields the same children, wiring and
     observation as passing them to the template's constructor and letting expand add
     them.
-
-    .. note:: The charts' node order differs, because children populated up front are
-        registered before the following top level nodes rather than during compilation.
     """
     populated_before_compile = MotionStatechart()
     goal = Sequence()

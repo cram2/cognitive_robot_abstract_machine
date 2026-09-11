@@ -8,11 +8,14 @@ import scipy
 import scipy.sparse as sp
 
 import krrood.symbolic_math.symbolic_math as sm
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.exceptions import (
+    FloatVariableAlreadyHasResolveError,
     HasFreeVariablesError,
     NotColumnVectorError,
     NotEnoughArgumentsError,
     NotSquareMatrixError,
+    SymbolicMathNotJsonSerializableError,
 )
 from krrood.symbolic_math.symbolic_math import VariableParameters
 from .reference_implementations import (
@@ -1630,3 +1633,56 @@ class TestMatrix:
         assert isinstance(m[2, :], sm.Vector)
         assert np.allclose(m[:2, :2], np.eye(2))
         assert isinstance(m[:2, :2], sm.Matrix)
+
+
+# %% JSON serialization
+
+
+class TestJsonSerialization:
+    """
+    A symbolic math value reaches JSON only as numbers: a constant round-trips, a value
+    that depends on variables is refused.
+    """
+
+    def test_variable_is_not_json_serializable(self):
+        variable = sm.FloatVariable("x")
+
+        with pytest.raises(SymbolicMathNotJsonSerializableError) as error:
+            to_json(variable)
+
+        assert error.value.expression is variable
+
+    def test_expression_with_a_variable_is_not_json_serializable(self):
+        expression = sm.FloatVariable("x") + 1
+
+        with pytest.raises(SymbolicMathNotJsonSerializableError) as error:
+            to_json(expression)
+
+        assert error.value.expression is expression
+
+    @pytest.mark.parametrize(
+        "constant",
+        [
+            sm.Scalar(1.5),
+            sm.Vector([1, 2]),
+            sm.Matrix([[1, 2], [3, 4]]),
+            sm.Matrix([[1, 2]]),
+        ],
+        ids=["scalar", "vector", "matrix", "row matrix"],
+    )
+    def test_constant_round_trips(self, constant: sm.SymbolicMathType):
+        constant_copy = from_json(to_json(constant))
+
+        assert type(constant_copy) is type(constant)
+        assert constant_copy.shape == constant.shape
+        assert np.array_equal(constant_copy.to_np(), constant.to_np())
+
+    def test_error_holding_a_variable_is_not_json_serializable(self):
+        """
+        An error is serialized field by field, so a variable it holds is refused rather
+        than serialized without end.
+        """
+        variable = sm.FloatVariable("x")
+
+        with pytest.raises(SymbolicMathNotJsonSerializableError):
+            to_json(FloatVariableAlreadyHasResolveError(variable=variable))

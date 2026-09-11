@@ -56,8 +56,8 @@ class PiecewiseConstantCurvatureConnection(Connection):
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         return cls(
             name=from_json(data["name"]),
-            parent=tracker.get_world_entity_with_id(id=from_json(data["parent_id"])),
-            child=tracker.get_world_entity_with_id(id=from_json(data["child_id"])),
+            parent=tracker.get(from_json(data["parent_id"])),
+            child=tracker.get(from_json(data["child_id"])),
             parent_T_connection_expression=from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
@@ -263,8 +263,8 @@ class CosseratRodConnection(Connection):
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         return cls(
             name=from_json(data["name"]),
-            parent=tracker.get_world_entity_with_id(id=from_json(data["parent_id"])),
-            child=tracker.get_world_entity_with_id(id=from_json(data["child_id"])),
+            parent=tracker.get(from_json(data["parent_id"])),
+            child=tracker.get(from_json(data["child_id"])),
             parent_T_connection_expression=from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),

@@ -12,6 +12,8 @@ from functools import partial
 
 from typing_extensions import Callable
 
+import pytest
+
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -33,6 +35,7 @@ from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstFalseNode,
     ConstTrueNode,
+    TestNodeAssertionError,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from semantic_digital_twin.spatial_types.spatial_types import Point3
@@ -206,6 +209,23 @@ def test_repeat_on_stall_retries_when_a_failure_monitor_of_its_attempt_fires():
 
     assert loop.stop_retry_monitor.resets == 3
     assert loop.goal_reached_state == ObservationStateValues.FALSE
+
+
+def test_repeat_until_ends_the_motion_with_its_exception_once_retrying_stops():
+    """
+    A loop handed an exception reports running out of attempts by ending the motion with
+    it, rather than only observing False.
+    """
+    task = ConstFalseNode(name="task")
+    exception = TestNodeAssertionError(reason="attempts exhausted")
+    _, _, executor = _repeat_on_timeout(
+        task, target=2, repeat_template=partial(RepeatUntil, exception=exception)
+    )
+
+    with pytest.raises(type(exception)) as error:
+        executor.tick_until_end(SETTLE_CYCLES)
+
+    assert error.value is exception
 
 
 # %% the stall timeout

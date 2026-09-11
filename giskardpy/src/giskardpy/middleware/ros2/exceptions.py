@@ -228,6 +228,30 @@ class ExecutionAbortedException(ExecutionException):
 
 
 @dataclass
+class UnserializableGoalError(ExecutionException):
+    """
+    Stands in for the error a goal failed with when that error could not be serialized,
+    so that the client still learns what went wrong.
+    """
+
+    error_class_name: str
+    """
+    The fully qualified name of the class of the error the goal failed with.
+    """
+
+    message: str
+    """
+    The message of the error the goal failed with.
+    """
+
+    def error_message(self) -> str:
+        return f"Goal failed with '{self.error_class_name}': {self.message}"
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
 class ExecutionSucceededPrematurely(ExecutionException):
     """
     Raised when the execution finishes before the minimum execution time.

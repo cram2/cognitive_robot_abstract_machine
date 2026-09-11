@@ -30,6 +30,7 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
     TransitionKind,
     DefaultWeights,
+    NodeJSONKey,
 )
 from giskardpy.motion_statechart.error_signals import ErrorSignal
 from giskardpy.motion_statechart.exceptions import (
@@ -51,7 +52,9 @@ from giskardpy.motion_statechart.plotters.plot_specs import (
 )
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.utils.utils import string_shortener
+from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
 from krrood.adapters.json_serializer import (
+    DataclassJSONSerializer,
     SubclassJSONSerializer,
 )
 from krrood.exceptions import DataclassException
@@ -662,7 +665,7 @@ class LifeCycleTransitions:
 
 
 @dataclass(repr=False, eq=False)
-class MotionStatechartNode:
+class MotionStatechartNode(SubclassJSONSerializer):
     name: str = field(default=None, kw_only=True)
     """
     A name for the node within a motion statechart.
@@ -682,8 +685,9 @@ class MotionStatechartNode:
     """
     Process-unique identifier assigned at construction and used to name this node's state
     variables. Unlike :attr:`index` it exists before the node is added to a motion statechart,
-    so variable names are unique from construction time. It is not serialized: conditions
-    reference nodes by :attr:`unique_name`, which is reproduced deterministically on load.
+    so variable names are unique from construction time. A deserialized node gets a new one:
+    conditions reference nodes by :attr:`unique_name`, which is reproduced deterministically
+    on load, and the serialized identifier only tells apart the nodes of one JSON document.
     """
 
     parent_node_index: Optional[int] = field(
@@ -849,6 +853,26 @@ class MotionStatechartNode:
             self.parent_node_index = None
         else:
             self.parent_node_index = parent_node.index
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **DataclassJSONSerializer.to_json(self),
+            NodeJSONKey.NODE_ID: self._node_id,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        """
+        Deserializes the node, or returns the instance already deserialized for the same
+        node of the document, so that nodes referring to it share it.
+        """
+        tracker = DeserializedNodeTracker.from_kwargs(kwargs)
+        node_id = data[NodeJSONKey.NODE_ID]
+        if tracker.has(node_id):
+            return tracker.get(node_id)
+        node = DataclassJSONSerializer.from_json(data, clazz=cls, **kwargs)
+        tracker.add(node_id, node)
+        return node
 
     def _set_transition(self, transition: TrinaryCondition) -> None:
         """
@@ -1588,6 +1612,17 @@ GenericMotionStatechartNode = TypeVar(
 )
 
 
+@dataclass
+class DeserializedNodeTracker(DeserializedObjectTracker[str, MotionStatechartNode]):
+    """
+    The nodes deserialized from one JSON document, by the node id they were serialized
+    with.
+
+    A document holds a node once for every place that refers to it, for example as a node
+    of a motion statechart and as the node a monitor watches.
+    """
+
+
 def velocity_convergence_expression(
     context: MotionStatechartContext,
     joint_convergence_threshold: float,
@@ -1783,9 +1818,13 @@ class Goal(MotionStatechartNode):
         :param context: The context that contains data that can be used to expand this goal.
         """
 
-    def add_node(self, node: MotionStatechartNode) -> None:
+    def _add_child_to_motion_statechart(self, node: MotionStatechartNode) -> None:
         """
-        Adds a node to this goal and the motion statechart this goal belongs to.
+        Adds a node to this goal and to the motion statechart this goal belongs to.
+
+        .. note:: Call this from :meth:`expand`: the children of a goal join the motion
+            statechart while it is compiled, so that before that they are serialized
+            only once, inside their goal.
 
         :param node: The node to add as a child of this goal.
         """
@@ -1862,14 +1901,17 @@ class Goal(MotionStatechartNode):
         if node.belongs_to_motion_statechart() and node.parent_node != self:
             raise NodeAlreadyBelongsToDifferentNodeError(node=self, new_node=node)
 
-    def add_nodes(self, nodes: List[MotionStatechartNode]) -> None:
+    def _add_children_to_motion_statechart(
+        self, nodes: List[MotionStatechartNode]
+    ) -> None:
         """
-        Adds multiple nodes to this goal and the motion statechart this goal belongs to.
+        Adds multiple nodes to this goal and to the motion statechart this goal belongs
+        to, see :meth:`_add_child_to_motion_statechart`.
 
         :param nodes: The nodes to add as children of this goal.
         """
         for node in nodes:
-            self.add_node(node)
+            self._add_child_to_motion_statechart(node)
 
 
 @dataclass(eq=False, repr=False)

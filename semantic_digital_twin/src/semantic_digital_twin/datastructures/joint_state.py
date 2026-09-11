@@ -154,7 +154,7 @@ class JointState(SubclassJSONSerializer):
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         child_names = data.get("child_names") or [None] * len(data["child_ids"])
         connections = [
-            tracker.get_world_entity_with_id(
+            tracker.get(
                 from_json(child_id), name=from_json(child_name)
             ).parent_connection
             for child_id, child_name in zip(data["child_ids"], child_names)

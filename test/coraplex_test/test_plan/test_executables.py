@@ -8,13 +8,20 @@ nodes that terminate the chart, which depend on the execution type.
 """
 
 import pytest
+from typing_extensions import List
 
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import CancelMotion, EndMotion, Task
+from giskardpy.motion_statechart.graph_node import (
+    CancelMotion,
+    EndMotion,
+    Goal,
+    MotionStatechartNode,
+    Task,
+)
 from giskardpy.motion_statechart.monitors.payload_monitors import (
     ThreadedPredicateMonitor,
 )
@@ -77,10 +84,24 @@ def test_motion_state_chart_is_created_once(reach_action_executable):
     )
 
 
+def _nodes_below(goal: Goal) -> List[MotionStatechartNode]:
+    """
+    :return: Every node held by `goal` or by a goal below it.
+    """
+    return [
+        descendant
+        for child in goal.nodes
+        for descendant in [
+            child,
+            *(_nodes_below(child) if isinstance(child, Goal) else []),
+        ]
+    ]
+
+
 def test_parsing_populates_the_chart_with_the_motions(reach_action_executable):
     """
-    Every task is in the chart before execution begins, below the executable's root
-    goal.
+    Every task is below the executable's root goal before execution begins, and the root
+    goal is in the chart.
     """
     tasks = list(reach_action_executable.motion_mappings.values())
     chart = reach_action_executable.motion_state_chart
@@ -88,7 +109,7 @@ def test_parsing_populates_the_chart_with_the_motions(reach_action_executable):
     assert len(tasks) == 2
     assert reach_action_executable.root_node in chart.nodes
     for task in tasks:
-        assert task in chart.nodes
+        assert task in _nodes_below(reach_action_executable.root_node)
         # A reach that frees its gripper carries its Cartesian goal alongside the
         # collision rules, so the mapped node is the pair rather than the goal itself.
         assert (
@@ -99,7 +120,7 @@ def test_parsing_populates_the_chart_with_the_motions(reach_action_executable):
 def test_parsing_mirrors_the_plan_tree_as_nested_goals(reach_action_executable):
     """
     The action's motions live in a goal below the executable's root goal rather than
-    flat in the chart.
+    directly in the root goal.
     """
     tasks = list(reach_action_executable.motion_mappings.values())
     root_goal = reach_action_executable.root_node
@@ -107,8 +128,12 @@ def test_parsing_mirrors_the_plan_tree_as_nested_goals(reach_action_executable):
     assert isinstance(root_goal, Sequence)
     assert root_goal.parent_node is None
     for task in tasks:
-        assert task.parent_node is not None
-        assert task.parent_node.parent_node is root_goal
+        assert task not in root_goal.nodes
+        [parent_goal] = [
+            goal
+            for goal in root_goal.nodes
+            if isinstance(goal, Goal) and task in goal.nodes
+        ]
 
 
 def test_parsing_does_not_terminate_the_chart(reach_action_executable):

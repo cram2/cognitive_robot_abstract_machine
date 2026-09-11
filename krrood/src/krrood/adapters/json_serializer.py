@@ -4,6 +4,7 @@ import enum
 import importlib
 import inspect
 import uuid
+from datetime import timedelta
 from abc import ABC
 from dataclasses import dataclass, fields, is_dataclass
 from dataclasses import field
@@ -410,6 +411,35 @@ class UUIDJSONSerializer(ExternalClassJSONSerializer[uuid.UUID]):
         cls, data: Dict[str, Any], clazz: Type[uuid.UUID], **kwargs
     ) -> uuid.UUID:
         return clazz(data["value"])
+
+
+@dataclass
+class TimedeltaJSONSerializer(ExternalClassJSONSerializer[timedelta]):
+    """
+    External JSON serializer for durations.
+
+    Stored as the three components a duration normalises itself to, so a value survives
+    the round trip exactly rather than through a float of seconds.
+    """
+
+    @classmethod
+    def to_json(cls, obj: timedelta) -> Dict[str, Any]:
+        return {
+            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            "days": obj.days,
+            "seconds": obj.seconds,
+            "microseconds": obj.microseconds,
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[timedelta], **kwargs
+    ) -> timedelta:
+        return clazz(
+            days=data["days"],
+            seconds=data["seconds"],
+            microseconds=data["microseconds"],
+        )
 
 
 @dataclass

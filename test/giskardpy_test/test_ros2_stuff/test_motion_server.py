@@ -11,6 +11,7 @@ from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.exceptions import (
     ExecutionCanceledException,
     RequiredWorldUpdateNotReceivedError,
+    UnserializableGoalError,
     WorldModelModifiedDuringMotionError,
 )
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
@@ -23,13 +24,18 @@ from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.motion_server import MotionServer
 from giskardpy.middleware.ros2.post_goal_plotters import PostGoalPlotter
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.exceptions import SelfInStartConditionError
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import (
     CountSimulationTimeSeconds,
 )
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
+    ConstTrueNode,
+)
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import from_json
+from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.world import World
@@ -319,6 +325,27 @@ class BrokenInputError(Exception):
     """
     Raised by :class:`FailingInputSynchronizer`.
     """
+
+
+def create_error_holding_a_variable() -> SelfInStartConditionError:
+    """
+    :return: The error of a node that waits for itself, which holds the observation
+        variable of that node and therefore cannot be serialized.
+    """
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(node := ConstTrueNode(name="waits for itself"))
+    with pytest.raises(SelfInStartConditionError) as error:
+        node.start_condition = node.observation_variable
+    return error.value
+
+
+class UnserializableFailureInputSynchronizer(InputSynchronizer):
+    """
+    Fails while reading its input with an error that cannot be serialized.
+    """
+
+    def apply(self) -> bool:
+        raise create_error_holding_a_variable()
 
 
 @dataclass
@@ -688,6 +715,37 @@ class TestGoalResult:
 
         assert error.action_server_name == "mimic"
         assert error.goal_id == 7
+
+    def test_a_failure_that_cannot_be_serialized_is_reported_by_its_message(
+        self, motion_server: MotionServerFixture
+    ):
+        """
+        An error holding objects of the running motion cannot travel to the client,
+        which still has to learn what went wrong.
+        """
+        failure = create_error_holding_a_variable()
+
+        result = motion_server.motion_server.create_result(failure)
+
+        error = from_json(json.loads(result.result)["error"])
+        assert isinstance(error, UnserializableGoalError)
+        assert error.error_class_name == get_full_class_name(SelfInStartConditionError)
+        assert error.message == str(failure)
+
+    def test_a_failure_that_cannot_be_serialized_still_answers_the_client(
+        self, motion_server: MotionServerFixture
+    ):
+        motion_server.control_loop.inputs.synchronizers = [
+            UnserializableFailureInputSynchronizer(
+                world=motion_server.executor.context.world
+            )
+        ]
+        motion_server.action_server.goal_json = create_goal_json()
+
+        motion_server.motion_server.run_idle_cycle()
+
+        assert motion_server.action_server.outcome == GoalOutcome.ABORTED
+        assert len(motion_server.action_server.sent_results) == 1
 
     def test_a_successful_goal_reports_no_failure(
         self, motion_server: MotionServerFixture

@@ -111,8 +111,8 @@ class Attempt(SelfDecidingNode, Goal):
         only briefly would otherwise be indistinguishable afterwards from one that never
         fired at all.
         """
-        self.add_node(self.task)
-        self.add_nodes(self.failure_monitors)
+        self._add_child_to_motion_statechart(self.task)
+        self._add_children_to_motion_statechart(self.failure_monitors)
         for failure_monitor in self.failure_monitors:
             failure_monitor.success_condition = trinary_logic_or(
                 failure_monitor.success_condition, failure_monitor.observation_variable
@@ -139,6 +139,35 @@ class Attempt(SelfDecidingNode, Goal):
                 else_result=Scalar.const_trinary_unknown(),
             )
         )
+
+
+# %% running a list of nodes
+
+
+@dataclass(repr=False, eq=False)
+class NodeListGoal(Goal):
+    """
+    A goal that runs the list of nodes it is handed.
+
+    The nodes join the motion statechart when :meth:`expand` adds them during
+    compilation, so a node handed over before that is serialized once, inside this goal.
+    """
+
+    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
+    """
+    The nodes this goal runs, in the order they were handed over.
+    """
+
+    def add_node(self, node: MotionStatechartNode) -> None:
+        """
+        Hands this goal one more node to run.
+
+        :param node: The node to run as a child of this goal.
+        """
+        self._add_node_sanity_check(node)
+        if node in self.nodes:
+            return
+        self.nodes.append(node)
 
 
 # %% goals built from nodes that end on their own
@@ -194,7 +223,7 @@ class GoalOverSelfDecidingNodes(SelfDecidingNode, Goal, ABC):
         self._check_caller_wired_no_transitions(node)
         self._check_node_doesnt_belong_to_different_parent(node)
         if isinstance(node, SelfDecidingNode):
-            self.add_node(node)
+            self._add_child_to_motion_statechart(node)
             return node
         if not isinstance(node, MaintenanceNode):
             raise NodeCannotDecideItselfError(node=self, child=node)
@@ -203,13 +232,13 @@ class GoalOverSelfDecidingNodes(SelfDecidingNode, Goal, ABC):
         # so the children stay in the order the caller wrote them in.
         if node in self.nodes:
             self.nodes[self.nodes.index(node)] = attempt
-        self.add_node(attempt)
+        self._add_child_to_motion_statechart(attempt)
         node.parent_node = attempt
         return attempt
 
 
 @dataclass(repr=False, eq=False)
-class Sequence(GoalOverSelfDecidingNodes):
+class Sequence(NodeListGoal, GoalOverSelfDecidingNodes):
     """
     Runs a list of nodes one after another.
 
@@ -218,11 +247,6 @@ class Sequence(GoalOverSelfDecidingNodes):
     rather than leaving it waiting forever.
 
     .. note:: corresponds to the RPL's SEQ. (McDermott, Drew. A reactive plan language, 1991)
-    """
-
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
-    """
-    The child nodes run one after another, in order.
     """
 
     _steps: List[MotionStatechartNode] = field(default_factory=list, init=False)
@@ -241,7 +265,7 @@ class Sequence(GoalOverSelfDecidingNodes):
         for node in list(self.nodes):
             # A node that ends the motion decides nothing and has nothing to convert.
             if isinstance(node, TerminalNode):
-                self.add_node(node)
+                self._add_child_to_motion_statechart(node)
                 step = node
             else:
                 step = self._add_self_deciding(node)
@@ -277,7 +301,7 @@ class Sequence(GoalOverSelfDecidingNodes):
 
 
 @dataclass(repr=False, eq=False)
-class Parallel(MaintenanceNode, Goal):
+class Parallel(MaintenanceNode, NodeListGoal):
     """
     Holds a list of nodes at once until enough of them are at their goals together.
 
@@ -288,11 +312,6 @@ class Parallel(MaintenanceNode, Goal):
     observe now, because releasing a constraint that reached its goal would let a
     sibling drag the robot back out of it. That also makes it a maintenance node itself:
     a plan step built from one is an attempt wrapping it.
-    """
-
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
-    """
-    The child nodes held at once.
     """
 
     minimum_success: Optional[int] = field(default=None, kw_only=True)
@@ -315,7 +334,7 @@ class Parallel(MaintenanceNode, Goal):
     def expand(self, context: MotionStatechartContext) -> None:
         self._check_has_children()
         for node in self.nodes:
-            self.add_node(node)
+            self._add_child_to_motion_statechart(node)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
@@ -367,6 +386,12 @@ class RepeatUntil(GoalOverSelfDecidingNodes):
     Stops the retrying once it observes True, which makes this goal observe False.
     """
 
+    exception: Optional[DataclassException] = field(default=None, kw_only=True)
+    """
+    The failure that ends the motion once :attr:`stop_retry_monitor` calls the retrying
+    off, or None to only observe False then.
+    """
+
     _attempt: Optional[MotionStatechartNode] = field(default=None, init=False)
     """
     The node actually run, which is :attr:`task` wrapped in an attempt if it needed one.
@@ -384,7 +409,7 @@ class RepeatUntil(GoalOverSelfDecidingNodes):
         itself on reaching what it counts.
         """
         self._attempt = self._add_self_deciding(self.task)
-        self.add_node(self.stop_retry_monitor)
+        self._add_child_to_motion_statechart(self.stop_retry_monitor)
 
         retrying_stopped = Scalar(self.stop_retry_monitor.goal_reached)
         still_trying = trinary_logic_not(retrying_stopped)
@@ -395,6 +420,20 @@ class RepeatUntil(GoalOverSelfDecidingNodes):
             self._attempt.is_failed, still_trying
         )
         self._attempt.interrupt_condition = retrying_stopped
+        self._end_motion_once_retrying_stops()
+
+    def _end_motion_once_retrying_stops(self) -> None:
+        """
+        Add the node that ends the motion with :attr:`exception` once
+        :attr:`stop_retry_monitor` calls the retrying off.
+        """
+        if self.exception is None:
+            return
+        exhausted = CancelMotion(
+            name=f"{self.name}/exhausted", exception=self.exception
+        )
+        self._add_child_to_motion_statechart(exhausted)
+        exhausted.start_condition = self.stop_retry_monitor.observation_variable
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
@@ -475,17 +514,12 @@ class RepeatOnStall(RepeatUntil):
 
 
 @dataclass(repr=False, eq=False)
-class TryAll(GoalOverSelfDecidingNodes):
+class TryAll(NodeListGoal, GoalOverSelfDecidingNodes):
     """
     Runs a list of alternatives at once and takes the first one that works.
 
     Its observation turns True as soon as an alternative reached its goal, and False
     only once every one of them ended without doing so.
-    """
-
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
-    """
-    The child nodes tried at once.
     """
 
     _alternatives: List[MotionStatechartNode] = field(default_factory=list, init=False)
@@ -535,7 +569,7 @@ class TryAll(GoalOverSelfDecidingNodes):
 
 
 @dataclass(repr=False, eq=False)
-class TryInOrder(GoalOverSelfDecidingNodes):
+class TryInOrder(NodeListGoal, GoalOverSelfDecidingNodes):
     """
     Tries a list of alternatives one after another, short-circuiting on the first
     success.
@@ -548,11 +582,6 @@ class TryInOrder(GoalOverSelfDecidingNodes):
     to ordering: wrap one in an :class:`Attempt` carrying the monitors that decide it.
 
     .. note:: corresponds to the RPL's TRY-IN-ORDER. (McDermott, Drew. A reactive plan language, 1991)
-    """
-
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
-    """
-    The child nodes tried one after another, in order.
     """
 
     _alternatives: List[MotionStatechartNode] = field(default_factory=list, init=False)
@@ -636,5 +665,5 @@ class CancelledWhenTrue(StoppedWhenTrue):
         cancelled = CancelMotion(
             name=f"{self.name}/cancelled", exception=self.exception
         )
-        self.add_node(cancelled)
+        self._add_child_to_motion_statechart(cancelled)
         cancelled.start_condition = self.monitor.observation_variable

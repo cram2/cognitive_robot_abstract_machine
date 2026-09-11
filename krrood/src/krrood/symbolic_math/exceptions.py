@@ -9,6 +9,7 @@ from typing_extensions import (
     Any,
 )
 
+from krrood.adapters.exceptions import JSONSerializationError
 from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
@@ -195,6 +196,29 @@ class DuplicateVariablesError(SymbolicMathError):
 
     def error_message(self) -> str:
         return f"Operation failed due to duplicate variables: {self.variables}. All variables must be unique."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class SymbolicMathNotJsonSerializableError(SymbolicMathError, JSONSerializationError):
+    """
+    Raised when a symbolic math value that depends on variables is serialized to JSON.
+
+    Only a constant has a value that means something to whoever reads the JSON.
+    """
+
+    expression: SymbolicMathType
+    """
+    The value that depends on variables.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{type(self.expression).__name__}' is not JSON serializable, because it "
+            f"depends on the variables {self.expression.free_variables()}."
+        )
 
     def suggest_correction(self) -> str:
         return ""

@@ -5,6 +5,7 @@ from typing import Any
 from giskardpy.middleware.ros2.exceptions import (
     ExecutionAbortedException,
     ExecutionCanceledException,
+    UnserializableGoalError,
     WorldModelModifiedDuringMotionError,
 )
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
@@ -70,6 +71,16 @@ def test_a_rebuilt_error_keeps_its_fields():
 
     assert error.action_server_name == "a"
     assert error.goal_id == 2
+
+
+def test_an_error_that_could_not_be_serialized_arrives_with_its_message():
+    reported = UnserializableGoalError(error_class_name="a.module.Boom", message="boom")
+    result = ResultMessageMimic.with_payload({"error": to_json(reported)})
+
+    error = MyActionClient.create_abort_exception(result)
+
+    assert isinstance(error, UnserializableGoalError)
+    assert error.message == reported.message
 
 
 def test_a_failure_without_a_reported_error_is_a_plain_abort():

@@ -7,8 +7,8 @@ from itertools import groupby
 from typing_extensions import TYPE_CHECKING, List
 
 from coraplex.plans.executables import Executable, GiskardExecutable
-from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import Goal, MotionStatechartNode
+from giskardpy.motion_statechart.goals.templates import NodeListGoal, Sequence
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 
 if TYPE_CHECKING:
@@ -52,11 +52,11 @@ class BuildsMotionStateChart:
 
     @abstractmethod
     def add_to_motion_state_chart(
-        self, parent_goal: Goal, executable: GiskardExecutable
+        self, parent_goal: NodeListGoal, executable: GiskardExecutable
     ) -> MotionStatechartNode:
         """
-        Add this node's giskard representation to `parent_goal`, extending the motion
-        state chart the goal belongs to.
+        Add this node's giskard representation to `parent_goal` as one of the nodes it
+        runs.
 
         :param parent_goal: The goal this node's representation becomes a child of.
         :param executable: The executable whose motion mappings record the added nodes.
@@ -65,7 +65,7 @@ class BuildsMotionStateChart:
 
     # %% building the chart
 
-    def create_goal(self) -> Goal:
+    def create_goal(self) -> NodeListGoal:
         """
         :return: An empty goal describing how the children are executed.
         """
@@ -73,7 +73,7 @@ class BuildsMotionStateChart:
 
     def add_children_to_motion_state_chart(
         self,
-        goal: Goal,
+        goal: NodeListGoal,
         children: List[BuildsMotionStateChart],
         executable: GiskardExecutable,
     ) -> None:

@@ -75,7 +75,7 @@ class Open(MaintenanceNode, Goal):
         )
         self.goal_joint_state = self._reachable_goal_joint_state()
 
-        self.add_nodes(
+        self._add_children_to_motion_statechart(
             [
                 JointPositionList(
                     name="hinge goal",

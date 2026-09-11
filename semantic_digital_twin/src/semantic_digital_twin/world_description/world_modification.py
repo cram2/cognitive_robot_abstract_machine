@@ -654,7 +654,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         for diff in self.updated_kwargs_json_list:
             current_value = getattr(entity, diff.attribute_name)
             if isinstance(current_value, list_like_classes):
-                self._apply_to_list(current_value, diff, **kwargs)
+                self._apply_to_list(world, current_value, diff, **kwargs)
             else:
                 obj = self._resolve_item(
                     world, from_json(diff.added_values[0], **kwargs)
@@ -674,7 +674,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
                     added_values=diff.removed_values,
                     removed_values=diff.added_values,
                 )
-                self._apply_to_list(current_value, inverse_diff, **kwargs)
+                self._apply_to_list(world, current_value, inverse_diff, **kwargs)
             else:
                 obj = self._resolve_item(
                     world, from_json(diff.removed_values[0], **kwargs)
@@ -683,9 +683,12 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         world._model_manager.current_model_modification_block.append(self)
 
     def _apply_to_list(
-        self, current_value: List[Any], diff: JSONAttributeDiff, **kwargs
+        self,
+        world: World,
+        current_value: List[Any],
+        diff: JSONAttributeDiff,
+        **kwargs,
     ):
-        world = kwargs["__world_entity_tracker"]._world
         for raw_json in diff.removed_values:
             raw = from_json(raw_json, **kwargs)
             obj = self._resolve_item(world, raw)

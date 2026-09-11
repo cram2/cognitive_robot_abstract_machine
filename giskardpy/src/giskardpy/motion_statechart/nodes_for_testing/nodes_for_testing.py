@@ -85,9 +85,9 @@ class TestGoal(MaintenanceNode, Goal):
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.sub_node1 = ConstTrueNode(name="sub muh1")
-        self.add_node(self.sub_node1)
+        self._add_child_to_motion_statechart(self.sub_node1)
         self.sub_node2 = ConstTrueNode(name="sub muh2")
-        self.add_node(self.sub_node2)
+        self._add_child_to_motion_statechart(self.sub_node2)
         self.sub_node1.success_condition = self.sub_node1.observation_variable
         self.sub_node2.start_condition = self.sub_node1.observation_variable
 
@@ -103,7 +103,7 @@ class TestNestedGoal(MaintenanceNode, Goal):
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.inner = TestGoal(name="inner")
-        self.add_node(self.inner)
+        self._add_child_to_motion_statechart(self.inner)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar(self.inner.observation_variable))
@@ -132,7 +132,7 @@ class TestRunAfterStop(SelfDecidingNode, Goal):
             ),
         )
 
-        self.add_nodes(
+        self._add_children_to_motion_statechart(
             nodes=[
                 self.ticking1,
                 self.ticking2,
@@ -165,7 +165,9 @@ class TestEndBeforeStart(Goal):
         self.node2 = ConstTrueNode()
         self.node3 = ConstTrueNode()
 
-        self.add_nodes(nodes=[self.node1, self.node2, self.node3])
+        self._add_children_to_motion_statechart(
+            nodes=[self.node1, self.node2, self.node3]
+        )
 
         self.node3.start_condition = self.node1.goal_reached
         self.node3.success_condition = self.node2.observation_variable
@@ -203,7 +205,7 @@ class TestRunAfterStopFromPause(SelfDecidingNode, Goal):
             ),
         )
 
-        self.add_nodes(
+        self._add_children_to_motion_statechart(
             nodes=[self.ticking1, self.ticking2, self.ticking3, self.cancel, self.pulse]
         )
         self.pulse.start_condition = self.ticking3.goal_reached
@@ -236,8 +238,10 @@ class TestUnpauseUnknownFromParentPause(SelfDecidingNode, Goal):
             exception=TestNodeAssertionError(reason="Node did not unpause correctly"),
         )
 
-        self.add_node(self.count_ticks1)
-        self.add_node(Sequence(nodes=[self.count_ticks2, self.cancel]))
+        self._add_child_to_motion_statechart(self.count_ticks1)
+        self._add_child_to_motion_statechart(
+            Sequence(nodes=[self.count_ticks2, self.cancel])
+        )
 
         self.count_ticks1.pause_condition = sm.Scalar.const_trinary_unknown()
 
@@ -311,7 +315,7 @@ class GoalCuttingOffItsChildAtItsGoal(Goal):
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.child = ConstTrueNode()
-        self.add_node(self.child)
+        self._add_child_to_motion_statechart(self.child)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_true())
@@ -331,7 +335,7 @@ class GoalCuttingOffItsChild(Goal):
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.child = ConstFalseNode()
-        self.add_node(self.child)
+        self._add_child_to_motion_statechart(self.child)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_true())
@@ -357,7 +361,7 @@ class GoalWithChildInterruptedBySibling(Goal):
     def expand(self, context: MotionStatechartContext) -> None:
         self.trigger = ConstTrueNode()
         self.child = ConstFalseNode()
-        self.add_nodes(nodes=[self.trigger, self.child])
+        self._add_children_to_motion_statechart(nodes=[self.trigger, self.child])
         self.child.interrupt_condition = self.trigger.observation_variable
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -385,7 +389,7 @@ class GoalWithChildFailingOnItsOwn(Goal):
     def expand(self, context: MotionStatechartContext) -> None:
         self.trigger = ConstTrueNode()
         self.child = ConstFalseNode()
-        self.add_nodes(nodes=[self.trigger, self.child])
+        self._add_children_to_motion_statechart(nodes=[self.trigger, self.child])
         self.child.fail_condition = self.trigger.observation_variable
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -413,7 +417,7 @@ class GoalWithChildSucceedingOnItsOwn(Goal):
     def expand(self, context: MotionStatechartContext) -> None:
         self.trigger = ConstTrueNode()
         self.child = ConstFalseNode()
-        self.add_nodes(nodes=[self.trigger, self.child])
+        self._add_children_to_motion_statechart(nodes=[self.trigger, self.child])
         self.child.success_condition = self.trigger.observation_variable
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -440,7 +444,7 @@ class GoalWithChildStartingLate(Goal):
     def expand(self, context: MotionStatechartContext) -> None:
         delay = CountControlCycles(control_cycles=self.delay_in_control_cycles)
         self.child = ConstFalseNode()
-        self.add_nodes(nodes=[delay, self.child])
+        self._add_children_to_motion_statechart(nodes=[delay, self.child])
         self.child.start_condition = delay.observation_variable
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -461,7 +465,7 @@ class GoalCuttingOffItsUndecidedChild(Goal):
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.child = NodeObservingNothingYet()
-        self.add_node(self.child)
+        self._add_child_to_motion_statechart(self.child)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_true())
@@ -481,7 +485,7 @@ class GoalCuttingOffItsGrandchild(Goal):
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.inner_goal = GoalCuttingOffItsChild()
-        self.add_node(self.inner_goal)
+        self._add_child_to_motion_statechart(self.inner_goal)
 
     @property
     def grandchild(self) -> ConstFalseNode:

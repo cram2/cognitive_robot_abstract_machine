@@ -44,8 +44,8 @@ class MonitoredGoal(MaintenanceNode, Goal, ABC):
     """
 
     def expand(self, context: MotionStatechartContext) -> None:
-        self.add_node(self.monitor)
-        self.add_node(self.monitored_node)
+        self._add_child_to_motion_statechart(self.monitor)
+        self._add_child_to_motion_statechart(self.monitored_node)
         self.wire_monitor()
 
     @abstractmethod

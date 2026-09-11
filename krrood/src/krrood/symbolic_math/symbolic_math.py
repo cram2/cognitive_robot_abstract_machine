@@ -31,7 +31,7 @@ from types import TracebackType
 from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import field, dataclass
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from functools import partial, wraps
 from inspect import BoundArguments
 
@@ -53,6 +53,8 @@ from typing_extensions import (
     Any,
 )
 
+from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.exceptions import (
     HasFreeVariablesError,
     DuplicateVariablesError,
@@ -64,6 +66,7 @@ from krrood.symbolic_math.exceptions import (
     UnsupportedOperationError,
     WrongDimensionsError,
     CannotConvertToStringError,
+    SymbolicMathNotJsonSerializableError,
 )
 
 EPS: float = sys.float_info.epsilon * 4.0
@@ -529,7 +532,10 @@ class SymbolicMathType(ABC):
     """
 
     pinned_free_variables: List[FloatVariable] = field(
-        kw_only=True, repr=False, default_factory=list
+        kw_only=True,
+        repr=False,
+        default_factory=list,
+        metadata=JSONMetadata(serialize=False).as_dict(),
     )
     """
     Strong references to this expression's free variables, keeping them alive.
@@ -915,8 +921,47 @@ class SymbolicMathType(ABC):
         return H.dot(v)
 
 
+# %% JSON serialization
+
+
+class SymbolicMathJSONKey(StrEnum):
+    """
+    The keys of the JSON a constant symbolic math value is serialized to.
+    """
+
+    VALUES = "values"
+    """
+    The entries of the value, as a list of rows.
+    """
+
+
+@dataclass(eq=False, repr=False)
+class SerializableSymbolicMathType(SymbolicMathType, SubclassJSONSerializer):
+    """
+    A symbolic math value that can be serialized to JSON while it is constant.
+    """
+
+    def to_json(self) -> Dict[str, Any]:
+        """
+        :raises SymbolicMathNotJsonSerializableError: If the value depends on variables,
+            since an expression means nothing to whoever reads the JSON.
+        """
+        if not self.is_constant():
+            raise SymbolicMathNotJsonSerializableError(expression=self)
+        result = super().to_json()
+        result[SymbolicMathJSONKey.VALUES] = ca.DM(self.casadi_sx).full().tolist()
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(data[SymbolicMathJSONKey.VALUES])
+
+
+# %% scalars, vectors and matrices
+
+
 @dataclass(eq=False, init=False, repr=False)
-class Scalar(SymbolicMathType):
+class Scalar(SerializableSymbolicMathType):
     """
     A symbolic type representing a scalar value.
     """
@@ -1254,7 +1299,7 @@ class FloatVariable(Scalar):
 
 
 @dataclass(eq=False, repr=False)
-class Vector(SymbolicMathType):
+class Vector(SerializableSymbolicMathType):
     """
     A vector of symbolic expressions.
 
@@ -1386,7 +1431,7 @@ class Vector(SymbolicMathType):
 
 
 @dataclass(eq=False, repr=False)
-class Matrix(SymbolicMathType):
+class Matrix(SerializableSymbolicMathType):
     """
     A matrix of symbolic expressions.
 

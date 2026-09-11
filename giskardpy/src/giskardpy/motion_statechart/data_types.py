@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import IntEnum, Enum
+from enum import IntEnum, Enum, StrEnum
 from typing import Union, FrozenSet
 
 from giskardpy.motion_statechart.exceptions import TransitionHasNoVerdictError
@@ -9,6 +9,21 @@ from krrood.symbolic_math.symbolic_math import Scalar, if_eq_cases
 from semantic_digital_twin.world_description.geometry import Color
 
 goal_parameter = Union[str, float, bool, dict, list, IntEnum, None]
+
+
+# %% serialization
+
+
+class NodeJSONKey(StrEnum):
+    """
+    Keys a serialized node carries on top of its dataclass fields.
+    """
+
+    NODE_ID = "node_id"
+    """
+    Tells apart the nodes of one JSON document, so every place referring to the same node
+    deserializes to the same instance.
+    """
 
 
 # %% life cycle states
