@@ -43,7 +43,7 @@ class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
         )
 
     @classmethod
-    def to_json(cls, obj: Any) -> Dict[str, Any]:
+    def to_json(cls, obj: Any, **kwargs) -> Dict[str, Any]:
         """
         Serialize a ROS 2 message into a JSON-compatible dictionary.
         """
@@ -85,14 +85,14 @@ class QoSProfileJSONSerializer(ExternalClassJSONSerializer[QoSProfile]):
     """
 
     @classmethod
-    def to_json(cls, obj: QoSProfile) -> Dict[str, Any]:
+    def to_json(cls, obj: QoSProfile, **kwargs) -> Dict[str, Any]:
         """
         Serialize a QoSProfile into a JSON-compatible dictionary.
         """
         return {
             JSON_TYPE_NAME: get_full_class_name(obj.__class__),
             **{
-                field_name: to_json(getattr(obj, field_name))
+                field_name: to_json(getattr(obj, field_name), **kwargs)
                 for field_name in obj.__slots__
             },
         }
@@ -120,7 +120,7 @@ class DurationJSONSerializer(ExternalClassJSONSerializer[Duration]):
     """
 
     @classmethod
-    def to_json(cls, obj: Duration) -> Dict[str, Any]:
+    def to_json(cls, obj: Duration, **kwargs) -> Dict[str, Any]:
         """
         Serialize a Duration into a JSON-compatible dictionary.
         """

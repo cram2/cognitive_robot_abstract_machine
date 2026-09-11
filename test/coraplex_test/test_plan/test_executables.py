@@ -7,6 +7,8 @@ adds a goal per plan node and a task per motion, and ``prepare_for_execution`` a
 nodes that terminate the chart, which depend on the execution type.
 """
 
+from copy import deepcopy
+
 import pytest
 from typing_extensions import List
 
@@ -26,9 +28,17 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     ThreadedPredicateMonitor,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Sphere
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 
+from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.datastructures.enums import ExecutionType
@@ -40,6 +50,8 @@ from coraplex.execution_environment import (
 from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
+from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
+from coraplex.view_manager import ViewManager
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 
@@ -249,6 +261,33 @@ def test_prepare_for_execution_leaves_out_collision_avoidance_when_not_asked_for
     chart = reach_action_executable.motion_state_chart
     assert chart.get_nodes_by_type(ExternalCollisionAvoidance) == []
     assert chart.get_nodes_by_type(SelfCollisionAvoidance) == []
+
+
+@pytest.mark.parametrize("holds_a_body", [False, True])
+def test_a_robot_keeps_moving_while_it_holds_a_body(_tiago_world_setup, holds_a_body):
+    """
+    Holding something means the fingers touch it, so a motion that follows a grasp must
+    not abort on the grasp itself.
+
+    The held body is a sphere hanging off the tool frame, between the fingers, as a
+    grasped object hangs off it after a pick-up.
+    """
+    world = deepcopy(_tiago_world_setup)
+    tiago = world.get_semantic_annotations_by_type(Tiago)[0]
+    if holds_a_body:
+        tool_frame = ViewManager.get_end_effector_view(Arms.RIGHT, tiago).tool_frame
+        with world.modify_world():
+            held_body = Body(
+                name=PrefixedName("held"),
+                collision=ShapeCollection(shapes=[Sphere(radius=0.02)]),
+            )
+            world.add_connection(FixedConnection(parent=tool_frame, child=held_body))
+    plan = execute_single(
+        MoveTorsoAction(TorsoState.HIGH), context=Context(world, tiago)
+    )
+
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+        plan.perform()
 
 
 # %% how long a motion may take

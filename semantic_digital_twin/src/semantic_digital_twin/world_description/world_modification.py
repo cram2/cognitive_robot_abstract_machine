@@ -365,11 +365,11 @@ class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerialize
     # Written by hand rather than from the fields: the annotation stays json until
     # :meth:`apply` builds it against the world it is applied to, which the generic
     # serialization would rob it of by building it while reading the modification.
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "semantic_annotation_json": self.semantic_annotation_json,
-            "semantic_annotation_id": to_json(self.semantic_annotation_id),
+            "semantic_annotation_id": to_json(self.semantic_annotation_id, **kwargs),
         }
 
     @classmethod
@@ -410,10 +410,10 @@ class RemoveSemanticAnnotationModification(WorldModification, SubclassJSONSerial
             from_json(self.semantic_annotation_json, **kwargs)
         )
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
-            "semantic_annotation_id": to_json(self.semantic_annotation_id),
+            **super().to_json(**kwargs),
+            "semantic_annotation_id": to_json(self.semantic_annotation_id, **kwargs),
             "semantic_annotation_json": self.semantic_annotation_json,
         }
 
@@ -601,14 +601,14 @@ class SetDofHasHardwareInterface(WorldModification):
             ],
         )
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "degree_of_freedom_ids": [
-                to_json(dof_id) for dof_id in self.degree_of_freedom_ids
+                to_json(dof_id, **kwargs) for dof_id in self.degree_of_freedom_ids
             ],
             "value": self.value,
-            "previous_values": to_json(self.previous_values),
+            "previous_values": to_json(self.previous_values, **kwargs),
         }
 
     @classmethod
@@ -709,11 +709,13 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
     # Written by hand rather than from the fields: the values an attribute gained and
     # lost stay json until :meth:`apply` builds them against the world it is applied to,
     # which the generic serialization would rob them of.
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
-            "entity_id": to_json(self.entity_id),
-            "updated_kwargs_json_list": to_json(self.updated_kwargs_json_list),
+            **super().to_json(**kwargs),
+            "entity_id": to_json(self.entity_id, **kwargs),
+            "updated_kwargs_json_list": to_json(
+                self.updated_kwargs_json_list, **kwargs
+            ),
         }
 
     @classmethod

@@ -468,11 +468,11 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         """
         return [field_ for field_ in fields(cls) if field_.init]
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             **{
-                field_.name: to_json(getattr(self, field_.name))
+                field_.name: to_json(getattr(self, field_.name), **kwargs)
                 for field_ in self._serialized_fields()
             },
         }
@@ -624,7 +624,7 @@ class Mesh(Shape):
             if field_.name != "filename"
         ]
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         # Serialize the unscaled geometry and the scale separately. This is the same
         # mesh :attr:`mesh` exposes, so a deserialized mesh reproduces the original
         # rather than a differently tessellated version of the same file.
@@ -640,9 +640,9 @@ class Mesh(Shape):
             ).tolist()
         file_type = self.filename.split(".")[-1]
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "mesh": mesh_dict,
-            "scale": to_json(self.scale),
+            "scale": to_json(self.scale, **kwargs),
             "file_type": file_type,
         }
 

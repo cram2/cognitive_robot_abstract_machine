@@ -199,14 +199,14 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
             for body_a, body_b in product(robot_bodies, external_bodies)
         }
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "buffer_zone_distance": self.buffer_zone_distance,
             "violated_distance": self.violated_distance,
-            "robot": to_json(self.robot.id),
+            "robot": to_json(self.robot.id, **kwargs),
             "body_subset": to_json(
-                {b.id for b in self.body_subset} if self.body_subset else None
+                {b.id for b in self.body_subset} if self.body_subset else None, **kwargs
             ),
         }
 
@@ -315,6 +315,31 @@ class AllowCollisionForEndEffector(AllowCollisionRule):
 
     def _update(self, world: World):
         self.allowed_collision_bodies = set(self.end_effector.bodies_with_collision)
+
+
+@dataclass
+class AllowCollisionBetweenEndEffectorsAndHeldBodies(AllowCollisionRule):
+    """
+    Allows collisions between every body an end effector holds and the bodies of that
+    end effector, since holding a body means touching it.
+
+    The held bodies are read every time the world model changes, so a body grasped
+    after this rule was created is covered. A held body stays checked against the rest
+    of the robot.
+    """
+
+    def _update(self, world: World):
+        # robot_parts imports the world, which imports the collision rules
+        from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
+        self.allowed_collision_pairs = {
+            CollisionCheck.create_for_bodies_with_collision(held_body, body)
+            for robot in world.get_semantic_annotations_by_type(AbstractRobot)
+            for end_effector in robot.get_end_effectors()
+            for held_body in end_effector.held_bodies
+            for body in end_effector.bodies_with_collision
+            if body != held_body
+        }
 
 
 @dataclass
@@ -722,13 +747,13 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
             )
         return self
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "allowed_body_ids": to_json(
-                {body.id for body in self.allowed_collision_bodies}
+                {body.id for body in self.allowed_collision_bodies}, **kwargs
             ),
-            "allowed_collision_pairs": to_json(self.allowed_collision_pairs),
+            "allowed_collision_pairs": to_json(self.allowed_collision_pairs, **kwargs),
         }
 
     @classmethod

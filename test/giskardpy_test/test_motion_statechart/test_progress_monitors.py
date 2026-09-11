@@ -328,6 +328,34 @@ class TestStallDetection:
         ]
         assert [node.seconds for node in timer] == [timeout.total_seconds()]
 
+    def test_a_task_at_its_goal_is_not_approaching_one(
+        self, cylinder_bot_world: World
+    ):
+        """
+        A task that is exactly at its goal has no rate to measure, since the rate of a
+        distance divides by that distance. Having arrived is not approaching, so it must
+        not read as the progress that keeps a stalled motion from being given up on.
+        """
+        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        arrived = CartesianPosition(
+            name="arrived",
+            root_link=cylinder_bot_world.root,
+            tip_link=bot,
+            goal_point=Point3(0, 0, 0, reference_frame=bot),
+        )
+        monitor = NotApproachingGoal(monitored_task=arrived)
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_node(arrived)
+        motion_statechart.add_node(monitor)
+        motion_statechart.add_node(EndMotion())
+
+        executor = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        executor.compile(motion_statechart=motion_statechart)
+        executor.tick()
+        executor.tick()
+
+        assert arrived.error_signal.expression.evaluate()[0] == 0
+        assert monitor.observation_state == ObservationStateValues.TRUE
 
 # %% measuring the convergence rate
 

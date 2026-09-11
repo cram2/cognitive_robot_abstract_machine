@@ -44,10 +44,10 @@ class PiecewiseConstantCurvatureConnection(Connection):
     The physical arc length of this specific segment.
     """
 
-    def to_json(self) -> dict[str, Any]:
-        result = super().to_json()
-        result["kappa_dof_id"] = to_json(self.kappa_dof_id)
-        result["phi_dof_id"] = to_json(self.phi_dof_id)
+    def to_json(self, **kwargs) -> dict[str, Any]:
+        result = super().to_json(**kwargs)
+        result["kappa_dof_id"] = to_json(self.kappa_dof_id, **kwargs)
+        result["phi_dof_id"] = to_json(self.phi_dof_id, **kwargs)
         result["segment_length"] = self.segment_length
         return result
 
@@ -249,12 +249,12 @@ class CosseratRodConnection(Connection):
     The intrinsic rest length of the rod segment.
     """
 
-    def to_json(self) -> dict[str, Any]:
-        result = super().to_json()
-        result["bending_x_dof_id"] = to_json(self.bending_x_dof_id)
-        result["bending_y_dof_id"] = to_json(self.bending_y_dof_id)
-        result["torsion_dof_id"] = to_json(self.torsion_dof_id)
-        result["extension_dof_id"] = to_json(self.extension_dof_id)
+    def to_json(self, **kwargs) -> dict[str, Any]:
+        result = super().to_json(**kwargs)
+        result["bending_x_dof_id"] = to_json(self.bending_x_dof_id, **kwargs)
+        result["bending_y_dof_id"] = to_json(self.bending_y_dof_id, **kwargs)
+        result["torsion_dof_id"] = to_json(self.torsion_dof_id, **kwargs)
+        result["extension_dof_id"] = to_json(self.extension_dof_id, **kwargs)
         result["segment_length"] = self.segment_length
         return result
 

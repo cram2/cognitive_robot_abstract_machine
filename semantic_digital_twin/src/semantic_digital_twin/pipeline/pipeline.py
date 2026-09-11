@@ -178,7 +178,8 @@ class BodyFactoryReplace(Step):
 
             world.remove_kinematic_structure_entity(body)
 
-            parent_connection.child = new_world.root
-            world.merge_world(new_world, parent_connection)
+            world.merge_world(
+                new_world, parent_connection.copy_with_new_child(new_world.root)
+            )
 
         return world

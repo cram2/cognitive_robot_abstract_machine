@@ -1267,7 +1267,8 @@ def test_rebind_body(world_setup):
 
 def test_rebind_connection(world_setup):
     """
-    A connection, which has no id of its own, is rebound through its parent and child.
+    A connection is rebound to the connection of the other world between the same parent
+    and child.
     """
     world, l1, l2, bf, r1, r2 = world_setup
     world_copy = deepcopy(world)
@@ -1713,6 +1714,83 @@ def test_add_body_hash():
     with world.modify_world():
         world.remove_kinematic_structure_entity(body)
     assert hash(body) not in world._world_entity_hash_table
+
+
+# %% connections are identified by the entities they connect
+
+
+def test_a_connection_and_its_copy_in_another_world_share_an_id(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection = world.get_connection(r1, r2)
+
+    world_copy = deepcopy(world)
+    connection_copy = world_copy.get_connection(
+        world_copy.get_kinematic_structure_entity_by_id(r1.id),
+        world_copy.get_kinematic_structure_entity_by_id(r2.id),
+    )
+
+    assert connection_copy is not connection
+    assert connection_copy.id == connection.id
+
+
+def test_connections_between_different_entities_have_different_ids(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    assert world.get_connection(bf, l1).id != world.get_connection(bf, r1).id
+
+
+def test_the_world_finds_a_connection_by_its_id(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection = world.get_connection(r1, r2)
+
+    assert world.get_world_entity_with_id_by_id(connection.id) is connection
+
+
+def test_a_connection_leaves_the_world_with_its_child(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection = world.get_connection(r1, r2)
+
+    with world.modify_world():
+        world.remove_kinematic_structure_entity(r2)
+
+    assert world.find_world_entity_with_id(connection.id) is None
+    assert connection._world is None
+
+
+def test_adding_a_second_connection_between_connected_entities_keeps_the_first(
+    world_setup,
+):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection = world.get_connection(bf, l1)
+    number_of_connections = len(world.connections)
+
+    with world.modify_world():
+        world.add_connection(FixedConnection(parent=bf, child=l1))
+
+    assert len(world.connections) == number_of_connections
+    assert world.get_connection(bf, l1) is connection
+
+
+def test_a_connection_copied_with_a_new_child_connects_the_new_child(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: RevoluteConnection = world.get_connection(r1, r2)
+    new_child = Body(name=PrefixedName("r3"))
+
+    connection_copy = connection.copy_with_new_child(new_child)
+
+    assert type(connection_copy) is RevoluteConnection
+    assert connection_copy.parent is r1
+    assert connection_copy.child is new_child
+    assert connection_copy.raw_dof is connection.raw_dof
+    assert (
+        connection_copy.id
+        == RevoluteConnection(
+            parent=r1,
+            child=new_child,
+            raw_dof=connection.raw_dof,
+            axis=connection.axis,
+        ).id
+    )
 
 
 def test_world_state_trajectory(world_setup, tmp_path):

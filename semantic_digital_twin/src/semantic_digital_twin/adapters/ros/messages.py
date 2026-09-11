@@ -31,12 +31,12 @@ class MetaData(SubclassJSONSerializer):
     """The id of the origin world. This is used to identify messages that were published by the same publisher."""
 
     @memoize
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "node_name": self.node_name,
             "process_id": self.process_id,
-            "world_id": to_json(self.world_id),
+            "world_id": to_json(self.world_id, **kwargs),
         }
 
     @classmethod
@@ -190,12 +190,12 @@ class WorldModelSnapshot(SubclassJSONSerializer):
     states: List[float]
     """The values of the free variables contained in the state snapshot."""
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
-            SnapshotField.MODIFICATIONS: to_json(self.modifications),
+            **super().to_json(**kwargs),
+            SnapshotField.MODIFICATIONS: to_json(self.modifications, **kwargs),
             SnapshotField.STATE: {
-                SnapshotField.IDS: to_json(self.ids),
+                SnapshotField.IDS: to_json(self.ids, **kwargs),
                 SnapshotField.STATES: list(self.states),
             },
         }

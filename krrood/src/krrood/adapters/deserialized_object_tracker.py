@@ -5,15 +5,17 @@ from dataclasses import dataclass, field
 from typing_extensions import Any, Dict, Generic, Self, TypeVar
 
 from krrood.adapters.exceptions import UntrackedObjectError
+from krrood.adapters.keyword_argument import SerializationKeywordArgument
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood.utils import get_full_class_name
 
 KeyType = TypeVar("KeyType")
 TrackedType = TypeVar("TrackedType")
 
 
 @dataclass
-class DeserializedObjectTracker(Generic[KeyType, TrackedType], SubClassSafeGeneric):
+class DeserializedObjectTracker(
+    Generic[KeyType, TrackedType], SubClassSafeGeneric, SerializationKeywordArgument
+):
     """
     The objects created while deserializing one JSON document, by the key the document
     refers to them with.
@@ -43,21 +45,6 @@ class DeserializedObjectTracker(Generic[KeyType, TrackedType], SubClassSafeGener
         if keyword not in from_json_kwargs:
             from_json_kwargs[keyword] = cls()
         return from_json_kwargs[keyword]
-
-    @classmethod
-    def _keyword(cls) -> str:
-        """
-        :return: The keyword argument this type of tracker is passed as, distinct for every
-            tracker type.
-        """
-        return get_full_class_name(cls)
-
-    def create_kwargs(self) -> Dict[str, Self]:
-        """
-        :return: Keyword arguments carrying this tracker, to pass to the top-level
-            ``from_json`` call.
-        """
-        return {self._keyword(): self}
 
     def add(self, key: KeyType, tracked_object: TrackedType) -> None:
         """

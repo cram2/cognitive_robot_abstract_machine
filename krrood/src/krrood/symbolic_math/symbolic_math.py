@@ -941,14 +941,14 @@ class SerializableSymbolicMathType(SymbolicMathType, SubclassJSONSerializer):
     A symbolic math value that can be serialized to JSON while it is constant.
     """
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         """
         :raises SymbolicMathNotJsonSerializableError: If the value depends on variables,
             since an expression means nothing to whoever reads the JSON.
         """
         if not self.is_constant():
             raise SymbolicMathNotJsonSerializableError(expression=self)
-        result = super().to_json()
+        result = super().to_json(**kwargs)
         result[SymbolicMathJSONKey.VALUES] = ca.DM(self.casadi_sx).full().tolist()
         return result
 

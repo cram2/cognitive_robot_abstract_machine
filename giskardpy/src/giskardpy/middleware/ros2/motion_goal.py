@@ -52,14 +52,14 @@ class MotionGoal(SubclassJSONSerializer):
             required_position=required_position,
         )
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "motion_statechart": self.motion_statechart_json_data,
             "required_position": (
                 None
                 if self.required_position is None
-                else to_json(self.required_position)
+                else to_json(self.required_position, **kwargs)
             ),
         }
 

@@ -38,7 +38,7 @@ class Open3DPointCloudJSONSerializer(
     """
 
     @classmethod
-    def to_json(cls, obj: o3d.geometry.PointCloud) -> Dict[str, Any]:
+    def to_json(cls, obj: o3d.geometry.PointCloud, **kwargs) -> Dict[str, Any]:
         """
         Convert an Open3D point cloud into a JSON-compatible payload.
         """
@@ -66,7 +66,7 @@ class NumpyScalarJSONSerializer(ExternalClassJSONSerializer[np.generic]):
     """
 
     @classmethod
-    def to_json(cls, obj: np.generic) -> Dict[str, Any]:
+    def to_json(cls, obj: np.generic, **kwargs) -> Dict[str, Any]:
         """
         Convert a NumPy scalar value to JSON-compatible data.
         """

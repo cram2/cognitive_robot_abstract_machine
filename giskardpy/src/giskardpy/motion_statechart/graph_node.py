@@ -272,8 +272,8 @@ class TrinaryCondition(SubclassJSONSerializer):
     def __repr__(self):
         return str(self)
 
-    def to_json(self) -> Dict[str, Any]:
-        json_data = super().to_json()
+    def to_json(self, **kwargs) -> Dict[str, Any]:
+        json_data = super().to_json(**kwargs)
         json_data["kind"] = self.kind.name
         json_data["expression"] = str(self)
         json_data["owner"] = self.owner.index if self.owner else None
@@ -839,9 +839,9 @@ class MotionStatechartNode(SubclassJSONSerializer):
         else:
             self.parent_node_index = parent_node.index
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **DataclassJSONSerializer.to_json(self),
+            **DataclassJSONSerializer.to_json(self, **kwargs),
             NodeJSONKey.NODE_ID: self._node_id,
         }
 

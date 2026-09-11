@@ -11,6 +11,9 @@ from krrood.parametrization.feature_extraction.aggregations import (
     aggregation_statistic,
     get_aggregation_class,
 )
+from krrood.parametrization.feature_extraction.exceptions import (
+    MissingFieldNameError,
+)
 from krrood.parametrization.feature_extraction.feature_extractor import (
     FeatureExtractor,
 )
@@ -354,3 +357,30 @@ def test_room_count_computes_correct_number_of_rooms():
     instance = TestExPartsAggregations(instance=test_ex_parts, field_name="rooms")
     [room_count] = instance.apply_mapping().values()
     assert room_count == 2
+
+
+def test_symbolic_features_are_derivable_without_a_domain_object():
+    """
+    The symbolic features of a field must be reconstructible from the class alone, so a
+    model that was persisted without its training data can still evaluate them.
+    """
+    room = SceneRoom(
+        position=KRROODPosition(0, 0, 0),
+        orientation=KRROODOrientation(0, 0, 0, 1),
+        objects=[],
+    )
+    instance = SceneRoomAggregations(instance=room, field_name="objects")
+    assert (
+        SceneRoomAggregations.symbolic_features_of_field("objects")
+        == instance.symbolic_aggregation_features()
+    )
+
+
+def test_symbolic_aggregation_features_require_a_field_name():
+    room = SceneRoom(
+        position=KRROODPosition(0, 0, 0),
+        orientation=KRROODOrientation(0, 0, 0, 1),
+        objects=[],
+    )
+    with pytest.raises(MissingFieldNameError):
+        SceneRoomAggregations(instance=room).symbolic_aggregation_features()

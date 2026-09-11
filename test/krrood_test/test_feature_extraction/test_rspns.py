@@ -1,9 +1,12 @@
 from unittest.mock import patch
 
+import json
+
 import numpy as np
 import pytest
 from sortedcontainers import SortedSet
 
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.distributions.distributions import IntegerDistribution
@@ -94,8 +97,8 @@ def test_fit_class_circuit_is_valid(relational_probabilistic_circuit):
 
 def test_fit_class_circuit_has_room_scalar_variables(relational_probabilistic_circuit):
     names = {
-        v.name
-        for v in relational_probabilistic_circuit.class_probabilistic_circuit.variables
+        variable.name
+        for variable in relational_probabilistic_circuit.class_probabilistic_circuit.variables
     }
     assert "SceneRoom.position.x" in names
     assert "SceneRoom.position.y" in names
@@ -108,8 +111,8 @@ def test_fit_class_circuit_has_room_scalar_variables(relational_probabilistic_ci
 
 def test_fit_class_circuit_has_aggregation_variable(relational_probabilistic_circuit):
     names = {
-        v.name
-        for v in relational_probabilistic_circuit.class_probabilistic_circuit.variables
+        variable.name
+        for variable in relational_probabilistic_circuit.class_probabilistic_circuit.variables
     }
     assert "SceneRoomAggregations.total_count()" in names
 
@@ -133,7 +136,7 @@ def test_fit_exchangeable_template_latent_is_total_count(
     template = relational_probabilistic_circuit.exchangeable_distribution_templates[
         "objects"
     ]
-    latent_names = {v.name for v in template.latent_variables}
+    latent_names = {variable.name for variable in template.latent_variables}
     assert "SceneRoomAggregations.total_count()" in latent_names
 
 
@@ -141,8 +144,8 @@ def test_fit_exchangeable_template_models_object_type(relational_probabilistic_c
     template = relational_probabilistic_circuit.exchangeable_distribution_templates[
         "objects"
     ]
-    pc = template.template_distribution.class_probabilistic_circuit
-    names = {v.name for v in pc.variables}
+    probabilistic_circuit = template.template_distribution.class_probabilistic_circuit
+    names = {variable.name for variable in probabilistic_circuit.variables}
     assert "type" in names
 
 
@@ -155,7 +158,7 @@ def test_ground_has_per_object_type_variables(
     relational_probabilistic_circuit, room_query_4
 ):
     model = relational_probabilistic_circuit.ground(room_query_4)
-    names = {v.name for v in model.variables}
+    names = {variable.name for variable in model.variables}
     for i in range(4):
         assert f"SceneRoom.objects[{i}].type" in names
 
@@ -164,12 +167,12 @@ def test_ground_preserves_room_scalar_variables(
     relational_probabilistic_circuit, room_query_4
 ):
     model = relational_probabilistic_circuit.ground(room_query_4)
-    names = {v.name for v in model.variables}
+    names = {variable.name for variable in model.variables}
     assert "SceneRoom.position.x" in names
     assert "SceneRoom.orientation.w" in names
 
 
-def test_ground_retains_unavailable_aggregates_by_default(
+def test_ground_integrates_out_unavailable_aggregates(
     relational_probabilistic_circuit, room_query_4
 ):
     """
@@ -177,9 +180,8 @@ def test_ground_retains_unavailable_aggregates_by_default(
     query, so the Monte-Carlo path must retain them as variables (grounding never
     integrates undetermined latents out), alongside the object-type variables.
     """
-    np.random.seed(0)
     model = relational_probabilistic_circuit.ground(room_query_4)
-    names = {v.name for v in model.variables}
+    names = {variable.name for variable in model.variables}
     assert "SceneRoomAggregations.chair_count()" in names
     assert "SceneRoomAggregations.table_count()" in names
     for i in range(4):
@@ -203,7 +205,6 @@ def test_non_positive_sample_count_raises_when_integration_needed(
     relational_probabilistic_circuit.monte_carlo_sample_count = 0
     with pytest.raises(InvalidMonteCarloSampleCountError):
         relational_probabilistic_circuit.ground(room_query_4)
-
 
 @pytest.fixture
 def relational_probabilistic_circuit_with_ambiguous_total_count_4():
@@ -271,6 +272,90 @@ def test_monte_carlo_sample_count_controls_mixture_size(
     assert many > single
 
 
+@pytest.fixture
+def deserialized_relational_probabilistic_circuit(relational_probabilistic_circuit):
+    """
+    The circuit after a round-trip through actual JSON text.
+
+    Going through :func:`json.dumps` and :func:`json.loads` rather than only through the
+    intermediate dict is what exposes encoding losses such as integer node keys becoming
+    strings.
+    """
+    return from_json(json.loads(json.dumps(to_json(relational_probabilistic_circuit))))
+
+
+def test_deserialization_restores_class(deserialized_relational_probabilistic_circuit):
+    assert isinstance(
+        deserialized_relational_probabilistic_circuit, RelationalProbabilisticCircuit
+    )
+    assert deserialized_relational_probabilistic_circuit.class_ is SceneRoom
+
+
+def test_deserialization_restores_class_circuit_variables(
+    relational_probabilistic_circuit, deserialized_relational_probabilistic_circuit
+):
+    original_names = {
+        variable.name
+        for variable in relational_probabilistic_circuit.class_probabilistic_circuit.variables
+    }
+    restored_names = {
+        variable.name
+        for variable in deserialized_relational_probabilistic_circuit.class_probabilistic_circuit.variables
+    }
+    assert restored_names == original_names
+
+
+def test_deserialization_restores_exchangeable_templates(
+    relational_probabilistic_circuit, deserialized_relational_probabilistic_circuit
+):
+    assert (
+        deserialized_relational_probabilistic_circuit.exchangeable_distribution_templates.keys()
+        == relational_probabilistic_circuit.exchangeable_distribution_templates.keys()
+    )
+    template = deserialized_relational_probabilistic_circuit.exchangeable_distribution_templates[
+        "objects"
+    ]
+    latent_names = {variable.name for variable in template.latent_variables}
+    assert latent_names == {
+        variable.name
+        for variable in relational_probabilistic_circuit.exchangeable_distribution_templates[
+            "objects"
+        ].latent_variables
+    }
+
+
+def test_deserialized_circuit_grounds_to_the_same_variables(
+    relational_probabilistic_circuit,
+    deserialized_relational_probabilistic_circuit,
+    room_query_4,
+):
+    np.random.seed(0)
+    original = relational_probabilistic_circuit.ground(room_query_4)
+    np.random.seed(0)
+    restored = deserialized_relational_probabilistic_circuit.ground(room_query_4)
+    assert restored.is_valid()
+    assert {variable.name for variable in restored.variables} == {
+        variable.name for variable in original.variables
+    }
+
+
+def test_deserialized_circuit_preserves_likelihoods(
+    relational_probabilistic_circuit, deserialized_relational_probabilistic_circuit
+):
+    """
+    The class distribution itself must be preserved numerically, not only structurally.
+    """
+    samples = relational_probabilistic_circuit.class_probabilistic_circuit.sample(10)
+    assert np.allclose(
+        relational_probabilistic_circuit.class_probabilistic_circuit.log_likelihood(
+            samples
+        ),
+        deserialized_relational_probabilistic_circuit.class_probabilistic_circuit.log_likelihood(
+            samples
+        ),
+    )
+
+
 def test_ground_variable_count_scales_with_query_size(relational_probabilistic_circuit):
     query_2 = a(SceneRoom)(
         position=a(KRROODPosition)(x=..., y=..., z=...),
@@ -299,7 +384,7 @@ def test_sampled_grounding_retains_undetermined_latents_as_variables(
     model = relational_probabilistic_circuit.ground(
         room_query_4, grounding_mode=GroundingMode.SAMPLED
     )
-    names = {v.name for v in model.variables}
+    names = {variable.name for variable in model.variables}
     assert "SceneRoomAggregations.chair_count()" in names
     assert "SceneRoomAggregations.table_count()" in names
 
@@ -311,7 +396,7 @@ def test_sampled_grounding_preserves_object_type_variables(
     model = relational_probabilistic_circuit.ground(
         room_query_4, grounding_mode=GroundingMode.SAMPLED
     )
-    names = {v.name for v in model.variables}
+    names = {variable.name for variable in model.variables}
     for i in range(4):
         assert f"SceneRoom.objects[{i}].type" in names
 
@@ -331,10 +416,14 @@ def _causal_circuit_for(model):
     GroundingMode.SAMPLED/EXACT causal-registration test below exercises.
     """
     chair_count_variable = next(
-        v for v in model.variables if v.name == "SceneRoomAggregations.chair_count()"
+        variable
+        for variable in model.variables
+        if variable.name == "SceneRoomAggregations.chair_count()"
     )
     object_type_variable = next(
-        v for v in model.variables if v.name == "SceneRoom.objects[0].type"
+        variable
+        for variable in model.variables
+        if variable.name == "SceneRoom.objects[0].type"
     )
     tree = MarginalDeterminismTreeNode.from_causal_graph(
         [chair_count_variable], [object_type_variable]
@@ -395,7 +484,7 @@ def test_exact_grounding_retains_undetermined_latents_as_variables(
     model = relational_probabilistic_circuit.ground(
         room_query_4, grounding_mode=GroundingMode.EXACT
     )
-    names = {v.name for v in model.variables}
+    names = {variable.name for variable in model.variables}
     assert "SceneRoomAggregations.chair_count()" in names
     assert "SceneRoomAggregations.table_count()" in names
 
@@ -417,15 +506,15 @@ def test_exact_grounding_is_reproducible_across_calls(
     """
     np.random.seed(0)
     first = {
-        v.name
-        for v in relational_probabilistic_circuit.ground(
+        variable.name
+        for variable in relational_probabilistic_circuit.ground(
             room_query_4, grounding_mode=GroundingMode.EXACT
         ).variables
     }
     np.random.seed(123)
     second = {
-        v.name
-        for v in relational_probabilistic_circuit.ground(
+        variable.name
+        for variable in relational_probabilistic_circuit.ground(
             room_query_4, grounding_mode=GroundingMode.EXACT
         ).variables
     }
@@ -479,7 +568,7 @@ def test_exact_grounding_falls_back_to_sampled_when_partition_overlaps(
             )
 
     assert model.is_valid()
-    names = {v.name for v in model.variables}
+    names = {variable.name for variable in model.variables}
     assert "SceneRoomAggregations.chair_count()" in names
     assert any("falling back" in message.lower() for message in caplog.messages)
 
@@ -488,7 +577,9 @@ def test_exact_grounding_falls_back_to_sampled_when_partition_overlaps(
 # latent and the exchangeable relation's own attributes, not just its variable set
 
 
-def _room_with_chair_count(rng: np.random.Generator, chair_count: int) -> SceneRoom:
+def _room_with_chair_count(
+    random_generator: np.random.Generator, chair_count: int
+) -> SceneRoom:
     """
     A three-object room whose first object's type is CHAIR whenever chair_count is at
     least 2, TABLE otherwise, and whose remaining objects are padded to match
@@ -506,7 +597,9 @@ def _room_with_chair_count(rng: np.random.Generator, chair_count: int) -> SceneR
     ]
     return SceneRoom(
         position=KRROODPosition(
-            x=float(rng.uniform(0, 5)), y=float(rng.uniform(0, 5)), z=0.0
+            x=float(random_generator.uniform(0, 5)),
+            y=float(random_generator.uniform(0, 5)),
+            z=0.0,
         ),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
         objects=objects,
@@ -514,10 +607,10 @@ def _room_with_chair_count(rng: np.random.Generator, chair_count: int) -> SceneR
 
 
 @pytest.fixture
-def correlated_rpc() -> RelationalProbabilisticCircuit:
-    rng = np.random.default_rng(0)
-    rooms = [_room_with_chair_count(rng, 1) for _ in range(20)] + [
-        _room_with_chair_count(rng, 3) for _ in range(20)
+def correlated_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
+    random_generator = np.random.default_rng(0)
+    rooms = [_room_with_chair_count(random_generator, 1) for _ in range(20)] + [
+        _room_with_chair_count(random_generator, 3) for _ in range(20)
     ]
     model = RelationalProbabilisticCircuit(SceneRoom)
     model.fit([to_dao(room) for room in rooms])
@@ -536,7 +629,7 @@ def correlated_room_query():
 
 
 def test_exact_grounding_preserves_correlation_with_the_retained_latent(
-    correlated_rpc, correlated_room_query
+    correlated_relational_probabilistic_circuit, correlated_room_query
 ):
     """
     Regression test: the retained chair_count latent must stay statistically tied to the
@@ -553,14 +646,18 @@ def test_exact_grounding_preserves_correlation_with_the_retained_latent(
     one.
     """
     np.random.seed(0)
-    grounded = correlated_rpc.ground(
+    grounded = correlated_relational_probabilistic_circuit.ground(
         correlated_room_query, grounding_mode=GroundingMode.EXACT
     )
     chair_count_variable = next(
-        v for v in grounded.variables if v.name == "SceneRoomAggregations.chair_count()"
+        variable
+        for variable in grounded.variables
+        if variable.name == "SceneRoomAggregations.chair_count()"
     )
     object_type_variable = next(
-        v for v in grounded.variables if v.name == "SceneRoom.objects[0].type"
+        variable
+        for variable in grounded.variables
+        if variable.name == "SceneRoom.objects[0].type"
     )
 
     tree = MarginalDeterminismTreeNode.from_causal_graph(

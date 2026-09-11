@@ -101,9 +101,9 @@ class HasXYZ(Sage10kBase):
     y: float
     z: float
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "x": self.x,
             "y": self.y,
             "z": self.z,
@@ -173,9 +173,9 @@ class Sage10kSize(Sage10kBase):
     def z(self) -> float:
         return self.height
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "height": self.height,
             "length": self.length,
             "width": self.width,
@@ -199,9 +199,9 @@ class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
     metallic: float
     roughness: float
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "metallic": self.metallic,
             "roughness": self.roughness,
         }
@@ -248,12 +248,12 @@ class Sage10kWall(Sage10kWithID):
     The thickness of the wall.
     """
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "id": self.id,
-            "start_point": to_json(self.start_point),
-            "end_point": to_json(self.end_point),
+            "start_point": to_json(self.start_point, **kwargs),
+            "end_point": to_json(self.end_point, **kwargs),
             "material": self.material,
             "height": self.height,
             "thickness": self.thickness,
@@ -473,9 +473,9 @@ class Sage10kObject(Sage10kWithID):
 
         return body
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "id": self.id,
             "room_id": self.room_id,
             "type": self.type,
@@ -485,10 +485,10 @@ class Sage10kObject(Sage10kWithID):
             "place_id": self.place_id,
             "place_guidance": self.place_guidance,
             "mass": self.mass,
-            "position": to_json(self.position),
-            "rotation": to_json(self.rotation),
-            "dimensions": to_json(self.dimensions),
-            "pbr_parameters": to_json(self.pbr_parameters),
+            "position": to_json(self.position, **kwargs),
+            "rotation": to_json(self.rotation, **kwargs),
+            "dimensions": to_json(self.dimensions, **kwargs),
+            "pbr_parameters": to_json(self.pbr_parameters, **kwargs),
         }
 
     @classmethod
@@ -566,9 +566,9 @@ class Sage10kDoor(Sage10kWithID):
     The door materials filename found in the `materials` folder.
     """
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "id": self.id,
             "wall_id": self.wall_id,
             "position_on_wall": self.position_on_wall,
@@ -908,17 +908,17 @@ class Sage10kRoom(Sage10kWithID):
 
         return world.root
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
             JSON_TYPE_NAME: get_full_class_name(self.__class__),
             "id": self.id,
             "room_type": self.room_type,
-            "dimensions": to_json(self.dimensions),
-            "position": to_json(self.position),
+            "dimensions": to_json(self.dimensions, **kwargs),
+            "position": to_json(self.position, **kwargs),
             "floor_material": self.floor_material,
-            "objects": to_json(self.objects),
-            "walls": to_json(self.walls),
-            "doors": to_json(self.doors),
+            "objects": to_json(self.objects, **kwargs),
+            "walls": to_json(self.walls, **kwargs),
+            "doors": to_json(self.doors, **kwargs),
         }
 
     @classmethod
@@ -975,15 +975,15 @@ class Sage10kScene(Sage10kWithID):
     The layout files are named like `layout*.json`.
     """
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
+            **super().to_json(**kwargs),
             "id": self.id,
             "building_style": self.building_style,
             "description": self.description,
             "created_from_text": self.created_from_text,
             "total_area": self.total_area,
-            "rooms": to_json(self.rooms),
+            "rooms": to_json(self.rooms, **kwargs),
         }
 
     @classmethod

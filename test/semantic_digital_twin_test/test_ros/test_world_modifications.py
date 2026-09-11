@@ -382,10 +382,6 @@ def test_revert_remove_kinematic_structure_entity():
 
 
 def test_revert_add_connection():
-    # world.is_connection_in_world() is not used here: Connection.add_to_world()
-    # never registers connections in the world's entity-hash table, so that check is
-    # always False regardless of revert. Membership in world.connections is the
-    # meaningful check, matching how the rest of this file verifies connections.
     world = World()
     with world.modify_world():
         b1 = Body(name=PrefixedName("b1"))

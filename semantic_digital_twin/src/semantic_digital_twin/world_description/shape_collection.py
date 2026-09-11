@@ -205,10 +205,10 @@ class ShapeCollection(SubclassJSONSerializer):
             HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            **super().to_json(),
-            "shapes": [to_json(shape) for shape in self.shapes],
+            **super().to_json(**kwargs),
+            "shapes": [to_json(shape, **kwargs) for shape in self.shapes],
         }
 
     @classmethod

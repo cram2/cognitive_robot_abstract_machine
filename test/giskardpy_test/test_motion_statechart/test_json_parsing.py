@@ -20,6 +20,7 @@ from giskardpy.motion_statechart.graph_node import (
     EndMotion,
     CancelMotion,
 )
+from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.motion_statechart import (
@@ -55,7 +56,10 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    WorldEntityReferenceWriter,
+)
 
 
 def test_TrueMonitor():
@@ -125,6 +129,57 @@ def test_to_json_joint_position_list(mini_world):
     assert node_copy.name == node.name
     assert node_copy.threshold == node.threshold
     assert node_copy.goal_state == node.goal_state
+
+
+def test_a_motion_statechart_refers_to_world_entities_by_reference(mini_world):
+    """
+    Whoever reads a motion statechart has the world it was built for, so its nodes point
+    at the entities of that world instead of carrying copies of them.
+    """
+    root = mini_world.get_kinematic_structure_entity_by_name("root")
+    tip = mini_world.get_kinematic_structure_entity_by_name("tip")
+    msc = MotionStatechart()
+    msc.add_node(
+        node := CartesianPose(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0.1, reference_frame=root
+            ),
+        )
+    )
+
+    json_data = json.loads(json.dumps(msc.to_json()))
+
+    assert json_data["nodes"][node.index][
+        "root_link"
+    ] == WorldEntityReferenceWriter().write_reference(root)
+
+    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    msc_copy = MotionStatechart.from_json(json_data, **tracker.create_kwargs())
+    node_copy = msc_copy.get_node_by_index(node.index)
+    assert node_copy.root_link is root
+    assert node_copy.tip_link is tip
+
+
+def test_a_motion_statechart_refers_to_connections_by_reference(mini_world):
+    """
+    A connection is a world entity like any other, so a node holding one points at the
+    connection of the reader's world.
+    """
+    connection = mini_world.get_connection_by_name("root_T_tip")
+    msc = MotionStatechart()
+    msc.add_node(node := JointPositionReached(connection=connection, position=0.5))
+
+    json_data = json.loads(json.dumps(msc.to_json()))
+
+    assert json_data["nodes"][node.index][
+        "connection"
+    ] == WorldEntityReferenceWriter().write_reference(connection)
+
+    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    msc_copy = MotionStatechart.from_json(json_data, **tracker.create_kwargs())
+    assert msc_copy.get_node_by_index(node.index).connection is connection
 
 
 def test_start_condition(mini_world):

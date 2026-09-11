@@ -44,6 +44,9 @@ from giskardpy.motion_statechart.graph_node import (
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
 from giskardpy.qp.constraint_collection import ConstraintCollection
+from semantic_digital_twin.world_description.world_entity import (
+    WorldEntityReferenceWriter,
+)
 
 
 @dataclass(repr=False, eq=False)
@@ -155,11 +158,11 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
             data=self.data.copy(),
         )
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         """
         :return: The JSON representation of the base class, extended with the raw :attr:`data` array.
         """
-        return {**super().to_json(), "data": self.data.tolist()}
+        return {**super().to_json(**kwargs), "data": self.data.tolist()}
 
     @classmethod
     def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
@@ -1180,17 +1183,22 @@ class MotionStatechart(SubclassJSONSerializer):
             self, second_width_in_cm=second_length_in_cm, context=context
         ).plot_gantt_chart(path)
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         """
+        World entities are written as references, because whoever reads a motion
+        statechart resolves them against its own world, which has the same entities.
+
         :return: The JSON representation of this motion statechart, including all nodes and their unique edges.
         .. warning:: This rebuilds the graph's edges from the nodes' current conditions as a side effect, see :meth:`_add_transitions`.
         """
+        kwargs = {**kwargs, **WorldEntityReferenceWriter().create_kwargs()}
         self._add_transitions()
-        result = super().to_json()
+        result = super().to_json(**kwargs)
         result["nodes"] = [
-            to_json(node) for node in sorted(self.nodes, key=lambda n: n.index)
+            to_json(node, **kwargs)
+            for node in sorted(self.nodes, key=lambda n: n.index)
         ]
-        result["unique_edges"] = [edge.to_json() for edge in self.unique_edges]
+        result["unique_edges"] = [edge.to_json(**kwargs) for edge in self.unique_edges]
         return result
 
     @classmethod

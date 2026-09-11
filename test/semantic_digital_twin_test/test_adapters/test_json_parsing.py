@@ -1,3 +1,4 @@
+import json
 import os
 from copy import deepcopy
 
@@ -45,7 +46,11 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 )
 from semantic_digital_twin.world_description.geometry import Box
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    ReferencedWorldEntity,
+    WorldEntityReferenceWriter,
+)
 
 
 def test_body_json_serialization():
@@ -201,6 +206,75 @@ def test_a_reference_resolves_to_the_entity_it_names():
 
     assert parsed_connection.parent is parent
     assert parsed_connection.child is child
+
+
+def test_an_entity_written_as_a_reference_carries_only_its_id_and_name():
+    body = Body(name=PrefixedName("cable_post"))
+
+    json_data = to_json(body, **WorldEntityReferenceWriter().create_kwargs())
+
+    assert json_data == to_json(ReferencedWorldEntity(id=body.id, name=body.name))
+
+
+def test_an_entity_written_as_a_reference_is_read_as_the_entity_of_the_world():
+    world = World()
+    body = Body(name=PrefixedName("cable_post"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+    json_data = json.loads(
+        json.dumps(to_json(body, **WorldEntityReferenceWriter().create_kwargs()))
+    )
+
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+
+    assert from_json(json_data, **tracker.create_kwargs()) is body
+
+
+def test_a_reference_to_an_entity_cannot_be_read_without_a_world():
+    body = Body(name=PrefixedName("cable_post"))
+    json_data = to_json(body, **WorldEntityReferenceWriter().create_kwargs())
+
+    with pytest.raises(MissingWorldError):
+        from_json(json_data)
+
+
+def test_a_reference_to_an_entity_the_world_lacks_names_the_entity():
+    body = Body(name=PrefixedName("cable_post"))
+    json_data = to_json(body, **WorldEntityReferenceWriter().create_kwargs())
+
+    tracker = WorldEntityWithIDKwargsTracker.from_world(World())
+    with pytest.raises(WorldEntityWithIDNotInKwargs) as raised:
+        from_json(json_data, **tracker.create_kwargs())
+
+    assert raised.value.key == body.id
+    assert raised.value.world_entity_name == body.name
+
+
+def test_a_connection_written_as_a_reference_carries_only_its_id_and_name():
+    world = World()
+    parent = Body(name=PrefixedName("cable_post"))
+    child = Body(name=PrefixedName("cable"))
+    with world.modify_world():
+        world.add_connection(connection := FixedConnection(parent=parent, child=child))
+
+    json_data = to_json(connection, **WorldEntityReferenceWriter().create_kwargs())
+
+    assert json_data == WorldEntityReferenceWriter().write_reference(connection)
+
+
+def test_a_connection_written_as_a_reference_is_read_as_the_connection_of_the_world():
+    world = World()
+    parent = Body(name=PrefixedName("cable_post"))
+    child = Body(name=PrefixedName("cable"))
+    with world.modify_world():
+        world.add_connection(connection := FixedConnection(parent=parent, child=child))
+    json_data = json.loads(
+        json.dumps(to_json(connection, **WorldEntityReferenceWriter().create_kwargs()))
+    )
+
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+
+    assert from_json(json_data, **tracker.create_kwargs()) is connection
 
 
 def test_world_entity_missing_from_the_world_is_an_untracked_object():

@@ -90,12 +90,31 @@ class NotApproachingGoal(MotionStatechartNode):
         if rate is None:
             self._sampled_error = error_signal
             return NodeArtifacts()
-        normalized_rate = rate / self.monitored_task.threshold
         return NodeArtifacts(
             observation=sm.trinary_logic_or(
                 self._monitored_task_is_not_running(),
-                sm.abs(normalized_rate) <= self.minimum_convergence_rate,
+                sm.abs(self._normalized_rate(error_signal, rate))
+                <= self.minimum_convergence_rate,
             )
+        )
+
+    def _normalized_rate(self, error_signal: ErrorSignal, rate: Scalar) -> Scalar:
+        """
+        The rate of change of ``error_signal`` as a fraction of the monitored task's
+        threshold per second.
+
+        Differentiating a distance leaves it divided by that distance, so the rate is
+        undefined exactly at the goal. Having arrived is not approaching one either, so
+        that reads as no change.
+
+        :param error_signal: The error whose rate was taken.
+        :param rate: The rate of change of that error, in its own units per second.
+        :return: The threshold relative rate.
+        """
+        no_change = Scalar(0)
+        return (
+            sm.if_eq_zero(error_signal.expression, no_change, rate)
+            / self.monitored_task.threshold
         )
 
     def _monitored_task_is_not_running(self) -> Scalar:
