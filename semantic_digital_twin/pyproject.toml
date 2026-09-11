@@ -55,6 +55,7 @@ dependencies = [
     "psycopg",
     "plyfile",
     "huggingface-hub",
+    "py7zr",
     "usd-core>=24.11",
     "vhacdx",
     "rerun-sdk[datafusion]",
