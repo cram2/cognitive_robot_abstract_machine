@@ -107,10 +107,14 @@ real per-frame camera parameters and 6D object ground-truth poses in the
 from semantic_digital_twin.adapters.grasp_clutter_6d_dataset.loader import (
     GraspClutter6DDatasetLoader,
     GraspClutter6DModelVariant,
+    GraspClutter6DObjectSet,
+    GraspClutter6DSplit,
 )
 
 loader = GraspClutter6DDatasetLoader()
-scene_id = loader.available_scene_ids(object_set="grasp", split="train")[0]
+scene_id = loader.available_scene_ids(
+    object_set=GraspClutter6DObjectSet.GRASP, split=GraspClutter6DSplit.TRAIN
+)[0]
 models_directory = loader.download_models(GraspClutter6DModelVariant.EVAL)
 
 # scene = loader.load_scene(scene_id)  # only after download_scenes() - see below

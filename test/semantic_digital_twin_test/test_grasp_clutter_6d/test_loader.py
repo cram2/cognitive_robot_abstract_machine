@@ -7,6 +7,8 @@ from requests import HTTPError
 from semantic_digital_twin.adapters.grasp_clutter_6d_dataset.loader import (
     GraspClutter6DDatasetLoader,
     GraspClutter6DModelVariant,
+    GraspClutter6DObjectSet,
+    GraspClutter6DSplit,
 )
 
 SCENE_ID_PATTERN = re.compile(r"^\d{6}$")
@@ -36,7 +38,13 @@ def test_model_variant_enum_has_the_expected_members():
     }
 
 
-@pytest.mark.parametrize("object_set,split", [("grasp", "train"), ("ycbv", "test")])
+@pytest.mark.parametrize(
+    "object_set,split",
+    [
+        (GraspClutter6DObjectSet.GRASP, GraspClutter6DSplit.TRAIN),
+        (GraspClutter6DObjectSet.YCBV, GraspClutter6DSplit.TEST),
+    ],
+)
 def test_available_scene_ids(loader, object_set, split):
     scene_ids = _skip_on_network_error(
         lambda: loader.available_scene_ids(object_set=object_set, split=split)
@@ -47,7 +55,9 @@ def test_available_scene_ids(loader, object_set, split):
 
 def test_object_ids_for_scene(loader):
     scene_ids = _skip_on_network_error(
-        lambda: loader.available_scene_ids(object_set="grasp", split="train")
+        lambda: loader.available_scene_ids(
+            object_set=GraspClutter6DObjectSet.GRASP, split=GraspClutter6DSplit.TRAIN
+        )
     )
     object_ids = _skip_on_network_error(
         lambda: loader.object_ids_for_scene(scene_ids[0])

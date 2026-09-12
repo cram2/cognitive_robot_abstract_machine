@@ -54,6 +54,29 @@ class GraspClutter6DModelVariant(StrEnum):
     OBJ_METERS = "models_obj_m"
 
 
+class GraspClutter6DObjectSet(StrEnum):
+    """
+    The two object catalogs GraspClutter6D's scenes are built from. See
+    :meth:`GraspClutter6DDatasetLoader.available_scene_ids`.
+    """
+
+    GRASP = "grasp"
+    """The dataset's own 200 novel objects."""
+
+    YCBV = "ycbv"
+    """The standard YCB-Video objects."""
+
+
+class GraspClutter6DSplit(StrEnum):
+    """
+    The dataset's train/test split. See
+    :meth:`GraspClutter6DDatasetLoader.available_scene_ids`.
+    """
+
+    TRAIN = "train"
+    TEST = "test"
+
+
 @dataclass
 class GraspClutter6DDatasetLoader:
     """
@@ -214,18 +237,21 @@ class GraspClutter6DDatasetLoader:
         return self._extract_archive(part_paths[0], self.directory, "scenes")
 
     def available_scene_ids(
-        self, object_set: str = "grasp", split: str = "train"
+        self,
+        object_set: GraspClutter6DObjectSet = GraspClutter6DObjectSet.GRASP,
+        split: GraspClutter6DSplit = GraspClutter6DSplit.TRAIN,
     ) -> Tuple[str, ...]:
         """
         List the scene ids of one split, without downloading any scene data.
 
-        :param object_set: ``"grasp"`` (scenes built from the dataset's own 200 novel
-            objects) or ``"ycbv"`` (scenes built from the standard YCB-Video objects).
-        :param split: ``"train"`` or ``"test"``.
+        :param object_set: Which object catalog the scenes are built from.
+        :param split: Which split to list.
         :return: The scene ids of that split, e.g. ``("000005", "000009", ...)``.
         """
         split_info_directory = self.download_split_info()
-        file_path = split_info_directory / f"{object_set}_{split}_scene_ids.json"
+        file_path = (
+            split_info_directory / f"{object_set.value}_{split.value}_scene_ids.json"
+        )
         return tuple(json.loads(file_path.read_text()))
 
     def object_ids_for_scene(self, scene_id: str) -> Tuple[int, ...]:
