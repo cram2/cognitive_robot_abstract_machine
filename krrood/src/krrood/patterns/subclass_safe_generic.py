@@ -25,7 +25,10 @@ from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
-from krrood.exceptions import MismatchingNumberOfGenericParametersAndResolvedTypes
+from krrood.exceptions import (
+    MismatchingNumberOfGenericParametersAndResolvedTypes,
+    UnboundGenericParameter,
+)
 from krrood.utils import (
     get_generic_type_parameters,
     ensure_hashable,
@@ -119,6 +122,23 @@ class SubClassSafeGeneric(ABC):
         :return: The generic type parameters of this class.
         """
         return get_generic_type_parameters(cls, SubClassSafeGeneric)
+
+    @classmethod
+    def get_type_of_generic_parameter(cls, parameter: TypeVar) -> Type:
+        """
+        Read back the type this class binds one type parameter to.
+
+        The parameter may be declared anywhere in the inheritance chain, so a class that
+        binds its own parameter still reports what its bases bound theirs to.
+
+        :param parameter: The type parameter to read.
+        :return: The concrete type it is bound to.
+        :raises UnboundGenericParameter: If it is bound to no concrete type.
+        """
+        bound_type = cls._get_generic_type_substitutions().get(parameter)
+        if bound_type is None or isinstance(bound_type, (TypeVar, TypeVarTuple)):
+            raise UnboundGenericParameter(cls, parameter)
+        return bound_type
 
     @staticmethod
     def _substitutions_bind_a_concrete_type(

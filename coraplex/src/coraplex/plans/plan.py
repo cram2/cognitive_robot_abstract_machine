@@ -17,6 +17,7 @@ from typing_extensions import (
     Type,
 )
 
+from coraplex.exceptions import CannotInsertBesideRoot
 from coraplex.plans.plan_entity import PlanEntity
 from coraplex.plans.plan_node import (
     PlanNode,
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
     from coraplex.plans.plan_callbacks import PlanCallback
     from coraplex.datastructures.dataclasses import Context
     from coraplex.plans.designator import Designator
+    from coraplex.plans.plan_transformation import PlanTransformation
 
 
 logger = logging.getLogger(__name__)
@@ -242,15 +244,71 @@ class Plan:
         for node in nodes_for_adding:
             self.add_node(node)
 
-    def insert_below(self, insert_node: PlanNode, insert_below: PlanNode):
+    def insert_as_last_child(self, reference_node: PlanNode, node: PlanNode):
         """
-        Inserts a node below the given node.
+        Inserts a node as the last child of a node of this plan.
 
-        :param insert_node: The node to be inserted
-        :param insert_below: A node of the plan below which the given node should be
-            added
+        :param reference_node: The node of the plan the given node is inserted below
+        :param node: The node to insert
         """
-        self.add_edge(insert_below, insert_node)
+        self.add_edge(reference_node, node)
+
+    def insert_before(self, reference_node: PlanNode, node: PlanNode):
+        """
+        Inserts a node as the left neighbour of a node of this plan.
+
+        :param reference_node: The node of the plan the given node is inserted before
+        :param node: The node to insert
+        """
+        self._insert_as_sibling(reference_node, node, reference_node.layer_index)
+
+    def insert_after(self, reference_node: PlanNode, node: PlanNode):
+        """
+        Inserts a node as the right neighbour of a node of this plan.
+
+        :param reference_node: The node of the plan the given node is inserted after
+        :param node: The node to insert
+        """
+        self._insert_as_sibling(reference_node, node, reference_node.layer_index + 1)
+
+    def _insert_as_sibling(
+        self, reference_node: PlanNode, node: PlanNode, layer_index: int
+    ):
+        """
+        Inserts a node under the parent of the reference node at the given position
+        among its children, shifting the later children to the right.
+
+        :param reference_node: The node of the plan whose parent takes the given node
+        :param node: The node to insert
+        :param layer_index: The position the given node takes among its new siblings
+        :raises CannotInsertBesideRoot: If the reference node is the root of the plan
+        """
+        if reference_node.parent is None:
+            raise CannotInsertBesideRoot(reference_node)
+        self.add_edge(reference_node.parent, node, layer_index)
+
+    @property
+    def plan_transformations(self) -> List[PlanTransformation]:
+        """
+        The transformations that rewrite this plan while it is expanded.
+
+        :return: The transformations of this plan's context; a plan without a context
+            has none.
+        """
+        return self.context.plan_transformations if self.context else []
+
+    def apply_plan_transformations(self, node: PlanNode):
+        """
+        Rewrites the plan with every transformation that applies to the given node.
+
+        :param node: The node that was just expanded
+        """
+        for transformation in self.plan_transformations:
+            if not transformation.applies_to_node(node):
+                continue
+            if not transformation.is_applicable(node):
+                continue
+            transformation.apply(node)
 
     def perform(self) -> Any:
         """
@@ -357,25 +415,12 @@ class Plan:
         """
         return self._visualizer_classes[backend](
             graph=self.plan_graph,
-            label_getter=lambda node: node.__node_label__(),
-            information_getter=lambda node: node.__node_info__(),
+            label_getter=lambda node: node.node_label,
+            information_getter=lambda node: node.node_info.to_lines(),
             color_getter=lambda node: node.status.color.to_hex(),
             layout=layout,
             title=repr(self),
         )
-
-    def _node_details(self, node: PlanNode) -> List[str]:
-        """
-        :param node: The node to describe.
-        :return: The status, timing and outcome of the node as detail lines.
-        """
-        return [
-            f"status: {node.status.name}",
-            f"start: {node.start_time}",
-            f"end: {node.end_time}",
-            f"result: {node.result}",
-            f"reason: {node.reason}",
-        ]
 
     def __repr__(self):
         return f"Plan with {len(self.all_nodes)} nodes"

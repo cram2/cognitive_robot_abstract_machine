@@ -6,6 +6,7 @@ from typing import Optional, Tuple, Type, TYPE_CHECKING, Iterator
 
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.execution_environment import ExecutionEnvironment
+from coraplex.language import SequentialNode
 from coraplex.plans.executables import (
     Executable,
     GiskardExecutable,
@@ -81,14 +82,20 @@ class ActionTrial:
         rolling every attempt back to where the copy started would mean undoing a longer
         and longer run of blocks, most of them already-undone ones.
 
+        The action is tried inside a sequence of its own, the way it is executed for
+        real, so that the nodes a plan transformation puts beside it are tried with it
+        rather than failing on a candidate that has no siblings.
+
         :param action: The grounded action to try out.
         :return: True if `action` runs to completion without raising a `PlanFailure`.
         """
         context = self._copy()
         world = context.world
         plan = Plan(context=context)
+        attempt = SequentialNode()
         candidate = ActionNode(designator=world.rebind_world_entities(action))
-        plan.add_node(candidate)
+        plan.add_node(attempt)
+        attempt.add_child(candidate)
         version = world.get_world_model_manager().version
 
         with world.reset_state_context(), ExecutionEnvironment(
@@ -96,7 +103,7 @@ class ActionTrial:
             collision_avoidance=GiskardExecutable.collision_avoidance,
         ):
             try:
-                candidate.perform()
+                attempt.perform()
                 return True
             except PlanFailure:
                 return False
@@ -171,6 +178,16 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
     On failure, `advance` replaces it with the next candidate.
     """
 
+    current_attempt: Optional[SequentialNode] = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The sequence that is executed for the current candidate.
+
+    It holds the candidate and everything a plan transformation put beside it, so that
+    those nodes are part of what this node runs rather than being skipped.
+    """
+
     _trial: Optional[ActionTrial] = field(default=None, init=False, repr=False)
     """
     The trial every candidate of this node is tried against.
@@ -201,13 +218,17 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
 
     def _attach(self, action: ActionDescription) -> ActionNode:
         """
-        Wrap a grounded action in an `ActionNode` and add it as this node's child.
+        Wrap a grounded action in an `ActionNode` and add it below a fresh attempt
+        sequence of this node.
 
         :param action: The grounded action to attach.
         :return: The new candidate node.
         """
+        attempt = SequentialNode()
         candidate = ActionNode(designator=action)
-        self.add_child(candidate)
+        self.add_child(attempt)
+        attempt.add_child(candidate)
+        self.current_attempt = attempt
         self.current_candidate = candidate
         return candidate
 
@@ -262,7 +283,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
         while action is not None:
             if self._trial.succeeds(action):
                 self._attach(action)
-                self.current_candidate.notify()
+                self.current_attempt.notify()
                 return True
             action = self._pull_next_action()
         return False
