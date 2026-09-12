@@ -15,9 +15,7 @@ from semantic_digital_twin.adapters.grasp_clutter_6d_dataset.exceptions import (
     GraspClutter6DSceneFilesMissingError,
 )
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
@@ -25,7 +23,6 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     RotationMatrix,
-    Vector3,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -34,10 +31,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import (
-    Body,
-    KinematicStructureEntity,
-)
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -56,42 +50,47 @@ class GraspClutter6DCameraInfo:
     """
 
     intrinsics: np.ndarray
-    """The 3x3 camera intrinsic matrix (`cam_K`), in pixels."""
+    """
+    The 3x3 camera intrinsic matrix (`cam_K`), in pixels. `semantic_digital_twin` has no
+    dedicated spatial type for a camera projection matrix (only
+    :class:`~semantic_digital_twin.datastructures.camera_resolution.CameraResolution` for
+    plain pixel width/height), so this stays a plain matrix.
+    """
 
     depth_scale: float
     """Multiply this frame's raw depth image values by this factor to get millimeters."""
 
-    world_R_camera: Optional[RotationMatrix] = None
+    camera_T_world: Optional[HomogeneousTransformationMatrix] = None
     """
-    Rotation (`cam_R_w2c`) that rotates a point given in the dataset's world frame into
-    this camera's frame. Not yet bound to a reference frame - that only exists once a
-    world is being built (see :meth:`GraspClutter6DScene._add_world_frame`). `None` if
-    the scene defines no world frame, in which case object poses are only meaningful
-    relative to the camera.
+    This frame's world-to-camera transform (`cam_R_w2c`/`cam_t_w2c` bundled together):
+    rotates/translates a point given in the dataset's world frame into this camera's
+    frame. Not yet bound to a reference/child frame - that only exists once a world is
+    being built (see :meth:`GraspClutter6DScene._add_world_frame`). `None` if the scene
+    defines no world frame, in which case object poses are only meaningful relative to
+    the camera.
     """
-
-    world_t_camera: Optional[Point3] = None
-    """Translation (`cam_t_w2c`) paired with `world_R_camera`, already converted to meters."""
 
     @classmethod
     def from_json(cls, data: Dict) -> Self:
         rotation = data.get("cam_R_w2c")
         translation = data.get("cam_t_w2c")
+        camera_T_world = None
+        if rotation is not None and translation is not None:
+            camera_T_world = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                point=Point3(
+                    *(
+                        np.array(translation, dtype=float)
+                        * cls.MILLIMETERS_TO_METERS
+                    )
+                ),
+                rotation_matrix=RotationMatrix(
+                    data=np.array(rotation, dtype=float).reshape(3, 3)
+                ),
+            )
         return cls(
             intrinsics=np.array(data["cam_K"], dtype=float).reshape(3, 3),
             depth_scale=float(data["depth_scale"]),
-            world_R_camera=(
-                RotationMatrix(data=np.array(rotation, dtype=float).reshape(3, 3))
-                if rotation is not None
-                else None
-            ),
-            world_t_camera=(
-                Point3(
-                    *(np.array(translation, dtype=float) * cls.MILLIMETERS_TO_METERS)
-                )
-                if translation is not None
-                else None
-            ),
+            camera_T_world=camera_T_world,
         )
 
     @property
@@ -111,37 +110,6 @@ class GraspClutter6DCameraInfo:
         )
 
 
-@dataclass(eq=False)
-class GraspClutter6DCamera(Camera):
-    """
-    A GraspClutter6D frame's camera, represented with the same
-    :class:`~semantic_digital_twin.robots.robot_parts.Camera` semantic annotation used
-    for every other camera in this package, instead of a bare, unannotated
-    :class:`~semantic_digital_twin.world_description.world_entity.Body`.
-
-    .. note::
-        Unlike every other :class:`Camera` subclass in this package, this one is not
-        attached to any robot -
-        :meth:`setup_default_configuration_in_world_below_robot_root` is not
-        implemented.
-    """
-
-    def setup_hardware_interfaces(self):
-        pass
-
-    def setup_joint_states(self) -> List[JointState]:
-        return []
-
-    @classmethod
-    def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
-    ) -> Self:
-        raise NotImplementedError(
-            "GraspClutter6DCamera is not attached to a robot; construct it directly "
-            "instead."
-        )
-
-
 @dataclass
 class GraspClutter6DObjectPose:
     """
@@ -155,49 +123,29 @@ class GraspClutter6DObjectPose:
     and `models_info.json` keys.
     """
 
-    camera_R_object: RotationMatrix
+    camera_T_object: HomogeneousTransformationMatrix
     """
-    Rotation (`cam_R_m2c`) that rotates a point given in the object's own model frame
-    into the camera frame. Not yet bound to a reference frame - see
-    :meth:`camera_T_object`.
+    This object's pose (`cam_R_m2c`/`cam_t_m2c` bundled together) relative to the
+    camera. Not yet bound to a reference/child frame - `GraspClutter6DScene` rebinds it
+    to the actual camera/object bodies once they exist, e.g.
+    ``HomogeneousTransformationMatrix(data=pose.camera_T_object, reference_frame=camera_body, child_frame=object_body)``.
     """
-
-    camera_t_object: Point3
-    """Translation (`cam_t_m2c`) paired with `camera_R_object`, already converted to meters."""
 
     @classmethod
     def from_json(cls, data: Dict) -> Self:
         return cls(
             object_id=int(data["obj_id"]),
-            camera_R_object=RotationMatrix(
-                data=np.array(data["cam_R_m2c"], dtype=float).reshape(3, 3)
+            camera_T_object=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                point=Point3(
+                    *(
+                        np.array(data["cam_t_m2c"], dtype=float)
+                        * GraspClutter6DCameraInfo.MILLIMETERS_TO_METERS
+                    )
+                ),
+                rotation_matrix=RotationMatrix(
+                    data=np.array(data["cam_R_m2c"], dtype=float).reshape(3, 3)
+                ),
             ),
-            camera_t_object=Point3(
-                *(
-                    np.array(data["cam_t_m2c"], dtype=float)
-                    * GraspClutter6DCameraInfo.MILLIMETERS_TO_METERS
-                )
-            ),
-        )
-
-    def camera_T_object(self, camera: Body, obj: Body) -> HomogeneousTransformationMatrix:
-        """
-        :param camera: The camera body to use as the transform's reference frame.
-        :param obj: The object body to use as the transform's child frame.
-        :return: This object's pose relative to `camera`.
-        """
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=Point3(
-                self.camera_t_object.x,
-                self.camera_t_object.y,
-                self.camera_t_object.z,
-                reference_frame=camera,
-            ),
-            rotation_matrix=RotationMatrix(
-                data=self.camera_R_object, reference_frame=camera
-            ),
-            reference_frame=camera,
-            child_frame=obj,
         )
 
 
@@ -217,8 +165,10 @@ class GraspClutter6DFrame:
     """
 
     camera: GraspClutter6DCameraInfo
+    """This frame's camera parameters."""
 
     object_poses: List[GraspClutter6DObjectPose] = field(default_factory=list)
+    """The ground-truth pose of every object visible in this frame."""
 
 
 @dataclass
@@ -240,8 +190,21 @@ class GraspClutter6DScene:
     directory: Path
     """The scene's own extracted folder, directly containing `scene_camera.json`/`scene_gt.json`."""
 
-    frames: Dict[str, GraspClutter6DFrame] = field(default_factory=dict)
-    """Every frame of this scene, keyed by frame id."""
+    frames: List[GraspClutter6DFrame] = field(default_factory=list)
+    """Every frame of this scene. Each frame carries its own `image_id` - see :meth:`frame`."""
+
+    def frame(self, image_id: str) -> GraspClutter6DFrame:
+        """
+        :param image_id: The frame id to look up, e.g. ``"1"``.
+        :raises GraspClutter6DImageNotFoundError: if no frame in `self.frames` has this id.
+        :return: The matching frame.
+        """
+        for frame in self.frames:
+            if frame.image_id == image_id:
+                return frame
+        raise GraspClutter6DImageNotFoundError(
+            scene_id=self.scene_id, image_id=image_id
+        )
 
     @classmethod
     def from_directory(cls, scene_id: str, directory: Path) -> Self:
@@ -264,8 +227,8 @@ class GraspClutter6DScene:
         camera_json = json.loads(camera_file.read_text())
         gt_json = json.loads(gt_file.read_text())
 
-        frames = {
-            image_id: GraspClutter6DFrame(
+        frames = [
+            GraspClutter6DFrame(
                 image_id=image_id,
                 camera=GraspClutter6DCameraInfo.from_json(camera_data),
                 object_poses=[
@@ -274,7 +237,7 @@ class GraspClutter6DScene:
                 ],
             )
             for image_id, camera_data in camera_json.items()
-        }
+        ]
         return cls(scene_id=scene_id, directory=directory, frames=frames)
 
     def create_world(
@@ -298,14 +261,13 @@ class GraspClutter6DScene:
         becomes when this world is mirrored into a simulator) to sit directly on the
         world root.
 
-        :param image_id: The frame to build, one of `self.frames`' keys.
+        :param image_id: The frame to build, one of `self.frames`' `image_id`s.
         :param models_directory: The extracted `models`/`models_eval`/`models_m` directory
             containing this frame's objects' `obj_%06d.ply` mesh files.
-        :param with_world_frame: If True and the frame's camera has
-            `cam_R_w2c`/`cam_t_w2c`, also add a `map` root body and place the camera under
-            it via the inverse of that world-to-camera transform. If False (the default),
-            or if the frame has no world-frame information, the camera body itself is the
-            world's root.
+        :param with_world_frame: If True and the frame's camera has a `camera_T_world`,
+            also add a `map` root body and place the camera under it via the inverse of
+            that world-to-camera transform. If False (the default), or if the frame has
+            no world-frame information, the camera body itself is the world's root.
         :param mesh_unit_scale: Factor applied to every loaded mesh's vertices. The
             default assumes millimeter-unit meshes (the `models`/`models_eval` archives);
             pass ``1.0`` when using the meter-unit `models_m`/`models_obj_m` archives.
@@ -318,11 +280,7 @@ class GraspClutter6DScene:
             found in `models_directory`.
         :return: The built world.
         """
-        if image_id not in self.frames:
-            raise GraspClutter6DImageNotFoundError(
-                scene_id=self.scene_id, image_id=image_id
-            )
-        frame = self.frames[image_id]
+        frame = self.frame(image_id)
 
         world = World()
         camera_body = Body()
@@ -331,17 +289,9 @@ class GraspClutter6DScene:
         )
         with world.modify_world():
             world.add_body(camera_body)
-        with world.modify_world():
-            world.add_semantic_annotation(
-                GraspClutter6DCamera(
-                    root=camera_body,
-                    forward_facing_axis=Vector3.Z(),
-                    field_of_view=frame.camera.field_of_view,
-                )
-            )
 
         root_body = camera_body
-        if with_world_frame and frame.camera.world_R_camera is not None:
+        if with_world_frame and frame.camera.camera_T_world is not None:
             root_body = self._add_world_frame(world, frame.camera, camera_body)
 
         for index, pose in enumerate(frame.object_poses):
@@ -367,27 +317,17 @@ class GraspClutter6DScene:
         frame's world-to-camera transform.
 
         :param world: The world `camera_body` was already added to.
-        :param camera_info: The frame's camera parameters, with `world_R_camera`/
-            `world_t_camera` both present.
+        :param camera_info: The frame's camera parameters, with `camera_T_world` present.
         :param camera_body: The already-added camera body.
         :return: The new `map` body.
         """
         map_body = Body()
         map_body.name = PrefixedName(name="map", prefix=camera_body.name.prefix)
 
-        # `world_R_camera`/`world_t_camera` rotate/translate a point from the dataset's
-        # world frame into the camera frame, i.e. they *are* camera_T_map; the camera's
-        # pose in the map frame is that transform's inverse.
-        camera_T_map = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=Point3(
-                camera_info.world_t_camera.x,
-                camera_info.world_t_camera.y,
-                camera_info.world_t_camera.z,
-                reference_frame=camera_body,
-            ),
-            rotation_matrix=RotationMatrix(
-                data=camera_info.world_R_camera, reference_frame=camera_body
-            ),
+        # `camera_T_world` rotates/translates a point from the dataset's world frame
+        # into the camera frame; the camera's pose in the map frame is its inverse.
+        camera_T_map = HomogeneousTransformationMatrix(
+            data=camera_info.camera_T_world,
             reference_frame=camera_body,
             child_frame=map_body,
         )
@@ -449,7 +389,9 @@ class GraspClutter6DScene:
             name=f"{name}_{index}", prefix=f"{self.scene_id}_{image_id}"
         )
 
-        camera_T_object = pose.camera_T_object(camera=camera_body, obj=body)
+        camera_T_object = HomogeneousTransformationMatrix(
+            data=pose.camera_T_object, reference_frame=camera_body, child_frame=body
+        )
         root_T_object = world.transform(camera_T_object, root_body)
 
         loaded_mesh = trimesh.load(str(mesh_path), process=False, force="mesh")

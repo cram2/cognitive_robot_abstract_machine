@@ -81,23 +81,25 @@ def test_from_directory_parses_frames_and_poses(tmp_path):
     _write_scene(tmp_path)
     scene = GraspClutter6DScene.from_directory(scene_id="000001", directory=tmp_path)
 
-    assert set(scene.frames.keys()) == {"1", "2"}
-    assert len(scene.frames["1"].object_poses) == 2
-    assert scene.frames["1"].object_poses[0].object_id == 1
-    # cam_t_m2c is in millimeters; camera_t_object is already converted to meters.
-    translation = scene.frames["1"].object_poses[0].camera_t_object
+    assert {f.image_id for f in scene.frames} == {"1", "2"}
+    frame_one = scene.frame("1")
+    assert len(frame_one.object_poses) == 2
+    assert frame_one.object_poses[0].object_id == 1
+    # cam_t_m2c is in millimeters; camera_T_object's translation is already in meters.
+    translation = frame_one.object_poses[0].camera_T_object.to_position()
     np.testing.assert_allclose(
         [float(translation.x), float(translation.y), float(translation.z)],
         [1.0, 2.0, 3.0],
     )
-    assert scene.frames["2"].camera.world_R_camera is not None
-    world_translation = scene.frames["2"].camera.world_t_camera
+    frame_two = scene.frame("2")
+    assert frame_two.camera.camera_T_world is not None
+    world_translation = frame_two.camera.camera_T_world.to_position()
     np.testing.assert_allclose(
         [float(world_translation.x), float(world_translation.y), float(world_translation.z)],
         [0.5, 0.0, 0.0],
     )
     # frame "1" has no world-to-camera transform in the fixture.
-    assert scene.frames["1"].camera.world_R_camera is None
+    assert frame_one.camera.camera_T_world is None
 
 
 def test_create_world_unknown_frame_raises(tmp_path):
