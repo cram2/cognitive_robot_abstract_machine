@@ -45,7 +45,9 @@ from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
-context = Context(world, pr2_view)
+# A location draws its candidates from a costmap, so a seed is what makes this
+# example run the same way twice.
+context = Context(world, pr2_view, sampling_seed=0)
 
 origin_pose = pr2_view.root.global_pose
 ```

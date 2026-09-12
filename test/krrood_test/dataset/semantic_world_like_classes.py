@@ -168,10 +168,9 @@ class ContainsType(Predicate):
 @dataclass(unsafe_hash=True)
 class GraspConfig(WorldEntity):
     """
-    Simulates GraspDescription from coraplex with fields like rotate_gripper.
+    A value object an action reaches through a relationship rather than owning directly.
 
-    Used to test set_of() with transitive attributes like
-    MoveToReachDAO.grasp_description.rotate_gripper.
+    Used to test set_of() with attributes that are transitive rather than direct.
     """
 
     rotate_gripper: float = field(default=0.0)
@@ -182,7 +181,7 @@ class GraspConfig(WorldEntity):
 @dataclass(unsafe_hash=True)
 class MoveAction(WorldEntity):
     """
-    Simulates MoveToReachDAO from coraplex with direct fields and a relationship.
+    An action with direct fields alongside a relationship to a nested value object.
 
     Used to test set_of() with both direct and transitive attributes.
     """

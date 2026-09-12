@@ -80,6 +80,14 @@ class AvoidCollisionRule(CollisionRule, ABC):
     def apply_to_collision_matrix(self, collision_matrix: CollisionMatrix):
         collision_matrix.add_collision_checks(self.added_collision_checks)
 
+    @property
+    def referenced_bodies(self) -> set[Body]:
+        return {
+            body
+            for check in self.added_collision_checks
+            for body in (check.body_a, check.body_b)
+        }
+
 
 @dataclass
 class AllowCollisionRule(CollisionRule, ABC):
@@ -97,6 +105,14 @@ class AllowCollisionRule(CollisionRule, ABC):
     """
     Set of bodies that are allowed to collide.
     """
+
+    @property
+    def referenced_bodies(self) -> set[Body]:
+        return self.allowed_collision_bodies | {
+            body
+            for check in self.allowed_collision_pairs
+            for body in (check.body_a, check.body_b)
+        }
 
     def apply_to_collision_matrix(self, collision_matrix: CollisionMatrix):
         collision_matrix.remove_collision_checks(self.allowed_collision_pairs)
@@ -172,7 +188,19 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
     A subset of bodies managed by the rule. 
     All of them must belong to `robot`.
     If None, all robot bodies are used.
+
+    Bodies without collision geometry are dropped, since no distance is ever kept to
+    one.
     """
+
+    def __post_init__(self):
+        if self.body_subset is None:
+            return
+        self.body_subset = {body for body in self.body_subset if body.has_collision()}
+
+    @property
+    def referenced_bodies(self) -> set[Body]:
+        return super().referenced_bodies | (self.body_subset or set())
 
     def _update(self, world: World):
         if self.body_subset is not None:
@@ -202,6 +230,8 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
             "body_subset": to_json(
                 {b.id for b in self.body_subset} if self.body_subset else None, **kwargs
             ),
+            "buffer_zone_distance": to_json(self.buffer_zone_distance, **kwargs),
+            "violated_distance": to_json(self.violated_distance, **kwargs),
         }
 
     @classmethod
@@ -212,7 +242,12 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
         body_subset = None
         if body_subset_ids is not None:
             body_subset = {tracker.get(body_id) for body_id in body_subset_ids}
-        return cls(robot=robot, body_subset=body_subset)
+        return cls(
+            robot=robot,
+            body_subset=body_subset,
+            buffer_zone_distance=from_json(data["buffer_zone_distance"], **kwargs),
+            violated_distance=from_json(data["violated_distance"], **kwargs),
+        )
 
     def __eq__(self, other):
         if not isinstance(other, AvoidExternalCollisions):

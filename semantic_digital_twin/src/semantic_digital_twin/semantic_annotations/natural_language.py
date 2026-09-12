@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasGraspPoses,
+    HasRootBody,
+)
 
 
 @dataclass(eq=False)
@@ -19,9 +22,12 @@ class NaturalLanguageDescription(HasRootBody):
 
 
 @dataclass(eq=False)
-class NaturalLanguageWithTypeDescription(NaturalLanguageDescription):
+class NaturalLanguageWithTypeDescription(NaturalLanguageDescription, HasGraspPoses):
     """
     A natural language description of a Sage10k object including the type information of the object.
+
+    Graspable, unlike its base: a description can name anything in a scene, walls
+    included, but the typed ones stand for the objects a robot is asked to pick up.
     """
 
     type_description: Optional[str] = field(default=None)

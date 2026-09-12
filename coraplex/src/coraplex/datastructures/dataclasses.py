@@ -110,20 +110,20 @@ class Context(PlanEntity):
     Should debug information be printed or visualized.
     """
 
+    sampling_seed: Optional[int] = field(default=None)
+    """
+    Fixes the draws the locations of this plan make, so a run repeats exactly.
+
+    ``None`` explores differently every run, which is what drawing from a map buys over
+    ranking it. A demonstration kept as a regression test pins it instead.
+    """
+
     motion_tolerances: MotionToleranceConfig = field(
         default_factory=MotionToleranceConfig
     )
     """
     Default goal-achievement tolerances motions fall back to when they leave their own
     thresholds unset.
-    """
-
-    ticks_per_motion: int = 2000
-    """
-    How many ticks each motion of a chart may take before the run gives up on it.
-
-    Also the budget a reachability check gives the same motions, so a pose is not
-    rejected for running out of time sooner than the run that would perform it.
     """
 
     def __post_init__(self):
@@ -194,3 +194,25 @@ class Context(PlanEntity):
         if plan:
             plan.add_plan_entity(result)
         return result
+
+    def for_world(self, world: World, robot: AbstractRobot) -> Context:
+        """
+        The same settings, addressing another world.
+
+        Anything run against a copy of the world -- a probe, a what-if -- has to be run
+        the way the plan itself is, or it answers about something the plan never does.
+
+        :param world: The world the new context addresses.
+        :param robot: The robot of ``world`` that acts in it.
+        :return: A context over ``world``, belonging to no plan.
+        """
+        return Context(
+            world=world,
+            robot=robot,
+            ros_node=self.ros_node,
+            evaluate_conditions=self.evaluate_conditions,
+            query_backend=self.query_backend,
+            alternative_motion_mappings=self.alternative_motion_mappings,
+            _debug=self._debug,
+            motion_tolerances=self.motion_tolerances,
+        )

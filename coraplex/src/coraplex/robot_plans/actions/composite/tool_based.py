@@ -30,10 +30,10 @@ from coraplex.datastructures.enums import (
 )
 from coraplex.exceptions import (
     MissingWaypoints,
-    MotionDidNotFinish,
     WipingTargetMissing,
 )
 from coraplex.plans.factories import sequential
+from giskardpy.motion_statechart.exceptions import NoProgressError
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.mixins import HasTcpGoalThresholds
@@ -366,13 +366,13 @@ class WipingAction(ToolMotionAction):
 
     def _perform_plan(self) -> None:
         """
-        Perform the wiping plan, accepting an unfinished motion if the tool still
+        Perform the wiping plan, accepting a motion that gave up if the tool still
         reached the final waypoint.
         """
         subplan = self.add_subplan(self.action_plan)
         try:
             subplan.perform()
-        except MotionDidNotFinish:
+        except NoProgressError:
             if not self._tool_reached_final_waypoint():
                 raise
 

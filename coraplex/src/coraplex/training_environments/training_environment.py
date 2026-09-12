@@ -21,7 +21,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProductUnit,
 )
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.plans.failures import (
@@ -192,18 +191,13 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         )
 
         move_to_reach = a(MoveToReach)(
-            target_pose_end_effector=target_pose,
+            grasp_pose=target_pose,
             target_pose_offset_robot=a(Pose2D)(
                 x=..., y=..., yaw=..., reference_frame=None
             ),
             hip_rotation=...,
-            grasp_description=a(GraspDescription)(
-                approach_direction=...,
-                vertical_alignment=...,
-                end_effector=variable(EndEffector, world.semantic_annotations),
-                rotate_gripper=...,
-                manipulation_offset=...,
-            ),
+            end_effector=variable(EndEffector, world.semantic_annotations),
+            approach_clearance=...,
         )
 
         move_to_reach.expression.limit(limit)
@@ -229,18 +223,16 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         robot_x = parameters.variables["MoveToReach.target_pose_offset_robot.x"]
         robot_y = parameters.variables["MoveToReach.target_pose_offset_robot.y"]
         hip_rotation = parameters.variables["MoveToReach.hip_rotation"]
-        manipulation_offset = parameters.variables[
-            "MoveToReach.grasp_description.manipulation_offset"
-        ]
+        approach_clearance = parameters.variables["MoveToReach.approach_clearance"]
 
         distribution = fully_factorized(
-            means={manipulation_offset: 0.05},
+            means={approach_clearance: 0.05},
             variances={robot_x: 0.5, robot_y: 0.5, hip_rotation: 0.1},
             variables=parameters.variables.values(),
         )
 
         hip_rotation_condition = SimpleEvent.from_data(
-            {manipulation_offset: closed(0.0, 0.4)}
+            {approach_clearance: closed(0.0, 0.4)}
         )
         hip_rotation_condition.fill_missing_variables(distribution.variables)
         distribution.log_truncated_of_simple_event_in_place(hip_rotation_condition)

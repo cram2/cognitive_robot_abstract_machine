@@ -13,8 +13,8 @@ def test_type_checking_only_field_annotation_resolves_to_referenced_type():
 
     ``ClassWithTypeCheckingOnlyAnnotation.annotation_only_field`` is annotated with
     :class:`TypeReferencedOnlyInAnnotations`, which is imported only inside a ``TYPE_CHECKING``
-    block - the same annotation-only pattern that ``semantic_digital_twin`` and ``coraplex`` use for
-    fields such as ``GraspDescription.end_effector``. The name is therefore absent from the module's
+    block - the same annotation-only pattern other packages use for a field whose type they
+    never construct themselves. The name is therefore absent from the module's
     runtime namespace, so a naive ``get_type_hints`` raises ``NameError`` and the resolver must
     recover the type from the module's type-checking imports instead of raising
     ``CouldNotResolveType``.

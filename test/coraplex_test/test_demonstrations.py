@@ -20,6 +20,8 @@ from coraplex.demonstrations import RobotDemonstration, RobotDemonstrationRosSes
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.world import World
 
+from ..conftest import SAMPLING_SEED
+
 
 class PlanDeliberatelyFailed(Exception):
     """
@@ -78,7 +80,11 @@ class RecordingDemonstration(RobotDemonstration):
         self.populate_scene_calls += 1
 
     def build_context(self, world: World) -> Context:
-        return Context(world, world.get_semantic_annotations_by_type(MinimalRobot)[0])
+        return Context(
+            world,
+            world.get_semantic_annotations_by_type(MinimalRobot)[0],
+            sampling_seed=SAMPLING_SEED,
+        )
 
     def build_plan(self, context: Context) -> PlanNode:
         return code(self.run_plan_body, context)

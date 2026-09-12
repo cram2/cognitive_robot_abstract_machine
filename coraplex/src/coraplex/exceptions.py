@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, Type, List
+from typing_extensions import TYPE_CHECKING, Type
 
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
 from coraplex.datastructures.enums import Arms, ExecutionType
@@ -13,7 +12,7 @@ from coraplex.plans.failures import PlanFailure
 if TYPE_CHECKING:
     from coraplex.plans.designator import Designator
     from coraplex.robot_plans.actions.base import ActionDescription
-    from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
         SemanticAnnotation,
@@ -123,6 +122,45 @@ class PerceptionTargetMissing(DataclassException):
 
 
 @dataclass
+class OffersNoGrasp(DataclassException):
+    """
+    Raised when an action has to take hold of an object that offers no grasp.
+    """
+
+    graspable: SemanticAnnotation
+    """
+    The annotation that generated no grasp frame.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.graspable} offers no grasp to take hold by."
+
+    def suggest_correction(self) -> str:
+        return (
+            "name a grasp_pose on the action, or give the annotation a grasp_poses "
+            "implementation that yields at least one frame."
+        )
+
+
+@dataclass
+class GraspPoseMissing(DataclassException):
+    """
+    Raised when a reach names neither a grasp to aim at nor an object offering one.
+    """
+
+    instance: Designator
+    """
+    The action that has nothing to reach for.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.instance} names neither a grasp_pose nor an object_designator."
+
+    def suggest_correction(self) -> str:
+        return "provide a grasp_pose, or an object_designator whose grasps it can take."
+
+
+@dataclass
 class MissingToolFrame(DataclassException):
     """
     Raised when no tool frame is available for the requested arm.
@@ -158,26 +196,6 @@ class ConditionNotSatisfied(PlanFailure):
             return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied"
         false_statements = get_false_statements(self.condition)
         return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied, following statements are false: {[s._name_ for s in false_statements]}"
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class MotionDidNotFinish(PlanFailure):
-
-    unfinished_motions: List[MotionStatechartNode]
-    """
-    The nodes that did not succeed, whether they failed, were interrupted or never
-    ended.
-    """
-
-    def error_message(self) -> str:
-        reports = ", ".join(
-            f"{motion.unique_name} ({motion.life_cycle_state.name})"
-            for motion in self.unfinished_motions
-        )
-        return f"Motion did not finish, following motions did not succeed: {reports}"
 
     def suggest_correction(self) -> str:
         return ""
@@ -339,29 +357,3 @@ class NotOnASingleLevelException(DataclassException):
 
     def suggest_correction(self) -> str:
         return f"Move the robot to a recognized level"
-
-
-@dataclass
-class BodyIsNotHeld(DataclassException):
-    """
-    Raised when a grasp should be read off a body that no end effector is holding.
-    """
-
-    body: KinematicStructureEntity
-    """
-    The body that was expected to be held.
-    """
-
-    end_effector: EndEffector
-    """
-    The end effector that was expected to hold it.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"'{self.body.name}' is not held by '{self.end_effector.name}', so there is "
-            f"no grasp to read from the world."
-        )
-
-    def suggest_correction(self) -> str:
-        return "pick the body up before reading its grasp."

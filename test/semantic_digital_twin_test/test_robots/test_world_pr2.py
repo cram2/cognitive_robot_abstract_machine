@@ -455,6 +455,27 @@ def test_has_left_right_arm_mixin(pr2_world_state_reset):
     )()
 
 
+def test_an_arm_covers_the_chain_down_to_its_end_effector(pr2_world_state_reset):
+    """
+    Whatever carries the end effector -- a wrist mounted force torque sensor, say --
+    belongs to the arm holding it.
+
+    An arm's tip stops where its joints do, so a body mounted past it belongs to no part
+    of the robot at all, and anything written for the arm or for its end effector passes
+    it by.
+    """
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    for arm in (pr2.left_arm, pr2.right_arm):
+        carrying_chain = (
+            pr2_world_state_reset.compute_chain_of_kinematic_structure_entities(
+                arm.root, arm.end_effector.root
+            )
+        )
+
+        assert set(carrying_chain) <= set(arm.kinematic_structure_entities)
+
+
 def test_kinematic_chains(pr2_world_state_reset):
     semantic_kinematic_chain_annotation: List[KinematicChain] = (
         pr2_world_state_reset.get_semantic_annotations_by_type(KinematicChain)

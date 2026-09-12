@@ -226,6 +226,13 @@ class CollisionRule(ABC):
         Modifies the collision matrix by adding or removing collision checks.
         """
 
+    @property
+    @abstractmethod
+    def referenced_bodies(self) -> set[Body]:
+        """
+        :return: Every body this rule names.
+        """
+
     def is_up_to_date(self, world: World) -> bool:
         """
         Checks if the collision rule is up to date with the current state of the world.

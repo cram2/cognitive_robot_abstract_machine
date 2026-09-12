@@ -16,6 +16,7 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
+from giskardpy.motion_statechart.exceptions import NoProgressError
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import (
     CancelMotion,
@@ -27,6 +28,7 @@ from giskardpy.motion_statechart.graph_node import (
 from giskardpy.motion_statechart.monitors.payload_monitors import (
     ThreadedPredicateMonitor,
 )
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -39,15 +41,13 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.datastructures.enums import ExecutionType
+from coraplex.datastructures.enums import Arms, ExecutionType
 from coraplex.execution_environment import (
     ExecutionEnvironment,
     real_robot,
     simulated_robot,
 )
-from coraplex.plans.executables import GiskardExecutable
+from coraplex.exceptions import ConditionNotSatisfied
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
@@ -68,14 +68,9 @@ def reach_action_executable(immutable_model_world):
     )
     plan = execute_single(
         ReachAction(
-            Pose.from_xyz_rpy(2, 1.5, 0.7, reference_frame=world.root),
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
-            world.get_semantic_annotations_by_type(Milk)[0],
+            grasp_pose=Pose.from_xyz_rpy(2, 1.5, 0.7, reference_frame=world.root),
+            arm=Arms.RIGHT,
+            object_designator=world.get_semantic_annotations_by_type(Milk)[0],
         ),
         context=context,
     )
@@ -186,7 +181,11 @@ def test_execution_does_not_add_condition_monitors(
 
     chart = reach_action_executable.motion_state_chart
     assert chart.get_nodes_by_type(ThreadedPredicateMonitor) == []
-    assert chart.get_nodes_by_type(CancelMotion) == []
+    assert [
+        cancel
+        for cancel in chart.get_nodes_by_type(CancelMotion)
+        if isinstance(cancel.exception, ConditionNotSatisfied)
+    ] == []
 
 
 # %% wiring conditions into a chart
@@ -293,10 +292,43 @@ def test_a_robot_keeps_moving_while_it_holds_a_body(_tiago_world_setup, holds_a_
 # %% how long a motion may take
 
 
-def test_the_tick_budget_is_not_class_state(reach_action_executable):
+def test_prepare_for_execution_watches_the_whole_motion_for_progress(
+    reach_action_executable,
+):
     """
-    The budget is a policy of the run, carried by its context, so two runs in one
-    process cannot be given different budgets by class state that outlives them.
+    A stalled run has to end by itself, so the chart carries a monitor watching the root
+    goal and an abort path wired to it.
     """
-    assert not hasattr(GiskardExecutable, "ticks_per_motion")
-    assert reach_action_executable.context.ticks_per_motion
+    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=False):
+        reach_action_executable.prepare_for_execution()
+
+    chart = reach_action_executable.motion_state_chart
+    [progress_monitor] = chart.get_nodes_by_type(StillProgressing)
+
+    assert progress_monitor.monitored_node is reach_action_executable.root_node
+    assert len(chart.get_nodes_by_type(CancelMotion)) == 1
+
+
+def test_a_motion_that_stops_approaching_its_goal_is_given_up_on(
+    immutable_model_world,
+):
+    """
+    Nothing bounds the tick loop but the monitor, so a reach the arm cannot close on has
+    to end the run rather than tick forever.
+    """
+    world, view, context = immutable_model_world
+    out_of_reach = Pose.from_xyz_rpy(2, 1.5, 50, reference_frame=world.root)
+    plan = execute_single(
+        ReachAction(
+            grasp_pose=out_of_reach,
+            arm=Arms.RIGHT,
+            object_designator=world.get_semantic_annotations_by_type(Milk)[0],
+        ),
+        context=context,
+    )
+    plan.notify()
+    executable = plan.parse()
+
+    with simulated_robot:
+        with pytest.raises(NoProgressError):
+            executable.execute()

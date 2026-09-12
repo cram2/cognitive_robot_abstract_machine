@@ -31,17 +31,13 @@ classifying annotator to that engine removes both without changing this demo.
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import ClassVar
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
-    ApproachDirection,
     Arms,
     DetectionTechnique,
     ExecutionType,
-    VerticalAlignment,
 )
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.demonstrations import RobotDemonstration
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
@@ -104,7 +100,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
     The plan ends where it started, so it can be repeated against the same scene.
     """
 
-    ros_node_name: ClassVar[str] = "stretch_demo_node"
+    ros_node_name: str = "stretch_demo_node"
 
     def build_simulated_world(self) -> World:
         """
@@ -166,12 +162,6 @@ class StretchApartmentDemonstration(RobotDemonstration):
         """
         world = context.world
 
-        grasp_description = GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            ViewManager.get_arm_view(Arms.LEFT, context.robot).end_effector,
-        )
-
         cereal = world.get_semantic_annotations_by_type(CheezeIt)[0]
         cereal_body = cereal.root
         shelf_layer_body = world.get_body_by_name(CEREAL_SHELF_LAYER_NAME)
@@ -200,9 +190,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     trust_detected_orientation=True,
                     accept_first_if_multiple=True,
                 ),
-                PickUpAction(
-                    cereal, Arms.LEFT, grasp_description, perceive_before_grasp=True
-                ),
+                PickUpAction(cereal, Arms.LEFT, perceive_before_grasp=True),
                 ParkArmsAction(Arms.BOTH),
                 NavigateAction(
                     Pose.from_xyz_rpy(
@@ -242,7 +230,6 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 a(PickUpAction)(
                     object_designator=cereal,
                     arm=Arms.LEFT,
-                    grasp_description=grasp_description,
                     perceive_before_grasp=True,
                 ),
                 ParkArmsAction(Arms.BOTH),

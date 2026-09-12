@@ -43,6 +43,7 @@ from coraplex.plans.failures import (
     PlanCancelled,
     PlanFailure,
     RepetitionsExhausted,
+    RECOVERABLE_FAILURES,
 )
 from coraplex.plans.motion_state_chart_building import BuildsMotionStateChart
 from coraplex.plans.plan_node import PlanNode
@@ -261,7 +262,7 @@ class TryInOrderNode(ExecutesSequentially):
         for child in self.children:
             try:
                 child.perform()
-            except PlanFailure:
+            except RECOVERABLE_FAILURES:
                 continue
         failed = all(
             [child.status == LifeCycleValues.FAILED for child in self.children]
@@ -357,10 +358,10 @@ class PauseMonitor(MonitorNode):
     """
     Holds its children for as long as the monitor observes True.
 
-    .. warning:: A monitor that never turns False again holds the children forever, so the
-        motion runs out of control cycles and fails with
-        :class:`~coraplex.exceptions.MotionDidNotFinish`. Use :class:`CancelMonitor` to
-        give up on the plan instead.
+    .. warning:: A monitor that never turns False again holds the children forever. Held
+        tasks are not running, so the chart's stall monitor does not read them as stuck
+        and the run never ends by itself. Use :class:`CancelMonitor` to give up on the
+        plan instead.
     """
 
     def create_monitored_goal(self) -> MonitoredGoal:
@@ -372,10 +373,10 @@ class PauseUntilMonitor(MonitorNode):
     """
     Holds its children until the monitor observes True.
 
-    .. warning:: A monitor that never turns True holds the children forever, so the
-        motion runs out of control cycles and fails with
-        :class:`~coraplex.exceptions.MotionDidNotFinish`. Use :class:`CancelMonitor` to
-        give up on the plan instead.
+    .. warning:: A monitor that never turns True holds the children forever. Held tasks
+        are not running, so the chart's stall monitor does not read them as stuck and the
+        run never ends by itself. Use :class:`CancelMonitor` to give up on the plan
+        instead.
     """
 
     def create_monitored_goal(self) -> MonitoredGoal:

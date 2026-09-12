@@ -11,9 +11,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colors
 from skimage.measure import label
-from typing_extensions import Tuple, List, Optional, Iterator, Callable, TYPE_CHECKING
+from typing_extensions import (
+    Tuple,
+    List,
+    Optional,
+    Iterator,
+    Callable,
+    TYPE_CHECKING,
+)
 
+from coraplex.datastructures.enums import Arms
 from coraplex.locations.base import PoseGeneratorBackend
+from coraplex.locations.sampling import CostmapSamplingStrategy
+from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
@@ -26,8 +36,8 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vect
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-if TYPE_CHECKING:
-    from coraplex.datastructures.dataclasses import Context
+from coraplex.config.action_conf import ActionConfig
+from coraplex.datastructures.dataclasses import Context
 
 logger = logging.getLogger("coraplex")
 
@@ -169,23 +179,6 @@ class Costmap(PoseGeneratorBackend):
     The world from which this locations was created.
     """
     vis_ids: List[int] = field(default_factory=list, init=False)
-
-    number_of_samples: int = field(kw_only=True, default=200)
-    """
-    Number of samples to return at max
-    """
-
-    sample_randomly: bool = field(kw_only=True, default=False)
-    """
-    If the sampling should randomly pick valid entries
-    """
-
-    orientation_generator: Optional[Callable[[Point3, Pose], Quaternion]] = field(
-        kw_only=True, default=None
-    )
-    """
-    An optional orientatoin generator to use to generate the orientation for a sampled pose
-    """
 
     def _chunks(self, lst: List, n: int) -> Iterator[List]:
         """
@@ -355,40 +348,39 @@ class Costmap(PoseGeneratorBackend):
 
         return rectangles
 
-    def __iter__(self) -> Iterator[Pose]:
+    def candidates(
+        self,
+        sampling_strategy: CostmapSamplingStrategy,
+        number_of_samples: int = 2000,
+        orientation_generator: Optional[Callable[[Point3, Pose], Quaternion]] = None,
+    ) -> Iterator[Pose]:
         """
-        A generator that crates pose candidates from a given locations. The generator
-        selects the highest 100 values and returns the corresponding positions.
-        Orientations are calculated such that the Robot faces the center of the locations.
+        Draw pose candidates from this map.
 
-        :Yield: A tuple of position and orientation
+        :param sampling_strategy: What this map's ratings are used for when picking.
+        :param number_of_samples: How many candidates to draw. Far more than a
+            caller judges properly, since a standing pose inside the furniture costs
+            nothing to refuse.
+        :param orientation_generator: Which way a candidate faces, or ``None`` to face
+            this map's origin.
+        :Yield: A candidate pose.
         """
 
         ori_gen = (
-            self.orientation_generator
-            or OrientationGenerator.generate_origin_orientation
+            orientation_generator or OrientationGenerator.generate_origin_orientation
         )
-
         # Determines how many positions should be sampled from the locations
-        if (
-            self.number_of_samples == -1
-            or self.number_of_samples > self.map.flatten().shape[0]
-        ):
-            self.number_of_samples = self.map.flatten().shape[0]
+        if number_of_samples == -1 or number_of_samples > self.map.flatten().shape[0]:
+            number_of_samples = self.map.flatten().shape[0]
 
         segmented_maps = self.segment_map()
-        samples_per_map = self.number_of_samples // len(segmented_maps)
+        samples_per_map = number_of_samples // len(segmented_maps)
         for seg_map in segmented_maps:
 
-            if self.sample_randomly:
-                indices = np.random.choice(seg_map.size, samples_per_map, replace=False)
-            else:
-                indices = np.argpartition(seg_map.flatten(), -samples_per_map)[
-                    -samples_per_map:
-                ]
+            indices = sampling_strategy.choose(seg_map.flatten(), samples_per_map)
 
             indices = np.dstack(np.unravel_index(indices, self.map.shape)).reshape(
-                samples_per_map, 2
+                -1, 2
             )
 
             height = seg_map.shape[0]
@@ -867,6 +859,36 @@ class RingCostmap(Costmap):
 
     def __post_init__(self):
         self.map = self.ring()
+
+    @classmethod
+    def from_arm_reach_distance(
+        cls,
+        context: Context,
+        arm: Arms,
+        origin: Pose,
+        reach_fraction: float = ActionConfig.reach_fraction,
+    ) -> RingCostmap:
+        """
+        Creates a ring costmap around a target the robot is to reach with one arm.
+
+        :param context: The context holding the robot and world.
+        :param arm: The arm that is to do the reaching.
+        :param origin: The target the ring is drawn around.
+        :param reach_fraction: The fraction of the arm's length the ring stands off
+            the target by. That needs to be replaced with an estimate of the
+            reachability space of the robot arms.
+        :returns: The ring costmap.
+        """
+        return cls(
+            resolution=0.02,
+            width=200,
+            height=200,
+            std=15,
+            distance=ViewManager.get_arm_view(arm, context.robot).approximate_length()
+            * reach_fraction,
+            world=context.world,
+            origin=origin,
+        )
 
     def ring(self) -> np.ndarray:
         radius_in_pixels = self.distance / self.resolution

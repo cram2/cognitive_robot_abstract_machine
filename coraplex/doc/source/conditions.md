@@ -31,26 +31,37 @@ In general the pre -and postcondition can be anything that is an EQL predicate, 
 evaluates to bool. Conditions are defined as static methods that receive the EQL `variables`, the execution
 `context` and the action `kwargs`.
 
+Every action that closes a gripper on something asks the same question, so the condition itself lives on
+{class}`~coraplex.robot_plans.actions.core.pick_up.HasGraspChoice` and the action delegates to it.
+
 ```python
 @staticmethod
-def pre_condition(variables, context, kwargs):
-    end_effector = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+def can_take_hold(variables, context, kwargs):
     return and_(
-        GripperIsFree(end_effector),
-        IsObjectReachableBy(
-            robot=context.robot,
-            world=context.world,
+        GripperIsFree(
+            ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        ),
+        IsGraspReachableBy(
+            context=Context(
+                robot=context.robot,
+                world=context.world,
+                alternative_motion_mappings=context.alternative_motion_mappings,
+            ),
             arm=variables["arm"],
-            object_designator=kwargs["object_designator"],
-            grasp_description=kwargs["grasp_description"],
+            grasp_pose=HasGraspChoice.resolve_grasp_pose(
+                kwargs["grasp_pose"], kwargs["object_designator"]
+            ),
+            object_designator=kwargs["object_designator"].root,
         ),
     )
 ```
 
 This condition is comprised of two conditions, the first is that the gripper that should pick up the object is free and
-not holding anything ({class}`~coraplex.querying.predicates.GripperIsFree`) and the second is that the object is
-reachable ({class}`~coraplex.locations.pose_validator.IsObjectReachableBy`). The arm is the queried variable here, since
-querying over other parameter (like the object to be picked up) would result in very unexpected behaviour of the plan.
+not holding anything ({class}`~coraplex.querying.predicates.GripperIsFree`) and the second is that the grasp the action
+will take is reachable ({class}`~coraplex.locations.pose_validator.IsGraspReachableBy`). That grasp is the one the
+caller named, or the first the object offers when they named none. The arm is the queried variable
+here, since querying over other parameter (like the object to be picked up) would result in very unexpected behaviour of
+the plan.
 
 Now imagine the following scenario, the robot is standing near the object it should pick up but the object cannot be
 picked up with the specified arm, however using the other arm would enable the robot to execute the PickUp Action.

@@ -158,23 +158,28 @@ class NotApproachingGoal(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class AnyMonitoredTaskRunning(MotionStatechartNode):
+class AnyMonitoredTaskShortOfItsGoal(MotionStatechartNode):
     """
-    Turns ``True`` while at least one of :attr:`monitored_tasks` is running.
+    Turns ``True`` while at least one of :attr:`monitored_tasks` is running and has not
+    reached its goal.
 
     Without this, a set of tasks that have all finished, or have not started, would read
     as "nothing is approaching its goal" and be mistaken for a stall.
+
+    A task that reached its goal counts as finished even while it is still running:
+    nothing ends a task for arriving, so it would otherwise keep this true for the rest
+    of the motion and make the first wait after the last goal was reached a stall.
     """
 
     monitored_tasks: List[ConvergingTask] = field(kw_only=True)
     """
-    The tasks whose life cycle states are watched.
+    The tasks whose life cycle states and goals are watched.
     """
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        Each life cycle comparison is ``0`` or ``1``, so their maximum is ``1`` exactly
-        when at least one task runs.
+        Each task contributes ``0`` or ``1``, so their maximum is ``1`` exactly when at
+        least one of them is still short of its goal.
 
         That also stays correct for a single task, unlike an n-ary or.
         """
@@ -185,6 +190,7 @@ class AnyMonitoredTaskRunning(MotionStatechartNode):
                         sm.Scalar(
                             task.life_cycle_variable == int(LifeCycleValues.RUNNING)
                         )
+                        * sm.logic_not(task.goal_reached.is_true())
                         for task in self.monitored_tasks
                     ]
                 )
@@ -309,14 +315,15 @@ class StillProgressing(Goal):
             )
             for task in self._monitored_tasks
         ]
-        any_running = AnyMonitoredTaskRunning(
-            name=f"{self.name}/any_running", monitored_tasks=self._monitored_tasks
+        still_working = AnyMonitoredTaskShortOfItsGoal(
+            name=f"{self.name}/short_of_its_goal",
+            monitored_tasks=self._monitored_tasks,
         )
         self._add_children_to_motion_statechart(
-            self._not_approaching_monitors + [any_running]
+            self._not_approaching_monitors + [still_working]
         )
         return sm.trinary_logic_and(
-            any_running.observation_variable,
+            still_working.observation_variable,
             *[
                 monitor.observation_variable
                 for monitor in self._not_approaching_monitors

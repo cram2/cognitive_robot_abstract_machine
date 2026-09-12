@@ -24,6 +24,10 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Noun,
 )
 from coraplex.datastructures.dataclasses import Context
+from coraplex.locations.sampling import (
+    CostmapSamplingStrategy,
+    HighestRatedFirst,
+)
 
 if TYPE_CHECKING:
     from coraplex.alternative_motion_mapping import AlternativeMotion
@@ -44,7 +48,11 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Point3,
+    Pose,
+    Quaternion,
+)
 from semantic_digital_twin.world import World
 
 logger = logging.getLogger("coraplex")
@@ -81,6 +89,41 @@ class Location(Iterable[Pose]):
     """
     How close in meters the robot may come to its surroundings at a candidate pose
     before that pose counts as in collision.
+    """
+
+    sampling_strategy: CostmapSamplingStrategy = field(
+        default_factory=HighestRatedFirst
+    )
+    """
+    What the ratings of the generated candidates are used for.
+
+    Belongs here rather than to any one of the maps that constrain this location: it
+    decides how the merged result is drawn from, which is what this location iterates.
+    """
+
+    number_of_samples: int = 2000
+    """
+    How many candidates to draw from the generated map.
+
+    Far more than :attr:`candidates_to_validate`, since most are refused cheaply before
+    any of them is judged properly.
+    """
+
+    orientation_generator: Optional[Callable[[Point3, Pose], Quaternion]] = None
+    """
+    Which way a drawn candidate faces.
+
+    ``None`` faces the target.
+    """
+
+    candidates_to_validate: int = 50
+    """
+    How many candidates are checked for reachability before the location gives up.
+
+    Only candidates that got that far count: judging one drives the robot to see whether
+    it arrives, while a pose standing in collision is thrown out cheaply beforehand. A
+    budget spent on the cheap refusals would leave a target hemmed in by furniture with
+    none of its reachable poses ever tried.
     """
 
     @property
@@ -125,7 +168,6 @@ class Location(Iterable[Pose]):
                 robot=test_robot,
                 alternative_motion_mappings=self.context.alternative_motion_mappings,
                 motion_tolerances=self.context.motion_tolerances,
-                ticks_per_motion=self.context.ticks_per_motion,
             )
 
         if self.context.debug:
@@ -133,7 +175,12 @@ class Location(Iterable[Pose]):
                 _world=test_world, node=self.context.ros_node
             ).with_collision_visualization()
 
-        for pose_candidate in self.generator:
+        validated = 0
+        for pose_candidate in self.generator.candidates(
+            self.sampling_strategy,
+            self.number_of_samples,
+            self.orientation_generator,
+        ):
 
             # A candidate says where to stand and which way to look, which is the
             # heading NavigateAction is handed. Turning it into a base pose the same way
@@ -166,11 +213,19 @@ class Location(Iterable[Pose]):
                 logger.debug(f"Candidate pose in collision, skipping")
                 continue
 
+            validated += 1
             if all(
                 validator(pose_candidate=pose_candidate)
                 for validator in self.validators
             ):
                 yield pose_candidate
+
+            if validated >= self.candidates_to_validate:
+                logger.debug(
+                    f"Validated {validated} candidates without another one to offer, "
+                    f"giving up"
+                )
+                return
 
     def merge(self, other: Location) -> Location:
         """
@@ -226,6 +281,26 @@ class PoseGeneratorBackend:
     @abstractmethod
     def __iter__(self) -> Iterator[Pose]:
         pass
+
+    def candidates(
+        self,
+        sampling_strategy: CostmapSamplingStrategy,
+        number_of_samples: int = 2000,
+        orientation_generator: Optional[Callable[[Point3, Pose], Quaternion]] = None,
+    ) -> Iterator[Pose]:
+        """
+        Draw pose candidates from this backend.
+
+        A backend that does not rate its candidates has nothing for a strategy to
+        decide, and offers them in its own order.
+
+        :param sampling_strategy: What the ratings of the candidates are used for.
+        :param number_of_samples: How many candidates to draw.
+        :param orientation_generator: Which way a candidate faces, or ``None`` to leave
+            it to the backend.
+        :return: The pose candidates, in the order they should be tried.
+        """
+        return iter(self)
 
     def merge(self, other: PoseGeneratorBackend) -> PoseGeneratorBackend:
         """

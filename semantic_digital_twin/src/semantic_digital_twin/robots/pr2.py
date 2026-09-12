@@ -359,12 +359,16 @@ class PR2LeftArm(Arm[PR2LeftGripper]):
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
+        # The left gripper is carried by a force torque sensor rather than by the wrist
+        # directly, so the arm reaches past its last joint to the body that holds the
+        # gripper. Stopping at the wrist would leave the sensor in neither the arm nor
+        # the gripper, and so outside every rule written for either.
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "torso_lift_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_wrist_roll_link"
+                robot_root, "l_force_torque_link"
             ),
         )
 

@@ -26,17 +26,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List
 
+
 import coraplex as _coraplex_pkg
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
 import krrood.entity_query_language.factories as eql
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import (
-    Arms,
-    ApproachDirection,
-    VerticalAlignment,
-)
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import Arms
 from coraplex.execution_environment import simulated_robot
 from coraplex.orm.ormatic_interface import Base, PlanMappingDAO  # type: ignore
 from coraplex.plans.factories import sequential, try_in_order, code
@@ -203,12 +199,9 @@ def build_plan() -> Plan:
     with world.modify_world():
         world_reasoner = WorldReasoner(world)
         world_reasoner.reason()
-        world.add_semantic_annotations(
-            [
-                Bowl(root=world.get_body_by_name("bowl.stl")),
-                Spoon(root=world.get_body_by_name("spoon.stl")),
-            ]
-        )
+        bowl_annotation = Bowl(root=world.get_body_by_name("bowl.stl"))
+        spoon_annotation = Spoon(root=world.get_body_by_name("spoon.stl"))
+        world.add_semantic_annotations([bowl_annotation, spoon_annotation])
         world.add_semantic_annotation_recursively(
             Drawer(
                 root=world.get_body_by_name("cabinet10_drawer_top"),
@@ -230,27 +223,26 @@ def build_plan() -> Plan:
                     code(_failing_step),
                     TransportAction(
                         world.get_semantic_annotations_by_type(Milk)[0],
-                        Pose.from_xyz_rpy(
+                        Arms.LEFT,
+                        target_location=Pose.from_xyz_rpy(
                             4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root
                         ),
-                        Arms.LEFT,
                     ),
                 ],
                 context=context,
             ),
             TransportAction(
-                world.get_semantic_annotations_by_type(Bowl)[0],
-                Pose.from_xyz_rpy(5.0, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
+                bowl_annotation,
                 Arms.LEFT,
+                target_location=Pose.from_xyz_rpy(
+                    5.0, 3.3, 0.75, yaw=1.57, reference_frame=world.root
+                ),
             ),
             TransportAction(
-                world.get_semantic_annotations_by_type(Spoon)[0],
-                Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
+                spoon_annotation,
                 Arms.LEFT,
-                GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.TOP,
-                    pr2.left_arm.end_effector,
+                target_location=Pose.from_xyz_rpy(
+                    5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root
                 ),
             ),
         ],

@@ -64,8 +64,10 @@ with simulated_robot(collision_avoidance=True):
 
 {meth}`~coraplex.plans.executables.GiskardExecutable.execute` dispatches on the active execution type:
 
-- `SIMULATED`: the chart is compiled and ticked against the world of the context until it reports an end motion. If
-  it does not finish within the tick budget a {class}`~coraplex.exceptions.MotionDidNotFinish` exception is raised.
+- `SIMULATED`: the chart is compiled and ticked against the world of the context until it reports an end motion. A
+  motion that stops approaching its goal gives up and raises
+  {class}`~giskardpy.motion_statechart.exceptions.NoProgressError`, naming the tasks that stalled; one that keeps
+  converging is never cut off for taking many ticks.
 - `REAL`: the chart is sent to giskard via the `GiskardWrapper` while a watcher thread monitors for interrupts.
 - `NO_EXECUTION`: the chart is built but not run, which is useful for inspecting or validating a plan.
 
