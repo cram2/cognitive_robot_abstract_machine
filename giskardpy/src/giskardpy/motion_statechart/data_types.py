@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import IntEnum, Enum, StrEnum
 from typing import Union, FrozenSet
 
+from giskardpy.motion_statechart.exceptions import TransitionHasNoVerdictError
 from krrood.symbolic_math.symbolic_math import Scalar, if_eq_cases
 from semantic_digital_twin.world_description.geometry import Color
 
@@ -68,18 +69,19 @@ class LifeCycleValues(IntEnum):
 
     SUCCEEDED = 3, Color.from_hex("#28A745"), "✔"
     """
-    The node was ended while it was observing its goal as reached.
+    The node's success condition held.
     """
 
     FAILED = 4, Color.from_hex("#EF4444"), "✖"
     """
-    The node was ended while it was not.
+    The node declared that it cannot continue, through its own fail condition.
     """
 
     INTERRUPTED = 5, Color.from_hex("#F97316"), "■"
     """
-    The node was ended while it was not observing anything decisive, which is no basis
-    for a judgement.
+    The node's interrupt condition held, or an ancestor ended and took it down with it.
+
+    Neither is a judgement of the node itself.
     """
 
     def __new__(cls, value: int, color: Color, badge: str) -> LifeCycleValues:
@@ -116,25 +118,6 @@ class LifeCycleValues(IntEnum):
         :return: Whether a node in this state has ended.
         """
         return self in self.terminal_states()
-
-    @classmethod
-    def verdict_for(cls, observation: ObservationStateValues) -> LifeCycleValues:
-        """
-        The verdict a node receives when it is ended.
-
-        An observation that has no answer yet is no basis for a judgement, so it leaves
-        the node unjudged.
-
-        :param observation: What the node observes at the moment it is ended.
-        :return: The terminal state the node reaches.
-        """
-        match observation:
-            case ObservationStateValues.TRUE:
-                return cls.SUCCEEDED
-            case ObservationStateValues.FALSE:
-                return cls.FAILED
-            case _:
-                return cls.INTERRUPTED
 
 
 class FloatEnum(float, Enum):
@@ -288,19 +271,25 @@ class TransitionKind(Enum):
     Transitions nodes from RUNNING to PAUSED if True, or back if False.
     """
 
-    END = 3
+    SUCCEED = 3
     """
-    Transitions nodes from RUNNING or PAUSED to a terminal state, and their descendants
-    on the same terms.
-
-    Which terminal state a node reaches follows from what it observes at that moment,
-    see :meth:`LifeCycleValues.verdict_for`, whether its own end condition or an
-    ancestor's ended it.
+    Ends a node from RUNNING or PAUSED as SUCCEEDED, and interrupts its descendants.
     """
 
     RESET = 4
     """
     Transitions nodes from any state to NOT_STARTED.
+    """
+
+    FAIL = 5
+    """
+    Ends a node from RUNNING or PAUSED as FAILED, because it cannot continue, and
+    interrupts its descendants.
+    """
+
+    INTERRUPT = 6
+    """
+    Ends a node from RUNNING or PAUSED as INTERRUPTED, and its descendants with it.
     """
 
     @property
@@ -313,10 +302,37 @@ class TransitionKind(Enum):
                 return frozenset({LifeCycleValues.NOT_STARTED})
             case TransitionKind.PAUSE:
                 return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
-            case TransitionKind.END:
-                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
             case TransitionKind.RESET:
                 return frozenset(LifeCycleValues)
+            case (
+                TransitionKind.SUCCEED | TransitionKind.FAIL | TransitionKind.INTERRUPT
+            ):
+                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
+
+    @classmethod
+    def ending_kinds(cls) -> tuple[TransitionKind, ...]:
+        """
+        :return: The transitions that end a node, in the order they take precedence when
+            several hold on the same control cycle: a node that arrived did what it was
+            asked, and a node that cannot continue says more about itself than being
+            stopped does.
+        """
+        return cls.SUCCEED, cls.FAIL, cls.INTERRUPT
+
+    @property
+    def verdict(self) -> LifeCycleValues:
+        """
+        :return: The terminal state this transition ends a node in.
+        :raises TransitionHasNoVerdictError: If this transition does not end a node.
+        """
+        match self:
+            case TransitionKind.SUCCEED:
+                return LifeCycleValues.SUCCEEDED
+            case TransitionKind.FAIL:
+                return LifeCycleValues.FAILED
+            case TransitionKind.INTERRUPT:
+                return LifeCycleValues.INTERRUPTED
+        raise TransitionHasNoVerdictError(transition_kind=self)
 
     def can_trigger_from(self, life_cycle: LifeCycleValues) -> bool:
         """

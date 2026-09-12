@@ -2,12 +2,15 @@
 Tests for the repeating goal templates (see
 ``giskardpy/motion_statechart/goals/templates.py``).
 
-The loop itself is exercised with a plain ``RepeatUntil`` whose failure monitor counts
-control cycles, so it needs neither a world nor a converging task, and ``RepeatOnStall``
-is exercised against a motion that really does stop making progress.
+The loop itself is exercised with a plain ``RepeatUntil`` whose attempt gives up after a
+number of control cycles, so it needs neither a world nor a converging task, and
+``RepeatOnStall`` is exercised against a motion that really does stop making progress.
 """
 
 from datetime import timedelta
+from functools import partial
+
+from typing_extensions import Callable
 
 import pytest
 
@@ -17,13 +20,18 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.goals.templates import RepeatOnStall, RepeatUntil
+from giskardpy.motion_statechart.goals.templates import (
+    Attempt,
+    RepeatOnStall,
+    RepeatUntil,
+)
 from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.monitors.payload_monitors import (
     CountControlCycles,
     CountNodeResets,
 )
+from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstFalseNode,
     ConstTrueNode,
@@ -39,23 +47,36 @@ from .test_progress_monitors import unreachable_arm_goal
 ATTEMPT_CYCLES = 2
 
 # Control cycles after which the world free loops below have settled on a verdict.
-SETTLE_CYCLES = 12
+# An attempt declares its own failure, and a node reading its own verdict reads the state
+# it entered the cycle with, so every retry costs a cycle on top of ATTEMPT_CYCLES.
+SETTLE_CYCLES = 20
+
+# A stall timeout no world free test below runs long enough to reach.
+STALL_TIMEOUT_OUTLASTING_THE_TEST = timedelta(days=1)
 
 
 def _repeat_on_timeout(
-    task: MotionStatechartNode, target: int
+    task: MotionStatechartNode,
+    target: int,
+    repeat_template: Callable[..., RepeatUntil] = RepeatUntil,
 ) -> tuple[RepeatUntil, MotionStatechart, Executor]:
     """
     Build a compiled chart around a task that is retried until it has been reset
     `target` times.
+
+    :param repeat_template: Builds the loop around the attempt.
     """
-    loop = RepeatUntil(
-        name="loop",
+    attempt = Attempt(
+        name="attempt",
         task=task,
-        stop_retry_monitor=CountNodeResets(name="counter", node=task, target=target),
-        failure_monitor=CountControlCycles(
-            name="timeout", control_cycles=ATTEMPT_CYCLES
-        ),
+        failure_monitors=[
+            CountControlCycles(name="timeout", control_cycles=ATTEMPT_CYCLES)
+        ],
+    )
+    loop = repeat_template(
+        name="loop",
+        task=attempt,
+        stop_retry_monitor=CountNodeResets(name="counter", node=attempt, target=target),
     )
     motion_statechart = MotionStatechart()
     motion_statechart.add_node(loop)
@@ -80,7 +101,7 @@ def test_repeat_until_retries_until_the_monitor_gives_up():
         executor.tick()
 
     assert loop.stop_retry_monitor.resets == 3
-    assert loop.observation_state == ObservationStateValues.FALSE
+    assert loop.goal_reached_state == ObservationStateValues.FALSE
 
 
 def test_repeat_until_succeeds_without_retrying():
@@ -94,7 +115,7 @@ def test_repeat_until_succeeds_without_retrying():
     executor.tick_until_end(SETTLE_CYCLES)
 
     assert loop.stop_retry_monitor.resets == 0
-    assert loop.observation_state == ObservationStateValues.TRUE
+    assert loop.goal_reached_state == ObservationStateValues.TRUE
     assert motion_statechart.is_end_motion()
 
 
@@ -103,8 +124,8 @@ def test_repeat_until_puts_the_task_back_to_not_started():
     Retrying really restarts the task rather than leaving it running, so a task that
     only behaves correctly from its start is safe to retry.
 
-    Every reset but the last one starts a fresh run; the last is the one that trips the
-    monitor, after which nothing starts again.
+    Every reset starts a fresh run, the last of them for the single control cycle it
+    takes the monitor to count that reset and call the retrying off.
     """
     task = ConstFalseNode(name="task")
     loop, motion_statechart, executor = _repeat_on_timeout(task, target=3)
@@ -121,7 +142,7 @@ def test_repeat_until_puts_the_task_back_to_not_started():
         and life_cycles[index + 1] == LifeCycleValues.RUNNING
     ]
     assert loop.stop_retry_monitor.resets == 3
-    assert len(restarts) == loop.stop_retry_monitor.target - 1
+    assert len(restarts) == loop.stop_retry_monitor.target
 
 
 def test_repeat_until_does_not_retry_after_giving_up():
@@ -135,14 +156,59 @@ def test_repeat_until_does_not_retry_after_giving_up():
     for _ in range(SETTLE_CYCLES):
         executor.tick()
     resets_when_given_up = loop.stop_retry_monitor.resets
-    assert loop.observation_state == ObservationStateValues.FALSE
+    assert loop.goal_reached_state == ObservationStateValues.FALSE
 
     for _ in range(SETTLE_CYCLES):
         executor.tick()
 
     assert loop.stop_retry_monitor.resets == resets_when_given_up
-    assert task.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert loop.observation_state == ObservationStateValues.FALSE
+    assert loop.task.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert loop.goal_reached_state == ObservationStateValues.FALSE
+
+
+def test_repeat_until_attempts_a_task_that_never_ends_on_its_own():
+    """
+    A task handed over without an attempt around it is attempted all the same, so the
+    loop ends once the task reaches its goal.
+    """
+    task = ConstTrueNode(name="task")
+    loop = RepeatUntil(
+        name="loop",
+        task=task,
+        stop_retry_monitor=CountNodeResets(name="counter", node=task, target=1),
+    )
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(loop)
+    motion_statechart.add_node(EndMotion.when_true(loop))
+    executor = Executor(MotionStatechartContext(world=World()))
+    executor.compile(motion_statechart=motion_statechart)
+
+    executor.tick_until_end(SETTLE_CYCLES)
+
+    assert type(task.parent_node) is Attempt
+    assert loop.goal_reached_state == ObservationStateValues.TRUE
+    assert motion_statechart.is_end_motion()
+
+
+def test_repeat_on_stall_retries_when_a_failure_monitor_of_its_attempt_fires():
+    """
+    An attempt handed to the stall loop keeps giving up on its own failure monitors, so
+    the loop retries it without waiting for a stall.
+    """
+    task = ConstFalseNode(name="task")
+    loop, _, executor = _repeat_on_timeout(
+        task,
+        target=3,
+        repeat_template=partial(
+            RepeatOnStall, timeout=STALL_TIMEOUT_OUTLASTING_THE_TEST
+        ),
+    )
+
+    for _ in range(SETTLE_CYCLES):
+        executor.tick()
+
+    assert loop.stop_retry_monitor.resets == 3
+    assert loop.goal_reached_state == ObservationStateValues.FALSE
 
 
 def test_repeat_until_ends_the_motion_with_its_exception_once_retrying_stops():
@@ -152,20 +218,9 @@ def test_repeat_until_ends_the_motion_with_its_exception_once_retrying_stops():
     """
     task = ConstFalseNode(name="task")
     exception = TestNodeAssertionError(reason="attempts exhausted")
-    loop = RepeatUntil(
-        name="loop",
-        task=task,
-        stop_retry_monitor=CountNodeResets(name="counter", node=task, target=2),
-        failure_monitor=CountControlCycles(
-            name="timeout", control_cycles=ATTEMPT_CYCLES
-        ),
-        exception=exception,
+    _, _, executor = _repeat_on_timeout(
+        task, target=2, repeat_template=partial(RepeatUntil, exception=exception)
     )
-    motion_statechart = MotionStatechart()
-    motion_statechart.add_node(loop)
-    motion_statechart.add_node(EndMotion.when_true(loop))
-    executor = Executor(MotionStatechartContext(world=World()))
-    executor.compile(motion_statechart=motion_statechart)
 
     with pytest.raises(type(exception)) as error:
         executor.tick_until_end(SETTLE_CYCLES)
@@ -198,7 +253,7 @@ def test_stall_timeout_reaches_the_progress_monitor():
 
     loop = _repeat_on_stall(timeout=timeout)
 
-    assert loop.failure_monitor.timeout == timeout
+    assert loop.task.failure_monitors[0].timeout == timeout
 
 
 def test_default_stall_timeout_leaves_an_attempt_time_to_converge():
@@ -208,7 +263,29 @@ def test_default_stall_timeout_leaves_an_attempt_time_to_converge():
     """
     loop = _repeat_on_stall()
 
-    assert loop.failure_monitor.timeout == timedelta(seconds=5)
+    assert loop.task.failure_monitors[0].timeout == timedelta(seconds=5)
+
+
+def test_repeat_on_stall_watches_the_task_of_an_attempt_it_is_handed():
+    """
+    An attempt handed to the stall loop is kept, and giving up on a stall becomes one
+    more of its ways of failing, measured on the task it runs.
+    """
+    task = ConstFalseNode(name="task")
+    given_monitor = CountControlCycles(name="timeout", control_cycles=ATTEMPT_CYCLES)
+    attempt = Attempt(name="attempt", task=task, failure_monitors=[given_monitor])
+
+    loop = RepeatOnStall(
+        name="loop",
+        task=attempt,
+        stop_retry_monitor=CountNodeResets(name="counter", node=attempt, target=1),
+    )
+
+    assert loop.task is attempt
+    [kept_monitor, stall_monitor] = attempt.failure_monitors
+    assert kept_monitor is given_monitor
+    assert type(stall_monitor) is Stalled
+    assert stall_monitor.monitored_node is task
 
 
 # %% retrying a motion that stops making progress
@@ -236,11 +313,11 @@ def test_repeat_on_stall_retries_a_motion_that_stops_converging(
     executor.compile(motion_statechart=motion_statechart)
     for _ in range(2000):
         executor.tick()
-        if loop.observation_state == ObservationStateValues.FALSE:
+        if loop.goal_reached_state == ObservationStateValues.FALSE:
             break
 
     assert loop.stop_retry_monitor.resets == 2
-    assert loop.observation_state == ObservationStateValues.FALSE
+    assert loop.goal_reached_state == ObservationStateValues.FALSE
 
 
 def test_repeat_on_stall_leaves_a_reachable_motion_alone(cylinder_bot_world: World):
@@ -268,4 +345,4 @@ def test_repeat_on_stall_leaves_a_reachable_motion_alone(cylinder_bot_world: Wor
     executor.tick_until_end(2000)
 
     assert loop.stop_retry_monitor.resets == 0
-    assert loop.observation_state == ObservationStateValues.TRUE
+    assert loop.goal_reached_state == ObservationStateValues.TRUE

@@ -15,6 +15,7 @@ from typing_extensions import (
 
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import (
+    Attempt,
     CancelledWhenTrue,
     NodeListGoal,
     Parallel,
@@ -186,22 +187,21 @@ class RepeatNode(ExecutesSequentially):
         kw_only=True, default=RepeatOnStall
     )
     """
-    Builds the giskard goal deciding what counts as a failed attempt.
+    Builds the giskard goal that runs the children over and over.
 
     Use it for a decision derived from the children, such as a stall. It is called with
-    the children's goal, the attempt counter, the failure reported once the attempts run
-    out and :attr:`failure_monitor`, so a template needing more configuration is passed
-    pre-configured, for instance ``partial(RepeatOnStall,
-    timeout=timedelta(seconds=1))``.
+    the children's goal, the attempt counter and the failure reported once the attempts
+    run out, so a template needing more configuration is passed pre-configured, for
+    instance ``partial(RepeatOnStall, timeout=timedelta(seconds=1))``.
     """
 
     failure_monitor: Optional[MotionStatechartNode] = field(default=None, kw_only=True)
     """
     Node whose True observation means an attempt failed.
 
-    Use it for a decision that stands on its own, such as a force spike, together with
-    :class:`~giskardpy.motion_statechart.goals.templates.RepeatUntil` as the template.
-    Templates that derive their own reject it.
+    Use it for a decision that stands on its own, such as a force spike. It turns the
+    children's goal into an attempt that gives up when this monitor fires, and the
+    default template makes that attempt give up on a stall as well.
     """
 
     def parse(self) -> Executable:
@@ -223,22 +223,25 @@ class RepeatNode(ExecutesSequentially):
             node=children_goal,
             target=self.maximum_repetitions,
         )
-        # A template that derives its own failure monitor, such as RepeatOnStall,
-        # excludes failure_monitor from its constructor entirely, so it must only be
-        # passed on when one was actually given.
-        failure_monitor_kwargs = (
-            {"failure_monitor": self.failure_monitor}
+        # A monitor that stands on its own makes an attempt out of the children, and a
+        # template with ways of failing of its own, such as RepeatOnStall, adds them to
+        # that attempt.
+        attempted_children = (
+            Attempt(
+                name=f"{type(self).__name__}/attempt",
+                task=children_goal,
+                failure_monitors=[self.failure_monitor],
+            )
             if self.failure_monitor is not None
-            else {}
+            else children_goal
         )
         loop = self.repeat_template(
             name=type(self).__name__,
-            task=children_goal,
+            task=attempted_children,
             stop_retry_monitor=counter,
             exception=RepetitionsExhausted(
                 language_node=self, maximum_repetitions=self.maximum_repetitions
             ),
-            **failure_monitor_kwargs,
         )
         parent_goal.add_node(loop)
         self.add_children_to_motion_state_chart(

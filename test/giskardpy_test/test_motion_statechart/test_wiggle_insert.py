@@ -190,7 +190,7 @@ def test_wiggle_insert(hsr_world_state_reset):
             ]
         )
     )
-    barrier.end_condition = barrier.observation_variable
+    barrier.success_condition = barrier.observation_variable
     msc.add_node(EndMotion.when_true(motion))
 
     kin_sim = Executor(
@@ -200,5 +200,5 @@ def test_wiggle_insert(hsr_world_state_reset):
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
 
-    assert motion.observation_state == ObservationStateValues.TRUE
+    assert motion.goal_reached_state == ObservationStateValues.TRUE
     assert not np.allclose(wiggle._current_vector, np.zeros(3))

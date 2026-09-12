@@ -56,10 +56,14 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.templates import (
     Parallel,
     RepeatOnStall,
-    Sequence, TryAll, TryInOrder, CancelledWhenTrue,
+    Sequence,
+    TryAll,
+    TryInOrder,
+    CancelledWhenTrue,
 )
 from giskardpy.motion_statechart.graph_node import CancelMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import CountNodeResets
+from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstFalseNode,
 )
@@ -138,10 +142,13 @@ def test_sequential_plan_nests_a_goal_per_plan_node(immutable_model_world):
 
 def _monitored_goal_of(executable):
     """
+    A monitored goal is a maintenance node, so the sequence that runs it wraps it in an
+    attempt to give it an ending.
+
     :return: The single monitored goal below the executable's root goal.
     """
-    [monitored_goal] = executable.root_node.nodes
-    return monitored_goal
+    [step] = executable.root_node.nodes
+    return step.task
 
 
 def _parse_and_compile(plan, world, context):
@@ -218,9 +225,12 @@ def test_cancel_monitor_ends_the_children_goal(immutable_model_world, rclpy_node
     monitored_goal = _monitored_goal_of(executable)
     assert type(monitored_goal) is CancelledWhenTrue
     assert monitored_goal.nodes[:2] == [monitor, monitored_goal.monitored_node]
-    assert monitored_goal.monitored_node.end_condition.free_variables() == [
-        monitor.observation_variable
-    ]
+    # The children's goal already ends itself once it succeeds, so the monitor firing is
+    # a reason to interrupt it on top of that. It is read through its verdict, which
+    # outlasts a monitor that ends itself on firing.
+    assert monitor.goal_reached in (
+        monitored_goal.monitored_node.interrupt_condition.free_variables()
+    )
 
 
 def test_cancel_monitor_ends_the_motion_when_the_monitor_fires(
@@ -297,6 +307,35 @@ def test_repeat_node_wraps_its_children_in_a_repeating_goal(
     assert counter is loop.stop_retry_monitor
     [exhausted] = [node for node in loop.nodes if isinstance(node, CancelMotion)]
     assert exhausted.start_condition.free_variables() == [counter.observation_variable]
+
+
+def test_repeat_node_with_failure_monitor_gives_the_stall_template_one_attempt(
+    immutable_model_world, rclpy_node
+):
+    """
+    A failure monitor and the default stall template share one attempt around the
+    children, which gives up on whichever of the two fires first.
+    """
+    world, view, context = immutable_model_world
+    never = ConstFalseNode(name="never")
+
+    plan = repeat(
+        [MoveTorsoAction(TorsoState.HIGH)],
+        maximum_repetitions=3,
+        failure_monitor=never,
+        context=context,
+    )
+    executable = _parse_and_compile(plan, world, context)
+
+    [loop] = executable.root_node.nodes
+    assert type(loop) is RepeatOnStall
+    assert never in loop.task.failure_monitors
+    stall_monitors = [
+        monitor
+        for monitor in loop.task.failure_monitors
+        if isinstance(monitor, Stalled)
+    ]
+    assert len(stall_monitors) == 1
 
 
 def test_merge_motions(immutable_model_world, rclpy_node):

@@ -394,7 +394,7 @@ def test_one_arrow_is_drawn_per_dependency():
     observed = ConstTrueNode(name="Observed")
     owner = ConstTrueNode(name="Owner")
     motion_statechart = build_dependency_statechart(observed, owner)
-    owner.end_condition = observed.goal_reached
+    owner.success_condition = observed.goal_reached
     owner.reset_condition = observed.goal_reached
     expand(motion_statechart)
 
@@ -574,7 +574,9 @@ def test_conditions_are_grayed_out_when_not_triggerable(
     motion_statechart = build_dependency_statechart(observed, node)
     node.start_condition = observed.goal_reached
     node.pause_condition = observed.is_succeeded
-    node.end_condition = observed.is_failed
+    node.success_condition = observed.is_failed
+    node.fail_condition = observed.is_interrupted
+    node.interrupt_condition = observed.is_paused
     node.reset_condition = observed.is_running
     expand(motion_statechart)
     motion_statechart.life_cycle_state[node] = life_cycle_state
@@ -583,33 +585,34 @@ def test_conditions_are_grayed_out_when_not_triggerable(
     label = find_node(draw(motion_statechart), node).get_label()
     disabled_color = DISABLED_CONDITION_COLOR.to_hex()
 
-    for prefix, condition, transition_kind, term in [
+    for condition, term in [
         (
-            "start",
             node._start_condition,
-            TransitionKind.START,
             f"{observed.unique_name}.{GoalReachedVariable.attribute_name}",
         ),
         (
-            "pause",
             node._pause_condition,
-            TransitionKind.PAUSE,
             f"{observed.unique_name}.{LifeCyclePredicate.IS_SUCCEEDED.attribute_name}",
         ),
         (
-            "end  ",
-            node._end_condition,
-            TransitionKind.END,
+            node._success_condition,
             f"{observed.unique_name}.{LifeCyclePredicate.IS_FAILED.attribute_name}",
         ),
         (
-            "reset",
+            node._fail_condition,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_INTERRUPTED.attribute_name}",
+        ),
+        (
+            node._interrupt_condition,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_PAUSED.attribute_name}",
+        ),
+        (
             node._reset_condition,
-            TransitionKind.RESET,
             f"{observed.unique_name}.{LifeCyclePredicate.IS_RUNNING.attribute_name}",
         ),
     ]:
-        can_trigger = transition_kind.can_trigger_from(life_cycle_state)
+        prefix = MotionStatechartGraphviz.condition_prefix(condition.kind)
+        can_trigger = condition.kind.can_trigger_from(life_cycle_state)
         if can_trigger:
             assert f'<FONT FACE="{Font.MONOSPACE}">{prefix}:' in label
             assert (

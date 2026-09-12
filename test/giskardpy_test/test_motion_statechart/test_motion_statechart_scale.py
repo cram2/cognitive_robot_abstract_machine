@@ -31,7 +31,7 @@ def _build_chain(
         motion_statechart.add_node(node)
         if previous is not None:
             node.start_condition = previous.observation_variable
-        node.end_condition = node.observation_variable
+        node.success_condition = node.observation_variable
         chain.append(node)
         previous = node
     return chain

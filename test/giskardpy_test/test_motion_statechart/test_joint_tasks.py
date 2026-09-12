@@ -65,7 +65,7 @@ def test_set_seed_configuration(pr2_world_state_reset):
     end = EndMotion()
     msc.add_node(node1)
     msc.add_node(end)
-    node1.end_condition = node1.observation_variable
+    node1.success_condition = node1.observation_variable
     end.start_condition = node1.observation_variable
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
@@ -101,7 +101,7 @@ def test_set_seed_odometry(pr2_world_state_reset):
     end = EndMotion()
     msc.add_node(node1)
     msc.add_node(end)
-    node1.end_condition = node1.observation_variable
+    node1.success_condition = node1.observation_variable
     end.start_condition = node1.observation_variable
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))

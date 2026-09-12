@@ -4,13 +4,17 @@ from dataclasses import field, dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
+from giskardpy.motion_statechart.graph_node import (
+    MaintenanceNode,
+    MotionStatechartNode,
+    NodeArtifacts,
+)
 from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False)
-class FeatureFunctionMonitor(MotionStatechartNode):
+class FeatureFunctionMonitor(MaintenanceNode):
     """
     Base for monitors that compare a controlled feature (attached to ``tip_link``) with a
     reference feature (attached to ``root_link``) expressed in the root link frame.

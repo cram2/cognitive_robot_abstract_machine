@@ -15,6 +15,7 @@ from giskardpy.motion_statechart.data_types import (
 from giskardpy.motion_statechart.exceptions import NoProgressError
 from giskardpy.motion_statechart.error_signals import ErrorSignal
 from giskardpy.motion_statechart.graph_node import (
+    MaintenanceNode,
     CancelMotion,
     ConvergingTask,
     Goal,
@@ -29,7 +30,7 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
 
 
 @dataclass(eq=False, repr=False)
-class NotApproachingGoal(MotionStatechartNode):
+class NotApproachingGoal(MaintenanceNode):
     """
     Turns ``True`` while :attr:`monitored_task` is not closing on its goal fast enough.
 
@@ -158,7 +159,7 @@ class NotApproachingGoal(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class AnyMonitoredTaskRunning(MotionStatechartNode):
+class AnyMonitoredTaskRunning(MaintenanceNode):
     """
     Turns ``True`` while at least one of :attr:`monitored_tasks` is running.
 
@@ -206,7 +207,7 @@ class StillProgressing(Goal):
     whose steps run one after another, and names the task that is actually stuck.
 
     Wire :meth:`cancel_motion` to abort a motion that is no longer making progress, or
-    the negation of its observation to a node's end condition to give up on that node.
+    the negation of its observation to a node's fail condition to give up on that node.
     """
 
     monitored_node: MotionStatechartNode = field(kw_only=True)
@@ -325,15 +326,17 @@ class StillProgressing(Goal):
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        The timer only turns true once progress has stalled for :attr:`timeout`, so
-        every other reading of it means this node has not given up yet.
+        The timer only reaches what it counts once progress has stalled for
+        :attr:`timeout`, so every other reading of it means this node has not given up
+        yet. It is read through :attr:`goal_reached`, which outlasts the timer ending
+        itself on reaching its target.
 
-        The timer is unknown until it starts, which a plain negation would carry through
-        to a node that is in fact progressing, so the timer is compared against being
+        The timer says nothing until it starts, which a plain negation would carry
+        through to a node that is in fact progressing, so it is compared against being
         true rather than negated.
         """
         return NodeArtifacts(
-            observation=trinary_logic_not(self._timer.observation_variable.is_true())
+            observation=trinary_logic_not(self._timer.goal_reached.is_true())
         )
 
     def _find_converging_tasks(
@@ -353,6 +356,26 @@ class StillProgressing(Goal):
         for child_node in node.nodes:
             tasks.extend(self._find_converging_tasks(child_node))
         return tasks
+
+
+@dataclass(eq=False, repr=False)
+class Stalled(StillProgressing):
+    """
+    Turns ``True`` once nothing under :attr:`monitored_node` has approached its goal for
+    :attr:`timeout`.
+
+    The same measurement as :class:`StillProgressing`, said the way a failure monitor is
+    read: a monitor is passed to an
+    :class:`~giskardpy.motion_statechart.goals.templates.Attempt` as the thing that goes
+    wrong, not as the thing that goes right.
+    """
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        The timer reaches what it counts once progress has stalled for :attr:`timeout`,
+        which is exactly when this node has something to report.
+        """
+        return NodeArtifacts(observation=self._timer.goal_reached.is_true())
 
 
 @dataclass(eq=False, repr=False)

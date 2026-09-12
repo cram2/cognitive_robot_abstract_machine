@@ -49,8 +49,8 @@ def observation_for(
     """
     Evaluate the observation a goal builds for one pair of input observations.
 
-    The monitored node is read through what it has reached, which is what it observes
-    while it runs, so the same value stands for both of its variables.
+    Either node may be read through what it has reached, which is what it observes while
+    it runs, so the same value stands for both of a node's variables.
 
     :param goal: The goal whose observation expression is evaluated.
     :param monitored_observation: What the monitored node observes.
@@ -65,8 +65,14 @@ def observation_for(
             goal.monitored_node.observation_variable,
             goal.monitored_node.goal_reached,
             goal.monitor.observation_variable,
+            goal.monitor.goal_reached,
         ],
-        [monitored_observation, monitored_observation, monitor_observation],
+        [
+            monitored_observation,
+            monitored_observation,
+            monitor_observation,
+            monitor_observation,
+        ],
     )
     return ObservationStateValues(float(substituted))
 

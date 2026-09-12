@@ -96,23 +96,30 @@ def test_trinary_transition():
     assert condition_copy == condition
 
 
-def test_end_condition_round_trip():
+@pytest.mark.parametrize("transition_kind", TransitionKind.ending_kinds())
+def test_ending_condition_round_trip(transition_kind: TransitionKind):
     """
-    An end condition survives serialization, including the predicate it reads.
+    Every condition that ends a node survives serialization, including the predicate it
+    reads, and keeps the kind that decides the verdict it yields.
     """
     msc = MotionStatechart()
     msc.add_nodes([first := ConstTrueNode(), second := ConstTrueNode()])
-    second.end_condition = trinary_logic_and(
-        first.is_succeeded, second.observation_variable
+    second.set_condition(
+        transition_kind,
+        trinary_logic_and(first.is_succeeded, second.observation_variable),
     )
-    condition = second._end_condition
+    [condition] = [
+        condition
+        for condition in second.conditions
+        if condition.kind is transition_kind
+    ]
 
     condition_copy = TrinaryCondition.from_json(
         json.loads(json.dumps(condition.to_json())), motion_statechart=msc
     )
 
     assert condition_copy == condition
-    assert condition_copy.kind is TransitionKind.END
+    assert condition_copy.kind is transition_kind
 
 
 def test_to_json_joint_position_list(mini_world):
@@ -193,7 +200,7 @@ def test_start_condition(mini_world):
     end = ConstTrueNode()
     msc.add_node(end)
 
-    node1.end_condition = node1.observation_variable
+    node1.success_condition = node1.observation_variable
     node2.start_condition = node1.observation_variable
     node2.pause_condition = node3.observation_variable
     end.start_condition = trinary_logic_and(
@@ -420,6 +427,26 @@ def test_collapsed_goal_survives_json_round_trip():
     msc_copy = MotionStatechart.from_json(new_json_data)
 
     assert msc_copy.get_node_by_index(goal.index).plot_specifications.collapse_children
+
+
+def test_structure_copy_keeps_every_condition():
+    """
+    A structural copy stands in for the chart it was made from, so every transition
+    condition of a node comes along with it.
+    """
+    msc = MotionStatechart()
+    msc.add_nodes([trigger := ConstTrueNode(), node := ConstTrueNode()])
+    for transition_kind in TransitionKind:
+        node.set_condition(transition_kind, trigger.observation_variable)
+
+    node_copy = msc.create_structure_copy().get_node_by_index(node.index)
+
+    assert [
+        str(node_copy.get_condition(transition_kind))
+        for transition_kind in TransitionKind
+    ] == [
+        str(node.get_condition(transition_kind)) for transition_kind in TransitionKind
+    ]
 
 
 def test_cancel_motion():
