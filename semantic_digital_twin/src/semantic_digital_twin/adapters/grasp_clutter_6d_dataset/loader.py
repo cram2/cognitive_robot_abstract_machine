@@ -7,7 +7,8 @@ import shutil
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import ClassVar, Optional, Tuple
+from types import ModuleType
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ except ImportError:
         "huggingface_hub not installed. `GraspClutter6DDatasetLoader` downloads will not "
         "work. Install it with `pip install huggingface_hub`."
     )
-    huggingface_hub = None
+    huggingface_hub: Optional[ModuleType] = None
 
 try:
     import py7zr
@@ -35,7 +36,7 @@ except ImportError:
         "py7zr not installed. `GraspClutter6DDatasetLoader` archive extraction will not "
         "work. Install it with `pip install py7zr`."
     )
-    py7zr = None
+    py7zr: Optional[ModuleType] = None
 
 
 class GraspClutter6DModelVariant(StrEnum):
@@ -92,12 +93,16 @@ class GraspClutter6DDatasetLoader:
     repository_id: str = "GraspClutter6D/GraspClutter6D"
     """The Hugging Face dataset repository ID."""
 
-    _SCENES_ARCHIVE_PARTS: ClassVar[Tuple[str, ...]] = (
-        "scenes.7z.001",
-        "scenes.7z.002",
-        "scenes.7z.003",
-        "scenes.7z.004",
-        "scenes.7z.005",
+    _scenes_archive_parts: Tuple[str, ...] = field(
+        default=(
+            "scenes.7z.001",
+            "scenes.7z.002",
+            "scenes.7z.003",
+            "scenes.7z.004",
+            "scenes.7z.005",
+        ),
+        init=False,
+        repr=False,
     )
     """
     The 5 volumes of the dataset's one combined scenes archive (~203 GB total), split
@@ -204,7 +209,7 @@ class GraspClutter6DDatasetLoader:
         if expected_directory.exists():
             return expected_directory
         part_paths = [
-            self._download_archive(name) for name in self._SCENES_ARCHIVE_PARTS
+            self._download_archive(name) for name in self._scenes_archive_parts
         ]
         return self._extract_archive(part_paths[0], self.directory, "scenes")
 

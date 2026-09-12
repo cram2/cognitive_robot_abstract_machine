@@ -49,12 +49,16 @@ class GraspClutter6DCameraInfo:
     dataset is converted with this factor.
     """
 
-    intrinsics: np.ndarray
+    field_of_view: FieldOfView
     """
-    The 3x3 camera intrinsic matrix (`cam_K`), in pixels. `semantic_digital_twin` has no
-    dedicated spatial type for a camera projection matrix (only
-    :class:`~semantic_digital_twin.datastructures.camera_resolution.CameraResolution` for
-    plain pixel width/height), so this stays a plain matrix.
+    This camera's field of view, estimated from the frame's `cam_K` intrinsics matrix -
+    every other camera in this package (e.g.
+    :class:`~semantic_digital_twin.robots.pr2.PR2KinectV1`) only ever stores a
+    `FieldOfView`, never a raw intrinsics matrix, so `cam_K` is used only transiently, to
+    derive this, rather than kept as a field of its own. `scene_camera.json` does not
+    give the image resolution directly, so this assumes the principal point sits at the
+    image center (``width = 2 * cx``, ``height = 2 * cy``) - a common approximation, not
+    a value read from the dataset itself.
     """
 
     depth_scale: float
@@ -87,26 +91,16 @@ class GraspClutter6DCameraInfo:
                     data=np.array(rotation, dtype=float).reshape(3, 3)
                 ),
             )
+        intrinsics = np.array(data["cam_K"], dtype=float).reshape(3, 3)
+        focal_x, focal_y = intrinsics[0, 0], intrinsics[1, 1]
+        principal_x, principal_y = intrinsics[0, 2], intrinsics[1, 2]
         return cls(
-            intrinsics=np.array(data["cam_K"], dtype=float).reshape(3, 3),
+            field_of_view=FieldOfView(
+                horizontal_angle=2 * np.arctan(principal_x / focal_x),
+                vertical_angle=2 * np.arctan(principal_y / focal_y),
+            ),
             depth_scale=float(data["depth_scale"]),
             camera_T_world=camera_T_world,
-        )
-
-    @property
-    def field_of_view(self) -> FieldOfView:
-        """
-        :return: This camera's field of view, estimated from `intrinsics`. The dataset's
-            `scene_camera.json` does not give the image resolution directly, so this
-            assumes the principal point sits at the image center (``width = 2 * cx``,
-            ``height = 2 * cy``) - a common approximation, not a value read from the
-            dataset itself.
-        """
-        focal_x, focal_y = self.intrinsics[0, 0], self.intrinsics[1, 1]
-        principal_x, principal_y = self.intrinsics[0, 2], self.intrinsics[1, 2]
-        return FieldOfView(
-            horizontal_angle=2 * np.arctan(principal_x / focal_x),
-            vertical_angle=2 * np.arctan(principal_y / focal_y),
         )
 
 
