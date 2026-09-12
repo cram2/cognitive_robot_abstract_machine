@@ -49,7 +49,10 @@ class GraspClutter6DImageNotFoundError(DataclassException, LookupError):
         return f"Frame '{self.image_id}' not found in GraspClutter6D scene '{self.scene_id}'."
 
     def suggest_correction(self) -> str:
-        return "Check `scene.frames.keys()` for the frame ids available in this scene."
+        return (
+            "Check the image_id of each frame in `scene.frames`, or call "
+            "`scene.frame(image_id)` to look one up."
+        )
 
 
 @dataclass

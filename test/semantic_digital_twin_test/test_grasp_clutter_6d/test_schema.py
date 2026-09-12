@@ -16,7 +16,7 @@ from semantic_digital_twin.adapters.grasp_clutter_6d_dataset.schema import (
 )
 from semantic_digital_twin.adapters.mujoco_video_recording import MujocoVideoRecorder
 from semantic_digital_twin.semantic_annotations.natural_language import (
-    NaturalLanguageWithTypeDescription,
+    NaturalLanguageDescription,
 )
 
 requires_mujoco_ci = pytest.mark.skipif(
@@ -143,11 +143,12 @@ def test_create_world_places_objects_relative_to_camera(tmp_path):
     assert (1.0, 2.0, 3.0) in positions
     assert (-1.0, 0.0, 0.0) in positions
 
-    annotations = world.get_semantic_annotations_by_type(
-        NaturalLanguageWithTypeDescription
-    )
+    annotations = world.get_semantic_annotations_by_type(NaturalLanguageDescription)
     assert len(annotations) == 2
-    assert all(a.type_description == "object" for a in annotations)
+    # both instances share an object_id, so they share a description too - unlike their
+    # (index-suffixed) body names, which stay distinct.
+    assert {a.description for a in annotations} == {"object_000001"}
+    assert {a.root for a in annotations} == set(object_bodies)
 
 
 def test_create_world_with_world_frame_positions_camera(tmp_path):

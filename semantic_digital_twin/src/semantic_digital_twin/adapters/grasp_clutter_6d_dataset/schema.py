@@ -17,7 +17,7 @@ from semantic_digital_twin.adapters.grasp_clutter_6d_dataset.exceptions import (
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.natural_language import (
-    NaturalLanguageWithTypeDescription,
+    NaturalLanguageDescription,
 )
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -409,9 +409,7 @@ class GraspClutter6DScene:
 
         with world.modify_world():
             world.add_semantic_annotation(
-                NaturalLanguageWithTypeDescription(
-                    root=body, description=name, type_description="object"
-                )
+                NaturalLanguageDescription(root=body, description=name)
             )
 
         return body

@@ -94,3 +94,40 @@ hand or exported from a DCC tool) loads the same way, just without `ArtVipDatase
 category/name bookkeeping.
 
 The dataset is public (Apache 2.0), no gated access. Requires the `usd-core` library (`pxr`).
+
+## GraspClutter6D
+
+Real, densely cluttered bin/shelf/table scenes from
+[GraspClutter6D](https://sites.google.com/view/graspclutter6d) (1000 scenes, ~14
+objects/scene, 200 object models plus the standard YCB-Video objects), annotated with
+real per-frame camera parameters and 6D object ground-truth poses in the
+[BOP dataset format](https://github.com/thodan/bop_toolkit):
+
+```python
+from semantic_digital_twin.adapters.grasp_clutter_6d_dataset.loader import (
+    GraspClutter6DDatasetLoader,
+    GraspClutter6DModelVariant,
+)
+
+loader = GraspClutter6DDatasetLoader()
+scene_id = loader.available_scene_ids(object_set="grasp", split="train")[0]
+models_directory = loader.download_models(GraspClutter6DModelVariant.EVAL)
+
+# scene = loader.load_scene(scene_id)  # only after download_scenes() - see below
+```
+
+Unlike this package's other dataset loaders, GraspClutter6D does not store its scenes as
+separate repository files - all 1000 are packed into one combined, 5-volume, ~203 GB
+`scenes.7z` archive, so `GraspClutter6DDatasetLoader.load_scene` needs
+`download_scenes()` to have downloaded and extracted the whole thing first; there is no
+way to fetch a single scene. `download_split_info()` (scene id lists) and
+`download_models()` (object meshes) are comparatively small and safe to call freely.
+
+`GraspClutter6DScene.from_directory`/`load_scene` only parse a scene's ground truth
+(`scene_camera.json`/`scene_gt.json`) - not its RGB/depth/mask images, and not a World.
+Call `.create_world(image_id, models_directory)` on the parsed scene to build one for a
+given frame, with one `Body` per object placed at its ground-truth pose relative to the
+camera (and, with `with_world_frame=True`, a `map` root body placing the camera itself,
+for frames that carry a world-to-camera transform).
+
+Requires the `huggingface_hub` and `py7zr` packages.
