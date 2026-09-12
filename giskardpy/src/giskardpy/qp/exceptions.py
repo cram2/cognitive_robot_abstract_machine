@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from typing_extensions import TYPE_CHECKING, Type
 
-from giskardpy.data_types.exceptions import GiskardException, DontPrintStackTrace
+from giskardpy.data_types.exceptions import GiskardException, DoesntPrintStackTrace
 
 if TYPE_CHECKING:
     from giskardpy.qp.constraint import GiskardConstraint
@@ -128,7 +128,7 @@ class HardConstraintsViolatedException(InfeasibleException):
 
 
 @dataclass
-class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
+class EmptyProblemException(InfeasibleException, DoesntPrintStackTrace):
     """
     Raised when the QP problem has no free variables.
     """

@@ -49,7 +49,7 @@ execition_mode = ExecutionType.REAL
 
 print("Init ROS")
 rclpy.init()
-node = rclpy.create_node("stretch_demo_node")
+node = rclpy.create_node("tracy_demo_node")
 
 executor = MultiThreadedExecutor()
 executor.add_node(node)

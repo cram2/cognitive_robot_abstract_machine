@@ -63,6 +63,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.middleware.ros2.exceptions import (
+    ClientDisconnectedError,
     ExecutionCanceledException,
     ExecutionAbortedException,
     WorldModelModifiedDuringMotionError,
@@ -1873,6 +1874,34 @@ class TestActionServerEvents:
 
         with pytest.raises(ExecutionCanceledException):
             await giskard.api.get_result()
+
+    @pytest.mark.asyncio
+    async def test_a_goal_whose_client_stops_announcing_itself_is_aborted(
+        self, giskard: PR2Tester
+    ):
+        """
+        Nobody is waiting for a motion whose client died, so it is stopped instead of
+        being driven to its end.
+        """
+        msc = MotionStatechart()
+        msc.add_node(
+            CartesianPose(
+                root_link=giskard.map,
+                tip_link=giskard.base_footprint,
+                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.5, reference_frame=giskard.base_footprint
+                ),
+            )
+        )
+        goal_accepted_future = giskard.api.execute_async(msc)
+        wait_for_future_to_complete(goal_accepted_future)
+        await asyncio.sleep(2)
+
+        giskard.api.heartbeat_publisher.stop()
+
+        with pytest.raises(ClientDisconnectedError) as disconnect:
+            await giskard.api.get_result()
+        assert disconnect.value.client == giskard.api.client
 
     def test_empty_goal(self, giskard: PR2Tester):
         with pytest.raises(EmptyMotionStatechartError):
