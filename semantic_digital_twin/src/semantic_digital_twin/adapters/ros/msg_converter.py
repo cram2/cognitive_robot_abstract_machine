@@ -52,6 +52,30 @@ class CannotConvertRos2ToSemDTError(ROS2ConversionError):
 
 
 @dataclass
+class LaserScanBeamCountMismatch(ROS2ConversionError):
+    """
+    Raised when a laser scan holds a different number of measurements than the beams its
+    own angles describe.
+    """
+
+    beam_count: int = field(kw_only=True)
+    """
+    How many beams the scan's angles describe.
+    """
+
+    range_count: int = field(kw_only=True)
+    """
+    How many measurements the scan holds.
+    """
+
+    def error_message(self) -> str:
+        return f"Laser scan describes {self.beam_count} beams but holds {self.range_count} measurements."
+
+    def suggest_correction(self) -> str:
+        return "check that the scan's angle_min, angle_max and angle_increment match its ranges."
+
+
+@dataclass
 class Ros2ToSemDTConverter(ABC, Generic[InputType, OutputType]):
     """
     Base class for converters that convert ROS2 messages to their semDT representation.

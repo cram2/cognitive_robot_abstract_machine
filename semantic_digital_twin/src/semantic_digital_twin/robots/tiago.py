@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 from abc import ABC
 from collections import defaultdict
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Self, List
 
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.adapters.sensors.lidar import SimulatedLaser
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidSelfCollisions,
@@ -22,7 +24,9 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.robots.robot_part_mixins import (
+    HasLaser,
     HasLeftRightArm,
     HasMobileBase,
     HasNeck,
@@ -31,7 +35,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     TGenericLeftFinger,
     TGenericRightFinger,
     HasEndEffector,
-    HasSensors,
 )
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
@@ -472,7 +475,38 @@ class TiagoTorso(
 
 
 @dataclass(eq=False)
-class TiagoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoTorso]):
+class TiagoBaseLaser(SimulatedLaser):
+    """
+    The SICK TIM551 scanner sweeping the floor in front of the Tiago's base.
+
+    ..note:: The description's own beam count is not a whole number, so the scanner's
+        angular resolution of a third of a degree gives the angle between two beams.
+    """
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "base_laser_link"
+            ),
+            scan_pattern=ScanPattern(
+                minimum_angle=-1.658133,
+                maximum_angle=1.66347956,
+                angle_increment=0.00581718,
+                minimum_range=0.05,
+                maximum_range=10.0,
+            ),
+        )
+
+
+@dataclass(eq=False)
+class TiagoMobileBase(
+    MobileBase[DifferentialDrive],
+    HasTorso[TiagoTorso],
+    HasLaser[TiagoBaseLaser],
+):
 
     @classproperty
     def forward_axis(cls) -> Vector3:

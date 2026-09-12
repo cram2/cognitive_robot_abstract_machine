@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Self, List
 
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.adapters.sensors.lidar import SimulatedLaser
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -23,8 +24,10 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasNeck,
+    HasLaser,
     HasLeftRightArm,
     HasTorso,
     HasMobileBase,
@@ -108,6 +111,30 @@ class PR2KinectV1(Camera):
             minimal_height=1.27,
             maximal_height=1.60,
             default_camera=True,
+        )
+
+
+@dataclass(eq=False)
+class PR2BaseLaser(SimulatedLaser):
+    """
+    The Hokuyo scanner sweeping the floor in front of the PR2's base.
+    """
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "base_laser_link"
+            ),
+            scan_pattern=ScanPattern(
+                minimum_angle=-2.2689,
+                maximum_angle=2.2689,
+                angle_increment=0.0043633,
+                minimum_range=0.023,
+                maximum_range=60.0,
+            ),
         )
 
 
@@ -464,7 +491,7 @@ class PR2Torso(Torso, HasLeftRightArm[PR2LeftArm, PR2RightArm], HasNeck[PR2Neck]
 
 
 @dataclass(eq=False)
-class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso]):
+class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLaser[PR2BaseLaser]):
 
     @classproperty
     def forward_axis(cls) -> Vector3:

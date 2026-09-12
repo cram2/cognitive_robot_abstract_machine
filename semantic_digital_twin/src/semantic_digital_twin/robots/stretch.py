@@ -7,9 +7,11 @@ from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
 
+import numpy as np
 from typing_extensions import Self, List
 
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.adapters.sensors.lidar import SimulatedLaser
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     SelfCollisionMatrixRule,
@@ -22,8 +24,10 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasNeck,
+    HasLaser,
     HasOneArm,
     HasTorso,
     HasMobileBase,
@@ -87,7 +91,7 @@ class StretchLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
@@ -110,7 +114,7 @@ class StretchRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
@@ -147,7 +151,7 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
@@ -183,7 +187,7 @@ class StretchArm(Arm[StretchGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_lift"),
@@ -204,7 +208,7 @@ class StretchCameraColor(Camera):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
@@ -229,7 +233,7 @@ class StretchCameraDepth(Camera):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
@@ -253,7 +257,7 @@ class StretchCameraInfra1(Camera):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
@@ -277,7 +281,7 @@ class StretchCameraInfra2(Camera):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
@@ -308,7 +312,7 @@ class StretchNeck(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_head"),
@@ -348,7 +352,7 @@ class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_mast"),
@@ -357,8 +361,36 @@ class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
 
 
 @dataclass(eq=False)
-class StretchMobileBase(MobileBase[DifferentialDrive], HasTorso[StretchTorso]):
+class StretchBaseLaser(SimulatedLaser):
+    """
+    The RPLIDAR scanner sweeping the whole floor around the Stretch's base.
 
+    ..note:: The sweep closes a full circle, so its last beam stops one increment short
+        of its first rather than repeating it.
+    """
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+            cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "laser"),
+            scan_pattern=ScanPattern(
+                minimum_angle=-np.pi,
+                maximum_angle=np.pi,
+                angle_increment=0.005823156330734491,
+                minimum_range=0.05,
+                maximum_range=12.0,
+            ),
+        )
+
+
+@dataclass(eq=False)
+class StretchMobileBase(
+    MobileBase[DifferentialDrive],
+    HasTorso[StretchTorso],
+    HasLaser[StretchBaseLaser],
+):
     full_body_controlled: bool = field(default=True, kw_only=True)
 
     @classproperty
@@ -373,7 +405,7 @@ class StretchMobileBase(MobileBase[DifferentialDrive], HasTorso[StretchTorso]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+            cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),

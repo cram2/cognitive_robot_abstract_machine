@@ -4,14 +4,18 @@ from dataclasses import dataclass
 from typing import Any
 
 import geometry_msgs.msg as geometry_msgs
+from sensor_msgs.msg import LaserScan
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
 from semantic_digital_twin.adapters.ros.msg_converter import (
+    LaserScanBeamCountMismatch,
     Ros2ToSemDTConverter,
     InputType,
     OutputType,
 )
+from semantic_digital_twin.datastructures.laser_reading import LaserReading
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -253,3 +257,27 @@ class MeshMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Mesh]):
             data.header.frame_id
         )
         return result
+
+
+@dataclass
+class LaserScanToSemDTConverter(Ros2ToSemDTConverter[LaserScan, LaserReading]):
+
+    @classmethod
+    def convert(cls, data: LaserScan, world: World) -> LaserReading:
+        root = world.get_kinematic_structure_entity_by_name(data.header.frame_id)
+        scan_pattern = ScanPattern(
+            minimum_angle=data.angle_min,
+            maximum_angle=data.angle_max,
+            angle_increment=data.angle_increment,
+            minimum_range=data.range_min,
+            maximum_range=data.range_max,
+        )
+        if scan_pattern.beam_count != len(data.ranges):
+            raise LaserScanBeamCountMismatch(
+                beam_count=scan_pattern.beam_count,
+                range_count=len(data.ranges),
+            )
+        return LaserReading(
+            direction=scan_pattern.beam_directions_in_frame(root),
+            distance=[float(measurement) for measurement in data.ranges],
+        )

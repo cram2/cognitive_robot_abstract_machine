@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Union
 
 from typing_extensions import (
-    TYPE_CHECKING,
     Type,
     TypeVar,
     Generic,
@@ -15,16 +14,12 @@ from typing_extensions import (
     Unpack,
 )
 
-from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.patterns.subclass_safe_generic import (
     SubClassSafeGeneric,
 )
 from krrood.utils import get_generic_type_parameters
+from semantic_digital_twin.datastructures.laser_reading import LaserReading
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.world_description.world_modification import (
-    synchronized_attribute_modification,
-)
 
 logger = logging.getLogger("semantic_digital_twin")
 
@@ -44,6 +39,7 @@ TGenericRightFinger = TypeVar("TGenericRightFinger")
 TGenericFingers = TypeVarTuple("TGenericFingers")
 TGenericArms = TypeVarTuple("TGenericArms")
 TGenericSensors = TypeVarTuple("TGenericSensors")
+TGenericLaser = TypeVar("TGenericLaser")
 
 
 @dataclass(eq=False)
@@ -57,6 +53,34 @@ class RobotPartMixin(ABC):
         """
         Validation method that describes assumptions made about the robot part.
         """
+
+    def validate_assumptions(self):
+        """
+        Checks the assumptions of every mixin this robot part combines.
+
+        ..note:: Calling :meth:`validate` would reach only one mixin, since a part
+            combining several of them resolves the name to the first.
+        """
+        for mixin in self._narrowest_mixins():
+            mixin.validate(self)
+
+    def _narrowest_mixins(self) -> list[Type[RobotPartMixin]]:
+        """
+        :return: The mixins stating this part's assumptions, leaving out every mixin
+            another one of them narrows.
+        """
+        mixins = [
+            ancestor
+            for ancestor in type(self).__mro__
+            if issubclass(ancestor, RobotPartMixin) and "validate" in vars(ancestor)
+        ]
+        return [
+            mixin
+            for mixin in mixins
+            if not any(
+                other is not mixin and issubclass(other, mixin) for other in mixins
+            )
+        ]
 
 
 @dataclass(eq=False)
@@ -83,7 +107,7 @@ class HasFingers(
         list.
         """
         assert (
-            len(self.fingers) >= 3
+                len(self.fingers) >= 3
         ), f"Expected at least 3 fingers, got {len(self.fingers)}. If this RobotPart is supposed to only have two use HasTwoFingers instead."
 
     @property
@@ -111,7 +135,7 @@ class HasTwoFingers(
 
     def validate(self):
         assert (
-            len(self.fingers) == 2
+                len(self.fingers) == 2
         ), f"Expected exactly 2 fingers, got {len(self.fingers)}"
 
     @property
@@ -176,7 +200,7 @@ class HasArms(Generic[Unpack[TGenericArms]], SubClassSafeGeneric, RobotPartMixin
 
     def validate(self):
         assert (
-            len(self.arms) > 2
+                len(self.arms) > 2
         ), f"Expected at least three arms, got {len(self.arms)}. If your robot only has one arm, use HasOneArm instead. If it has two arms, consider using HasLeftRightArm instead."
 
 
@@ -223,7 +247,7 @@ class HasLeftRightArm(
         return self._assign_left_right_arms(RightOf)
 
     def _assign_left_right_arms(
-        self, relation: Type[Union[LeftOf, RightOf]]
+            self, relation: Type[Union[LeftOf, RightOf]]
     ) -> Union[TGenericLeftArm, TGenericRightArm]:
         """
         Assigns the left and right arms based on their position relative to the robot's
@@ -234,7 +258,7 @@ class HasLeftRightArm(
         :return: The arm that is on the left or right side of the robot.
         """
         assert (
-            len(self.arms) == 2
+                len(self.arms) == 2
         ), f"Must have exactly two arms to specify left and right arm, but found {len(self.arms)}."
         pov = self.root.global_transform
         [first_arm, second_arm] = self.arms
@@ -298,3 +322,24 @@ class HasNeck(Generic[TGenericNeck], SubClassSafeGeneric, RobotPartMixin, ABC):
 
     def validate(self):
         assert self.neck is not None, f"Expected neck, got None"
+
+
+@dataclass(eq=False)
+class HasLaser(Generic[TGenericLaser], SubClassSafeGeneric, RobotPartMixin, ABC):
+    """
+    Mixin class for robots or robot parts that have a laser as their direct child.
+    """
+
+    laser: TGenericLaser = field(default=None, kw_only=True)
+    """
+    The laser attached to the robot part.
+    """
+
+    def validate(self):
+        assert self.laser is not None, "Expected laser, got None"
+
+    def get_laser_reading(self) -> LaserReading:
+        """
+        :return: The most recent sweep of the attached laser.
+        """
+        return self.laser.get_laser_reading()
