@@ -1007,6 +1007,55 @@ class PickingRobotAggregations(AggregationStatistic[PickingRobot]):
         return result
 
 
+class RobotStation(Enum):
+    """
+    Where a picking robot is stationed.
+    """
+
+    LAB = auto()
+    FACTORY = auto()
+
+
+@dataclass
+class StationedPickingRobot:
+    """
+    A picking robot with a class-level enum attribute -- its station -- alongside its
+    exchangeable grasp attempts.
+    """
+
+    station: RobotStation
+    """
+    Where the robot is stationed.
+    """
+
+    skill: float
+    """
+    The robot's skill level.
+    """
+
+    attempts: List[GraspAttempt]
+    """
+    The robot's grasp attempts.
+    """
+
+
+@dataclass
+class StationedPickingRobotAggregations(AggregationStatistic[StationedPickingRobot]):
+    """
+    Aggregation statistics for :class:`StationedPickingRobot` over its ``attempts``
+    field.
+    """
+
+    @aggregation_statistic("attempts")
+    def success_count(self) -> int:
+        """
+        Count of successful grasp attempts.
+        """
+        grasped_var = variable(GraspAttempt, self.instance.attempts).grasped
+        [result] = entity(count_range(grasped_var)).where(grasped_var == True).tolist()
+        return result
+
+
 @dataclass
 class ExampleInt:
     attribute: int

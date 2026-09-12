@@ -28,7 +28,11 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     RevoluteConnection,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+    DerivativeMap,
+)
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Scale,
@@ -47,6 +51,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoSim,
     MujocoActuator,
     MujocoBuilder,
+    MujocoGeom,
     MujocoLight,
     MujocoSynchronizer,
 )
@@ -510,6 +515,123 @@ def test_builder_assigns_material_to_a_textured_primitive_shape(tmp_path):
     assert texture.file == str(texture_file)
 
 
+def test_builder_writes_a_geoms_contact_bitmasks(tmp_path):
+    """
+    A shape's ``MujocoGeom.contype``/``conaffinity`` must reach the built geom, so two
+    geoms can be kept from ever generating a contact (a robot's own overlapping links)
+    while each still collides with everything else.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        box_shape = Box(scale=Scale(1, 1, 1))
+        box_shape.simulator_additional_properties.append(
+            MujocoGeom(contype=2, conaffinity=4)
+        )
+        link = Body(
+            name=PrefixedName("link"),
+            visual=ShapeCollection([box_shape]),
+            collision=ShapeCollection([box_shape]),
+        )
+        world.add_kinematic_structure_entity(link)
+        world.add_connection(FixedConnection(parent=root, child=link))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [geom] = [
+        geom
+        for body in builder.spec.bodies
+        for geom in body.geoms
+        if body.name == "link"
+    ]
+    assert geom.contype == 2
+    assert geom.conaffinity == 4
+
+
+def test_builder_keeps_a_visual_only_geom_contactless_despite_its_bitmasks(tmp_path):
+    """
+    A shape that is visual only never collides, whatever ``MujocoGeom`` bitmasks it
+    carries: those describe how a collidable geom pairs up, not whether it collides at
+    all.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        box_shape = Box(scale=Scale(1, 1, 1))
+        box_shape.simulator_additional_properties.append(
+            MujocoGeom(contype=2, conaffinity=4)
+        )
+        link = Body(name=PrefixedName("link"), visual=ShapeCollection([box_shape]))
+        world.add_kinematic_structure_entity(link)
+        world.add_connection(FixedConnection(parent=root, child=link))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [geom] = [
+        geom
+        for body in builder.spec.bodies
+        for geom in body.geoms
+        if body.name == "link"
+    ]
+    assert geom.contype == 0
+    assert geom.conaffinity == 0
+
+
+def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
+    """
+    A mimic connection with a negative multiplier is displayed in the opposite direction
+    of the raw DOF it shares, so its compiled joint range must be the mirrored one --
+    otherwise its own limit and the equality tying it to the raw DOF only agree at 0,
+    and the whole linkage is pinned there however hard its actuator pushes.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        knuckle = Body(name=PrefixedName("knuckle"))
+        mirrored_knuckle = Body(name=PrefixedName("mirrored_knuckle"))
+        world.add_body(knuckle)
+        world.add_body(mirrored_knuckle)
+        dof = DegreeOfFreedom(
+            name=PrefixedName("knuckle_joint"),
+            limits=DegreeOfFreedomLimits(
+                DerivativeMap(position=0.0), DerivativeMap(position=0.8)
+            ),
+        )
+        world.add_degree_of_freedom(dof)
+        world.add_connection(
+            RevoluteConnection(
+                name=PrefixedName("knuckle_joint"),
+                parent=root,
+                child=knuckle,
+                axis=Vector3.Z(reference_frame=knuckle),
+                raw_dof=dof,
+            )
+        )
+        world.add_connection(
+            RevoluteConnection(
+                name=PrefixedName("mirrored_knuckle_joint"),
+                parent=root,
+                child=mirrored_knuckle,
+                axis=Vector3.Z(reference_frame=mirrored_knuckle),
+                raw_dof=dof,
+                multiplier=-1.0,
+            )
+        )
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [mirrored_joint] = [
+        joint for joint in builder.spec.joints if joint.name == "mirrored_knuckle_joint"
+    ]
+    assert list(mirrored_joint.range) == pytest.approx([-0.8, 0.0])
+
+
 def test_mujoco_with_tracy_dae_files():
     try:
         dae_world = URDFParser.from_file(file_path=TEST_URDF_TRACY).parse()
@@ -860,7 +982,8 @@ def test_world_sim_state_sync():
 
 def _write_thin_slab_mesh(directory) -> str:
     """
-    Writes a minimal OBJ mesh for a closed box thin enough (1e-5 units) that MuJoCo's
+    Writes a minimal OBJ mesh for a closed box thin enough (1e-5 units) that MuJoCo's.
+
     default ("legacy") volume-based inertia estimator used to reject it as "mesh volume
     is too small" (fixed upstream as of MuJoCo 3.11) - the shape of real CAD furniture
     panels (a door slab, a backing panel), reproduced with an actual ArtVIP dataset
@@ -1061,8 +1184,8 @@ def test_thicken_if_near_planar_regenerates_instead_of_reusing_a_stale_file(tmp_
 @dataclass
 class BoxOnPlaneWorld:
     """
-    A world holding a ground plane and one free-floating box, together with the
-    pieces of it a test needs to address afterwards.
+    A world holding a ground plane and one free-floating box, together with the pieces
+    of it a test needs to address afterwards.
     """
 
     world: World
@@ -1083,8 +1206,8 @@ class BoxOnPlaneWorld:
 
 def _build_box_on_plane_world() -> BoxOnPlaneWorld:
     """
-    Build a ground plane plus a single free-floating box, authored directly
-    into a :class:`World` so a simulator can be built from it without spawning.
+    Build a ground plane plus a single free-floating box, authored directly into a
+    :class:`World` so a simulator can be built from it without spawning.
 
     :return: The world and the box handles the caller needs.
     """
@@ -1204,7 +1327,8 @@ def test_pose_written_during_sim_to_world_pull_reaches_the_simulator():
         qpos_address = synchronizer._resolve_qpos_address(box_connection)
         assert qpos_address is not None, "free joint is missing from the MuJoCo model"
         written_xyz = numpy.asarray(
-            multi_sim.simulator._mj_data.qpos[qpos_address : qpos_address + 3], dtype=float
+            multi_sim.simulator._mj_data.qpos[qpos_address : qpos_address + 3],
+            dtype=float,
         )
         assert numpy.allclose(written_xyz, target_xyz, atol=1e-6), (
             "pose written during the sim → world pull never reached MuJoCo: "
@@ -1218,9 +1342,8 @@ def test_pose_written_during_sim_to_world_pull_reaches_the_simulator():
 
 def test_pose_write_waits_for_the_running_physics_step():
     """
-    The *world → sim* push must write ``qpos`` under the simulator's model
-    lock, the same lock :meth:`MujocoSimulator.step_callback` holds across
-    ``mj_step``.
+    The *world → sim* push must write ``qpos`` under the simulator's model lock, the
+    same lock :meth:`MujocoSimulator.step_callback` holds across ``mj_step``.
 
     The scene integrates with RK4, which saves the state at the top of the step
     and writes the integrated ``qpos`` back at the end. A pose written into
@@ -1286,7 +1409,8 @@ def test_pose_write_waits_for_the_running_physics_step():
         qpos_address = synchronizer._resolve_qpos_address(box_connection)
         assert qpos_address is not None, "free joint is missing from the MuJoCo model"
         written_xyz = numpy.asarray(
-            multi_sim.simulator._mj_data.qpos[qpos_address : qpos_address + 3], dtype=float
+            multi_sim.simulator._mj_data.qpos[qpos_address : qpos_address + 3],
+            dtype=float,
         )
         assert numpy.allclose(written_xyz, target_xyz, atol=1e-6), (
             "pose never reached MuJoCo once the model lock was free: "

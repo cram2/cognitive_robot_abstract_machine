@@ -796,6 +796,7 @@ class CausalCircuit:
             )
 
         if len(effect_mixture.log_weights) == 0:
+            output_circuit.remove_node(effect_mixture)
             return False
         effect_mixture.normalize()
 
@@ -807,6 +808,10 @@ class CausalCircuit:
             )
         )
         if cause_region_circuit is None:
+            # The mixture and everything attached under it were built into
+            # output_circuit already; a region that is skipped must not leave them
+            # behind as a second root.
+            output_circuit.remove_node_and_successor_structure(effect_mixture)
             return False
 
         product_unit = ProductUnit(probabilistic_circuit=output_circuit)

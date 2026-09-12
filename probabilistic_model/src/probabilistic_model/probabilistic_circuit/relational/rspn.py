@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 from sortedcontainers import SortedSet
-from typing_extensions import TYPE_CHECKING, Any, Optional, Type
+from typing_extensions import TYPE_CHECKING, Any, Optional, Type, Union
 
 from krrood.ormatic.data_access_objects.dao import (
     DataAccessObject,
@@ -145,8 +145,12 @@ class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
         :return: A self-contained circuit ready to be mounted into the parent.
         """
         part_circuit = self.template_distribution.ground(part)
+        # Structure is preserved, and the latents restricted away without simplifying,
+        # so a template fitted stratified over one of the part's own attributes keeps
+        # its strata apart: a simplifying conditional would merge them into one sum
+        # whose children overlap on that attribute.
         conditioning_result, _ = part_circuit.log_conditional_in_place(
-            aggregation_statistics
+            aggregation_statistics, preserve_structure=True
         )
         if conditioning_result is None:
             part_circuit = self.template_distribution.ground(part)
@@ -155,7 +159,7 @@ class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
             for variable in part_circuit.variables
             if variable not in self.latent_variables
         ]
-        part_circuit.marginal_in_place(non_latent_variables)
+        part_circuit.restrict_to_variables_in_place(non_latent_variables)
         prefix = self._prefix_for_part(part, index)
         part_circuit.rename_variables_with_prefix(prefix, self.latent_variables)
         if len(part_circuit.nodes()) == 0:
@@ -251,24 +255,65 @@ class ExchangeablePartGrounder:
         weighted by the node-local likelihoods of the sampled values.
         """
         sampled_assignments = self._sample_undetermined_latents()
-        log_weights_per_node = [
-            self._node_local_latent_log_likelihoods(
-                product_node, self.undetermined_latents, sampled_assignments
+        assignments_per_node = []
+        log_weights_per_node = []
+        for product_node in self.product_nodes_to_extend:
+            assignments, log_weights = self._node_local_assignments(
+                product_node, sampled_assignments
             )
-            for product_node in self.product_nodes_to_extend
-        ]
+            assignments_per_node.append(assignments)
+            log_weights_per_node.append(log_weights)
         retained_variables = (
             SortedSet(self.circuit.variables) - self.undetermined_latents
         )
         self.circuit.restrict_to_variables_in_place(retained_variables)
-        mounted_roots = [
-            self._mount_instance_with_retained_latents(assignment)
-            for assignment in sampled_assignments
-        ]
-        for product_node, log_weights in zip(
-            self.product_nodes_to_extend, log_weights_per_node
+        mounted_roots_by_assignment: dict[tuple, Unit] = {}
+        for product_node, assignments, log_weights in zip(
+            self.product_nodes_to_extend, assignments_per_node, log_weights_per_node
         ):
+            mounted_roots = []
+            for assignment in assignments:
+                key = self._assignment_key(assignment)
+                if key not in mounted_roots_by_assignment:
+                    mounted_roots_by_assignment[key] = (
+                        self._mount_instance_with_retained_latents(assignment)
+                    )
+                mounted_roots.append(mounted_roots_by_assignment[key])
             self._attach_mixture_to_node(product_node, mounted_roots, log_weights)
+
+    def _assignment_key(self, assignment: dict[Variable, Any]) -> tuple:
+        """
+        :param assignment: Values of the undetermined latents.
+        :return: The values in the latents' sorted order, to tell assignments apart.
+        """
+        return tuple(assignment[variable] for variable in self.undetermined_latents)
+
+    def _node_local_assignments(
+        self, product_node: ProductUnit, sampled_assignments: list[dict[Variable, Any]]
+    ) -> tuple[list[dict[Variable, Any]], list[float]]:
+        """
+        The latent assignments one mounting node integrates over, with their node-local
+        log-likelihoods.
+
+        The assignments sampled from the whole class circuit are used wherever the node
+        gives any of them positive likelihood. A node whose own latent distribution none
+        of them falls into -- a stratum whose value the samples happened to miss --
+        draws its own samples from its local marginal instead, so it is never handed an
+        instance carrying another node's latent value.
+
+        :param product_node: The mounting product node.
+        :param sampled_assignments: The assignments sampled from the whole circuit.
+        :return: The node's assignments and their node-local log-likelihoods.
+        """
+        log_weights = self._node_local_latent_log_likelihoods(
+            product_node, self.undetermined_latents, sampled_assignments
+        )
+        if any(log_weight > -np.inf for log_weight in log_weights):
+            return sampled_assignments, log_weights
+        local_assignments = self._sample_undetermined_latents(product_node)
+        return local_assignments, self._node_local_latent_log_likelihoods(
+            product_node, self.undetermined_latents, local_assignments
+        )
 
     def attach_exact_partition_mixture(self) -> None:
         """
@@ -375,7 +420,9 @@ class ExchangeablePartGrounder:
             )
         return wrapper
 
-    def _sample_undetermined_latents(self) -> list[dict[Variable, Any]]:
+    def _sample_undetermined_latents(
+        self, product_node: Optional[ProductUnit] = None
+    ) -> list[dict[Variable, Any]]:
         """
         Draw the distinct values of the undetermined latents to integrate over.
 
@@ -383,6 +430,8 @@ class ExchangeablePartGrounder:
         latents from the conditioned class circuit and deduplicates them, so that each
         distinct value is grounded only once.
 
+        :param product_node: A mounting product node to sample the latents local to,
+            instead of from the whole conditioned class circuit.
         :return: One value assignment per distinct sampled point.
         :raises InvalidMonteCarloSampleCountError: If the sample count is not positive.
         :raises UndeterminedLatentsNotModeledError: If the conditioned class circuit
@@ -390,7 +439,12 @@ class ExchangeablePartGrounder:
         """
         if self.monte_carlo_sample_count < 1:
             raise InvalidMonteCarloSampleCountError(self.monte_carlo_sample_count)
-        proposal = self.circuit.marginal(self.undetermined_latents)
+        if product_node is None:
+            proposal = self.circuit.marginal(self.undetermined_latents)
+        else:
+            proposal = ProbabilisticCircuit()
+            proposal.mount(product_node)
+            proposal = proposal.marginal(self.undetermined_latents)
         if proposal is None:
             raise UndeterminedLatentsNotModeledError(list(self.undetermined_latents))
         samples = proposal.sample(self.monte_carlo_sample_count)
@@ -537,9 +591,10 @@ class ExchangeablePartGrounder:
         """
         Attach a normalized sum unit over exchangeable instances to one node.
 
-        Instances whose node-local likelihood is zero are skipped. The instances are
-        already mounted in ``circuit`` and shared across all mounting nodes; only the
-        weighted sum-unit edges differ per node.
+        Instances whose node-local likelihood is zero are skipped; at least one has a
+        positive one, since :meth:`_node_local_assignments` draws a node's own samples
+        otherwise. The instances are already mounted in ``circuit`` and shared across
+        all mounting nodes; only the weighted sum-unit edges differ per node.
 
         :param product_node: The mounting product node to extend.
         :param instance_roots: The roots of the mounted exchangeable instances.
@@ -550,8 +605,6 @@ class ExchangeablePartGrounder:
             for instance_root, log_weight in zip(instance_roots, log_weights)
             if log_weight > -np.inf
         ]
-        if not weighted_instances:
-            weighted_instances = [(instance_roots[0], 0.0)]
         sum_unit = SumUnit(probabilistic_circuit=self.circuit)
         product_node.add_subcircuit(sum_unit)
         for instance_root, log_weight in weighted_instances:
@@ -603,6 +656,26 @@ class RelationalProbabilisticCircuit:
     instance one that is support-deterministic over a chosen variable -- rather than
     ``fit`` knowing about that requirement itself. Leave ``None`` for the plain,
     unconstrained fit.
+    """
+
+    min_samples_per_leaf: Union[int, float] = 1
+    """
+    The fewest training rows a leaf of the class-level ``JointProbabilityTree`` may
+    hold, or, below one, that number as a fraction of the training rows; forwarded to
+    every exchangeable part's template fit as well.
+
+    The default lets the tree split down to one row per leaf, which pins every
+    continuous attribute to the training values it saw.
+    """
+
+    part_circuit_builders: dict[
+        str, Callable[[pd.DataFrame, list[AnnotatedVariable]], ProbabilisticCircuit]
+    ] = field(default_factory=dict)
+    """
+    Per exchangeable-part field name, the :attr:`class_circuit_builder` the part's
+    template distribution is fitted with instead of the plain, unconstrained fit.
+
+    A part absent from this mapping is fitted plainly.
     """
 
     schema_information: Optional[DataAccessObjectSchema] = field(
@@ -737,7 +810,11 @@ class RelationalProbabilisticCircuit:
             if inferred.variable.name in aggregation_names
         ]
         template = ExchangeableDistributionTemplate(
-            RelationalProbabilisticCircuit(child_type),
+            RelationalProbabilisticCircuit(
+                child_type,
+                min_samples_per_leaf=self.min_samples_per_leaf,
+                class_circuit_builder=self.part_circuit_builders.get(exchangeable_part),
+            ),
             latent_variables,
         )
         template.template_distribution.fit(
@@ -771,7 +848,8 @@ class RelationalProbabilisticCircuit:
         variables = infer_variables_from_dataframe(class_dataframe)
         if self.class_circuit_builder is None:
             self.class_probabilistic_circuit = JointProbabilityTree(
-                annotated_variables=variables
+                annotated_variables=variables,
+                min_samples_per_leaf=self.min_samples_per_leaf,
             ).fit(class_dataframe)
         else:
             self.class_probabilistic_circuit = self.class_circuit_builder(
@@ -804,8 +882,14 @@ class RelationalProbabilisticCircuit:
             with the grounded exchangeable distribution.
         """
         if aggregation_statistics:
+            # Structure is preserved so a determined statistic's own leaves stay inside
+            # the class circuit's leaf products, which are then still the lowest
+            # products modelling every latent and so still the mounting points: a
+            # simplifying conditional would hang the statistic under a new root product
+            # and flatten the class circuit's branches, leaving only that root to mount
+            # on and cutting every class attribute loose from the retained latents.
             conditioning_result, _ = circuit.log_conditional_in_place(
-                aggregation_statistics
+                aggregation_statistics, preserve_structure=True
             )
             if conditioning_result is None:
                 circuit = self.class_probabilistic_circuit.__deepcopy__()

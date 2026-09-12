@@ -5,7 +5,10 @@ import mujoco
 import numpy
 import pytest
 
-from physics_simulators.mujoco_simulator import MujocoSimulator
+from physics_simulators.mujoco_simulator import (
+    HeadlessGraphicsBackend,
+    MujocoSimulator,
+)
 from physics_simulators.base_simulator import (
     SimulatorConstraints,
     SimulatorState,
@@ -496,6 +499,47 @@ class TestMujocoSimulator:
             result.type is SimulatorCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION
         )
 
+    # %% actuator control
+
+    def test_set_actuator_control_hands_the_actuator_a_new_set_point(self, simulator):
+        """
+        set_actuator_control must write the value into the actuator's own control input,
+        so a subsequent get_actuator reads it back -- without moving the joint outright
+        the way set_joint_value does.
+        """
+        set_point = 0.5
+
+        result = simulator.callbacks["set_actuator_control"](
+            actuator_name="actuator1", value=set_point
+        )
+        assert (
+            result.type
+            is SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA
+        )
+
+        actuator = simulator.callbacks["get_actuator"](actuator_name="actuator1")
+        assert actuator.result.ctrl[0] == set_point
+
+    def test_set_actuator_control_reports_an_already_reached_set_point(self, simulator):
+        simulator.callbacks["set_actuator_control"](
+            actuator_name="actuator1", value=0.5
+        )
+
+        result = simulator.callbacks["set_actuator_control"](
+            actuator_name="actuator1", value=0.5
+        )
+        assert (
+            result.type is SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION
+        )
+
+    def test_set_actuator_control_fails_for_unknown_actuator(self, simulator):
+        result = simulator.callbacks["set_actuator_control"](
+            actuator_name="this_actuator_does_not_exist", value=0.5
+        )
+        assert (
+            result.type is SimulatorCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION
+        )
+
 
 class TestMujocoSimulatorComplex:
     file_path = os.path.join(resources_path, "mjx_single_cube_no_mesh.xml")
@@ -619,3 +663,33 @@ class TestMujocoSimulatorComplex:
                     sim.stop()
                 except Exception:
                     pass
+
+
+class TestOffscreenRenderingAvailability:
+    """
+    Whether offscreen rendering can be attempted depends on the process's OpenGL setup.
+    """
+
+    @pytest.fixture(autouse=True)
+    def no_graphics_environment(self, monkeypatch):
+        monkeypatch.delenv(MujocoSimulator.GRAPHICS_BACKEND_VARIABLE, raising=False)
+        monkeypatch.delenv(MujocoSimulator.DISPLAY_VARIABLE, raising=False)
+
+    def test_unavailable_without_backend_or_display(self):
+        assert not MujocoSimulator.offscreen_rendering_available()
+
+    @pytest.mark.parametrize("backend", list(HeadlessGraphicsBackend))
+    def test_available_with_headless_backend(self, monkeypatch, backend):
+        monkeypatch.setenv(MujocoSimulator.GRAPHICS_BACKEND_VARIABLE, backend)
+
+        assert MujocoSimulator.offscreen_rendering_available()
+
+    def test_unavailable_with_windowed_backend_and_no_display(self, monkeypatch):
+        monkeypatch.setenv(MujocoSimulator.GRAPHICS_BACKEND_VARIABLE, "glfw")
+
+        assert not MujocoSimulator.offscreen_rendering_available()
+
+    def test_available_with_display(self, monkeypatch):
+        monkeypatch.setenv(MujocoSimulator.DISPLAY_VARIABLE, ":1")
+
+        assert MujocoSimulator.offscreen_rendering_available()

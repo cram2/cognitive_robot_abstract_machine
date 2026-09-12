@@ -39,6 +39,7 @@ jobs:
           - lib: robokudo
           - lib: segmind
           - lib: experiments
+          - lib: causal_reasoning
           - lib: version
           - lib: cognitive_robot_abstract_machine
     uses: ./.github/workflows/ci_reusable.yml

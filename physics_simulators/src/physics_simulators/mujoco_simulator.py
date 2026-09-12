@@ -3,8 +3,9 @@
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, InitVar
+from enum import StrEnum
 from threading import RLock
-from typing import Optional, List, Dict, Union, Any
+from typing import Optional, List, Dict, Union, Any, ClassVar
 
 import mujoco
 import mujoco.viewer
@@ -16,6 +17,16 @@ from physics_simulators.base_simulator import (
     SimulatorCallbackResult,
     SimulatorState,
 )
+
+
+class HeadlessGraphicsBackend(StrEnum):
+    """
+    The OpenGL backends MuJoCo renders with when no display is available, selected
+    through the ``MUJOCO_GL`` environment variable.
+    """
+
+    EGL = "egl"
+    OSMESA = "osmesa"
 
 
 @dataclass
@@ -43,6 +54,17 @@ class MujocoRenderer(SimulatorRenderer):
 class MujocoSimulator(BaseSimulator):
     """
     Mujoco Simulator class.
+    """
+
+    GRAPHICS_BACKEND_VARIABLE: ClassVar[str] = "MUJOCO_GL"
+    """
+    The environment variable MuJoCo reads its OpenGL backend from.
+    """
+
+    DISPLAY_VARIABLE: ClassVar[str] = "DISPLAY"
+    """
+    The environment variable that names the X display the windowed backend renders
+    through.
     """
 
     _name: str = field(init=False, repr=False)
@@ -740,6 +762,40 @@ class MujocoSimulator(BaseSimulator):
             type=SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
             info=f"Getting actuator {actuator_name}",
             result=actuator,
+        )
+
+    @BaseSimulator.simulator_callback
+    def set_actuator_control(
+        self, actuator_name: str, value: float
+    ) -> SimulatorCallbackResult:
+        """
+        Set the control input of an actuator by its name.
+
+        Unlike :meth:`set_joint_value`, which moves a joint to a value outright, this
+        hands the value to the actuator as a set point and leaves the actuator's own
+        dynamics to reach it.
+
+        :param actuator_name: The name of the actuator
+        :param value: The new control input
+        :return: A SimulatorCallbackResult indicating the success or failure of the
+            operation
+        """
+        get_actuator = self.get_actuator(actuator_name)
+        if (
+            get_actuator.type
+            != SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION
+        ):
+            return get_actuator
+        actuator = get_actuator.result
+        if numpy.isclose(actuator.ctrl[0], value):
+            return SimulatorCallbackResult(
+                type=SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                info=f"Actuator {actuator_name} is already controlled to {value}",
+            )
+        actuator.ctrl[0] = value
+        return SimulatorCallbackResult(
+            type=SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+            info=f"Set control of actuator {actuator_name} to {value}",
         )
 
     @BaseSimulator.simulator_callback
@@ -1491,6 +1547,18 @@ class MujocoSimulator(BaseSimulator):
             result=key_id,
         )
 
+    @classmethod
+    def offscreen_rendering_available(cls) -> bool:
+        """
+        Whether this process can create the OpenGL context that :meth:`capture_rgb` and
+        :meth:`capture_depth` need: a headless backend is selected, or a display is
+        available to the windowed one.
+        """
+        backend = os.environ.get(cls.GRAPHICS_BACKEND_VARIABLE, "")
+        if backend in HeadlessGraphicsBackend:
+            return True
+        return cls.DISPLAY_VARIABLE in os.environ
+
     @BaseSimulator.simulator_callback
     def capture_rgb(
         self, camera_name: str = None, height=240, width=320
@@ -1560,7 +1628,6 @@ class MujocoSimulator(BaseSimulator):
         :return: A SimulatorCallbackResult object with the segmentation data as the
             result.
         """
-
         with self._model_lock:
             with mujoco.Renderer(self._mj_model, height, width) as renderer:
                 renderer.enable_segmentation_rendering()

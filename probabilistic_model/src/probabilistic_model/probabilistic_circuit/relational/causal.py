@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, List, Optional
+from typing_extensions import TYPE_CHECKING, Dict, List, Optional, Sequence, Union
 
 import pandas as pd
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
@@ -43,6 +43,12 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import Match
 
 logger = logging.getLogger(__name__)
+
+StratificationColumns = Union[str, Sequence[str]]
+"""
+The dataframe column, or columns whose joint value, a stratified fit partitions its
+training rows by.
+"""
 
 
 @dataclass
@@ -101,8 +107,9 @@ class RelationalCausalCircuit:
         self,
         relational_probabilistic_circuit: RelationalProbabilisticCircuit,
         instances: List[DataAccessObject],
-        stratify_by: str,
+        stratify_by: Optional[StratificationColumns],
         dataframe_from_parent: Optional[pd.DataFrame] = None,
+        stratify_parts_by: Optional[Dict[str, StratificationColumns]] = None,
     ) -> RelationalProbabilisticCircuit:
         """
         Fit ``relational_probabilistic_circuit`` support-deterministically over
@@ -119,16 +126,35 @@ class RelationalCausalCircuit:
         :param instances: Training instances; all must share the same DAO class.
         :param stratify_by: Name of the class-level dataframe column to partition the
             training data by -- an EQL attribute-access expression's own ``._name_``, or
-            the equivalent dotted access-path string.
+            the equivalent dotted access-path string -- or several such names, in which
+            case the rows are partitioned by their joint value, so the circuit is
+            support-deterministic over each of them. ``None`` leaves the class circuit
+            to the plain fit, for a cause that lives on an exchangeable part alone.
         :param dataframe_from_parent: Forwarded to
             ``RelationalProbabilisticCircuit.fit``.
+        :param stratify_parts_by: Per exchangeable-part field name, the column(s) of
+            that part's own template dataframe to partition its template fit by, so a
+            per-object attribute can be registered as a cause. A child attribute's
+            column is named by its access path from the child alone, without the child
+            class's name (``"type"`` for ``SceneObject.type``). Parts absent from the
+            mapping are fitted plainly.
         :return:``relational_probabilistic_circuit``, fitted, to allow chaining.
         """
-        relational_probabilistic_circuit.class_circuit_builder = (
-            lambda class_dataframe, variables: self._fit_stratified_class_circuit(
-                class_dataframe, variables, stratify_by
+        min_samples_per_leaf = relational_probabilistic_circuit.min_samples_per_leaf
+        if stratify_by is not None:
+            relational_probabilistic_circuit.class_circuit_builder = (
+                lambda class_dataframe, variables: self._fit_stratified_class_circuit(
+                    class_dataframe, variables, stratify_by, min_samples_per_leaf
+                )
             )
-        )
+        for part_name, part_columns in (stratify_parts_by or {}).items():
+            relational_probabilistic_circuit.part_circuit_builders[part_name] = (
+                lambda part_dataframe, variables, columns=part_columns: (
+                    self._fit_stratified_class_circuit(
+                        part_dataframe, variables, columns, min_samples_per_leaf
+                    )
+                )
+            )
         return relational_probabilistic_circuit.fit(
             instances, dataframe_from_parent=dataframe_from_parent
         )
@@ -137,7 +163,8 @@ class RelationalCausalCircuit:
     def _fit_stratified_class_circuit(
         class_dataframe: pd.DataFrame,
         variables: List[AnnotatedVariable],
-        stratify_by: str,
+        stratify_by: StratificationColumns,
+        min_samples_per_leaf: Union[int, float] = 1,
     ) -> ProbabilisticCircuit:
         """
         Fit one class circuit per distinct value of ``stratify_by``, combined under a
@@ -154,16 +181,20 @@ class RelationalCausalCircuit:
         :param variables: The variables inferred over the full dataframe, reused as the
             annotation (mean, standard deviation, split thresholds) for every
             partition's own fit.
-        :param stratify_by: Name of the column to partition the dataframe by.
+        :param stratify_by: Name of the column, or names of the columns whose joint
+            value, to partition the dataframe by.
+        :param min_samples_per_leaf: See
+            :attr:`~probabilistic_model.probabilistic_circuit.relational.rspn.RelationalProbabilisticCircuit.min_samples_per_leaf`;
+            applies within each partition.
         :return: The combined circuit.
         """
         result = ProbabilisticCircuit()
         root = SumUnit(probabilistic_circuit=result)
         total_row_count = len(class_dataframe)
-        for _, partition in class_dataframe.groupby(stratify_by):
-            partition_circuit = JointProbabilityTree(annotated_variables=variables).fit(
-                partition.reset_index(drop=True)
-            )
+        for _, partition in class_dataframe.groupby(stratify_by, sort=False):
+            partition_circuit = JointProbabilityTree(
+                annotated_variables=variables, min_samples_per_leaf=min_samples_per_leaf
+            ).fit(partition.reset_index(drop=True))
             node_index_map = result.mount(partition_circuit.root)
             root.add_subcircuit(
                 node_index_map[partition_circuit.root.index],

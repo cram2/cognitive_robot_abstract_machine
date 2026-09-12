@@ -1,3 +1,4 @@
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -257,6 +258,18 @@ def test_list_of_enums():
     data = to_json(obj)
     result = from_json(data)
     assert result == obj
+
+
+def test_string_enum_member_comes_back_as_the_member():
+    """
+    Regression test: a member of an enum that is also a ``str`` used to be written as
+    its bare string, since it passed as a leaf value, and so came back as a plain
+    ``str`` that merely compared equal to the member.
+    """
+    data = json.loads(json.dumps(to_json(CustomEnum.A)))
+    result = from_json(data)
+    assert type(result) is CustomEnum
+    assert result is CustomEnum.A
 
 
 def test_exception():

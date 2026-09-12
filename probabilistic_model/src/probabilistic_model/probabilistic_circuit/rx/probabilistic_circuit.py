@@ -1383,9 +1383,21 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         return self
 
     def log_conditional_in_place(
-        self, point: Dict[Variable, Any]
+        self, point: Dict[Variable, Any], preserve_structure: bool = False
     ) -> Tuple[Optional[Self], float]:
+        """
+        Condition the circuit on a point, in place.
 
+        :param point: The value to condition each of the given variables on.
+        :param preserve_structure: Keep the circuit's own units where they are: each
+            leaf of a conditioned variable becomes a point at its value and every sum is
+            reweighted, but nothing is marginalized, merged or moved. Otherwise the
+            conditioned variables are marginalized out, hung back as points under a new
+            root product, and the result is simplified -- which flattens nested sums and
+            so erases which branch a unit belonged to.
+        :return: The conditioned circuit, or ``None`` if the point has no probability,
+            and the point's log-likelihood.
+        """
         # do forward pass
         for layer in reversed(self.layers):
             for unit in layer:
@@ -1413,6 +1425,10 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
             return None, -np.inf
 
         self.remove_unreachable_nodes(root)
+
+        if preserve_structure:
+            self.normalize()
+            return self, root.result_of_current_query
 
         # simplify dirac parts
         remaining_variables = [v for v in self.variables if v not in point]

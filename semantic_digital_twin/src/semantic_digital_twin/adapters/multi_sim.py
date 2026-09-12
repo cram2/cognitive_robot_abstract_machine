@@ -330,9 +330,17 @@ class KinematicStructureEntityConverter(EntityConverter, ABC):
         kinematic_structure_entity_props = EntityConverter._convert(self, entity)
         # The simulator joint supplies the variable part, so the static frame must
         # exclude it (see Connection.reference_origin_expression).
-        [px, py, pz, qx, qy, qz, qw] = (
-            entity.parent_connection.reference_origin_as_position_quaternion().evaluate()[0]
-        )
+        [
+            px,
+            py,
+            pz,
+            qx,
+            qy,
+            qz,
+            qw,
+        ] = entity.parent_connection.reference_origin_as_position_quaternion().evaluate()[
+            0
+        ]
         kinematic_structure_entity_pos = [px, py, pz]
         kinematic_structure_entity_quat = [qw, qx, qy, qz]
         kinematic_structure_entity_props.update(
@@ -598,7 +606,14 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
         px, py, pz, qw, qx, qy, qz = cas_pose_to_list(child_T_connection_transform)
         joint_pos = [px, py, pz]
         joint_quat = [qw, qx, qy, qz]
-        joint_range = [dof.limits.lower.position, dof.limits.upper.position]
+        # entity.dof (not the raw dof) applies this connection's own multiplier/offset,
+        # including swapping lower/upper for a negative multiplier: a mimic connection's
+        # own compiled joint range must be expressed in its own displayed value, not the
+        # shared raw dof's, or a negative-multiplier mimic (e.g. a gripper's own second
+        # finger) gets a range that can only satisfy both its own limit and the equality
+        # constraint tying it to the raw dof at the single point where both ranges touch.
+        adjusted_limits = entity.dof.limits
+        joint_range = [adjusted_limits.lower.position, adjusted_limits.upper.position]
         if any([r is None for r in joint_range]):
             joint_range = [0, 0]
         joint_props.update(
@@ -1200,10 +1215,24 @@ class MujocoGeom(SimulatorAdditionalProperty):
 
     friction: List[float] = field(default_factory=lambda: [1, 0.005, 0.0001])
     """
-    Contact friction parameters for dynamically generated contact pairs. 
-    The first number is the sliding friction, acting along both axes of the tangent plane. 
-    The second number is the torsional friction, acting around the contact normal. 
-    The third number is the rolling friction, acting around both axes of the tangent plane. 
+    Contact friction parameters for dynamically generated contact pairs.
+    The first number is the sliding friction, acting along both axes of the tangent plane.
+    The second number is the torsional friction, acting around the contact normal.
+    The third number is the rolling friction, acting around both axes of the tangent plane.
+    """
+
+    contype: int = 1
+    """
+    Bitmask enabling contact generation for this geom as the acting side of a pair: a
+    contact between geoms A and B is generated only if ``A.contype & B.conaffinity`` or
+    ``B.contype & A.conaffinity`` is nonzero. Matches MuJoCo's own default of 1, so a
+    geom with no other bit set behaves exactly as if this were never specified.
+    """
+
+    conaffinity: int = 1
+    """
+    Bitmask enabling contact generation for this geom as the receiving side of a pair;
+    see :attr:`contype`. Matches MuJoCo's own default of 1.
     """
 
 
@@ -1902,6 +1931,9 @@ class MujocoBuilder(MultiSimBuilder):
                 geom_props["solimp"] = mujoco_geom.solver_impedance
                 geom_props["solref"] = mujoco_geom.solver_reference
                 geom_props["friction"] = mujoco_geom.friction
+                if is_collidable:
+                    geom_props["contype"] = mujoco_geom.contype
+                    geom_props["conaffinity"] = mujoco_geom.conaffinity
                 break
         geom_spec = parent_body_spec.add_geom(**geom_props)
         if geom_spec.type == mujoco.mjtGeom.mjGEOM_BOX and geom_spec.size[2] == 0:
@@ -3051,14 +3083,10 @@ class MujocoSynchronizer(MultiSimSynchronizer):
                 connection = joint_backed.connection
                 match connection:
                     case Connection6DoF():
-                        self._read_6dof_from_qpos(
-                            connection, joint_backed.qpos_address
-                        )
+                        self._read_6dof_from_qpos(connection, joint_backed.qpos_address)
                         changed = True
                     case ActiveConnection1DOF():
-                        self._read_1dof_from_qpos(
-                            connection, joint_backed.qpos_address
-                        )
+                        self._read_1dof_from_qpos(connection, joint_backed.qpos_address)
                         changed = True
                     case _:
                         self._warn_unsupported_connection("sim→world", connection)
@@ -3108,7 +3136,9 @@ class MujocoSynchronizer(MultiSimSynchronizer):
                     case _:
                         self._warn_unsupported_connection("world→sim", connection)
 
-    def _read_6dof_from_qpos(self, connection: Connection6DoF, qpos_address: int) -> None:
+    def _read_6dof_from_qpos(
+        self, connection: Connection6DoF, qpos_address: int
+    ) -> None:
         """
         Copy a 6DoF MuJoCo free-joint qpos block into ``world.state`` for
         ``connection``.

@@ -218,6 +218,10 @@ def relational_probabilistic_circuit_with_ambiguous_total_count_4():
     discover -- ``relational_probabilistic_circuit``'s own two rooms have distinct ``total_count()`` values (3 and
     4), so conditioning on 4 objects there pins the aggregates down to a single value
     regardless of sample count.
+
+    Both rooms are fitted into one leaf (``min_samples_per_leaf=2``): grounding draws a
+    leaf's own samples whenever the shared ones miss its values, so an ambiguity has to
+    sit within one leaf for the sample count to decide how much of it is discovered.
     """
     three_chairs_one_table = SceneRoom(
         position=KRROODPosition(x=4.0, y=3.0, z=0.0),
@@ -239,7 +243,7 @@ def relational_probabilistic_circuit_with_ambiguous_total_count_4():
             SceneObject(type=SceneObjectType.CHAIR),
         ],
     )
-    model = RelationalProbabilisticCircuit(SceneRoom)
+    model = RelationalProbabilisticCircuit(SceneRoom, min_samples_per_leaf=2)
     model.fit([to_dao(three_chairs_one_table), to_dao(two_chairs_two_tables)])
     return model
 
