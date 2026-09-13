@@ -185,7 +185,15 @@ class CollisionMatrix:
         )
 
     def add_collision_checks(self, collision_checks: set[CollisionCheck]):
-        self.collision_checks |= collision_checks
+        """
+        Adds collision checks to the matrix.
+
+        A check for a body pair the matrix already contains replaces the distance of
+        that pair.
+        """
+        self.collision_checks = (
+            self.collision_checks - collision_checks
+        ) | collision_checks
 
     def remove_collision_checks(self, collision_checks: set[CollisionCheck]):
         self.collision_checks -= collision_checks
@@ -215,7 +223,7 @@ class CollisionRule(ABC):
     They modify collision matrices by adding or removing collision checks.
     """
 
-    _last_world_model_version: int = field(init=False, default=-1)
+    _last_world_model_version: int = field(init=False, default=-1, compare=False)
     """
     Used to prevent updating the collision matrix when the world model has not changed.
     """
