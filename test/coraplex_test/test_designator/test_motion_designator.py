@@ -701,7 +701,6 @@ def test_place_action_lets_the_carried_object_touch_what_it_lands_on(
     assert release_nodes[0].designator.allow_gripper_collision is True
 
 
-@pytest.mark.skipif(skip_tests, reason="Alternative motion mappings not available")
 def test_alternative_mapping(hsr_apartment_world):
     world, view, context = hsr_apartment_world
     context.alternative_motion_mappings = [HSRBMoveMotion]

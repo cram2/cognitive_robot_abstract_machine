@@ -97,9 +97,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Slider,
     Door,
     Hinge,
+    Floor,
     GroundFloor,
     FirstFloor,
     Level,
+    SemanticEnvironmentAnnotation,
 )
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -649,6 +651,26 @@ def _apartment_world_setup():
     )
 
     with apartment_world.modify_world():
+        footprint = (
+            SemanticEnvironmentAnnotation(
+                root=apartment_world.root, _world=apartment_world
+            )
+            .as_bounding_box_collection_at_origin(
+                HomogeneousTransformationMatrix(reference_frame=apartment_world.root)
+            )
+            .bounding_box()
+        )
+        Floor.create_with_new_body_in_world(
+            name="apartment_floor",
+            world=apartment_world,
+            scale=Scale(footprint.depth, footprint.width, 0.01),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                float(footprint.center.x),
+                float(footprint.center.y),
+                -0.01 / 2,
+                reference_frame=apartment_world.root,
+            ),
+        )
 
         apartment_world.add_semantic_annotations(
             [

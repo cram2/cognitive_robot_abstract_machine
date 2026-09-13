@@ -179,7 +179,7 @@ def test_planar_bounding_box_intersection_with_disjoint_box_is_none():
     assert a.intersection_with(b) is None
 
 
-# %% BoundingBoxCollection[PlanarBoundingBox]
+# %% BoundingBoxCollection[PlanarBoundingBox, Point2]
 
 
 def test_planar_bounding_box_collection_merge():

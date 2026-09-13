@@ -1,10 +1,11 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from dataclasses import dataclass, field
-
 import numpy as np
 import pytest
+from rustworkx.rustworkx import NoEdgeBetweenNodes
+from typing_extensions import Iterable, Iterator, List, Tuple, Generator
+
 from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
     StretchMoveToolCenterPoint,
@@ -23,12 +24,17 @@ from coraplex.datastructures.enums import (
 )
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.datastructures.trajectory import PoseTrajectory
+from coraplex.exceptions import NoFloorBelowRobot
 from coraplex.execution_environment import simulated_robot
+from coraplex.locations.base import Location, PoseGeneratorBackend, PoseValidator
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.composite.facing import FaceAtAction
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.container import OpenAction, CloseAction
 from coraplex.robot_plans.actions.core.misc import DetectAction, MoveToReach
+from coraplex.robot_plans.actions.core.navigation import (
+    GCSNavigateAction,
+)
 from coraplex.robot_plans.actions.core.navigation import (
     NavigateAction,
     LookAtAction,
@@ -46,24 +52,16 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     FollowToolCenterPointPathAction,
 )
-from coraplex.locations.base import Location, PoseGeneratorBackend, PoseValidator
 from coraplex.view_manager import ViewManager
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
-from rustworkx.rustworkx import NoEdgeBetweenNodes
-
-from probabilistic_model.bayesian_network.bayesian_network import Node
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
+from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
     StaticJointState,
 )
-from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
-from typing_extensions import Iterable, Iterator, List, Tuple, Generator
 
 try:
     from semantic_digital_twin.robots.garmi import Garmi
@@ -74,10 +72,9 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Milk,
-    Door,
     Elevator,
     FirstFloor,
+    Floor,
     Level,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -885,6 +882,147 @@ def test_a_location_validates_a_candidate_where_navigating_to_it_would_stand(
     )
 
 
+def test_a_location_accepts_a_candidate_standing_on_the_floor(
+    mutable_multiple_robot_apartment,
+):
+    """
+    The floor is what the robot drives on, so resting on it is not the collision that
+    disqualifies a place to stand.
+    """
+    world, robot, context = mutable_multiple_robot_apartment
+    # An open stretch of the apartment, so the floor is the only thing any of these
+    # robots touches while standing there.
+    heading = Pose.from_xyz_rpy(11, 2.5, 0, yaw=0.7, reference_frame=world.root)
+    location = Location(context, heading, SinglePoseGenerator(heading), [])
+
+    assert list(location) == [heading]
+
+
+def test_multi_robot_gcs_navigation(immutable_multiple_robot_apartment, rclpy_node):
+    """
+    The robot ends up at the target, having driven around the furniture between it and
+    where it started rather than through it.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+    target_position = [5, 1]
+
+    plan = execute_single(
+        GCSNavigateAction(
+            Pose.from_xyz_rpy(*target_position, 0, reference_frame=world.root)
+        ),
+        context=context,
+    )
+
+    with simulated_robot:
+        plan.perform()
+
+    robot_base_position = robot.global_transform.to_position().to_np().flatten()
+
+    assert robot_base_position[:2] == pytest.approx(target_position, abs=0.01)
+
+
+def test_gcs_navigation_arrives_at_each_waypoint_facing_the_next_one(
+    immutable_multiple_robot_apartment,
+):
+    """
+    Lining a waypoint's orientation up with the leg leaving it saves the next leg the
+    turn it would otherwise start with, which is what a differential drive pays for.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+
+    action = GCSNavigateAction(Pose.from_xyz_rpy(5, 1, 0, reference_frame=world.root))
+    execute_single(action, context=context)
+
+    waypoints = action._waypoints()
+    path = action._path()
+
+    # The path starts at the first waypoint the robot has to travel to, not at the
+    # waypoint it is already standing on.
+    assert len(path) == len(waypoints) - 1
+
+    for pose, waypoint, next_waypoint in zip(path, waypoints[1:], waypoints[2:]):
+        world_V_travel = np.array(
+            [float(next_waypoint.x - waypoint.x), float(next_waypoint.y - waypoint.y)]
+        )
+        world_V_facing = pose.to_rotation_matrix().to_np()[:2, 0]
+
+        assert world_V_facing == pytest.approx(
+            world_V_travel / np.linalg.norm(world_V_travel), abs=0.01
+        )
+
+
+def test_gcs_navigation_plans_on_the_floor_the_robot_stands_on(
+    immutable_multiple_robot_apartment,
+):
+    """
+    The free space the robot drives through is the one above the floor it stands on, so
+    the multi-storey building standing next to the apartment contributes obstacles but
+    not the surface the path is laid out on.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+
+    action = GCSNavigateAction(Pose.from_xyz_rpy(5, 1, 0, reference_frame=world.root))
+    execute_single(action, context=context)
+
+    floor = action._floor
+    assert floor in world.get_semantic_annotations_by_type(Floor)
+
+    base_pose = robot.root.global_pose
+    floor_box = floor.as_bounding_box_collection_at_origin(
+        HomogeneousTransformationMatrix(reference_frame=world.root)
+    ).bounding_box()
+    assert floor_box.min_x <= float(base_pose.x) <= floor_box.max_x
+    assert floor_box.min_y <= float(base_pose.y) <= floor_box.max_y
+    assert floor_box.max_z == pytest.approx(float(base_pose.z))
+
+    waypoints = action._waypoints()
+    assert [waypoint.reference_frame for waypoint in waypoints] == [floor.root] * len(
+        waypoints
+    )
+
+
+def test_gcs_navigation_takes_a_waypoints_height_from_that_waypoints_frame(
+    immutable_multiple_robot_apartment,
+):
+    """
+    A waypoint is expressed in the floor's frame, so the height the robot keeps while
+    driving to it has to be read in that same frame rather than in the world's.
+    """
+    world, robot, context = immutable_multiple_robot_apartment
+
+    action = GCSNavigateAction(Pose.from_xyz_rpy(5, 1, 0, reference_frame=world.root))
+    execute_single(action, context=context)
+
+    # The last pose is the requested target, which carries the caller's own height.
+    for pose in action._path()[:-1]:
+        base_in_pose_frame = world.transform(
+            robot.root.global_transform, pose.reference_frame
+        )
+        assert float(pose.z) == pytest.approx(float(base_in_pose_frame.z))
+
+
+def test_gcs_navigation_needs_a_floor_below_the_robot(
+    mutable_multiple_robot_apartment,
+):
+    """
+    Without a floor there is no surface to lay a path out on, which is a broken world
+    rather than an unreachable target.
+    """
+    world, robot, context = mutable_multiple_robot_apartment
+    robot.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        -50, -50, 0
+    )
+    world.notify_state_change()
+
+    action = GCSNavigateAction(Pose.from_xyz_rpy(5, 1, 0, reference_frame=world.root))
+    execute_single(action, context=context)
+
+    with pytest.raises(NoFloorBelowRobot) as raised:
+        action._waypoints()
+
+    assert raised.value.robot is robot
+
+
 # %% riding an elevator
 
 
@@ -960,7 +1098,9 @@ def test_elevator_navigation(mutable_multiple_robot_apartment, rclpy_node):
     distance_from_cabin_center = float(elevator.scale.x) / 2 + action.exit_clearance
     expected_position = (
         cabin_position[:3]
-        + elevator.hole_direction.to_np().flatten()[:3] * -1 * distance_from_cabin_center
+        + elevator.hole_direction.to_np().flatten()[:3]
+        * -1
+        * distance_from_cabin_center
     )
     expected_position[2] = starting_height + elevator_travel
 

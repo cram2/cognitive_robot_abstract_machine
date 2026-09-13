@@ -7,7 +7,6 @@ from functools import cached_property
 
 import numpy as np
 import numpy.typing as npt
-from random_events.product_algebra import Event, SimpleEvent
 from trimesh import Trimesh
 from trimesh.util import concatenate
 from typing_extensions import (
@@ -25,14 +24,19 @@ from typing_extensions import (
 from typing_extensions import TYPE_CHECKING
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from random_events.product_algebra import Event, SimpleEvent
 from semantic_digital_twin.exceptions import MismatchingWorld
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+)
 from semantic_digital_twin.world_description.geometry import (
     Shape,
     AxisAlignedBox,
+    PointT,
     VolumetricBoundingBox,
     Color,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 
 BoxT = TypeVar("BoxT", bound=AxisAlignedBox)
 """
@@ -252,7 +256,7 @@ class ShapeCollection(SubclassJSONSerializer):
 
 
 @dataclass
-class BoundingBoxCollection(Generic[BoxT], ShapeCollection):
+class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
     """
     A collection of axis-aligned bounding boxes, sharing one reference frame.
 
@@ -261,6 +265,9 @@ class BoundingBoxCollection(Generic[BoxT], ShapeCollection):
     on the shared :class:`AxisAlignedBox` interface. ``as_shapes``/``from_shapes``
     additionally need :meth:`AxisAlignedBox.as_shape`, so they are only meaningful for
     a :class:`VolumetricBoundingBox` collection.
+
+    The second parameter is the point type the boxes are asked about. It follows from the
+    first, but Python cannot derive one type parameter from another, so both are spelled.
     """
 
     shapes: List[BoxT] = field(default_factory=list)
@@ -289,6 +296,15 @@ class BoundingBoxCollection(Generic[BoxT], ShapeCollection):
             *[box.simple_event for box in self.bounding_boxes]
         )
 
+    def contains(self, point: PointT) -> bool:
+        """
+        Check whether a point lies in any of the bounding boxes.
+
+        :param point: The point to check, in any reference frame.
+        :return: True if one of the bounding boxes contains the point.
+        """
+        return any(box.contains(point) for box in self.bounding_boxes)
+
     def merge(self, other: Self) -> Self:
         """
         Merge another bounding box collection into this one.
@@ -307,9 +323,9 @@ class BoundingBoxCollection(Generic[BoxT], ShapeCollection):
     @classmethod
     def merge_all(
         cls,
-        collections: Iterable[BoundingBoxCollection[BoxT]],
+        collections: Iterable[BoundingBoxCollection[BoxT, PointT]],
         reference_frame: KinematicStructureEntity,
-    ) -> BoundingBoxCollection[BoxT]:
+    ) -> BoundingBoxCollection[BoxT, PointT]:
         """
         Merge a sequence of bounding box collections into one.
 
@@ -330,7 +346,7 @@ class BoundingBoxCollection(Generic[BoxT], ShapeCollection):
         reference_frame: KinematicStructureEntity,
         simple_event: SimpleEvent,
         keep_surface: bool = False,
-    ) -> BoundingBoxCollection[BoxT]:
+    ) -> BoundingBoxCollection[BoxT, PointT]:
         """
         Create a collection of bounding boxes from a simple random event.
 
