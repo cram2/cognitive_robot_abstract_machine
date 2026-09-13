@@ -176,6 +176,11 @@ class GraspClutter6DDatasetLoader:
         expected_directory = extraction_root / expected_name
         if expected_directory.exists():
             return expected_directory
+        if py7zr is None:
+            raise ImportError(
+                "py7zr is required to extract GraspClutter6D archives. Install it with "
+                "`pip install py7zr`, or the semantic_digital_twin 'datasets' extra."
+            )
         extraction_root.mkdir(parents=True, exist_ok=True)
         try:
             with py7zr.SevenZipFile(str(archive_path), mode="r") as archive:

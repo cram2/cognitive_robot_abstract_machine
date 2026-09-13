@@ -1,6 +1,10 @@
 import re
 
 import pytest
+
+pytest.importorskip(
+    "py7zr", reason="py7zr is not installed - install the semantic_digital_twin 'datasets' extra"
+)
 from huggingface_hub.errors import HfHubHTTPError
 from requests import HTTPError
 

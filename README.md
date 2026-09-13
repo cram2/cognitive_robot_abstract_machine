@@ -78,6 +78,12 @@ uv sync --extra dev --active
 uv sync --package semantic_digital_twin --extra iris --active --inexact
 ```
 
+Running the test suite does not require any dataset-loading dependencies (Drake, py7zr, usd-core/pxr) - tests that need one of these skip cleanly when it is not installed. To actually load GraspClutter6D or ArtVIP datasets (or run their tests against the real packages), add the `datasets` extra the same way:
+
+```bash
+uv sync --package semantic_digital_twin --extra datasets --active --inexact
+```
+
 
 ### Alternative: Poetry
 
