@@ -72,6 +72,12 @@ If you also want the development dependencies, run:
 uv sync --extra dev --active 
 ```
 
+`semantic_digital_twin`'s Drake-based IRIS/GCS features (and their tests, `test/semantic_digital_twin_test/test_worlds/test_gcs_polygons.py`) need the optional `iris` extra on top of that - it is layered on separately since Drake is a large, `semantic_digital_twin`-specific dependency:
+
+```bash
+uv sync --package semantic_digital_twin --extra iris --active --inexact
+```
+
 
 ### Alternative: Poetry
 

@@ -92,6 +92,9 @@ workspace = [
 gui = [
     "ripple_down_rules[gui]",
 ]
+iris = [
+    "drake",
+]
 dev = [
     "pytest>=7.0.0,<8.0.0",
 ]
