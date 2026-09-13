@@ -883,6 +883,24 @@ class SerializationTestCase(unittest.TestCase):
             restored.log_likelihood(samples), truncated.log_likelihood(samples)
         )
 
+    def test_json_round_trip_of_a_conditioned_circuit(self):
+        # conditional() attaches a DiracDeltaLayer per conditioned variable under a new
+        # product root, which is not exercised by any of the ALL_CIRCUITS factories.
+        layered = ProbabilisticCircuit.from_rustworkx(gaussian_circuit())
+        conditioned, _ = layered.conditional({x: 0.5})
+        self.assertIsInstance(conditioned.root, ProductLayer)
+        self.assertTrue(
+            any(
+                isinstance(layer, DiracDeltaLayer) for layer in conditioned.layers
+            )
+        )
+
+        restored = from_json(to_json(conditioned))
+        samples = conditioned.sample(200)
+        np.testing.assert_allclose(
+            restored.log_likelihood(samples), conditioned.log_likelihood(samples)
+        )
+
     def test_deep_copy_is_independent(self):
         layered = ProbabilisticCircuit.from_rustworkx(deterministic_mixture())
         copy = layered.__deepcopy__()

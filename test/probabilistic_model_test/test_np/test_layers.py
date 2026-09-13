@@ -6,6 +6,7 @@ and the integration with a learned circuit.
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -190,6 +191,40 @@ class DenseSumLayerTestCase(unittest.TestCase):
         samples = circuit.sample(20000)
         self.assertAlmostEqual(float((samples < 1.0).mean()), 0.2, delta=0.02)
         self.assertAlmostEqual(float((samples > 2.0).mean()), 0.5, delta=0.02)
+
+    def test_a_shared_dense_layer_is_only_converted_once(self):
+        # as_sparse() used to allocate a fresh SparseSumLayer on every call, so a dense
+        # layer reached through two parents recomputed its whole contribution twice
+        # instead of hitting the shared cache. Two sum layers mixing the same
+        # DenseSumLayer differently reproduces that without needing a product layer.
+        shared = self.layer  # DenseSumLayer with 2 nodes, from setUp
+        mixer_one = SparseSumLayer(
+            [shared], [SparseArray.from_dense(np.log([[0.6, 0.4]]), fill_value=-np.inf)]
+        )
+        mixer_two = SparseSumLayer(
+            [shared], [SparseArray.from_dense(np.log([[0.3, 0.7]]), fill_value=-np.inf)]
+        )
+        root = SparseSumLayer(
+            [mixer_one, mixer_two],
+            [
+                SparseArray.from_dense(np.log([[0.5]]), fill_value=-np.inf),
+                SparseArray.from_dense(np.log([[0.5]]), fill_value=-np.inf),
+            ],
+        )
+        circuit = ProbabilisticCircuit([x], root)
+        event = SimpleEvent.from_data({x: closed(0.0, 1.0)}).as_composite_set()
+
+        calls = []
+        original_as_sparse = DenseSumLayer.as_sparse
+
+        def counting_as_sparse(self):
+            calls.append(1)
+            return original_as_sparse(self)
+
+        with mock.patch.object(DenseSumLayer, "as_sparse", counting_as_sparse):
+            circuit.truncated(event)
+
+        self.assertEqual(len(calls), 1)
 
 
 class TruncationOfInputLayersTestCase(unittest.TestCase):

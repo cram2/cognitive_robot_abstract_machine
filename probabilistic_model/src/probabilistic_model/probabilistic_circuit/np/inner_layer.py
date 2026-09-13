@@ -1910,7 +1910,16 @@ class DenseSumLayer(SumLayer):
 
     # the structural queries are the same for both weight layouts; converting to the
     # sparse layout keeps them in one place and produces a circuit that is sparse
-    # afterwards anyway, because truncation removes edges
+    # afterwards anyway, because truncation removes edges.
+    #
+    # as_sparse() allocates a new SparseSumLayer on every call, so its own internal
+    # cache (keyed by the id of that fresh object) never gets a hit across separate
+    # calls on this same DenseSumLayer. A shared DenseSumLayer reached via several
+    # parents would otherwise redo the conversion and recompute its own contribution
+    # once per parent -- and, down a chain of shared dense layers, that compounds into
+    # one recomputation per path instead of one per node. Caching under id(self) here,
+    # with the same key scheme the sparse layers use, restores the "evaluate a shared
+    # layer once" guarantee for the dense layout too.
     def log_truncated_of_simple_event(
         self,
         event: SimpleEvent,
@@ -1919,13 +1928,20 @@ class DenseSumLayer(SumLayer):
         cache: Optional[Dict] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Tuple[Layer, npt.NDArray]:
-        return self.as_sparse().log_truncated_of_simple_event(
+        if cache is None:
+            cache = {}
+        key = ("truncated", id(self))
+        if key in cache:
+            return cache[key]
+        result = self.as_sparse().log_truncated_of_simple_event(
             event,
             variables,
             singleton_allowed,
             cache=cache,
             log_probabilities=log_probabilities,
         )
+        cache[key] = result
+        return result
 
     def log_truncated_of_simple_events(
         self,
@@ -1935,13 +1951,20 @@ class DenseSumLayer(SumLayer):
         cache: Optional[Dict] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Tuple[Layer, npt.NDArray]:
-        return self.as_sparse().log_truncated_of_simple_events(
+        if cache is None:
+            cache = {}
+        key = ("batched truncated", id(self))
+        if key in cache:
+            return cache[key]
+        result = self.as_sparse().log_truncated_of_simple_events(
             events,
             variables,
             singleton_allowed,
             cache=cache,
             log_probabilities=log_probabilities,
         )
+        cache[key] = result
+        return result
 
     def log_conditional_of_point(
         self,
@@ -1950,9 +1973,16 @@ class DenseSumLayer(SumLayer):
         cache: Optional[Dict] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Tuple[Layer, npt.NDArray]:
-        return self.as_sparse().log_conditional_of_point(
+        if cache is None:
+            cache = {}
+        key = ("conditional", id(self))
+        if key in cache:
+            return cache[key]
+        result = self.as_sparse().log_conditional_of_point(
             point, variables, cache=cache, log_probabilities=log_probabilities
         )
+        cache[key] = result
+        return result
 
     def required_child_nodes(
         self, alive: npt.NDArray, log_probabilities: Dict[int, npt.NDArray]
@@ -2053,7 +2083,13 @@ class DenseSumLayer(SumLayer):
         cache: Optional[Dict] = None,
         progress_bar: Optional[tqdm.tqdm] = None,
     ) -> List[Unit]:
-        return self.as_sparse().to_rustworkx(variables, result, cache, progress_bar)
+        if cache is None:
+            cache = {}
+        if id(self) in cache:
+            return cache[id(self)]
+        units = self.as_sparse().to_rustworkx(variables, result, cache, progress_bar)
+        cache[id(self)] = units
+        return units
 
 
 class ProductLayer(InnerLayer):
