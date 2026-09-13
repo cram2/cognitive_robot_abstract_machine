@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
+import numpy.typing as npt
 import trimesh
 from typing_extensions import Self
 
@@ -34,19 +35,25 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 
+def _millimeters_to_meters(value: npt.ArrayLike) -> np.ndarray:
+    """
+    GraspClutter6D's BOP-format JSON files (and its mesh files) give every length in
+    millimeters; the rest of this package works in meters (SI). Centralized here so the
+    conversion factor exists exactly once instead of as a magic number repeated at every
+    call site.
+
+    :param value: A length, or array of lengths, in millimeters.
+    :return: `value` converted to meters.
+    """
+    return np.array(value, dtype=float) * 1e-3
+
+
 @dataclass
 class GraspClutter6DCameraInfo:
     """
     Camera parameters of one frame, parsed from one entry of a scene's
     `scene_camera.json`, following the BOP dataset format
     (https://github.com/thodan/bop_toolkit).
-    """
-
-    MILLIMETERS_TO_METERS: ClassVar[float] = 1e-3
-    """
-    GraspClutter6D's BOP-format JSON files give every translation in millimeters; the
-    rest of this package works in meters (SI), so every translation parsed from the
-    dataset is converted with this factor.
     """
 
     field_of_view: FieldOfView
@@ -81,12 +88,7 @@ class GraspClutter6DCameraInfo:
         camera_T_world = None
         if rotation is not None and translation is not None:
             camera_T_world = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                point=Point3(
-                    *(
-                        np.array(translation, dtype=float)
-                        * cls.MILLIMETERS_TO_METERS
-                    )
-                ),
+                point=Point3(*_millimeters_to_meters(translation)),
                 rotation_matrix=RotationMatrix(
                     data=np.array(rotation, dtype=float).reshape(3, 3)
                 ),
@@ -130,12 +132,7 @@ class GraspClutter6DObjectPose:
         return cls(
             object_id=int(data["obj_id"]),
             camera_T_object=HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                point=Point3(
-                    *(
-                        np.array(data["cam_t_m2c"], dtype=float)
-                        * GraspClutter6DCameraInfo.MILLIMETERS_TO_METERS
-                    )
-                ),
+                point=Point3(*_millimeters_to_meters(data["cam_t_m2c"])),
                 rotation_matrix=RotationMatrix(
                     data=np.array(data["cam_R_m2c"], dtype=float).reshape(3, 3)
                 ),
@@ -240,7 +237,7 @@ class GraspClutter6DScene:
         models_directory: Path,
         *,
         with_world_frame: bool = False,
-        mesh_unit_scale: float = GraspClutter6DCameraInfo.MILLIMETERS_TO_METERS,
+        mesh_unit_scale: float = float(_millimeters_to_meters(1.0)),
         object_names: Optional[Dict[int, str]] = None,
     ) -> World:
         """
@@ -276,13 +273,10 @@ class GraspClutter6DScene:
         """
         frame = self.frame(image_id)
 
-        world = World()
-        camera_body = Body()
-        camera_body.name = PrefixedName(
-            name="camera", prefix=f"{self.scene_id}_{image_id}"
+        world = World.create_with_root_body(
+            root_body_name="camera", prefix=f"{self.scene_id}_{image_id}"
         )
-        with world.modify_world():
-            world.add_body(camera_body)
+        camera_body = world.root
 
         root_body = camera_body
         if with_world_frame and frame.camera.camera_T_world is not None:
@@ -315,8 +309,9 @@ class GraspClutter6DScene:
         :param camera_body: The already-added camera body.
         :return: The new `map` body.
         """
-        map_body = Body()
-        map_body.name = PrefixedName(name="map", prefix=camera_body.name.prefix)
+        map_body = Body(
+            name=PrefixedName(name="map", prefix=camera_body.name.prefix)
+        )
 
         # `camera_T_world` rotates/translates a point from the dataset's world frame
         # into the camera frame; the camera's pose in the map frame is its inverse.
@@ -378,9 +373,10 @@ class GraspClutter6DScene:
 
         name = (object_names or {}).get(pose.object_id, f"object_{pose.object_id:06d}")
 
-        body = Body()
-        body.name = PrefixedName(
-            name=f"{name}_{index}", prefix=f"{self.scene_id}_{image_id}"
+        body = Body(
+            name=PrefixedName(
+                name=f"{name}_{index}", prefix=f"{self.scene_id}_{image_id}"
+            )
         )
 
         camera_T_object = HomogeneousTransformationMatrix(
