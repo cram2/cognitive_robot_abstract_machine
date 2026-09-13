@@ -67,6 +67,31 @@ class OrmGenerationFailedError(DataclassException, RuntimeError):
 
 
 @dataclass
+class OrmImportFailedError(DataclassException, RuntimeError):
+    """
+    Raised when importing the ORM interfaces of a checkout fails for a reason other than
+    an interface no longer matching the classes it maps.
+    """
+
+    output: str
+    """
+    What the attempt wrote before it gave up.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "Importing the ORM interfaces of this checkout failed for a reason other "
+            f"than a stale interface. It wrote:\n{self.output}"
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that every package of the checkout is installed, and import the "
+            "interfaces by hand to follow what happens."
+        )
+
+
+@dataclass
 class MissingORMBuildChoiceError(DataclassException, ValueError):
     """
     Raised when a test run names the option that says when to build the ORM interfaces

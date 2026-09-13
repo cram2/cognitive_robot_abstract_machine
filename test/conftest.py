@@ -186,8 +186,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=None,
         help=(
             "when to build the generated ORM interfaces; "
-            f"'{OrmBuild.AUTO}' builds only what the checkout has not built since its "
-            f"sources changed, '{OrmBuild.ALWAYS}' builds every run, whatever the "
+            f"'{OrmBuild.AUTO}' builds only when an interface of the checkout can no "
+            f"longer be imported, '{OrmBuild.ALWAYS}' builds every run, whatever the "
             f"checkout holds, '{OrmBuild.NEVER}' builds nothing, and reads whatever the "
             "checkout holds"
         ),

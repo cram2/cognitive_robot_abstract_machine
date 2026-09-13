@@ -5,8 +5,8 @@ Every package's ``ormatic_interface.py`` is generated rather than tracked, so a 
 holds none until something builds them. Only the packages whose tests read a mapped
 datastructure call this; the rest never pay for a build they would not read.
 
-A build takes about a minute, so a run only pays for it when the checkout has not built
-its interfaces since the sources changed. ``--orm-build`` overrides that.
+A build takes about a minute, so a run only pays for it when an interface of the
+checkout can no longer be imported. ``--orm-build`` overrides that.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ class OrmBuild(StrEnum):
 
     AUTO = "auto"
     """
-    Builds only what the checkout has not built since its sources changed.
+    Builds when an interface of the checkout can no longer be imported.
     """
 
     ALWAYS = "always"
@@ -147,12 +147,14 @@ class OrmBuild(StrEnum):
         Whether this choice has the given interfaces built.
 
         :param interfaces: The interfaces of the checkout under test.
+        :raises OrmImportFailedError: If :attr:`AUTO` cannot import them for a reason
+            other than one of them being stale.
         """
         if self is OrmBuild.NEVER:
             return False
         if self is OrmBuild.ALWAYS:
             return True
-        return interfaces.is_outdated
+        return interfaces.stale_interface() is not None
 
 
 @cache
