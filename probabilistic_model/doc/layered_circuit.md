@@ -147,3 +147,121 @@ Be aware that the JAX implementation is still in development and might not be as
 I would be happy to get support here if someone is interested in it.
 
 JAX and networkx formats can be converted into each other.
+
+## NumPy Implementation
+
+The JAX implementation trades the structural inferences for hardware acceleration. The
+numpy implementation in `probabilistic_model.probabilistic_circuit.np` keeps the layered
+layout but gives the structural inferences back, so it supports every query the rustworkx
+implementation supports.
+
+It uses the same decomposition into layers: a `SumLayer` stores the weights of all of its
+nodes grouped per child layer, a `ProductLayer` stores the edges of all of its nodes as
+one sparse integer matrix, and an input layer stores the parameters of all of its nodes in
+contiguous arrays.
+
+```{code-cell} ipython3
+from probabilistic_model.probabilistic_circuit.np.probabilistic_circuit import ProbabilisticCircuit as NumpyPC
+
+numpy_model = NumpyPC.from_rustworkx(model)
+print(numpy_model)
+print(numpy_model.root)
+```
+
+Queries that do not change the structure are evaluated for all nodes of a layer at once,
+just like in JAX:
+
+```{code-cell} ipython3
+samples = numpy_model.sample(5)
+print(numpy_model.log_likelihood(samples))
+print(numpy_model.expectation())
+```
+
+The structural queries work as well and return a layered circuit again:
+
+```{code-cell} ipython3
+from random_events.interval import closed
+from random_events.product_algebra import SimpleEvent
+
+event = SimpleEvent.from_data({x: closed(0.25, 2.5)}).as_composite_set()
+truncated, probability = numpy_model.truncated(event)
+print(probability)
+print(truncated.marginal([y]))
+print(numpy_model.conditional({x: 0.5})[0])
+```
+
+Three design decisions make this possible:
+
+- Truncating an input layer keeps its number of nodes, so the edges of the parents stay
+  valid. When a node splits into several pieces, or when the truncated nodes no longer
+  share one type, the pieces are grouped into layers by type and a sum layer selects the
+  pieces of each original node. Nodes that became impossible are marked with a
+  log-probability of `-inf` and are then removed by a pass that prunes every impossible
+  and unreachable node and renumbers the sparse structures.
+- Every bottom-up query is memoized by the identity of the layer, so a layer that several
+  parents point at is evaluated once rather than once per path.
+- A structural pass never writes into the layers it reads; it builds new ones. That is
+  what lets a truncation to a composite event work off a single copy of the circuit.
+
+### Truncating to an event with many simple sets
+
+Truncating to an event with `k` simple sets is the most demanding query of the package.
+The graph implementation truncates a copy of the circuit to each simple set and mixes the
+`k` results. Doing that in a layered circuit would defeat the layout: the result gets one
+set of layers per simple set, so a circuit with ten layers turns into one with hundreds of
+layers holding a handful of nodes each, and every later query pays python overhead per
+layer instead of running over arrays.
+
+The numpy implementation truncates to all `k` simple sets in **one** pass instead. Every
+layer is replicated once per simple set inside its own parameter block, so the result has
+the same number of layers as the circuit it came from and blocks that are `k` times
+taller. Layers that cannot be replicated this way -- a Gaussian layer becomes a truncated
+Gaussian layer, a composite assignment splits a node into several pieces -- raise
+`BatchedTruncationUnsupported`, and the circuit falls back to truncating once per simple
+set.
+
+Measured on a joint probability tree with 319 nodes over 4 variables, truncated to a
+staircase of disjoint boxes:
+
+| simple sets | rustworkx | numpy layered | layers in the result |
+| --- | --- | --- | --- |
+| 5 | 56 ms | 5.2 ms | 10 |
+| 10 | 102 ms | 7.7 ms | 10 |
+| 25 | 357 ms | 15.2 ms | 10 |
+| 50 | 501 ms | 30.6 ms | 10 |
+| 100 | 1225 ms | 56.8 ms | 10 |
+
+Truncating one simple set at a time instead, the same 100-set result is spread over 801
+layers and takes 192 ms to build.
+
+### Speed of the other queries
+
+On the same joint probability tree, before truncation:
+
+| query | rustworkx | numpy layered |
+| --- | --- | --- |
+| `log_likelihood`, 100 events | 10.5 ms | 1.2 ms |
+| `log_likelihood`, 1000 events | 14.9 ms | 7.7 ms |
+| `log_likelihood`, 10000 events | 56.4 ms | 65.4 ms |
+| `sample`, 10000 samples | 7.0 ms | 4.2 ms |
+| `probability_of_simple_event` | 8.4 ms | 0.6 ms |
+
+and on the circuit truncated to 100 simple sets, which has 16258 nodes:
+
+| query | rustworkx | numpy layered |
+| --- | --- | --- |
+| `log_likelihood`, 1000 events | 785 ms | 337 ms |
+| `sample`, 1000 samples | 43 ms | 22 ms |
+| `probability_of_simple_event` | 452 ms | 0.9 ms |
+
+The layered layout removes the per-node python overhead, which dominates small and medium
+queries, and a query over a `SimpleEvent` becomes one pass over a handful of arrays. It
+does not make the *asymptotics* better, and it can be slower than the rustworkx
+implementation for very large batches on circuits whose leaves have small disjoint
+supports: rustworkx evaluates each leaf only at the events inside its support, while a
+layer evaluates its whole `(#events, #nodes)` block.
+
+Use the rustworkx implementation to build and learn circuits, the numpy implementation
+when the same fixed circuit is queried many times and the structural inferences are
+needed, and the JAX implementation when the circuit has to be trained by gradient descent.
+All three convert into each other.
