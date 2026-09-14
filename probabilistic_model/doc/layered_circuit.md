@@ -151,7 +151,7 @@ JAX and networkx formats can be converted into each other.
 ## NumPy Implementation
 
 The JAX implementation trades the structural inferences for hardware acceleration. The
-numpy implementation in `probabilistic_model.probabilistic_circuit.np` keeps the layered
+numpy implementation in `probabilistic_model.probabilistic_circuit.tensorized` keeps the layered
 layout but gives the structural inferences back, so it supports every query the rustworkx
 implementation supports.
 
@@ -161,7 +161,7 @@ one sparse integer matrix, and an input layer stores the parameters of all of it
 contiguous arrays.
 
 ```{code-cell} ipython3
-from probabilistic_model.probabilistic_circuit.np.probabilistic_circuit import ProbabilisticCircuit as NumpyPC
+from probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit import ProbabilisticCircuit as NumpyPC
 
 numpy_model = NumpyPC.from_rustworkx(model)
 print(numpy_model)
@@ -233,6 +233,12 @@ staircase of disjoint boxes:
 
 Truncating one simple set at a time instead, the same 100-set result is spread over 801
 layers and takes 192 ms to build.
+
+`experiments/src/experiments/probabilistic_model_experiments/layered_circuit_speed.py`
+reproduces this table and the query timings below it;
+`.../probabilistic_model_experiments/conditioning_speed.py` measures conditioning on a
+partial point the same way, which sees a much smaller speedup since there is nothing to
+batch in a single point the way there is in a many-simple-set truncation.
 
 ### Speed of the other queries
 
