@@ -19,26 +19,26 @@ from probabilistic_model.distributions.distributions import IntegerDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.probabilistic_circuit.np.discrete_layer import IntegerLayer
-from probabilistic_model.probabilistic_circuit.np.helper import (
+from probabilistic_model.probabilistic_circuit.tensorized.discrete_layer import IntegerLayer
+from probabilistic_model.probabilistic_circuit.tensorized.helper import (
     fully_factorized,
     mixture_of,
     product_of,
     uniform_measure_of_event,
     uniform_measure_of_simple_event,
 )
-from probabilistic_model.probabilistic_circuit.np.inner_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     DenseSumLayer,
     ProductLayer,
     SparseSumLayer,
 )
-from probabilistic_model.probabilistic_circuit.np.input_layer import DiracDeltaLayer
-from probabilistic_model.probabilistic_circuit.np.probabilistic_circuit import (
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer import DiracDeltaLayer
+from probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.np.uniform_layer import UniformLayer
+from probabilistic_model.probabilistic_circuit.tensorized.uniform_layer import UniformLayer
 from .test_probabilistic_circuit import shared_children_circuit
-from probabilistic_model.probabilistic_circuit.np.utils import (
+from probabilistic_model.probabilistic_circuit.tensorized.utils import (
     SparseArray,
     embedded_logsumexp,
 )

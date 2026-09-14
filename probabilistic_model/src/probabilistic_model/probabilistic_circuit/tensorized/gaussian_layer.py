@@ -15,8 +15,8 @@ from probabilistic_model.distributions.gaussian import (
     TruncatedGaussianDistribution,
 )
 from probabilistic_model.exceptions import ShapeMismatchError
-from probabilistic_model.probabilistic_circuit.np.inner_layer import memoized
-from probabilistic_model.probabilistic_circuit.np.input_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import memoized
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     ContinuousLayer,
     ContinuousLayerWithFiniteSupport,
 )

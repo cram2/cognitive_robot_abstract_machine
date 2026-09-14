@@ -25,7 +25,7 @@ from typing_extensions import (
 )
 
 from probabilistic_model.exceptions import ShapeMismatchError
-from probabilistic_model.probabilistic_circuit.np.utils import (
+from probabilistic_model.probabilistic_circuit.tensorized.utils import (
     SparseArray,
     embedded_logsumexp,
     remap_indices,
@@ -57,10 +57,10 @@ def import_layer_modules():
     package ``__init__`` keeps the import of this module free of cycles: every layer
     module imports from this one.
     """
-    from probabilistic_model.probabilistic_circuit.np import discrete_layer  # noqa: F401
-    from probabilistic_model.probabilistic_circuit.np import gaussian_layer  # noqa: F401
-    from probabilistic_model.probabilistic_circuit.np import input_layer  # noqa: F401
-    from probabilistic_model.probabilistic_circuit.np import uniform_layer  # noqa: F401
+    from probabilistic_model.probabilistic_circuit.tensorized import discrete_layer  # noqa: F401
+    from probabilistic_model.probabilistic_circuit.tensorized import gaussian_layer  # noqa: F401
+    from probabilistic_model.probabilistic_circuit.tensorized import input_layer  # noqa: F401
+    from probabilistic_model.probabilistic_circuit.tensorized import uniform_layer  # noqa: F401
 
 
 def layer_class_of(clazz: Type) -> Type[Layer]:
@@ -132,7 +132,7 @@ class Layer(SubclassJSONSerializer, ABC):
     a layer at once.
 
     Variables are referred to by their index in the ``variables`` of the owning
-    :class:`probabilistic_model.probabilistic_circuit.np.probabilistic_circuit.ProbabilisticCircuit`
+    :class:`probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit.ProbabilisticCircuit`
     rather than by the variable objects themselves.
     """
 

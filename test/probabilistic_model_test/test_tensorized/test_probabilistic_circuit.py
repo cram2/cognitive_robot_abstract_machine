@@ -42,23 +42,23 @@ from probabilistic_model.distributions.distributions import (
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.exceptions import IntractableError
-from probabilistic_model.probabilistic_circuit.np.discrete_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.discrete_layer import (
     IntegerLayer,
     SymbolicLayer,
 )
-from probabilistic_model.probabilistic_circuit.np.gaussian_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.gaussian_layer import (
     GaussianLayer,
     TruncatedGaussianLayer,
 )
-from probabilistic_model.probabilistic_circuit.np.inner_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ProductLayer,
     SparseSumLayer,
 )
-from probabilistic_model.probabilistic_circuit.np.input_layer import DiracDeltaLayer
-from probabilistic_model.probabilistic_circuit.np.probabilistic_circuit import (
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer import DiracDeltaLayer
+from probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.np.uniform_layer import UniformLayer
+from probabilistic_model.probabilistic_circuit.tensorized.uniform_layer import UniformLayer
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RxCircuit,
     ProductUnit,

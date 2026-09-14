@@ -19,8 +19,8 @@ from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
 )
 from probabilistic_model.exceptions import ShapeMismatchError
-from probabilistic_model.probabilistic_circuit.np.inner_layer import memoized
-from probabilistic_model.probabilistic_circuit.np.input_layer import InputLayer
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import memoized
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer import InputLayer
 from probabilistic_model.utils import MissingDict
 
 
@@ -174,7 +174,7 @@ class DiscreteLayer(InputLayer, ABC):
         raise NotImplementedError
 
     def normalize_own(self):
-        from probabilistic_model.probabilistic_circuit.np.utils import (
+        from probabilistic_model.probabilistic_circuit.tensorized.utils import (
             embedded_logsumexp,
         )
 

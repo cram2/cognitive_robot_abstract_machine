@@ -10,8 +10,8 @@ from sortedcontainers import SortedSet
 from typing_extensions import Dict, List, Optional, Self, Tuple, Type
 
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.probabilistic_circuit.np.inner_layer import memoized
-from probabilistic_model.probabilistic_circuit.np.input_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import memoized
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     ContinuousLayerWithFiniteSupport,
 )
 

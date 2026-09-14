@@ -6,15 +6,15 @@ from random_events.variable import Continuous, Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Dict, Iterable, List, Optional
 
-from probabilistic_model.probabilistic_circuit.np.inner_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     Layer,
     ProductLayer,
     SparseSumLayer,
 )
-from probabilistic_model.probabilistic_circuit.np.probabilistic_circuit import (
+from probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.np.utils import SparseArray
+from probabilistic_model.probabilistic_circuit.tensorized.utils import SparseArray
 from probabilistic_model.probabilistic_circuit.rx import helper as rx_helper
 
 

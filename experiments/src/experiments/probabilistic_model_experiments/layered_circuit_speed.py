@@ -30,7 +30,7 @@ from experiments.experiment_definitions import (
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.probabilistic_circuit.np.probabilistic_circuit import (
+from probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (

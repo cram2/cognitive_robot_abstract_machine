@@ -17,7 +17,7 @@ from typing_extensions import Any, Dict, Iterable, List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.exceptions import IntractableError
-from probabilistic_model.probabilistic_circuit.np.inner_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     BatchedTruncationUnsupported,
     Layer,
     LayerConverter,
@@ -25,10 +25,10 @@ from probabilistic_model.probabilistic_circuit.np.inner_layer import (
     SparseSumLayer,
     SumLayer,
 )
-from probabilistic_model.probabilistic_circuit.np.input_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     layer_of_distributions,
 )
-from probabilistic_model.probabilistic_circuit.np.utils import SparseArray
+from probabilistic_model.probabilistic_circuit.tensorized.utils import SparseArray
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RustworkxProbabilisticCircuit,
 )

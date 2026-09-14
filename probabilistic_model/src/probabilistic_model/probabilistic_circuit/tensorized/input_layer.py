@@ -19,7 +19,7 @@ from probabilistic_model.distributions.distributions import (
     UnivariateDistribution,
 )
 from probabilistic_model.exceptions import ShapeMismatchError
-from probabilistic_model.probabilistic_circuit.np.inner_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     BatchedTruncationUnsupported,
     Layer,
     LayerConverter,
@@ -27,7 +27,7 @@ from probabilistic_model.probabilistic_circuit.np.inner_layer import (
     layer_class_of,
     memoized,
 )
-from probabilistic_model.probabilistic_circuit.np.utils import SparseArray
+from probabilistic_model.probabilistic_circuit.tensorized.utils import SparseArray
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RustworkxProbabilisticCircuit,
     Unit,
