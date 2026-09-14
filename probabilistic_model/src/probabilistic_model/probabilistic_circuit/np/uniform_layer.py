@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import numpy.typing as npt
 from random_events.interval import Interval
@@ -14,6 +16,7 @@ from probabilistic_model.probabilistic_circuit.np.input_layer import (
 )
 
 
+@dataclass(eq=False, repr=False)
 class UniformLayer(ContinuousLayerWithFiniteSupport):
     """
     A layer of uniform distributions over one continuous variable.
@@ -84,7 +87,7 @@ class UniformLayer(ContinuousLayerWithFiniteSupport):
             ],
             dtype=np.int64,
         )
-        return cls(variable_index, interval, bounds)
+        return cls(variable_index, interval, bounds=bounds)
 
     def sample_of_node(
         self, node: int, amount: int, variables: SortedSet
@@ -154,6 +157,6 @@ class UniformLayer(ContinuousLayerWithFiniteSupport):
         )
 
         return (
-            self.__class__(self.variable, interval_of_nodes, bounds_of_nodes),
+            self.__class__(self.variable, interval_of_nodes, bounds=bounds_of_nodes),
             log_probabilities,
         )

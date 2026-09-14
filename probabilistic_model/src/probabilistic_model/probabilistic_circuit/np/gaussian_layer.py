@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
@@ -21,6 +22,7 @@ from probabilistic_model.probabilistic_circuit.np.input_layer import (
 )
 
 
+@dataclass(eq=False, repr=False)
 class GaussianLayer(ContinuousLayer):
     """
     A layer of Gaussian distributions over one continuous variable.
@@ -36,10 +38,10 @@ class GaussianLayer(ContinuousLayer):
     The standard deviation of every node.
     """
 
-    def __init__(self, variable: int, location: npt.NDArray, scale: npt.NDArray):
-        super().__init__(variable)
-        self.location = np.asarray(location, dtype=float).reshape(-1)
-        self.scale = np.asarray(scale, dtype=float).reshape(-1)
+    def __post_init__(self):
+        super().__post_init__()
+        self.location = np.asarray(self.location, dtype=float).reshape(-1)
+        self.scale = np.asarray(self.scale, dtype=float).reshape(-1)
 
     @property
     def number_of_nodes(self) -> int:
@@ -163,6 +165,7 @@ class GaussianLayer(ContinuousLayer):
         )
 
 
+@dataclass(eq=False, repr=False)
 class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
     """
     A layer of truncated Gaussian distributions over one continuous variable.
@@ -181,17 +184,10 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
     The standard deviation of the untruncated Gaussian of every node.
     """
 
-    def __init__(
-        self,
-        variable: int,
-        interval: npt.NDArray,
-        location: npt.NDArray,
-        scale: npt.NDArray,
-        bounds: Optional[npt.NDArray] = None,
-    ):
-        super().__init__(variable, interval, bounds)
-        self.location = np.asarray(location, dtype=float).reshape(-1)
-        self.scale = np.asarray(scale, dtype=float).reshape(-1)
+    def __post_init__(self):
+        super().__post_init__()
+        self.location = np.asarray(self.location, dtype=float).reshape(-1)
+        self.scale = np.asarray(self.scale, dtype=float).reshape(-1)
 
     @property
     def number_of_own_parameters(self) -> int:
@@ -277,7 +273,7 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
             interval,
             np.array([distribution.location for distribution in distributions]),
             np.array([distribution.scale for distribution in distributions]),
-            bounds,
+            bounds=bounds,
         )
 
     def select_nodes(self, mask: npt.NDArray) -> Self:
@@ -286,7 +282,7 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
             self.interval[mask],
             self.location[mask],
             self.scale[mask],
-            self.bounds[mask],
+            bounds=self.bounds[mask],
         )
 
     @classmethod
@@ -296,7 +292,7 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
             np.concatenate([layer.interval for layer in layers]),
             np.concatenate([layer.location for layer in layers]),
             np.concatenate([layer.scale for layer in layers]),
-            np.concatenate([layer.bounds for layer in layers]),
+            bounds=np.concatenate([layer.bounds for layer in layers]),
         )
 
     def apply_translation_own(self, translation: npt.NDArray):
@@ -318,7 +314,7 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
             self.interval.copy(),
             self.location.copy(),
             self.scale.copy(),
-            self.bounds.copy(),
+            bounds=self.bounds.copy(),
         )
         memo[id(self)] = result
         return result
@@ -336,5 +332,5 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
             np.array(data["interval"]),
             np.array(data["location"]),
             np.array(data["scale"]),
-            np.array(data["bounds"]),
+            bounds=np.array(data["bounds"]),
         )

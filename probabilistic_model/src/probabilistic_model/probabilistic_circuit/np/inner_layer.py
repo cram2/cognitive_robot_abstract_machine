@@ -4,7 +4,7 @@ import functools
 import inspect
 import math
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
@@ -134,11 +134,6 @@ class Layer(SubclassJSONSerializer, ABC):
     Variables are referred to by their index in the ``variables`` of the owning
     :class:`probabilistic_model.probabilistic_circuit.np.probabilistic_circuit.ProbabilisticCircuit`
     rather than by the variable objects themselves.
-    """
-
-    _variables: Optional[npt.NDArray] = None
-    """
-    Cached indices of the variables in the scope of this layer.
     """
 
     # ------------------------------------------------------------------ structure
@@ -706,14 +701,27 @@ class Layer(SubclassJSONSerializer, ABC):
         return f"{self.__class__.__name__}({self.number_of_nodes})"
 
 
+@dataclass(eq=False, repr=False)
 class InnerLayer(Layer, ABC):
     """
     Abstract base class for the layers that have child layers.
+
+    The field is named ``_child_layers`` rather than ``child_layers`` because
+    :class:`Layer` already defines ``child_layers`` as a property (returning ``[]`` for
+    layers without children); a dataclass field of the same name would pick that property
+    up as its default through inherited attribute lookup, which breaks field ordering in
+    every subclass that adds a required field afterwards.
     """
 
-    def __init__(self, child_layers: List[Layer]):
-        self._child_layers = list(child_layers)
-        self._variables = None
+    _child_layers: List[Layer]
+
+    _variables_cache: Optional[npt.NDArray] = field(default=None, init=False, repr=False)
+    """
+    Cached indices of the variables in the scope of this layer.
+    """
+
+    def __post_init__(self):
+        self._child_layers = list(self._child_layers)
 
     @property
     def child_layers(self) -> List[Layer]:
@@ -723,7 +731,7 @@ class InnerLayer(Layer, ABC):
         """
         Drop the cached scope of this layer so that it is recomputed on the next access.
         """
-        self._variables = None
+        self._variables_cache = None
 
     def remap_variables(self, remap: npt.NDArray, cache: Optional[Dict] = None):
         if cache is None:
@@ -743,6 +751,7 @@ class InnerLayer(Layer, ABC):
         return result
 
 
+@dataclass(eq=False, repr=False)
 class SumLayer(InnerLayer, ABC):
     """
     Abstract base class for layers of sum units.
@@ -753,15 +762,17 @@ class SumLayer(InnerLayer, ABC):
     same scope, which is the scope of the child layers.
     """
 
-    def __init__(self, child_layers: List[Layer], log_weights: List[Any]):
-        super().__init__(child_layers)
-        self.log_weights = list(log_weights)
+    log_weights: List[Any]
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.log_weights = list(self.log_weights)
 
     @property
     def variables(self) -> npt.NDArray:
-        if self._variables is None:
-            self._variables = self.child_layers[0].variables
-        return self._variables
+        if self._variables_cache is None:
+            self._variables_cache = self.child_layers[0].variables
+        return self._variables_cache
 
     @property
     def log_weighted_child_layers(self) -> Iterator[Tuple[Any, Layer]]:
@@ -1043,6 +1054,7 @@ class SumLayer(InnerLayer, ABC):
         return True
 
 
+@dataclass(eq=False, repr=False)
 class SparseSumLayer(SumLayer):
     """
     A sum layer whose weights are stored sparsely.
@@ -1053,27 +1065,23 @@ class SparseSumLayer(SumLayer):
 
     log_weights: List[SparseArray]
 
-    _edge_gather: Optional[npt.NDArray] = None
+    _edge_gather: Optional[npt.NDArray] = field(default=None, init=False, repr=False)
     """
     Cached index matrix of :attr:`edge_gather`.
     """
 
-    _edges_are_contiguous: bool = False
+    _edges_are_contiguous: bool = field(default=False, init=False, repr=False)
     """
     Whether the edges are stored node by node with the same number of edges per node,
     filled together with :attr:`_edge_gather`.
     """
 
-    _edge_targets: Optional[Tuple[npt.NDArray, npt.NDArray]] = None
+    _edge_targets: Optional[Tuple[npt.NDArray, npt.NDArray]] = field(
+        default=None, init=False, repr=False
+    )
     """
     Cached targets of :attr:`edge_targets`.
     """
-
-    def __init__(self, child_layers: List[Layer], log_weights: List[SparseArray]):
-        super().__init__(child_layers, log_weights)
-        self._edge_gather = None
-        self._edges_are_contiguous = False
-        self._edge_targets = None
 
     @property
     def number_of_nodes(self) -> int:
@@ -1780,6 +1788,7 @@ class SparseSumLayer(SumLayer):
         return units
 
 
+@dataclass(eq=False, repr=False)
 class DenseSumLayer(SumLayer):
     """
     A sum layer whose weights are stored densely.
@@ -1790,8 +1799,9 @@ class DenseSumLayer(SumLayer):
 
     log_weights: List[npt.NDArray]
 
-    def __init__(self, child_layers: List[Layer], log_weights: List[npt.NDArray]):
-        super().__init__(child_layers, [np.asarray(w, dtype=float) for w in log_weights])
+    def __post_init__(self):
+        super().__post_init__()
+        self.log_weights = [np.asarray(w, dtype=float) for w in self.log_weights]
 
     @property
     def number_of_nodes(self) -> int:
@@ -2092,6 +2102,7 @@ class DenseSumLayer(SumLayer):
         return units
 
 
+@dataclass(eq=False, repr=False)
 class ProductLayer(InnerLayer):
     """
     A layer of decomposable product units.
@@ -2103,10 +2114,6 @@ class ProductLayer(InnerLayer):
     """
 
     edges: SparseArray
-
-    def __init__(self, child_layers: List[Layer], edges: SparseArray):
-        super().__init__(child_layers)
-        self.edges = edges
 
     @property
     def number_of_nodes(self) -> int:
@@ -2121,13 +2128,13 @@ class ProductLayer(InnerLayer):
 
     @property
     def variables(self) -> npt.NDArray:
-        if self._variables is None:
-            self._variables = np.unique(
+        if self._variables_cache is None:
+            self._variables_cache = np.unique(
                 np.concatenate(
                     [child_layer.variables for child_layer in self.child_layers]
                 )
             )
-        return self._variables
+        return self._variables_cache
 
     def validate_own(self):
         if self.edges.shape != (len(self.child_layers), self.number_of_nodes):

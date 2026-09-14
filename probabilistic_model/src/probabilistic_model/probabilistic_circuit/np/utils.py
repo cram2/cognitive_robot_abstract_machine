@@ -7,7 +7,7 @@ import numpy.typing as npt
 from typing_extensions import Any, Dict, Self, Tuple
 
 
-@dataclass
+@dataclass(eq=False)
 class SparseArray:
     """
     A minimal two dimensional sparse array in coordinate (COO) format.
@@ -18,6 +18,9 @@ class SparseArray:
     index of ``0`` is a perfectly meaningful edge. Every scipy format drops explicitly
     stored zeros during conversion and arithmetic, which would silently delete those
     edges.
+
+    ``eq=False`` because the default field-tuple comparison would call ``==`` on the
+    ``data``/``indices`` arrays, which raises once they hold more than one element.
     """
 
     data: npt.NDArray

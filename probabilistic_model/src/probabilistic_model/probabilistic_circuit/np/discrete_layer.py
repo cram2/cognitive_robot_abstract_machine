@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
@@ -23,6 +24,7 @@ from probabilistic_model.probabilistic_circuit.np.input_layer import InputLayer
 from probabilistic_model.utils import MissingDict
 
 
+@dataclass(eq=False, repr=False)
 class DiscreteLayer(InputLayer, ABC):
     """
     Abstract base class for the input layers of discrete univariate distributions.
@@ -45,12 +47,10 @@ class DiscreteLayer(InputLayer, ABC):
     The logarithmic probability of every state for every node, shape (#nodes, #states).
     """
 
-    def __init__(
-        self, variable: int, states: npt.NDArray, log_probabilities: npt.NDArray
-    ):
-        super().__init__(variable)
-        states = np.asarray(states).reshape(-1)
-        log_probabilities = np.asarray(log_probabilities, dtype=float).reshape(
+    def __post_init__(self):
+        super().__post_init__()
+        states = np.asarray(self.states).reshape(-1)
+        log_probabilities = np.asarray(self.log_probabilities, dtype=float).reshape(
             -1, len(states)
         )
         order = np.argsort(states, kind="stable")
@@ -269,6 +269,7 @@ class DiscreteLayer(InputLayer, ABC):
         )
 
 
+@dataclass(eq=False, repr=False)
 class SymbolicLayer(DiscreteLayer):
     """
     A layer of categorical distributions over one symbolic variable.
@@ -299,6 +300,7 @@ class SymbolicLayer(DiscreteLayer):
         return np.isin(self.states, hashes)
 
 
+@dataclass(eq=False, repr=False)
 class IntegerLayer(DiscreteLayer):
     """
     A layer of distributions over one integer variable.

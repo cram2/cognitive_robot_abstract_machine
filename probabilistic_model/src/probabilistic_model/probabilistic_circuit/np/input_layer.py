@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
@@ -136,6 +137,7 @@ def assemble_input_layer(
     return SparseSumLayer(child_layers, log_weights), log_probabilities
 
 
+@dataclass(eq=False, repr=False)
 class InputLayer(Layer, ABC):
     """
     Abstract base class for the input layers of a layered circuit.
@@ -145,19 +147,17 @@ class InputLayer(Layer, ABC):
     branching.
     """
 
-    def __init__(self, variable: int):
-        self._variables = np.array([int(variable)], dtype=np.int64)
+    variable: int
+    """
+    The index of the variable of this layer.
+    """
 
-    @property
-    def variable(self) -> int:
-        """
-        :return: The index of the variable of this layer.
-        """
-        return int(self._variables[0])
+    def __post_init__(self):
+        self.variable = int(self.variable)
 
     @property
     def variables(self) -> npt.NDArray:
-        return self._variables
+        return np.array([self.variable], dtype=np.int64)
 
     def set_variables(self, value: npt.NDArray):
         """
@@ -165,10 +165,10 @@ class InputLayer(Layer, ABC):
 
         :param value: The new indices.
         """
-        self._variables = np.asarray(value, dtype=np.int64)
+        [self.variable] = np.asarray(value, dtype=np.int64)
 
     def remap_variables(self, remap: npt.NDArray, cache: Optional[Dict] = None):
-        self._variables = np.array([remap[self.variable]], dtype=np.int64)
+        self.variable = int(remap[self.variable])
 
     def column_of(self, x: npt.NDArray) -> npt.NDArray:
         """
@@ -563,6 +563,7 @@ class InputLayer(Layer, ABC):
         return result
 
 
+@dataclass(eq=False, repr=False)
 class ContinuousLayer(InputLayer, ABC):
     """
     Abstract base class for the input layers of continuous univariate distributions.
@@ -635,6 +636,7 @@ class ContinuousLayer(InputLayer, ABC):
         raise NotImplementedError
 
 
+@dataclass(eq=False, repr=False)
 class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     """
     Abstract base class for continuous input layers whose nodes have a finite support.
@@ -647,7 +649,10 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     The first column holds the lower bounds, the second the upper bounds.
     """
 
-    bounds: npt.NDArray
+    # keyword-only so that a subclass can add required positional fields (such as
+    # location and scale) after ``interval`` without violating dataclass field
+    # ordering, which does not allow a required field to follow one that has a default
+    bounds: Optional[npt.NDArray] = field(default=None, kw_only=True)
     """
     The kind of every bound as an array of shape (#nodes, 2) holding
     :class:`random_events.interval.Bound` values.
@@ -658,17 +663,12 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     which the support and mode queries compare against.
     """
 
-    def __init__(
-        self,
-        variable: int,
-        interval: npt.NDArray,
-        bounds: Optional[npt.NDArray] = None,
-    ):
-        super().__init__(variable)
-        self.interval = np.asarray(interval, dtype=float).reshape(-1, 2)
-        if bounds is None:
-            bounds = np.full(self.interval.shape, int(Bound.OPEN), dtype=np.int64)
-        self.bounds = np.asarray(bounds, dtype=np.int64).reshape(-1, 2)
+    def __post_init__(self):
+        super().__post_init__()
+        self.interval = np.asarray(self.interval, dtype=float).reshape(-1, 2)
+        if self.bounds is None:
+            self.bounds = np.full(self.interval.shape, int(Bound.OPEN), dtype=np.int64)
+        self.bounds = np.asarray(self.bounds, dtype=np.int64).reshape(-1, 2)
 
     @property
     def lower(self) -> npt.NDArray:
@@ -751,14 +751,16 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
         return left & right
 
     def select_nodes(self, mask: npt.NDArray) -> Self:
-        return self.__class__(self.variable, self.interval[mask], self.bounds[mask])
+        return self.__class__(
+            self.variable, self.interval[mask], bounds=self.bounds[mask]
+        )
 
     @classmethod
     def concatenate(cls, layers: List[Self]) -> Self:
         return cls(
             layers[0].variable,
             np.concatenate([layer.interval for layer in layers]),
-            np.concatenate([layer.bounds for layer in layers]),
+            bounds=np.concatenate([layer.bounds for layer in layers]),
         )
 
     def apply_translation_own(self, translation: npt.NDArray):
@@ -773,7 +775,7 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
         if id(self) in memo:
             return memo[id(self)]
         result = self.__class__(
-            self.variable, self.interval.copy(), self.bounds.copy()
+            self.variable, self.interval.copy(), bounds=self.bounds.copy()
         )
         memo[id(self)] = result
         return result
@@ -787,10 +789,13 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
-            data["variable"], np.array(data["interval"]), np.array(data["bounds"])
+            data["variable"],
+            np.array(data["interval"]),
+            bounds=np.array(data["bounds"]),
         )
 
 
+@dataclass(eq=False, repr=False)
 class DiracDeltaLayer(ContinuousLayer):
     """
     A layer of Dirac delta distributions over one continuous variable.
@@ -806,22 +811,15 @@ class DiracDeltaLayer(ContinuousLayer):
     The value that replaces the infinite density of every node.
     """
 
-    tolerance: float
+    tolerance: float = 1e-6
     """
     The tolerance with which a value is considered equal to the location.
     """
 
-    def __init__(
-        self,
-        variable: int,
-        location: npt.NDArray,
-        density_cap: npt.NDArray,
-        tolerance: float = 1e-6,
-    ):
-        super().__init__(variable)
-        self.location = np.asarray(location, dtype=float).reshape(-1)
-        self.density_cap = np.asarray(density_cap, dtype=float).reshape(-1)
-        self.tolerance = tolerance
+    def __post_init__(self):
+        super().__post_init__()
+        self.location = np.asarray(self.location, dtype=float).reshape(-1)
+        self.density_cap = np.asarray(self.density_cap, dtype=float).reshape(-1)
 
     @property
     def number_of_nodes(self) -> int:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import numpy.typing as npt
 import tqdm
@@ -39,6 +41,7 @@ from probabilistic_model.probabilistic_model import (
 from probabilistic_model.utils import logsumexp
 
 
+@dataclass(eq=False)
 class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
     """
     A probabilistic circuit whose units are grouped into layers of numpy arrays.
@@ -50,9 +53,14 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
     rustworkx implementation, including the structural ones.
 
     The root layer has exactly one node, which is the output of the circuit.
+
+    The field is named ``_variables`` rather than ``variables`` because
+    ``ProbabilisticModel`` declares ``variables`` as an abstract property; a dataclass
+    field of the same name would pick that property up as its default through inherited
+    attribute lookup, which breaks field ordering with ``root`` declared after it.
     """
 
-    _variables: SortedSet
+    _variables: Iterable[Variable]
     """
     The variables of the circuit. The layers refer to them by their index here.
     """
@@ -62,12 +70,8 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
     The root layer of the circuit.
     """
 
-    def __init__(self, variables: Iterable[Variable], root: Layer):
-        # ``ProbabilisticModel`` declares ``variables`` as an abstract property, so this
-        # class implements it as a real property and spells its initializer out instead
-        # of generating one with ``@dataclass``
-        self.variables = variables
-        self.root = root
+    def __post_init__(self):
+        self.variables = self._variables
 
     @property
     def variables(self) -> SortedSet:
