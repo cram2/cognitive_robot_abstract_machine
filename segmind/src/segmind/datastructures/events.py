@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cached_property
 
-from geometry_msgs.msg import PoseStamped
 from typing_extensions import Optional, List
 
 from segmind.datastructures.object_tracker import (
@@ -13,7 +12,7 @@ from segmind.datastructures.object_tracker import (
     ObjectTrackerFactory,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.numeric import NumericPose
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -131,13 +130,14 @@ class MotionEvent(EventWithTrackedObjects, ABC):
     vice versa.
     """
 
-    start_pose: Pose = field(default_factory=Pose)
+    start_pose: NumericPose = field(kw_only=True)
     """
-    The pose of the object at the start of the event.
+    The pose of the object at the start of the event, in the world frame.
     """
-    current_pose: Pose = field(default_factory=Pose)
+
+    current_pose: NumericPose = field(kw_only=True)
     """
-    The pose of the object at the end of the event.
+    The pose of the object at the end of the event, in the world frame.
     """
 
 
@@ -198,9 +198,9 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     Bounding box of the object.
     """
 
-    pose: Pose = field(init=False)
+    pose: NumericPose = field(init=False)
     """
-    Pose of the object.
+    Pose of the object, in the world frame.
     """
 
     with_object_bounding_box: Optional[VolumetricBoundingBox] = field(
@@ -210,24 +210,24 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     Bounding box of the second object in contact.
     """
 
-    with_object_pose: Optional[PoseStamped] = field(init=False, default=None)
+    with_object_pose: Optional[NumericPose] = field(init=False, default=None)
     """
-    Pose of the second object in contact.
+    Pose of the second object in contact, in the world frame.
     """
 
     def __post_init__(self):
         self.bounding_box = VolumetricBoundingBox.from_mesh(
             self.tracked_object.collision.combined_mesh,
-            origin=self.tracked_object.global_pose.to_homogeneous_matrix(),
+            origin=self.tracked_object.numeric_global_transform,
         )
-        self.pose = self.tracked_object.global_pose
+        self.pose = self.tracked_object.numeric_global_pose
 
         if self.with_object is not None:
             self.with_object_bounding_box = VolumetricBoundingBox.from_mesh(
                 self.with_object.collision.combined_mesh,
-                origin=self.with_object.global_pose.to_homogeneous_matrix(),
+                origin=self.with_object.numeric_global_transform,
             )
-            self.with_object_pose = self.with_object.global_pose
+            self.with_object_pose = self.with_object.numeric_global_pose
 
 
 @dataclass(init=False, unsafe_hash=True)
