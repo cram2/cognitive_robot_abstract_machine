@@ -8,7 +8,7 @@ import numpy.typing as npt
 from random_events.variable import Variable
 from scipy.stats import norm
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, List, Optional, Self, Tuple, Type
+from typing_extensions import Any, Dict, List, Optional, Self
 
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
@@ -23,7 +23,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
 
 
 @dataclass(eq=False, repr=False)
-class GaussianLayer(ContinuousLayer):
+class GaussianLayer(ContinuousLayer[GaussianDistribution]):
     """
     A layer of Gaussian distributions over one continuous variable.
     """
@@ -50,10 +50,6 @@ class GaussianLayer(ContinuousLayer):
     @property
     def number_of_own_parameters(self) -> int:
         return 2 * self.number_of_nodes
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        return (GaussianDistribution,)
 
     def validate_own(self):
         if self.location.shape != self.scale.shape:
@@ -166,7 +162,7 @@ class GaussianLayer(ContinuousLayer):
 
 
 @dataclass(eq=False, repr=False)
-class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
+class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianDistribution]):
     """
     A layer of truncated Gaussian distributions over one continuous variable.
 
@@ -192,10 +188,6 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
     @property
     def number_of_own_parameters(self) -> int:
         return 4 * self.number_of_nodes
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        return (TruncatedGaussianDistribution,)
 
     @property
     def cumulative_distribution_to_lower(self) -> npt.NDArray:

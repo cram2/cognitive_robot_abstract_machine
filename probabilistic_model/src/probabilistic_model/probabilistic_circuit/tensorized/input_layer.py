@@ -19,13 +19,19 @@ from probabilistic_model.distributions.distributions import (
     UnivariateDistribution,
 )
 from probabilistic_model.exceptions import ShapeMismatchError
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     BatchedTruncationUnsupported,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
+    ForwardSampleAssignment,
     Layer,
     LayerConverter,
+    RustworkxUnitType,
     SparseSumLayer,
-    layer_class_of,
     memoized,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.rustworkx_conversion import (
+    layer_class_of,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.utils import SparseArray
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -138,7 +144,7 @@ def assemble_input_layer(
 
 
 @dataclass(eq=False, repr=False)
-class InputLayer(Layer, ABC):
+class InputLayer(Layer[RustworkxUnitType], ABC):
     """
     Abstract base class for the input layers of a layered circuit.
 
@@ -295,11 +301,11 @@ class InputLayer(Layer, ABC):
 
     def sample_forward(
         self,
-        assignment: Dict[int, List[List[npt.NDArray]]],
+        assignment: ForwardSampleAssignment,
         samples: npt.NDArray,
         variables: SortedSet,
     ):
-        own_assignment = assignment[id(self)]
+        own_assignment = assignment.rows_of(self)
         for node, rows_of_node in enumerate(own_assignment):
             if not rows_of_node:
                 continue
@@ -564,7 +570,7 @@ class InputLayer(Layer, ABC):
 
 
 @dataclass(eq=False, repr=False)
-class ContinuousLayer(InputLayer, ABC):
+class ContinuousLayer(InputLayer[RustworkxUnitType], ABC):
     """
     Abstract base class for the input layers of continuous univariate distributions.
     """
@@ -637,7 +643,7 @@ class ContinuousLayer(InputLayer, ABC):
 
 
 @dataclass(eq=False, repr=False)
-class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
+class ContinuousLayerWithFiniteSupport(ContinuousLayer[RustworkxUnitType], ABC):
     """
     Abstract base class for continuous input layers whose nodes have a finite support.
     """
@@ -796,7 +802,7 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
 
 
 @dataclass(eq=False, repr=False)
-class DiracDeltaLayer(ContinuousLayer):
+class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
     """
     A layer of Dirac delta distributions over one continuous variable.
     """
@@ -832,10 +838,6 @@ class DiracDeltaLayer(ContinuousLayer):
     def validate_own(self):
         if self.location.shape != self.density_cap.shape:
             raise ShapeMismatchError(self.location.shape, self.density_cap.shape)
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        return (DiracDeltaDistribution,)
 
     def node_distribution(
         self, index: int, variable: Variable

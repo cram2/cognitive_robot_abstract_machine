@@ -6,7 +6,6 @@ and the integration with a learned circuit.
 from __future__ import annotations
 
 import unittest
-from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -28,16 +27,15 @@ from probabilistic_model.probabilistic_circuit.tensorized.helper import (
     uniform_measure_of_simple_event,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
-    DenseSumLayer,
     ProductLayer,
     SparseSumLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import DiracDeltaLayer
-from probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit import (
-    ProbabilisticCircuit,
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.uniform_layer import UniformLayer
-from .test_probabilistic_circuit import shared_children_circuit
+from .test_layered_probabilistic_circuit import shared_children_circuit
 from probabilistic_model.probabilistic_circuit.tensorized.utils import (
     SparseArray,
     embedded_logsumexp,
@@ -114,133 +112,20 @@ class SparseArrayTestCase(unittest.TestCase):
         )
 
 
-class DenseSumLayerTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.input_layer = uniform_layer_of(0, [(0, 1), (1, 2), (2, 3)])
-        self.weights = np.array([[0.2, 0.3, 0.5], [0.5, 0.25, 0.25]])
-        self.layer = DenseSumLayer([self.input_layer], [np.log(self.weights)])
-
-    def test_log_likelihood(self):
-        points = np.array([[0.5], [1.5], [2.5], [4.0]])
-        result = self.layer.log_likelihood_of_nodes(points)
-        # every uniform has a density of one on its own unit interval; the last point
-        # lies outside all of them, hence the deliberate log of zero
-        with np.errstate(divide="ignore"):
-            expected = np.log(
-                np.array(
-                    [
-                        [0.2, 0.5],
-                        [0.3, 0.25],
-                        [0.5, 0.25],
-                        [0.0, 0.0],
-                    ]
-                )
-            )
-        np.testing.assert_allclose(result, expected)
-
-    def test_it_agrees_with_the_sparse_layout(self):
-        points = np.array([[0.25], [1.25], [2.25]])
-        np.testing.assert_allclose(
-            self.layer.log_likelihood_of_nodes(points),
-            self.layer.as_sparse().log_likelihood_of_nodes(points),
-        )
-
-    def test_unnormalized_weights_are_normalized_on_the_fly(self):
-        layer = DenseSumLayer([self.input_layer], [np.log(self.weights * 7.0)])
-        points = np.array([[0.5], [1.5]])
-        np.testing.assert_allclose(
-            layer.log_likelihood_of_nodes(points),
-            self.layer.log_likelihood_of_nodes(points),
-        )
-
-    def test_normalize(self):
-        layer = DenseSumLayer([self.input_layer], [np.log(self.weights * 7.0)])
-        layer.normalize()
-        np.testing.assert_allclose(
-            layer.log_normalization_constants, np.zeros(2), atol=1e-12
-        )
-
-    def test_number_of_parameters(self):
-        self.assertEqual(self.layer.number_of_own_parameters, 6)
-
-    def test_json_round_trip(self):
-        restored = from_json(to_json(self.layer))
-        points = np.array([[0.5], [1.5], [2.5]])
-        np.testing.assert_allclose(
-            restored.log_likelihood_of_nodes(points),
-            self.layer.log_likelihood_of_nodes(points),
-        )
-
-    def test_truncation_of_a_circuit_with_a_dense_root(self):
-        root = DenseSumLayer([self.input_layer], [np.log([[0.2, 0.3, 0.5]])])
-        circuit = ProbabilisticCircuit([x], root)
-
-        event = SimpleEvent.from_data({x: closed(0.0, 1.0)}).as_composite_set()
-        truncated, probability = circuit.truncated(event)
-
-        self.assertAlmostEqual(probability, 0.2)
-        np.testing.assert_allclose(
-            truncated.likelihood(np.array([[0.5], [1.5]])), np.array([1.0, 0.0])
-        )
-
-    def test_sampling_a_circuit_with_a_dense_root(self):
-        np.random.seed(69)
-        root = DenseSumLayer([self.input_layer], [np.log([[0.2, 0.3, 0.5]])])
-        circuit = ProbabilisticCircuit([x], root)
-        samples = circuit.sample(20000)
-        self.assertAlmostEqual(float((samples < 1.0).mean()), 0.2, delta=0.02)
-        self.assertAlmostEqual(float((samples > 2.0).mean()), 0.5, delta=0.02)
-
-    def test_a_shared_dense_layer_is_only_converted_once(self):
-        # as_sparse() used to allocate a fresh SparseSumLayer on every call, so a dense
-        # layer reached through two parents recomputed its whole contribution twice
-        # instead of hitting the shared cache. Two sum layers mixing the same
-        # DenseSumLayer differently reproduces that without needing a product layer.
-        shared = self.layer  # DenseSumLayer with 2 nodes, from setUp
-        mixer_one = SparseSumLayer(
-            [shared], [SparseArray.from_dense(np.log([[0.6, 0.4]]), fill_value=-np.inf)]
-        )
-        mixer_two = SparseSumLayer(
-            [shared], [SparseArray.from_dense(np.log([[0.3, 0.7]]), fill_value=-np.inf)]
-        )
-        root = SparseSumLayer(
-            [mixer_one, mixer_two],
-            [
-                SparseArray.from_dense(np.log([[0.5]]), fill_value=-np.inf),
-                SparseArray.from_dense(np.log([[0.5]]), fill_value=-np.inf),
-            ],
-        )
-        circuit = ProbabilisticCircuit([x], root)
-        event = SimpleEvent.from_data({x: closed(0.0, 1.0)}).as_composite_set()
-
-        calls = []
-        original_as_sparse = DenseSumLayer.as_sparse
-
-        def counting_as_sparse(self):
-            calls.append(1)
-            return original_as_sparse(self)
-
-        with mock.patch.object(DenseSumLayer, "as_sparse", counting_as_sparse):
-            circuit.truncated(event)
-
-        self.assertEqual(len(calls), 1)
-
-
 class TruncationOfInputLayersTestCase(unittest.TestCase):
     """
     Truncating an input layer has to keep the number of nodes stable, even when a node
     splits into several pieces or changes its type.
     """
 
-    def circuit_of(self, layer) -> ProbabilisticCircuit:
-        return ProbabilisticCircuit(
+    def circuit_of(self, layer) -> LayeredProbabilisticCircuit:
+        return LayeredProbabilisticCircuit(
             [x], mixture_of([layer], [0.0]) if layer.number_of_nodes == 1 else layer
         )
 
     def test_truncating_to_a_composite_interval_introduces_a_selecting_sum_layer(self):
         layer = uniform_layer_of(0, [(0, 4)])
-        circuit = ProbabilisticCircuit([x], mixture_of([layer], [0.0]))
+        circuit = LayeredProbabilisticCircuit([x], mixture_of([layer], [0.0]))
 
         event = SimpleEvent.from_data(
             {x: closed(0.0, 1.0) | closed(3.0, 4.0)}
@@ -265,7 +150,7 @@ class TruncationOfInputLayersTestCase(unittest.TestCase):
 
     def test_truncating_to_a_singleton(self):
         layer = uniform_layer_of(0, [(0, 2)])
-        circuit = ProbabilisticCircuit([x], mixture_of([layer], [0.0]))
+        circuit = LayeredProbabilisticCircuit([x], mixture_of([layer], [0.0]))
 
         event = SimpleEvent.from_data({x: singleton(1.0)}).as_composite_set()
         truncated, probability = circuit.truncated(event, singleton_allowed=True)
@@ -285,7 +170,7 @@ class TruncationOfInputLayersTestCase(unittest.TestCase):
                 )
             ],
         )
-        circuit = ProbabilisticCircuit([x], root)
+        circuit = LayeredProbabilisticCircuit([x], root)
 
         event = SimpleEvent.from_data({x: closed(2.0, 3.0)}).as_composite_set()
         truncated, probability = circuit.truncated(event)
@@ -439,7 +324,7 @@ class VectorizedTruncationTestCase(unittest.TestCase):
         Truncating a composite event reuses one circuit for every simple set instead of
         copying it, which is only sound because the pass builds new layers.
         """
-        layered = ProbabilisticCircuit.from_rustworkx(shared_children_circuit())
+        layered = LayeredProbabilisticCircuit.from_rustworkx(shared_children_circuit())
         layers_before = list(layered.layers)
         parameters_before = [
             (type(layer).__name__, layer.number_of_nodes, to_json(layer))
@@ -511,7 +396,7 @@ class HelperTestCase(unittest.TestCase):
         product = product_of([x, y], [layer_x, layer_y])
         self.assertIsInstance(product, ProductLayer)
 
-        circuit = ProbabilisticCircuit([x, y], product)
+        circuit = LayeredProbabilisticCircuit([x, y], product)
         np.testing.assert_allclose(
             circuit.likelihood(np.array([[0.5, 1.0]])), np.array([0.5])
         )
@@ -519,7 +404,7 @@ class HelperTestCase(unittest.TestCase):
         mixture = mixture_of([product], [np.log(1.0)])
         self.assertIsInstance(mixture, SparseSumLayer)
         np.testing.assert_allclose(
-            ProbabilisticCircuit([x, y], mixture).likelihood(
+            LayeredProbabilisticCircuit([x, y], mixture).likelihood(
                 np.array([[0.5, 1.0]])
             ),
             np.array([0.5]),
@@ -552,7 +437,7 @@ class JointProbabilityTreeIntegrationTestCase(unittest.TestCase):
         cls.rx_circuit = JointProbabilityTree(
             annotated_variables=variables, min_samples_per_leaf=0.1
         ).fit(frame)
-        cls.layered = ProbabilisticCircuit.from_rustworkx(cls.rx_circuit)
+        cls.layered = LayeredProbabilisticCircuit.from_rustworkx(cls.rx_circuit)
 
     def setUp(self):
         np.random.seed(69)

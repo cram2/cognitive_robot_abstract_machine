@@ -1,27 +1,28 @@
 from __future__ import annotations
 
 import functools
-import inspect
-import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
 import tqdm
-from krrood.adapters.json_serializer import SubclassJSONSerializer, recursive_subclasses
+from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import (
     Any,
     Dict,
+    Generic,
+    Iterable,
     Iterator,
     List,
     Optional,
     Self,
     Tuple,
-    Type,
+    TypeVar,
 )
 
 from probabilistic_model.exceptions import ShapeMismatchError
@@ -38,60 +39,12 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 
 
-class BatchedTruncationUnsupported(Exception):
-    """
-    Raised when a layer cannot be truncated to several simple events in one pass.
-
-    The circuit catches this and falls back to truncating once per simple event. It is an
-    exception rather than a ``None`` return because the decision is made deep inside the
-    recursion, by an input layer, and has to abort the whole pass.
-    """
-
-
-def import_layer_modules():
-    """
-    Import the modules that define the concrete layers.
-
-    The lookup of a layer class walks the subclasses of :class:`Layer`, so the modules
-    that define them have to have been imported. Doing that here rather than in the
-    package ``__init__`` keeps the import of this module free of cycles: every layer
-    module imports from this one.
-    """
-    from probabilistic_model.probabilistic_circuit.tensorized import discrete_layer  # noqa: F401
-    from probabilistic_model.probabilistic_circuit.tensorized import gaussian_layer  # noqa: F401
-    from probabilistic_model.probabilistic_circuit.tensorized import input_layer  # noqa: F401
-    from probabilistic_model.probabilistic_circuit.tensorized import uniform_layer  # noqa: F401
-
-
-def layer_class_of(clazz: Type) -> Type[Layer]:
-    """
-    Find the layer class that corresponds to a class of the rustworkx implementation.
-
-    An exact match wins over an inherited one. That distinction matters because the
-    distributions form their own hierarchy: a truncated Gaussian is a Gaussian, so
-    matching by ``issubclass`` alone would put it into whichever of the two layers the
-    subclass iteration happens to reach first.
-
-    :param clazz: The unit class or the distribution class of a leaf unit.
-    :return: The matching layer class.
-    """
-    import_layer_modules()
-
-    candidates = [
-        subclass
-        for subclass in recursive_subclasses(Layer)
-        if not inspect.isabstract(subclass)
-    ]
-
-    for subclass in candidates:
-        if clazz in subclass.rustworkx_classes():
-            return subclass
-
-    for subclass in candidates:
-        if issubclass(clazz, subclass.rustworkx_classes()):
-            return subclass
-
-    raise TypeError(f"Could not find a layer class for {clazz}")
+RustworkxUnitType = TypeVar("RustworkxUnitType")
+"""
+The class of the ``probabilistic_model.probabilistic_circuit.rx`` package that a
+:class:`Layer` subclass represents: a unit class for an inner layer, or the distribution
+class of a leaf unit for an input layer.
+"""
 
 
 def memoized(name: str):
@@ -122,7 +75,52 @@ def memoized(name: str):
     return decorator
 
 
-class Layer(SubclassJSONSerializer, ABC):
+@dataclass
+class ForwardSampleAssignment:
+    """
+    Bookkeeping for a top-down sampling pass over a circuit.
+
+    A layer routes the output rows assigned to each of its nodes to the nodes of its
+    child layers; a child layer that is shared by several parents accumulates rows from
+    each of them before it is its own turn to route them further.
+    """
+
+    rows_by_node: Dict[int, List[List[npt.NDArray]]]
+    """
+    For every layer, indexed by its id, the row-index arrays assigned to each of its
+    nodes so far.
+    """
+
+    @classmethod
+    def for_layers(cls, layers: Iterable[Layer]) -> Self:
+        """
+        :param layers: Every layer that will be visited during the pass.
+        :return: An assignment with an empty bucket for every node of every layer.
+        """
+        return cls(
+            {id(layer): [[] for _ in range(layer.number_of_nodes)] for layer in layers}
+        )
+
+    def assign(self, layer: Layer, node: int, rows: npt.NDArray) -> None:
+        """
+        Route output rows to one node of a layer.
+
+        :param layer: The layer the node belongs to.
+        :param node: The index of the node within that layer.
+        :param rows: The output rows drawn from that node.
+        """
+        self.rows_by_node[id(layer)][node].append(rows)
+
+    def rows_of(self, layer: Layer) -> List[List[npt.NDArray]]:
+        """
+        :param layer: The layer to read the assignment of.
+        :return: The row-index arrays assigned to every node of that layer so far, one
+            list per node.
+        """
+        return self.rows_by_node[id(layer)]
+
+
+class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSerializer, ABC):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
 
@@ -132,8 +130,13 @@ class Layer(SubclassJSONSerializer, ABC):
     a layer at once.
 
     Variables are referred to by their index in the ``variables`` of the owning
-    :class:`probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit.ProbabilisticCircuit`
+    :class:`probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit.LayeredProbabilisticCircuit`
     rather than by the variable objects themselves.
+
+    Concrete subclasses bind :data:`RustworkxUnitType` to the ``rx`` class they represent,
+    for instance ``ProductLayer(InnerLayer[ProductUnit])``; the conversion in
+    :mod:`probabilistic_model.probabilistic_circuit.tensorized.rustworkx_conversion` reads
+    it back with :meth:`get_generic_type_parameters` to find the layer class for a unit.
     """
 
     # ------------------------------------------------------------------ structure
@@ -203,18 +206,22 @@ class Layer(SubclassJSONSerializer, ABC):
             before children.
         """
         result: List[Layer] = []
-        seen = set()
-
-        def visit(layer: Layer):
-            if id(layer) in seen:
-                return
-            seen.add(id(layer))
-            result.append(layer)
-            for child_layer in layer.child_layers:
-                visit(child_layer)
-
-        visit(self)
+        self._visit_once(result, set())
         return result
+
+    def _visit_once(self, result: List[Layer], seen: set):
+        """
+        Append this layer and its descendants to ``result``, each exactly once.
+
+        :param result: The list to append to, in visiting order.
+        :param seen: The ids of the layers already visited.
+        """
+        if id(self) in seen:
+            return
+        seen.add(id(self))
+        result.append(self)
+        for child_layer in self.child_layers:
+            child_layer._visit_once(result, seen)
 
     def all_layers_with_depth(self, depth: int = 0) -> List[Tuple[int, Layer]]:
         """
@@ -352,15 +359,14 @@ class Layer(SubclassJSONSerializer, ABC):
     @abstractmethod
     def sample_forward(
         self,
-        assignment: Dict[int, List[List[npt.NDArray]]],
+        assignment: ForwardSampleAssignment,
         samples: npt.NDArray,
         variables: SortedSet,
     ):
         """
         Route the sample rows that the parents of this layer assigned to its nodes.
 
-        :param assignment: A map from the id of a layer to, per node of that layer, the
-            list of row index arrays that were routed to it.
+        :param assignment: The rows assigned to every node of every layer so far.
         :param samples: The array the input layers write their samples into.
         :param variables: The variables of the circuit.
         """
@@ -613,50 +619,6 @@ class Layer(SubclassJSONSerializer, ABC):
     # ------------------------------------------------------------------ conversion
 
     @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        """
-        :return: The classes of the ``probabilistic_model.probabilistic_circuit.rx``
-            package that this layer represents.
-        """
-        return tuple()
-
-    @staticmethod
-    def create_layers_from_nodes(
-        nodes: List[Unit],
-        child_layers: List[LayerConverter],
-        progress_bar: bool = False,
-    ) -> List[LayerConverter]:
-        """
-        Group a list of units of a rustworkx circuit into layers.
-
-        :param nodes: The units that form one level of the rustworkx circuit.
-        :param child_layers: The converters of the level below.
-        :param progress_bar: Whether to show a progress bar.
-        :return: One converter per created layer.
-        """
-        result = []
-
-        def type_of(node: Unit) -> Type:
-            return type(node.distribution) if node.is_leaf else type(node)
-
-        # grouping is by exact type, not by ``isinstance``: a truncated Gaussian leaf is
-        # an instance of the Gaussian distribution and would otherwise be pulled into the
-        # Gaussian group, whose layer cannot hold it
-        groups: Dict[Tuple[Type, Tuple], List[Unit]] = {}
-        for node in nodes:
-            groups.setdefault((type_of(node), tuple(node.variables)), []).append(node)
-
-        for (node_type, _), group in groups.items():
-            layer_type = layer_class_of(node_type)
-            result.append(
-                layer_type.create_layer_from_nodes_with_same_type_and_scope(
-                    group, child_layers, progress_bar
-                )
-            )
-
-        return result
-
-    @classmethod
     @abstractmethod
     def create_layer_from_nodes_with_same_type_and_scope(
         cls,
@@ -702,7 +664,7 @@ class Layer(SubclassJSONSerializer, ABC):
 
 
 @dataclass(eq=False, repr=False)
-class InnerLayer(Layer, ABC):
+class InnerLayer(Layer[RustworkxUnitType], ABC):
     """
     Abstract base class for the layers that have child layers.
 
@@ -752,7 +714,7 @@ class InnerLayer(Layer, ABC):
 
 
 @dataclass(eq=False, repr=False)
-class SumLayer(InnerLayer, ABC):
+class SumLayer(InnerLayer[SumUnit], ABC):
     """
     Abstract base class for layers of sum units.
 
@@ -762,11 +724,7 @@ class SumLayer(InnerLayer, ABC):
     same scope, which is the scope of the child layers.
     """
 
-    log_weights: List[Any]
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.log_weights = list(self.log_weights)
+    log_weights: List[SparseArray]
 
     @property
     def variables(self) -> npt.NDArray:
@@ -775,7 +733,7 @@ class SumLayer(InnerLayer, ABC):
         return self._variables_cache
 
     @property
-    def log_weighted_child_layers(self) -> Iterator[Tuple[Any, Layer]]:
+    def log_weighted_child_layers(self) -> Iterator[Tuple[SparseArray, Layer]]:
         """
         :return: The log-weights and the child layers, zipped together.
         """
@@ -791,7 +749,7 @@ class SumLayer(InnerLayer, ABC):
 
     @property
     @abstractmethod
-    def normalized_weights(self) -> Any:
+    def normalized_weights(self) -> List[SparseArray]:
         """
         :return: The weights of each node in linear space, normalized to sum to one.
         """
@@ -807,10 +765,6 @@ class SumLayer(InnerLayer, ABC):
                 raise ShapeMismatchError(
                     child_layer.number_of_nodes, log_weights.shape[1]
                 )
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        return (SumUnit,)
 
     # ------------------------------------------------------------------ queries
 
@@ -972,52 +926,6 @@ class SumLayer(InnerLayer, ABC):
         ]
         return self._weighted_forward_over_nodes(child_results)
 
-    def sample_forward(
-        self,
-        assignment: Dict[int, List[List[npt.NDArray]]],
-        samples: npt.NDArray,
-        variables: SortedSet,
-    ):
-        own_assignment = assignment[id(self)]
-        weights = self.normalized_weights_per_child_layer()
-
-        # the (child layer, child node) target of every column of the concatenated
-        # weight matrix, so that a single multinomial draw partitions the rows
-        targets = []
-        for child_layer_index, child_layer in enumerate(self.child_layers):
-            for child_node in range(child_layer.number_of_nodes):
-                targets.append((child_layer_index, child_node))
-
-        concatenated = np.concatenate(weights, axis=1)
-
-        for node, rows_of_node in enumerate(own_assignment):
-            if not rows_of_node:
-                continue
-            rows = np.concatenate(rows_of_node)
-            probabilities = concatenated[node]
-
-            # guard against the accumulated floating point error of the normalization
-            total = probabilities.sum()
-            if total <= 0:
-                continue
-            probabilities = probabilities / total
-
-            counts = np.random.multinomial(len(rows), pvals=probabilities)
-
-            # shuffle so that the contiguous chunks handed to the children are an
-            # unbiased partition of the rows
-            np.random.shuffle(rows)
-
-            offset = 0
-            for count, (child_layer_index, child_node) in zip(counts, targets):
-                if not count:
-                    continue
-                child_layer = self.child_layers[child_layer_index]
-                assignment[id(child_layer)][child_node].append(
-                    rows[offset : offset + count]
-                )
-                offset += count
-
     # ------------------------------------------------------------------ structural
 
     @abstractmethod
@@ -1062,8 +970,6 @@ class SparseSumLayer(SumLayer):
     This is the layer that a circuit of the ``rx`` package is converted into: sum units
     there usually have few children, so the dense weight matrix would be mostly empty.
     """
-
-    log_weights: List[SparseArray]
 
     _edge_gather: Optional[npt.NDArray] = field(default=None, init=False, repr=False)
     """
@@ -1257,11 +1163,11 @@ class SparseSumLayer(SumLayer):
 
     def sample_forward(
         self,
-        assignment: Dict[int, List[List[npt.NDArray]]],
+        assignment: ForwardSampleAssignment,
         samples: npt.NDArray,
         variables: SortedSet,
     ):
-        own_assignment = assignment[id(self)]
+        own_assignment = assignment.rows_of(self)
         gather = self.edge_gather
         # the padding slot gets a weight of zero, so it is never drawn
         weights = np.append(self.normalized_edge_weights, 0.0)
@@ -1290,8 +1196,10 @@ class SparseSumLayer(SumLayer):
                 if not count:
                     continue
                 child_layer = self.child_layers[child_layer_of_edge[position]]
-                assignment[id(child_layer)][child_node_of_edge[position]].append(
-                    rows[offset : offset + count]
+                assignment.assign(
+                    child_layer,
+                    child_node_of_edge[position],
+                    rows[offset : offset + count],
                 )
                 offset += count
 
@@ -1789,321 +1697,7 @@ class SparseSumLayer(SumLayer):
 
 
 @dataclass(eq=False, repr=False)
-class DenseSumLayer(SumLayer):
-    """
-    A sum layer whose weights are stored densely.
-
-    This is the layout of the sum layers of a randomly initialized region graph, where
-    every node is connected to every node of its child layers.
-    """
-
-    log_weights: List[npt.NDArray]
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.log_weights = [np.asarray(w, dtype=float) for w in self.log_weights]
-
-    @property
-    def number_of_nodes(self) -> int:
-        return self.log_weights[0].shape[0]
-
-    @property
-    def number_of_own_parameters(self) -> int:
-        return sum(math.prod(log_weights.shape) for log_weights in self.log_weights)
-
-    @property
-    def number_of_components(self) -> int:
-        return sum(
-            child_layer.number_of_components for child_layer in self.child_layers
-        ) + sum(math.prod(log_weights.shape) for log_weights in self.log_weights)
-
-    @property
-    def concatenated_log_weights(self) -> npt.NDArray:
-        """
-        :return: The log-weights of all child layers side by side.
-        """
-        return np.concatenate(self.log_weights, axis=1)
-
-    @property
-    def log_normalization_constants(self) -> npt.NDArray:
-        return embedded_logsumexp(self.concatenated_log_weights, axis=1)
-
-    @property
-    def normalized_weights(self) -> npt.NDArray:
-        with np.errstate(invalid="ignore"):
-            result = np.exp(
-                self.concatenated_log_weights
-                - self.log_normalization_constants.reshape(-1, 1)
-            )
-        return np.nan_to_num(result, nan=0.0)
-
-    def normalized_weights_per_child_layer(self) -> List[npt.NDArray]:
-        normalization = self.log_normalization_constants.reshape(-1, 1)
-        result = []
-        for log_weights in self.log_weights:
-            with np.errstate(invalid="ignore"):
-                weights = np.exp(log_weights - normalization)
-            result.append(np.nan_to_num(weights, nan=0.0))
-        return result
-
-    def normalized_log_weights_per_child_layer(self) -> List[npt.NDArray]:
-        normalization = self.log_normalization_constants.reshape(-1, 1)
-        return [log_weights - normalization for log_weights in self.log_weights]
-
-    def edges(self) -> Iterator[Tuple[int, int, int]]:
-        for child_layer_index, log_weights in enumerate(self.log_weights):
-            for node in range(log_weights.shape[0]):
-                for child_node in range(log_weights.shape[1]):
-                    yield node, child_layer_index, child_node
-
-    def log_weighted_sum(self, child_results: List[npt.NDArray]) -> npt.NDArray:
-        normalization = self.log_normalization_constants
-        result = None
-        for log_weights, child_result in zip(self.log_weights, child_results):
-            # (..., 1, #child nodes) + (#nodes, #child nodes)
-            combined = child_result[..., None, :] + log_weights
-            contribution = embedded_logsumexp(combined, axis=-1)
-            result = (
-                contribution
-                if result is None
-                else np.logaddexp(result, contribution)
-            )
-        return result - normalization
-
-    def normalize_own(self):
-        normalization = self.log_normalization_constants.reshape(-1, 1)
-        self.log_weights = [
-            log_weights - normalization for log_weights in self.log_weights
-        ]
-
-    def __deepcopy__(self, memo=None) -> DenseSumLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        child_layers = [
-            child_layer.__deepcopy__(memo) for child_layer in self.child_layers
-        ]
-        result = self.__class__(
-            child_layers, [log_weights.copy() for log_weights in self.log_weights]
-        )
-        memo[id(self)] = result
-        return result
-
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["log_weights"] = [
-            log_weights.tolist() for log_weights in self.log_weights
-        ]
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        child_layers = [
-            Layer.from_json(child_layer, **kwargs)
-            for child_layer in data["child_layers"]
-        ]
-        log_weights = [np.asarray(w, dtype=float) for w in data["log_weights"]]
-        return cls(child_layers, log_weights)
-
-    def as_sparse(self) -> SparseSumLayer:
-        """
-        :return: An equivalent sum layer with sparsely stored weights.
-        """
-        return SparseSumLayer(
-            list(self.child_layers),
-            [
-                SparseArray.from_dense(log_weights, fill_value=-np.inf)
-                for log_weights in self.log_weights
-            ],
-        )
-
-    # the structural queries are the same for both weight layouts; converting to the
-    # sparse layout keeps them in one place and produces a circuit that is sparse
-    # afterwards anyway, because truncation removes edges.
-    #
-    # as_sparse() allocates a new SparseSumLayer on every call, so its own internal
-    # cache (keyed by the id of that fresh object) never gets a hit across separate
-    # calls on this same DenseSumLayer. A shared DenseSumLayer reached via several
-    # parents would otherwise redo the conversion and recompute its own contribution
-    # once per parent -- and, down a chain of shared dense layers, that compounds into
-    # one recomputation per path instead of one per node. Caching under id(self) here,
-    # with the same key scheme the sparse layers use, restores the "evaluate a shared
-    # layer once" guarantee for the dense layout too.
-    def log_truncated_of_simple_event(
-        self,
-        event: SimpleEvent,
-        variables: SortedSet,
-        singleton_allowed: bool,
-        cache: Optional[Dict] = None,
-        log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
-    ) -> Tuple[Layer, npt.NDArray]:
-        if cache is None:
-            cache = {}
-        key = ("truncated", id(self))
-        if key in cache:
-            return cache[key]
-        result = self.as_sparse().log_truncated_of_simple_event(
-            event,
-            variables,
-            singleton_allowed,
-            cache=cache,
-            log_probabilities=log_probabilities,
-        )
-        cache[key] = result
-        return result
-
-    def log_truncated_of_simple_events(
-        self,
-        events: List[SimpleEvent],
-        variables: SortedSet,
-        singleton_allowed: bool,
-        cache: Optional[Dict] = None,
-        log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
-    ) -> Tuple[Layer, npt.NDArray]:
-        if cache is None:
-            cache = {}
-        key = ("batched truncated", id(self))
-        if key in cache:
-            return cache[key]
-        result = self.as_sparse().log_truncated_of_simple_events(
-            events,
-            variables,
-            singleton_allowed,
-            cache=cache,
-            log_probabilities=log_probabilities,
-        )
-        cache[key] = result
-        return result
-
-    def log_conditional_of_point(
-        self,
-        point: Dict[Variable, Any],
-        variables: SortedSet,
-        cache: Optional[Dict] = None,
-        log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
-    ) -> Tuple[Layer, npt.NDArray]:
-        if cache is None:
-            cache = {}
-        key = ("conditional", id(self))
-        if key in cache:
-            return cache[key]
-        result = self.as_sparse().log_conditional_of_point(
-            point, variables, cache=cache, log_probabilities=log_probabilities
-        )
-        cache[key] = result
-        return result
-
-    def required_child_nodes(
-        self, alive: npt.NDArray, log_probabilities: Dict[int, npt.NDArray]
-    ) -> List[Tuple[Layer, npt.NDArray]]:
-        result = []
-        for log_weights, child_layer in self.log_weighted_child_layers:
-            needed = (alive[:, None] & (log_weights > -np.inf)).any(axis=0)
-            child_log_probabilities = log_probabilities.get(id(child_layer))
-            if child_log_probabilities is not None:
-                needed = needed & (child_log_probabilities > -np.inf)
-            result.append((child_layer, needed))
-        return result
-
-    def rebuild(
-        self,
-        needed: Dict[int, npt.NDArray],
-        rebuilt: Dict[int, Optional[Layer]],
-    ) -> Optional[Layer]:
-        alive = needed[id(self)]
-        if not alive.any():
-            return None
-
-        new_child_layers = []
-        new_log_weights = []
-        for log_weights, child_layer in self.log_weighted_child_layers:
-            pruned_child = rebuilt.get(id(child_layer))
-            if pruned_child is None:
-                continue
-            child_needed = needed[id(child_layer)]
-            new_child_layers.append(pruned_child)
-            new_log_weights.append(log_weights[np.ix_(alive, child_needed)])
-
-        if not new_child_layers:
-            return None
-
-        return self.__class__(new_child_layers, new_log_weights)
-
-    def marginal(
-        self, kept: npt.NDArray, cache: Optional[Dict] = None
-    ) -> Optional[Layer]:
-        if cache is None:
-            cache = {}
-        key = ("marginal", id(self))
-        if key in cache:
-            return cache[key]
-
-        new_child_layers = []
-        new_log_weights = []
-        for log_weights, child_layer in self.log_weighted_child_layers:
-            marginal_child = child_layer.marginal(kept, cache)
-            if marginal_child is None:
-                continue
-            new_child_layers.append(marginal_child)
-            new_log_weights.append(log_weights.copy())
-
-        result = (
-            None
-            if not new_child_layers
-            else self.__class__(new_child_layers, new_log_weights)
-        )
-        cache[key] = result
-        return result
-
-    def simplify(self, cache: Optional[Dict] = None) -> Layer:
-        if cache is None:
-            cache = {}
-        key = ("simplify", id(self))
-        if key in cache:
-            return cache[key]
-        result = self.__class__(
-            [child_layer.simplify(cache) for child_layer in self.child_layers],
-            [log_weights.copy() for log_weights in self.log_weights],
-        )
-        cache[key] = result
-        return result
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        # a rustworkx circuit is always converted into the sparse variant
-        return tuple()
-
-    @classmethod
-    def create_layer_from_nodes_with_same_type_and_scope(
-        cls,
-        nodes: List[Unit],
-        child_layers: List[LayerConverter],
-        progress_bar: bool = False,
-    ) -> LayerConverter:
-        raise NotImplementedError(
-            "Dense sum layers are not created from rustworkx circuits. "
-            "Use SparseSumLayer instead."
-        )
-
-    def to_rustworkx(
-        self,
-        variables: SortedSet,
-        result: RustworkxProbabilisticCircuit,
-        cache: Optional[Dict] = None,
-        progress_bar: Optional[tqdm.tqdm] = None,
-    ) -> List[Unit]:
-        if cache is None:
-            cache = {}
-        if id(self) in cache:
-            return cache[id(self)]
-        units = self.as_sparse().to_rustworkx(variables, result, cache, progress_bar)
-        cache[id(self)] = units
-        return units
-
-
-@dataclass(eq=False, repr=False)
-class ProductLayer(InnerLayer):
+class ProductLayer(InnerLayer[ProductUnit]):
     """
     A layer of decomposable product units.
 
@@ -2141,10 +1735,6 @@ class ProductLayer(InnerLayer):
             raise ShapeMismatchError(
                 (len(self.child_layers), self.number_of_nodes), self.edges.shape
             )
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        return (ProductUnit,)
 
     def is_decomposable_own(self) -> bool:
         seen = set()
@@ -2338,11 +1928,11 @@ class ProductLayer(InnerLayer):
 
     def sample_forward(
         self,
-        assignment: Dict[int, List[List[npt.NDArray]]],
+        assignment: ForwardSampleAssignment,
         samples: npt.NDArray,
         variables: SortedSet,
     ):
-        own_assignment = assignment[id(self)]
+        own_assignment = assignment.rows_of(self)
 
         rows_per_node = [
             np.concatenate(rows) if rows else None for rows in own_assignment
@@ -2353,7 +1943,7 @@ class ProductLayer(InnerLayer):
             if rows is None:
                 continue
             child_layer = self.child_layers[child_layer_index]
-            assignment[id(child_layer)][child_node].append(rows)
+            assignment.assign(child_layer, child_node, rows)
 
     # ------------------------------------------------------------------ structural
 

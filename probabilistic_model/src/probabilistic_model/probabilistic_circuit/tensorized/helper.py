@@ -11,40 +11,40 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ProductLayer,
     SparseSumLayer,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit import (
-    ProbabilisticCircuit,
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.utils import SparseArray
 from probabilistic_model.probabilistic_circuit.rx import helper as rx_helper
 
 
-def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> ProbabilisticCircuit:
+def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> LayeredProbabilisticCircuit:
     """
     Create the uniform measure over a simple event as a layered circuit.
 
     :param simple_event: The simple event.
     :return: The circuit describing the uniform measure.
     """
-    return ProbabilisticCircuit.from_rustworkx(
+    return LayeredProbabilisticCircuit.from_rustworkx(
         rx_helper.uniform_measure_of_simple_event(simple_event)
     )
 
 
-def uniform_measure_of_event(event: Event) -> ProbabilisticCircuit:
+def uniform_measure_of_event(event: Event) -> LayeredProbabilisticCircuit:
     """
     Create the uniform measure over an event as a layered circuit.
 
     :param event: The event.
     :return: The circuit describing the uniform measure.
     """
-    return ProbabilisticCircuit.from_rustworkx(rx_helper.uniform_measure_of_event(event))
+    return LayeredProbabilisticCircuit.from_rustworkx(rx_helper.uniform_measure_of_event(event))
 
 
 def fully_factorized(
     variables: Iterable[Variable],
     means: Optional[Dict[Continuous, float]] = None,
     variances: Optional[Dict[Continuous, float]] = None,
-) -> ProbabilisticCircuit:
+) -> LayeredProbabilisticCircuit:
     """
     Create a fully factorized distribution over a set of variables as a layered circuit.
 
@@ -53,7 +53,7 @@ def fully_factorized(
     :param variances: The variances of the normal distributions of the numeric variables.
     :return: The circuit.
     """
-    return ProbabilisticCircuit.from_rustworkx(
+    return LayeredProbabilisticCircuit.from_rustworkx(
         rx_helper.fully_factorized(variables, means, variances)
     )
 

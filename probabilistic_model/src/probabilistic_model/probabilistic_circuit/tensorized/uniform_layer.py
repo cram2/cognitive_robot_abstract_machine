@@ -7,7 +7,7 @@ import numpy.typing as npt
 from random_events.interval import Interval
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Dict, List, Optional, Self, Tuple, Type
+from typing_extensions import Dict, List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import memoized
@@ -17,14 +17,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
 
 
 @dataclass(eq=False, repr=False)
-class UniformLayer(ContinuousLayerWithFiniteSupport):
+class UniformLayer(ContinuousLayerWithFiniteSupport[UniformDistribution]):
     """
     A layer of uniform distributions over one continuous variable.
     """
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        return (UniformDistribution,)
 
     @property
     def number_of_own_parameters(self) -> int:

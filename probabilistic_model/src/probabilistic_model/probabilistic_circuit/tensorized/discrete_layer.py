@@ -11,7 +11,7 @@ from random_events.set import Set
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, List, Optional, Self, Tuple, Type
+from typing_extensions import Any, Dict, List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.distributions import (
     DiscreteDistribution,
@@ -20,12 +20,13 @@ from probabilistic_model.distributions.distributions import (
 )
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import memoized
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import RustworkxUnitType
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import InputLayer
 from probabilistic_model.utils import MissingDict
 
 
 @dataclass(eq=False, repr=False)
-class DiscreteLayer(InputLayer, ABC):
+class DiscreteLayer(InputLayer[RustworkxUnitType], ABC):
     """
     Abstract base class for the input layers of discrete univariate distributions.
 
@@ -270,14 +271,10 @@ class DiscreteLayer(InputLayer, ABC):
 
 
 @dataclass(eq=False, repr=False)
-class SymbolicLayer(DiscreteLayer):
+class SymbolicLayer(DiscreteLayer[SymbolicDistribution]):
     """
     A layer of categorical distributions over one symbolic variable.
     """
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        return (SymbolicDistribution,)
 
     def node_distribution(
         self, index: int, variable: Variable
@@ -301,14 +298,10 @@ class SymbolicLayer(DiscreteLayer):
 
 
 @dataclass(eq=False, repr=False)
-class IntegerLayer(DiscreteLayer):
+class IntegerLayer(DiscreteLayer[IntegerDistribution]):
     """
     A layer of distributions over one integer variable.
     """
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type, ...]:
-        return (IntegerDistribution,)
 
     def node_distribution(self, index: int, variable: Variable) -> IntegerDistribution:
         return IntegerDistribution(

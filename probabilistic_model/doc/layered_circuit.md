@@ -161,7 +161,7 @@ one sparse integer matrix, and an input layer stores the parameters of all of it
 contiguous arrays.
 
 ```{code-cell} ipython3
-from probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit import ProbabilisticCircuit as NumpyPC
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import LayeredProbabilisticCircuit as NumpyPC
 
 numpy_model = NumpyPC.from_rustworkx(model)
 print(numpy_model)
@@ -235,10 +235,10 @@ Truncating one simple set at a time instead, the same 100-set result is spread o
 layers and takes 192 ms to build.
 
 `experiments/src/experiments/probabilistic_model_experiments/layered_circuit_speed.py`
-reproduces this table and the query timings below it;
-`.../probabilistic_model_experiments/conditioning_speed.py` measures conditioning on a
-partial point the same way, which sees a much smaller speedup since there is nothing to
-batch in a single point the way there is in a many-simple-set truncation.
+reproduces this table and the query timings below it, along with conditioning on a
+partial point measured the same way; conditioning sees a much smaller speedup since
+there is nothing to batch in a single point the way there is in a many-simple-set
+truncation.
 
 ### Speed of the other queries
 

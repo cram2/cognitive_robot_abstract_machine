@@ -17,8 +17,11 @@ from typing_extensions import Any, Dict, Iterable, List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.exceptions import IntractableError
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     BatchedTruncationUnsupported,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
+    ForwardSampleAssignment,
     Layer,
     LayerConverter,
     ProductLayer,
@@ -27,6 +30,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     layer_of_distributions,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.rustworkx_conversion import (
+    create_layers_from_nodes,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.utils import SparseArray
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -42,7 +48,7 @@ from probabilistic_model.utils import logsumexp
 
 
 @dataclass(eq=False)
-class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
+class LayeredProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
     """
     A probabilistic circuit whose units are grouped into layers of numpy arrays.
 
@@ -148,12 +154,10 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
     def sample(self, amount: int) -> npt.NDArray:
         order = self.root.topological_layer_order()
-        assignment: Dict[int, List[List[npt.NDArray]]] = {
-            id(layer): [[] for _ in range(layer.number_of_nodes)] for layer in order
-        }
+        assignment = ForwardSampleAssignment.for_layers(order)
 
         # the root is responsible for every row of the output array
-        assignment[id(self.root)][0].append(np.arange(amount))
+        assignment.assign(self.root, 0, np.arange(amount))
 
         samples = np.full((amount, len(self.variables)), np.nan)
         for layer in order:
@@ -607,9 +611,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
             # every converter created so far is offered as a possible child, not only
             # those of the level directly below: the layering of the graph is by
             # shortest distance to the root, so an edge may skip levels
-            new_converters = Layer.create_layers_from_nodes(
-                nodes, converters, progress_bar
-            )
+            new_converters = create_layers_from_nodes(nodes, converters, progress_bar)
             converters = new_converters + converters
 
         root_converters = [
@@ -637,16 +639,6 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         result = RustworkxProbabilisticCircuit()
         self.root.to_rustworkx(self.variables, result, {}, bar)
         return result
-
-    def plot_structure(self, **kwargs):
-        """
-        Plot the structure of this circuit by converting it to a circuit of the ``rx``
-        package, which owns the layout and drawing code.
-
-        :param kwargs: Keyword arguments handed on to
-            :meth:`probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit.ProbabilisticCircuit.plot_structure`.
-        """
-        return self.to_rustworkx().plot_structure(**kwargs)
 
     def __deepcopy__(self, memo=None) -> Self:
         return self.__class__(SortedSet(self.variables), self.root.__deepcopy__({}))

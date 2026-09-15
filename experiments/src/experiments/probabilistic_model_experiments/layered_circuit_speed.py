@@ -9,6 +9,11 @@ simple set and mixing the results spreads a circuit with a handful of layers ove
 hundreds of them, so every later query pays python overhead per layer instead of
 running over arrays. This experiment measures the alternative, a single batched pass
 that keeps the number of layers constant, against that baseline.
+
+Conditioning on a partial point is measured too. It is inherently a single pass with
+little to batch away, unlike truncating to an event with many simple sets, so the gain
+over rustworkx there comes only from the layered layout removing per-node python
+overhead, not from any batching.
 """
 
 from __future__ import annotations
@@ -30,17 +35,13 @@ from experiments.experiment_definitions import (
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.probabilistic_circuit.tensorized.probabilistic_circuit import (
-    ProbabilisticCircuit,
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RustworkxProbabilisticCircuit,
 )
 
-NUMBER_OF_VARIABLES = 4
-NUMBER_OF_SAMPLES = 5000
-MIN_SAMPLES_PER_LEAF = 0.02
-MIN_SAMPLES_PER_QUANTILE = 50
 NUMBERS_OF_SIMPLE_SETS = (5, 10, 25, 50, 100)
 LARGEST_NUMBER_OF_SIMPLE_SETS = NUMBERS_OF_SIMPLE_SETS[-1]
 
@@ -55,25 +56,54 @@ class BenchmarkStage(enum.Enum):
     AFTER_TRUNCATION = "after truncation"
 
 
-def learn_circuit() -> JointProbabilityTree:
+@dataclass
+class CorrelatedNormalTreeFactory:
     """
-    :return: A joint probability tree fitted to correlated normal samples.
+    Learns a joint probability tree fitted to correlated normal samples, shared by
+    every measurement in this experiment.
     """
-    np.random.seed(69)
-    covariance = np.random.uniform(0, 1, (NUMBER_OF_VARIABLES, NUMBER_OF_VARIABLES))
-    covariance = covariance @ covariance.T
-    data = np.random.multivariate_normal(
-        np.zeros(NUMBER_OF_VARIABLES), covariance, NUMBER_OF_SAMPLES
-    )
-    frame = pd.DataFrame(
-        data, columns=[f"x_{index}" for index in range(NUMBER_OF_VARIABLES)]
-    )
-    variables = infer_variables_from_dataframe(
-        frame, min_samples_per_quantile=MIN_SAMPLES_PER_QUANTILE
-    )
-    return JointProbabilityTree(
-        annotated_variables=variables, min_samples_per_leaf=MIN_SAMPLES_PER_LEAF
-    ).fit(frame)
+
+    number_of_variables: int = 4
+    """
+    Number of continuous variables of the fitted samples.
+    """
+
+    number_of_samples: int = 5000
+    """
+    Number of samples drawn to fit the tree.
+    """
+
+    min_samples_per_leaf: float = 0.02
+    """
+    Minimum fraction of samples a leaf of the tree must hold.
+    """
+
+    min_samples_per_quantile: int = 50
+    """
+    Minimum number of samples per quantile when inferring the variables' domains.
+    """
+
+    def learn_circuit(self) -> JointProbabilityTree:
+        """
+        :return: A joint probability tree fitted to correlated normal samples.
+        """
+        np.random.seed(69)
+        covariance = np.random.uniform(
+            0, 1, (self.number_of_variables, self.number_of_variables)
+        )
+        covariance = covariance @ covariance.T
+        data = np.random.multivariate_normal(
+            np.zeros(self.number_of_variables), covariance, self.number_of_samples
+        )
+        frame = pd.DataFrame(
+            data, columns=[f"x_{index}" for index in range(self.number_of_variables)]
+        )
+        variables = infer_variables_from_dataframe(
+            frame, min_samples_per_quantile=self.min_samples_per_quantile
+        )
+        return JointProbabilityTree(
+            annotated_variables=variables, min_samples_per_leaf=self.min_samples_per_leaf
+        ).fit(frame)
 
 
 def staircase_of_boxes(
@@ -171,7 +201,7 @@ class QueryDurationResult(ExperimentResult):
 def measure_query_durations(
     stage: BenchmarkStage,
     rustworkx_circuit: RustworkxProbabilisticCircuit,
-    layered: ProbabilisticCircuit,
+    layered: LayeredProbabilisticCircuit,
 ) -> list[QueryDurationResult]:
     """
     Measure ``log_likelihood``, ``sample`` and ``probability_of_simple_event`` on both
@@ -292,8 +322,8 @@ class TruncationScalingResult(ExperimentResult):
 
 
 def measure_truncation_scaling(
-    rustworkx_circuit: RustworkxProbabilisticCircuit, layered: ProbabilisticCircuit
-) -> tuple[list[TruncationScalingResult], RustworkxProbabilisticCircuit, ProbabilisticCircuit]:
+    rustworkx_circuit: RustworkxProbabilisticCircuit, layered: LayeredProbabilisticCircuit
+) -> tuple[list[TruncationScalingResult], RustworkxProbabilisticCircuit, LayeredProbabilisticCircuit]:
     """
     Measure truncating both circuits to a staircase of disjoint boxes of growing size.
 
@@ -346,9 +376,86 @@ def measure_truncation_scaling(
     return results, largest_rustworkx_truncated, largest_layered_truncated
 
 
+@dataclass
+class ConditioningResult(ExperimentResult):
+    """
+    Wall-clock duration of conditioning on a partial point, rustworkx vs the layered
+    numpy circuit.
+
+    rustworkx's ``log_conditional_in_place`` reports the wrong probability on circuits
+    with shared subcircuits (this joint probability tree shares leaves across branches),
+    so correctness is cross-checked against the layered circuit's own
+    ``marginal().log_likelihood()`` instead of trusting rustworkx's return value; only
+    the timing is compared between the two.
+    """
+
+    number_of_conditioned_variables: int
+    """
+    Number of variables the point assigns a value to.
+    """
+
+    rustworkx_duration: float
+    """
+    Fastest of several runs on the rustworkx circuit, in milliseconds.
+    """
+
+    layered_duration: float
+    """
+    Fastest of several runs on the layered circuit, in milliseconds.
+    """
+
+    speedup: float
+    """
+    How many times faster the layered circuit answered than rustworkx.
+    """
+
+
+def measure_conditioning(
+    rustworkx_circuit: JointProbabilityTree, layered: LayeredProbabilisticCircuit
+) -> list[ConditioningResult]:
+    """
+    Measure conditioning on points that fix a growing number of variables.
+
+    :param rustworkx_circuit: The rustworkx circuit.
+    :param layered: The layered circuit it was converted from.
+    :return: One result per number of conditioned variables.
+    """
+    sample = rustworkx_circuit.sample(1)[0]
+    variables = layered.variables
+    results = []
+
+    for number_of_conditioned in range(1, len(variables) + 1):
+        point = {variables[i]: sample[i] for i in range(number_of_conditioned)}
+        conditioned_variables = list(point.keys())
+
+        marginal_check = layered.marginal(conditioned_variables)
+        row = np.array([[point[v] for v in conditioned_variables]])
+        expected_log_probability = float(marginal_check.log_likelihood(row)[0])
+
+        rustworkx_duration, _ = fastest_duration(
+            lambda: rustworkx_circuit.__deepcopy__().log_conditional_in_place(point),
+            repeats=5,
+        )
+        layered_duration, (_, layered_log_probability) = fastest_duration(
+            lambda: layered.__deepcopy__().log_conditional_in_place(point), repeats=5
+        )
+        assert np.isclose(expected_log_probability, layered_log_probability)
+
+        results.append(
+            ConditioningResult(
+                number_of_conditioned_variables=number_of_conditioned,
+                rustworkx_duration=round(rustworkx_duration * 1000, 3),
+                layered_duration=round(layered_duration * 1000, 3),
+                speedup=round(rustworkx_duration / layered_duration, 1),
+            )
+        )
+
+    return results
+
+
 def main():
-    rustworkx_circuit = learn_circuit()
-    layered = ProbabilisticCircuit.from_rustworkx(rustworkx_circuit)
+    rustworkx_circuit = CorrelatedNormalTreeFactory().learn_circuit()
+    layered = LayeredProbabilisticCircuit.from_rustworkx(rustworkx_circuit)
 
     before_table = ExperimentsTable(
         measure_query_durations(
@@ -385,6 +492,16 @@ def main():
             f"Query durations (ms) on the circuit truncated to "
             f"{LARGEST_NUMBER_OF_SIMPLE_SETS} simple sets "
             f"({layered_truncated.number_of_nodes} nodes)."
+        )
+    )
+    print()
+
+    conditioning_results = measure_conditioning(rustworkx_circuit, layered)
+    print(
+        TypstRenderer(ExperimentsTable(conditioning_results)).render_figure(
+            f"Conditioning durations (ms) on a joint probability tree with "
+            f"{layered.number_of_nodes} nodes, as the number of conditioned "
+            f"variables grows, rustworkx vs the layered numpy circuit."
         )
     )
 
