@@ -1,5 +1,6 @@
 import math
 import os
+from collections import Counter
 from importlib.resources import files
 from pathlib import Path
 
@@ -23,6 +24,8 @@ from semantic_digital_twin.world_description.geometry import (
 )
 from semantic_digital_twin.world_description.mesh_file_storage import MeshFileStorage
 from semantic_digital_twin.world_description.world_entity import Body
+
+from ...casadi_calls import CasadiCalls
 
 
 def test_recenter_origin_centers_bounding_box():
@@ -318,6 +321,47 @@ def test_textured_primitive_survives_serialization():
 
     assert restored.texture == box.texture
     assert restored == box
+
+
+# %% a shape's origin read as numbers
+
+
+def test_a_shapes_numeric_origin_holds_its_origins_numbers():
+    shape = Box(
+        scale=Scale(1.0, 1.0, 1.0),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 3.0, yaw=0.5),
+    )
+
+    assert np.array_equal(shape.numeric_origin.to_np(), shape.origin.to_np())
+
+
+def test_reading_a_shapes_numeric_origin_again_calls_no_casadi():
+    """
+    A shape's origin is model data, so it is read out once and every later read is
+    numbers only.
+    """
+    shape = Box(
+        scale=Scale(1.0, 1.0, 1.0),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 3.0),
+    )
+    first = shape.numeric_origin.to_np().copy()
+
+    with CasadiCalls() as casadi_calls:
+        again = shape.numeric_origin.to_np()
+
+    assert np.array_equal(again, first)
+    assert casadi_calls.calls_by_caller == Counter()
+
+
+def test_a_replaced_origin_is_read_out_again():
+    shape = Box(
+        scale=Scale(1.0, 1.0, 1.0),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 3.0),
+    )
+    shape.numeric_origin
+    shape.origin = HomogeneousTransformationMatrix.from_xyz_rpy(4.0, 5.0, 6.0)
+
+    assert np.array_equal(shape.numeric_origin.to_np(), shape.origin.to_np())
 
 
 # %% the volume a shape encloses

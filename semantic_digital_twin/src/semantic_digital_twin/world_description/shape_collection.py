@@ -30,6 +30,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
 )
+from semantic_digital_twin.spatial_types.numeric import NumericTransform
 from semantic_digital_twin.world_description.geometry import (
     Shape,
     AxisAlignedBox,
@@ -165,14 +166,14 @@ class ShapeCollection(SubclassJSONSerializer):
         """
         transformed_meshes = []
         for shape in self.shapes:
-            transform = shape.origin.to_np()
+            transform = shape.numeric_origin.to_np()
             mesh = shape.mesh.copy()
             mesh.apply_transform(transform)
             transformed_meshes.append(mesh)
         return concatenate(transformed_meshes)
 
     def as_bounding_box_collection_at_origin(
-        self, origin: HomogeneousTransformationMatrix
+        self, origin: NumericTransform
     ) -> BoundingBoxCollection:
         """
         Provides the bounding box collection for this entity given a transformation
@@ -206,7 +207,7 @@ class ShapeCollection(SubclassJSONSerializer):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=reference_frame)
+            NumericTransform.identity(reference_frame)
         )
 
     def to_json(self, **kwargs) -> Dict[str, Any]:
@@ -238,7 +239,7 @@ class ShapeCollection(SubclassJSONSerializer):
     def scale(self):
         return (
             self.as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=self.reference_frame)
+                NumericTransform.identity(self.reference_frame)
             )
             .bounding_box()
             .scale

@@ -1,3 +1,4 @@
+from collections import Counter
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List
@@ -20,6 +21,7 @@ from semantic_digital_twin.reasoning.predicates import (
     is_supported_by,
     reachable,
     is_place_occupied,
+    InsideOf,
 )
 from semantic_digital_twin.reasoning.robot_predicates import (
     robot_in_collision,
@@ -51,6 +53,8 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
     KinematicStructureEntity,
 )
+
+from ...casadi_calls import CasadiCalls
 
 
 @pytest.fixture(scope="function")
@@ -409,6 +413,170 @@ def test_supporting(two_block_world):
         )
     assert is_supported_by(top, center)
     assert not is_supported_by(center, top)
+
+
+# %% checks after the first call no CasADi
+
+
+def _stand_on(center: Body, top: Body) -> None:
+    """
+    Stand ``top`` directly on ``center``.
+    """
+    with center._world.modify_world():
+        top.parent_connection.parent_T_connection_expression = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=center, z=1.0)
+        )
+
+
+def _region_over_the_upper_half_of(body: Body) -> Region:
+    """
+    A region the size of ``body``, fixed half a body above it.
+    """
+    region = Region(name=PrefixedName("region"))
+    region.area = ShapeCollection(
+        [
+            Box(
+                scale=Scale(1.0, 1.0, 1.0),
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=region
+                ),
+            )
+        ]
+    )
+    with body._world.modify_world():
+        body._world.add_connection(
+            FixedConnection(
+                parent=body,
+                child=region,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    z=0.5, reference_frame=body
+                ),
+            )
+        )
+    return region
+
+
+def test_checking_support_again_calls_no_casadi(two_block_world):
+    """
+    The first check reads each shape's origin out once; checks after it run on numbers
+    alone, so they can run on a thread that does not own the world.
+    """
+    center, top = two_block_world
+    _stand_on(center, top)
+    is_supported_by(top, center)
+
+    with CasadiCalls() as casadi_calls:
+        supported = is_supported_by(top, center)
+
+    assert supported
+    assert casadi_calls.calls_by_caller == Counter()
+
+
+def test_checking_a_body_in_a_region_again_calls_no_casadi(two_block_world):
+    center, _ = two_block_world
+    region = _region_over_the_upper_half_of(center)
+    is_body_in_region(center, region)
+
+    with CasadiCalls() as casadi_calls:
+        fraction = is_body_in_region(center, region)
+
+    assert fraction == 0.5
+    assert casadi_calls.calls_by_caller == Counter()
+
+
+# %% containment
+
+
+@pytest.fixture(scope="function")
+def container_and_content():
+    """
+    A box twice the size of the one placed inside it, which a test can move.
+
+    The inner box's corners sit well inside the outer box's faces, so a test moves it
+    without landing any corner exactly on a boundary.
+    """
+    container = Body(name=PrefixedName("container"))
+    container.collision = ShapeCollection(
+        [
+            Box(
+                scale=Scale(2.0, 2.0, 2.0),
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=container
+                ),
+            )
+        ],
+        reference_frame=container,
+    )
+    content = Body(name=PrefixedName("content"))
+    content.collision = ShapeCollection(
+        [
+            Box(
+                scale=Scale(1.0, 1.0, 1.0),
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=content
+                ),
+            )
+        ],
+        reference_frame=content,
+    )
+    world = World()
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection(
+                parent=container,
+                child=content,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=container
+                ),
+            )
+        )
+    return container, content
+
+
+def _place_content(container: Body, content: Body, z: float) -> None:
+    """
+    Move the inner box to a height above the outer box's own frame.
+    """
+    with container._world.modify_world():
+        content.parent_connection.parent_T_connection_expression = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=container, z=z)
+        )
+
+
+def test_a_body_within_another_is_entirely_contained(container_and_content):
+    container, content = container_and_content
+
+    assert InsideOf(content, container)() == 1.0
+
+
+def test_a_body_beyond_another_is_not_contained_at_all(container_and_content):
+    container, content = container_and_content
+    _place_content(container, content, z=5.0)
+
+    assert InsideOf(content, container)() == 0.0
+
+
+def test_a_body_crossing_another_is_contained_in_proportion(container_and_content):
+    """
+    Half the inner box's corners are still inside the outer box once it is lifted far
+    enough that its top face clears the outer box's own.
+    """
+    container, content = container_and_content
+    _place_content(container, content, z=1.0)
+
+    assert InsideOf(content, container)() == 0.5
+
+
+def test_checking_containment_again_calls_no_casadi(container_and_content):
+    container, content = container_and_content
+    _place_content(container, content, z=1.0)
+    InsideOf(content, container)()
+
+    with CasadiCalls() as casadi_calls:
+        ratio = InsideOf(content, container)()
+
+    assert ratio == 0.5
+    assert casadi_calls.calls_by_caller == Counter()
 
 
 def test_is_body_in_gripper(pr2_world_copy):

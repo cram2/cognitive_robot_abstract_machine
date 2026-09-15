@@ -17,6 +17,8 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
 ROOT_T_BODY = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -109,6 +111,30 @@ def test_a_numeric_point_keeps_its_own_coordinates() -> None:
     assert point.to_np().tolist() == [1.0, 2.0, 3.0, 1.0]
 
 
+def test_transformed_points_match_transforming_them_one_by_one() -> None:
+    """
+    A mesh's vertices are carried into another frame in one array rather than a point
+    at a time, so the bulk result has to match the per-point one.
+    """
+    numeric = NumericTransform.from_transformation_matrix(ROOT_T_BODY)
+    points = np.array([[0.0, 0.0, 0.0], [1.0, -2.0, 0.5], [-3.0, 4.0, 2.5]])
+
+    transformed = numeric.transform_points(points)
+
+    one_by_one = [(numeric.to_np() @ np.append(point, 1.0))[:3] for point in points]
+    assert transformed == pytest.approx(np.array(one_by_one))
+
+
+def test_transforming_no_points_yields_no_points() -> None:
+    """
+    An entity without geometry hands over an empty array, which must not be read as a
+    point at the origin.
+    """
+    numeric = NumericTransform.from_transformation_matrix(ROOT_T_BODY)
+
+    assert numeric.transform_points(np.empty((0, 3))).shape == (0, 3)
+
+
 # %% reading a world entity out numerically
 def _stacked_bodies() -> tuple[Body, Body]:
     """
@@ -165,3 +191,29 @@ def test_a_bodys_numeric_global_transform_builds_nothing_symbolic(
     monkeypatch.setattr(HomogeneousTransformationMatrix, "__init__", _refuse_to_build)
 
     assert upper.numeric_global_transform.to_np() == pytest.approx(expected)
+
+
+def test_a_bodys_numeric_global_bounds_enclose_its_geometry_where_it_stands() -> None:
+    """
+    Whether a body is inside another is answered by the bounds of that other body where
+    it stands in the world.
+    """
+    _, upper = _stacked_bodies()
+    upper.collision = ShapeCollection(
+        [Box(scale=Scale(2.0, 4.0, 6.0), origin=HomogeneousTransformationMatrix())],
+        reference_frame=upper,
+    )
+
+    bounds = upper.numeric_global_bounds
+
+    assert bounds.lower == pytest.approx([-1.0, -2.0, -2.0])
+    assert bounds.upper == pytest.approx([1.0, 2.0, 4.0])
+
+
+def test_a_body_without_geometry_encloses_no_point() -> None:
+    """
+    Bounds that enclosed everything instead would put every body inside it.
+    """
+    lower, _ = _stacked_bodies()
+
+    assert lower.numeric_global_bounds.contains(np.zeros((1, 3))).tolist() == [False]

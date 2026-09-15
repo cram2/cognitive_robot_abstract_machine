@@ -102,10 +102,10 @@ class NumericTransform:
 
     @classmethod
     def from_transformation_matrix(
-        cls, reference_T_body: HomogeneousTransformationMatrix
+        cls, reference_T_body: HomogeneousTransformationMatrix | Pose
     ) -> NumericTransform:
         """
-        Read a symbolic transform out into numbers.
+        Read a symbolic transform or pose out into numbers.
 
         :param reference_T_body: The transform to read out.
         """
@@ -159,6 +159,17 @@ class NumericTransform:
         return NumericPoint3.from_coordinates(
             self.matrix[:3, 3], reference_frame=self.reference_frame
         )
+
+    def transform_points(
+        self, points: npt.NDArray[np.float64]
+    ) -> npt.NDArray[np.float64]:
+        """
+        Carry a whole point cloud through this transform at once.
+
+        :param points: The points to carry, one per row of an ``(n, 3)`` array.
+        :return: The carried points, in the same layout.
+        """
+        return points @ self.matrix[:3, :3].T + self.matrix[:3, 3]
 
 
 @dataclass(frozen=True)

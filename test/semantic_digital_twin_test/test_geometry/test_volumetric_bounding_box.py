@@ -1,3 +1,5 @@
+from collections import Counter
+
 import numpy as np
 import pytest
 from random_events.interval import closed
@@ -6,6 +8,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.spatial_types.numeric import NumericTransform
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
@@ -14,6 +17,8 @@ from semantic_digital_twin.world_description.shape_collection import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from random_events.product_algebra import Event, SimpleEvent
+
+from ...casadi_calls import CasadiCalls
 
 
 def test_volumetric_bounding_box_transform_same_frame(pr2_apartment_state_reset):
@@ -164,3 +169,86 @@ def test_contains(pr2_apartment_state_reset):
     point = Point3(0, 0, 0, reference_frame=pr2_apartment_state_reset.root)
 
     assert bb.contains(point)
+
+
+# %% a box read as numbers
+
+
+def _body_turned_a_quarter_next_to_another() -> tuple[Body, Body]:
+    """
+    Two bodies, the second one metre along the first's x-axis and turned a quarter
+    around its z-axis.
+    """
+    world = World()
+    with world.modify_world():
+        body1 = Body(name=PrefixedName("body1"))
+        body2 = Body(name=PrefixedName("body2"))
+        world.add_connection(
+            FixedConnection(
+                body1,
+                body2,
+                HomogeneousTransformationMatrix.from_xyz_rpy(1, 0, 0, yaw=np.pi / 2),
+            )
+        )
+    return body1, body2
+
+
+def test_a_bounding_box_holds_its_origin_as_numbers():
+    """
+    A box's origin is read on every interval and every change of frame.
+    """
+    symbolic_origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 3.0)
+
+    bb = VolumetricBoundingBox(-0.5, -1, 0, 0.5, 1, 1, symbolic_origin)
+
+    assert isinstance(bb.origin, NumericTransform)
+    assert np.array_equal(bb.origin.to_np(), symbolic_origin.to_np())
+
+
+def test_a_box_carried_to_a_poses_origin_holds_it_as_numbers():
+    """
+    A pose names a place as a transformation matrix does, so a box carried to one holds
+    its origin as numbers all the same.
+    """
+    body1, body2 = _body_turned_a_quarter_next_to_another()
+    bb = VolumetricBoundingBox(-0.5, -1, 0, 0.5, 1, 1, NumericTransform.identity(body2))
+    pose = body1.global_pose
+
+    transformed = bb.transform_to_origin(pose)
+
+    assert isinstance(transformed.origin, NumericTransform)
+    assert np.array_equal(transformed.origin.to_np(), pose.to_np())
+
+
+def test_reading_a_boxs_intervals_calls_no_casadi():
+    bb = VolumetricBoundingBox(
+        -0.5, -1, 0, 0.5, 1, 1, HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3)
+    )
+
+    with CasadiCalls() as casadi_calls:
+        intervals = [bb.x_interval, bb.y_interval, bb.z_interval]
+
+    assert [(interval.lower, interval.upper) for interval in intervals] == [
+        (0.5, 1.5),
+        (1.0, 3.0),
+        (3.0, 4.0),
+    ]
+    assert casadi_calls.calls_by_caller == Counter()
+
+
+def test_carrying_a_box_into_another_frame_calls_no_casadi():
+    body1, body2 = _body_turned_a_quarter_next_to_another()
+    bb = VolumetricBoundingBox(-0.5, -1, 0, 0.5, 1, 1, NumericTransform.identity(body2))
+
+    with CasadiCalls() as casadi_calls:
+        transformed = bb.transform_to_origin(NumericTransform.identity(body1))
+
+    assert (
+        transformed.min_x,
+        transformed.min_y,
+        transformed.min_z,
+        transformed.max_x,
+        transformed.max_y,
+        transformed.max_z,
+    ) == pytest.approx((0.0, -0.5, 0.0, 2.0, 0.5, 1.0))
+    assert casadi_calls.calls_by_caller == Counter()
