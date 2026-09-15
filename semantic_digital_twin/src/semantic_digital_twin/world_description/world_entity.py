@@ -49,6 +49,7 @@ from semantic_digital_twin.exceptions import (
     ReferenceFrameMismatchError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
+from semantic_digital_twin.spatial_types.numeric import NumericPose, NumericTransform
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -433,6 +434,32 @@ class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
         :return: Pose representing the global pose.
         """
         return self._world.compute_forward_kinematics(self._world.root, self).to_pose()
+
+    @property
+    def numeric_global_transform(self) -> NumericTransform:
+        """
+        The transform of the KinematicStructureEntity in the world frame, as plain
+        numbers.
+
+        Unlike :attr:`global_transform`, this builds no symbolic expression, so it is
+        safe to read from a thread other than the one that owns the world.
+        """
+        return NumericTransform(
+            matrix=self._world.compute_forward_kinematics_np(self._world.root, self),
+            reference_frame=self._world.root,
+        )
+
+    @property
+    def numeric_global_pose(self) -> NumericPose:
+        """
+        The pose of the KinematicStructureEntity in the world frame, as plain numbers.
+
+        Unlike :attr:`global_pose`, this builds no symbolic expression, so it is safe to
+        read from a thread other than the one that owns the world.
+        """
+        return NumericPose.from_transformation_matrix(
+            self._world.compute_forward_kinematics_np(self._world.root, self)
+        )
 
     @property
     def parent_connection(self) -> Connection:
