@@ -215,8 +215,11 @@ layer instead of running over arrays.
 The numpy implementation truncates to all `k` simple sets in **one** pass instead. Every
 layer is replicated once per simple set inside its own parameter block, so the result has
 the same number of layers as the circuit it came from and blocks that are `k` times
-taller. Layers that cannot be replicated this way -- a Gaussian layer becomes a truncated
-Gaussian layer, a composite assignment splits a node into several pieces -- raise
+taller. A layer whose type changes with the assignment -- a Gaussian layer becomes a
+truncated Gaussian layer, a composite assignment splits a node into several pieces --
+still batches fine as long as every simple set in the `k` produces the *same* resulting
+type; only a batch whose simple sets disagree on the type (for instance a Gaussian layer
+where one simple set leaves the whole real line and another bounds it) raises
 `BatchedTruncationUnsupported`, and the circuit falls back to truncating once per simple
 set.
 

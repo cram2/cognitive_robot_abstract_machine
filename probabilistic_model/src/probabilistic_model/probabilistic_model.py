@@ -3,7 +3,6 @@ from __future__ import annotations
 import itertools
 import math
 import plotly.graph_objects as go
-from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Union,
@@ -56,7 +55,6 @@ else:
     MomentType = VariableMap
 
 
-@dataclass
 class ProbabilisticModel(ABC):
     """
     Abstract base class for probabilistic models.
@@ -67,6 +65,16 @@ class ProbabilisticModel(ABC):
 
     This class can be used as an interface to any kind of probabilistic model, tractable
     or not.
+
+    .. note::
+        This class is intentionally not a dataclass and does not declare ``variables`` as
+        a ``@property``: either would force itself onto every subclass's constructor
+        signature or onto every subclass's attribute lookup, and a subclass that computes
+        its variables (as a property backed by other state) and one that stores them
+        directly (as a plain field) need the freedom to do either without the base class
+        getting in the way. ``variables`` is therefore only a type-annotated contract, not
+        an enforced one; a subclass that fails to provide it raises ``AttributeError`` on
+        first access rather than at instantiation.
     """
 
     @property
@@ -76,12 +84,10 @@ class ProbabilisticModel(ABC):
         """
         return self.__class__.__name__
 
-    @property
-    @abstractmethod
-    def variables(self) -> Tuple[Variable, ...]:
-        """
-        :return: The variables of the model.
-        """
+    variables: Tuple[Variable, ...]
+    """
+    The variables of the model.
+    """
 
     def get_variable_by_name(self, name: str) -> Variable:
         [variable] = [v for v in self.variables if v.name == name]

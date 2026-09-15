@@ -5,11 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 import tqdm
-from krrood.adapters.json_serializer import (
-    SubclassJSONSerializer,
-    from_json,
-    to_json,
-)
+from krrood.adapters.json_serializer import DataclassJSONSerializer
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
@@ -48,7 +44,7 @@ from probabilistic_model.utils import logsumexp
 
 
 @dataclass(eq=False)
-class LayeredProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
+class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
     """
     A probabilistic circuit whose units are grouped into layers of numpy arrays.
 
@@ -60,15 +56,19 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
     The root layer has exactly one node, which is the output of the circuit.
 
-    The field is named ``_variables`` rather than ``variables`` because
-    ``ProbabilisticModel`` declares ``variables`` as an abstract property; a dataclass
-    field of the same name would pick that property up as its default through inherited
-    attribute lookup, which breaks field ordering with ``root`` declared after it.
+    Unlike :class:`Layer`, this class does not inherit
+    :class:`~krrood.adapters.json_serializer.SubclassJSONSerializer`: both of its fields
+    (``variables``, a list-like of values the generic serializer already knows how to
+    walk, and ``root``, a ``SubclassJSONSerializer`` in its own right) round-trip through
+    :class:`~krrood.adapters.json_serializer.DataclassJSONSerializer`'s automatic field
+    walk without a hand-written ``to_json``/``_from_json`` pair.
     """
 
-    _variables: Iterable[Variable]
+    variables: Iterable[Variable]
     """
-    The variables of the circuit. The layers refer to them by their index here.
+    The variables of the circuit. The layers refer to them by their index here. Always
+    normalized to a :class:`~sortedcontainers.SortedSet` in :meth:`__post_init__`, since
+    variable indices are meaningful only relative to a fixed order.
     """
 
     root: Layer
@@ -77,17 +77,8 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
     """
 
     def __post_init__(self):
-        self.variables = self._variables
-
-    @property
-    def variables(self) -> SortedSet:
-        return self._variables
-
-    @variables.setter
-    def variables(self, value: Iterable[Variable]):
-        self._variables = (
-            value if isinstance(value, SortedSet) else SortedSet(value)
-        )
+        if not isinstance(self.variables, SortedSet):
+            self.variables = SortedSet(self.variables)
 
     @property
     def variable_to_index_map(self) -> Dict[Variable, int]:
@@ -645,16 +636,3 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
     def __copy__(self) -> Self:
         return self.__deepcopy__()
-
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["variables"] = [to_json(variable) for variable in self.variables]
-        result["root"] = self.root.to_json(**kwargs)
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        variables = SortedSet(
-            from_json(variable, **kwargs) for variable in data["variables"]
-        )
-        return cls(variables, Layer.from_json(data["root"], **kwargs))

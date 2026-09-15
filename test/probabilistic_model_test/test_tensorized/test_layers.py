@@ -10,15 +10,23 @@ import unittest
 import numpy as np
 import pandas as pd
 from krrood.adapters.json_serializer import from_json, to_json
-from random_events.interval import Bound, SimpleInterval, closed, open, singleton
+from random_events.interval import Bound, SimpleInterval, closed, open, reals, singleton
 from random_events.product_algebra import SimpleEvent
 from random_events.variable import Continuous, Integer
 
 from probabilistic_model.distributions.distributions import IntegerDistribution
+from probabilistic_model.distributions.gaussian import (
+    GaussianDistribution,
+    TruncatedGaussianDistribution,
+)
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
 from probabilistic_model.probabilistic_circuit.tensorized.discrete_layer import IntegerLayer
+from probabilistic_model.probabilistic_circuit.tensorized.gaussian_layer import (
+    GaussianLayer,
+    TruncatedGaussianLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.helper import (
     fully_factorized,
     mixture_of,
@@ -318,6 +326,102 @@ class VectorizedTruncationTestCase(unittest.TestCase):
                         truncated_layer.probabilities_of_node(node),
                         expected.probabilities,
                     )
+
+    def test_gaussian_layer_agrees_with_the_scalar_truncation(self):
+        bound_pairs = [
+            (Bound.CLOSED, Bound.CLOSED),
+            (Bound.CLOSED, Bound.OPEN),
+            (Bound.OPEN, Bound.CLOSED),
+            (Bound.OPEN, Bound.OPEN),
+        ]
+        # locations and scales that overlap the event fully, partially and barely at all
+        node_parameters = [(0.0, 1.0), (2.0, 0.5), (-3.0, 2.0), (100.0, 0.01)]
+        event_ranges = [(-1.0, 1.0), (-10.0, 10.0), (5.0, 6.0)]
+
+        distributions = [
+            GaussianDistribution(variable=x, location=location, scale=scale)
+            for location, scale in node_parameters
+        ]
+        layer = GaussianLayer.from_distributions(0, distributions)
+
+        for event_bounds in bound_pairs:
+            for lower, upper in event_ranges:
+                event_interval = SimpleInterval.from_data(lower, upper, *event_bounds)
+                with self.subTest(event_bounds=event_bounds, event=(lower, upper)):
+                    vectorized = layer.log_truncated_of_assignment(
+                        event_interval.as_composite_set(), False
+                    )
+                    self.assertIsNotNone(vectorized)
+                    truncated_layer, log_probabilities = vectorized
+
+                    for node, distribution in enumerate(distributions):
+                        expected, expected_log_probability = (
+                            distribution.log_conditional_from_simple_interval(
+                                event_interval, False
+                            )
+                        )
+                        if expected is None:
+                            self.assertEqual(log_probabilities[node], -np.inf)
+                            continue
+
+                        self.assertAlmostEqual(
+                            float(log_probabilities[node]),
+                            float(expected_log_probability),
+                        )
+                        self.assertIsInstance(
+                            expected, TruncatedGaussianDistribution
+                        )
+                        self.assertEqual(
+                            truncated_layer.simple_interval_of(node),
+                            expected.interval,
+                        )
+
+    def test_gaussian_layer_truncated_to_the_real_line_stays_gaussian(self):
+        distributions = [
+            GaussianDistribution(variable=x, location=0.0, scale=1.0),
+            GaussianDistribution(variable=x, location=5.0, scale=2.0),
+        ]
+        layer = GaussianLayer.from_distributions(0, distributions)
+
+        vectorized = layer.log_truncated_of_assignment(reals(), False)
+        self.assertIsNotNone(vectorized)
+        truncated_layer, log_probabilities = vectorized
+
+        self.assertIsInstance(truncated_layer, GaussianLayer)
+        self.assertNotIsInstance(truncated_layer, TruncatedGaussianLayer)
+        np.testing.assert_allclose(log_probabilities, 0.0, atol=1e-9)
+        np.testing.assert_array_equal(truncated_layer.location, layer.location)
+        np.testing.assert_array_equal(truncated_layer.scale, layer.scale)
+
+    def test_gaussian_layer_marks_a_node_with_no_probability_left_as_impossible(self):
+        layer = GaussianLayer.from_distributions(
+            0,
+            [
+                GaussianDistribution(variable=x, location=0.0, scale=0.001),
+                GaussianDistribution(variable=x, location=100.0, scale=1.0),
+            ],
+        )
+        _, log_probabilities = layer.log_truncated_of_assignment(
+            closed(99.0, 101.0), False
+        )
+        self.assertEqual(log_probabilities[0], -np.inf)
+        self.assertGreater(log_probabilities[1], -np.inf)
+
+    def test_a_singleton_event_falls_back_to_the_scalar_path_for_a_gaussian_layer(self):
+        layer = GaussianLayer.from_distributions(
+            0, [GaussianDistribution(variable=x, location=0.0, scale=1.0)]
+        )
+        self.assertIsNone(layer.log_truncated_of_assignment(singleton(1.0), True))
+
+    def test_a_composite_assignment_falls_back_to_the_scalar_path_for_a_gaussian_layer(
+        self,
+    ):
+        layer = GaussianLayer.from_distributions(
+            0, [GaussianDistribution(variable=x, location=0.0, scale=1.0)]
+        )
+        self.assertIsNone(
+            layer.log_truncated_of_assignment(closed(0, 1) | closed(3, 4), False)
+        )
 
     def test_a_structural_pass_does_not_write_into_the_circuit_it_reads(self):
         """

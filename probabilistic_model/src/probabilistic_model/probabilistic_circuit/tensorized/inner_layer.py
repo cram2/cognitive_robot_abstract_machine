@@ -157,12 +157,25 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
         """
         raise NotImplementedError
 
-    @property
-    def child_layers(self) -> List[Layer]:
+    def __getattr__(self, name: str) -> List[Layer]:
         """
-        :return: The child layers of this layer.
+        Fall back to no child layers for a layer that never declared any.
+
+        :class:`Layer` is not itself a dataclass and declares no ``child_layers`` field
+        or property, so that :class:`InnerLayer` is free to declare it as an ordinary
+        required field without a base-class descriptor of the same name blocking that
+        (a ``@property`` would, even a getter-only one, since assigning to it in
+        ``InnerLayer``'s generated ``__init__`` would then hit its missing setter).
+        Ordinary attribute lookup only reaches ``__getattr__`` when nothing set the
+        attribute anywhere else, which is exactly the case for a layer without children.
+
+        :param name: The attribute that plain lookup could not find.
+        :return: An empty list, for ``child_layers`` only.
+        :raises AttributeError: For every other name.
         """
-        return []
+        if name == "child_layers":
+            return []
+        raise AttributeError(name)
 
     @property
     def number_of_components(self) -> int:
@@ -667,15 +680,12 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
 class InnerLayer(Layer[RustworkxUnitType], ABC):
     """
     Abstract base class for the layers that have child layers.
-
-    The field is named ``_child_layers`` rather than ``child_layers`` because
-    :class:`Layer` already defines ``child_layers`` as a property (returning ``[]`` for
-    layers without children); a dataclass field of the same name would pick that property
-    up as its default through inherited attribute lookup, which breaks field ordering in
-    every subclass that adds a required field afterwards.
     """
 
-    _child_layers: List[Layer]
+    child_layers: List[Layer]
+    """
+    The child layers of this layer.
+    """
 
     _variables_cache: Optional[npt.NDArray] = field(default=None, init=False, repr=False)
     """
@@ -683,11 +693,7 @@ class InnerLayer(Layer[RustworkxUnitType], ABC):
     """
 
     def __post_init__(self):
-        self._child_layers = list(self._child_layers)
-
-    @property
-    def child_layers(self) -> List[Layer]:
-        return self._child_layers
+        self.child_layers = list(self.child_layers)
 
     def reset_variables(self):
         """

@@ -652,11 +652,12 @@ class TruncationTestCase(unittest.TestCase):
             truncated.number_of_nodes, separate.number_of_nodes - len(separate.layers)
         )
 
-    def test_a_gaussian_circuit_falls_back_to_truncating_once_per_simple_set(self):
-        # a gaussian layer becomes a truncated gaussian layer, which the batched pass
-        # does not handle, so this exercises the fallback end to end
+    def test_a_gaussian_circuit_batches_truncation_to_several_simple_sets(self):
+        # every box bounds both variables, so every gaussian leaf becomes a truncated
+        # gaussian layer and the batch stays uniform enough for the batched pass to
+        # handle directly instead of falling back to truncating once per simple set
         layered = LayeredProbabilisticCircuit.from_rustworkx(gaussian_circuit())
-        self.assertIsNone(
+        self.assertIsNotNone(
             layered.truncated_root_of_simple_events(
                 list(self.boxes(4, -1.0, 3.0).simple_sets), False
             )

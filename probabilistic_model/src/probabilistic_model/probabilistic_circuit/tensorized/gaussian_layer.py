@@ -5,17 +5,21 @@ from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
+from random_events.interval import Interval, reals
 from random_events.variable import Variable
 from scipy.stats import norm
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, List, Optional, Self
+from typing_extensions import Any, Dict, List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
     TruncatedGaussianDistribution,
 )
 from probabilistic_model.exceptions import ShapeMismatchError
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import memoized
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
+    Layer,
+    memoized,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     ContinuousLayer,
     ContinuousLayerWithFiniteSupport,
@@ -138,6 +142,65 @@ class GaussianLayer(ContinuousLayer[GaussianDistribution]):
     def apply_scaling_own(self, scaling: npt.NDArray):
         self.location = self.location * scaling[self.variable]
         self.scale = self.scale * scaling[self.variable]
+
+    def log_truncated_of_assignment(
+        self, assignment: Interval, singleton_allowed: bool
+    ) -> Optional[Tuple[Layer, npt.NDArray]]:
+        """
+        Truncate all nodes to one simple interval at once.
+
+        Mirrors
+        :meth:`~probabilistic_model.distributions.gaussian.GaussianDistribution.log_conditional_from_simple_interval_if_not_singleton`
+        for the whole layer at once: truncating to the whole real line leaves every node
+        a Gaussian, so the layer stays a :class:`GaussianLayer`; any other interval turns
+        the whole layer into a :class:`TruncatedGaussianLayer` bounded by it, since the
+        assignment is the same for every node of a layer. A node that has no probability
+        left in the interval is marked ``-inf`` and pruned afterward instead of being
+        dropped here, exactly as in :class:`UniformLayer`.
+
+        A composite assignment splits a node into one piece per simple interval and a
+        singleton turns it into a Dirac delta; neither keeps the layer a Gaussian-family
+        layer, so both fall back to the generic per-node path.
+        """
+        if len(assignment.simple_sets) != 1:
+            return None
+
+        interval = assignment.simple_sets[0]
+        if singleton_allowed and interval.is_singleton():
+            return None
+
+        lower, upper = float(interval.lower), float(interval.upper)
+        cumulative = self.cumulative_distribution_of_nodes_from_column(
+            np.array([lower, upper])
+        )
+        probability = cumulative[1] - cumulative[0]
+        alive = probability > 0
+        log_probabilities = np.where(
+            alive, np.log(np.where(alive, probability, 1.0)), -np.inf
+        )
+
+        if interval.as_composite_set() == reals():
+            return (
+                self.__class__(self.variable, self.location.copy(), self.scale.copy()),
+                log_probabilities,
+            )
+
+        left_bound, right_bound = int(interval.left), int(interval.right)
+        interval_of_nodes = np.tile([lower, upper], (self.number_of_nodes, 1))
+        bounds_of_nodes = np.tile(
+            np.array([left_bound, right_bound], dtype=np.int64),
+            (self.number_of_nodes, 1),
+        )
+        return (
+            TruncatedGaussianLayer(
+                self.variable,
+                interval_of_nodes,
+                self.location.copy(),
+                self.scale.copy(),
+                bounds=bounds_of_nodes,
+            ),
+            log_probabilities,
+        )
 
     def __deepcopy__(self, memo=None) -> GaussianLayer:
         if memo is None:
