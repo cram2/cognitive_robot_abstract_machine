@@ -38,7 +38,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     Unit,
 )
 
-
 RustworkxUnitType = TypeVar("RustworkxUnitType")
 """
 The class of the ``probabilistic_model.probabilistic_circuit.rx`` package that a
@@ -120,7 +119,9 @@ class ForwardSampleAssignment:
         return self.rows_by_node[id(layer)]
 
 
-class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSerializer, ABC):
+class Layer(
+    Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSerializer, ABC
+):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
 
@@ -139,7 +140,7 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
     it back with :meth:`get_generic_type_parameters` to find the layer class for a unit.
     """
 
-    # ------------------------------------------------------------------ structure
+    # %% structure
 
     @property
     @abstractmethod
@@ -163,8 +164,8 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
 
         :class:`Layer` is not itself a dataclass and declares no ``child_layers`` field
         or property, so that :class:`InnerLayer` is free to declare it as an ordinary
-        required field without a base-class descriptor of the same name blocking that
-        (a ``@property`` would, even a getter-only one, since assigning to it in
+        required field without a base-class descriptor of the same name blocking that (a
+        ``@property`` would, even a getter-only one, since assigning to it in
         ``InnerLayer``'s generated ``__init__`` would then hit its missing setter).
         Ordinary attribute lookup only reaches ``__getattr__`` when nothing set the
         attribute anywhere else, which is exactly the case for a layer without children.
@@ -253,7 +254,8 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
         all of its parents.
 
         This is the order in which a top-down pass (such as sampling) has to visit the
-        layers so that a layer is only processed once every parent has contributed to it.
+        layers so that a layer is only processed once every parent has contributed to
+        it.
 
         :return: The layers in topological order.
         """
@@ -278,7 +280,7 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
 
         return result
 
-    # ------------------------------------------------------------------ queries
+    # %% queries
 
     @abstractmethod
     def log_likelihood_of_nodes(
@@ -385,7 +387,7 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
         """
         raise NotImplementedError
 
-    # ------------------------------------------------------------------ structural
+    # %% structural
 
     @abstractmethod
     def log_truncated_of_simple_event(
@@ -422,7 +424,7 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
         singleton_allowed: bool,
         cache: Optional[Dict] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
-    ) -> Tuple[Layer, npt.NDArray]:
+    ) -> Optional[Tuple[Layer, npt.NDArray]]:
         """
         Truncate this layer to several simple events at once.
 
@@ -438,8 +440,9 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
         :param singleton_allowed: Whether singletons are allowed in the events.
         :param cache: The shared cache of the current query.
         :param log_probabilities: The map the per-node log-probabilities are written to.
-        :return: The truncated layer and the log-probabilities of its nodes.
-        :raises BatchedTruncationUnsupported: If a layer below cannot do this.
+        :return: The truncated layer and the log-probabilities of its nodes, or ``None``
+            if this layer or one below it cannot be truncated this way and the caller has
+            to fall back to truncating once per event.
         """
         raise NotImplementedError
 
@@ -482,7 +485,8 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
         Determine which nodes of the direct children a set of live nodes still needs.
 
         :param alive: A boolean mask of the live nodes of this layer.
-        :param log_probabilities: The per-layer log-probabilities of the structural pass.
+        :param log_probabilities: The per-layer log-probabilities of the structural
+            pass.
         :return: One ``(child layer, mask)`` pair per child layer.
         """
         return []
@@ -568,9 +572,9 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
         Remove layers that have no effect on the represented distribution.
 
         This collapses the identity sum and product layers that the structural queries
-        introduce. Unlike the rustworkx implementation it does not merge nested layers of
-        the same type, because in a layered circuit that would have to fuse the parameter
-        blocks of layers with different numbers of nodes.
+        introduce. Unlike the rustworkx implementation it does not merge nested layers
+        of the same type, because in a layered circuit that would have to fuse the
+        parameter blocks of layers with different numbers of nodes.
 
         :param cache: The shared cache of the current pass.
         :return: The simplified layer.
@@ -598,6 +602,24 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
     def is_decomposable_own(self) -> bool:
         """
         :return: Whether this layer alone is decomposable.
+        """
+        return True
+
+    def is_deterministic(self, variables: SortedSet) -> bool:
+        """
+        :param variables: The variables of the circuit.
+        :return: Whether every sum layer of the circuit rooted here is deterministic.
+        """
+        cache: Dict = {}
+        return all(
+            layer.is_deterministic_own(variables, cache) for layer in self.all_layers()
+        )
+
+    def is_deterministic_own(self, variables: SortedSet, cache: Dict) -> bool:
+        """
+        :param variables: The variables of the circuit.
+        :param cache: The shared cache of the supports computed so far.
+        :return: Whether this layer alone is deterministic.
         """
         return True
 
@@ -629,7 +651,7 @@ class Layer(Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSeriali
         Scale the parameters of this layer alone in-place.
         """
 
-    # ------------------------------------------------------------------ conversion
+    # %% conversion
 
     @classmethod
     @abstractmethod
@@ -687,7 +709,9 @@ class InnerLayer(Layer[RustworkxUnitType], ABC):
     The child layers of this layer.
     """
 
-    _variables_cache: Optional[npt.NDArray] = field(default=None, init=False, repr=False)
+    _variables_cache: Optional[npt.NDArray] = field(
+        default=None, init=False, repr=False
+    )
     """
     Cached indices of the variables in the scope of this layer.
     """
@@ -772,12 +796,12 @@ class SumLayer(InnerLayer[SumUnit], ABC):
                     child_layer.number_of_nodes, log_weights.shape[1]
                 )
 
-    # ------------------------------------------------------------------ queries
+    # %% queries
 
     def _weighted_forward(self, child_results: List[npt.NDArray]) -> npt.NDArray:
         """
-        Combine the results of the child layers of a linear (non-logarithmic) query whose
-        results have the nodes in the last axis.
+        Combine the results of the child layers of a linear (non-logarithmic) query
+        whose results have the nodes in the last axis.
 
         :param child_results: The result per child layer, shape (..., #child nodes).
         :return: The result for the nodes of this layer, shape (..., #nodes).
@@ -829,8 +853,8 @@ class SumLayer(InnerLayer[SumUnit], ABC):
         """
         Reduce the log-results of the child layers with the normalized log-weights.
 
-        :param child_results: The log-results per child layer, with shape
-            (..., #nodes of the child layer).
+        :param child_results: The log-results per child layer, with shape (..., #nodes
+            of the child layer).
         :return: The log-result of the nodes of this layer with shape (..., #nodes).
         """
         raise NotImplementedError
@@ -932,7 +956,7 @@ class SumLayer(InnerLayer[SumUnit], ABC):
         ]
         return self._weighted_forward_over_nodes(child_results)
 
-    # ------------------------------------------------------------------ structural
+    # %% structural
 
     @abstractmethod
     def edges(self) -> Iterator[Tuple[int, int, int]]:
@@ -949,13 +973,20 @@ class SumLayer(InnerLayer[SumUnit], ABC):
         """
         raise NotImplementedError
 
-    def is_deterministic_own(self, supports: List[List[Event]]) -> bool:
+    def is_deterministic_own(self, variables: SortedSet, cache: Dict) -> bool:
         """
-        Check whether every node of this sum layer is deterministic.
+        Check whether every node of this sum layer has children with pairwise disjoint
+        supports.
 
-        :param supports: The support of every node of every child layer.
+        :param variables: The variables of the circuit.
+        :param cache: The shared cache of the supports computed so far.
         :return: Whether all nodes are deterministic.
         """
+        supports = [
+            child_layer.support_of_nodes(variables, cache=cache)
+            for child_layer in self.child_layers
+        ]
+
         supports_per_node: List[List[Event]] = [[] for _ in range(self.number_of_nodes)]
         for node, child_layer_index, child_node in self.edges():
             supports_per_node[node].append(supports[child_layer_index][child_node])
@@ -1308,7 +1339,7 @@ class SparseSumLayer(SumLayer):
         ]
         return cls(child_layers, log_weights)
 
-    # ------------------------------------------------------------------ structural
+    # %% structural
 
     def _structural_pass(
         self,
@@ -1377,7 +1408,7 @@ class SparseSumLayer(SumLayer):
         singleton_allowed: bool,
         cache: Optional[Dict] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
-    ) -> Tuple[Layer, npt.NDArray]:
+    ) -> Optional[Tuple[Layer, npt.NDArray]]:
         if cache is None:
             cache = {}
         key = ("batched truncated", id(self))
@@ -1390,15 +1421,16 @@ class SparseSumLayer(SumLayer):
         new_child_layers = []
         new_log_weights = []
         for log_weights, child_layer in self.log_weighted_child_layers:
-            new_child_layer, child_log_probabilities = (
-                child_layer.log_truncated_of_simple_events(
-                    events,
-                    variables,
-                    singleton_allowed,
-                    cache=cache,
-                    log_probabilities=log_probabilities,
-                )
+            truncated_child = child_layer.log_truncated_of_simple_events(
+                events,
+                variables,
+                singleton_allowed,
+                cache=cache,
+                log_probabilities=log_probabilities,
             )
+            if truncated_child is None:
+                return None
+            new_child_layer, child_log_probabilities = truncated_child
             new_child_layers.append(new_child_layer)
 
             # the block of event k is the original sparsity pattern shifted into its own
@@ -1475,7 +1507,8 @@ class SparseSumLayer(SumLayer):
         :param alive: The live nodes of this layer.
         :param log_weights: The weights of the edges into the child layer.
         :param child_layer: The child layer.
-        :param log_probabilities: The per-layer log-probabilities of the structural pass.
+        :param log_probabilities: The per-layer log-probabilities of the structural
+            pass.
         :return: A boolean mask over the stored weight entries.
         """
         mask = alive[log_weights.rows] & (log_weights.data > -np.inf)
@@ -1489,9 +1522,7 @@ class SparseSumLayer(SumLayer):
     ) -> List[Tuple[Layer, npt.NDArray]]:
         result = []
         for log_weights, child_layer in self.log_weighted_child_layers:
-            mask = self.live_entries(
-                alive, log_weights, child_layer, log_probabilities
-            )
+            mask = self.live_entries(alive, log_weights, child_layer, log_probabilities)
             needed = np.zeros(child_layer.number_of_nodes, dtype=bool)
             needed[log_weights.columns[mask]] = True
             result.append((child_layer, needed))
@@ -1606,7 +1637,7 @@ class SparseSumLayer(SumLayer):
             and np.array_equal(sorted_weights.columns, expected)
         )
 
-    # ------------------------------------------------------------------ conversion
+    # %% conversion
 
     @classmethod
     def create_layer_from_nodes_with_same_type_and_scope(
@@ -1709,8 +1740,8 @@ class ProductLayer(InnerLayer[ProductUnit]):
 
     The edges are stored as a sparse integer matrix of shape (#child layers, #nodes).
     The value of the entry ``(l, n)`` is the index of the node in the ``l``-th child
-    layer that the ``n``-th node of this layer multiplies. A node of a child layer may be
-    referenced by several nodes of this layer.
+    layer that the ``n``-th node of this layer multiplies. A node of a child layer may
+    be referenced by several nodes of this layer.
     """
 
     edges: SparseArray
@@ -1751,7 +1782,7 @@ class ProductLayer(InnerLayer[ProductUnit]):
             seen |= variables
         return True
 
-    # ------------------------------------------------------------------ queries
+    # %% queries
 
     def edges_of_child_layer(
         self, child_layer_index: int
@@ -1760,10 +1791,10 @@ class ProductLayer(InnerLayer[ProductUnit]):
         The edges into one child layer.
 
         :param child_layer_index: The index of the child layer.
-        :return: The nodes of this layer, the nodes of the child layer they point to, and
-            whether every node appears at most once. A decomposable product has at most
-            one factor in each child layer, so the fast path is the normal one; the check
-            keeps the reduction correct for a circuit that is not decomposable.
+        :return: The nodes of this layer, the nodes of the child layer they point to,
+            and whether every node appears at most once. A decomposable product has at
+            most one factor in each child layer, so the fast path is the normal one; the
+            check keeps the reduction correct for a circuit that is not decomposable.
         """
         mask = self.edges.rows == child_layer_index
         nodes = self.edges.columns[mask]
@@ -1951,7 +1982,7 @@ class ProductLayer(InnerLayer[ProductUnit]):
             child_layer = self.child_layers[child_layer_index]
             assignment.assign(child_layer, child_node, rows)
 
-    # ------------------------------------------------------------------ structural
+    # %% structural
 
     def _structural_pass(
         self,
@@ -2019,7 +2050,7 @@ class ProductLayer(InnerLayer[ProductUnit]):
         singleton_allowed: bool,
         cache: Optional[Dict] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
-    ) -> Tuple[Layer, npt.NDArray]:
+    ) -> Optional[Tuple[Layer, npt.NDArray]]:
         if cache is None:
             cache = {}
         key = ("batched truncated", id(self))
@@ -2034,15 +2065,16 @@ class ProductLayer(InnerLayer[ProductUnit]):
         new_child_layers = []
         child_log_probabilities = []
         for child_layer in self.child_layers:
-            new_child_layer, child_log_probability = (
-                child_layer.log_truncated_of_simple_events(
-                    events,
-                    variables,
-                    singleton_allowed,
-                    cache=cache,
-                    log_probabilities=log_probabilities,
-                )
+            truncated_child = child_layer.log_truncated_of_simple_events(
+                events,
+                variables,
+                singleton_allowed,
+                cache=cache,
+                log_probabilities=log_probabilities,
             )
+            if truncated_child is None:
+                return None
+            new_child_layer, child_log_probability = truncated_child
             new_child_layers.append(new_child_layer)
             child_log_probabilities.append(child_log_probability)
 
@@ -2060,7 +2092,10 @@ class ProductLayer(InnerLayer[ProductUnit]):
         ) * np.tile(node_counts[self.edges.rows], number_of_events)
 
         edges = SparseArray.from_coordinates(
-            rows, columns, data, (len(self.child_layers), number_of_events * number_of_nodes)
+            rows,
+            columns,
+            data,
+            (len(self.child_layers), number_of_events * number_of_nodes),
         )
         result = self.__class__(new_child_layers, edges)
 
@@ -2260,7 +2295,7 @@ class ProductLayer(InnerLayer[ProductUnit]):
         ]
         return cls(child_layers, SparseArray.from_json(data["edges"]))
 
-    # ------------------------------------------------------------------ conversion
+    # %% conversion
 
     @classmethod
     def create_layer_from_nodes_with_same_type_and_scope(
@@ -2341,7 +2376,8 @@ class ProductLayer(InnerLayer[ProductUnit]):
 @dataclass
 class LayerConverter:
     """
-    Bookkeeping for the conversion of a circuit of the ``rx`` package into a layered one.
+    Bookkeeping for the conversion of a circuit of the ``rx`` package into a layered
+    one.
     """
 
     layer: Layer

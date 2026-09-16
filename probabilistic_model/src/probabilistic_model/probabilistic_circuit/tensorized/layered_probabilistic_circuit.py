@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
-import tqdm
 from krrood.adapters.json_serializer import DataclassJSONSerializer
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Variable
@@ -13,22 +12,18 @@ from typing_extensions import Any, Dict, Iterable, List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.exceptions import IntractableError
-from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
-    BatchedTruncationUnsupported,
-)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ForwardSampleAssignment,
     Layer,
-    LayerConverter,
     ProductLayer,
     SparseSumLayer,
-    SumLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     layer_of_distributions,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.rustworkx_conversion import (
-    create_layers_from_nodes,
+    circuit_of_root_layer,
+    root_layer_of_circuit,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.utils import SparseArray
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -48,37 +43,24 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
     """
     A probabilistic circuit whose units are grouped into layers of numpy arrays.
 
-    The circuit is a directed acyclic graph of :class:`Layer` objects. Every layer holds
-    the parameters of all of its nodes in contiguous arrays, so that a query is evaluated
-    for all nodes of a layer at once instead of node by node. This is the same layout the
-    jax implementation uses; unlike that one it supports the full set of queries of the
-    rustworkx implementation, including the structural ones.
+    The circuit is a rooted directed acyclic graph of :class:`Layer` objects. Every
+    layer holds the parameters of all of its nodes in contiguous arrays, so that a query
+    is evaluated for all nodes of a layer at once instead of node by node.
 
     The root layer has exactly one node, which is the output of the circuit.
-
-    Unlike :class:`Layer`, this class does not inherit
-    :class:`~krrood.adapters.json_serializer.SubclassJSONSerializer`: both of its fields
-    (``variables``, a list-like of values the generic serializer already knows how to
-    walk, and ``root``, a ``SubclassJSONSerializer`` in its own right) round-trip through
-    :class:`~krrood.adapters.json_serializer.DataclassJSONSerializer`'s automatic field
-    walk without a hand-written ``to_json``/``_from_json`` pair.
     """
 
-    variables: Iterable[Variable]
+    variables: SortedSet
     """
-    The variables of the circuit. The layers refer to them by their index here. Always
-    normalized to a :class:`~sortedcontainers.SortedSet` in :meth:`__post_init__`, since
-    variable indices are meaningful only relative to a fixed order.
+    The variables of the circuit, ordered.
+
+    The layers refer to them by their index here, so the order is part of the circuit.
     """
 
     root: Layer
     """
     The root layer of the circuit.
     """
-
-    def __post_init__(self):
-        if not isinstance(self.variables, SortedSet):
-            self.variables = SortedSet(self.variables)
 
     @property
     def variable_to_index_map(self) -> Dict[Variable, int]:
@@ -120,7 +102,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
             f"with {len(self.layers)} layers and {self.number_of_nodes} nodes"
         )
 
-    # ------------------------------------------------------------------ queries
+    # %% queries
 
     def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
         return self.root.log_likelihood_of_nodes(np.asarray(events))[:, 0]
@@ -184,19 +166,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
         :return: Whether every sum node of this circuit has children with pairwise
             disjoint supports.
         """
-        cache: Dict = {}
-        self.root.support_of_nodes(self.variables, cache=cache)
-
-        for layer in self.layers:
-            if not isinstance(layer, SumLayer):
-                continue
-            supports = [
-                cache[("support", id(child_layer))]
-                for child_layer in layer.child_layers
-            ]
-            if not layer.is_deterministic_own(supports):
-                return False
-        return True
+        return self.root.is_deterministic(self.variables)
 
     def is_decomposable(self) -> bool:
         """
@@ -205,7 +175,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
         """
         return self.root.is_decomposable()
 
-    # ------------------------------------------------------------------ structural
+    # %% structural
 
     def log_truncated(
         self, event: Event, singleton_allowed: bool = False
@@ -219,9 +189,9 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
         """
         Truncate this circuit to an event in place.
 
-        A composite event is handled the way the rustworkx implementation handles it: a
-        copy of the circuit is truncated to each of the disjoint simple sets, and the
-        results become the children of a new root sum layer.
+        A composite event is truncated to each of its disjoint simple sets, and the
+        results become the children of a new root sum layer weighted by the probability
+        of the set they were truncated to.
 
         :param event: The event to truncate to.
         :param singleton_allowed: Whether singletons are allowed in the event.
@@ -322,10 +292,10 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
 
         Every layer is replicated once per event, so the result has the same number of
         *layers* as this circuit and blocks that are as many times taller as there are
-        events. Truncating once per event and mixing the results instead would produce one
-        set of layers per event, which is what makes the following queries slow: with a
-        hundred simple sets, the same circuit ends up spread over hundreds of layers of a
-        few nodes each.
+        events. Truncating once per event and mixing the results instead would produce
+        one set of layers per event, which is what makes the following queries slow:
+        with a hundred simple sets, the same circuit ends up spread over hundreds of
+        layers of a few nodes each.
 
         :param events: The simple events to truncate to.
         :param singleton_allowed: Whether singletons are allowed in the events.
@@ -334,18 +304,16 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
             caller has to fall back to truncating once per event.
         """
         log_probabilities: Dict[int, npt.NDArray] = {}
-        try:
-            replicated, node_log_probabilities = (
-                self.root.log_truncated_of_simple_events(
-                    events,
-                    self.variables,
-                    singleton_allowed,
-                    cache={},
-                    log_probabilities=log_probabilities,
-                )
-            )
-        except BatchedTruncationUnsupported:
+        batched = self.root.log_truncated_of_simple_events(
+            events,
+            self.variables,
+            singleton_allowed,
+            cache={},
+            log_probabilities=log_probabilities,
+        )
+        if batched is None:
             return None
+        replicated, node_log_probabilities = batched
 
         # the simple sets of an event are disjoint, so P(E) = sum_k P(E_k)
         total_log_probability = float(logsumexp(node_log_probabilities))
@@ -407,8 +375,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
         Condition this circuit on a partial point in place.
 
         The variables of the point are marginalized out of the conditioned circuit and
-        reattached as Dirac layers under a new product root, which is the structure the
-        rustworkx implementation produces as well.
+        reattached as Dirac layers under a new product root.
 
         :param point: The partial point.
         :return: This circuit and the log-density at the point, or ``(None, -inf)``.
@@ -574,7 +541,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
             values[self.variables.index(variable)] = value
         self.root.apply_scaling(values)
 
-    # ------------------------------------------------------------------ conversion
+    # %% conversion
 
     @classmethod
     def from_rustworkx(
@@ -589,47 +556,18 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
         :param progress_bar: Whether to show a progress bar.
         :return: The layered circuit.
         """
-        converters: List[LayerConverter] = []
-
-        levels = list(circuit.layers)
-        iterator = (
-            tqdm.tqdm(reversed(levels), total=len(levels), desc="Creating layers")
-            if progress_bar
-            else reversed(levels)
+        return cls(
+            SortedSet(circuit.variables), root_layer_of_circuit(circuit, progress_bar)
         )
 
-        for nodes in iterator:
-            # every converter created so far is offered as a possible child, not only
-            # those of the level directly below: the layering of the graph is by
-            # shortest distance to the root, so an edge may skip levels
-            new_converters = create_layers_from_nodes(nodes, converters, progress_bar)
-            converters = new_converters + converters
-
-        root_converters = [
-            converter for converter in converters if converter.nodes[0] is circuit.root
-        ]
-        if len(root_converters) != 1:
-            raise ValueError("The circuit does not have exactly one root.")
-
-        return cls(SortedSet(circuit.variables), root_converters[0].layer)
-
-    def to_rustworkx(
-        self, progress_bar: bool = False
-    ) -> RustworkxProbabilisticCircuit:
+    def to_rustworkx(self, progress_bar: bool = False) -> RustworkxProbabilisticCircuit:
         """
         Convert this circuit into a circuit of the ``rx`` package.
 
         :param progress_bar: Whether to show a progress bar.
         :return: The converted circuit.
         """
-        bar = (
-            tqdm.tqdm(total=self.root.number_of_components, desc="Converting to rx")
-            if progress_bar
-            else None
-        )
-        result = RustworkxProbabilisticCircuit()
-        self.root.to_rustworkx(self.variables, result, {}, bar)
-        return result
+        return circuit_of_root_layer(self.root, self.variables, progress_bar)
 
     def __deepcopy__(self, memo=None) -> Self:
         return self.__class__(SortedSet(self.variables), self.root.__deepcopy__({}))

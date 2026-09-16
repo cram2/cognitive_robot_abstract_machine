@@ -54,11 +54,15 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ProductLayer,
     SparseSumLayer,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.input_layer import DiracDeltaLayer
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
+    DiracDeltaLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.uniform_layer import UniformLayer
+from probabilistic_model.probabilistic_circuit.tensorized.uniform_layer import (
+    UniformLayer,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RxCircuit,
     ProductUnit,
@@ -293,7 +297,9 @@ class ConversionTestCase(unittest.TestCase):
         self.assertTrue(
             any(isinstance(layer, SymbolicLayer) for layer in layered.layers)
         )
-        self.assertTrue(any(isinstance(layer, IntegerLayer) for layer in layered.layers))
+        self.assertTrue(
+            any(isinstance(layer, IntegerLayer) for layer in layered.layers)
+        )
 
 
 class QueryTestCase(unittest.TestCase):
@@ -525,10 +531,7 @@ class TruncationTestCase(unittest.TestCase):
         ).as_composite_set()
         truncated = self.assert_same_truncation(gaussian_circuit(), event, grid)
         self.assertTrue(
-            any(
-                isinstance(layer, TruncatedGaussianLayer)
-                for layer in truncated.layers
-            )
+            any(isinstance(layer, TruncatedGaussianLayer) for layer in truncated.layers)
         )
 
     def test_truncation_of_a_mixed_circuit(self):
@@ -602,8 +605,8 @@ class TruncationTestCase(unittest.TestCase):
 
     def test_the_batched_pass_agrees_with_truncating_once_per_simple_set(self):
         """
-        Truncating to all simple sets in one pass and truncating to them one at a time and
-        mixing the results have to describe the same distribution.
+        Truncating to all simple sets in one pass and truncating to them one at a time
+        and mixing the results have to describe the same distribution.
         """
         grid = np.stack(
             np.meshgrid(np.linspace(-1, 4, 30), np.linspace(-1, 4, 30)), axis=-1
@@ -612,13 +615,13 @@ class TruncationTestCase(unittest.TestCase):
 
         for name in ("overlapping", "deterministic", "shared"):
             with self.subTest(name):
-                layered = LayeredProbabilisticCircuit.from_rustworkx(ALL_CIRCUITS[name]())
+                layered = LayeredProbabilisticCircuit.from_rustworkx(
+                    ALL_CIRCUITS[name]()
+                )
 
                 batched, batched_probability = layered.truncated(event.__deepcopy__())
-                separate, separate_probability = (
-                    self.truncate_one_simple_set_at_a_time(
-                        layered, event.__deepcopy__()
-                    )
+                separate, separate_probability = self.truncate_one_simple_set_at_a_time(
+                    layered, event.__deepcopy__()
                 )
 
                 self.assertAlmostEqual(batched_probability, separate_probability)
@@ -631,7 +634,8 @@ class TruncationTestCase(unittest.TestCase):
     def test_the_batched_pass_keeps_the_number_of_layers(self):
         """
         The point of truncating to every simple set in one pass: the circuit keeps its
-        layers and their blocks grow, instead of getting one set of layers per simple set.
+        layers and their blocks grow, instead of getting one set of layers per simple
+        set.
         """
         layered = LayeredProbabilisticCircuit.from_rustworkx(shared_children_circuit())
         event = self.boxes(10, 0.0, 2.0)
@@ -667,6 +671,33 @@ class TruncationTestCase(unittest.TestCase):
             np.meshgrid(np.linspace(-4, 6, 25), np.linspace(-4, 6, 25)), axis=-1
         ).reshape(-1, 2)
         self.assert_same_truncation(gaussian_circuit(), self.boxes(4, -1.0, 3.0), grid)
+
+    def test_a_batch_whose_simple_sets_disagree_on_the_layer_type_reports_it(self):
+        """
+        A batch a layer cannot be truncated in has to be reported, so that the circuit
+        falls back to truncating once per simple set.
+        """
+        # one simple set bounds x and turns the gaussian leaves over it into truncated
+        # gaussians, the other leaves x unbounded and keeps them gaussian, so the blocks
+        # of the two do not go into one layer
+        event = (
+            SimpleEvent.from_data(
+                {x: closed(0.0, 1.0), y: closed(0.0, 1.0)}
+            ).as_composite_set()
+            | SimpleEvent.from_data({y: closed(2.0, 3.0)}).as_composite_set()
+        )
+        layered = LayeredProbabilisticCircuit.from_rustworkx(gaussian_circuit())
+        event.fill_missing_variables(set(layered.variables))
+
+        self.assertIsNone(
+            layered.truncated_root_of_simple_events(list(event.simple_sets), False)
+        )
+
+        # and the fallback answers what the rustworkx circuit answers
+        grid = np.stack(
+            np.meshgrid(np.linspace(-4, 6, 25), np.linspace(-4, 6, 25)), axis=-1
+        ).reshape(-1, 2)
+        self.assert_same_truncation(gaussian_circuit(), event, grid)
 
     def test_truncation_puts_all_mass_inside_the_event(self):
         layered = LayeredProbabilisticCircuit.from_rustworkx(overlapping_mixture())
@@ -708,7 +739,10 @@ class ConditionalTestCase(unittest.TestCase):
 
     def test_conditioning_on_a_continuous_variable(self):
         # p(x = 0.75) is the weight of the only branch whose support contains 0.75
-        for name, expected_probability in (("overlapping", 0.4), ("deterministic", 0.3)):
+        for name, expected_probability in (
+            ("overlapping", 0.4),
+            ("deterministic", 0.3),
+        ):
             with self.subTest(name):
                 rx_circuit = ALL_CIRCUITS[name]()
                 layered = LayeredProbabilisticCircuit.from_rustworkx(rx_circuit)
@@ -720,9 +754,7 @@ class ConditionalTestCase(unittest.TestCase):
                 self.assertAlmostEqual(probability, expected_probability)
                 self.assertEqual(list(conditional.variables), list(layered.variables))
 
-                grid = np.stack(
-                    [np.full(40, 0.75), np.linspace(-1, 4, 40)], axis=-1
-                )
+                grid = np.stack([np.full(40, 0.75), np.linspace(-1, 4, 40)], axis=-1)
                 np.testing.assert_allclose(
                     conditional.log_likelihood(grid),
                     rx_conditional.log_likelihood(grid),
@@ -733,7 +765,9 @@ class ConditionalTestCase(unittest.TestCase):
         grid = np.linspace(-1, 5, 60001)
         for name in ("overlapping", "deterministic", "shared"):
             with self.subTest(name):
-                layered = LayeredProbabilisticCircuit.from_rustworkx(ALL_CIRCUITS[name]())
+                layered = LayeredProbabilisticCircuit.from_rustworkx(
+                    ALL_CIRCUITS[name]()
+                )
                 conditional, _ = layered.conditional({x: 0.75})
                 density = conditional.likelihood(
                     np.stack([np.full_like(grid, 0.75), grid], axis=-1)
@@ -891,9 +925,7 @@ class SerializationTestCase(unittest.TestCase):
         conditioned, _ = layered.conditional({x: 0.5})
         self.assertIsInstance(conditioned.root, ProductLayer)
         self.assertTrue(
-            any(
-                isinstance(layer, DiracDeltaLayer) for layer in conditioned.layers
-            )
+            any(isinstance(layer, DiracDeltaLayer) for layer in conditioned.layers)
         )
 
         restored = from_json(to_json(conditioned))
@@ -964,12 +996,8 @@ class TransformationTestCase(unittest.TestCase):
         before = layered.log_likelihood(samples)
 
         layered.update_variables({x: Continuous("z"), y: Continuous("a")})
-        self.assertEqual(
-            [variable.name for variable in layered.variables], ["a", "z"]
-        )
-        np.testing.assert_allclose(
-            layered.log_likelihood(samples[:, ::-1]), before
-        )
+        self.assertEqual([variable.name for variable in layered.variables], ["a", "z"])
+        np.testing.assert_allclose(layered.log_likelihood(samples[:, ::-1]), before)
 
 
 class SimplificationTestCase(unittest.TestCase):
@@ -1006,22 +1034,16 @@ class LayerTestCase(unittest.TestCase):
     """
 
     def test_uniform_layer_likelihood(self):
-        layer = UniformLayer.from_distributions(
-            0, [uniform(x, 0, 1), uniform(x, 1, 3)]
-        )
+        layer = UniformLayer.from_distributions(0, [uniform(x, 0, 1), uniform(x, 1, 3)])
         self.assertEqual(layer.number_of_nodes, 2)
         result = layer.log_likelihood_of_nodes(np.array([[0.5], [2.0], [5.0]]))
-        expected = np.array(
-            [[0.0, -np.inf], [-np.inf, -np.log(2)], [-np.inf, -np.inf]]
-        )
+        expected = np.array([[0.0, -np.inf], [-np.inf, -np.log(2)], [-np.inf, -np.inf]])
         np.testing.assert_allclose(result, expected)
 
     def test_dirac_delta_layer_likelihood(self):
         layer = DiracDeltaLayer(0, np.array([0.0, 1.0]), np.array([1.0, 2.0]))
         result = layer.log_likelihood_of_nodes(np.array([[0.0], [1.0], [2.0]]))
-        expected = np.array(
-            [[0.0, -np.inf], [-np.inf, np.log(2)], [-np.inf, -np.inf]]
-        )
+        expected = np.array([[0.0, -np.inf], [-np.inf, np.log(2)], [-np.inf, -np.inf]])
         np.testing.assert_allclose(result, expected)
 
     def test_gaussian_layer_likelihood(self):

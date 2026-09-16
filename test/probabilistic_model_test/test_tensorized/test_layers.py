@@ -13,6 +13,7 @@ from krrood.adapters.json_serializer import from_json, to_json
 from random_events.interval import Bound, SimpleInterval, closed, open, reals, singleton
 from random_events.product_algebra import SimpleEvent
 from random_events.variable import Continuous, Integer
+from sortedcontainers import SortedSet
 
 from probabilistic_model.distributions.distributions import IntegerDistribution
 from probabilistic_model.distributions.gaussian import (
@@ -22,7 +23,9 @@ from probabilistic_model.distributions.gaussian import (
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.probabilistic_circuit.tensorized.discrete_layer import IntegerLayer
+from probabilistic_model.probabilistic_circuit.tensorized.discrete_layer import (
+    IntegerLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.gaussian_layer import (
     GaussianLayer,
     TruncatedGaussianLayer,
@@ -38,11 +41,15 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ProductLayer,
     SparseSumLayer,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.input_layer import DiracDeltaLayer
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
+    DiracDeltaLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.uniform_layer import UniformLayer
+from probabilistic_model.probabilistic_circuit.tensorized.uniform_layer import (
+    UniformLayer,
+)
 from .test_layered_probabilistic_circuit import shared_children_circuit
 from probabilistic_model.probabilistic_circuit.tensorized.utils import (
     SparseArray,
@@ -87,9 +94,7 @@ class SparseArrayTestCase(unittest.TestCase):
         sorted_sparse = sparse.sort_indices()
         np.testing.assert_array_equal(sorted_sparse.rows, np.array([0, 1, 1]))
         np.testing.assert_array_equal(sorted_sparse.columns, np.array([2, 0, 1]))
-        np.testing.assert_array_equal(
-            sorted_sparse.data, np.array([20.0, 10.0, 30.0])
-        )
+        np.testing.assert_array_equal(sorted_sparse.data, np.array([20.0, 10.0, 30.0]))
 
     def test_json_round_trip(self):
         sparse = SparseArray.from_coordinates([0, 1], [1, 0], [1.5, -2.5], (2, 2))
@@ -128,12 +133,15 @@ class TruncationOfInputLayersTestCase(unittest.TestCase):
 
     def circuit_of(self, layer) -> LayeredProbabilisticCircuit:
         return LayeredProbabilisticCircuit(
-            [x], mixture_of([layer], [0.0]) if layer.number_of_nodes == 1 else layer
+            SortedSet([x]),
+            mixture_of([layer], [0.0]) if layer.number_of_nodes == 1 else layer,
         )
 
     def test_truncating_to_a_composite_interval_introduces_a_selecting_sum_layer(self):
         layer = uniform_layer_of(0, [(0, 4)])
-        circuit = LayeredProbabilisticCircuit([x], mixture_of([layer], [0.0]))
+        circuit = LayeredProbabilisticCircuit(
+            SortedSet([x]), mixture_of([layer], [0.0])
+        )
 
         event = SimpleEvent.from_data(
             {x: closed(0.0, 1.0) | closed(3.0, 4.0)}
@@ -158,7 +166,9 @@ class TruncationOfInputLayersTestCase(unittest.TestCase):
 
     def test_truncating_to_a_singleton(self):
         layer = uniform_layer_of(0, [(0, 2)])
-        circuit = LayeredProbabilisticCircuit([x], mixture_of([layer], [0.0]))
+        circuit = LayeredProbabilisticCircuit(
+            SortedSet([x]), mixture_of([layer], [0.0])
+        )
 
         event = SimpleEvent.from_data({x: singleton(1.0)}).as_composite_set()
         truncated, probability = circuit.truncated(event, singleton_allowed=True)
@@ -178,7 +188,7 @@ class TruncationOfInputLayersTestCase(unittest.TestCase):
                 )
             ],
         )
-        circuit = LayeredProbabilisticCircuit([x], root)
+        circuit = LayeredProbabilisticCircuit(SortedSet([x]), root)
 
         event = SimpleEvent.from_data({x: closed(2.0, 3.0)}).as_composite_set()
         truncated, probability = circuit.truncated(event)
@@ -199,8 +209,10 @@ class TruncationOfInputLayersTestCase(unittest.TestCase):
 class VectorizedTruncationTestCase(unittest.TestCase):
     """
     The input layers truncate all of their nodes with array arithmetic instead of one
-    python call per node. That fast path has to agree with the distribution classes it
-    replaces, in every combination of open and closed bounds.
+    python call per node.
+
+    That fast path has to agree with the distribution classes it replaces, in every
+    combination of open and closed bounds.
     """
 
     def test_uniform_layer_agrees_with_the_scalar_truncation(self):
@@ -261,9 +273,7 @@ class VectorizedTruncationTestCase(unittest.TestCase):
 
     def test_a_singleton_event_falls_back_to_the_scalar_path(self):
         layer = uniform_layer_of(0, [(0, 2)])
-        self.assertIsNone(
-            layer.log_truncated_of_assignment(singleton(1.0), True)
-        )
+        self.assertIsNone(layer.log_truncated_of_assignment(singleton(1.0), True))
 
     def test_a_composite_assignment_falls_back_to_the_scalar_path(self):
         layer = uniform_layer_of(0, [(0, 4)])
@@ -272,9 +282,7 @@ class VectorizedTruncationTestCase(unittest.TestCase):
         )
 
     def test_dirac_delta_layer_agrees_with_the_scalar_truncation(self):
-        layer = DiracDeltaLayer(
-            0, np.array([0.0, 1.0, 2.0]), np.array([1.0, 1.0, 1.0])
-        )
+        layer = DiracDeltaLayer(0, np.array([0.0, 1.0, 2.0]), np.array([1.0, 1.0, 1.0]))
         for assignment in (
             closed(0.5, 1.5),
             closed(1.0, 1.0),
@@ -291,25 +299,21 @@ class VectorizedTruncationTestCase(unittest.TestCase):
                     _, expected = distribution.log_truncated(
                         SimpleEvent.from_data({x: assignment}).as_composite_set()
                     )
-                    self.assertEqual(
-                        float(log_probabilities[node]), float(expected)
-                    )
+                    self.assertEqual(float(log_probabilities[node]), float(expected))
 
     def test_discrete_layer_agrees_with_the_scalar_truncation(self):
         distributions = [
             IntegerDistribution(
                 variable=n, probabilities=MissingDict(float, {0: 0.2, 1: 0.3, 2: 0.5})
             ),
-            IntegerDistribution(
-                variable=n, probabilities=MissingDict(float, {0: 1.0})
-            ),
+            IntegerDistribution(variable=n, probabilities=MissingDict(float, {0: 1.0})),
         ]
         layer = IntegerLayer.from_distributions(0, distributions)
 
         for assignment in (closed(0, 1), closed(2, 2), closed(5, 6)):
             with self.subTest(str(assignment)):
-                truncated_layer, log_probabilities = (
-                    layer.log_truncated_of_assignment(assignment, False)
+                truncated_layer, log_probabilities = layer.log_truncated_of_assignment(
+                    assignment, False
                 )
                 for node, distribution in enumerate(distributions):
                     expected, expected_log_probability = distribution.log_truncated(
@@ -368,9 +372,7 @@ class VectorizedTruncationTestCase(unittest.TestCase):
                             float(log_probabilities[node]),
                             float(expected_log_probability),
                         )
-                        self.assertIsInstance(
-                            expected, TruncatedGaussianDistribution
-                        )
+                        self.assertIsInstance(expected, TruncatedGaussianDistribution)
                         self.assertEqual(
                             truncated_layer.simple_interval_of(node),
                             expected.interval,
@@ -458,9 +460,7 @@ class VectorizedTruncationTestCase(unittest.TestCase):
             ],
             parameters_before,
         )
-        np.testing.assert_array_equal(
-            layered.log_likelihood(points), likelihood_before
-        )
+        np.testing.assert_array_equal(layered.log_likelihood(points), likelihood_before)
 
 
 class HelperTestCase(unittest.TestCase):
@@ -500,7 +500,7 @@ class HelperTestCase(unittest.TestCase):
         product = product_of([x, y], [layer_x, layer_y])
         self.assertIsInstance(product, ProductLayer)
 
-        circuit = LayeredProbabilisticCircuit([x, y], product)
+        circuit = LayeredProbabilisticCircuit(SortedSet([x, y]), product)
         np.testing.assert_allclose(
             circuit.likelihood(np.array([[0.5, 1.0]])), np.array([0.5])
         )
@@ -508,7 +508,7 @@ class HelperTestCase(unittest.TestCase):
         mixture = mixture_of([product], [np.log(1.0)])
         self.assertIsInstance(mixture, SparseSumLayer)
         np.testing.assert_allclose(
-            LayeredProbabilisticCircuit([x, y], mixture).likelihood(
+            LayeredProbabilisticCircuit(SortedSet([x, y]), mixture).likelihood(
                 np.array([[0.5, 1.0]])
             ),
             np.array([0.5]),
@@ -521,8 +521,8 @@ class HelperTestCase(unittest.TestCase):
 
 class JointProbabilityTreeIntegrationTestCase(unittest.TestCase):
     """
-    A learned circuit is a much larger and more irregular graph than the hand built ones,
-    so it exercises the conversion and the queries on a realistic structure.
+    A learned circuit is a much larger and more irregular graph than the hand built
+    ones, so it exercises the conversion and the queries on a realistic structure.
     """
 
     @classmethod
@@ -548,9 +548,7 @@ class JointProbabilityTreeIntegrationTestCase(unittest.TestCase):
 
     def test_conversion_is_valid(self):
         self.layered.validate()
-        self.assertEqual(
-            list(self.layered.variables), list(self.rx_circuit.variables)
-        )
+        self.assertEqual(list(self.layered.variables), list(self.rx_circuit.variables))
         self.assertTrue(self.layered.is_decomposable())
 
     def test_log_likelihood(self):

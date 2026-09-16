@@ -77,17 +77,17 @@ class ProbabilisticModel(ABC):
         first access rather than at instantiation.
     """
 
+    variables: Tuple[Variable, ...]
+    """
+    The variables of the model.
+    """
+
     @property
     def representation(self) -> str:
         """
         The symbol used to represent this distribution.
         """
         return self.__class__.__name__
-
-    variables: Tuple[Variable, ...]
-    """
-    The variables of the model.
-    """
 
     def get_variable_by_name(self, name: str) -> Variable:
         [variable] = [v for v in self.variables if v.name == name]

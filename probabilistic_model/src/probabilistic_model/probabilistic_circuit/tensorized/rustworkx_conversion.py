@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import inspect
 
+import tqdm
 from krrood.adapters.json_serializer import recursive_subclasses
+from sortedcontainers import SortedSet
 from typing_extensions import Dict, List, Tuple, Type
 
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     Layer,
     LayerConverter,
 )
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import Unit
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit,
+    Unit,
+)
 
 
 def layer_class_of(clazz: Type) -> Type[Layer]:
@@ -70,9 +75,7 @@ def create_layers_from_nodes(
     # Gaussian group, whose layer cannot hold it
     groups: Dict[Tuple[Type, Tuple], List[Unit]] = {}
     for node in nodes:
-        groups.setdefault(
-            (_type_of_node(node), tuple(node.variables)), []
-        ).append(node)
+        groups.setdefault((_type_of_node(node), tuple(node.variables)), []).append(node)
 
     for (node_type, _), group in groups.items():
         layer_type = layer_class_of(node_type)
@@ -82,4 +85,62 @@ def create_layers_from_nodes(
             )
         )
 
+    return result
+
+
+def root_layer_of_circuit(
+    circuit: ProbabilisticCircuit, progress_bar: bool = False
+) -> Layer:
+    """
+    Convert a circuit of the ``rx`` package into layers.
+
+    :param circuit: The circuit to convert.
+    :param progress_bar: Whether to show a progress bar.
+    :return: The root layer of the converted circuit.
+    :raises ValueError: If the circuit does not have exactly one root.
+    """
+    converters: List[LayerConverter] = []
+
+    levels = list(circuit.layers)
+    iterator = (
+        tqdm.tqdm(reversed(levels), total=len(levels), desc="Creating layers")
+        if progress_bar
+        else reversed(levels)
+    )
+
+    for nodes in iterator:
+        # every converter created so far is offered as a possible child, not only those
+        # of the level directly below: the layering of the graph is by shortest distance
+        # to the root, so an edge may skip levels
+        converters = (
+            create_layers_from_nodes(nodes, converters, progress_bar) + converters
+        )
+
+    root_converters = [
+        converter for converter in converters if converter.nodes[0] is circuit.root
+    ]
+    if len(root_converters) != 1:
+        raise ValueError("The circuit does not have exactly one root.")
+
+    return root_converters[0].layer
+
+
+def circuit_of_root_layer(
+    root: Layer, variables: SortedSet, progress_bar: bool = False
+) -> ProbabilisticCircuit:
+    """
+    Convert layers into a circuit of the ``rx`` package.
+
+    :param root: The root layer to convert.
+    :param variables: The variables of the circuit, in the order the layers index them.
+    :param progress_bar: Whether to show a progress bar.
+    :return: The converted circuit.
+    """
+    bar = (
+        tqdm.tqdm(total=root.number_of_components, desc="Converting to rx")
+        if progress_bar
+        else None
+    )
+    result = ProbabilisticCircuit()
+    root.to_rustworkx(variables, result, {}, bar)
     return result

@@ -219,9 +219,8 @@ taller. A layer whose type changes with the assignment -- a Gaussian layer becom
 truncated Gaussian layer, a composite assignment splits a node into several pieces --
 still batches fine as long as every simple set in the `k` produces the *same* resulting
 type; only a batch whose simple sets disagree on the type (for instance a Gaussian layer
-where one simple set leaves the whole real line and another bounds it) raises
-`BatchedTruncationUnsupported`, and the circuit falls back to truncating once per simple
-set.
+where one simple set leaves the whole real line and another bounds it) reports that it
+cannot be batched, and the circuit falls back to truncating once per simple set.
 
 Measured on a joint probability tree with 319 nodes over 4 variables, truncated to a
 staircase of disjoint boxes:

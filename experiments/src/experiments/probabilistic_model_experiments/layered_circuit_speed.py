@@ -6,9 +6,9 @@ The circuit is a joint probability tree fitted to correlated normal samples. The
 demanding case is truncating it to an event with many simple sets, which is the
 bottleneck of the application this implementation was built for: truncating once per
 simple set and mixing the results spreads a circuit with a handful of layers over
-hundreds of them, so every later query pays python overhead per layer instead of
-running over arrays. This experiment measures the alternative, a single batched pass
-that keeps the number of layers constant, against that baseline.
+hundreds of them, so every later query pays python overhead per layer instead of running
+over arrays. This experiment measures the alternative, a single batched pass that keeps
+the number of layers constant, against that baseline.
 
 Conditioning on a partial point is measured too. It is inherently a single pass with
 little to batch away, unlike truncating to an event with many simple sets, so the gain
@@ -27,11 +27,14 @@ import pandas as pd
 from random_events.interval import SimpleInterval
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
+from typing_extensions import Any, Callable, Tuple
 
 from experiments.experiment_definitions import (
     ExperimentResult,
     ExperimentsTable,
+    MeanAndStandardDeviation,
     TypstRenderer,
+    Unit,
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
@@ -48,8 +51,8 @@ LARGEST_NUMBER_OF_SIMPLE_SETS = NUMBERS_OF_SIMPLE_SETS[-1]
 
 class BenchmarkStage(enum.Enum):
     """
-    Whether a query benchmark ran on the original circuit or on the circuit truncated
-    to :data:`LARGEST_NUMBER_OF_SIMPLE_SETS` simple sets.
+    Whether a query benchmark ran on the original circuit or on the circuit truncated to
+    :data:`LARGEST_NUMBER_OF_SIMPLE_SETS` simple sets.
     """
 
     BEFORE_TRUNCATION = "before truncation"
@@ -59,8 +62,8 @@ class BenchmarkStage(enum.Enum):
 @dataclass
 class CorrelatedNormalTreeFactory:
     """
-    Learns a joint probability tree fitted to correlated normal samples, shared by
-    every measurement in this experiment.
+    Learns a joint probability tree fitted to correlated normal samples, shared by every
+    measurement in this experiment.
     """
 
     number_of_variables: int = 4
@@ -102,7 +105,8 @@ class CorrelatedNormalTreeFactory:
             frame, min_samples_per_quantile=self.min_samples_per_quantile
         )
         return JointProbabilityTree(
-            annotated_variables=variables, min_samples_per_leaf=self.min_samples_per_leaf
+            annotated_variables=variables,
+            min_samples_per_leaf=self.min_samples_per_leaf,
         ).fit(frame)
 
 
@@ -150,19 +154,26 @@ def staircase_of_boxes(
     return result
 
 
-def fastest_duration(function, repeats: int = 3):
+def measure_duration(
+    function: Callable[[], Any], repeats: int = 3
+) -> Tuple[MeanAndStandardDeviation, Any]:
     """
     :param function: The function to time.
     :param repeats: How often to run it.
-    :return: The shortest duration in seconds and the result of the last run.
+    :return: The duration in milliseconds over all runs, and the result of the last run.
     """
-    best = float("inf")
+    durations = []
     result = None
     for _ in range(repeats):
         start = time.perf_counter()
         result = function()
-        best = min(best, time.perf_counter() - start)
-    return best, result
+        # milliseconds rather than seconds, since the statistics are rounded to a fixed
+        # number of decimals of the unit they are built in
+        durations.append((time.perf_counter() - start) * 1000)
+    return (
+        MeanAndStandardDeviation.from_measurements(durations, Unit.MILLISECONDS),
+        result,
+    )
 
 
 @dataclass
@@ -182,19 +193,19 @@ class QueryDurationResult(ExperimentResult):
     Name of the query, with its batch size where relevant.
     """
 
-    rustworkx_duration: float
+    rustworkx_duration: MeanAndStandardDeviation
     """
-    Fastest of several runs on the rustworkx circuit, in milliseconds.
+    Duration of the runs on the rustworkx circuit.
     """
 
-    layered_duration: float
+    layered_duration: MeanAndStandardDeviation
     """
-    Fastest of several runs on the layered circuit, in milliseconds.
+    Duration of the runs on the layered circuit.
     """
 
     speedup: float
     """
-    How many times faster the layered circuit answered than rustworkx.
+    How many times faster the layered circuit answered than rustworkx, by mean duration.
     """
 
 
@@ -216,26 +227,28 @@ def measure_query_durations(
 
     for amount in (100, 1000, 10000):
         samples = rustworkx_circuit.sample(amount)
-        rustworkx_duration, rustworkx_result = fastest_duration(
+        rustworkx_duration, rustworkx_result = measure_duration(
             lambda: rustworkx_circuit.log_likelihood(samples)
         )
-        layered_duration, layered_result = fastest_duration(
+        layered_duration, layered_result = measure_duration(
             lambda: layered.log_likelihood(samples)
         )
         assert np.allclose(rustworkx_result, layered_result)
         results.append(
             _query_result(
-                stage, f"log_likelihood, {amount} events",
-                rustworkx_duration, layered_duration,
+                stage,
+                f"log_likelihood, {amount} events",
+                rustworkx_duration,
+                layered_duration,
             )
         )
 
     for amount in (1000, 10000):
-        rustworkx_duration, _ = fastest_duration(
-            lambda: rustworkx_circuit.sample(amount), repeats=2
+        rustworkx_duration, _ = measure_duration(
+            lambda: rustworkx_circuit.sample(amount), repeats=3
         )
-        layered_duration, _ = fastest_duration(
-            lambda: layered.sample(amount), repeats=2
+        layered_duration, _ = measure_duration(
+            lambda: layered.sample(amount), repeats=3
         )
         results.append(
             _query_result(
@@ -244,10 +257,10 @@ def measure_query_durations(
         )
 
     bounding_box = rustworkx_circuit.support.bounding_box()
-    rustworkx_duration, _ = fastest_duration(
+    rustworkx_duration, _ = measure_duration(
         lambda: rustworkx_circuit.probability_of_simple_event(bounding_box)
     )
-    layered_duration, _ = fastest_duration(
+    layered_duration, _ = measure_duration(
         lambda: layered.probability_of_simple_event(bounding_box)
     )
     results.append(
@@ -260,21 +273,24 @@ def measure_query_durations(
 
 
 def _query_result(
-    stage: BenchmarkStage, query: str, rustworkx_duration: float, layered_duration: float
+    stage: BenchmarkStage,
+    query: str,
+    rustworkx_duration: MeanAndStandardDeviation,
+    layered_duration: MeanAndStandardDeviation,
 ) -> QueryDurationResult:
     """
     :param stage: Whether this is measuring the original or the truncated circuit.
     :param query: Name of the query.
-    :param rustworkx_duration: Fastest run on the rustworkx circuit, in seconds.
-    :param layered_duration: Fastest run on the layered circuit, in seconds.
-    :return: The result, with durations converted to milliseconds.
+    :param rustworkx_duration: Duration of the runs on the rustworkx circuit.
+    :param layered_duration: Duration of the runs on the layered circuit.
+    :return: The result.
     """
     return QueryDurationResult(
         stage=stage,
         query=query,
-        rustworkx_duration=round(rustworkx_duration * 1000, 3),
-        layered_duration=round(layered_duration * 1000, 3),
-        speedup=round(rustworkx_duration / layered_duration, 1),
+        rustworkx_duration=rustworkx_duration,
+        layered_duration=layered_duration,
+        speedup=round(rustworkx_duration.mean / layered_duration.mean, 1),
     )
 
 
@@ -290,21 +306,21 @@ class TruncationScalingResult(ExperimentResult):
     Number of disjoint simple sets the truncating event is composed of.
     """
 
-    rustworkx_duration: float
+    rustworkx_duration: MeanAndStandardDeviation
     """
     Duration of truncating the rustworkx circuit once per simple set and mixing the
-    results, in milliseconds.
+    results.
     """
 
-    layered_duration: float
+    layered_duration: MeanAndStandardDeviation
     """
-    Duration of truncating the layered circuit in a single batched pass, in
-    milliseconds.
+    Duration of truncating the layered circuit in a single batched pass.
     """
 
     speedup: float
     """
-    How many times faster the layered circuit's batched pass is than rustworkx.
+    How many times faster the layered circuit's batched pass is than rustworkx, by mean
+    duration.
     """
 
     result_number_of_nodes: int
@@ -314,16 +330,22 @@ class TruncationScalingResult(ExperimentResult):
 
     result_number_of_layers: int
     """
-    Number of layers of the layered result. Stays constant regardless of
-    :attr:`number_of_simple_sets`, which is the point of the batched truncation pass:
-    truncating once per simple set instead would spread the result over one set of
-    layers per simple set.
+    Number of layers of the layered result.
+
+    Stays constant regardless of :attr:`number_of_simple_sets`, which is the point of
+    the batched truncation pass: truncating once per simple set instead would spread the
+    result over one set of layers per simple set.
     """
 
 
 def measure_truncation_scaling(
-    rustworkx_circuit: RustworkxProbabilisticCircuit, layered: LayeredProbabilisticCircuit
-) -> tuple[list[TruncationScalingResult], RustworkxProbabilisticCircuit, LayeredProbabilisticCircuit]:
+    rustworkx_circuit: RustworkxProbabilisticCircuit,
+    layered: LayeredProbabilisticCircuit,
+) -> tuple[
+    list[TruncationScalingResult],
+    RustworkxProbabilisticCircuit,
+    LayeredProbabilisticCircuit,
+]:
     """
     Measure truncating both circuits to a staircase of disjoint boxes of growing size.
 
@@ -349,12 +371,12 @@ def measure_truncation_scaling(
         )
 
         rustworkx_duration, (rustworkx_truncated, rustworkx_probability) = (
-            fastest_duration(
-                lambda: rustworkx_circuit.truncated(event.__deepcopy__()), repeats=1
+            measure_duration(
+                lambda: rustworkx_circuit.truncated(event.__deepcopy__()), repeats=3
             )
         )
-        layered_duration, (layered_truncated, layered_probability) = fastest_duration(
-            lambda: layered.truncated(event.__deepcopy__()), repeats=1
+        layered_duration, (layered_truncated, layered_probability) = measure_duration(
+            lambda: layered.truncated(event.__deepcopy__()), repeats=3
         )
         assert np.isclose(rustworkx_probability, layered_probability)
 
@@ -365,9 +387,9 @@ def measure_truncation_scaling(
         results.append(
             TruncationScalingResult(
                 number_of_simple_sets=len(event.simple_sets),
-                rustworkx_duration=round(rustworkx_duration * 1000, 3),
-                layered_duration=round(layered_duration * 1000, 3),
-                speedup=round(rustworkx_duration / layered_duration, 1),
+                rustworkx_duration=rustworkx_duration,
+                layered_duration=layered_duration,
+                speedup=round(rustworkx_duration.mean / layered_duration.mean, 1),
                 result_number_of_nodes=layered_truncated.number_of_nodes,
                 result_number_of_layers=len(layered_truncated.layers),
             )
@@ -394,19 +416,19 @@ class ConditioningResult(ExperimentResult):
     Number of variables the point assigns a value to.
     """
 
-    rustworkx_duration: float
+    rustworkx_duration: MeanAndStandardDeviation
     """
-    Fastest of several runs on the rustworkx circuit, in milliseconds.
+    Duration of the runs on the rustworkx circuit.
     """
 
-    layered_duration: float
+    layered_duration: MeanAndStandardDeviation
     """
-    Fastest of several runs on the layered circuit, in milliseconds.
+    Duration of the runs on the layered circuit.
     """
 
     speedup: float
     """
-    How many times faster the layered circuit answered than rustworkx.
+    How many times faster the layered circuit answered than rustworkx, by mean duration.
     """
 
 
@@ -432,11 +454,11 @@ def measure_conditioning(
         row = np.array([[point[v] for v in conditioned_variables]])
         expected_log_probability = float(marginal_check.log_likelihood(row)[0])
 
-        rustworkx_duration, _ = fastest_duration(
+        rustworkx_duration, _ = measure_duration(
             lambda: rustworkx_circuit.__deepcopy__().log_conditional_in_place(point),
             repeats=5,
         )
-        layered_duration, (_, layered_log_probability) = fastest_duration(
+        layered_duration, (_, layered_log_probability) = measure_duration(
             lambda: layered.__deepcopy__().log_conditional_in_place(point), repeats=5
         )
         assert np.isclose(expected_log_probability, layered_log_probability)
@@ -444,9 +466,9 @@ def measure_conditioning(
         results.append(
             ConditioningResult(
                 number_of_conditioned_variables=number_of_conditioned,
-                rustworkx_duration=round(rustworkx_duration * 1000, 3),
-                layered_duration=round(layered_duration * 1000, 3),
-                speedup=round(rustworkx_duration / layered_duration, 1),
+                rustworkx_duration=rustworkx_duration,
+                layered_duration=layered_duration,
+                speedup=round(rustworkx_duration.mean / layered_duration.mean, 1),
             )
         )
 
@@ -464,14 +486,14 @@ def main():
     )
     print(
         TypstRenderer(before_table).render_figure(
-            f"Query durations (ms) on a joint probability tree with "
+            f"Query durations on a joint probability tree with "
             f"{layered.number_of_nodes} nodes, rustworkx vs the layered numpy circuit."
         )
     )
     print()
 
-    scaling_results, rustworkx_truncated, layered_truncated = measure_truncation_scaling(
-        rustworkx_circuit, layered
+    scaling_results, rustworkx_truncated, layered_truncated = (
+        measure_truncation_scaling(rustworkx_circuit, layered)
     )
     print(
         TypstRenderer(ExperimentsTable(scaling_results)).render_figure(
@@ -489,7 +511,7 @@ def main():
     )
     print(
         TypstRenderer(after_table).render_figure(
-            f"Query durations (ms) on the circuit truncated to "
+            f"Query durations on the circuit truncated to "
             f"{LARGEST_NUMBER_OF_SIMPLE_SETS} simple sets "
             f"({layered_truncated.number_of_nodes} nodes)."
         )
@@ -499,7 +521,7 @@ def main():
     conditioning_results = measure_conditioning(rustworkx_circuit, layered)
     print(
         TypstRenderer(ExperimentsTable(conditioning_results)).render_figure(
-            f"Conditioning durations (ms) on a joint probability tree with "
+            f"Conditioning durations on a joint probability tree with "
             f"{layered.number_of_nodes} nodes, as the number of conditioned "
             f"variables grows, rustworkx vs the layered numpy circuit."
         )

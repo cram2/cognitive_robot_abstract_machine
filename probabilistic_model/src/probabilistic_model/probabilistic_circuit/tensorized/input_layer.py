@@ -19,9 +19,6 @@ from probabilistic_model.distributions.distributions import (
     UnivariateDistribution,
 )
 from probabilistic_model.exceptions import ShapeMismatchError
-from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
-    BatchedTruncationUnsupported,
-)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ForwardSampleAssignment,
     Layer,
@@ -62,16 +59,16 @@ def assemble_input_layer(
     """
     Assemble the result of a structural query on an input layer.
 
-    Every node of the original layer contributes a list of ``(distribution,
-    log-probability)`` pieces. A node contributes more than one piece when it was
+    Every node of the original layer contributes a list of pieces, each a distribution
+    with its log-probability. A node contributes more than one piece when it was
     truncated to a composite set, and different nodes may contribute pieces of different
-    types, for instance when truncating a Gaussian layer to an interval leaves some nodes
-    untruncated.
+    types, for instance when truncating a Gaussian layer to an interval leaves some
+    nodes untruncated.
 
-    The result always has exactly as many nodes as the original layer, in the same order,
-    so that the edges of the parents stay valid. If the pieces fit into a single input
-    layer, that layer is returned directly; otherwise the pieces are grouped by type and
-    a sum layer selects the pieces of every original node.
+    The result always has exactly as many nodes as the original layer, in the same
+    order, so that the edges of the parents stay valid. If the pieces fit into a single
+    input layer, that layer is returned directly; otherwise the pieces are grouped by
+    type and a sum layer selects the pieces of every original node.
 
     :param variable_index: The index of the variable of the layer.
     :param pieces: The pieces per node of the original layer.
@@ -83,7 +80,9 @@ def assemble_input_layer(
                 -np.inf
                 if not node_pieces
                 else float(
-                    np.logaddexp.reduce([log_probability for _, log_probability in node_pieces])
+                    np.logaddexp.reduce(
+                        [log_probability for _, log_probability in node_pieces]
+                    )
                 )
             )
             for node_pieces in pieces
@@ -185,10 +184,12 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         """
         return x[:, self.variable]
 
-    # ------------------------------------------------------------------ per node view
+    # %% per node view
 
     @abstractmethod
-    def node_distribution(self, index: int, variable: Variable) -> UnivariateDistribution:
+    def node_distribution(
+        self, index: int, variable: Variable
+    ) -> UnivariateDistribution:
         """
         Materialize one node of this layer as a univariate distribution.
 
@@ -232,7 +233,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
             for index in range(self.number_of_nodes)
         ]
 
-    # ------------------------------------------------------------------ queries
+    # %% queries
 
     @memoized("support")
     def support_of_nodes(
@@ -249,7 +250,8 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
     ) -> Tuple[List[Event], npt.NDArray]:
         variable = variables[self.variable]
         modes = [
-            distribution.log_mode() for distribution in self.node_distributions(variable)
+            distribution.log_mode()
+            for distribution in self.node_distributions(variable)
         ]
         return [mode for mode, _ in modes], np.array(
             [value for _, value in modes], dtype=float
@@ -328,7 +330,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         distribution = self.node_distribution(node, variables[self.variable])
         return distribution.sample(amount)[:, 0]
 
-    # ------------------------------------------------------------------ structural
+    # %% structural
 
     def truncate_node(
         self,
@@ -363,12 +365,14 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         This is the vectorized counterpart of :meth:`truncate_node`. Returning ``None``
         means "not supported for this layer or this assignment", and the caller falls
         back to materializing every node as a distribution and truncating it one by one.
-        Overriding this is what keeps a truncation from costing one python call per node,
-        which is the dominant cost when truncating to an event with many simple sets.
+        Overriding this is what keeps a truncation from costing one python call per
+        node, which is the dominant cost when truncating to an event with many simple
+        sets.
 
         :param assignment: The assignment of the variable of this layer.
         :param singleton_allowed: Whether singletons are allowed.
-        :return: The truncated layer and the log-probabilities of its nodes, or ``None``.
+        :return: The truncated layer and the log-probabilities of its nodes, or
+            ``None``.
         """
         return None
 
@@ -407,7 +411,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         return result
 
     @classmethod
-    def concatenate(cls, layers: List[Self]) -> Self:
+    def concatenate(cls, layers: List[Self]) -> Optional[Self]:
         """
         Join layers of this type over the same variable into one layer.
 
@@ -417,10 +421,9 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         taken from the first one.
 
         :param layers: The layers to join.
-        :return: The joined layer.
-        :raises BatchedTruncationUnsupported: If this layer type cannot be joined.
+        :return: The joined layer, or ``None`` if this layer type cannot be joined.
         """
-        raise BatchedTruncationUnsupported(cls)
+        return None
 
     def log_truncated_of_simple_events(
         self,
@@ -429,7 +432,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         singleton_allowed: bool,
         cache: Optional[Dict] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
-    ) -> Tuple[Layer, npt.NDArray]:
+    ) -> Optional[Tuple[Layer, npt.NDArray]]:
         if cache is None:
             cache = {}
         key = ("batched truncated", id(self))
@@ -446,14 +449,17 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
             # the generic per-node path may split a node into several pieces or change
             # its type, neither of which keeps the block layout this pass relies on
             if result is None:
-                raise BatchedTruncationUnsupported(self)
+                return None
             truncated.append(result)
 
         layers = [layer for layer, _ in truncated]
         if len({type(layer) for layer in layers}) != 1:
-            raise BatchedTruncationUnsupported(self)
+            return None
 
         layer = type(layers[0]).concatenate(layers)
+        if layer is None:
+            return None
+
         node_log_probabilities = np.concatenate(
             [log_probability for _, log_probability in truncated]
         )
@@ -514,7 +520,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
             return None
         return self.__deepcopy__()
 
-    # ------------------------------------------------------------------ conversion
+    # %% conversion
 
     @classmethod
     def create_layer_from_nodes_with_same_type_and_scope(
@@ -750,9 +756,7 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer[RustworkxUnitType], ABC):
         elif not right_closed.any():
             right = column < self.upper
         else:
-            right = np.where(
-                right_closed, column <= self.upper, column < self.upper
-            )
+            right = np.where(right_closed, column <= self.upper, column < self.upper)
 
         return left & right
 
@@ -907,8 +911,8 @@ class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
         self, assignment: Interval, singleton_allowed: bool
     ) -> Tuple[DiracDeltaLayer, npt.NDArray]:
         """
-        Truncating a Dirac delta either keeps it unchanged or makes it impossible, so the
-        whole layer is truncated by testing which locations the assignment contains.
+        Truncating a Dirac delta either keeps it unchanged or makes it impossible, so
+        the whole layer is truncated by testing which locations the assignment contains.
         """
         inside = np.zeros(self.number_of_nodes, dtype=bool)
         for interval in assignment.simple_sets:
