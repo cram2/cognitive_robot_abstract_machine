@@ -3,7 +3,7 @@
 The confidence model is a relational probabilistic circuit fitted per class on the
 familiar instances of that class. It answers one question about a new object: how
 likely is it under the distribution of familiar instances of its own class. An
-object whose likelihood falls below its class's calibrated threshold does not
+object whose log-likelihood falls below its class's calibrated threshold does not
 resemble anything the model was trained on and is judged unfamiliar.
 """
 
@@ -21,6 +21,8 @@ from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
 from typing_extensions import Any, List
+
+from experiments.confidence_aware_eql.feature_pipeline import extract_feature_dataframe
 
 # %% exceptions
 
@@ -112,6 +114,10 @@ class PerClassConfidenceModel:
     def fit(cls, domain_class: type, instances: List[Any]) -> PerClassConfidenceModel:
         """Fit a relational probabilistic circuit and calibrate its threshold.
 
+        The circuit is fitted on the class + volume + aspect ratio dataframe
+        :func:`extract_feature_dataframe` produces, rather than the DAO's own mapped
+        columns, since those are the class's real, non-redundant features.
+
         The threshold is calibrated as the first percentile of the training
         instances' own log-likelihoods, so an instance less likely than almost every
         familiar one is judged unfamiliar.
@@ -121,7 +127,8 @@ class PerClassConfidenceModel:
         :return: A fitted per-class confidence model.
         """
         circuit = RelationalProbabilisticCircuit(domain_class)
-        circuit.fit([to_dao(instance) for instance in instances])
+        daos = [to_dao(instance) for instance in instances]
+        circuit.fit(daos, dataframe_from_parent=extract_feature_dataframe(instances))
         model = cls(circuit, threshold=-np.inf)
         training_log_likelihoods = [
             model.log_likelihood_of(instance) for instance in instances
@@ -141,13 +148,12 @@ class PerClassConfidenceModel:
         :return: The instance's log-likelihood under the fitted circuit.
         """
         grounded = self.circuit.ground(_build_grounding_query(self.circuit.class_, instance))
-        dataframe = self.circuit.feature_extractor.create_dataframe([to_dao(instance)])
-        dataframe = self.circuit.feature_extractor.preprocess_dataframe(dataframe)
+        feature_row = extract_feature_dataframe([instance])
         variable_names = [variable.name for variable in grounded.variables]
-        event = np.full((1, len(variable_names)), np.nan)
+        event = np.full((1, len(variable_names)), np.nan, dtype=object)
         for index, name in enumerate(variable_names):
-            if name in dataframe.columns:
-                event[0, index] = dataframe[name].iloc[0]
+            if name in feature_row.columns:
+                event[0, index] = feature_row[name].iloc[0]
         return float(grounded.log_likelihood(event)[0])
 
 

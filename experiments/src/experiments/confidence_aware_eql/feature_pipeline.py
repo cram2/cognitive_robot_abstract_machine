@@ -1,10 +1,9 @@
 """Turn semantic objects into a feature dataframe for confidence-aware evaluation.
 
 The out-of-distribution check needs the features of an object as a row of a
-dataframe. This module bridges the semantic objects of a world to that
-dataframe: it converts each object to its data access object, hands the
-collection to the :class:`FeatureExtractor`, and keeps the mass and the object
-class as the features the confidence model is learned on.
+dataframe. This module bridges the semantic objects of a world to that dataframe: the
+object's class together with its collision geometry's volume and aspect ratio are
+kept as the features the confidence model is learned on.
 """
 
 from __future__ import annotations
@@ -12,8 +11,7 @@ from __future__ import annotations
 import enum
 
 import pandas as pd
-from krrood.ormatic.data_access_objects.dao import to_dao
-from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
+from semantic_digital_twin.world_description.geometry import Mesh
 from typing_extensions import Any, List
 
 
@@ -22,11 +20,27 @@ class ObjectClass(enum.StrEnum):
 
     A :class:`~enum.StrEnum`, so a member equals and hashes like its string value.
     Enum members carry the class name as their value, so an instance's class is
-    looked up with ``ObjectClass(type(instance).__name__)``.
+    looked up with ``ObjectClass(type(instance).__name__)``. Covers every class
+    :class:`~semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaObjectResolver`
+    maps a robocasa object category to.
     """
 
+    APPLE = "Apple"
+    BANANA = "Banana"
+    ORANGE = "Orange"
+    TOMATO = "Tomato"
+    LETTUCE = "Lettuce"
+    CARROT = "Carrot"
+    POTATO = "Potato"
+    BOTTLE = "Bottle"
     CUP = "Cup"
+    MUG = "Mug"
+    BOWL = "Bowl"
+    PLATE = "Plate"
+    PAN = "Pan"
     POT = "Pot"
+    KETTLE = "Kettle"
+    BREAD = "Bread"
 
 
 class Feature(enum.StrEnum):
@@ -36,39 +50,59 @@ class Feature(enum.StrEnum):
     code that indexes a column by its plain string name keeps working unchanged.
     """
 
-    MASS = "mass"
-    """The object's mass, in kilograms."""
-
     CLASS = "class"
     """The object's semantic-annotation class."""
 
+    VOLUME = "volume"
+    """The object's root body collision geometry's total watertight mesh volume, in cubic meters."""
+
+    ASPECT_RATIO = "aspect_ratio"
+    """The object's height over its widest horizontal extent."""
+
+
+def _collision_volume(instance: Any) -> float:
+    """Sum the watertight collision mesh volume of an object's root body.
+
+    A collision mesh that is not watertight has no well-defined enclosed volume and is
+    excluded from the sum rather than raising, since a real object is commonly made of
+    several convex collision pieces and only some of them need to be watertight for
+    the total to still be meaningful.
+
+    :param instance: The semantic object whose root body's collision volume is summed.
+    :return: The total volume, in cubic meters; ``0.0`` if no collision shape is watertight.
+    """
+    return sum(
+        shape.volume
+        for shape in instance.root.collision
+        if isinstance(shape, Mesh) and shape.mesh.is_watertight
+    )
+
+
+def _aspect_ratio(instance: Any) -> float:
+    """The height of an object's root body collision geometry over its widest horizontal extent.
+
+    :param instance: The semantic object whose shape is measured.
+    :return: The extent along the vertical axis divided by the greater of the two
+        horizontal extents.
+    """
+    minimum, maximum = instance.root.collision.combined_mesh.bounds
+    horizontal_extent, vertical_extent = maximum[:2] - minimum[:2], maximum[2] - minimum[2]
+    return float(vertical_extent / max(horizontal_extent))
+
 
 def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
-    """Extract the mass and class of each object as a feature dataframe.
+    """Extract the class, volume, and aspect ratio of each object as a feature dataframe.
 
-    Each object is converted to its data access object so that the
-    :class:`FeatureExtractor` can read its mapped attributes, and its own
-    ``preprocess_dataframe`` is run on that extracted dataframe before any column
-    is selected, converting any boolean or enum-typed extracted attribute into a
-    JPT-compatible column. The mass is kept under a stable column name and the
-    object class is added as an :class:`ObjectClass` column, while the remaining
-    extracted attributes are dropped.
+    The feature values are read from each object's own collision geometry directly,
+    which a data access object does not carry.
 
     :param objects: The semantic objects whose features are extracted.
-    :return: One row per object with a mass and a class column.
+    :return: One row per object with a class, volume, and aspect ratio column.
     """
-    data_access_objects = [to_dao(instance) for instance in objects]
-    extractor = FeatureExtractor.from_instances(data_access_objects)
-    extracted = extractor.create_dataframe(data_access_objects)
-    extracted = extractor.preprocess_dataframe(extracted)
-
-    mass_column = next(name for name in extracted.columns if name.endswith(".mass"))
-    dataframe = pd.DataFrame(
+    return pd.DataFrame(
         {
-            Feature.MASS: extracted[mass_column].to_numpy(),
-            Feature.CLASS: [
-                ObjectClass(type(instance).__name__) for instance in objects
-            ],
+            Feature.CLASS: [ObjectClass(type(instance).__name__) for instance in objects],
+            Feature.VOLUME: [_collision_volume(instance) for instance in objects],
+            Feature.ASPECT_RATIO: [_aspect_ratio(instance) for instance in objects],
         }
     )
-    return dataframe
