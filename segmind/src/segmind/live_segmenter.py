@@ -86,11 +86,6 @@ class SegmindEnvironmentVariable(StrEnum):
     When set, the file a watched run writes the events SegMind detected to.
     """
 
-    DASHBOARD = "SEGMIND_DASHBOARD"
-    """
-    When set, a watched run serves its events on a page while it goes on.
-    """
-
 
 # %% records of detected events
 
