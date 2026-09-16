@@ -13,9 +13,18 @@ from enum import StrEnum
 from importlib import resources
 
 from flask import Flask, Response, jsonify, render_template_string, stream_with_context
-from typing_extensions import TYPE_CHECKING, Iterator, Optional, Self
+from typing_extensions import TYPE_CHECKING, Iterator, List, Optional, Self, Tuple, Type
 from werkzeug.serving import BaseWSGIServer, make_server
 
+from segmind.datastructures.events import (
+    ContactEvent,
+    DetectionEvent,
+    LossOfContactEvent,
+    RotationEvent,
+    StopRotationEvent,
+    StopTranslationEvent,
+    TranslationEvent,
+)
 from segmind.event_feed import EventFeed, EventRow, FeedField
 
 if TYPE_CHECKING:
@@ -37,6 +46,20 @@ HEARTBEAT_INTERVAL_SECONDS = 15.0
 """
 How long the event stream may stay silent before a comment line is sent, so a quiet
 stretch does not read as a dropped connection.
+"""
+
+
+EVENTS_NOT_SHOWN: Tuple[Type[DetectionEvent], ...] = (
+    ContactEvent,
+    LossOfContactEvent,
+    TranslationEvent,
+    StopTranslationEvent,
+    RotationEvent,
+    StopRotationEvent,
+)
+"""
+The events the page leaves out: touching and moving, which a single carry produces in
+numbers, and which the events concluded from them already account for.
 """
 
 
@@ -128,6 +151,12 @@ class LiveEventDashboard:
     Where the page is served.
     """
 
+    hidden_event_types: Tuple[Type[DetectionEvent], ...] = EVENTS_NOT_SHOWN
+    """
+    The kinds of event the page leaves out; the feed keeps them either way, so anything
+    else reading it still sees them.
+    """
+
     app: Flask = field(init=False, repr=False)
     """
     The application answering the dashboard's routes.
@@ -203,8 +232,22 @@ class LiveEventDashboard:
             page, fields=FeedField, event_stream_route=DashboardRoute.EVENT_STREAM
         )
 
+    def _shown(self, events: List[DetectionEvent]) -> List[DetectionEvent]:
+        """
+        :param events: The events detected.
+        :return: The ones the page shows, in the order they were detected.
+        """
+        return [
+            event for event in events if not isinstance(event, self.hidden_event_types)
+        ]
+
     def _events(self) -> Response:
-        return jsonify([EventRow.of(event).to_json() for event in self.feed.snapshot()])
+        return jsonify(
+            [
+                EventRow.of(event).to_json()
+                for event in self._shown(self.feed.snapshot())
+            ]
+        )
 
     def _event_stream(self) -> Response:
         return Response(
@@ -223,5 +266,5 @@ class LiveEventDashboard:
             if not events:
                 yield StreamMessage.HEARTBEAT
                 continue
-            for event in events:
+            for event in self._shown(events):
                 yield f"data: {json.dumps(EventRow.of(event).to_json())}\n\n"
