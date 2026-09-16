@@ -1,3 +1,4 @@
+import logging
 import os
 
 from coraplex.datastructures.dataclasses import Context
@@ -11,6 +12,8 @@ from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTor
 
 from coraplex.testing import setup_world
 from krrood.entity_query_language.factories import an, entity, variable, the
+from segmind import event_logger
+from segmind.live_segmenter import LiveSegmenter
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
@@ -42,17 +45,21 @@ bowl = STLParser(
 ).parse()
 
 with world.modify_world():
+    # On the island countertop, whose top face is at 0.9468, plus how far the bowl's
+    # lowest point sits below its own origin.
     world.merge_world_at_pose(
         bowl,
         HomogeneousTransformationMatrix.from_xyz_quaternion(
-            2.4, 2.2, 1, reference_frame=world.root
+            2.4, 2.2, 0.9793, reference_frame=world.root
         ),
     )
+    # Resting on the drawer's floor: its bounding box reaches 13.8 mm higher than the
+    # floor itself, so a spoon put at the box's own height would lie in the air.
     connection = FixedConnection(
         parent=world.get_body_by_name("cabinet10_drawer_top"),
         child=spoon.root,
         parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-            -0.05, -0.05, 0
+            -0.05, -0.05, -0.0138
         ),
     )
     world.merge_world(spoon, connection)
@@ -97,18 +104,26 @@ plan = sequential(
         ParkArmsAction(Arms.BOTH),
         MoveTorsoAction(TorsoState.HIGH),
         TransportAction(
-            next(an(entity(variable(Milk, domain=world.semantic_annotations))).evaluate()),
-            Pose.from_xyz_rpy(4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root),
+            next(
+                an(entity(variable(Milk, domain=world.semantic_annotations))).evaluate()
+            ),
+            Pose.from_xyz_rpy(4.9, 3.3, 0.8103, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            next(an(entity(variable(Bowl, domain=world.semantic_annotations))).evaluate()),
-            Pose.from_xyz_rpy(5, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
+            next(
+                an(entity(variable(Bowl, domain=world.semantic_annotations))).evaluate()
+            ),
+            Pose.from_xyz_rpy(5, 3.3, 0.7551, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            next(an(entity(variable(Spoon, domain=world.semantic_annotations))).evaluate()),
-            Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
+            next(
+                an(
+                    entity(variable(Spoon, domain=world.semantic_annotations))
+                ).evaluate()
+            ),
+            Pose.from_xyz_rpy(5.1, 3.3, 0.729, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
             GraspDescription(
                 ApproachDirection.FRONT,
@@ -120,5 +135,18 @@ plan = sequential(
     context=context,
 ).plan
 
-with simulated_robot:
+segmenter = LiveSegmenter.watching(
+    world,
+    [world.get_body_by_name(name) for name in ("milk.stl", "bowl.stl", "spoon.stl")],
+)
+with simulated_robot, segmenter:
     plan.perform()
+
+# What SegMind detected is reported at debug level, which nothing shows by default, and
+# this demo is meant to be read off the console.
+detected_events = logging.getLogger(event_logger.__name__)
+detected_events.setLevel(logging.DEBUG)
+detected_events.addHandler(logging.StreamHandler())
+
+segmenter.event_logger.print_events()
+segmenter.write_event_records_where_requested()
