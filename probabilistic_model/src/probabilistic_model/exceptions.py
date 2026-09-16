@@ -42,6 +42,28 @@ class UndefinedOperationError(DataclassException):
 
 
 @dataclass
+class UnorderedVariablesError(DataclassException, TypeError):
+    """
+    Exception raised when a model that indexes its variables by position is given them
+    in a container that does not fix their order.
+    """
+
+    received_type: Any
+    """
+    The type the variables were given in.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Variables indexed by position must be a SortedSet, "
+            f"received {self.received_type.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Wrap the variables in a SortedSet before constructing the model."
+
+
+@dataclass
 class ShapeMismatchError(DataclassException, ValueError):
     """
     Exception raised when the shape of two objects does not match.

@@ -31,9 +31,10 @@ from unittest import mock
 import numpy as np
 from krrood.adapters.json_serializer import from_json, to_json
 from random_events.interval import closed
-from random_events.product_algebra import Event, SimpleEvent
+from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.set import Set
 from random_events.variable import Continuous, Integer, Symbolic
+from sortedcontainers import SortedSet
 
 from probabilistic_model.distributions.distributions import (
     IntegerDistribution,
@@ -41,7 +42,7 @@ from probabilistic_model.distributions.distributions import (
 )
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.exceptions import IntractableError
+from probabilistic_model.exceptions import IntractableError, UnorderedVariablesError
 from probabilistic_model.probabilistic_circuit.tensorized.discrete_layer import (
     IntegerLayer,
     SymbolicLayer,
@@ -252,6 +253,19 @@ class ConversionTestCase(unittest.TestCase):
                 self.assertEqual(list(layered.variables), list(rx_circuit.variables))
                 layered.validate()
 
+    def test_variables_that_do_not_fix_their_order_are_rejected(self):
+        """
+        The layers index variables by position, so a container that does not fix the
+        order would silently answer for the wrong variable.
+        """
+        root = LayeredProbabilisticCircuit.from_rustworkx(overlapping_mixture()).root
+
+        with self.assertRaises(UnorderedVariablesError):
+            LayeredProbabilisticCircuit([y, x], root)
+
+        ordered = LayeredProbabilisticCircuit(SortedSet([y, x]), root)
+        self.assertEqual(list(ordered.variables), [x, y])
+
     def test_layer_types_of_a_uniform_mixture(self):
         layered = LayeredProbabilisticCircuit.from_rustworkx(overlapping_mixture())
         self.assertIsInstance(layered.root, SparseSumLayer)
@@ -340,6 +354,48 @@ class QueryTestCase(unittest.TestCase):
                     layered.cumulative_distribution_function(samples),
                     rx_circuit.cumulative_distribution_function(samples),
                 )
+
+    def test_moment(self):
+        for name in CONTINUOUS_CIRCUITS:
+            with self.subTest(name):
+                rx_circuit = ALL_CIRCUITS[name]()
+                layered = LayeredProbabilisticCircuit.from_rustworkx(rx_circuit)
+                order = VariableMap({x: 1, y: 1})
+                center = VariableMap({x: 0.0, y: 0.0})
+                expected = rx_circuit.moment(order, center)
+
+                moment = layered.moment(order, center)
+                self.assertEqual(set(moment.keys()), set(expected.keys()))
+                for variable, value in expected.items():
+                    np.testing.assert_allclose(moment[variable], value)
+
+    def test_moment_of_a_subset_of_the_variables(self):
+        rx_circuit = overlapping_mixture()
+        layered = LayeredProbabilisticCircuit.from_rustworkx(rx_circuit)
+
+        order = VariableMap({x: 1})
+        center = VariableMap({x: 0.0})
+        moment = layered.moment(order, center)
+        expected = rx_circuit.moment(order, center)
+
+        np.testing.assert_allclose(moment[x], expected[x])
+        # the unrequested variable still reports, as it does in the rx circuit
+        np.testing.assert_allclose(moment[y], expected[y])
+
+    def test_central_moment(self):
+        rx_circuit = overlapping_mixture()
+        layered = LayeredProbabilisticCircuit.from_rustworkx(rx_circuit)
+
+        mean = layered.moment(VariableMap({x: 1}), VariableMap({x: 0.0}))
+        order = VariableMap({x: 2})
+        center = VariableMap({x: mean[x]})
+
+        variance = layered.moment(order, center)[x]
+        np.testing.assert_allclose(variance, rx_circuit.moment(order, center)[x])
+
+        # the variance of the mixture, against the samples it generates
+        samples = rx_circuit.sample(200000)[:, 0]
+        self.assertAlmostEqual(variance, float(samples.var()), places=2)
 
     def test_probability_of_a_simple_event(self):
         rx_circuit = overlapping_mixture()

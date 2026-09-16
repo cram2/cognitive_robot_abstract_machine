@@ -11,7 +11,7 @@ from sortedcontainers import SortedSet
 from typing_extensions import Any, Dict, Iterable, List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.helper import make_dirac
-from probabilistic_model.exceptions import IntractableError
+from probabilistic_model.exceptions import IntractableError, UnorderedVariablesError
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ForwardSampleAssignment,
     Layer,
@@ -54,13 +54,18 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
     """
     The variables of the circuit, ordered.
 
-    The layers refer to them by their index here, so the order is part of the circuit.
+    The layers refer to them by their index here, so the order is part of the circuit
+    and a container that does not fix it is rejected.
     """
 
     root: Layer
     """
     The root layer of the circuit.
     """
+
+    def __post_init__(self):
+        if not isinstance(self.variables, SortedSet):
+            raise UnorderedVariablesError(type(self.variables))
 
     @property
     def variable_to_index_map(self) -> Dict[Variable, int]:

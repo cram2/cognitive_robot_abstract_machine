@@ -12,12 +12,8 @@ class SparseArray:
     """
     A minimal two dimensional sparse array in coordinate (COO) format.
 
-    This mirrors the role :class:`jax.experimental.sparse.BCOO` plays in the jax
-    implementation of layered circuits. It is deliberately not backed by
-    :mod:`scipy.sparse`: the product layers store *child node indices* as values, and an
-    index of ``0`` is a perfectly meaningful edge. Every scipy format drops explicitly
-    stored zeros during conversion and arithmetic, which would silently delete those
-    edges.
+    An explicitly stored zero is kept as a stored entry: the product layers hold *child
+    node indices* as values, where an index of ``0`` is a meaningful edge.
 
     ``eq=False`` because the default field-tuple comparison would call ``==`` on the
     ``data``/``indices`` arrays, which raises once they hold more than one element.

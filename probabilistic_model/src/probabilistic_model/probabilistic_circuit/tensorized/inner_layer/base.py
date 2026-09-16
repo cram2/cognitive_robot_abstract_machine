@@ -153,13 +153,9 @@ class Layer(
         """
         Fall back to no child layers for a layer that never declared any.
 
-        :class:`Layer` is not itself a dataclass and declares no ``child_layers`` field
-        or property, so that :class:`InnerLayer` is free to declare it as an ordinary
-        required field without a base-class descriptor of the same name blocking that (a
-        ``@property`` would, even a getter-only one, since assigning to it in
-        ``InnerLayer``'s generated ``__init__`` would then hit its missing setter).
-        Ordinary attribute lookup only reaches ``__getattr__`` when nothing set the
-        attribute anywhere else, which is exactly the case for a layer without children.
+        Attribute lookup reaches ``__getattr__`` only when nothing set the attribute
+        anywhere else. For ``child_layers`` that means an input layer: every inner layer
+        declares it as an ordinary field and sets it on construction.
 
         :param name: The attribute that plain lookup could not find.
         :return: An empty list, for ``child_layers`` only.
@@ -563,9 +559,8 @@ class Layer(
         Remove layers that have no effect on the represented distribution.
 
         This collapses the identity sum and product layers that the structural queries
-        introduce. Unlike the rustworkx implementation it does not merge nested layers
-        of the same type, because in a layered circuit that would have to fuse the
-        parameter blocks of layers with different numbers of nodes.
+        introduce. Nested layers of the same type are left alone: merging them would
+        have to fuse the parameter blocks of layers with different numbers of nodes.
 
         :param cache: The shared cache of the current pass.
         :return: The simplified layer.

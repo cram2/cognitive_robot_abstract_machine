@@ -67,14 +67,9 @@ class ProbabilisticModel(ABC):
     or not.
 
     .. note::
-        This class is intentionally not a dataclass and does not declare ``variables`` as
-        a ``@property``: either would force itself onto every subclass's constructor
-        signature or onto every subclass's attribute lookup, and a subclass that computes
-        its variables (as a property backed by other state) and one that stores them
-        directly (as a plain field) need the freedom to do either without the base class
-        getting in the way. ``variables`` is therefore only a type-annotated contract, not
-        an enforced one; a subclass that fails to provide it raises ``AttributeError`` on
-        first access rather than at instantiation.
+        ``variables`` is a type-annotated contract, which leaves each subclass free to
+        store it as a plain field or compute it as a property. A subclass that provides
+        neither raises ``AttributeError`` on first access.
     """
 
     variables: Tuple[Variable, ...]
