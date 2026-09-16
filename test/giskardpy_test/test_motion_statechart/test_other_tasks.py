@@ -510,7 +510,7 @@ def test_pointing(pr2_world_state_reset: World):
     msc.add_node(pointing)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = pointing.observation_variable
+    end.start_condition = pointing.observes_true
 
     kin_sim = Executor(
         MotionStatechartContext(
@@ -542,7 +542,7 @@ def test_pointing_cone(pr2_world_state_reset: World):
     msc.add_node(pointing_cone)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = pointing_cone.observation_variable
+    end.start_condition = pointing_cone.observes_true
 
     kin_sim = Executor(
         MotionStatechartContext(
@@ -598,7 +598,7 @@ def test_align_planes(pr2_world_state_reset: World):
 
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = align_planes.observation_variable
+    end.start_condition = align_planes.observes_true
 
     kin_sim = Executor(
         MotionStatechartContext(
@@ -652,7 +652,7 @@ def test_align_perpendicular(pr2_world_state_reset: World):
 
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = align_perp.observation_variable
+    end.start_condition = align_perp.observes_true
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
@@ -746,9 +746,8 @@ class TestOpenClose:
         self, prismatic_bot2: World
     ):
         """
-        Neither part is ended by the goal that runs them, so a part something else ends
-        keeps counting through the verdict it earned rather than through the observation
-        behind it, which is gone by then.
+        Both parts are created by the goal and end only when it ends, so it reads what
+        they observe now.
         """
         motion_statechart = MotionStatechart()
         motion_statechart.add_node(
@@ -762,7 +761,7 @@ class TestOpenClose:
         )
 
         assert set(open_goal._observation_expression.free_variables()) == {
-            part.goal_reached for part in open_goal.nodes
+            part.observation_variable for part in open_goal.nodes
         }
 
     def test_open(self, pr2_world_copy, tmp_path):
@@ -878,8 +877,9 @@ class TestOpenClose:
         kin_sim.tick_until_end()
         msc.draw(str(tmp_path / "muh.pdf"))
 
-        assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert closing.life_cycle_state == LifeCycleValues.SUCCEEDED
+        # A step's verdict belongs to the attempt the sequence wrapped it in.
+        assert opening.parent_node.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert closing.parent_node.life_cycle_state == LifeCycleValues.SUCCEEDED
 
     def test_unscrew_and_tighten_bottle_cap(self, pr2_world_copy):
         screw_pitch = 0.03
@@ -971,7 +971,8 @@ class TestOpenClose:
         kin_sim.compile(motion_statechart=unscrew_statechart)
         kin_sim.tick_until_end()
 
-        assert open.life_cycle_state == LifeCycleValues.SUCCEEDED
+        # A step's verdict belongs to the attempt the sequence wrapped it in.
+        assert open.parent_node.life_cycle_state == LifeCycleValues.SUCCEEDED
 
         # One full turn must have moved the cap one screw pitch along the screw axis,
         # away from the bottle (towards the robot, -x).

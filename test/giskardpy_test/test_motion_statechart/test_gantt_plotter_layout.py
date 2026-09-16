@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
     HistoryGanttChartPlotter,
 )
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
-    TestNestedGoal,
+    TestNestedCompositeStatechartNode,
     ConstTrueNode,
 )
 from semantic_digital_twin.world import World
@@ -178,7 +178,7 @@ def test_x_axis_units_control_cycles_vs_seconds(monkeypatch):
 def test_tree_glyphs_in_labels(monkeypatch):
     msc = MotionStatechart()
     root1 = ConstTrueNode(name="A")
-    nested = TestNestedGoal(name="B")
+    nested = TestNestedCompositeStatechartNode(name="B")
     msc.add_nodes([root1, nested])
     msc.add_node(EndMotion.when_true(root1))
 

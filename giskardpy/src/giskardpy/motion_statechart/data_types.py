@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import IntEnum, Enum, StrEnum
+from enum import IntEnum, Enum, StrEnum, auto
 from typing import Union, FrozenSet
 
+from giskardpy.motion_statechart.exceptions import TransitionHasNoVerdictError
 from krrood.symbolic_math.symbolic_math import Scalar, if_eq_cases
 from semantic_digital_twin.world_description.geometry import Color
 
@@ -22,6 +23,44 @@ class NodeJSONKey(StrEnum):
     """
     Tells apart the nodes of one JSON document, so every place referring to the same node
     deserializes to the same instance.
+    """
+
+
+class TransitionConditionJSONKey(StrEnum):
+    """
+    Keys a serialized transition condition carries.
+    """
+
+    KIND = "kind"
+    """
+    The kind of transition the condition controls.
+    """
+
+    EXPRESSION = "expression"
+    """
+    The rendered condition, naming every variable by the id of its node.
+    """
+
+    OWNER = "owner"
+    """
+    The id of the node the condition belongs to.
+    """
+
+
+class MotionStatechartJSONKey(StrEnum):
+    """
+    Keys a serialized motion statechart carries.
+    """
+
+    NODES = "nodes"
+    """
+    The nodes of the motion statechart, in the order of their index.
+    """
+
+    CONDITIONS = "conditions"
+    """
+    Every transition condition of every node the document holds, including the children
+    of goals that join the motion statechart only when it is compiled.
     """
 
 
@@ -68,18 +107,19 @@ class LifeCycleValues(IntEnum):
 
     SUCCEEDED = 3, Color.from_hex("#28A745"), "✔"
     """
-    The node was ended while it was observing its goal as reached.
+    The node's success condition held.
     """
 
     FAILED = 4, Color.from_hex("#EF4444"), "✖"
     """
-    The node was ended while it was not.
+    The node declared that it cannot continue, through its own fail condition.
     """
 
     INTERRUPTED = 5, Color.from_hex("#F97316"), "■"
     """
-    The node was ended while it was not observing anything decisive, which is no basis
-    for a judgement.
+    The node's interrupt condition held, or an ancestor ended and took it down with it.
+
+    Neither is a judgement of the node itself.
     """
 
     def __new__(cls, value: int, color: Color, badge: str) -> LifeCycleValues:
@@ -102,39 +142,12 @@ class LifeCycleValues(IntEnum):
         """
         return frozenset({cls.SUCCEEDED, cls.FAILED, cls.INTERRUPTED})
 
-    @classmethod
-    def judged_states(cls) -> FrozenSet[LifeCycleValues]:
-        """
-        :return: The states a node reaches by being judged on its own terms, as opposed
-            to :attr:`INTERRUPTED`.
-        """
-        return frozenset({cls.SUCCEEDED, cls.FAILED})
-
     @property
     def is_terminal(self) -> bool:
         """
         :return: Whether a node in this state has ended.
         """
         return self in self.terminal_states()
-
-    @classmethod
-    def verdict_for(cls, observation: ObservationStateValues) -> LifeCycleValues:
-        """
-        The verdict a node receives when it is ended.
-
-        An observation that has no answer yet is no basis for a judgement, so it leaves
-        the node unjudged.
-
-        :param observation: What the node observes at the moment it is ended.
-        :return: The terminal state the node reaches.
-        """
-        match observation:
-            case ObservationStateValues.TRUE:
-                return cls.SUCCEEDED
-            case ObservationStateValues.FALSE:
-                return cls.FAILED
-            case _:
-                return cls.INTERRUPTED
 
 
 class FloatEnum(float, Enum):
@@ -187,36 +200,25 @@ class LifeCyclePredicateDefinition:
 
     true_states: FrozenSet[LifeCycleValues]
     """
-    The states in which the predicate is true.
-    """
-
-    unknown_states: FrozenSet[LifeCycleValues] = frozenset()
-    """
-    The states in which the predicate has no answer yet.
-
-    Every state that is neither here nor in :attr:`true_states` makes the predicate
-    false.
+    The states in which the predicate is true; every other state makes it false.
     """
 
     def truth_value(self, life_cycle_value: LifeCycleValues) -> ObservationStateValues:
         """
         :param life_cycle_value: The state to evaluate the predicate in.
-        :return: The trinary value the predicate takes in that state.
+        :return: True if the predicate holds in that state, false otherwise.
         """
         if life_cycle_value in self.true_states:
             return ObservationStateValues.TRUE
-        if life_cycle_value in self.unknown_states:
-            return ObservationStateValues.UNKNOWN
         return ObservationStateValues.FALSE
 
     def expression(self, life_cycle: Scalar) -> Scalar:
         """
         The same truth table as :meth:`truth_value`, but read off an expression rather
-        than a value, so a predicate can be resolved while the life cycle state it reads
-        is still being computed.
+        than a value.
 
         :param life_cycle: The life cycle state to evaluate the predicate in.
-        :return: The trinary value the predicate takes in that state.
+        :return: True if the predicate holds in that state, false otherwise.
         """
         return if_eq_cases(
             a=life_cycle,
@@ -224,38 +226,101 @@ class LifeCyclePredicateDefinition:
                 (int(state), Scalar(float(self.truth_value(state))))
                 for state in sorted(LifeCycleValues)
             ],
-            else_result=Scalar.const_trinary_unknown(),
+            else_result=Scalar.const_false(),
         )
 
 
 class LifeCyclePredicate(LifeCyclePredicateDefinition, Enum):
     """
-    A test on a node's life cycle state that may be used in transition conditions.
+    A test on the life cycle state of a node, which may be used in transition conditions
+    and observations.
 
-    Verdict predicates are trinary, because *how* a node ended has no answer before it
-    ends. :attr:`IS_SUCCEEDED` and :attr:`IS_FAILED` stay unknown until the node is
-    judged, which leaves an interrupted node as open as a running one;
-    :attr:`IS_TERMINATED` and :attr:`IS_INTERRUPTED` are answered by every way of
-    ending. Phase predicates are binary, because *where* a node is right now always has
-    an answer.
+    Every member is binary: a node that has not ended, or ended some other way, did not
+    end the way a verdict predicate asks about.
     """
 
     IS_NOT_STARTED = frozenset({LifeCycleValues.NOT_STARTED})
     IS_RUNNING = frozenset({LifeCycleValues.RUNNING})
     IS_PAUSED = frozenset({LifeCycleValues.PAUSED})
     IS_TERMINATED = LifeCycleValues.terminal_states()
-    IS_SUCCEEDED = (
-        frozenset({LifeCycleValues.SUCCEEDED}),
-        frozenset(LifeCycleValues) - LifeCycleValues.judged_states(),
-    )
-    IS_FAILED = (
-        frozenset({LifeCycleValues.FAILED}),
-        frozenset(LifeCycleValues) - LifeCycleValues.judged_states(),
-    )
-    IS_INTERRUPTED = (
-        frozenset({LifeCycleValues.INTERRUPTED}),
-        frozenset(LifeCycleValues) - LifeCycleValues.terminal_states(),
-    )
+    IS_SUCCEEDED = frozenset({LifeCycleValues.SUCCEEDED})
+    IS_FAILED = frozenset({LifeCycleValues.FAILED})
+    IS_INTERRUPTED = frozenset({LifeCycleValues.INTERRUPTED})
+
+    @property
+    def attribute_name(self) -> str:
+        """
+        :return: The name this predicate is reached under on a node, also used to render
+            it inside a condition.
+        """
+        return self.name.lower()
+
+
+# %% observation predicates
+
+
+class ObservationReading(Enum):
+    """
+    Which of a node's observations a test reads.
+    """
+
+    CURRENT = auto()
+    """
+    What the node observes now, which is unknown while it is not running.
+    """
+
+    LAST = auto()
+    """
+    The observation the node took most recently, which it keeps once it has ended.
+    """
+
+
+@dataclass(frozen=True)
+class ObservationPredicateDefinition:
+    """
+    A test whether one of a node's observations is a particular value.
+    """
+
+    reading: ObservationReading
+    """
+    The observation the test reads.
+    """
+
+    observed_value: ObservationStateValues
+    """
+    The value the test is true for; every other value, unknown included, makes it false.
+    """
+
+    def truth_value(
+        self, observation: ObservationStateValues
+    ) -> ObservationStateValues:
+        """
+        :param observation: The observation to evaluate the test on.
+        :return: True if `observation` is :attr:`observed_value`, false otherwise.
+        """
+        if observation == self.observed_value:
+            return ObservationStateValues.TRUE
+        return ObservationStateValues.FALSE
+
+    def expression(self, observation: Scalar) -> Scalar:
+        """
+        The same test as :meth:`truth_value`, read off an expression rather than a value.
+
+        :param observation: The observation to evaluate the test on.
+        :return: True if `observation` is :attr:`observed_value`, false otherwise.
+        """
+        return Scalar(observation) == float(self.observed_value)
+
+
+class ObservationPredicate(ObservationPredicateDefinition, Enum):
+    """
+    A two-valued test on what a node observes, which may be used in transition conditions
+    and observation expressions alike.
+    """
+
+    OBSERVES_TRUE = ObservationReading.CURRENT, ObservationStateValues.TRUE
+    OBSERVES_FALSE = ObservationReading.CURRENT, ObservationStateValues.FALSE
+    LAST_OBSERVED_TRUE = ObservationReading.LAST, ObservationStateValues.TRUE
 
     @property
     def attribute_name(self) -> str:
@@ -288,19 +353,25 @@ class TransitionKind(Enum):
     Transitions nodes from RUNNING to PAUSED if True, or back if False.
     """
 
-    END = 3
+    SUCCEED = 3
     """
-    Transitions nodes from RUNNING or PAUSED to a terminal state, and their descendants
-    on the same terms.
-
-    Which terminal state a node reaches follows from what it observes at that moment,
-    see :meth:`LifeCycleValues.verdict_for`, whether its own end condition or an
-    ancestor's ended it.
+    Ends a node from RUNNING or PAUSED as SUCCEEDED, and interrupts its descendants.
     """
 
     RESET = 4
     """
     Transitions nodes from any state to NOT_STARTED.
+    """
+
+    FAIL = 5
+    """
+    Ends a node from RUNNING or PAUSED as FAILED, because it cannot continue, and
+    interrupts its descendants.
+    """
+
+    INTERRUPT = 6
+    """
+    Ends a node from RUNNING or PAUSED as INTERRUPTED, and its descendants with it.
     """
 
     @property
@@ -313,10 +384,37 @@ class TransitionKind(Enum):
                 return frozenset({LifeCycleValues.NOT_STARTED})
             case TransitionKind.PAUSE:
                 return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
-            case TransitionKind.END:
-                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
             case TransitionKind.RESET:
                 return frozenset(LifeCycleValues)
+            case (
+                TransitionKind.SUCCEED | TransitionKind.FAIL | TransitionKind.INTERRUPT
+            ):
+                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
+
+    @classmethod
+    def ending_kinds(cls) -> tuple[TransitionKind, ...]:
+        """
+        :return: The transitions that end a node, in the order they take precedence when
+            several hold on the same control cycle: a node that arrived did what it was
+            asked, and a node that cannot continue says more about itself than being
+            stopped does.
+        """
+        return cls.SUCCEED, cls.FAIL, cls.INTERRUPT
+
+    @property
+    def verdict(self) -> LifeCycleValues:
+        """
+        :return: The terminal state this transition ends a node in.
+        :raises TransitionHasNoVerdictError: If this transition does not end a node.
+        """
+        match self:
+            case TransitionKind.SUCCEED:
+                return LifeCycleValues.SUCCEEDED
+            case TransitionKind.FAIL:
+                return LifeCycleValues.FAILED
+            case TransitionKind.INTERRUPT:
+                return LifeCycleValues.INTERRUPTED
+        raise TransitionHasNoVerdictError(transition_kind=self)
 
     def can_trigger_from(self, life_cycle: LifeCycleValues) -> bool:
         """

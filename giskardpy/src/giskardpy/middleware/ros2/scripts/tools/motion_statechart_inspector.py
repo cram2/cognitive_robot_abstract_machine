@@ -21,8 +21,10 @@ from PyQt5.QtWidgets import (
     QShortcut,
 )
 from giskardpy.middleware.ros2 import rospy
+from giskardpy.middleware.ros2.feedback_publisher import MotionStatechartPayloadKey
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
+    LastObservationState,
     LifeCycleState,
     ObservationState,
 )
@@ -248,7 +250,7 @@ class DotGraphViewer(QWidget):
     def handle_new_message(self, msg: JsonAction_FeedbackMessage) -> None:
         # This runs in the main thread
         json_data = json.loads(msg.feedback.feedback)
-        msg_goal_id = json_data["goal_id"]
+        msg_goal_id = json_data[MotionStatechartPayloadKey.GOAL_ID]
 
         self.parse_new_motion_statechart(json_data)
         self.parse_state(json_data)
@@ -291,22 +293,31 @@ class DotGraphViewer(QWidget):
         self.graphs_by_goal[goal_id].append(graph)
 
     def parse_new_motion_statechart(self, json_data: Dict[str, Any]):
-        motion_statechart_data = json_data.get("motion_statechart")
+        motion_statechart_data = json_data.get(
+            MotionStatechartPayloadKey.MOTION_STATECHART
+        )
         if motion_statechart_data is not None:
             self.motion_statechart = MotionStatechart.from_json(motion_statechart_data)
             self.motion_statechart._add_transitions()
 
     def parse_state(self, json_data: Dict[str, Any]):
-        life_cycle_data = json_data.get("life_cycle_state")
+        life_cycle_data = json_data.get(MotionStatechartPayloadKey.LIFE_CYCLE_STATE)
         life_cycle_state = LifeCycleState.from_json(
             life_cycle_data, motion_statechart=self.motion_statechart
         )
-        observation_data = json_data.get("observation_state")
+        observation_data = json_data.get(MotionStatechartPayloadKey.OBSERVATION_STATE)
         observation_state = ObservationState.from_json(
             observation_data, motion_statechart=self.motion_statechart
         )
+        last_observation_data = json_data.get(
+            MotionStatechartPayloadKey.LAST_OBSERVATION_STATE
+        )
+        last_observation_state = LastObservationState.from_json(
+            last_observation_data, motion_statechart=self.motion_statechart
+        )
         self.motion_statechart.life_cycle_state.data = life_cycle_state.data
         self.motion_statechart.observation_state.data = observation_state.data
+        self.motion_statechart.last_observation_state.data = last_observation_state.data
 
     def display_graph(
         self, goal_index: int, message_index: int, update_position_label: bool = True

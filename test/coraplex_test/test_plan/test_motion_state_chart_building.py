@@ -24,8 +24,11 @@ from coraplex.plans.plan_node import (
     PlanNode,
 )
 from coraplex.plans.underspecified import UnderspecifiedNode
-from giskardpy.motion_statechart.goals.templates import NodeListGoal, Sequence
-from giskardpy.motion_statechart.graph_node import Goal
+from giskardpy.motion_statechart.goals.templates import (
+    NodeListCompositeStatechartNode,
+    Sequence,
+)
+from giskardpy.motion_statechart.graph_node import CompositeStatechartNode
 
 # %% a chart builder that is not a plan node
 
@@ -47,7 +50,7 @@ class ChartBuilderWithoutPlan(BuildsMotionStateChart):
     Whether this builder claims to contribute motions.
     """
 
-    added_goal: Optional[Goal] = field(default=None, init=False)
+    added_goal: Optional[CompositeStatechartNode] = field(default=None, init=False)
     """
     The goal this builder added to a chart, None until it was added to one.
     """
@@ -65,8 +68,10 @@ class ChartBuilderWithoutPlan(BuildsMotionStateChart):
         return False
 
     def add_to_motion_state_chart(
-        self, parent_goal: NodeListGoal, executable: GiskardExecutable
-    ) -> Goal:
+        self,
+        parent_goal: NodeListCompositeStatechartNode,
+        executable: GiskardExecutable,
+    ) -> CompositeStatechartNode:
         self.added_goal = self.create_goal()
         parent_goal.add_node(self.added_goal)
         return self.added_goal

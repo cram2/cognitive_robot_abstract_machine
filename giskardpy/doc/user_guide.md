@@ -11,4 +11,4 @@ The following examples demonstrate the basic usage of Giskard:
 
 ## Advanced Usage
 
-For more complex scenarios, you can compose multiple goals into `Parallel` or `Sequence` nodes, and use custom `Monitors` to trigger transitions in the `MotionStatechart`.
+For more complex scenarios, you can compose nodes with templates such as `Sequence`, `Parallel`, `TryInOrder` or `RepeatUntil`, and use custom `Monitors` to trigger transitions in the `MotionStatechart`. See [Motion Statecharts](motion_statecharts.md#templates) for how each template wires its children.

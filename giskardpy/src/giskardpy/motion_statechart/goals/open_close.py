@@ -11,13 +11,17 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import Goal, NodeArtifacts
+from giskardpy.motion_statechart.graph_node import (
+    CompositeStatechartNode,
+    MaintenanceNode,
+    NodeArtifacts,
+)
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 
 
 @dataclass(eq=False, repr=False)
-class Open(Goal):
+class Open(MaintenanceNode, CompositeStatechartNode):
     """
     Open a 1-dof mechanism in an environment by driving its degree of freedom towards
     its upper limit while keeping the end effector fixed relative to the grasped part.
@@ -104,12 +108,14 @@ class Open(Goal):
         Build an observation that is True once both the degree of freedom and the grip
         on the grasped part reached their goals.
 
-        This goal ends neither of them, so a part that keeps running is judged by what
-        it observes now and stops counting once it drifts away from its goal again. A
-        part something *else* ended keeps counting, because its verdict outlasts it.
+        Both parts are created here and end only when this goal ends, so each is judged
+        by what it observes now and stops counting once it drifts away from its goal
+        again.
         """
         return NodeArtifacts(
-            observation=trinary_logic_and(*[node.goal_reached for node in self.nodes])
+            observation=trinary_logic_and(
+                *[node.observation_variable for node in self.nodes]
+            )
         )
 
 

@@ -7,14 +7,14 @@ import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import Goal
+from giskardpy.motion_statechart.graph_node import CompositeStatechartNode
 from giskardpy.motion_statechart.graph_node import Task
 from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class InsertCylinder(Goal):
+class InsertCylinder(CompositeStatechartNode):
     cylinder_name: Body = field(kw_only=True)
     hole_point: Point3 = field(kw_only=True)
     cylinder_height: Optional[float] = None
@@ -87,7 +87,7 @@ class InsertCylinder(Goal):
 
         init_done = f"{reach_top} and {tilt_task}"
 
-        reach_top.end_condition = init_done
+        reach_top.success_condition = init_done
 
         # %% move down
         stay_on_line = Task(name="Stay on Straight Line")
@@ -115,7 +115,7 @@ class InsertCylinder(Goal):
 
         bottom_reached = f"{insert_task} and {stay_on_line}"
 
-        tilt_task.end_condition = bottom_reached
+        tilt_task.success_condition = bottom_reached
         # %% tilt straight
         # tilt_monitor.observation_expression = cas.less(tilt_error, 0.01)
 
@@ -128,7 +128,7 @@ class InsertCylinder(Goal):
             weight=self.weight,
         )
         tilt_straight_task.start_condition = bottom_reached
-        # tilt_straight_task.end_condition = tilt_monitor.observation_state
+        # tilt_straight_task.success_condition = tilt_monitor.observation_state
         tilt_straight_task.observation_expression = tilt_error <= 0.01
 
         self.observation_expression = tilt_straight_task.observation_expression

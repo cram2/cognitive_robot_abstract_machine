@@ -8,7 +8,6 @@ from ..orm_interface_build import regenerate_orm_interfaces
 regenerate_orm_interfaces()
 
 
-
 import numpy as np
 import pytest
 
@@ -20,7 +19,7 @@ from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetOdometry,
 )
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from krrood.symbolic_math.symbolic_math import trinary_logic_and
+from krrood.symbolic_math.symbolic_math import logic_and
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -42,6 +41,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
 )
 from semantic_digital_twin.robots.pr2 import PR2Joint
+
 
 @pytest.fixture()
 def better_pr2_pose():
@@ -67,6 +67,7 @@ def better_pr2_pose():
         PR2Joint.HEAD_TILT: 0,
     }
 
+
 @pytest.fixture(scope="function")
 def pr2_with_box(pr2_world_copy) -> World:
     with pr2_world_copy.modify_world():
@@ -85,6 +86,7 @@ def pr2_with_box(pr2_world_copy) -> World:
         pr2_world_copy.add_connection(root_C_box)
     return pr2_world_copy
 
+
 @pytest.fixture()
 def mini_world():
     world = World()
@@ -96,6 +98,7 @@ def mini_world():
         )
         world.add_connection(connection)
     return world
+
 
 @pytest.fixture()
 def giskard_factory(init_rospy, robot: GiskardTester):
@@ -118,12 +121,12 @@ def giskard_factory(init_rospy, robot: GiskardTester):
             )
             base_pose_reached = SetOdometry(name="initial pose", base_pose=base_goal)
             msc.add_node(base_pose_reached)
-            done = trinary_logic_and(
-                initial_config.observation_variable,
-                base_pose_reached.observation_variable,
+            done = logic_and(
+                initial_config.observes_true,
+                base_pose_reached.observes_true,
             )
         else:
-            done = initial_config.observation_variable
+            done = initial_config.observes_true
         end = EndMotion(name="end")
         msc.add_node(end)
         end.start_condition = done
@@ -132,13 +135,16 @@ def giskard_factory(init_rospy, robot: GiskardTester):
 
     return _create_giskard
 
+
 @pytest.fixture()
 def giskard(giskard_factory, default_joint_state):
     return giskard_factory(default_joint_state)
 
+
 @pytest.fixture()
 def giskard_better_pose(giskard_factory, better_pose):
     return giskard_factory(better_pose)
+
 
 @pytest.fixture()
 def kitchen_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
@@ -155,6 +161,7 @@ def kitchen_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
     )
     return giskard_better_pose
 
+
 @pytest.fixture()
 def apartment_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
     giskard_better_pose.default_env_name = "iai_apartment"
@@ -170,6 +177,7 @@ def apartment_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
         ),
     )
     return giskard_better_pose
+
 
 def _symmetric_prismatic_limits(
     position: float | None, velocity: float
@@ -189,6 +197,7 @@ def _symmetric_prismatic_limits(
             position=position, velocity=velocity, acceleration=None, jerk=None
         ),
     )
+
 
 def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
     """
@@ -212,15 +221,18 @@ def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
     MinimalRobot.from_world(world)
     return world
 
+
 @pytest.fixture()
 def prismatic_bot():
     return _make_prismatic_world([_symmetric_prismatic_limits(1, 1)])
+
 
 @pytest.fixture()
 def prismatic_bot2():
     return _make_prismatic_world(
         [_symmetric_prismatic_limits(1, 1), _symmetric_prismatic_limits(0.5, 0.5)]
     )
+
 
 @pytest.fixture()
 def prismatic_world_no_position_limits():

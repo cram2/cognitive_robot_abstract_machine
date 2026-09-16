@@ -6,6 +6,7 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCyclePredicate,
     LifeCycleValues,
+    ObservationPredicate,
     ObservationStateValues,
     TransitionKind,
 )
@@ -16,16 +17,15 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
 from giskardpy.motion_statechart.graph_node import (
     CancelMotion,
     EndMotion,
-    Goal,
-    GoalReachedVariable,
+    CompositeStatechartNode,
     MotionStatechartNode,
     Task,
 )
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstTrueNode,
-    TestGoal,
-    TestNestedGoal,
+    TestCompositeStatechartNode,
+    TestNestedCompositeStatechartNode,
 )
 from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
 from giskardpy.motion_statechart.plotters.styles import (
@@ -50,7 +50,7 @@ def expand(motion_statechart: MotionStatechart) -> MotionStatechart:
     return motion_statechart
 
 
-def build_motion_statechart(goal: Goal) -> MotionStatechart:
+def build_motion_statechart(goal: CompositeStatechartNode) -> MotionStatechart:
     """
     Creates a motion statechart holding `goal` and an end motion, expanded far enough to
     be drawn.
@@ -179,7 +179,7 @@ def build_dependency_statechart(
 
 
 def test_expanded_goal_draws_children_in_its_cluster():
-    goal = TestGoal(name="goal")
+    goal = TestCompositeStatechartNode(name="goal")
     motion_statechart = build_motion_statechart(goal)
 
     cluster = find_cluster_of(draw(motion_statechart), goal)
@@ -192,7 +192,7 @@ def test_expanded_goal_draws_children_in_its_cluster():
 
 
 def test_expanded_goal_node_is_declared_only_in_its_cluster():
-    goal = TestGoal(name="goal")
+    goal = TestCompositeStatechartNode(name="goal")
     motion_statechart = build_motion_statechart(goal)
 
     graph = draw(motion_statechart)
@@ -204,7 +204,7 @@ def test_expanded_goal_node_is_declared_only_in_its_cluster():
 
 
 def test_collapsed_goal_hides_children_and_their_edges():
-    goal = TestGoal(name="goal")
+    goal = TestCompositeStatechartNode(name="goal")
     goal.plot_specifications.collapse_children = True
     motion_statechart = build_motion_statechart(goal)
 
@@ -218,7 +218,7 @@ def test_collapsed_goal_hides_children_and_their_edges():
 
 
 def test_collapsed_goal_reports_hidden_node_count():
-    goal = TestGoal(name="goal")
+    goal = TestCompositeStatechartNode(name="goal")
     goal.plot_specifications.collapse_children = True
     motion_statechart = build_motion_statechart(goal)
 
@@ -228,7 +228,7 @@ def test_collapsed_goal_reports_hidden_node_count():
 
 
 def test_collapsed_goal_counts_hidden_nodes_of_nested_goals():
-    goal = TestNestedGoal(name="goal")
+    goal = TestNestedCompositeStatechartNode(name="goal")
     goal.plot_specifications.collapse_children = True
     motion_statechart = build_motion_statechart(goal)
 
@@ -239,7 +239,7 @@ def test_collapsed_goal_counts_hidden_nodes_of_nested_goals():
 
 
 def test_expanded_goal_reports_no_hidden_node_count():
-    goal = TestGoal(name="goal")
+    goal = TestCompositeStatechartNode(name="goal")
     motion_statechart = build_motion_statechart(goal)
 
     cluster = find_cluster_of(draw(motion_statechart), goal)
@@ -259,7 +259,7 @@ def test_collision_avoidance_goals_collapse_their_children():
 
 
 def test_structure_copy_keeps_plot_specs():
-    goal = TestGoal(name="goal")
+    goal = TestCompositeStatechartNode(name="goal")
     goal.plot_specifications.collapse_children = True
     motion_statechart = build_motion_statechart(goal)
 
@@ -285,7 +285,7 @@ def test_pause_dependency_may_sit_beside_the_node_reading_it():
     observed = ConstTrueNode(name="Observed")
     owner = ConstTrueNode(name="Owner")
     motion_statechart = build_dependency_statechart(observed, owner)
-    owner.pause_condition = observed.goal_reached
+    owner.pause_condition = observed.last_observed_true
     expand(motion_statechart)
 
     edge = find_edge(draw(motion_statechart), observed, owner)
@@ -297,7 +297,7 @@ def test_start_dependency_is_drawn_a_row_above_the_node_reading_it():
     observed = ConstTrueNode(name="Observed")
     owner = ConstTrueNode(name="Owner")
     motion_statechart = build_dependency_statechart(observed, owner)
-    owner.start_condition = observed.goal_reached
+    owner.start_condition = observed.last_observed_true
     expand(motion_statechart)
 
     edge = find_edge(draw(motion_statechart), observed, owner)
@@ -315,8 +315,8 @@ def test_merged_arrow_keeps_the_largest_distance_its_conditions_ask_for():
     observed = ConstTrueNode(name="Observed")
     owner = ConstTrueNode(name="Owner")
     motion_statechart = build_dependency_statechart(observed, owner)
-    owner.start_condition = observed.goal_reached
-    owner.reset_condition = observed.goal_reached
+    owner.start_condition = observed.last_observed_true
+    owner.reset_condition = observed.last_observed_true
     expand(motion_statechart)
 
     edge = find_edge(draw(motion_statechart), observed, owner)
@@ -335,7 +335,7 @@ def test_reset_dependency_points_at_the_node_reading_it():
     observed = ConstTrueNode(name="Observed")
     owner = ConstTrueNode(name="Owner")
     motion_statechart = build_dependency_statechart(observed, owner)
-    owner.reset_condition = observed.goal_reached
+    owner.reset_condition = observed.last_observed_true
     expand(motion_statechart)
 
     graph = draw(motion_statechart)
@@ -376,7 +376,7 @@ def test_arrow_takes_the_line_width_of_the_observation_it_carries():
     observed = ConstTrueNode(name="Observed")
     owner = ConstTrueNode(name="Owner")
     motion_statechart = build_dependency_statechart(observed, owner)
-    owner.start_condition = observed.goal_reached
+    owner.start_condition = observed.last_observed_true
     expand(motion_statechart)
     motion_statechart.observation_state[observed] = ObservationStateValues.UNKNOWN
 
@@ -394,8 +394,8 @@ def test_one_arrow_is_drawn_per_dependency():
     observed = ConstTrueNode(name="Observed")
     owner = ConstTrueNode(name="Owner")
     motion_statechart = build_dependency_statechart(observed, owner)
-    owner.end_condition = observed.goal_reached
-    owner.reset_condition = observed.goal_reached
+    owner.success_condition = observed.last_observed_true
+    owner.reset_condition = observed.last_observed_true
     expand(motion_statechart)
 
     assert len(find_edges(draw(motion_statechart), observed, owner)) == 1
@@ -436,15 +436,18 @@ def test_condition_term_is_colored_when_its_node_name_reads_as_an_operator():
     observed = ConstTrueNode(name="open and close")
     owner = ConstTrueNode(name="Owner")
     motion_statechart = build_dependency_statechart(observed, owner)
-    owner.start_condition = observed.goal_reached
+    owner.start_condition = observed.last_observed_true
     expand(motion_statechart)
     motion_statechart.observation_state[observed] = ObservationStateValues.TRUE
     motion_statechart.life_cycle_state[observed] = LifeCycleValues.RUNNING
 
     label = find_node(draw(motion_statechart), owner).get_label()
 
-    term_color = OBSERVATION_DRAWING_STYLES[observed.goal_reached_state].color.to_hex()
-    term = f"{observed.unique_name}.{GoalReachedVariable.attribute_name}"
+    term_value = ObservationPredicate.LAST_OBSERVED_TRUE.truth_value(
+        observed.last_observation_state
+    )
+    term_color = OBSERVATION_DRAWING_STYLES[term_value].color.to_hex()
+    term = f"{observed.unique_name}.{ObservationPredicate.LAST_OBSERVED_TRUE.attribute_name}"
     assert f'<FONT COLOR="{term_color}">"{term}"</FONT>' in label
 
 
@@ -545,8 +548,8 @@ def test_edge_targeting_terminal_node_clips_to_outer_cluster():
     cancel = CancelMotion(exception=Exception("fail"))
     motion_statechart = MotionStatechart()
     motion_statechart.add_nodes([observed, end, cancel])
-    end.start_condition = observed.goal_reached
-    cancel.start_condition = observed.goal_reached
+    end.start_condition = observed.last_observed_true
+    cancel.start_condition = observed.last_observed_true
     expand(motion_statechart)
 
     graph = draw(motion_statechart)
@@ -572,9 +575,11 @@ def test_conditions_are_grayed_out_when_not_triggerable(
     node = ConstTrueNode(name="TestNode")
     observed = ConstTrueNode(name="ObservedNode")
     motion_statechart = build_dependency_statechart(observed, node)
-    node.start_condition = observed.goal_reached
+    node.start_condition = observed.last_observed_true
     node.pause_condition = observed.is_succeeded
-    node.end_condition = observed.is_failed
+    node.success_condition = observed.is_failed
+    node.fail_condition = observed.is_interrupted
+    node.interrupt_condition = observed.is_paused
     node.reset_condition = observed.is_running
     expand(motion_statechart)
     motion_statechart.life_cycle_state[node] = life_cycle_state
@@ -583,33 +588,34 @@ def test_conditions_are_grayed_out_when_not_triggerable(
     label = find_node(draw(motion_statechart), node).get_label()
     disabled_color = DISABLED_CONDITION_COLOR.to_hex()
 
-    for prefix, condition, transition_kind, term in [
+    for condition, term in [
         (
-            "start",
             node._start_condition,
-            TransitionKind.START,
-            f"{observed.unique_name}.{GoalReachedVariable.attribute_name}",
+            f"{observed.unique_name}.{ObservationPredicate.LAST_OBSERVED_TRUE.attribute_name}",
         ),
         (
-            "pause",
             node._pause_condition,
-            TransitionKind.PAUSE,
             f"{observed.unique_name}.{LifeCyclePredicate.IS_SUCCEEDED.attribute_name}",
         ),
         (
-            "end  ",
-            node._end_condition,
-            TransitionKind.END,
+            node._success_condition,
             f"{observed.unique_name}.{LifeCyclePredicate.IS_FAILED.attribute_name}",
         ),
         (
-            "reset",
+            node._fail_condition,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_INTERRUPTED.attribute_name}",
+        ),
+        (
+            node._interrupt_condition,
+            f"{observed.unique_name}.{LifeCyclePredicate.IS_PAUSED.attribute_name}",
+        ),
+        (
             node._reset_condition,
-            TransitionKind.RESET,
             f"{observed.unique_name}.{LifeCyclePredicate.IS_RUNNING.attribute_name}",
         ),
     ]:
-        can_trigger = transition_kind.can_trigger_from(life_cycle_state)
+        prefix = MotionStatechartGraphviz.condition_prefix(condition.kind)
+        can_trigger = condition.kind.can_trigger_from(life_cycle_state)
         if can_trigger:
             assert f'<FONT FACE="{Font.MONOSPACE}">{prefix}:' in label
             assert (

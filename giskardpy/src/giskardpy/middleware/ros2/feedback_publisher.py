@@ -2,12 +2,44 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Dict
 
 from json_msgs.action import JsonAction
 
 from giskardpy.executor import Executor
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
+
+
+class MotionStatechartPayloadKey(StrEnum):
+    """
+    The keys of the motion statechart feedback and result sent to the action client.
+    """
+
+    LIFE_CYCLE_STATE = "life_cycle_state"
+    """
+    The life cycle state of every node.
+    """
+
+    OBSERVATION_STATE = "observation_state"
+    """
+    The observation state of every node.
+    """
+
+    LAST_OBSERVATION_STATE = "last_observation_state"
+    """
+    The observation every node took most recently.
+    """
+
+    MOTION_STATECHART = "motion_statechart"
+    """
+    The structure of the motion statechart, sent once per goal.
+    """
+
+    GOAL_ID = "goal_id"
+    """
+    The goal the feedback belongs to.
+    """
 
 
 @dataclass
@@ -42,10 +74,10 @@ class ActionFeedbackPublisher:
         if self.executor.motion_statechart is None:
             return
         data = self.create_states()
-        data["motion_statechart"] = (
+        data[MotionStatechartPayloadKey.MOTION_STATECHART] = (
             self.executor.motion_statechart.create_structure_copy().to_json()
         )
-        data["goal_id"] = self.action_server.goal_id
+        data[MotionStatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
         self.last_history_length = len(self.executor.motion_statechart.history)
         self.send(data)
 
@@ -58,7 +90,7 @@ class ActionFeedbackPublisher:
         if not self.has_state_changed():
             return
         data = self.create_states()
-        data["goal_id"] = self.action_server.goal_id
+        data[MotionStatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
         self.send(data)
 
     def publish(self) -> None:
@@ -68,16 +100,19 @@ class ActionFeedbackPublisher:
         if self.executor.motion_statechart is None:
             return
         data = self.create_states()
-        data["goal_id"] = self.action_server.goal_id
+        data[MotionStatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
         self.send(data)
 
     def create_states(self) -> Dict[str, Any]:
         """
-        Collect the life cycle and observation state of the motion statechart.
+        Collect the life cycle, observation and last observation state of the motion
+        statechart.
         """
+        motion_statechart = self.executor.motion_statechart
         return {
-            "life_cycle_state": self.executor.motion_statechart.life_cycle_state.to_json(),
-            "observation_state": self.executor.motion_statechart.observation_state.to_json(),
+            MotionStatechartPayloadKey.LIFE_CYCLE_STATE: motion_statechart.life_cycle_state.to_json(),
+            MotionStatechartPayloadKey.OBSERVATION_STATE: motion_statechart.observation_state.to_json(),
+            MotionStatechartPayloadKey.LAST_OBSERVATION_STATE: motion_statechart.last_observation_state.to_json(),
         }
 
     def has_state_changed(self) -> bool:

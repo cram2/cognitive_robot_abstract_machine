@@ -18,12 +18,16 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
     SelfCollisionAvoidance,
 )
 from giskardpy.motion_statechart.graph_node import CancelMotion
-from giskardpy.motion_statechart.graph_node import EndMotion, Goal, Task
+from giskardpy.motion_statechart.graph_node import (
+    EndMotion,
+    CompositeStatechartNode,
+    Task,
+)
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
 from krrood.entity_query_language.factories import evaluate_condition
-from krrood.symbolic_math.symbolic_math import Scalar, trinary_logic_not
+from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
@@ -79,7 +83,7 @@ class GiskardExecutable(Executable):
     the motions and the pre- and postconditions.
     """
 
-    root_node: Goal = field(kw_only=True)
+    root_node: CompositeStatechartNode = field(kw_only=True)
     """
     The goal below which every motion of this executable lives.
     """
@@ -150,14 +154,11 @@ class GiskardExecutable(Executable):
         execution type is only known once an
         :py:class:`~coraplex.execution_environment.ExecutionEnvironment` is entered.
         """
-        end_trigger = self.root_node.goal_reached
         if GiskardExecutable.collision_avoidance:
             self.motion_state_chart.add_node(ExternalCollisionAvoidance())
             self.motion_state_chart.add_node(SelfCollisionAvoidance())
 
-        end_motion = EndMotion()
-        end_motion.start_condition = end_trigger
-        self.motion_state_chart.add_node(end_motion)
+        self.motion_state_chart.add_node(EndMotion.when_true(self.root_node))
 
     def _add_condition_monitors(self, end_trigger: Scalar) -> Scalar:
         """
@@ -181,7 +182,7 @@ class GiskardExecutable(Executable):
             pre_monitor = condition_monitor(self.pre_condition_node)
             self.motion_state_chart.add_node(pre_monitor)
             # only start the motion once the pre-condition holds
-            self.root_node.start_condition = pre_monitor.observation_variable
+            self.root_node.start_condition = pre_monitor.observes_true
             # abort if the pre-condition is observed to be false
             pre_cancel = CancelMotion(
                 exception=self._condition_not_satisfied(
@@ -189,9 +190,7 @@ class GiskardExecutable(Executable):
                     action_node=self.pre_condition_node.action_node.action,
                 )
             )
-            pre_cancel.start_condition = trinary_logic_not(
-                pre_monitor.observation_variable
-            )
+            pre_cancel.start_condition = pre_monitor.observes_false
             self.motion_state_chart.add_node(pre_cancel)
 
         if self.post_condition_node is not None and self.context.evaluate_conditions:
@@ -199,7 +198,7 @@ class GiskardExecutable(Executable):
             # only evaluate the post-condition once the motion is done
             post_monitor.start_condition = end_trigger
             self.motion_state_chart.add_node(post_monitor)
-            end_trigger = post_monitor.observation_variable
+            end_trigger = post_monitor.observes_true
             # abort if the post-condition is observed to be false
             post_cancel = CancelMotion(
                 exception=self._condition_not_satisfied(
@@ -207,9 +206,7 @@ class GiskardExecutable(Executable):
                     action_node=self.post_condition_node.action_node.action,
                 )
             )
-            post_cancel.start_condition = trinary_logic_not(
-                post_monitor.observation_variable
-            )
+            post_cancel.start_condition = post_monitor.observes_false
             self.motion_state_chart.add_node(post_cancel)
         return end_trigger
 

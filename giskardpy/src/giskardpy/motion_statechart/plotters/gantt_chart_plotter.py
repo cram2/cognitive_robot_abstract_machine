@@ -12,7 +12,10 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.graph_node import Goal, MotionStatechartNode
+from giskardpy.motion_statechart.graph_node import (
+    CompositeStatechartNode,
+    MotionStatechartNode,
+)
 from giskardpy.utils.utils import create_path
 from semantic_digital_twin.world_description.geometry import Color
 
@@ -235,7 +238,7 @@ class HistoryGanttChartPlotter:
 
         def return_children_in_order(n: MotionStatechartNode):
             yield n
-            if isinstance(n, Goal):
+            if isinstance(n, CompositeStatechartNode):
                 for c in n.nodes:
                     yield from return_children_in_order(c)
 

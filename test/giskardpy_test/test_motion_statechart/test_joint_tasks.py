@@ -27,8 +27,8 @@ from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import (
-    trinary_logic_and,
     shortest_angular_distance,
+    logic_and,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
@@ -65,8 +65,8 @@ def test_set_seed_configuration(pr2_world_state_reset):
     end = EndMotion()
     msc.add_node(node1)
     msc.add_node(end)
-    node1.end_condition = node1.observation_variable
-    end.start_condition = node1.observation_variable
+    node1.success_condition = node1.observes_true
+    end.start_condition = node1.observes_true
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
@@ -101,8 +101,8 @@ def test_set_seed_odometry(pr2_world_state_reset):
     end = EndMotion()
     msc.add_node(node1)
     msc.add_node(end)
-    node1.end_condition = node1.observation_variable
-    end.start_condition = node1.observation_variable
+    node1.success_condition = node1.observes_true
+    end.start_condition = node1.observes_true
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
@@ -159,10 +159,8 @@ def test_joint_goal(tmp_path):
     end = EndMotion()
     msc.add_node(end)
 
-    task1.start_condition = always_true.observation_variable
-    end.start_condition = trinary_logic_and(
-        task1.observation_variable, always_true.observation_variable
-    )
+    task1.start_condition = always_true.observes_true
+    end.start_condition = logic_and(task1.observes_true, always_true.observes_true)
 
     kin_sim = Executor(
         MotionStatechartContext(
@@ -220,7 +218,7 @@ def test_continuous_joint(pr2_world_state_reset):
     msc.add_node(joint_goal)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    end.start_condition = joint_goal.observes_true
 
     kin_sim = Executor(
         MotionStatechartContext(
@@ -256,7 +254,7 @@ def test_revolute_joint(pr2_world_state_reset):
     msc.add_node(joint_goal)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    end.start_condition = joint_goal.observes_true
 
     kin_sim = Executor(
         MotionStatechartContext(

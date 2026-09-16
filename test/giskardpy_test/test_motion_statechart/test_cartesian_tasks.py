@@ -40,7 +40,6 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionTrajectory,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from krrood.symbolic_math.symbolic_math import trinary_logic_not
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -714,7 +713,7 @@ class TestCartesianTasks:
         )
         motion_statechart.add_node(cart_goal2)
 
-        cart_goal1.end_condition = cart_goal1.observation_variable
+        cart_goal1.success_condition = cart_goal1.observes_true
         cart_goal2.start_condition = cart_goal1.is_succeeded
 
         motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
@@ -764,7 +763,7 @@ class TestCartesianTasks:
         )
         motion_statechart.add_node(cart_goal2)
 
-        cart_goal1.end_condition = cart_goal1.observation_variable
+        cart_goal1.success_condition = cart_goal1.observes_true
         cart_goal2.start_condition = cart_goal1.is_succeeded
 
         motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
@@ -807,7 +806,7 @@ class TestCartesianTasks:
         motion_statechart.add_node(cart_goal)
         end = EndMotion()
         motion_statechart.add_node(end)
-        end.start_condition = cart_goal.observation_variable
+        end.start_condition = cart_goal.observes_true
 
         executor = Executor(
             MotionStatechartContext(
@@ -855,7 +854,7 @@ class TestCartesianTasks:
         )
         motion_statechart.add_node(cart_goal2)
 
-        cart_goal1.end_condition = cart_goal1.observation_variable
+        cart_goal1.success_condition = cart_goal1.observes_true
         cart_goal2.start_condition = cart_goal1.is_succeeded
 
         motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
@@ -906,7 +905,7 @@ class TestCartesianTasks:
         )
         motion_statechart.add_node(cart_goal2)
 
-        cart_goal1.end_condition = cart_goal1.observation_variable
+        cart_goal1.success_condition = cart_goal1.observes_true
         cart_goal2.start_condition = cart_goal1.is_succeeded
 
         motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
@@ -1006,7 +1005,7 @@ class TestCartesianTasks:
         )
         motion_statechart.add_node(cart_goal2)
 
-        cart_goal1.end_condition = cart_goal1.observation_variable
+        cart_goal1.success_condition = cart_goal1.observes_true
         cart_goal2.start_condition = cart_goal1.is_succeeded
 
         motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
@@ -1060,7 +1059,7 @@ class TestCartesianTasks:
         )
         motion_statechart.add_node(cart_goal2)
 
-        cart_goal1.end_condition = cart_goal1.observation_variable
+        cart_goal1.success_condition = cart_goal1.observes_true
         cart_goal2.start_condition = cart_goal1.is_succeeded
 
         motion_statechart.add_node(EndMotion.when_all_true([cart_goal1, cart_goal2]))
@@ -1102,7 +1101,7 @@ class TestCartesianTasks:
         motion_statechart.add_node(cart_straight)
         end = EndMotion()
         motion_statechart.add_node(end)
-        end.start_condition = cart_straight.observation_variable
+        end.start_condition = cart_straight.observes_true
 
         executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         executor.compile(motion_statechart=motion_statechart)
@@ -1221,8 +1220,8 @@ class TestCartesianTasks:
             goal_point=goal_point,
         )
         motion_statechart.add_nodes([wrist_goal, straight])
-        wrist_goal.end_condition = wrist_goal.observation_variable
-        straight.start_condition = wrist_goal.observation_variable
+        wrist_goal.success_condition = wrist_goal.observes_true
+        straight.start_condition = wrist_goal.observes_true
         motion_statechart.add_node(EndMotion.when_true(straight))
 
         executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
@@ -1347,9 +1346,10 @@ class TestDiffDriveBaseGoal:
         executor = Executor(MotionStatechartContext(world=cylinder_bot_diff_world))
         executor.compile(motion_statechart=motion_statechart)
 
+        # Each step is a maintenance node, so the sequence runs it inside an attempt.
         for step in goal.nodes[1:]:
-            assert step.translation_threshold == 0.3
-            assert step.orientation_threshold == 0.3
+            assert step.task.translation_threshold == 0.3
+            assert step.task.orientation_threshold == 0.3
 
     def test_second_goal_drives_from_where_the_first_one_ended(
         self, cylinder_bot_diff_world
@@ -1465,9 +1465,7 @@ class TestVelocityTasks:
         )
         motion_statechart = self._build_msc(goal_node=goal, limit_node=low_weight_limit)
         cancel_motion = CancelMotion(exception=Exception("test"))
-        cancel_motion.start_condition = trinary_logic_not(
-            low_weight_limit.observation_variable
-        )
+        cancel_motion.start_condition = low_weight_limit.observes_false
         motion_statechart.add_node(cancel_motion)
 
         executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))

@@ -16,7 +16,7 @@ def get_all_classes_in_module(
 ) -> Dict[str, Type]:
     """
     :param module_name: e.g. giskardpy.goals
-    :param parent_class: e.g. Goal
+    :param parent_class: e.g. CompositeStatechartNode
     :return:
     """
     classes = {}

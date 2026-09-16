@@ -1,6 +1,5 @@
 from dataclasses import field, dataclass
 from itertools import combinations
-from typing import Optional
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -13,10 +12,11 @@ from giskardpy.motion_statechart.exceptions import (
     CollisionViolatedError,
 )
 from giskardpy.motion_statechart.graph_node import (
-    Goal,
-    MotionStatechartNode,
+    MaintenanceNode,
+    CompositeStatechartNode,
     NodeArtifacts,
     CancelMotion,
+    SelfDecidingNode,
 )
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.plotters.plot_specs import (
@@ -79,11 +79,7 @@ class _CancelBecauseCollisionViolated(CancelMotion):
         """
         if len(self.tasks) == 0:
             return Scalar.const_false()
-        if len(self.tasks) == 1:
-            return sm.trinary_logic_not(self.tasks[0].observation_variable)
-        return sm.trinary_logic_or(
-            *[sm.trinary_logic_not(node.observation_variable) for node in self.tasks]
-        )
+        return sm.logic_or(*[node.observes_false for node in self.tasks])
 
 
 @dataclass(eq=False, repr=False)
@@ -273,20 +269,14 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
     """
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        if len(self.tasks) == 1:
-            self.start_condition = sm.trinary_logic_not(
-                self.tasks[0].observation_variable
-            )
-        else:
-            self.start_condition = sm.trinary_logic_or(
-                *[
-                    sm.trinary_logic_not(node.observation_variable)
-                    for node in self.tasks
-                ]
-            )
+        self.start_condition = sm.logic_or(
+            *[node.observes_false for node in self.tasks]
+        )
         return NodeArtifacts()
 
-    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
+    def create_exception(
+        self, context: MotionStatechartContext
+    ) -> CollisionViolatedError:
         violated_tasks = [
             task
             for task in self.tasks
@@ -300,13 +290,13 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
             ][0]
             collisions.append(collision)
             thresholds.append(task.violated_distance.evaluate()[0])
-        raise CollisionViolatedError(
+        return CollisionViolatedError(
             violated_collisions=collisions, thresholds=thresholds
         )
 
 
 @dataclass(eq=False, repr=False)
-class UpdateTemporaryCollisionRules(MotionStatechartNode):
+class UpdateTemporaryCollisionRules(SelfDecidingNode):
     """
     Updates the temporary collision rules for the robot.
     """
@@ -339,7 +329,7 @@ class UpdateTemporaryCollisionRules(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class SetInitialTemporaryCollisionRules(MotionStatechartNode):
+class SetInitialTemporaryCollisionRules(SelfDecidingNode):
     """
     Updates the temporary collision rules for the robot.
     """
@@ -376,7 +366,7 @@ class SetInitialTemporaryCollisionRules(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class ExternalCollisionAvoidance(Goal):
+class ExternalCollisionAvoidance(CompositeStatechartNode):
     """
     A goal combining an ExternalCollisionDistanceMonitor and an
     ExternalCollisionAvoidanceTask. One pair will be added for all collision groups of
@@ -388,7 +378,7 @@ class ExternalCollisionAvoidance(Goal):
     """
 
     plot_specifications: NodePlotSpec = plot_specification_field(
-        NodePlotSpec.create_collapsed_goal_style
+        NodePlotSpec.create_collapsed_composite_statechart_node_style
     )
 
     robot: AbstractRobot = field(kw_only=True, default=None)
@@ -454,7 +444,7 @@ class ExternalCollisionAvoidance(Goal):
                     external_collision_manager=self.external_collision_manager,
                 )
                 self._add_child_to_motion_statechart(task)
-                task.pause_condition = distance_monitor.observation_variable
+                task.pause_condition = distance_monitor.observes_true
                 tasks.append(task)
 
         if self.cancel_if_collision_violated:
@@ -467,7 +457,7 @@ class ExternalCollisionAvoidance(Goal):
 
 
 @dataclass(eq=False, repr=False)
-class ExternalCollisionDistanceMonitor(MotionStatechartNode):
+class ExternalCollisionDistanceMonitor(MaintenanceNode):
     """
     Monitors the distance to the closest external object for a specific collision group
     of a body. Turns True if the distance falls below a given threshold.
@@ -663,20 +653,14 @@ class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
     """
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        if len(self.tasks) == 1:
-            self.start_condition = sm.trinary_logic_not(
-                self.tasks[0].observation_variable
-            )
-        else:
-            self.start_condition = sm.trinary_logic_or(
-                *[
-                    sm.trinary_logic_not(node.observation_variable)
-                    for node in self.tasks
-                ]
-            )
+        self.start_condition = sm.logic_or(
+            *[node.observes_false for node in self.tasks]
+        )
         return NodeArtifacts()
 
-    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
+    def create_exception(
+        self, context: MotionStatechartContext
+    ) -> CollisionViolatedError:
         violated_tasks = [
             task
             for task in self.tasks
@@ -690,13 +674,13 @@ class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
             ][0]
             collisions.append(collision)
             thresholds.append(task.violated_distance.evaluate()[0])
-        raise CollisionViolatedError(
+        return CollisionViolatedError(
             violated_collisions=collisions, thresholds=thresholds
         )
 
 
 @dataclass(eq=False, repr=False)
-class SelfCollisionAvoidance(Goal):
+class SelfCollisionAvoidance(CompositeStatechartNode):
     """
     A goal combining a SelfCollisionDistanceMonitor and a SelfCollisionAvoidanceTask.
     One pair will be added for all collision groups of the robot. The task will only be
@@ -708,7 +692,7 @@ class SelfCollisionAvoidance(Goal):
     """
 
     plot_specifications: NodePlotSpec = plot_specification_field(
-        NodePlotSpec.create_collapsed_goal_style
+        NodePlotSpec.create_collapsed_composite_statechart_node_style
     )
 
     robot: AbstractRobot = field(kw_only=True, default=None)
@@ -806,7 +790,7 @@ class SelfCollisionAvoidance(Goal):
                 self_collision_manager=self.self_collision_manager,
             )
             self._add_child_to_motion_statechart(task)
-            task.pause_condition = distance_monitor.observation_variable
+            task.pause_condition = distance_monitor.observes_true
             tasks.append(task)
 
         if self.cancel_if_collision_violated:
@@ -818,7 +802,7 @@ class SelfCollisionAvoidance(Goal):
 
 
 @dataclass(eq=False, repr=False)
-class SelfCollisionDistanceMonitor(MotionStatechartNode):
+class SelfCollisionDistanceMonitor(MaintenanceNode):
     """
     Monitors the distance to the closest external object for the group of a body.
 

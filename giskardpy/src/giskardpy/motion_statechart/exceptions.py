@@ -10,9 +10,10 @@ from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
 from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
 
 if TYPE_CHECKING:
+    from giskardpy.motion_statechart.data_types import TransitionKind
     from giskardpy.motion_statechart.graph_node import (
         MotionStatechartNode,
-        TrinaryCondition,
+        TransitionCondition,
     )
     from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
     from semantic_digital_twin.world_description.world_entity import (
@@ -136,29 +137,110 @@ class NodeAlreadyBelongsToDifferentNodeError(NodeInitializationError):
 
 
 @dataclass
-class EndMotionInGoalError(NodeInitializationError):
+class EndMotionInCompositeStatechartNodeError(NodeInitializationError):
     """
-    Raised when a node that ends the motion is added as a child of a goal.
+    Raised when a node that ends the motion is added as a child of a composite
+    statechart node.
     """
 
     def error_message(self) -> str:
-        return "Goals are not allowed to have EndMotion as a child."
+        return (
+            "Composite statechart nodes are not allowed to have EndMotion as a child."
+        )
 
     def suggest_correction(self) -> str:
-        return "Use a different node type or move the EndMotion node outside the Goal."
+        return "Use a different node type or move the EndMotion node outside the CompositeStatechartNode."
 
 
 @dataclass
-class GoalWithoutChildrenError(NodeInitializationError):
+class NodeCannotDecideItselfError(NodeInitializationError):
     """
-    Raised when a goal that runs a list of child nodes is built without any.
+    Raised when a template is handed a child that never reaches a terminal state on its
+    own, so nothing would ever move the template past it.
+    """
+
+    child: MotionStatechartNode
+    """
+    The child that would run forever.
     """
 
     def error_message(self) -> str:
-        return f'Goal "{self.node.unique_name}" was given no child nodes.'
+        return (
+            f'Node "{self.child.unique_name}" of "{self.node.unique_name}" never ends '
+            f"on its own."
+        )
 
     def suggest_correction(self) -> str:
-        return "Pass at least one node to the goal, or leave the goal out entirely."
+        return (
+            "Wrap it in an Attempt, stating what counts as failure, or declare it a "
+            "SelfDecidingNode if it already reaches a terminal state by itself."
+        )
+
+
+@dataclass
+class ChildTransitionAlreadyWiredError(NodeInitializationError):
+    """
+    Raised when a child handed to a template already has one of its life cycle
+    transitions wired, which is the template's to decide.
+    """
+
+    child: MotionStatechartNode
+    """
+    The child whose transition was already wired.
+    """
+
+    transition_kind: TransitionKind
+    """
+    The transition that was already wired.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The {self.transition_kind.name.lower()} condition of "
+            f'"{self.child.unique_name}" was wired before it was passed to '
+            f'"{self.node.unique_name}", which decides it.'
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Leave the child's life cycle to the template, or express the condition "
+            "where the template cannot: a fail condition stays with the node itself."
+        )
+
+
+@dataclass
+class TransitionHasNoVerdictError(MotionStatechartError):
+    """
+    Raised when the verdict of a transition that does not end a node is asked for.
+    """
+
+    transition_kind: TransitionKind
+    """
+    The transition whose verdict was asked for.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The {self.transition_kind.name.lower()} transition does not end a node, "
+            f"so it has no verdict."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Only ask the transitions that end a node for their verdict."
+
+
+@dataclass
+class CompositeStatechartNodeWithoutChildrenError(NodeInitializationError):
+    """
+    Raised when a composite statechart node that runs a list of child nodes is built
+    without any.
+    """
+
+    def error_message(self) -> str:
+        return f'CompositeStatechartNode "{self.node.unique_name}" was given no child nodes.'
+
+    def suggest_correction(self) -> str:
+        return "Pass at least one node to it, or leave it out entirely."
 
 
 @dataclass
@@ -293,52 +375,33 @@ class CyclicNodeDependencyError(NodeInitializationError):
 
 
 @dataclass
-class CyclicPredicateDependencyError(MotionStatechartError):
+class ControlCycleDoesNotSettleError(MotionStatechartError):
     """
-    Raised when nodes read each other's life cycle predicates in a cycle, so no order
-    exists in which one control cycle could be evaluated.
-    """
-
-    cycle: list[MotionStatechartNode]
-    """
-    The nodes forming the cycle, in the order in which they read each other.
+    Raised when passes through a motion statechart still change it after the most passes
+    one control cycle may take.
     """
 
-    def error_message(self) -> str:
-        cycle_str = " -> ".join(node.unique_name for node in self.cycle)
-        return f"Nodes read each other's life cycle predicates in a cycle: {cycle_str}."
-
-    def suggest_correction(self) -> str:
-        return (
-            "Break the cycle, for example by reading the observation state of one of "
-            "the nodes instead of its verdict."
-        )
-
-
-@dataclass
-class UnsupportedObservationVariableError(NodeInitializationError):
+    pass_limit: int
     """
-    Raised when the observation expression of a node reads a life cycle predicate.
-
-    Observations are computed before the life cycle state, so the state a predicate
-    reads does not exist yet at that point.
+    The most passes that may change the motion statechart within one control cycle.
     """
 
-    unsupported_variable: FloatVariable
+    unsettled_nodes: list[MotionStatechartNode]
     """
-    The variable in the observation expression that a node may not read.
+    The nodes whose state the pass after the limit changed.
     """
 
     def error_message(self) -> str:
+        names = ", ".join(node.unique_name for node in self.unsettled_nodes)
         return (
-            f'Observation of "{self.node.unique_name}" contains '
-            f'"{self.unsupported_variable}", which an observation may not read.'
+            f"The motion statechart still changed after {self.pass_limit} passes "
+            f"within one control cycle, at {names}."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "Read the life cycle state itself, e.g. 'node.life_cycle_variable', or move "
-            "the test into a transition condition."
+            "Check whether these nodes read each other's observations in a way no state "
+            "satisfies, for example each observing True while the other does not."
         )
 
 
@@ -406,6 +469,50 @@ class NodeNotFoundError(MotionStatechartError):
 
 
 @dataclass
+class UnknownConditionVariableError(MotionStatechartError):
+    """
+    Raised when a rendered condition names a variable that no node offers.
+    """
+
+    variable_name: str
+    """
+    The name the rendered condition uses for the variable.
+    """
+
+    def error_message(self) -> str:
+        return f'The condition names "{self.variable_name}", which no node offers.'
+
+    def suggest_correction(self) -> str:
+        return (
+            "Name a predicate of a node, e.g. 'observes_true', 'last_observed_true' or "
+            "'is_succeeded'."
+        )
+
+
+@dataclass
+class UnsupportedConditionSyntaxError(MotionStatechartError):
+    """
+    Raised when a rendered condition contains syntax that has no meaning as a condition.
+    """
+
+    unsupported_part: str
+    """
+    The part of the rendered condition that is not supported.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'The condition contains "{self.unsupported_part}", which is not supported.'
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Write the condition from quoted node predicates, True and False, combined "
+            "with 'and', 'or' and 'not'."
+        )
+
+
+@dataclass
 class NotInMotionStatechartError(MotionStatechartError):
     """
     Raised when an operation that requires a surrounding statechart is performed on a
@@ -430,7 +537,7 @@ class InvalidConditionError(MotionStatechartError):
     Base class for errors raised when a condition is set to an unusable expression.
     """
 
-    condition: TrinaryCondition
+    condition: TransitionCondition
     """
     The condition that was about to be set.
     """
@@ -463,7 +570,7 @@ class InputNotExpressionError(InvalidConditionError):
         return "Input is not an expression."
 
     def suggest_correction(self) -> str:
-        return "did you forget '.observation_variable'?"
+        return "did you forget '.observes_true'?"
 
 
 @dataclass
@@ -479,8 +586,8 @@ class SelfInStartConditionError(InvalidConditionError):
 @dataclass
 class UnsupportedConditionVariableError(InvalidConditionError):
     """
-    Raised when a condition contains a variable that is neither the observation state
-    nor a life cycle predicate of a node.
+    Raised when a condition contains a variable that is not a two-valued predicate of a
+    node, such as a node's observation, which may be unknown.
     """
 
     unsupported_variable: FloatVariable
@@ -495,8 +602,8 @@ class UnsupportedConditionVariableError(InvalidConditionError):
 
     def suggest_correction(self) -> str:
         return (
-            "Use the observation state of a node, e.g. 'node.observation_variable', or one "
-            "of its life cycle predicates, e.g. 'node.is_failed'."
+            "Use a predicate of a node, e.g. 'node.observes_true', "
+            "'node.last_observed_true' or 'node.is_failed'."
         )
 
 

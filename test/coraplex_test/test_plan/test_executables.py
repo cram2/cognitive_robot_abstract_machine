@@ -20,7 +20,7 @@ from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import (
     CancelMotion,
     EndMotion,
-    Goal,
+    CompositeStatechartNode,
     MotionStatechartNode,
     Task,
 )
@@ -96,7 +96,7 @@ def test_motion_state_chart_is_created_once(reach_action_executable):
     )
 
 
-def _nodes_below(goal: Goal) -> List[MotionStatechartNode]:
+def _nodes_below(goal: CompositeStatechartNode) -> List[MotionStatechartNode]:
     """
     :return: Every node held by `goal` or by a goal below it.
     """
@@ -105,7 +105,11 @@ def _nodes_below(goal: Goal) -> List[MotionStatechartNode]:
         for child in goal.nodes
         for descendant in [
             child,
-            *(_nodes_below(child) if isinstance(child, Goal) else []),
+            *(
+                _nodes_below(child)
+                if isinstance(child, CompositeStatechartNode)
+                else []
+            ),
         ]
     ]
 
@@ -144,7 +148,7 @@ def test_parsing_mirrors_the_plan_tree_as_nested_goals(reach_action_executable):
         [parent_goal] = [
             goal
             for goal in root_goal.nodes
-            if isinstance(goal, Goal) and task in goal.nodes
+            if isinstance(goal, CompositeStatechartNode) and task in goal.nodes
         ]
 
 
@@ -168,6 +172,23 @@ def test_prepare_for_execution_adds_a_single_end_motion(reach_action_executable)
 
     chart = reach_action_executable.motion_state_chart
     assert len(chart.get_nodes_by_type(EndMotion)) == 1
+
+
+def test_the_end_motion_waits_for_the_root_goal(reach_action_executable):
+    """
+    The motion ends once the root goal reaches its goal, read through what the root goal
+    observes and whether it succeeded.
+    """
+    with real_robot:
+        reach_action_executable.prepare_for_execution()
+
+    chart = reach_action_executable.motion_state_chart
+    [end_motion] = chart.get_nodes_by_type(EndMotion)
+    root_goal = reach_action_executable.root_node
+    assert set(end_motion.start_condition.free_variables()) == {
+        root_goal.observes_true,
+        root_goal.is_succeeded,
+    }
 
 
 @pytest.mark.parametrize("execution_environment", [real_robot, simulated_robot])
@@ -200,7 +221,7 @@ def test_condition_monitors_bring_their_own_abort_paths(reach_action_executable)
     assert reach_action_executable.post_condition_node
 
     reach_action_executable._add_condition_monitors(
-        reach_action_executable.root_node.observation_variable
+        reach_action_executable.root_node.observes_true
     )
 
     chart = reach_action_executable.motion_state_chart
@@ -216,7 +237,7 @@ def test_pre_condition_monitor_gates_the_root_goal(reach_action_executable):
     than an individual task.
     """
     reach_action_executable._add_condition_monitors(
-        reach_action_executable.root_node.observation_variable
+        reach_action_executable.root_node.observes_true
     )
 
     chart = reach_action_executable.motion_state_chart
@@ -224,9 +245,7 @@ def test_pre_condition_monitor_gates_the_root_goal(reach_action_executable):
     root_goal = reach_action_executable.root_node
 
     assert pre_monitor.name == "pre_condition"
-    assert root_goal.start_condition.free_variables() == [
-        pre_monitor.observation_variable
-    ]
+    assert root_goal.start_condition.free_variables() == [pre_monitor.observes_true]
 
 
 # %% collision avoidance

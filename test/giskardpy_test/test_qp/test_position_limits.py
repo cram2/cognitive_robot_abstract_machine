@@ -35,7 +35,7 @@ def test_joint_goal_inside_limits_reached(pr2_world_state_reset):
     msc.add_node(joint_goal)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    end.start_condition = joint_goal.observes_true
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
@@ -58,7 +58,7 @@ def test_joint_goal_clamped_to_upper_limit(pr2_world_state_reset):
     msc.add_node(joint_goal)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    end.start_condition = joint_goal.observes_true
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
@@ -80,7 +80,7 @@ def test_joint_goal_clamped_to_lower_limit(pr2_world_state_reset):
     msc.add_node(joint_goal)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    end.start_condition = joint_goal.observes_true
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
@@ -105,7 +105,7 @@ def test_joint_above_upper_limit_recovers(pr2_world_state_reset):
     msc.add_node(joint_goal)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    end.start_condition = joint_goal.observes_true
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
@@ -131,7 +131,7 @@ def test_joint_below_lower_limit_recovers(pr2_world_state_reset):
     msc.add_node(joint_goal)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    end.start_condition = joint_goal.observes_true
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
@@ -163,7 +163,7 @@ def test_multiple_joints_outside_limits_recover(pr2_world_state_reset):
     msc.add_node(joint_goal)
     end = EndMotion()
     msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    end.start_condition = joint_goal.observes_true
 
     kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)

@@ -6,7 +6,7 @@ from datetime import timedelta
 from typing_extensions import List, Optional
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.symbolic_math.symbolic_math import Scalar, trinary_logic_not
+from krrood.symbolic_math.symbolic_math import Scalar
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
@@ -15,9 +15,10 @@ from giskardpy.motion_statechart.data_types import (
 from giskardpy.motion_statechart.exceptions import NoProgressError
 from giskardpy.motion_statechart.error_signals import ErrorSignal
 from giskardpy.motion_statechart.graph_node import (
+    MaintenanceNode,
     CancelMotion,
     ConvergingTask,
-    Goal,
+    CompositeStatechartNode,
     MotionStatechartNode,
     NodeArtifacts,
 )
@@ -29,7 +30,7 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
 
 
 @dataclass(eq=False, repr=False)
-class NotApproachingGoal(MotionStatechartNode):
+class NotApproachingGoal(MaintenanceNode):
     """
     Turns ``True`` while :attr:`monitored_task` is not closing on its goal fast enough.
 
@@ -158,7 +159,7 @@ class NotApproachingGoal(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class AnyMonitoredTaskRunning(MotionStatechartNode):
+class AnyMonitoredTaskRunning(MaintenanceNode):
     """
     Turns ``True`` while at least one of :attr:`monitored_tasks` is running.
 
@@ -196,7 +197,7 @@ class AnyMonitoredTaskRunning(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class StillProgressing(Goal):
+class StillProgressing(CompositeStatechartNode):
     """
     Turns ``False`` once nothing under :attr:`monitored_node` has approached its goal
     for :attr:`timeout`.
@@ -206,7 +207,7 @@ class StillProgressing(Goal):
     whose steps run one after another, and names the task that is actually stuck.
 
     Wire :meth:`cancel_motion` to abort a motion that is no longer making progress, or
-    the negation of its observation to a node's end condition to give up on that node.
+    the negation of its observation to a node's fail condition to give up on that node.
     """
 
     monitored_node: MotionStatechartNode = field(kw_only=True)
@@ -275,7 +276,7 @@ class StillProgressing(Goal):
             node turns ``False``.
         """
         cancel = _CancelBecauseNoProgress(progress_monitor=self)
-        cancel.start_condition = sm.trinary_logic_not(self.observation_variable)
+        cancel.start_condition = self.observes_false
         return cancel
 
     def expand(self, context: MotionStatechartContext) -> None:
@@ -284,23 +285,30 @@ class StillProgressing(Goal):
             name=f"{self.name}/timer", seconds=self.timeout.total_seconds()
         )
         self._add_child_to_motion_statechart(self._timer)
-        stalled_now = self._expand_stall_detection()
-        self._timer.start_condition = stalled_now
-        self._timer.reset_condition = sm.trinary_logic_not(stalled_now)
+        stall_monitors = self._expand_stall_detection()
+        self._timer.start_condition = sm.logic_and(
+            Scalar.const_true(), *[monitor.observes_true for monitor in stall_monitors]
+        )
+        self._timer.reset_condition = sm.logic_or(
+            Scalar.const_false(),
+            *[monitor.observes_false for monitor in stall_monitors],
+        )
 
-    def _expand_stall_detection(self) -> Scalar:
+    def _expand_stall_detection(self) -> List[MotionStatechartNode]:
         """
-        Adds one monitor per converging task and combines them into a single signal.
+        Adds one monitor per converging task, next to one observing whether any of them
+        runs.
 
         A node with nothing converging beneath it has nothing that could approach a
         goal, so it counts as stalled for as long as it runs and :attr:`timeout` alone
         decides when it is given up on. That makes this node safe to point at anything,
         including a node built entirely from monitors.
 
-        :return: True while nothing beneath the monitored node is approaching its goal.
+        :return: The monitors that all observe True while nothing beneath the monitored
+            node is approaching its goal, none if nothing converges beneath it.
         """
         if not self._monitored_tasks:
-            return Scalar.const_true()
+            return []
         self._not_approaching_monitors = [
             NotApproachingGoal(
                 name=f"{self.name}/{task.name}",
@@ -315,26 +323,19 @@ class StillProgressing(Goal):
         self._add_children_to_motion_statechart(
             self._not_approaching_monitors + [any_running]
         )
-        return sm.trinary_logic_and(
-            any_running.observation_variable,
-            *[
-                monitor.observation_variable
-                for monitor in self._not_approaching_monitors
-            ],
-        )
+        return [any_running, *self._not_approaching_monitors]
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        The timer only turns true once progress has stalled for :attr:`timeout`, so
-        every other reading of it means this node has not given up yet.
+        The timer only reaches what it counts once progress has stalled for
+        :attr:`timeout`, so every other reading of it means this node has not given up
+        yet. Nothing but this node ending ends the timer, so its live observation is
+        there for as long as this node observes anything.
 
-        The timer is unknown until it starts, which a plain negation would carry through
-        to a node that is in fact progressing, so the timer is compared against being
-        true rather than negated.
+        The timer says nothing until it starts, which counts as not having reached what
+        it counts.
         """
-        return NodeArtifacts(
-            observation=trinary_logic_not(self._timer.observation_variable.is_true())
-        )
+        return NodeArtifacts(observation=sm.logic_not(self._timer.observes_true))
 
     def _find_converging_tasks(
         self, node: MotionStatechartNode
@@ -347,12 +348,32 @@ class StillProgressing(Goal):
         """
         if isinstance(node, ConvergingTask):
             return [node]
-        if not isinstance(node, Goal):
+        if not isinstance(node, CompositeStatechartNode):
             return []
         tasks = []
         for child_node in node.nodes:
             tasks.extend(self._find_converging_tasks(child_node))
         return tasks
+
+
+@dataclass(eq=False, repr=False)
+class Stalled(StillProgressing):
+    """
+    Turns ``True`` once nothing under :attr:`monitored_node` has approached its goal for
+    :attr:`timeout`.
+
+    The same measurement as :class:`StillProgressing`, said the way a failure monitor is
+    read: a monitor is passed to an
+    :class:`~giskardpy.motion_statechart.goals.templates.Attempt` as the thing that goes
+    wrong, not as the thing that goes right.
+    """
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        The timer reaches what it counts once progress has stalled for :attr:`timeout`,
+        which is exactly when this node has something to report.
+        """
+        return NodeArtifacts(observation=self._timer.observes_true)
 
 
 @dataclass(eq=False, repr=False)
@@ -373,5 +394,5 @@ class _CancelBecauseNoProgress(CancelMotion):
     which tasks are stalled.
     """
 
-    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
-        raise NoProgressError(progress_monitor=self.progress_monitor)
+    def create_exception(self, context: MotionStatechartContext) -> NoProgressError:
+        return NoProgressError(progress_monitor=self.progress_monitor)

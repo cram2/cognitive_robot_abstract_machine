@@ -27,7 +27,7 @@ class NodePlotSpec:
     """
     Whether the descendants of this node are omitted from the drawing.
 
-    Only has an effect on nodes that own children, i.e. goals.
+    Only has an effect on nodes that own children, i.e. composite statechart nodes.
     """
 
     style: str = NodeDrawingStyle.MONITOR.style
@@ -53,22 +53,22 @@ class NodePlotSpec:
         )
 
     @classmethod
-    def create_goal_style(cls) -> Self:
+    def create_composite_statechart_node_style(cls) -> Self:
         return cls(
             visible=True,
-            style=NodeDrawingStyle.GOAL.style,
-            shape=NodeDrawingStyle.GOAL.shape,
+            style=NodeDrawingStyle.COMPOSITE.style,
+            shape=NodeDrawingStyle.COMPOSITE.shape,
             extra_border_styles=[],
         )
 
     @classmethod
-    def create_collapsed_goal_style(cls) -> Self:
+    def create_collapsed_composite_statechart_node_style(cls) -> Self:
         """
-        :return: A goal style whose descendants are left out of the drawing.
+        :return: A composite statechart node style whose descendants are left out of the drawing.
         """
-        goal_style = cls.create_goal_style()
-        goal_style.collapse_children = True
-        return goal_style
+        composite_style = cls.create_composite_statechart_node_style()
+        composite_style.collapse_children = True
+        return composite_style
 
     @classmethod
     def create_end_style(cls):

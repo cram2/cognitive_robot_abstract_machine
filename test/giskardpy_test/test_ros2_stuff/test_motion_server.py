@@ -14,7 +14,10 @@ from giskardpy.middleware.ros2.exceptions import (
     UnserializableGoalError,
     WorldModelModifiedDuringMotionError,
 )
-from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
+from giskardpy.middleware.ros2.feedback_publisher import (
+    ActionFeedbackPublisher,
+    MotionStatechartPayloadKey,
+)
 from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from giskardpy.middleware.ros2.input_synchronization import (
     InputSynchronizer,
@@ -29,7 +32,10 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import (
     CountSimulationTimeSeconds,
 )
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from giskardpy.motion_statechart.motion_statechart import (
+    LastObservationState,
+    MotionStatechart,
+)
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstTrueNode,
 )
@@ -335,7 +341,7 @@ def create_error_holding_a_variable() -> SelfInStartConditionError:
     motion_statechart = MotionStatechart()
     motion_statechart.add_node(node := ConstTrueNode(name="waits for itself"))
     with pytest.raises(SelfInStartConditionError) as error:
-        node.start_condition = node.observation_variable
+        node.start_condition = node.observes_true
     return error.value
 
 
@@ -765,6 +771,23 @@ class TestGoalResult:
         result = json.loads(motion_server.action_server.sent_results[0].result)
         assert "life_cycle_state" in result
         assert "observation_state" in result
+
+    def test_result_contains_the_last_observation_state(
+        self, motion_server: MotionServerFixture
+    ):
+        motion_server.action_server.goal_json = create_goal_json()
+
+        motion_server.motion_server.run_idle_cycle()
+
+        result = json.loads(motion_server.action_server.sent_results[0].result)
+        motion_statechart = motion_server.executor.motion_statechart
+        assert (
+            LastObservationState.from_json(
+                result[MotionStatechartPayloadKey.LAST_OBSERVATION_STATE],
+                motion_statechart=motion_statechart,
+            )
+            == motion_statechart.last_observation_state
+        )
 
 
 class TestCleanupAfterGoal:

@@ -4,7 +4,7 @@ import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import Goal
+from giskardpy.motion_statechart.graph_node import CompositeStatechartNode
 from giskardpy.motion_statechart.graph_node import Task
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -16,7 +16,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class PrePushDoor(Goal):
+class PrePushDoor(CompositeStatechartNode):
     root_link: Body
     tip_link: Body
     door_object: Body

@@ -396,14 +396,14 @@ class TestJointGoals:
             )
         )
         msc.add_node(min_joint_goal)
-        min_joint_goal.end_condition = min_joint_goal.observation_variable
+        min_joint_goal.success_condition = min_joint_goal.observes_true
 
         torso_joint_goal = JointPositionList(
             goal_state=JointState.from_mapping(mapping={torso_lift_joint: 3.2})
         )
         msc.add_node(torso_joint_goal)
-        torso_joint_goal.start_condition = min_joint_goal.observation_variable
-        torso_joint_goal.end_condition = torso_joint_goal.observation_variable
+        torso_joint_goal.start_condition = min_joint_goal.observes_true
+        torso_joint_goal.success_condition = torso_joint_goal.observes_true
 
         max_joint_goal = JointPositionList(
             goal_state=JointState.from_mapping(
@@ -416,11 +416,11 @@ class TestJointGoals:
             )
         )
         msc.add_node(max_joint_goal)
-        max_joint_goal.start_condition = torso_joint_goal.observation_variable
+        max_joint_goal.start_condition = torso_joint_goal.observes_true
 
         end = EndMotion()
         msc.add_node(end)
-        end.start_condition = max_joint_goal.observation_variable
+        end.start_condition = max_joint_goal.observes_true
         giskard.api.execute(msc)
 
 

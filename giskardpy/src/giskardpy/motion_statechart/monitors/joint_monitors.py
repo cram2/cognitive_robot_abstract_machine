@@ -6,11 +6,15 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
+from giskardpy.motion_statechart.graph_node import (
+    MaintenanceNode,
+    MotionStatechartNode,
+    NodeArtifacts,
+)
 
 
 @dataclass(eq=False, repr=False)
-class JointPositionReached(MotionStatechartNode):
+class JointPositionReached(MaintenanceNode):
     """
     Monitors if a joint position is reached within a certain threshold.
     """

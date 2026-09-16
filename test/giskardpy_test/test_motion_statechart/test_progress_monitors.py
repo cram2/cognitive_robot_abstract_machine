@@ -287,7 +287,7 @@ class TestStallDetection:
         blocker = ConstFalseNode()
         motion_statechart.add_nodes([goal, blocker])
         # The goal only starts once the blocker is true, which never happens.
-        goal.start_condition = blocker.observation_variable
+        goal.start_condition = blocker.observes_true
         progressing = StillProgressing(
             monitored_node=goal, timeout=timedelta(seconds=0.5)
         )

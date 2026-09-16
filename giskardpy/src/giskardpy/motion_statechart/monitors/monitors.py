@@ -9,6 +9,7 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.exceptions import EmptyDegreesOfFreedomError
 from giskardpy.motion_statechart.graph_node import (
+    MaintenanceNode,
     MotionStatechartNode,
     NodeArtifacts,
     velocity_convergence_expression,
@@ -38,7 +39,7 @@ class ThreadedPayloadMonitor(MotionStatechartNode, ABC):
 
 
 @dataclass(repr=False, eq=False)
-class LocalMinimumReached(MotionStatechartNode):
+class LocalMinimumReached(MaintenanceNode):
     """
     Checks if the robot has reached a local minimum in the trajectory, by checking if
     all velocities are below a degree of freedoms' max velocity

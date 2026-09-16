@@ -12,7 +12,11 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
+from giskardpy.motion_statechart.graph_node import (
+    MaintenanceNode,
+    MotionStatechartNode,
+    NodeArtifacts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +52,12 @@ class Print(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class CountSeconds(MotionStatechartNode):
+class CountSeconds(MaintenanceNode):
     """
     This node counts X seconds and then turns True.
 
-    Only counts while in state RUNNING.
+    Only counts while in state RUNNING, and it is up to whoever runs it to stop it once
+    it has counted far enough.
     """
 
     seconds: float = field(kw_only=True)
@@ -72,12 +77,13 @@ class CountSeconds(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class TickCounter(MotionStatechartNode, ABC):
+class TickCounter(MaintenanceNode, ABC):
     """
     Base for nodes that count control ticks while RUNNING and turn True once a target is
     reached.
 
-    Only counts while in state RUNNING.
+    Only counts while in state RUNNING, and it is up to whoever runs it to stop it once
+    it reaches its target.
     """
 
     _counter: int = field(init=False, default=0)
@@ -283,7 +289,7 @@ class Pulse(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class CountNodeResets(MotionStatechartNode):
+class CountNodeResets(MaintenanceNode):
     """
     Turns True once :attr:`node` has been reset :attr:`target` times.
 

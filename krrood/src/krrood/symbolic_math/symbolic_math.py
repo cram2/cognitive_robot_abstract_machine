@@ -2202,26 +2202,45 @@ def is_constant_false(expression: Scalar) -> bool:
     return bool(expression == 0)
 
 
-def logic_and(left: ScalarData, right: ScalarData) -> Scalar:
+def logic_and(*args: ScalarData) -> Scalar:
     """
     Logical conjunction on symbolic scalars.
 
-    :param left: The left operand.
-    :param right: The right operand.
-    :return: The symbolic result of left AND right.
+    :param args: The operands.
+    :return: The symbolic result of all operands combined by AND.
+    :raises NotEnoughArgumentsError: If no operand is given.
     """
-    return left & right
+    return _combine_logic(operator.and_, args)
 
 
-def logic_or(left: ScalarData, right: ScalarData) -> Scalar:
+def logic_or(*args: ScalarData) -> Scalar:
     """
     Logical disjunction on symbolic scalars.
 
-    :param left: The left operand.
-    :param right: The right operand.
-    :return: The symbolic result of left OR right.
+    :param args: The operands.
+    :return: The symbolic result of all operands combined by OR.
+    :raises NotEnoughArgumentsError: If no operand is given.
     """
-    return left | right
+    return _combine_logic(operator.or_, args)
+
+
+def _combine_logic(
+    logic_operator: Callable[[Scalar, ScalarData], Scalar], args: Sequence[ScalarData]
+) -> Scalar:
+    """
+    :param logic_operator: The two-argument operator to fold the operands with.
+    :param args: The operands.
+    :return: The operands folded from the left by `logic_operator`.
+    :raises NotEnoughArgumentsError: If no operand is given.
+    """
+    if len(args) < 1:
+        raise NotEnoughArgumentsError(
+            minimum_number_of_arguments=1, actual_number_of_arguments=len(args)
+        )
+    result = Scalar(args[0])
+    for argument in args[1:]:
+        result = logic_operator(result, argument)
+    return result
 
 
 def logic_not(expression: ScalarData) -> Scalar:
@@ -2232,6 +2251,52 @@ def logic_not(expression: ScalarData) -> Scalar:
     :return: The symbolic result of NOT expression.
     """
     return ~expression
+
+
+def logic_to_str(expression: ScalarData) -> str:
+    """
+    Renders an expression built from the two-valued logic operators, with every variable
+    quoted by its name.
+
+    :param expression: The expression to render.
+    :return: The rendered expression, using ``and``, ``or``, ``not``, ``True`` and
+        ``False``.
+    :raises CannotConvertToStringError: If `expression` contains anything but those
+        operators, variables and the constants true and false.
+    """
+    casadi_expression = to_sx(expression)
+    if casadi_expression.is_symbolic():
+        return f'"{casadi_expression}"'
+    if casadi_expression.is_constant():
+        return _logic_constant_to_str(expression, float(casadi_expression))
+    match casadi_expression.op():
+        case ca.OP_AND:
+            left = logic_to_str(casadi_expression.dep(0))
+            right = logic_to_str(casadi_expression.dep(1))
+            return f"({left} and {right})"
+        case ca.OP_OR:
+            left = logic_to_str(casadi_expression.dep(0))
+            right = logic_to_str(casadi_expression.dep(1))
+            return f"({left} or {right})"
+        case ca.OP_NOT:
+            return f"not {logic_to_str(casadi_expression.dep(0))}"
+        case _:
+            raise CannotConvertToStringError(expression=expression)
+
+
+def _logic_constant_to_str(expression: ScalarData, value: float) -> str:
+    """
+    :param expression: The constant expression being rendered, reported if it is
+        neither true nor false.
+    :param value: The value of that constant.
+    :return: ``True`` or ``False``.
+    :raises CannotConvertToStringError: If `value` is neither true nor false.
+    """
+    if value == float(Scalar.const_true()):
+        return "True"
+    if value == float(Scalar.const_false()):
+        return "False"
+    raise CannotConvertToStringError(expression=expression)
 
 
 def logic_any(args: VectorData | MatrixData) -> Scalar:
@@ -2255,6 +2320,8 @@ def logic_all(args: GenericVectorOrMatrixType) -> Scalar:
 
 
 # %% trinary logic
+
+
 def trinary_logic_not(expression: FloatVariable | Scalar) -> Scalar:
     """
     |   Not ------------------ True    |  False Unknown | Unknown False   |  True.
@@ -2318,52 +2385,6 @@ def trinary_logic_or(*args: FloatVariable | Scalar) -> Scalar:
         return max(args[0], args[1])
     else:
         return trinary_logic_or(args[0], trinary_logic_or(*args[1:]))
-
-
-def trinary_logic_to_str(expression: Scalar) -> str:
-    """
-    Converts a trinary logic expression into its string representation.
-
-    This function processes an expression with trinary logic values (True, False,
-    Unknown) and translates it into a comprehensible string format. It takes into
-    account the logical operations involved and recursively evaluates the components if
-    necessary. The function handles variables representing trinary logic values, as well
-    as logical constructs such as "and", "or", and "not". If the expression cannot be
-    evaluated, an exception is raised.
-
-    :param expression: The trinary logic expression to be converted into a string
-        representation.
-    :return: A string representation of the trinary logic expression, displaying the
-        appropriate logical variables and structure.
-    :raises SpatialTypesError: If the provided expression cannot be converted into a
-        string representation.
-    """
-    cas_expr = to_sx(expression)
-
-    # Constant case
-    if cas_expr.n_dep() == 0:
-        if not cas_expr.is_constant():
-            return f'"{expression}"'
-        if float(expression) == 1.0:
-            return "True"
-        if float(expression) == 0.0:
-            return "False"
-        if float(expression) == 0.5:
-            return "Unknown"
-
-    match cas_expr.op():
-        case ca.OP_SUB:  # trinary "not" is 1-x
-            return f"not {trinary_logic_to_str(cas_expr.dep(1))}"
-        case ca.OP_FMIN:  # trinary "and" is min(left, right)
-            left = trinary_logic_to_str(cas_expr.dep(0))
-            right = trinary_logic_to_str(cas_expr.dep(1))
-            return f"({left} and {right})"
-        case ca.OP_FMAX:  # trinary "or" is max(left, right)
-            left = trinary_logic_to_str(cas_expr.dep(0))
-            right = trinary_logic_to_str(cas_expr.dep(1))
-            return f"({left} or {right})"
-        case _:
-            raise CannotConvertToStringError(expression=expression)
 
 
 # %% ifs
@@ -2564,6 +2585,9 @@ def if_cases(
     ...
     else:
         return else_result
+
+    .. warning:: Any guard that is not 0 selects its case, the trinary Unknown included.
+        Use :func:`trinary_if_cases` for guards in trinary logic.
     """
     result_sx_list = []
     ind = to_sx(len(cases))
@@ -2574,6 +2598,25 @@ def if_cases(
 
     result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
     return _create_return_type(else_result).from_casadi_sx(result_sx)
+
+
+def trinary_if_cases(
+    cases: Sequence[Tuple[ScalarData, GenericSymbolicType]],
+    else_result: GenericSymbolicType,
+) -> GenericSymbolicType:
+    """
+    Like :func:`if_cases`, for guards in trinary logic: a case is selected only while its
+    guard is True, never while it is Unknown.
+
+    :param cases: The (guard, result) pairs; the first guard that is True selects its
+        result.
+    :param else_result: The result while no guard is True.
+    :return: The expression selecting between the results.
+    """
+    return if_cases(
+        cases=[(Scalar(guard).is_true(), result) for guard, result in cases],
+        else_result=else_result,
+    )
 
 
 def if_less_eq_cases(

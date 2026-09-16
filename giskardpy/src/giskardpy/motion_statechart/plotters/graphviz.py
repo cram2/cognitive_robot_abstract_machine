@@ -13,14 +13,17 @@ from typing_extensions import (
     TYPE_CHECKING,
 )
 
-from giskardpy.motion_statechart.data_types import ObservationStateValues
+from giskardpy.motion_statechart.data_types import (
+    ObservationStateValues,
+    TransitionKind,
+)
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     TerminalNode,
 )
 from giskardpy.motion_statechart.graph_node import (
-    Goal,
-    TrinaryCondition,
+    CompositeStatechartNode,
+    TransitionCondition,
 )
 from giskardpy.motion_statechart.plotters.styles import (
     DISABLED_CONDITION_COLOR,
@@ -54,7 +57,7 @@ class ConditionDependency:
     The node those conditions read.
     """
 
-    conditions: List[TrinaryCondition] = field(default_factory=list)
+    conditions: List[TransitionCondition] = field(default_factory=list)
     """
     The conditions of :attr:`condition_owner` that read :attr:`observed_node`.
     """
@@ -76,7 +79,7 @@ def format_condition_text(text: str, color_constants: bool = False) -> str:
     """
     Rewrites the part of a condition that is not a term for display in an HTML label.
 
-    Logical operators start a new line and trinary constants are spelled out.
+    Logical operators start a new line and constants are spelled out.
 
     :param text: The text to rewrite.
     :param color_constants: Whether boolean constants should be colored with their
@@ -105,8 +108,8 @@ class MotionStatechartGraphviz:
     Draws a motion statechart as a graphviz graph.
 
     Every node becomes a labelled box showing its current observation and life cycle
-    state, every :class:`~giskardpy.motion_statechart.graph_node.Goal` becomes a cluster
-    around its children, and every dependency between two nodes becomes an arrow colored
+    state, every :class:`~giskardpy.motion_statechart.graph_node.CompositeStatechartNode`
+    becomes a cluster around its children, and every dependency between two nodes becomes an arrow colored
     by what the node it leaves observes.
 
     ..note:: The drawing reflects the state the statechart is in when it is drawn.
@@ -224,9 +227,9 @@ class MotionStatechartGraphviz:
     def _count_descendants(self, node: MotionStatechartNode) -> int:
         """
         :param node: The node to count below.
-        :return: The number of nodes below it, nested goals included.
+        :return: The number of nodes below it, nested composite statechart nodes included.
         """
-        if not isinstance(node, Goal):
+        if not isinstance(node, CompositeStatechartNode):
             return 0
         return sum(1 + self._count_descendants(child_node) for child_node in node.nodes)
 
@@ -244,37 +247,30 @@ class MotionStatechartGraphviz:
         :return: The condition rows of the label.
         """
         life_cycle_state = self.motion_statechart.life_cycle_state[node]
-        label = self._build_condition_row(
-            prefix="start",
-            condition=node._start_condition,
-            is_active=node._start_condition.kind.can_trigger_from(life_cycle_state),
-            line_color=line_color,
+        return "".join(
+            self._build_condition_row(
+                prefix=self.condition_prefix(condition.kind),
+                condition=condition,
+                is_active=condition.kind.can_trigger_from(life_cycle_state),
+                line_color=line_color,
+            )
+            for condition in node.conditions
+            if condition.kind is TransitionKind.START
+            or not isinstance(node, TerminalNode)
         )
-        if not isinstance(node, TerminalNode):
-            label += self._build_condition_row(
-                prefix="pause",
-                condition=node._pause_condition,
-                is_active=node._pause_condition.kind.can_trigger_from(life_cycle_state),
-                line_color=line_color,
-            )
-            label += self._build_condition_row(
-                prefix="end  ",
-                condition=node._end_condition,
-                is_active=node._end_condition.kind.can_trigger_from(life_cycle_state),
-                line_color=line_color,
-            )
-            label += self._build_condition_row(
-                prefix="reset",
-                condition=node._reset_condition,
-                is_active=node._reset_condition.kind.can_trigger_from(life_cycle_state),
-                line_color=line_color,
-            )
-        return label
+
+    @staticmethod
+    def condition_prefix(transition_kind: TransitionKind) -> str:
+        """
+        :param transition_kind: The transition whose condition a row lists.
+        :return: The text a condition row starts with.
+        """
+        return transition_kind.name.lower()
 
     def _build_condition_row(
         self,
         prefix: str,
-        condition: TrinaryCondition,
+        condition: TransitionCondition,
         is_active: bool,
         line_color: str,
     ) -> str:
@@ -296,7 +292,7 @@ class MotionStatechartGraphviz:
         )
 
     def _render_condition(
-        self, condition: TrinaryCondition, grayed_out: bool = False
+        self, condition: TransitionCondition, grayed_out: bool = False
     ) -> str:
         """
         Writes a condition for display, coloring every term in the value that term
@@ -306,8 +302,8 @@ class MotionStatechartGraphviz:
         disabled color applies uniformly.
 
         The value is the term's own, not the observation of the node it names: an
-        ``is_succeeded`` term has no answer until that node is judged, however decisive
-        that node's observation already is.
+        ``is_succeeded`` term is false until that node succeeded, however decisive that
+        node's observation already is.
 
         The terms are cut out before the rest is reformatted, so that a node whose name
         reads as a logical operator is still recognised as one term.
@@ -482,13 +478,13 @@ class MotionStatechartGraphviz:
         :param nodes: The nodes to draw.
         """
         for i, node in enumerate(nodes):
-            # Skip invisible nodes entirely, as well as the children of a Goal that is
-            # invisible or collapses them.
+            # Skip invisible nodes entirely, as well as the children of a
+            # CompositeStatechartNode that is invisible or collapses them.
             if not self._is_drawn(node):
                 continue
 
             if (
-                isinstance(node, Goal)
+                isinstance(node, CompositeStatechartNode)
                 and not node.plot_specifications.collapse_children
             ):
                 goal_cluster = self._add_cluster(node, parent_cluster)
@@ -520,7 +516,7 @@ class MotionStatechartGraphviz:
             graph_name=str(node.unique_name),
             fontname=Font.SANS_SERIF,
             fontsize=DRAWING_METRICS.font_size,
-            style=NodeDrawingStyle.GOAL.style,
+            style=NodeDrawingStyle.COMPOSITE.style,
             color="black",
             fillcolor="white",
             penwidth=DRAWING_METRICS.line_width,
@@ -546,7 +542,7 @@ class MotionStatechartGraphviz:
         dependencies: Dict[
             Tuple[MotionStatechartNode, MotionStatechartNode], ConditionDependency
         ] = {}
-        condition: TrinaryCondition
+        condition: TransitionCondition
         for (
             owner_index,
             observed_index,

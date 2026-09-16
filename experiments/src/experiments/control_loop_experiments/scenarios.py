@@ -44,7 +44,7 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
-from krrood.symbolic_math.symbolic_math import trinary_logic_and
+from krrood.symbolic_math.symbolic_math import logic_and
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
@@ -242,7 +242,7 @@ class BenchmarkRobot(GiskardTester):
             seed_configuration=JointState.from_mapping(connections),
         )
         motion_statechart.add_node(seed_configuration)
-        reached = seed_configuration.observation_variable
+        reached = seed_configuration.observes_true
         if self.has_odometry_joint():
             odometry = SetOdometry(
                 name="initial pose",
@@ -251,7 +251,7 @@ class BenchmarkRobot(GiskardTester):
                 ),
             )
             motion_statechart.add_node(odometry)
-            reached = trinary_logic_and(reached, odometry.observation_variable)
+            reached = logic_and(reached, odometry.observes_true)
         end = EndMotion(name="end")
         end.start_condition = reached
         motion_statechart.add_node(end)

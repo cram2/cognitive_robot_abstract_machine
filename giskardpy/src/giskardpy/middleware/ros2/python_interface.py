@@ -11,11 +11,13 @@ from json_msgs.action import JsonAction
 from json_msgs.action._json_action import JsonAction_Result
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.exceptions import NoActiveGoalToCancelError
+from giskardpy.middleware.ros2.feedback_publisher import MotionStatechartPayloadKey
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
 from giskardpy.middleware.ros2.world_updates import ClientWorldUpdates
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
+    LastObservationState,
     LifeCycleState,
     ObservationState,
 )
@@ -115,13 +117,22 @@ class GiskardWrapper:
         result_json = json.loads(result.result.result)
         self.world_updates.wait_for_the_changes_of_a_goal(result_json)
         parsed_life_cycle_state = LifeCycleState.from_json(
-            result_json["life_cycle_state"], motion_statechart=motion_statechart
+            result_json[MotionStatechartPayloadKey.LIFE_CYCLE_STATE],
+            motion_statechart=motion_statechart,
         )
         parsed_observation_state = ObservationState.from_json(
-            result_json["observation_state"], motion_statechart=motion_statechart
+            result_json[MotionStatechartPayloadKey.OBSERVATION_STATE],
+            motion_statechart=motion_statechart,
+        )
+        parsed_last_observation_state = LastObservationState.from_json(
+            result_json[MotionStatechartPayloadKey.LAST_OBSERVATION_STATE],
+            motion_statechart=motion_statechart,
         )
         motion_statechart.life_cycle_state.data = parsed_life_cycle_state.data
         motion_statechart.observation_state.data = parsed_observation_state.data
+        motion_statechart.last_observation_state.data = (
+            parsed_last_observation_state.data
+        )
         assert motion_statechart.is_end_motion()
 
     def _create_goal_message(

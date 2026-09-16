@@ -10,6 +10,7 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
     TransitionKind,
 )
+from giskardpy.motion_statechart.exceptions import TransitionHasNoVerdictError
 from semantic_digital_twin.world_description.geometry import Color
 
 # %% every state has to be drawable
@@ -86,7 +87,15 @@ def test_an_observation_state_is_found_by_the_number_it_stands_for():
             frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
         ),
         (
-            TransitionKind.END,
+            TransitionKind.SUCCEED,
+            frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
+        ),
+        (
+            TransitionKind.INTERRUPT,
+            frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
+        ),
+        (
+            TransitionKind.FAIL,
             frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
         ),
         (TransitionKind.RESET, frozenset(LifeCycleValues)),
@@ -108,3 +117,35 @@ def test_transition_kind_can_trigger_from(transition_kind, life_cycle_state):
     """
     expected = life_cycle_state in transition_kind.source_states
     assert transition_kind.can_trigger_from(life_cycle_state) is expected
+
+
+# %% the verdict an ending transition yields
+
+
+@pytest.mark.parametrize(
+    "transition_kind, expected_verdict",
+    [
+        (TransitionKind.SUCCEED, LifeCycleValues.SUCCEEDED),
+        (TransitionKind.FAIL, LifeCycleValues.FAILED),
+        (TransitionKind.INTERRUPT, LifeCycleValues.INTERRUPTED),
+    ],
+)
+def test_an_ending_transition_yields_its_own_verdict(
+    transition_kind: TransitionKind, expected_verdict: LifeCycleValues
+):
+    """
+    A verdict is declared by the condition that ended a node, never read off what the
+    node observed.
+    """
+    assert transition_kind.verdict is expected_verdict
+
+
+@pytest.mark.parametrize(
+    "transition_kind",
+    [kind for kind in TransitionKind if kind not in TransitionKind.ending_kinds()],
+)
+def test_a_transition_that_does_not_end_a_node_has_no_verdict(
+    transition_kind: TransitionKind,
+):
+    with pytest.raises(TransitionHasNoVerdictError):
+        transition_kind.verdict

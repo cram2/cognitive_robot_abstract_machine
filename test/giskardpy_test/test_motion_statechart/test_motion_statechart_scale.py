@@ -30,8 +30,8 @@ def _build_chain(
         node = ConstTrueNode()
         motion_statechart.add_node(node)
         if previous is not None:
-            node.start_condition = previous.observation_variable
-        node.end_condition = node.observation_variable
+            node.start_condition = previous.observes_true
+        node.success_condition = node.observes_true
         chain.append(node)
         previous = node
     return chain
@@ -88,7 +88,7 @@ def test_many_alternative_branches_scale(branch_length: int):
     active_branch, dead_branches = branches[0], branches[1:]
 
     for dead_branch in dead_branches:
-        dead_branch[0].start_condition = gate.observation_variable
+        dead_branch[0].start_condition = gate.observes_true
 
     msc.add_node(EndMotion.when_true(active_branch[-1]))
 

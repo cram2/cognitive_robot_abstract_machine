@@ -20,6 +20,7 @@ sphinx:
     - autoapi.extension  # Add the AutoAPI extension
     - sphinx.ext.autodoc
     - sphinxcontrib.plantuml
+    - sphinxcontrib.mermaid
   config:
     # AutoAPI configuration
     autoapi_dirs:
