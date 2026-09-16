@@ -42,6 +42,7 @@ from segmind.detectors.spatial_relation_detector_nodes import (
     SupportDetector,
 )
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
+from segmind.event_feed import ReceivesDetectedEvents
 from segmind.event_logger import EventLogger
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 from segmind.utils import PropagatingThread
@@ -83,6 +84,11 @@ class SegmindEnvironmentVariable(StrEnum):
     EVENTS_FILE = "SEGMIND_EVENTS_FILE"
     """
     When set, the file a watched run writes the events SegMind detected to.
+    """
+
+    DASHBOARD = "SEGMIND_DASHBOARD"
+    """
+    When set, a watched run serves its events on a page while it goes on.
     """
 
 
@@ -186,6 +192,11 @@ class LiveSegmenter(PropagatingThread):
     The detectors ticked.
     """
 
+    listeners: List[ReceivesDetectedEvents] = field(kw_only=True, default_factory=list)
+    """
+    Told about the events of every tick, as they are detected.
+    """
+
     pause_between_ticks: float = field(kw_only=True, default=0.01)
     """
     The least time, in seconds, the world is left to other threads after a tick.
@@ -248,10 +259,15 @@ class LiveSegmenter(PropagatingThread):
 
     def tick(self) -> None:
         """
-        Tick the detectors once, while no other thread changes the world.
+        Tick the detectors once, while no other thread changes the world, and tell every
+        listener what that tick detected.
         """
         with self.world._world_lock:
+            detected_before = len(self.event_logger.get_events())
             self.executor.tick()
+            detected = self.event_logger.get_events()[detected_before:]
+        for listener in self.listeners:
+            listener.receive(detected)
 
     def write_event_records(self, path: Path) -> None:
         """

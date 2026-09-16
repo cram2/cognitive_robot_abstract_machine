@@ -24,9 +24,15 @@ keywords = ["robotics", "knowledge", "memories", "episodic", "pycram"]
 requires-python = ">=3.10"
 
 
+[project.optional-dependencies]
+dashboard = ["flask"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["segmind*"]
+
+[tool.setuptools.package-data]
+segmind = ["dashboard/*.html"]
 
 [tool.setuptools.dynamic]
 version = {attr = "segmind.__version__"}

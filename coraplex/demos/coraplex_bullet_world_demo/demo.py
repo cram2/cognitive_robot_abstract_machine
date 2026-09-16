@@ -13,7 +13,7 @@ from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTor
 from coraplex.testing import setup_world
 from krrood.entity_query_language.factories import an, entity, variable, the
 from segmind import event_logger
-from segmind.live_segmenter import LiveSegmenter
+from segmind.live_segmenter import LiveSegmenter, SegmindEnvironmentVariable
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
@@ -139,8 +139,24 @@ segmenter = LiveSegmenter.watching(
     world,
     [world.get_body_by_name(name) for name in ("milk.stl", "bowl.stl", "spoon.stl")],
 )
+# Watched by eye while the plan runs, when asked for: the page lists each event as it
+# is detected. It is an extra, so nothing here needs flask unless it is switched on.
+dashboard = None
+if os.environ.get(SegmindEnvironmentVariable.DASHBOARD):
+    from segmind.dashboard.server import LiveEventDashboard
+
+    dashboard = LiveEventDashboard.watching(segmenter)
+    dashboard.start()
+    print(
+        f"SegMind live events: http://{dashboard.address.host}:{dashboard.port}",
+        flush=True,
+    )
+
 with simulated_robot, segmenter:
     plan.perform()
+
+if dashboard is not None:
+    dashboard.stop()
 
 # What SegMind detected is reported at debug level, which nothing shows by default, and
 # this demo is meant to be read off the console.
