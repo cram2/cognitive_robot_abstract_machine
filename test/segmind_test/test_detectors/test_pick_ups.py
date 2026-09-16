@@ -11,12 +11,15 @@ from typing_extensions import List
 
 from segmind.datastructures.events import (
     DetectionEvent,
+    GraspEvent,
     LossOfSupportEvent,
     PickUpEvent,
     TranslationEvent,
 )
 from segmind.detectors.base import SegmindContext
 from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
+from segmind.detectors.grasp_detector_nodes import GraspDetector
+from segmind.statecharts.segmind_statechart import SegmindStatechart
 
 from .test_detection_without_casadi import milk_in_the_apartment  # noqa: F401
 
@@ -112,3 +115,61 @@ def test_one_loss_of_support_is_the_pick_up_of_one_translation(milk_in_the_apart
     )
 
     assert len(_pick_ups_concluded_from(segmind_context)) == 1
+
+
+# %% where grasps are watched for
+
+
+def _pick_ups_concluded_beside_a_grasp_detector(
+    segmind_context: SegmindContext,
+) -> List[DetectionEvent]:
+    """
+    What a pick-up detector makes of ``segmind_context`` while a grasp detector runs in
+    the same statechart.
+    """
+    pick_up = PickUpDetector()
+    SegmindStatechart().build_statechart([GraspDetector(), pick_up])
+    return [
+        event
+        for event in pick_up.update_context_and_events(None, segmind_context, [])
+        if isinstance(event, PickUpEvent)
+    ]
+
+
+def test_a_lift_no_agent_took_hold_for_is_no_pick_up_where_grasps_are_watched_for(
+    milk_in_the_apartment,
+):
+    """
+    Where a grasp detector runs, a pick-up is an agent taking hold of an object and
+    lifting it, so an object leaving its surface by itself is not one.
+    """
+    _, milk, box = milk_in_the_apartment
+    lifted_at = datetime.now()
+    segmind_context = _logged(
+        [
+            _translation_of(milk, lifted_at),
+            LossOfSupportEvent(
+                tracked_object=milk, with_object=box, timestamp=lifted_at
+            ),
+        ]
+    )
+
+    assert _pick_ups_concluded_beside_a_grasp_detector(segmind_context) == []
+
+
+def test_a_grasp_and_a_lift_are_a_pick_up_where_grasps_are_watched_for(
+    milk_in_the_apartment,
+):
+    _, milk, box = milk_in_the_apartment
+    lifted_at = datetime.now()
+    segmind_context = _logged(
+        [
+            GraspEvent(tracked_object=milk, timestamp=lifted_at),
+            _translation_of(milk, lifted_at),
+            LossOfSupportEvent(
+                tracked_object=milk, with_object=box, timestamp=lifted_at
+            ),
+        ]
+    )
+
+    assert len(_pick_ups_concluded_beside_a_grasp_detector(segmind_context)) == 1

@@ -4,7 +4,7 @@ from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import List, Callable, Any
+from typing import List, Callable, Any, Type
 
 from typing_extensions import Hashable
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -25,6 +25,10 @@ from segmind.datastructures.events import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from segmind.detectors.base import AbstractDetector, SegmindContext
+from segmind.detectors.grasp_detector_nodes import (
+    GraspDetector,
+    LossOfGraspDetector,
+)
 
 
 @dataclass
@@ -40,6 +44,22 @@ class AbstractInteractionDetector(AbstractDetector):
     """
     The threshold for the time difference between two events to be considered an interaction.
     """
+
+    def runs_beside(self, detector_type: Type[AbstractDetector]) -> bool:
+        """
+        Whether a detector of ``detector_type`` runs in the same statechart as this one.
+
+        What a run watches for is what it can conclude from: where nothing detects an
+        agent taking hold of things, an interaction has to be read from the object's
+        own motion instead.
+
+        :param detector_type: The kind of detector looked for.
+        :return: True when one of that kind runs beside this detector.
+        """
+        statechart = self._motion_statechart
+        return statechart is not None and any(
+            isinstance(node, detector_type) for node in statechart.nodes
+        )
 
     @abstractmethod
     def interaction_key(
@@ -117,8 +137,11 @@ class AbstractInteractionDetector(AbstractDetector):
 @dataclass
 class PlacingDetector(AbstractInteractionDetector):
     """
-    Represents a class detection mechanism for identifying and managing new
-    placing events from observed system interactions.
+    Reports an object being put down.
+
+    Where an agent letting go of things is watched for, a placing is where it let this
+    one go; otherwise it is the object coming to rest on a surface, which is all a run
+    with no agent in it has to go on.
 
     This class is typically used to analyze specific event types, such as stop
     motion and support events, and identify correlations that form the basis
@@ -133,16 +156,6 @@ class PlacingDetector(AbstractInteractionDetector):
         A placing is the object coming to rest on a surface, concluded once per surface.
         """
         return PlacingEvent, secondary.tracked_object, secondary.with_object
-
-    use_grasp_logic: bool = False
-    """
-    Whether a placing is concluded from the agent letting go of the object.
-
-    With it, an object is placed where the agent released it, so a surface it merely
-    brushed while it was carried is not somewhere it was put down. Without it, coming
-    to rest on a surface is all there is to go on, which is the case where nothing
-    holds the object.
-    """
 
     def update_context_and_events(
         self,
@@ -164,7 +177,9 @@ class PlacingDetector(AbstractInteractionDetector):
         return self._find_interaction_events(
             segmind_context,
             primary_event_type=(
-                LossOfGraspEvent if self.use_grasp_logic else StopTranslationEvent
+                LossOfGraspEvent
+                if self.runs_beside(LossOfGraspDetector)
+                else StopTranslationEvent
             ),
             secondary_event_type=SupportEvent,
             make_event=lambda primary, secondary: PlacingEvent(
@@ -177,7 +192,11 @@ class PlacingDetector(AbstractInteractionDetector):
 @dataclass
 class PickUpDetector(AbstractInteractionDetector):
     """
-    Detects and processes interactions suggesting an object has been picked up.
+    Reports an object being picked up.
+
+    Where an agent taking hold of things is watched for, a pick-up is that agent lifting
+    this one off what held it up, one per grasp; otherwise it is the object moving after
+    losing its support, which is all a run with no agent in it has to go on.
 
     The PickUpDetector class determines if a "pickup" event has occurred by analyzing
     contextual events such as TranslationEvent and LossOfSupportEvent. It ensures
@@ -194,16 +213,6 @@ class PickUpDetector(AbstractInteractionDetector):
         A pick-up is one lift of the object, however many supports it loses at once.
         """
         return PickUpEvent, primary
-
-    use_grasp_logic: bool = False
-    """
-    Whether a pick-up is concluded from an agent taking hold of the object.
-
-    With it, one pick-up is reported per grasp, so an object that loses a surface again
-    while it is carried is not picked up a second time. Without it, moving after losing
-    its support is all there is to go on, which is the case where nothing holds it, and
-    is what is read from a world in which no agent takes hold of anything.
-    """
 
     def update_context_and_events(
         self,
@@ -225,7 +234,7 @@ class PickUpDetector(AbstractInteractionDetector):
         return self._find_interaction_events(
             segmind_context,
             primary_event_type=(
-                GraspEvent if self.use_grasp_logic else TranslationEvent
+                GraspEvent if self.runs_beside(GraspDetector) else TranslationEvent
             ),
             secondary_event_type=LossOfSupportEvent,
             make_event=lambda primary, secondary: PickUpEvent(

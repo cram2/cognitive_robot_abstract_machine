@@ -222,11 +222,8 @@ class LiveSegmenter(PropagatingThread):
             for body in bodies
             for detector_type in OBJECT_DETECTOR_TYPES
         ]
-        # A watched run has an agent in it, so what it did to an object is the better
-        # reading of a pick-up or a placing than the object's own motion alone.
         detectors.extend(
-            detector_type(use_grasp_logic=True)
-            for detector_type in EVENT_COMBINING_DETECTOR_TYPES
+            detector_type() for detector_type in EVENT_COMBINING_DETECTOR_TYPES
         )
         return cls(world=world, detectors=detectors)
 

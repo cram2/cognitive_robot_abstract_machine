@@ -234,7 +234,7 @@ def test_an_object_is_picked_up_when_an_agent_lifts_it_off_what_it_rested_on(
             GraspDetector(tracked_object=box),
             SupportDetector(tracked_object=box),
             LossOfSupportDetector(tracked_object=box),
-            PickUpDetector(use_grasp_logic=True),
+            PickUpDetector(),
         ],
     )
 
@@ -261,7 +261,7 @@ def test_an_object_is_placed_where_the_agent_let_go_of_it(pr2_world_copy):
             GraspDetector(tracked_object=box),
             LossOfGraspDetector(tracked_object=box),
             SupportDetector(tracked_object=box),
-            PlacingDetector(use_grasp_logic=True),
+            PlacingDetector(),
         ],
     )
 
@@ -312,7 +312,7 @@ def test_taking_hold_again_mid_carry_is_not_a_second_pick_up(pr2_world_copy):
             LossOfGraspDetector(tracked_object=box),
             SupportDetector(tracked_object=box),
             LossOfSupportDetector(tracked_object=box),
-            PickUpDetector(use_grasp_logic=True),
+            PickUpDetector(),
         ],
     )
     held = gripper.tool_frame.numeric_global_pose.position
