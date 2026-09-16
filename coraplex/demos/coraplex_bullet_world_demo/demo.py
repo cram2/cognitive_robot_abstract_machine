@@ -17,6 +17,7 @@ from segmind.detectors.coarse_event_detector_nodes import (
     PickUpDetector,
     PlacingDetector,
 )
+from segmind.detectors.grasp_detector_nodes import GraspDetector
 from segmind.detectors.spatial_relation_detector_nodes import ContainmentDetector
 from segmind.live_segmenter import LiveSegmenter
 from semantic_digital_twin.adapters.mesh import STLParser
@@ -36,7 +37,7 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import FixedConnection
 
-DETECTORS = (PickUpDetector, PlacingDetector, ContainmentDetector)
+DETECTORS = (PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector)
 """
 What SegMind is asked to detect in this demo. Every detector these are read from is
 brought along; the full list is printed when the demo starts.
