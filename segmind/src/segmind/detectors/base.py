@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from segmind.datastructures.events import MotionEvent, DetectionEvent, RotationEvent
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from segmind.event_logger import EventLogger
-from semantic_digital_twin.robots.robot_parts import EndEffector
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -121,6 +121,16 @@ class AbstractDetector(MotionStatechartNode, ABC):
     If None, all trackable objects in the world are checked.
     """
 
+    exclude_robot: bool = field(kw_only=True, default=True)
+    """
+    Whether every body of every robot is left out of what a tracked object is checked
+    against.
+
+    A run reads what happens in the scene, and a robot carrying an object touches it
+    throughout; what the robot does with it is read from the grasp instead, which asks
+    about the hand directly and so is unaffected by this.
+    """
+
     def on_tick(
         self, context: MotionStatechartContext
     ) -> Optional[ObservationStateValues]:
@@ -186,12 +196,23 @@ class AbstractDetector(MotionStatechartNode, ABC):
         return lost
 
     @staticmethod
+    def bodies_of_robots(world: World) -> Set[Body]:
+        """
+        Every body belonging to a robot of ``world``.
+        """
+        return {
+            body
+            for robot in world.get_semantic_annotations_by_type(AbstractRobot)
+            for body in robot.bodies
+        }
+
+    @staticmethod
     def bodies_outside_end_effectors(world: World) -> List[Body]:
         """
         The collidable bodies of ``world`` that are part of no end effector.
 
         An end effector holds what it grasps; it is not what objects rest on or are
-        contained in. The rest of a robot, such as the table it is mounted on, is.
+        contained in.
         """
         end_effector_bodies = {
             body
@@ -218,13 +239,17 @@ class AbstractDetector(MotionStatechartNode, ABC):
         :param tracked_objects: List of bodies to check for contact changes.
         :param predicate: Function that returns true if the objects are related.
         :param candidates: The bodies a tracked object may be related to; every
-            collidable body of the world when not given.
+            collidable body of the world when not given. The robot is left out of them
+            unless :attr:`exclude_robot` says otherwise.
         :return: Dictionary mapping bodies to sets of related bodies.
         """
 
         related_bodies: Dict[Body, Set[Body]] = {}
         if candidates is None:
             candidates = context.world.bodies_with_collision
+        if self.exclude_robot:
+            robot_bodies = self.bodies_of_robots(context.world)
+            candidates = [body for body in candidates if body not in robot_bodies]
         for obj in tracked_objects:
             for body in candidates:
                 if body is obj:

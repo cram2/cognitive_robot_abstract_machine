@@ -1,6 +1,7 @@
 """
-Tests for what detectors treat as something an object rests on: a robot's grippers hold
-what they grasp, and are not where objects are put down or picked up from.
+Tests for what detectors check an object against: the robot is left out, so what the
+robot does to an object is not read as something the scene did to it, and a gripper is
+never what an object rests on.
 """
 
 from __future__ import annotations
@@ -11,6 +12,8 @@ from typing_extensions import List
 from semantic_digital_twin.reasoning.predicates import contact
 from segmind.datastructures.events import SupportEvent
 from segmind.detectors.base import SegmindContext
+from segmind.datastructures.events import ContactEvent
+from segmind.detectors.atomic_event_detectors_nodes import ContactDetector
 from segmind.detectors.spatial_relation_detector_nodes import SupportDetector
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.statecharts.segmind_statechart import SegmindStatechart
@@ -70,10 +73,14 @@ def _box_resting_on(
     return box
 
 
-def _supporters_detected_for(world: World, box: Body) -> List[Body]:
+def _supporters_detected_for(
+    world: World, box: Body, exclude_robot: bool = True
+) -> List[Body]:
     executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
     executor.compile(
-        SegmindStatechart().build_statechart([SupportDetector(tracked_object=box)])
+        SegmindStatechart().build_statechart(
+            [SupportDetector(tracked_object=box, exclude_robot=exclude_robot)]
+        )
     )
     executor.tick()
     segmind_context = executor.context.require_extension(SegmindContext)
@@ -103,4 +110,51 @@ def test_an_object_on_a_gripper_is_not_supported_by_the_gripper(pr2_world_copy):
         for body in end_effector.bodies
     }
 
-    assert gripper_bodies.isdisjoint(_supporters_detected_for(pr2_world_copy, box))
+    # With the robot left out there would be nothing to disregard, so this asks what a
+    # run reading the robot too makes of the hand.
+    assert gripper_bodies.isdisjoint(
+        _supporters_detected_for(pr2_world_copy, box, exclude_robot=False)
+    )
+
+
+# %% the robot is not part of the scene a detector reads
+
+
+def _contacts_detected_for(
+    world: World, box: Body, exclude_robot: bool = True
+) -> List[Body]:
+    executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
+    executor.compile(
+        SegmindStatechart().build_statechart(
+            [ContactDetector(tracked_object=box, exclude_robot=exclude_robot)]
+        )
+    )
+    executor.tick()
+    segmind_context = executor.context.require_extension(SegmindContext)
+    return [
+        event.with_object
+        for event in segmind_context.logger.get_events()
+        if isinstance(event, ContactEvent) and event.tracked_object is box
+    ]
+
+
+def test_nothing_of_the_robot_is_checked_against_an_object(pr2_world_copy):
+    """
+    With the robot left out, a hand around an object is not read as the scene touching
+    it.
+    """
+    palm = pr2_world_copy.get_body_by_name("l_gripper_palm_link")
+    box = _box_resting_on(pr2_world_copy, palm, sunk_by=SUNK_INTO_A_GRIPPER)
+
+    assert _contacts_detected_for(pr2_world_copy, box) == []
+
+
+def test_the_robot_is_checked_against_an_object_when_it_is_not_left_out(pr2_world_copy):
+    """
+    The robot is left out because a run is asked to read the scene, not the robot; a run
+    that wants it back says so.
+    """
+    palm = pr2_world_copy.get_body_by_name("l_gripper_palm_link")
+    box = _box_resting_on(pr2_world_copy, palm, sunk_by=SUNK_INTO_A_GRIPPER)
+
+    assert palm in _contacts_detected_for(pr2_world_copy, box, exclude_robot=False)
