@@ -95,28 +95,14 @@ class LossOfContactDetector(AbstractDetector):
         :return: List of LossOfContactEvent instances generated during this update.
         """
         new_contact_pairs = self.get_relation(context, tracked_objects, contact)
-
-        events = []
-        for obj, contact_list in list(segmind_context.latest_contact_bodies.items()):
-            loss_contacts = (
-                contact_list.copy()
-                if obj not in new_contact_pairs
-                else contact_list - new_contact_pairs[obj]
-            )
-            if loss_contacts:
-
-                segmind_context.latest_contact_bodies[obj] -= loss_contacts
-                if not segmind_context.latest_contact_bodies[obj]:
-                    segmind_context.latest_contact_bodies.pop(obj)
-
-                events.extend(
-                    [
-                        LossOfContactEvent(tracked_object=obj, with_object=s)
-                        for s in loss_contacts
-                    ]
-                )
-
-        return events
+        lost_contacts = self.forget_lost_relations(
+            segmind_context.latest_contact_bodies, new_contact_pairs, tracked_objects
+        )
+        return [
+            LossOfContactEvent(tracked_object=obj, with_object=other)
+            for obj, others in lost_contacts.items()
+            for other in others
+        ]
 
 
 @dataclass(eq=False, repr=False)

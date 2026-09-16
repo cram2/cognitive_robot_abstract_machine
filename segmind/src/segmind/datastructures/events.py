@@ -249,6 +249,23 @@ class LossOfContactEvent(AbstractContactEvent):
 
 
 @dataclass(unsafe_hash=True)
+class GraspEvent(EventWithTrackedObjects):
+    """
+    An agent has taken hold of an object.
+
+    ..note:: :attr:`with_object` is the tool frame the object is held by, while what
+        touches the object is the hand around that frame.
+    """
+
+
+@dataclass(unsafe_hash=True)
+class LossOfGraspEvent(EventWithTrackedObjects):
+    """
+    An agent that had hold of an object has let go of it.
+    """
+
+
+@dataclass(unsafe_hash=True)
 class PickUpEvent(EventWithTrackedObjects):
     """
     Represents an event where an object is picked up by another object.

@@ -11,7 +11,9 @@ from segmind.datastructures.events import (
     SupportEvent,
     LossOfSupportEvent,
     ContainmentEvent,
-    LossOfContainmentEvent, ContactEvent, InsertionEvent,
+    LossOfContainmentEvent,
+    ContactEvent,
+    InsertionEvent,
 )
 
 from semantic_digital_twin.reasoning.predicates import is_supported_by, InsideOf
@@ -33,7 +35,10 @@ class SupportDetector(AbstractDetector):
     """
 
     def update_context_and_events(
-        self, context:MotionStatechartContext, segmind_context:SegmindContext, objects_to_check: List[Body]
+        self,
+        context: MotionStatechartContext,
+        segmind_context: SegmindContext,
+        objects_to_check: List[Body],
     ) -> List[DetectionEvent]:
         """
         Detects newly established support relationships.
@@ -46,7 +51,21 @@ class SupportDetector(AbstractDetector):
 
         events = []
         latest_support = segmind_context.latest_support
-        new_support_pairs = self.get_relation(context, objects_to_check, is_supported_by)
+        # A held object is carried rather than resting, so what it brushes on the way
+        # does not become something it rests on. What already holds it up is left
+        # alone, so taking hold of something that still stands on a surface does not
+        # take that surface away from it.
+        carried_by_nothing = [
+            body
+            for body in objects_to_check
+            if not segmind_context.latest_grasps.get(body)
+        ]
+        new_support_pairs = self.get_relation(
+            context,
+            carried_by_nothing,
+            is_supported_by,
+            candidates=self.bodies_outside_end_effectors(context.world),
+        )
         for body, support in new_support_pairs.items():
             new_supports = (
                 support
@@ -79,7 +98,10 @@ class LossOfSupportDetector(AbstractDetector):
     """
 
     def update_context_and_events(
-        self,context:MotionStatechartContext, segmind_context:SegmindContext , objects_to_check: List[Body]
+        self,
+        context: MotionStatechartContext,
+        segmind_context: SegmindContext,
+        objects_to_check: List[Body],
     ) -> List[DetectionEvent]:
         """
         Detects when previously existing support relationships are lost.
@@ -90,26 +112,20 @@ class LossOfSupportDetector(AbstractDetector):
         :return: List of LossOfSupportEvent objects representing removed supports.
         """
 
-        events = []
-        latest_support = segmind_context.latest_support
-        new_support_pairs = self.get_relation(context, objects_to_check, is_supported_by)
-
-        for body, support in list(latest_support.items()):
-            loss_supports = support - new_support_pairs.get(body, set())
-
-            if not loss_supports:
-                continue
-
-            segmind_context.latest_support[body] -= loss_supports
-            if not segmind_context.latest_support[body]:
-                segmind_context.latest_support.pop(body)
-
-            events.extend(
-                LossOfSupportEvent(tracked_object=body, with_object=s)
-                for s in loss_supports
-            )
-
-        return events
+        new_support_pairs = self.get_relation(
+            context,
+            objects_to_check,
+            is_supported_by,
+            candidates=self.bodies_outside_end_effectors(context.world),
+        )
+        lost_supports = self.forget_lost_relations(
+            segmind_context.latest_support, new_support_pairs, objects_to_check
+        )
+        return [
+            LossOfSupportEvent(tracked_object=body, with_object=supporter)
+            for body, supporters in lost_supports.items()
+            for supporter in supporters
+        ]
 
 
 @dataclass(eq=False, repr=False)
@@ -127,7 +143,7 @@ class BaseContainmentDetector(AbstractDetector):
     """
 
     def get_containment_pairs(
-        self,context:MotionStatechartContext, tracked_objects: List[Body]
+        self, context: MotionStatechartContext, tracked_objects: List[Body]
     ) -> Dict[Body, Set[Body]]:
         """
         Computes support relationships.
@@ -136,18 +152,21 @@ class BaseContainmentDetector(AbstractDetector):
         :return: Mapping of body → supporting bodies.
         """
         containment_pairs: Dict[Body, Set[Body]] = {}
-        bodies_with_collision = context.world.bodies_with_collision
+        candidates = self.bodies_outside_end_effectors(context.world)
 
         for obj in tracked_objects:
             containers = {
-                body for body in bodies_with_collision
+                body
+                for body in candidates
                 if obj is not body
-                   and InsideOf(obj, body).compute_containment_ratio() > self.containment_threshold
+                and InsideOf(obj, body).compute_containment_ratio()
+                > self.containment_threshold
             }
             if containers:
                 containment_pairs[obj] = containers
 
         return containment_pairs
+
 
 @dataclass(eq=False, repr=False)
 class ContainmentDetector(BaseContainmentDetector):
@@ -161,7 +180,10 @@ class ContainmentDetector(BaseContainmentDetector):
     """
 
     def update_context_and_events(
-        self, context:MotionStatechartContext, segmind_context:SegmindContext, objects_to_check: List[Body]
+        self,
+        context: MotionStatechartContext,
+        segmind_context: SegmindContext,
+        objects_to_check: List[Body],
     ) -> List[DetectionEvent]:
         """
         Updates the tracking context with new containment relationships and generates
@@ -205,8 +227,12 @@ class LossOfContainmentDetector(BaseContainmentDetector):
     verification and context management.
 
     """
+
     def update_context_and_events(
-        self, context:MotionStatechartContext, segmind_context:SegmindContext, objects_to_check: List[Body]
+        self,
+        context: MotionStatechartContext,
+        segmind_context: SegmindContext,
+        objects_to_check: List[Body],
     ) -> List[DetectionEvent]:
         """
         Updates the context with the latest containment pairs and generates events for
@@ -222,27 +248,14 @@ class LossOfContainmentDetector(BaseContainmentDetector):
         :return: List of LossOfContainmentEvent objects representing the loss of containment.
         """
         new_containment_pairs = self.get_containment_pairs(context, objects_to_check)
-        latest_containment = segmind_context.latest_containments
-        events = []
-        for obj, containment_list in list(latest_containment.items()):
-            lost_containments = (
-                containment_list.copy()
-                if obj not in new_containment_pairs
-                else containment_list - new_containment_pairs[obj]
-            )
-            if lost_containments:
-                latest_containment[obj] -= lost_containments
-                if not latest_containment[obj]:
-                    latest_containment.pop(obj)
-                events.extend(
-                    [
-                        LossOfContainmentEvent(tracked_object=obj, with_object=c)
-                        for c in lost_containments
-                    ]
-                )
-
-        return events
-
+        lost_containments = self.forget_lost_relations(
+            segmind_context.latest_containments, new_containment_pairs, objects_to_check
+        )
+        return [
+            LossOfContainmentEvent(tracked_object=obj, with_object=container)
+            for obj, containers in lost_containments.items()
+            for container in containers
+        ]
 
 
 @dataclass(eq=False, repr=False)
@@ -262,7 +275,12 @@ class InsertionDetector(AbstractDetector):
     The threshold for the time difference between two events to be considered an insertion.
     """
 
-    def update_context_and_events(self, context:MotionStatechartContext, segmind_context:SegmindContext, tracked_objs: List[Body]) -> List[DetectionEvent]:
+    def update_context_and_events(
+        self,
+        context: MotionStatechartContext,
+        segmind_context: SegmindContext,
+        tracked_objs: List[Body],
+    ) -> List[DetectionEvent]:
         """
         Updates context and processes tracked objects to generate a list of events.
 
@@ -278,9 +296,19 @@ class InsertionDetector(AbstractDetector):
         :return List of InsertionEvent objects representing detected insertions.
         """
         events = []
-        contact_events = [i for i in segmind_context.logger.get_events() if isinstance(i, ContactEvent)]
-        contact_events_with_holes = [i for i in contact_events if i.with_object in segmind_context.holes]
-        containment_event = [i for i in segmind_context.logger.get_events() if isinstance(i, ContainmentEvent)]
+        contact_events = [
+            i
+            for i in segmind_context.logger.get_events()
+            if isinstance(i, ContactEvent)
+        ]
+        contact_events_with_holes = [
+            i for i in contact_events if i.with_object in segmind_context.holes
+        ]
+        containment_event = [
+            i
+            for i in segmind_context.logger.get_events()
+            if isinstance(i, ContainmentEvent)
+        ]
 
         by_object = defaultdict(list)
         for i in contact_events_with_holes:
