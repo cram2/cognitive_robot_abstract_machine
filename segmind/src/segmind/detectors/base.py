@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Set, List, Any
+from typing import Optional, Dict, Set, List, Any, ClassVar, Tuple, Type
 
 from giskardpy.motion_statechart.context import (
     MotionStatechartContext,
@@ -115,6 +115,18 @@ class AbstractDetector(MotionStatechartNode, ABC):
     Abstract base class for all detectors.
     """
 
+    requires: ClassVar[Tuple[Type[AbstractDetector], ...]] = ()
+    """
+    The kinds of detector whose events this one is read from. A run using this detector
+    uses them too.
+    """
+
+    counterpart: ClassVar[Optional[Type[AbstractDetector]]] = None
+    """
+    For a detector reporting that something has ended, the one reporting that it began.
+    A run using either of the two uses both.
+    """
+
     tracked_object: Optional[Body] = field(kw_only=True, default=None)
     """
     :param tracked_object: Optional body that should be monitored.
@@ -164,6 +176,14 @@ class AbstractDetector(MotionStatechartNode, ABC):
                 e, segmind_context_extension.tracker_registry
             )
         return ObservationStateValues.TRUE if events else ObservationStateValues.FALSE
+
+    @classmethod
+    def watches_a_body(cls) -> bool:
+        """
+        Whether a detector of this kind watches one body. A kind read from the events of
+        other detectors concludes over every body those watch instead.
+        """
+        return not cls.requires
 
     @staticmethod
     def forget_lost_relations(

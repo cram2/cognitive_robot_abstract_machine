@@ -13,6 +13,11 @@ from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTor
 from coraplex.testing import setup_world
 from krrood.entity_query_language.factories import an, entity, variable, the
 from segmind import event_logger
+from segmind.detectors.coarse_event_detector_nodes import (
+    PickUpDetector,
+    PlacingDetector,
+)
+from segmind.detectors.spatial_relation_detector_nodes import ContainmentDetector
 from segmind.live_segmenter import LiveSegmenter
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
@@ -30,6 +35,12 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import FixedConnection
+
+DETECTORS = (PickUpDetector, PlacingDetector, ContainmentDetector)
+"""
+What SegMind is asked to detect in this demo. Every detector these are read from is
+brought along; the full list is printed when the demo starts.
+"""
 
 SHOW_LIVE_EVENTS = True
 """
@@ -146,6 +157,14 @@ plan = sequential(
 segmenter = LiveSegmenter.watching(
     world,
     [world.get_body_by_name(name) for name in ("milk.stl", "bowl.stl", "spoon.stl")],
+    detectors=DETECTORS,
+)
+print(
+    "SegMind detectors:",
+    ", ".join(
+        dict.fromkeys(type(detector).__name__ for detector in segmenter.detectors)
+    ),
+    flush=True,
 )
 dashboard = None
 if SHOW_LIVE_EVENTS:

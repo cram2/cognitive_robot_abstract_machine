@@ -19,6 +19,7 @@ from segmind.datastructures.events import (
 from semantic_digital_twin.reasoning.predicates import is_supported_by, InsideOf
 from semantic_digital_twin.world_description.world_entity import Body
 
+from segmind.detectors.atomic_event_detectors_nodes import ContactDetector
 from segmind.detectors.base import AbstractDetector, SegmindContext
 
 
@@ -96,6 +97,8 @@ class LossOfSupportDetector(AbstractDetector):
     simulation or analysis scenarios where maintaining updated context for object
     interactions is essential.
     """
+
+    counterpart = SupportDetector
 
     def update_context_and_events(
         self,
@@ -228,6 +231,8 @@ class LossOfContainmentDetector(BaseContainmentDetector):
 
     """
 
+    counterpart = ContainmentDetector
+
     def update_context_and_events(
         self,
         context: MotionStatechartContext,
@@ -269,6 +274,8 @@ class InsertionDetector(AbstractDetector):
     conditions are met. The class leverages a context that holds relevant
     event logs and tracked objects.
     """
+
+    requires = (ContactDetector, ContainmentDetector)
 
     shift_threshold: timedelta = timedelta(seconds=15.0)
     """

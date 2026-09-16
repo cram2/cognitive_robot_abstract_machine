@@ -16,10 +16,12 @@ from segmind.datastructures.events import (
     SupportEvent,
     TranslationEvent,
 )
+from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import (
     StopTranslationDetector,
     TranslationDetector,
 )
+from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.live_segmenter import (
     EVENT_COMBINING_DETECTOR_TYPES,
     OBJECT_DETECTOR_TYPES,
@@ -240,6 +242,33 @@ def test_watching_bodies_combines_their_events_once_for_all_of_them(
         for detector in segmenter.detectors
         if type(detector) in EVENT_COMBINING_DETECTOR_TYPES
     ) == Counter(EVENT_COMBINING_DETECTOR_TYPES)
+
+
+def test_watching_for_what_is_asked_watches_each_body_with_what_that_is_read_from(
+    milk_in_the_apartment,
+):
+    """
+    Asking for pick-ups is enough: each body is watched by every kind of detector a
+    pick-up is read from, and the pick-ups themselves are concluded once for all of them.
+    """
+    world, milk, box = milk_in_the_apartment
+
+    segmenter = LiveSegmenter.watching(world, [milk, box], detectors=[PickUpDetector])
+
+    chosen = DetectorSelection.of(PickUpDetector).detector_types
+    assert Counter(
+        (type(detector), detector.tracked_object) for detector in segmenter.detectors
+    ) == Counter(
+        {
+            **{
+                (detector_type, body): 1
+                for detector_type in chosen
+                if detector_type is not PickUpDetector
+                for body in (milk, box)
+            },
+            (PickUpDetector, None): 1,
+        }
+    )
 
 
 # %% handing detected events over

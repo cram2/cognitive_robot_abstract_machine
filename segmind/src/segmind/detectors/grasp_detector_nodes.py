@@ -122,6 +122,8 @@ class LossOfGraspDetector(AbstractGraspDetector):
     Reports an agent letting go of an object it had hold of.
     """
 
+    counterpart = GraspDetector
+
     def update_context_and_events(
         self,
         context: MotionStatechartContext,

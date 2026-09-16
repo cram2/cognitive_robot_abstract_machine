@@ -75,6 +75,8 @@ class LossOfContactDetector(AbstractDetector):
     bodies are lost.
     """
 
+    counterpart = ContactDetector
+
     def update_context_and_events(
         self,
         context: MotionStatechartContext,
@@ -255,6 +257,8 @@ class StopTranslationDetector(MotionDetector):
     Triggers a StopTranslationEvent when an object that was moving stops.
     """
 
+    counterpart = TranslationDetector
+
     def _check_and_trigger_event(
         self, context: SegmindContext, obj: Body, poses: List[NumericPose]
     ) -> Optional[DetectionEvent]:
@@ -334,6 +338,8 @@ class StopRotationDetector(MotionDetector):
 
     Triggers a StopRotationEvent when an object that was rotating stops.
     """
+
+    counterpart = RotationDetector
 
     def _check_and_trigger_event(
         self, context: SegmindContext, obj: Body, poses: List[NumericPose]

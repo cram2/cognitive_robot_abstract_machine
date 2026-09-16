@@ -14,9 +14,10 @@ from pathlib import Path
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json
-from typing_extensions import Any, Dict, List, Optional, Self, Tuple, Type
+from typing_extensions import Any, Dict, List, Optional, Self, Sequence, Tuple, Type
 
 from segmind.datastructures.events import EventWithTrackedObjects
+from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import (
     ContactDetector,
     LossOfContactDetector,
@@ -211,21 +212,31 @@ class LiveSegmenter(PropagatingThread):
         self.executor.compile(SegmindStatechart().build_statechart(self.detectors))
 
     @classmethod
-    def watching(cls, world: World, bodies: List[Body]) -> Self:
+    def watching(
+        cls,
+        world: World,
+        bodies: List[Body],
+        detectors: Sequence[Type[AbstractDetector]] = (),
+    ) -> Self:
         """
-        A segmenter detecting what happens to ``bodies``: each is watched by every
-        detector of :data:`OBJECT_DETECTOR_TYPES`, and their events are combined by the
-        detectors of :data:`EVENT_COMBINING_DETECTOR_TYPES`.
+        A segmenter detecting what happens to ``bodies``.
+
+        :param detectors: The kinds of detector asked for. Every kind they are read from
+            is brought along (see :class:`~segmind.detector_selection.DetectorSelection`),
+            so asking for what is to be detected is enough. Without any, every kind of
+            :data:`OBJECT_DETECTOR_TYPES` and :data:`EVENT_COMBINING_DETECTOR_TYPES`.
         """
-        detectors = [
-            detector_type(tracked_object=body)
-            for body in bodies
-            for detector_type in OBJECT_DETECTOR_TYPES
-        ]
-        detectors.extend(
-            detector_type() for detector_type in EVENT_COMBINING_DETECTOR_TYPES
+        asked_for = detectors or (
+            *OBJECT_DETECTOR_TYPES,
+            *EVENT_COMBINING_DETECTOR_TYPES,
         )
-        return cls(world=world, detectors=detectors)
+        chosen: List[AbstractDetector] = []
+        for detector_type in DetectorSelection.of(*asked_for).detector_types:
+            if detector_type.watches_a_body():
+                chosen.extend(detector_type(tracked_object=body) for body in bodies)
+            else:
+                chosen.append(detector_type())
+        return cls(world=world, detectors=chosen)
 
     @property
     def event_logger(self) -> EventLogger:
