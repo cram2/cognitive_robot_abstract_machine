@@ -56,7 +56,7 @@ class TopicSubscriberNode(TopicNode[MsgType]):
     in `current_msg` on_tick.
     """
 
-    _subscriber: Subscription = field(init=False)
+    _subscriber: Subscription = field(init=False, default=None)
     """
     Internal ROS subscription object.
     """
@@ -75,6 +75,10 @@ class TopicSubscriberNode(TopicNode[MsgType]):
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         node_artifacts = super().build(context)
+
+        if self._subscriber is not None:
+            return node_artifacts
+
         self._subscriber = self.ros2_node.create_subscription(
             msg_type=self.msg_type,
             topic=self.topic_name,
@@ -103,6 +107,12 @@ class TopicSubscriberNode(TopicNode[MsgType]):
     def on_reset(self, context: MotionStatechartContext):
         self.clear_msg()
 
+    def cleanup(self, context: MotionStatechartContext):
+        super().cleanup(context)
+        if self._subscriber is not None:
+            self.ros2_node.destroy_subscription(self._subscriber)
+            self._subscriber = None
+
 
 @dataclass(eq=False, repr=False)
 class TopicPublisherNode(TopicNode[MsgType]):
@@ -112,19 +122,29 @@ class TopicPublisherNode(TopicNode[MsgType]):
     This node will automatically create a publisher on build.
     """
 
-    _publisher: Publisher = field(init=False)
+    _publisher: Publisher = field(init=False, default=None)
     """
     Internal ROS publisher object.
     """
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         node_artifacts = super().build(context)
+
+        if self._publisher is not None:
+            return node_artifacts
+
         self._publisher = self.ros2_node.create_publisher(
             msg_type=self.msg_type,
             topic=self.topic_name,
             qos_profile=self.qos_profile,
         )
         return node_artifacts
+
+    def cleanup(self, context: MotionStatechartContext):
+        super().cleanup(context)
+        if self._publisher is not None:
+            self.ros2_node.destroy_publisher(self._publisher)
+            self._publisher = None
 
 
 @dataclass(eq=False, repr=False)

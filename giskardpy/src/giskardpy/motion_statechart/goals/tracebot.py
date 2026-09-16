@@ -1,134 +1,216 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import Optional
 
 import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import Goal
-from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.graph_node import Goal, Task, NodeArtifacts
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal, ReachPoint
 from semantic_digital_twin.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 
 
-@dataclass
-class InsertCylinder(Goal):
-    cylinder_name: Body = field(kw_only=True)
-    hole_point: Point3 = field(kw_only=True)
-    cylinder_height: Optional[float] = None
-    up: Optional[Vector3] = None
-    pre_grasp_height: float = 0.1
-    tilt: float = np.pi / 10
-    get_straight_after: float = 0.02
+@dataclass(eq=False, repr=False)
+class StayOnLineTask(Task):
+    """
+    Keeps the tool point on the line between two points.
+    """
 
-    def __post_init__(self):
-        self.root = context.world.root
-        self.tip = self.cylinder_name
-        if self.cylinder_height is None:
-            self.cylinder_height = context.world.links[self.tip].collisions[0].height
-        else:
-            self.cylinder_height = self.cylinder_height
-        self.root_P_hole = context.world.transform(
-            target_frame=self.root, spatial_object=self.hole_point
+    tip_P_tool: Point3 = field(kw_only=True)
+    """
+    Controlled point, expressed in the tip frame.
+    """
+
+    root_link: KinematicStructureEntity = field(kw_only=True)
+    """
+    Root link of the kinematic chain.
+    """
+
+    tip_link: KinematicStructureEntity = field(kw_only=True)
+    """
+    Body that is controlled.
+    """
+
+    root_P_start: Point3 = field(kw_only=True)
+    """
+    Start of the line segment, expressed in the root frame.
+    """
+
+    root_P_end: Point3 = field(kw_only=True)
+    """
+    End of the line segment, expressed in the root frame.
+    """
+
+    reference_velocity: float = field(default=0.1, kw_only=True)
+    """
+    Normalization velocity of the constraint in m/s.
+    """
+
+    threshold: float = field(default=0.01, kw_only=True)
+    """
+    Distance in m at or below which the tool counts as on the line.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        root_T_tip = context.world.compose_forward_kinematics_expression(
+            self.root_link, self.tip_link
         )
-        if self.up is None:
-            self.up = Vector3.Z()
-            self.up.reference_frame = self.root
-        self.root_V_up = context.world.transform(
-            target_frame=self.root, spatial_object=self.up
+        root_P_tool = root_T_tip @ self.tip_P_tool
+        distance_to_line, root_P_on_line = root_P_tool.distance_to_line_segment(
+            self.root_P_start, self.root_P_end
         )
 
-        self.weight = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
-
-        root_P_hole = self.root_P_hole
-        root_V_up = self.root_V_up
-        root_T_tip = context.world._forward_kinematic_manager.compose_expression(
-            self.root, self.tip
-        )
-        root_P_tip = root_T_tip.to_position()
-        tip_P_cylinder_bottom = Vector3.Z() * self.cylinder_height / 2
-        root_P_cylinder_bottom = root_T_tip @ tip_P_cylinder_bottom
-        root_P_tip = root_P_tip + root_P_cylinder_bottom
-        root_V_cylinder_z = root_T_tip @ -Vector3.Z()
-
-        # %% straight line goal
-        root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
-        distance_to_top = root_P_tip.euclidean_distance(root_P_top)
-
-        distance_to_line, root_P_on_line = root_P_tip.distance_to_line_segment(
-            root_P_hole, root_P_top
-        )
-        distance_to_hole = (root_P_hole - root_P_tip).norm()
-
-        reach_top = Task(name="Reach Top")
-        self.add_task(reach_top)
-        reach_top.add_point_goal_constraints(
-            frame_P_current=root_P_tip,
-            frame_P_goal=root_P_top,
-            reference_velocity=0.1,
-            weight=self.weight,
-        )
-        reach_top.observation_expression = distance_to_top < 0.01
-
-        # %% tilted orientation goal
-        tilt_error = root_V_cylinder_z.angle_between(root_V_up)
-        tilt_task = Task(name="Slightly Tilted")
-        self.add_task(tilt_task)
-        tilt_task.add_position_constraint(
-            expr_current=tilt_error,
-            expr_goal=self.tilt,
-            reference_velocity=0.1,
-            weight=self.weight,
-        )
-        root_V_cylinder_z.visualisation_frame = self.tip
-        tilt_task.observation_expression = sm.abs(tilt_error - self.tilt) <= 0.01
-
-        init_done = f"{reach_top} and {tilt_task}"
-
-        reach_top.end_condition = init_done
-
-        # %% move down
-        stay_on_line = Task(name="Stay on Straight Line")
-        self.add_task(stay_on_line)
-        stay_on_line.add_point_goal_constraints(
-            frame_P_current=root_P_tip,
+        artifacts = NodeArtifacts()
+        artifacts.geometry.add_point_goal_constraints(
+            frame_P_current=root_P_tool,
             frame_P_goal=root_P_on_line,
-            reference_velocity=0.1,
-            weight=self.weight,
-            name="pregrasp",
+            reference_velocity=self.reference_velocity,
+            quadratic_weight=self.weight,
         )
-        stay_on_line.observation_expression = distance_to_line < 0.01
+        artifacts.observation = distance_to_line < self.threshold
+        return artifacts
 
-        insert_task = Task(name="Insert")
-        self.add_task(insert_task)
-        insert_task.add_point_goal_constraints(
-            frame_P_current=root_P_tip,
-            frame_P_goal=root_P_hole,
-            reference_velocity=0.1,
+
+@dataclass(eq=False, repr=False)
+class InsertCylinder(Goal):
+    """
+    Inserts a grasped cylinder into a hole.
+
+    1. Reach a pre-insertion point above the hole while slightly tilted.
+    2. Move the cylinder down the line into the hole, staying on the line.
+    3. Straighten the cylinder so it is aligned with the hole axis.
+    """
+
+    tip_link: KinematicStructureEntity = field(kw_only=True)
+    """
+    Controlled tip of the kinematic chain; the grasped body to insert.
+    """
+
+    tip_P_tool: Point3 = field(kw_only=True)
+    """
+    Leading insertion point, e.g. the object's tip.
+    """
+
+    hole_point: Point3 = field(kw_only=True)
+    """
+    Position of the hole to insert into.
+    """
+
+    tip_V_axis: Vector3 = field(kw_only=True)
+    """
+    Insertion axis of the object, in the tip frame.
+    """
+
+    up_axis: Vector3 = field(kw_only=True)
+    """
+    Axis pointing out of the hole.
+    """
+
+    pre_grasp_height: float = 0.2
+    """
+    Distance above the hole along the up axis at which the insertion starts.
+    """
+
+    tilt: float = np.pi / 10
+    """
+    Angle in rad by which the cylinder is tilted during the approach.
+    """
+
+    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+    """
+    Task priority relative to other tasks.
+    """
+
+    reach_top: ReachPoint = field(init=False)
+    tilt_task: AngleGoal = field(init=False)
+    stay_on_line: StayOnLineTask = field(init=False)
+    insert_task: ReachPoint = field(init=False)
+    tilt_straight_task: AlignPlanes = field(init=False)
+
+    def expand(self, context: MotionStatechartContext) -> None:
+        root = context.world.root
+
+        root_V_up = context.world.transform(self.up_axis, root)
+        root_P_hole = context.world.transform(self.hole_point, root)
+        root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
+
+        self.reach_top = ReachPoint(
+            name="Reach Top",
+            root_link=root,
+            tip_link=self.tip_link,
+            tip_point=self.tip_P_tool,
+            reference_point=root_P_top,
+            maximum_velocity=0.1,
             weight=self.weight,
-            name="insertion",
         )
-        insert_task.start_condition = init_done
-        insert_task.observation_expression = distance_to_hole < 0.01
-
-        bottom_reached = f"{insert_task} and {stay_on_line}"
-
-        tilt_task.end_condition = bottom_reached
-        # %% tilt straight
-        # tilt_monitor.observation_expression = cas.less(tilt_error, 0.01)
-
-        tilt_straight_task = Task(name="Tilt Straight")
-        self.add_task(tilt_straight_task)
-        tilt_straight_task.add_vector_goal_constraints(
-            frame_V_current=root_V_cylinder_z,
-            frame_V_goal=root_V_up,
-            reference_velocity=0.1,
+        self.tilt_task = AngleGoal(
+            name="Slightly Tilted",
+            root_link=root,
+            tip_link=self.tip_link,
+            tip_vector=self.tip_V_axis,
+            reference_vector=root_V_up,
+            lower_angle=self.tilt,
+            upper_angle=self.tilt,
+            threshold=0.01,
             weight=self.weight,
         )
-        tilt_straight_task.start_condition = bottom_reached
-        # tilt_straight_task.end_condition = tilt_monitor.observation_state
-        tilt_straight_task.observation_expression = tilt_error <= 0.01
+        self.stay_on_line = StayOnLineTask(
+            name="Stay on Straight Line",
+            root_link=root,
+            tip_link=self.tip_link,
+            tip_P_tool=self.tip_P_tool,
+            root_P_start=root_P_hole,
+            root_P_end=root_P_top,
+            weight=self.weight,
+        )
+        self.insert_task = ReachPoint(
+            name="Insert",
+            root_link=root,
+            tip_link=self.tip_link,
+            tip_point=self.tip_P_tool,
+            reference_point=root_P_hole,
+            maximum_velocity=0.05,
+            weight=self.weight,
+        )
+        self.tilt_straight_task = AlignPlanes(
+            name="Tilt Straight",
+            root_link=root,
+            tip_link=self.tip_link,
+            tip_normal=self.tip_V_axis,
+            goal_normal=root_V_up,
+            reference_velocity=0.025,
+            weight=self.weight,
+        )
 
-        self.observation_expression = tilt_straight_task.observation_expression
+        self.add_nodes(
+            [
+                self.reach_top,
+                self.tilt_task,
+                self.stay_on_line,
+                self.insert_task,
+                self.tilt_straight_task,
+            ]
+        )
+
+        init_done = sm.trinary_logic_and(
+            self.reach_top.observation_variable,
+            self.tilt_task.observation_variable,
+        )
+        bottom_reached = sm.trinary_logic_and(
+            self.insert_task.observation_variable,
+            self.stay_on_line.observation_variable,
+        )
+
+        self.reach_top.end_condition = init_done
+        self.tilt_task.end_condition = bottom_reached
+        self.insert_task.start_condition = init_done
+        self.tilt_straight_task.start_condition = bottom_reached
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        return NodeArtifacts(observation=self.tilt_straight_task.observation_variable)
