@@ -10,6 +10,7 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from typing_extensions import List, Tuple, Type
 
 from segmind.datastructures.events import (
+    ContactEvent,
     DetectionEvent,
     GraspEvent,
     LossOfGraspEvent,
@@ -17,6 +18,7 @@ from segmind.datastructures.events import (
     PlacingEvent,
     SupportEvent,
 )
+from segmind.detectors.atomic_event_detectors_nodes import ContactDetector
 from segmind.detectors.base import AbstractDetector, SegmindContext
 from segmind.detectors.coarse_event_detector_nodes import (
     PickUpDetector,
@@ -46,6 +48,16 @@ BOX_SIZE = 0.05
 The edge length of the box a gripper holds in these tests.
 """
 
+BESIDE_THE_THUMB = 0.03
+"""
+How far past the thumb a test stands a box, so that it lies against the outside of that
+side of the hand rather than between the fingers.
+
+The fingertips are 30 mm apart and a box needs some size to be collided with at all, so
+a box that touches one side alone has to stand outside the hand, which is where one
+brushes a gripper reaching past it.
+"""
+
 CARRIED_AWAY = 5.0
 """
 How far a test moves the box to take it out of every gripper's reach.
@@ -64,13 +76,17 @@ def _left_gripper(world: World) -> EndEffector:
     return gripper
 
 
-def _box_at(world: World, position: Tuple[float, float, float]) -> Body:
+def _box_at(
+    world: World, position: Tuple[float, float, float], size: float = BOX_SIZE
+) -> Body:
     """
     Add a box free to move to ``world``, standing at ``position``.
+
+    :param size: The box's edge length.
     """
     box = Body(
         name=PrefixedName("held_box"),
-        collision=ShapeCollection([Box(scale=Scale(BOX_SIZE, BOX_SIZE, BOX_SIZE))]),
+        collision=ShapeCollection([Box(scale=Scale(size, size, size))]),
     )
     with world.modify_world():
         world.add_connection(
@@ -108,15 +124,23 @@ def _executor_for(
 
 
 def _events_of(
-    executor: EpisodeSegmenterExecutor, event_type: Type[DetectionEvent], body: Body
+    executor: EpisodeSegmenterExecutor,
+    event_type: Type[DetectionEvent],
+    body: Body,
+    with_object: bool = False,
 ) -> List[DetectionEvent]:
-    return [
+    """
+    :param with_object: Whether to answer with what each event happened with, rather
+        than the events themselves.
+    """
+    events = [
         event
         for event in executor.context.require_extension(
             SegmindContext
         ).logger.get_events()
         if type(event) is event_type and event.tracked_object is body
     ]
+    return [event.with_object for event in events] if with_object else events
 
 
 # %% taking hold of something
@@ -135,6 +159,36 @@ def test_a_body_a_gripper_has_hold_of_is_grasped(pr2_world_copy):
 
     [grasp] = _events_of(executor, GraspEvent, box)
     assert grasp.with_object is gripper.tool_frame
+
+
+def test_a_body_only_one_side_of_a_hand_touches_is_not_grasped(pr2_world_copy):
+    """
+    A hand holds what is between its fingers. Brushing something with one of them, as a
+    gripper does on its way past whatever stands near what it is reaching for, is not
+    taking hold of it.
+    """
+    gripper = _left_gripper(pr2_world_copy)
+    thumb_x, thumb_y, thumb_z = gripper.thumb.tip.numeric_global_pose.position
+    _, finger_y, _ = gripper.finger.tip.numeric_global_pose.position
+    past_the_thumb = thumb_y + BESIDE_THE_THUMB * (1 if thumb_y > finger_y else -1)
+    box = _box_at(pr2_world_copy, (thumb_x, past_the_thumb, thumb_z))
+
+    executor = _executor_for(
+        pr2_world_copy,
+        [
+            GraspDetector(tracked_object=box),
+            # asked to read the robot too, so that the touch can be seen at all
+            ContactDetector(tracked_object=box, exclude_robot=False),
+        ],
+    )
+    executor.tick()
+
+    # it really is against the hand, and still not held by it
+    assert any(
+        body in gripper.thumb.bodies
+        for body in _events_of(executor, ContactEvent, box, with_object=True)
+    )
+    assert _events_of(executor, GraspEvent, box) == []
 
 
 def test_a_body_the_gripper_no_longer_holds_is_let_go_of(pr2_world_copy):

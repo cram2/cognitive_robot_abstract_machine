@@ -17,6 +17,7 @@ from segmind.datastructures.events import (
 )
 from segmind.detectors.base import AbstractDetector, IndexedBodyPairs, SegmindContext
 from semantic_digital_twin.reasoning.predicates import contact
+from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -27,6 +28,36 @@ class AbstractGraspDetector(AbstractDetector, ABC):
     Shared reading of which tool frames have hold of which bodies.
     """
 
+    @staticmethod
+    def has_hold_of(end_effector: EndEffector, tracked_object: Body) -> bool:
+        """
+        Whether ``end_effector`` holds ``tracked_object``.
+
+        A hand holds what lies between its fingers, so each of them has to touch it.
+        Brushing one of them, as a gripper does passing whatever stands beside what it
+        reaches for, is not taking hold of anything. A hand that is not made of two
+        fingers is read as one part, since nothing here knows what holding means for it.
+
+        :param end_effector: The hand asked about.
+        :param tracked_object: The body it may hold.
+        :return: True when every side of the hand touches the body.
+        """
+        sides = (
+            [end_effector.thumb.bodies, end_effector.finger.bodies]
+            if isinstance(end_effector, HasTwoFingers)
+            else [end_effector.bodies]
+        )
+        return all(
+            any(
+                contact(tracked_object, body)
+                for body in side
+                if body is not tracked_object
+                and body.collision
+                and body.collision.shapes
+            )
+            for side in sides
+        )
+
     def tool_frames_holding(
         self, context: MotionStatechartContext, tracked_objects: List[Body]
     ) -> IndexedBodyPairs:
@@ -34,7 +65,7 @@ class AbstractGraspDetector(AbstractDetector, ABC):
         Which tool frames have hold of each body.
 
         A tool frame is a place rather than a thing and has no geometry to touch, so
-        what is asked is whether the hand around it touches the body.
+        what is asked is whether the hand around it holds the body.
 
         :param context: The current motion statechart context.
         :param tracked_objects: The bodies to check.
@@ -42,17 +73,8 @@ class AbstractGraspDetector(AbstractDetector, ABC):
         """
         holding: IndexedBodyPairs = {}
         for end_effector in context.world.get_semantic_annotations_by_type(EndEffector):
-            hand = [
-                body
-                for body in end_effector.bodies
-                if body.collision and body.collision.shapes
-            ]
             for tracked_object in tracked_objects:
-                if any(
-                    contact(tracked_object, body)
-                    for body in hand
-                    if body is not tracked_object
-                ):
+                if self.has_hold_of(end_effector, tracked_object):
                     holding.setdefault(tracked_object, set()).add(
                         end_effector.tool_frame
                     )
