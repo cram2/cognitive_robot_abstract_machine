@@ -85,7 +85,7 @@ def contact(
     :return: True if the two objects are in contact False else
     """
     tcd = body1._world.collision_manager.collision_detector
-    result = tcd.check_collision_between_bodies(body1, body2)
+    result = tcd.check_collision_between_bodies(body1, body2, distance=threshold)
 
     if result is None:
         return False
@@ -251,37 +251,47 @@ def compute_euclidean_planar_distance(
     return body1_position.euclidean_distance(body2_position)
 
 
+RESTING_CONTACT_TOLERANCE = 0.005
+"""
+How far above a surface a body may stand and still rest on it.
+
+A body is set down by a motion that stops where it can rather than exactly on the
+surface, so a support read from overlapping volume alone would hold for almost no
+placement at all. Measured on a robot stacking boxes, a placement missed the surface
+it was aimed at by 1.9 mm; this leaves room for that while staying far below the
+centimetres by which a body that is genuinely in the air clears a surface.
+"""
+
+
 @symbolic_function
 def is_supported_by(
-    supported_body: Body, supporting_body: Body, max_intersection_height: float = 0.1
+    supported_body: Body,
+    supporting_body: Body,
+    max_intersection_height: float = 0.1,
+    contact_tolerance: float = RESTING_CONTACT_TOLERANCE,
 ) -> bool:
     """
     Checks if one object is supporting another object.
+
+    An object rests on what touches it from underneath, which is read off where the two
+    meet rather than from where their middles lie: a container carries its own middle
+    above what stands on its floor, and a wall's bounding box reaches far past the wall.
 
     :param supported_body: Object that is supported
     :param supporting_body: Object that potentially supports the first object
     :param max_intersection_height: Maximum height of the intersection between the two
         objects. If the intersection is higher than this value, the check returns False
         due to unhandled clipping.
+    :param contact_tolerance: How far apart the two objects may be and still count as
+        touching, and so how far above the supporting object the supported object may
+        stand and still rest on it.
     :return: True if the second object is supported by the first object, False otherwise
     """
-    is_below = (
-        ViewDependentSpatialRelation.signed_distance_along_axis(
-            supported_body.numeric_global_transform.to_np(),
-            ViewAxis.VERTICAL,
-            supported_body.numeric_center_of_mass.to_np(),
-            supporting_body.numeric_center_of_mass.to_np(),
-            VIEW_DIRECTION_EPS,
-        )
-        < 0.0
-    )
-    if is_below:
-        return False
     supported_body_origin = NumericTransform.identity(supported_body)
     boxes_of_supported_body = (
         supported_body.collision.as_bounding_box_collection_at_origin(
             supported_body_origin
-        )
+        ).extend_downwards(contact_tolerance)
     )
     boxes_of_supporting_body = (
         supporting_body.collision.as_bounding_box_collection_at_origin(
@@ -298,7 +308,29 @@ def is_supported_by(
 
     z_intersection: Interval = intersection[SpatialVariables.z.value]
     size = sum([si.upper - si.lower for si in z_intersection.simple_sets])
-    return size < max_intersection_height
+    if size >= max_intersection_height:
+        return False
+
+    collision_detector = supported_body._world.collision_manager.collision_detector
+    touch = collision_detector.check_collision_between_bodies(
+        supported_body, supporting_body, distance=contact_tolerance
+    )
+    # How far apart the two are is read from the answer rather than left to the range
+    # asked for: a detector may report the closest pair it found whatever range it was
+    # given, and which detector answers is not this predicate's to know.
+    if touch is None or touch.distance >= contact_tolerance:
+        return False
+
+    return (
+        ViewDependentSpatialRelation.signed_distance_along_axis(
+            supported_body.numeric_global_transform.to_np(),
+            ViewAxis.VERTICAL,
+            touch.root_P_point_on_body_b,
+            supported_body.numeric_center_of_mass.to_np(),
+            VIEW_DIRECTION_EPS,
+        )
+        < 0.0
+    )
 
 
 @symbolic_function

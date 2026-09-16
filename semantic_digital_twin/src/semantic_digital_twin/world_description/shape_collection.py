@@ -439,6 +439,21 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
             self.reference_frame,
         )
 
+    def extend_downwards(self, amount: float) -> BoundingBoxCollection:
+        """
+        Reach further down from the lower face of every box in this collection.
+
+        Volumetric collections only, as :meth:`as_shapes` is: a floor-plan box has no
+        vertical face to reach down from.
+
+        :param amount: How far further down each box reaches, along the origin's -z.
+        :return: The extended collection.
+        """
+        return BoundingBoxCollection(
+            [box.extend_downwards(amount) for box in self.bounding_boxes],
+            self.reference_frame,
+        )
+
     def bounding_box(self) -> BoxT:
         """
         :return: The box that contains every bounding box in this collection.

@@ -217,3 +217,21 @@ def test_a_body_without_geometry_encloses_no_point() -> None:
     lower, _ = _stacked_bodies()
 
     assert lower.numeric_global_bounds.contains(np.zeros((1, 3))).tolist() == [False]
+
+
+def test_a_body_enclosing_no_volume_centers_its_mass_in_its_bounds() -> None:
+    """
+    A flat shape encloses no mass to center, so its center is where its geometry is.
+    """
+    _, upper = _stacked_bodies()
+    upper.collision = ShapeCollection(
+        [Box(scale=Scale(2.0, 4.0, 0.0), origin=HomogeneousTransformationMatrix())],
+        reference_frame=upper,
+    )
+
+    center = upper.numeric_center_of_mass
+
+    bounds = upper.numeric_global_bounds
+    assert (center.x, center.y, center.z) == pytest.approx(
+        tuple((bounds.lower + bounds.upper) / 2)
+    )

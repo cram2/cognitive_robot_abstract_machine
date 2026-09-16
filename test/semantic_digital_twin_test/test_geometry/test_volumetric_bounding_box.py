@@ -252,3 +252,29 @@ def test_carrying_a_box_into_another_frame_calls_no_casadi():
         transformed.max_z,
     ) == pytest.approx((0.0, -0.5, 0.0, 2.0, 0.5, 1.0))
     assert casadi_calls.calls_by_caller == Counter()
+
+
+# %% reaching below a box
+
+
+def test_extending_a_box_downwards_moves_only_its_lower_face(
+    pr2_apartment_state_reset,
+):
+    box = VolumetricBoundingBox(
+        -1,
+        -1,
+        -1,
+        1,
+        1,
+        1,
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            reference_frame=pr2_apartment_state_reset.root
+        ),
+    )
+
+    extended = box.extend_downwards(0.25)
+
+    assert extended.min_z == -1.25
+    assert (extended.min_x, extended.max_x) == (box.min_x, box.max_x)
+    assert (extended.min_y, extended.max_y) == (box.min_y, box.max_y)
+    assert extended.max_z == box.max_z

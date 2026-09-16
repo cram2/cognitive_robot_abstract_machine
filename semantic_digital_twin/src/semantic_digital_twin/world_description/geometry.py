@@ -1705,6 +1705,24 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
             self.origin,
         )
 
+    def extend_downwards(self, amount: float) -> VolumetricBoundingBox:
+        """
+        Reach further down from this box's lower face, leaving every other face where
+        it is.
+
+        :param amount: How far further down the box reaches, along its origin's -z.
+        :return: The extended box.
+        """
+        return self.__class__(
+            self.min_x,
+            self.min_y,
+            self.min_z - amount,
+            self.max_x,
+            self.max_y,
+            self.max_z,
+            self.origin,
+        )
+
     def contains(self, point: Point3) -> bool:
         """
         Check if the bounding box contains a point.

@@ -468,11 +468,17 @@ class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
         Computes the center of mass of this KinematicStructureEntity in the world frame,
         as plain numbers.
 
-        Unlike :attr:`center_of_mass`, this builds no symbolic expression.
+        Unlike :attr:`center_of_mass`, this builds no symbolic expression. A mesh that
+        encloses no volume has no mass to center, so it is centered in the middle of its
+        bounds.
 
         :return: NumericPoint3 holding the center of mass.
         """
-        body_P_center = np.append(self.combined_mesh.center_mass, 1.0)
+        mesh = self.combined_mesh
+        center_of_mass = mesh.center_mass
+        if not np.all(np.isfinite(center_of_mass)):
+            center_of_mass = mesh.bounds.mean(axis=0)
+        body_P_center = np.append(center_of_mass, 1.0)
         return NumericPoint3.from_coordinates(
             self.numeric_global_transform.to_np() @ body_P_center,
             reference_frame=self._world.root,
