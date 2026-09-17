@@ -48,7 +48,8 @@ from semantic_digital_twin.exceptions import (
     AlreadyBelongsToAWorldError,
     ReferenceFrameMismatchError,
 )
-from semantic_digital_twin.mixin import HasSimulatorProperties
+from semantic_digital_twin.mixin import HasSimulatorProperties, UniqueSimulatorProperty
+from semantic_digital_twin.world_description.connection_properties import ServoGains
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -504,6 +505,21 @@ class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
             singular_value_ratio_tolerance=singular_value_ratio_tolerance,
         )
         return cls.from_shape_collection(name, ShapeCollection([area_mesh]))
+
+
+@dataclass
+class GravityCompensation(UniqueSimulatorProperty):
+    """
+    How much of a body's weight a physical simulation carries for it: a link a servo
+    drives is carried by that servo in reality, so a simulation compensates its gravity
+    rather than making the servo spend torque holding it up.
+    """
+
+    fraction: float = 1.0
+    """
+    The fraction of the body's weight the simulation carries; ``1`` cancels gravity
+    exactly.
+    """
 
 
 @dataclass(eq=False)
@@ -1327,3 +1343,18 @@ class Actuator(WorldEntityWithSimulatorProperties):
         :param dof: The degree of freedom to add.
         """
         self._dofs.append(dof)
+
+
+@dataclass(eq=False)
+class PositionServo(Actuator):
+    """
+    An actuator that drives its degree of freedom towards a commanded position with a
+    PD law: the position the world holds for the degree of freedom is the servo's set
+    point, which the degree of freedom then reaches through the physics rather than
+    being teleported there.
+    """
+
+    gains: ServoGains = field(kw_only=True)
+    """
+    How hard the servo pulls the degree of freedom towards the set point.
+    """

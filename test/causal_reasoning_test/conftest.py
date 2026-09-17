@@ -2,9 +2,9 @@
 Fixtures for :mod:`test.causal_reasoning_test`.
 
 Builds this test package's own, self-contained ``ormatic_interface.py`` -- mapping
-only :mod:`experiments.causal_reasoning.mutagenesis.domain`'s dataclasses -- instead
-of hooking into the workspace-wide ORM build ``test/experiments_test/conftest.py``
-uses. That build chains through ``semantic_digital_twin``, ``giskardpy``, ``segmind``
+only the dataclasses of :mod:`experiments.causal_reasoning.mutagenesis.domain` and
+:mod:`experiments.causal_reasoning.tracy_clutter_picking.domain` -- instead of hooking into the
+workspace-wide ORM build ``test/experiments_test/conftest.py`` uses. That build chains through ``semantic_digital_twin``, ``giskardpy``, ``segmind``
 and ``coraplex`` before reaching ``experiments``, none of which this package's
 dataclasses need.
 """
@@ -21,6 +21,9 @@ from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.utils import classes_of_module
 
 from experiments.causal_reasoning.mutagenesis import domain as mutagenesis_domain
+from experiments.causal_reasoning.tracy_clutter_picking import (
+    domain as tracy_clutter_picking_domain,
+)
 
 
 def generate_sqlalchemy_interface() -> None:
@@ -33,7 +36,10 @@ def generate_sqlalchemy_interface() -> None:
     writing.
     """
     all_classes = {
-        clazz for clazz in classes_of_module(mutagenesis_domain) if is_dataclass(clazz)
+        clazz
+        for module in (mutagenesis_domain, tracy_clutter_picking_domain)
+        for clazz in classes_of_module(module)
+        if is_dataclass(clazz)
     }
     class_diagram = ClassDiagram(
         list(sorted(all_classes, key=lambda clazz: clazz.__name__, reverse=True))

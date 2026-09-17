@@ -34,6 +34,7 @@ TGenericCamera = TypeVar("TGenericCamera")
 TGenericEndEffector = TypeVar("TGenericEndEffector")
 TGenericArm = TypeVar("TGenericArm")
 TGenericMobileBase = TypeVar("TGenericMobileBase")
+TGenericMountingTable = TypeVar("TGenericMountingTable")
 TGenericTorso = TypeVar("TGenericTorso")
 TGenericNeck = TypeVar("TGenericNeck")
 TGenericLeftArm = TypeVar("TGenericLeftArm")
@@ -268,6 +269,23 @@ class HasMobileBase(
 
     def validate(self):
         assert self.mobile_base is not None, "Expected mobile base, got None"
+
+
+@dataclass(eq=False)
+class HasMountingTable(
+    Generic[TGenericMountingTable], SubClassSafeGeneric, RobotPartMixin, ABC
+):
+    """
+    Mixin class for stationary robots bolted onto a table.
+    """
+
+    table: TGenericMountingTable = field(default=None, kw_only=True)
+    """
+    The table the robot is mounted on.
+    """
+
+    def validate(self):
+        assert self.table is not None, "Expected table, got None"
 
 
 @dataclass(eq=False)

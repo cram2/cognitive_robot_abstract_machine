@@ -49,6 +49,17 @@ class SymbolicTestCase(unittest.TestCase):
         x_ = from_json(to_json(x))
         self.assertEqual(x, x_)
 
+    def test_make_value_of_a_multi_character_string(self):
+        """
+        A string is one symbol, not a sequence of its characters.
+        """
+        domain = {"cl", "c", "h"}
+        x = Symbolic(name="x", domain=Set.from_iterable(domain))
+        self.assertEqual(
+            x.make_value("cl"),
+            Set.from_simple_sets(SetElement.from_data("cl", domain)),
+        )
+
     def test_empty_domain(self):
         def make_variable():
             domain_cls = IntEnum("Domain", {"A": 1, "B": 2})

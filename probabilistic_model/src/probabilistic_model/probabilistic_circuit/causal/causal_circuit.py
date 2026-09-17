@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from anytree import NodeMixin, PreOrderIter, findall
 from scipy.special import logsumexp
-from random_events.interval import closed
+from random_events.interval import Interval, closed
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.sigma_algebra import AbstractCompositeSet, AbstractSimpleSet
 from random_events.variable import Variable
@@ -399,32 +399,59 @@ class CausalCircuit:
         child_marginals: List[Any],
     ) -> bool:
         """
-        Return True if at least one pair of child marginals is disjoint.
+        Return True if the child marginals are not all the same.
 
-        A SumUnit is treated as a split node for a query Variable only when at least one
-        pair of its children has disjoint support on that Variable. SumUnits whose
-        children all share the same marginal (e.g. a sibling SumUnit in a ProductUnit
-        that has no relationship to this variable) are not split nodes and must be
-        skipped to avoid false positives.
+        A SumUnit is treated as a split node for a query Variable as soon as its
+        children differ in their support on that Variable, whether or not any pair of
+        them is disjoint: children that overlap without coinciding, as a mixture of one
+        copy of a template per sampled value builds, leave no disjoint regions to
+        intervene on either. SumUnits whose children all share the same marginal (e.g.
+        a sibling SumUnit in a ProductUnit that has no relationship to this variable)
+        are not split nodes and must be skipped to avoid false positives.
 
         :param child_marginals: Marginal support events, one per SumUnit child.
-        :returns: True if any pair of marginals is disjoint.
+        :returns: True if any two marginals differ.
         """
-        return any(
-            child_marginals[i].intersection_with(child_marginals[j]).is_empty()
-            for i, j in itertools.combinations(range(len(child_marginals)), 2)
-        )
+        first, *others = child_marginals
+        return any(other != first for other in others)
 
     @staticmethod
-    def _overlapping_pair_exists(child_marginals: List[Any]) -> bool:
+    def _has_extent(event: Event, query_variable: Variable) -> bool:
         """
-        Return True if any pair of child marginals has non-empty intersection.
+        :param event: An event over ``query_variable`` alone.
+        :param query_variable: The variable the event restricts.
+        :return: Whether the event carries more than a boundary: a set of symbols that
+            is not empty, or an interval of positive length. Two continuous regions
+            that only touch at an endpoint, as neighbouring leaves of a fitted tree
+            do, share no extent.
+        """
+        for simple_event in event.simple_sets:
+            value = simple_event[query_variable]
+            if isinstance(value, Interval):
+                if any(
+                    interval.lower < interval.upper for interval in value.simple_sets
+                ):
+                    return True
+            elif not value.is_empty():
+                return True
+        return False
+
+    @classmethod
+    def _overlapping_pair_exists(
+        cls, child_marginals: List[Any], query_variable: Variable
+    ) -> bool:
+        """
+        Return True if any pair of child marginals intersects in more than a boundary.
 
         :param child_marginals: Marginal support events, one per SumUnit child.
+        :param query_variable: The variable the marginals are restricted to.
         :returns: True if any pair overlaps.
         """
         return any(
-            not child_marginals[i].intersection_with(child_marginals[j]).is_empty()
+            cls._has_extent(
+                child_marginals[i].intersection_with(child_marginals[j]),
+                query_variable,
+            )
             for i, j in itertools.combinations(range(len(child_marginals)), 2)
         )
 
@@ -449,7 +476,7 @@ class CausalCircuit:
         """
         if not self._child_marginals_split_on_variable(child_marginals):
             return None
-        if self._overlapping_pair_exists(child_marginals):
+        if self._overlapping_pair_exists(child_marginals, query_variable):
             return OverlappingChildSupportsViolation(
                 sum_unit_index=node.index,
                 query_variable=query_variable,
@@ -773,9 +800,7 @@ class CausalCircuit:
         """
         effect_mixture = SumUnit(probabilistic_circuit=output_circuit)
         for adjustment_partition in adjustment_partitions:
-            # Fill both events to the same variable set before intersecting:
-            # intersection_with keeps only variables already on its left operand, so
-            # intersecting first would silently drop cause_region's own variable.
+            # fill first: intersection_with keeps only the left operand's variables.
             joint_event = adjustment_partition.event.fill_missing_variables_pure(
                 self.probabilistic_circuit.variables
             ).intersection_with(
@@ -796,6 +821,7 @@ class CausalCircuit:
             )
 
         if len(effect_mixture.log_weights) == 0:
+            output_circuit.remove_node(effect_mixture)
             return False
         effect_mixture.normalize()
 
@@ -807,12 +833,14 @@ class CausalCircuit:
             )
         )
         if cause_region_circuit is None:
+            # effect_mixture is already part of output_circuit; a skipped region
+            # must not leave it and its subtree behind as a second root.
+            output_circuit.remove_node_and_successor_structure(effect_mixture)
             return False
 
         product_unit = ProductUnit(probabilistic_circuit=output_circuit)
         product_unit.attach_marginal_circuit(cause_region_circuit, output_circuit)
-        # effect_mixture is already a node of output_circuit (built directly above,
-        # not copied in from an external circuit), so it attaches as a plain child
+        # effect_mixture already belongs to output_circuit, so attach it directly
         # rather than through attach_marginal_circuit.
         product_unit.add_subcircuit(effect_mixture)
         root_sum_unit.add_subcircuit(product_unit, math.log(cause_region.probability))

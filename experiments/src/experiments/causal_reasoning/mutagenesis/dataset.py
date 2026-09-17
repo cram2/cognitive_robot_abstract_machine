@@ -8,13 +8,13 @@ live-dataset tests.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
-from typing_extensions import List
+from typing_extensions import Callable, Dict, List, Self, Tuple, TypeVar
 
 from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisAtom,
@@ -26,6 +26,10 @@ from experiments.causal_reasoning.mutagenesis.domain import (
 from experiments.causal_reasoning.mutagenesis.exceptions import (
     MutagenesisDatasetUnavailableError,
 )
+
+T = TypeVar("T")
+
+# %% the CTU database
 
 
 @dataclass(frozen=True)
@@ -151,6 +155,9 @@ def fetch_mutagenesis_molecules(
     ]
 
 
+# %% a synthetic stand-in
+
+
 def synthetic_mutagenesis_molecules(
     random_state: np.random.Generator,
     molecule_count: int = 20,
@@ -206,3 +213,111 @@ def synthetic_mutagenesis_molecules(
             )
         )
     return molecules
+
+
+# %% a set of molecules
+
+
+@dataclass(frozen=True)
+class MutagenicRate:
+    """
+    How often a group of molecules is mutagenic.
+    """
+
+    molecule_count: int
+    """
+    How many molecules the group holds.
+    """
+
+    mutagenic_count: int
+    """
+    How many of them are mutagenic.
+    """
+
+    @property
+    def rate(self) -> float:
+        """
+        The mutagenic share.
+        """
+        return self.mutagenic_count / self.molecule_count
+
+
+@dataclass
+class MutagenesisDataset:
+    """
+    A set of molecules, as fetched and as read by the pipelines.
+    """
+
+    molecules: List[MutagenesisMolecule] = field(default_factory=list)
+    """
+    The molecules.
+    """
+
+    @property
+    def mutagenic_rate(self) -> float:
+        """
+        Share of molecules that are mutagenic.
+        """
+        return sum(molecule.mutagenic for molecule in self.molecules) / len(
+            self.molecules
+        )
+
+    def mutagenic_rate_by(
+        self, key: Callable[[MutagenesisMolecule], T]
+    ) -> Dict[T, MutagenicRate]:
+        """
+        The mutagenic share among the molecules sharing a value.
+
+        :param key: What to group the molecules by.
+        :return: Each value's mutagenic rate, by value.
+        """
+        by_value: Dict[T, List[MutagenesisMolecule]] = {}
+        for molecule in self.molecules:
+            by_value.setdefault(key(molecule), []).append(molecule)
+        return {
+            value: MutagenicRate(
+                molecule_count=len(molecules),
+                mutagenic_count=sum(molecule.mutagenic for molecule in molecules),
+            )
+            for value, molecules in sorted(by_value.items())
+        }
+
+    def with_shuffled_parts(self, random_state: np.random.Generator) -> Self:
+        """
+        The same molecules with their atoms and bonds in a random order each.
+
+        :param random_state: Source of randomness for the orders.
+        :return: The dataset with reordered parts.
+        """
+        return type(self)(
+            [
+                replace(
+                    molecule,
+                    atoms=[
+                        molecule.atoms[index]
+                        for index in random_state.permutation(len(molecule.atoms))
+                    ],
+                    bonds=[
+                        molecule.bonds[index]
+                        for index in random_state.permutation(len(molecule.bonds))
+                    ],
+                )
+                for molecule in self.molecules
+            ]
+        )
+
+    def split(
+        self, train_fraction: float, random_state: np.random.Generator
+    ) -> Tuple[Self, Self]:
+        """
+        Shuffle the molecules and split them in two.
+
+        :param train_fraction: Share of molecules that go into the first part.
+        :param random_state: Source of randomness for the shuffle.
+        :return: The first and second part.
+        """
+        order = random_state.permutation(len(self.molecules))
+        split_index = int(train_fraction * len(self.molecules))
+        first = [self.molecules[index] for index in order[:split_index]]
+        second = [self.molecules[index] for index in order[split_index:]]
+        return type(self)(first), type(self)(second)

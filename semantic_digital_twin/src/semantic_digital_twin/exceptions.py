@@ -1898,3 +1898,75 @@ class NoSupportingSurfaceError(UsageError):
             "attach a supporting surface region to the annotation, or give its root "
             "body geometry with an upward facing face."
         )
+
+
+@dataclass
+class DuplicateSimulatorPropertyError(UsageError):
+    """
+    Raised when an entity carries more than one simulator property of a type of which a
+    simulator reads exactly one.
+    """
+
+    property_type: Type
+    """
+    The type of property attached more than once.
+    """
+
+    count: int
+    """
+    How many properties of that type the entity carries.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Expected at most one {self.property_type.__name__} simulator property, "
+            f"found {self.count}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Modify the existing property in place instead of attaching a second one; "
+            "HasSimulatorProperties.get_simulator_property_of_type returns it."
+        )
+
+
+@dataclass
+class SimulationNotStartedError(UsageError):
+    """
+    Raised when a simulation is advanced before it was started.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation was advanced too early.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The simulation of the world rooted at {self.world_name} has to be started "
+            "before it can be advanced."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Call start() first, or drive the simulation inside a with block."
+
+
+@dataclass
+class SimulationAlreadyRunningError(UsageError):
+    """
+    Raised when a simulation is started while it is already running.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation was started twice.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The simulation of the world rooted at {self.world_name} is already "
+            "running."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Stop the simulation before starting it again."

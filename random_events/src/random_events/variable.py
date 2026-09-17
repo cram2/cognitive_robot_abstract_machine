@@ -145,7 +145,8 @@ class Symbolic(Variable):
         )
 
     def make_value(self, value) -> Set:
-        if not isinstance(value, Iterable):
+        # a string is one symbol, not the sequence of its characters
+        if not isinstance(value, Iterable) or isinstance(value, str):
             value = [value]
 
         parsed_value = []

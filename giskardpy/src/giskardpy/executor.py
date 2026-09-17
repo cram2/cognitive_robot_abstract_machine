@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import timedelta
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -21,6 +25,9 @@ from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,
 )
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.adapters.multi_sim import MujocoSim
 
 
 @dataclass
@@ -115,6 +122,28 @@ class SimulationPacer(ScheduledPacer):
     @property
     def cycle_duration(self) -> float:
         return 1 / (self.target_frequency * self.real_time_factor)
+
+
+@dataclass
+class SteppedSimulationPacer(Pacer):
+    """
+    Holds a loop by stepping a physically simulated world one cycle forward between two
+    ticks, so a controller ticking against the world runs in lockstep with its physics.
+
+    Every tick's command lands in the world state, the simulation's servos take it as
+    their set point, and the physics advances one cycle before the next tick reads the
+    world back.
+    """
+
+    simulation: MujocoSim
+    """
+    The simulation to step; it has to be started with
+    :meth:`~semantic_digital_twin.adapters.multi_sim.MujocoSim.start_stepped_simulation`
+    already.
+    """
+
+    def sleep(self) -> None:
+        self.simulation.step_simulation(timedelta(seconds=1 / self.target_frequency))
 
 
 @dataclass
