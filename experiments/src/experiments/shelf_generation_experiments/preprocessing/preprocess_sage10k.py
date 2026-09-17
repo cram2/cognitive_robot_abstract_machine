@@ -17,13 +17,13 @@ from sklearn.cluster import DBSCAN
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from experiments.scene_generation_experiments.utils import (
+from experiments.shelf_generation_experiments.utils import (
     ObjectType,
     build_source_id_to_path,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
-from experiments.scene_generation_experiments.shelf_schema import (
+from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentObject2D,
     RelationalCircuitExperimentShelf,
     RelationalCircuitExperimentShelfLayer,
@@ -405,7 +405,7 @@ class ShelfMembershipClassifier:
     kind of shelf, which would let every table and chair in the dataset in.
 
     A shelf's kind is no longer classified from its furniture name; see
-    :attr:`~experiments.scene_generation_experiments.shelf_schema.RelationalCircuitExperimentShelf.theme_dominant_type`,
+    :attr:`~experiments.shelf_generation_experiments.shelf_schema.RelationalCircuitExperimentShelf.theme_dominant_type`,
     which is derived from what is actually placed on the shelf instead.
     """
 

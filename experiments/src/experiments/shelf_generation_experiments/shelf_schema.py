@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, Optional, assert_never, Union
 
-from experiments.scene_generation_experiments.exceptions import PathError
-from experiments.scene_generation_experiments.utils import (
+from experiments.shelf_generation_experiments.exceptions import PathError
+from experiments.shelf_generation_experiments.utils import (
     MeshCandidate,
     ObjectType,
     _MeshTypeMatcher,

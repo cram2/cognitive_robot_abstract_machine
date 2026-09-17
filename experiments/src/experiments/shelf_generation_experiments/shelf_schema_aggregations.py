@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from experiments.scene_generation_experiments.shelf_schema import (
+from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentObject2D,
     RelationalCircuitExperimentShelf,
     RelationalCircuitExperimentShelfLayer,

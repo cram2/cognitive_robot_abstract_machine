@@ -24,7 +24,7 @@ from semantic_digital_twin.orm.ormatic_interface import (
     Sage10kRotationDAO,
     Sage10kSizeDAO,
 )
-from experiments.scene_generation_experiments.preprocessing.preprocess_sage10k import (
+from experiments.shelf_generation_experiments.preprocessing.preprocess_sage10k import (
     PreprocessedObject,
     MeshBounds,
     MeshMeasurements,
@@ -33,10 +33,10 @@ from experiments.scene_generation_experiments.preprocessing.preprocess_sage10k i
     ShelfContents,
     ShelfMembershipClassifier,
 )
-from experiments.scene_generation_experiments.utils import MeshCandidate, ObjectType
+from experiments.shelf_generation_experiments.utils import MeshCandidate, ObjectType
 from krrood.ormatic.utils import create_engine
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from experiments.scene_generation_experiments.shelf_schema import (
+from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentObject2D,
     RelationalCircuitExperimentShelf,
     RelationalCircuitExperimentShelfLayer,

@@ -26,7 +26,7 @@ def test_entry_point_writes_objects_across_its_own_worker_processes(
 
     A worker process re-imports whatever module the entry point itself ran as; a class
     the entry point module defines, such as
-    :class:`~experiments.scene_generation_experiments.preprocessing.preprocess_sage10k.PreprocessedObject`,
+    :class:`~experiments.shelf_generation_experiments.preprocessing.preprocess_sage10k.PreprocessedObject`,
     then exists under two different identities somewhere in the run -- its own and the
     one the generated DAO interface points at. Regression test for
     :func:`~krrood.ormatic.data_access_objects.helper.get_dao_class` resolving those
@@ -46,7 +46,7 @@ def test_entry_point_writes_objects_across_its_own_worker_processes(
             sys.executable,
             "-u",
             "-m",
-            "experiments.scene_generation_experiments.preprocessing.preprocess_sage10k",
+            "experiments.shelf_generation_experiments.preprocessing.preprocess_sage10k",
         ],
         env={
             **os.environ,

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from experiments.scene_generation_experiments.utils import ObjectType
-from experiments.scene_generation_experiments.shelf_schema import (
+from experiments.shelf_generation_experiments.utils import ObjectType
+from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentObject2D,
     RelationalCircuitExperimentShelf,
     RelationalCircuitExperimentShelfLayer,
 )
-from experiments.scene_generation_experiments.shelf_schema_aggregations import (
+from experiments.shelf_generation_experiments.shelf_schema_aggregations import (
     RelationalCircuitExperimentShelfAggregations,
     RelationalCircuitExperimentShelfLayerAggregations,
 )

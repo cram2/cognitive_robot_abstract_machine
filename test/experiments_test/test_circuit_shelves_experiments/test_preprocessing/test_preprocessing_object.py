@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from plyfile import PlyData
 
-from experiments.scene_generation_experiments.utils import ObjectType
-from experiments.scene_generation_experiments.shelf_schema import (
+from experiments.shelf_generation_experiments.utils import ObjectType
+from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentObject2D,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

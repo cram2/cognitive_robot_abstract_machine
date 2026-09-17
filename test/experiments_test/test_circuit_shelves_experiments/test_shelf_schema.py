@@ -9,12 +9,12 @@ import pytest
 from sqlalchemy.orm import Session
 
 from experiments.orm.ormatic_interface import Base, RelationalCircuitExperimentShelfDAO
-from experiments.scene_generation_experiments.shelf_schema import (
+from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentObject2D,
     RelationalCircuitExperimentShelf,
     RelationalCircuitExperimentShelfLayer,
 )
-from experiments.scene_generation_experiments.utils import MeshCandidate, ObjectType
+from experiments.shelf_generation_experiments.utils import MeshCandidate, ObjectType
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
