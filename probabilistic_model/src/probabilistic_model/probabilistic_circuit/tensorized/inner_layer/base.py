@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
+import rustworkx
 import tqdm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -110,6 +111,23 @@ class ForwardSampleAssignment:
         return self.rows_by_node[id(layer)]
 
 
+@dataclass
+class LayerWithDepth:
+    """
+    A layer of a circuit together with its distance from the root.
+    """
+
+    depth: int
+    """
+    The number of layers between the root layer and this layer.
+    """
+
+    layer: Layer
+    """
+    The layer at that depth.
+    """
+
+
 class Layer(
     Generic[RustworkxUnitType], SubClassSafeGeneric, SubclassJSONSerializer, ABC
 ):
@@ -133,6 +151,15 @@ class Layer(
 
     # %% structure
 
+    child_layers: List[Layer]
+    """
+    The layers below this one: a field on :class:`InnerLayer`, an empty list on the
+    input layers.
+
+    An annotation rather than a property, so that the generated ``__init__`` of
+    :class:`InnerLayer` can assign to it.
+    """
+
     @property
     @abstractmethod
     def variables(self) -> npt.NDArray:
@@ -149,22 +176,6 @@ class Layer(
         """
         raise NotImplementedError
 
-    def __getattr__(self, name: str) -> List[Layer]:
-        """
-        Fall back to no child layers for a layer that never declared any.
-
-        Attribute lookup reaches ``__getattr__`` only when nothing set the attribute
-        anywhere else. For ``child_layers`` that means an input layer: every inner layer
-        declares it as an ordinary field and sets it on construction.
-
-        :param name: The attribute that plain lookup could not find.
-        :return: An empty list, for ``child_layers`` only.
-        :raises AttributeError: For every other name.
-        """
-        if name == "child_layers":
-            return []
-        raise AttributeError(name)
-
     @property
     def number_of_components(self) -> int:
         """
@@ -180,11 +191,12 @@ class Layer(
         return sum(layer.number_of_own_parameters for layer in self.all_layers())
 
     @property
+    @abstractmethod
     def number_of_own_parameters(self) -> int:
         """
         :return: The number of parameters stored in this layer alone.
         """
-        return 0
+        raise NotImplementedError
 
     def validate(self):
         """
@@ -196,10 +208,14 @@ class Layer(
         for layer in self.all_layers():
             layer.validate_own()
 
+    @abstractmethod
     def validate_own(self):
         """
         Check the shapes of the parameters stored in this layer alone.
+
+        :raises ShapeMismatchError: If a shape is inconsistent.
         """
+        raise NotImplementedError
 
     def all_layers(self) -> List[Layer]:
         """
@@ -224,13 +240,14 @@ class Layer(
         for child_layer in self.child_layers:
             child_layer._visit_once(result, seen)
 
-    def all_layers_with_depth(self, depth: int = 0) -> List[Tuple[int, Layer]]:
+    def all_layers_with_depth(self, depth: int = 0) -> List[LayerWithDepth]:
         """
+        :param depth: The depth to report for this layer.
         :return: Every layer of the circuit rooted here with its depth. Layers that are
             reachable along several paths appear once per path, mirroring the jax
             implementation.
         """
-        result = [(depth, self)]
+        result = [LayerWithDepth(depth, self)]
         for child_layer in self.child_layers:
             result.extend(child_layer.all_layers_with_depth(depth + 1))
         return result
@@ -240,32 +257,28 @@ class Layer(
         Order the layers of the circuit rooted here such that every layer appears after
         all of its parents.
 
-        This is the order in which a top-down pass (such as sampling) has to visit the
-        layers so that a layer is only processed once every parent has contributed to
-        it.
+        This is the order in which a top-down pass (such as sampling or :meth:`prune`)
+        has to visit the layers so that a layer is only processed once every parent has
+        contributed to it. A breadth-first order does not give that guarantee: a layer
+        that several parents share is reached at the smallest of their distances from
+        the root, which can be before a parent further down has been visited.
 
         :return: The layers in topological order.
         """
         layers = self.all_layers()
-        index_of = {id(layer): index for index, layer in enumerate(layers)}
-
-        in_degree = [0] * len(layers)
-        for layer in layers:
-            for child_layer in layer.child_layers:
-                in_degree[index_of[id(child_layer)]] += 1
-
-        queue = [index for index, degree in enumerate(in_degree) if degree == 0]
-        result = []
-        while queue:
-            index = queue.pop()
-            result.append(layers[index])
-            for child_layer in layers[index].child_layers:
-                child_index = index_of[id(child_layer)]
-                in_degree[child_index] -= 1
-                if in_degree[child_index] == 0:
-                    queue.append(child_index)
-
-        return result
+        graph = rustworkx.PyDiGraph()
+        index_of = {
+            id(layer): index
+            for layer, index in zip(layers, graph.add_nodes_from(layers))
+        }
+        graph.add_edges_from_no_data(
+            [
+                (index_of[id(layer)], index_of[id(child_layer)])
+                for layer in layers
+                for child_layer in layer.child_layers
+            ]
+        )
+        return [graph[index] for index in rustworkx.topological_sort(graph)]
 
     # %% queries
 
@@ -456,8 +469,17 @@ class Layer(
 
     def alive_own(self, log_probabilities: Dict[int, npt.NDArray]) -> npt.NDArray:
         """
+        Read back which nodes of this layer a structural query left possible.
+
+        A structural pass such as :meth:`log_truncated_of_simple_event` keeps the node
+        count of every layer it rewrites, so that the edges of the parents stay valid,
+        and reports the nodes that became impossible with a log-probability of ``-inf``.
+        A node of this layer is therefore still possible if its recorded log-probability
+        is above ``-inf``. A layer that the pass recorded nothing for is one it did not
+        rewrite, so none of its nodes became impossible.
+
         :param log_probabilities: The per-layer log-probabilities of the structural pass
-            that created this layer.
+            that created this layer, keyed by the id of the layer.
         :return: A boolean mask of the nodes of this layer that are still possible.
         """
         own = log_probabilities.get(id(self))
@@ -581,33 +603,39 @@ class Layer(
 
     def is_decomposable(self) -> bool:
         """
+        Only a product layer can violate decomposability, so only those are asked.
+
         :return: Whether every product layer of the circuit rooted here is decomposable.
         """
-        return all(layer.is_decomposable_own() for layer in self.all_layers())
+        # imported here because product_layer imports this module
+        from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer import (
+            ProductLayer,
+        )
 
-    def is_decomposable_own(self) -> bool:
-        """
-        :return: Whether this layer alone is decomposable.
-        """
-        return True
+        return all(
+            layer.is_decomposable_own()
+            for layer in self.all_layers()
+            if isinstance(layer, ProductLayer)
+        )
 
     def is_deterministic(self, variables: SortedSet) -> bool:
         """
+        Only a sum layer can violate determinism, so only those are asked.
+
         :param variables: The variables of the circuit.
         :return: Whether every sum layer of the circuit rooted here is deterministic.
         """
-        cache: Dict = {}
-        return all(
-            layer.is_deterministic_own(variables, cache) for layer in self.all_layers()
+        # imported here because sum_layer imports this module
+        from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
+            SumLayer,
         )
 
-    def is_deterministic_own(self, variables: SortedSet, cache: Dict) -> bool:
-        """
-        :param variables: The variables of the circuit.
-        :param cache: The shared cache of the supports computed so far.
-        :return: Whether this layer alone is deterministic.
-        """
-        return True
+        cache: Dict = {}
+        return all(
+            layer.is_deterministic_own(variables, cache)
+            for layer in self.all_layers()
+            if isinstance(layer, SumLayer)
+        )
 
     def apply_translation(self, translation: npt.NDArray):
         """
@@ -693,6 +721,8 @@ class InnerLayer(Layer[RustworkxUnitType], ABC):
     child_layers: List[Layer]
     """
     The child layers of this layer.
+
+    The list is not copied.
     """
 
     _variables_cache: Optional[npt.NDArray] = field(
@@ -701,9 +731,6 @@ class InnerLayer(Layer[RustworkxUnitType], ABC):
     """
     Cached indices of the variables in the scope of this layer.
     """
-
-    def __post_init__(self):
-        self.child_layers = list(self.child_layers)
 
     def reset_variables(self):
         """

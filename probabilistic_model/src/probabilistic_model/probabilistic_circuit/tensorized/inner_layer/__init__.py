@@ -9,6 +9,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base impor
     InnerLayer,
     Layer,
     LayerConverter,
+    LayerWithDepth,
     RustworkxUnitType,
     memoized,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "InnerLayer",
     "Layer",
     "LayerConverter",
+    "LayerWithDepth",
     "ProductLayer",
     "RustworkxUnitType",
     "SparseSumLayer",

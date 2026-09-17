@@ -161,6 +161,13 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         self.variable = int(self.variable)
 
     @property
+    def child_layers(self) -> List[Layer]:
+        """
+        :return: An empty list. An input layer is a leaf of the layer graph.
+        """
+        return []
+
+    @property
     def variables(self) -> npt.NDArray:
         return np.array([self.variable], dtype=np.int64)
 

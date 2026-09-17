@@ -38,6 +38,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.helper import (
     uniform_measure_of_simple_event,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
+    LayerWithDepth,
     ProductLayer,
     SparseSumLayer,
 )
@@ -461,6 +462,60 @@ class VectorizedTruncationTestCase(unittest.TestCase):
             parameters_before,
         )
         np.testing.assert_array_equal(layered.log_likelihood(points), likelihood_before)
+
+
+class LayerGraphTraversalTestCase(unittest.TestCase):
+    """
+    Walking the layer graph of a circuit in which one layer has two parents that sit at
+    different distances from the root.
+    """
+
+    def setUp(self):
+        self.leaf_x = uniform_layer_of(0, [(0, 1)])
+        self.leaf_y = UniformLayer.from_distributions(
+            1, [UniformDistribution(variable=y, interval=closed(0, 1).simple_sets[0])]
+        )
+        self.product = product_of([x, y], [self.leaf_x, self.leaf_y])
+        self.wrapper = mixture_of([self.product], [np.log(1.0)])
+        # the product layer is both a child of the root and, through the wrapper, its
+        # grandchild, so it is reachable at two different depths
+        self.root = mixture_of([self.product, self.wrapper], np.log([0.5, 0.5]))
+
+    def test_an_input_layer_has_no_child_layers(self):
+        self.assertEqual([], self.leaf_x.child_layers)
+
+    def test_all_layers_reports_a_shared_layer_once(self):
+        layers = self.root.all_layers()
+        self.assertEqual(
+            {id(self.root), id(self.product), id(self.wrapper)}
+            | {id(self.leaf_x), id(self.leaf_y)},
+            {id(layer) for layer in layers},
+        )
+        self.assertEqual(len({id(layer) for layer in layers}), len(layers))
+
+    def test_all_layers_with_depth_pairs_every_layer_with_its_depth(self):
+        self.assertEqual(
+            LayerWithDepth(0, self.root), self.root.all_layers_with_depth()[0]
+        )
+
+    def test_all_layers_with_depth_reports_a_shared_layer_once_per_path(self):
+        self.assertEqual(
+            [1, 2],
+            sorted(
+                entry.depth
+                for entry in self.root.all_layers_with_depth()
+                if entry.layer is self.product
+            ),
+        )
+
+    def test_topological_order_visits_every_parent_before_the_layer(self):
+        order = self.root.topological_layer_order()
+        positions = {id(layer): index for index, layer in enumerate(order)}
+
+        self.assertEqual(len(self.root.all_layers()), len(order))
+        for layer in order:
+            for child_layer in layer.child_layers:
+                self.assertLess(positions[id(layer)], positions[id(child_layer)])
 
 
 class HelperTestCase(unittest.TestCase):

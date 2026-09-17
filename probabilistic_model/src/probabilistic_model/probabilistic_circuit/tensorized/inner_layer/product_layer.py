@@ -73,6 +73,11 @@ class ProductLayer(InnerLayer[ProductUnit]):
             )
         return self._variables_cache
 
+    @property
+    def number_of_own_parameters(self) -> int:
+        # the edges of a product layer are structure, not parameters
+        return 0
+
     def validate_own(self):
         if self.edges.shape != (len(self.child_layers), self.number_of_nodes):
             raise ShapeMismatchError(
