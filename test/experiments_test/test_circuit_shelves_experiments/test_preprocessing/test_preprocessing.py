@@ -1124,7 +1124,9 @@ def test_sharded_object_pass_writes_every_object_exactly_once(tmp_path: Path) ->
     Base.metadata.create_all(bind=processed_engine)
 
     run = Sage10kPreprocessingRun(
-        sage10k_database_uri=raw_uri, processed_database_uri=processed_uri
+        sage10k_database_uri=raw_uri,
+        processed_database_uri=processed_uri,
+        scenes_root=tmp_path,
     )
     results = run._process_objects_in_parallel(
         room_ids=["room_1", "room_2", "room_3"],
@@ -1192,7 +1194,9 @@ def test_sharded_object_pass_keeps_shelf_contents_regardless_of_shard(
     }
 
     run = Sage10kPreprocessingRun(
-        sage10k_database_uri=raw_uri, processed_database_uri=processed_uri
+        sage10k_database_uri=raw_uri,
+        processed_database_uri=processed_uri,
+        scenes_root=tmp_path,
     )
     results = run._process_objects_in_parallel(
         room_ids=["room_1", "room_2"],
@@ -1274,7 +1278,9 @@ def test_only_shelf_relevant_meshes_are_measured(tmp_path: Path) -> None:
     )
 
     run = Sage10kPreprocessingRun(
-        sage10k_database_uri=raw_uri, processed_database_uri=processed_uri
+        sage10k_database_uri=raw_uri,
+        processed_database_uri=processed_uri,
+        scenes_root=tmp_path,
     )
     run._process_objects_in_parallel(
         room_ids=["room_1", "room_2"],

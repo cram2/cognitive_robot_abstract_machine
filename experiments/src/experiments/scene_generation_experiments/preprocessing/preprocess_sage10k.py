@@ -1060,6 +1060,12 @@ class Sage10kPreprocessingRun:
     Connection string for the processed database this run writes to.
     """
 
+    scenes_root: Path
+    """
+    Root directory that contains individual scene folders, passed to
+    :func:`build_source_id_to_path` to locate shelf-relevant meshes.
+    """
+
     mesh_measurement_worker_cap: int = 128
     """
     Upper bound on parallel workers for mesh measurement, independent of the host's core
@@ -1181,7 +1187,7 @@ class Sage10kPreprocessingRun:
         # defeating the point of scoping measurement at all.
         relevant_source_id_to_path = {
             source_id: path
-            for source_id, path in build_source_id_to_path().items()
+            for source_id, path in build_source_id_to_path(self.scenes_root).items()
             if source_id in shelf_contents.relevant_source_ids
         }
         bounds_by_source_id, mesh_measurement_worker_count = self._measure_meshes(
@@ -1844,14 +1850,19 @@ class Sage10kPreprocessingRun:
 if __name__ == "__main__":
     sage10k_database_uri = os.environ.get("SAGE10k_DATABASE_URI")
     processed_database_uri = os.environ.get("SAGE10K_PROCESSED_DATABASE_URI")
+    scenes_root = os.environ.get("SAGE10K_SCENES_ROOT")
     assert (
         sage10k_database_uri is not None
     ), "Please set the SAGE10k_DATABASE_URI environment variable."
     assert (
         processed_database_uri is not None
     ), "Please set the SAGE10K_PROCESSED_DATABASE_URI environment variable."
+    assert (
+        scenes_root is not None
+    ), "Please set the SAGE10K_SCENES_ROOT environment variable."
 
     Sage10kPreprocessingRun(
         sage10k_database_uri=sage10k_database_uri,
         processed_database_uri=processed_database_uri,
+        scenes_root=Path(scenes_root),
     ).run()

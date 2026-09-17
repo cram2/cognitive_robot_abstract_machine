@@ -301,9 +301,7 @@ class _MeshTypeMatcher:
         )
 
 
-def build_source_id_to_path(
-    scenes_root: Path = Path.home() / "Documents" / "sage-10k-scenes",
-) -> dict[str, Path]:
+def build_source_id_to_path(scenes_root: Path) -> dict[str, Path]:
     """
     Scan *scenes_root* and return a mapping from source_id to its scene directory.
 

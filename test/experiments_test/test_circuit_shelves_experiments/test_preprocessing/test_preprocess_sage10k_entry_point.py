@@ -38,6 +38,8 @@ def test_entry_point_writes_objects_across_its_own_worker_processes(
     _populated_sqlite_engine(tmp_path, objects)
     raw_uri = f"sqlite:///{tmp_path}/raw.db"
     processed_uri = f"sqlite:///{tmp_path}/processed.db"
+    scenes_root = tmp_path / "scenes"
+    scenes_root.mkdir()
 
     result = subprocess.run(
         [
@@ -50,6 +52,7 @@ def test_entry_point_writes_objects_across_its_own_worker_processes(
             **os.environ,
             "SAGE10k_DATABASE_URI": raw_uri,
             "SAGE10K_PROCESSED_DATABASE_URI": processed_uri,
+            "SAGE10K_SCENES_ROOT": str(scenes_root),
         },
         capture_output=True,
         text=True,
