@@ -1,3 +1,5 @@
+import os
+from dataclasses import dataclass
 from os.path import dirname
 
 import pytest
@@ -173,3 +175,40 @@ def correct_drawer_rdr(drawer_case_queries, drawer_expert) -> GeneralRDR:
     for case_query in drawer_case_queries:
         assert is_matching(rdr.classify, case_query)
     return rdr
+
+
+# %% a model saved for the test that reads it
+
+
+@dataclass
+class SavedRDRModel:
+    """
+    A classifier written to disk, and what a test needs to read it back.
+    """
+
+    directory: str
+    """
+    The directory the model was written into.
+    """
+
+    name: str
+    """
+    The name the model was written under.
+    """
+
+    def load(self) -> GeneralRDR:
+        """
+        :return: The classifier read back from the written model.
+        """
+        return GeneralRDR.load(self.directory, model_name=self.name)
+
+
+@pytest.fixture
+def saved_drawer_cabinet_rdr(request, drawer_cabinet_rdr) -> SavedRDRModel:
+    """
+    Write the drawer and cabinet classifier to a directory named after the test asking
+    for it, so a test reading a saved model neither waits on another test having written
+    one nor writes the path a test running beside it is writing.
+    """
+    directory = os.path.join(dirname(__file__), "..", "test_results", request.node.name)
+    return SavedRDRModel(directory, drawer_cabinet_rdr.save(directory))
