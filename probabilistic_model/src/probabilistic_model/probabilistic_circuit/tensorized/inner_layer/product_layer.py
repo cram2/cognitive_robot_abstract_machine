@@ -16,7 +16,6 @@ from typing_extensions import (
     Iterator,
     List,
     Optional,
-    Self,
     Tuple,
 )
 
@@ -31,10 +30,13 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     Unit,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
+    Edge,
     ForwardSampleAssignment,
     InnerLayer,
     Layer,
     LayerConverter,
+    LayerQuery,
+    QueryCache,
     memoized,
 )
 
@@ -44,13 +46,19 @@ class ProductLayer(InnerLayer[ProductUnit]):
     """
     A layer of decomposable product units.
 
-    The edges are stored as a sparse integer matrix of shape (#child layers, #nodes).
+    Every node multiplies at most one node of each child layer, so the scope of a node
+    is the union of the scopes of its child layers and its likelihood is the sum of
+    their log-likelihoods.
+    """
+
+    edges: SparseArray
+    """
+    The edges as a sparse integer matrix of shape (#child layers, #nodes).
+
     The value of the entry ``(l, n)`` is the index of the node in the ``l``-th child
     layer that the ``n``-th node of this layer multiplies. A node of a child layer may
     be referenced by several nodes of this layer.
     """
-
-    edges: SparseArray
 
     @property
     def number_of_nodes(self) -> int:
@@ -142,9 +150,9 @@ class ProductLayer(InnerLayer[ProductUnit]):
             result[..., ~touched] = fill
         return result
 
-    @memoized("log_likelihood")
+    @memoized(LayerQuery.LOG_LIKELIHOOD)
     def log_likelihood_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         child_results = [
             child_layer.log_likelihood_of_nodes(x, cache=cache)
@@ -152,9 +160,9 @@ class ProductLayer(InnerLayer[ProductUnit]):
         ]
         return self._gather_and_add(child_results, fill=0.0)
 
-    @memoized("cumulative_distribution")
+    @memoized(LayerQuery.CUMULATIVE_DISTRIBUTION)
     def cumulative_distribution_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         child_results = [
             child_layer.cumulative_distribution_of_nodes(x, cache=cache)
@@ -176,12 +184,12 @@ class ProductLayer(InnerLayer[ProductUnit]):
                 np.multiply.at(result, (Ellipsis, nodes), gathered)
         return result
 
-    @memoized("probability_of_simple_event")
+    @memoized(LayerQuery.PROBABILITY_OF_SIMPLE_EVENT)
     def probability_of_simple_event_of_nodes(
         self,
         event: SimpleEvent,
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
     ) -> npt.NDArray:
         child_results = [
             child_layer.probability_of_simple_event_of_nodes(
@@ -191,9 +199,9 @@ class ProductLayer(InnerLayer[ProductUnit]):
         ]
         return self._gather_and_multiply(child_results).reshape(-1)
 
-    @memoized("support")
+    @memoized(LayerQuery.SUPPORT)
     def support_of_nodes(
-        self, variables: SortedSet, cache: Optional[Dict] = None
+        self, variables: SortedSet, cache: Optional[QueryCache] = None
     ) -> List[Event]:
         child_supports = [
             child_layer.support_of_nodes(variables, cache=cache)
@@ -203,19 +211,21 @@ class ProductLayer(InnerLayer[ProductUnit]):
         own_variables = {variables[index] for index in self.variables}
         result: List[Optional[Event]] = [None] * self.number_of_nodes
 
-        for child_layer_index, node, child_node in self._edge_triples():
-            support = child_supports[child_layer_index][child_node].__deepcopy__()
-            if result[node] is None:
+        for edge in self.iterate_edges():
+            support = child_supports[edge.child_layer_index][
+                edge.child_node
+            ].__deepcopy__()
+            if result[edge.node] is None:
                 support.fill_missing_variables(own_variables)
-                result[node] = support
+                result[edge.node] = support
             else:
-                result[node] = result[node] & support
+                result[edge.node] = result[edge.node] & support
 
         return [Event() if support is None else support for support in result]
 
-    @memoized("log_mode")
+    @memoized(LayerQuery.LOG_MODE)
     def log_mode_of_nodes(
-        self, variables: SortedSet, cache: Optional[Dict] = None
+        self, variables: SortedSet, cache: Optional[QueryCache] = None
     ) -> Tuple[List[Event], npt.NDArray]:
         child_modes = [
             child_layer.log_mode_of_nodes(variables, cache=cache)
@@ -226,34 +236,33 @@ class ProductLayer(InnerLayer[ProductUnit]):
         events: List[Optional[Event]] = [None] * self.number_of_nodes
         values = np.zeros(self.number_of_nodes)
 
-        for child_layer_index, node, child_node in self._edge_triples():
-            child_event = child_modes[child_layer_index][0][child_node].__deepcopy__()
-            values[node] += child_modes[child_layer_index][1][child_node]
-            if events[node] is None:
+        for edge in self.iterate_edges():
+            child_event = child_modes[edge.child_layer_index][0][
+                edge.child_node
+            ].__deepcopy__()
+            values[edge.node] += child_modes[edge.child_layer_index][1][edge.child_node]
+            if events[edge.node] is None:
                 child_event.fill_missing_variables(own_variables)
-                events[node] = child_event
+                events[edge.node] = child_event
             else:
-                events[node] = events[node].intersection_with(child_event)
+                events[edge.node] = events[edge.node].intersection_with(child_event)
 
         return [Event() if event is None else event for event in events], values
 
-    def _edge_triples(self) -> Iterator[Tuple[int, int, int]]:
-        """
-        :return: Yields ``(child layer index, node, child node)`` for every edge.
-        """
+    def iterate_edges(self) -> Iterator[Edge]:
         for (child_layer_index, node), child_node in zip(
             self.edges.indices, self.edges.data
         ):
-            yield int(child_layer_index), int(node), int(child_node)
+            yield Edge(int(node), int(child_layer_index), int(child_node))
 
-    @memoized("moment")
+    @memoized(LayerQuery.MOMENT)
     def moment_of_nodes(
         self,
         order: npt.NDArray,
         center: npt.NDArray,
         requested: npt.NDArray,
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
     ) -> npt.NDArray:
         child_results = [
             child_layer.moment_of_nodes(
@@ -286,12 +295,12 @@ class ProductLayer(InnerLayer[ProductUnit]):
             np.concatenate(rows) if rows else None for rows in own_assignment
         ]
 
-        for child_layer_index, node, child_node in self._edge_triples():
-            rows = rows_per_node[node]
+        for edge in self.iterate_edges():
+            rows = rows_per_node[edge.node]
             if rows is None:
                 continue
-            child_layer = self.child_layers[child_layer_index]
-            assignment.assign(child_layer, child_node, rows)
+            child_layer = self.child_layers[edge.child_layer_index]
+            assignment.assign(child_layer, edge.child_node, rows)
 
     # %% structural
 
@@ -331,14 +340,13 @@ class ProductLayer(InnerLayer[ProductUnit]):
         event: SimpleEvent,
         variables: SortedSet,
         singleton_allowed: bool,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Tuple[Layer, npt.NDArray]:
         if cache is None:
-            cache = {}
-        key = ("truncated", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.TRUNCATED, self):
+            return cache.get(LayerQuery.TRUNCATED, self)
 
         child_results = [
             child_layer.log_truncated_of_simple_event(
@@ -350,23 +358,24 @@ class ProductLayer(InnerLayer[ProductUnit]):
             )
             for child_layer in self.child_layers
         ]
-        result = self._structural_pass(child_results, log_probabilities)
-        cache[key] = result
-        return result
+        return cache.set(
+            LayerQuery.TRUNCATED,
+            self,
+            self._structural_pass(child_results, log_probabilities),
+        )
 
     def log_truncated_of_simple_events(
         self,
         events: List[SimpleEvent],
         variables: SortedSet,
         singleton_allowed: bool,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Optional[Tuple[Layer, npt.NDArray]]:
         if cache is None:
-            cache = {}
-        key = ("batched truncated", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.BATCHED_TRUNCATED, self):
+            return cache.get(LayerQuery.BATCHED_TRUNCATED, self)
 
         number_of_events = len(events)
         number_of_nodes = self.number_of_nodes
@@ -422,21 +431,21 @@ class ProductLayer(InnerLayer[ProductUnit]):
             )
         log_probabilities[id(result)] = own_log_probabilities
 
-        cache[key] = (result, own_log_probabilities)
-        return cache[key]
+        return cache.set(
+            LayerQuery.BATCHED_TRUNCATED, self, (result, own_log_probabilities)
+        )
 
     def log_conditional_of_point(
         self,
         point: Dict[Variable, Any],
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Tuple[Layer, npt.NDArray]:
         if cache is None:
-            cache = {}
-        key = ("conditional", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.CONDITIONAL, self):
+            return cache.get(LayerQuery.CONDITIONAL, self)
 
         child_results = [
             child_layer.log_conditional_of_point(
@@ -447,9 +456,11 @@ class ProductLayer(InnerLayer[ProductUnit]):
             )
             for child_layer in self.child_layers
         ]
-        result = self._structural_pass(child_results, log_probabilities)
-        cache[key] = result
-        return result
+        return cache.set(
+            LayerQuery.CONDITIONAL,
+            self,
+            self._structural_pass(child_results, log_probabilities),
+        )
 
     def required_child_nodes(
         self, alive: npt.NDArray, log_probabilities: Dict[int, npt.NDArray]
@@ -509,13 +520,12 @@ class ProductLayer(InnerLayer[ProductUnit]):
         return self.__class__(new_child_layers, edges)
 
     def marginal(
-        self, kept: npt.NDArray, cache: Optional[Dict] = None
+        self, kept: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> Optional[Layer]:
         if cache is None:
-            cache = {}
-        key = ("marginal", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.MARGINAL, self):
+            return cache.get(LayerQuery.MARGINAL, self)
 
         new_child_layers = []
         new_rows = []
@@ -533,8 +543,7 @@ class ProductLayer(InnerLayer[ProductUnit]):
             new_child_layers.append(marginal_child)
 
         if not new_child_layers:
-            cache[key] = None
-            return None
+            return cache.set(LayerQuery.MARGINAL, self, None)
 
         edges = SparseArray.from_coordinates(
             np.concatenate(new_rows),
@@ -543,15 +552,13 @@ class ProductLayer(InnerLayer[ProductUnit]):
             (len(new_child_layers), self.number_of_nodes),
         )
         result = self.__class__(new_child_layers, edges)
-        cache[key] = result
-        return result
+        return cache.set(LayerQuery.MARGINAL, self, result)
 
-    def simplify(self, cache: Optional[Dict] = None) -> Layer:
+    def simplify(self, cache: Optional[QueryCache] = None) -> Layer:
         if cache is None:
-            cache = {}
-        key = ("simplify", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.SIMPLIFY, self):
+            return cache.get(LayerQuery.SIMPLIFY, self)
 
         simplified_children = [
             child_layer.simplify(cache) for child_layer in self.child_layers
@@ -561,8 +568,7 @@ class ProductLayer(InnerLayer[ProductUnit]):
         if result.is_identity():
             result = simplified_children[0]
 
-        cache[key] = result
-        return result
+        return cache.set(LayerQuery.SIMPLIFY, self, result)
 
     def is_identity(self) -> bool:
         """
@@ -592,19 +598,6 @@ class ProductLayer(InnerLayer[ProductUnit]):
         result = self.__class__(child_layers, self.edges.copy())
         memo[id(self)] = result
         return result
-
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["edges"] = self.edges.to_json()
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        child_layers = [
-            Layer.from_json(child_layer, **kwargs)
-            for child_layer in data["child_layers"]
-        ]
-        return cls(child_layers, SparseArray.from_json(data["edges"]))
 
     # %% conversion
 
@@ -653,13 +646,13 @@ class ProductLayer(InnerLayer[ProductUnit]):
         self,
         variables: SortedSet,
         result: RustworkxProbabilisticCircuit,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         progress_bar: Optional[tqdm.tqdm] = None,
     ) -> List[Unit]:
         if cache is None:
-            cache = {}
-        if id(self) in cache:
-            return cache[id(self)]
+            cache = QueryCache()
+        if cache.has(LayerQuery.TO_RUSTWORKX, self):
+            return cache.get(LayerQuery.TO_RUSTWORKX, self)
 
         if progress_bar:
             progress_bar.set_postfix_str(
@@ -675,10 +668,11 @@ class ProductLayer(InnerLayer[ProductUnit]):
             for child_layer in self.child_layers
         ]
 
-        for child_layer_index, node, child_node in self._edge_triples():
-            units[node].add_subcircuit(child_units[child_layer_index][child_node])
+        for edge in self.iterate_edges():
+            units[edge.node].add_subcircuit(
+                child_units[edge.child_layer_index][edge.child_node]
+            )
             if progress_bar:
                 progress_bar.update()
 
-        cache[id(self)] = units
-        return units
+        return cache.set(LayerQuery.TO_RUSTWORKX, self, units)

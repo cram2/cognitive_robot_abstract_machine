@@ -9,7 +9,7 @@ from typing_extensions import Dict, Iterable, List, Optional
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     Layer,
     ProductLayer,
-    SparseSumLayer,
+    SumLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
@@ -18,7 +18,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.utils import SparseArr
 from probabilistic_model.probabilistic_circuit.rx import helper as rx_helper
 
 
-def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> LayeredProbabilisticCircuit:
+def uniform_measure_of_simple_event(
+    simple_event: SimpleEvent,
+) -> LayeredProbabilisticCircuit:
     """
     Create the uniform measure over a simple event as a layered circuit.
 
@@ -37,7 +39,9 @@ def uniform_measure_of_event(event: Event) -> LayeredProbabilisticCircuit:
     :param event: The event.
     :return: The circuit describing the uniform measure.
     """
-    return LayeredProbabilisticCircuit.from_rustworkx(rx_helper.uniform_measure_of_event(event))
+    return LayeredProbabilisticCircuit.from_rustworkx(
+        rx_helper.uniform_measure_of_event(event)
+    )
 
 
 def fully_factorized(
@@ -50,7 +54,8 @@ def fully_factorized(
 
     :param variables: The variables.
     :param means: The means of the normal distributions of the numeric variables.
-    :param variances: The variances of the normal distributions of the numeric variables.
+    :param variances: The variances of the normal distributions of the numeric
+        variables.
     :return: The circuit.
     """
     return LayeredProbabilisticCircuit.from_rustworkx(
@@ -76,11 +81,10 @@ def product_of(variables: SortedSet, child_layers: List[Layer]) -> ProductLayer:
     return ProductLayer(child_layers, edges)
 
 
-def mixture_of(
-    child_layers: List[Layer], log_weights: Iterable[float]
-) -> SparseSumLayer:
+def mixture_of(child_layers: List[Layer], log_weights: Iterable[float]) -> SumLayer:
     """
-    Create a sum layer with a single node that mixes the first node of every child layer.
+    Create a sum layer with a single node that mixes the first node of every child
+    layer.
 
     :param child_layers: The child layers, each contributing its first node.
     :param log_weights: The logarithmic weight of every child layer.
@@ -91,7 +95,7 @@ def mixture_of(
         raise ValueError(
             "The number of weights has to match the number of child layers."
         )
-    return SparseSumLayer(
+    return SumLayer(
         child_layers,
         [
             SparseArray.from_coordinates(

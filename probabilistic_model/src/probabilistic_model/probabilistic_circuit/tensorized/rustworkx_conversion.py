@@ -10,11 +10,32 @@ from typing_extensions import Dict, List, Tuple, Type
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     Layer,
     LayerConverter,
+    QueryCache,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     Unit,
 )
+
+
+def import_layer_modules() -> None:
+    """
+    Import every module that defines a concrete layer.
+
+    :func:`layer_class_of` finds a layer among the subclasses of :class:`Layer`, which
+    only exist once the module defining them has been imported. That import lives here,
+    and not in the ``__init__`` of the package, because the layer modules import this
+    one.
+    """
+    from probabilistic_model.probabilistic_circuit.tensorized import (  # noqa: F401
+        discrete_layer,
+        gaussian_layer,
+        input_layer,
+        uniform_layer,
+    )
+    from probabilistic_model.probabilistic_circuit.tensorized import (  # noqa: F401
+        inner_layer,
+    )
 
 
 def layer_class_of(clazz: Type) -> Type[Layer]:
@@ -29,6 +50,8 @@ def layer_class_of(clazz: Type) -> Type[Layer]:
     :param clazz: The unit class or the distribution class of a leaf unit.
     :return: The matching layer class.
     """
+    import_layer_modules()
+
     candidates = [
         subclass
         for subclass in recursive_subclasses(Layer)
@@ -142,5 +165,5 @@ def circuit_of_root_layer(
         else None
     )
     result = ProbabilisticCircuit()
-    root.to_rustworkx(variables, result, {}, bar)
+    root.to_rustworkx(variables, result, QueryCache(), bar)
     return result

@@ -53,7 +53,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.gaussian_layer import 
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ProductLayer,
-    SparseSumLayer,
+    SumLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     DiracDeltaLayer,
@@ -268,7 +268,7 @@ class ConversionTestCase(unittest.TestCase):
 
     def test_layer_types_of_a_uniform_mixture(self):
         layered = LayeredProbabilisticCircuit.from_rustworkx(overlapping_mixture())
-        self.assertIsInstance(layered.root, SparseSumLayer)
+        self.assertIsInstance(layered.root, SumLayer)
         self.assertEqual(layered.root.number_of_nodes, 1)
 
         product_layer = layered.root.child_layers[0]

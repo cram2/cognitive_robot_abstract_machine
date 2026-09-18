@@ -16,7 +16,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ForwardSampleAssignment,
     Layer,
     ProductLayer,
-    SparseSumLayer,
+    QueryCache,
+    SumLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     layer_of_distributions,
@@ -249,7 +250,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
             )
             for root, log_probability in truncated
         ]
-        self.root = SparseSumLayer([root for root, _ in truncated], log_weights)
+        self.root = SumLayer([root for root, _ in truncated], log_weights)
         self.root.normalize()
         return self, total_log_probability
 
@@ -273,7 +274,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
             event,
             self.variables,
             singleton_allowed,
-            cache={},
+            cache=QueryCache(),
             log_probabilities=log_probabilities,
         )
 
@@ -313,7 +314,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
             events,
             self.variables,
             singleton_allowed,
-            cache={},
+            cache=QueryCache(),
             log_probabilities=log_probabilities,
         )
         if batched is None:
@@ -327,7 +328,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
 
         # mix the copy of the root that belongs to each event by the probability of that
         # event, which turns the replicated root into the single root of the result
-        mixture = SparseSumLayer(
+        mixture = SumLayer(
             [replicated],
             [
                 SparseArray.from_coordinates(
@@ -387,7 +388,10 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
         """
         log_probabilities: Dict[int, npt.NDArray] = {}
         new_root, node_log_probabilities = self.root.log_conditional_of_point(
-            point, self.variables, cache={}, log_probabilities=log_probabilities
+            point,
+            self.variables,
+            cache=QueryCache(),
+            log_probabilities=log_probabilities,
         )
 
         log_probability = float(node_log_probabilities[0])
@@ -437,7 +441,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
         remap = np.array(
             [variables.index(variable) for variable in self.variables], dtype=np.int64
         )
-        self.root.remap_variables(remap, {})
+        self.root.remap_variables(remap, QueryCache())
         self.variables = variables
 
     def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
@@ -463,14 +467,14 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
         kept = np.array(
             [variable in kept_variables for variable in self.variables], dtype=bool
         )
-        new_root = self.root.marginal(kept, {})
+        new_root = self.root.marginal(kept, QueryCache())
         if new_root is None:
             return None
 
         remap = np.full(len(self.variables), -1, dtype=np.int64)
         for new_index, variable in enumerate(kept_variables):
             remap[self.variables.index(variable)] = new_index
-        new_root.remap_variables(remap, {})
+        new_root.remap_variables(remap, QueryCache())
 
         self.root = new_root.simplify()
         self.variables = kept_variables
@@ -510,7 +514,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel, DataclassJSONSerializer):
             ],
             dtype=np.int64,
         )
-        self.root.remap_variables(remap, {})
+        self.root.remap_variables(remap, QueryCache())
         self.variables = replaced
 
     def rename_variables_with_prefix(

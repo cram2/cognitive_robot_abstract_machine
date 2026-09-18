@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import dataclasses
+import enum
 import functools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -8,6 +10,7 @@ import numpy as np
 import numpy.typing as npt
 import rustworkx
 import tqdm
+from krrood.adapters import json_serializer
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.product_algebra import Event, SimpleEvent
@@ -18,6 +21,7 @@ from typing_extensions import (
     Dict,
     Generic,
     Iterable,
+    Iterator,
     List,
     Optional,
     Self,
@@ -38,32 +42,142 @@ class of a leaf unit for an input layer.
 """
 
 
-def memoized(name: str):
+class LayerQuery(enum.Enum):
+    """
+    The passes over the layers whose per-layer result a :class:`QueryCache` holds.
+
+    A pass evaluates its query once per layer, so the query it belongs to is one half of
+    the key a cached result sits under and the layer it was evaluated for is the other.
+    """
+
+    LOG_LIKELIHOOD = enum.auto()
+    CUMULATIVE_DISTRIBUTION = enum.auto()
+    PROBABILITY_OF_SIMPLE_EVENT = enum.auto()
+    SUPPORT = enum.auto()
+    LOG_MODE = enum.auto()
+    MOMENT = enum.auto()
+    TRUNCATED = enum.auto()
+    BATCHED_TRUNCATED = enum.auto()
+    CONDITIONAL = enum.auto()
+    MARGINAL = enum.auto()
+    SIMPLIFY = enum.auto()
+    REMAP_VARIABLES = enum.auto()
+    TO_RUSTWORKX = enum.auto()
+
+
+@dataclass(frozen=True)
+class QueryCacheKey:
+    """
+    Which query, evaluated for which layer, an entry of a :class:`QueryCache` is the
+    result of.
+    """
+
+    query: LayerQuery
+    """
+    The query that was evaluated.
+    """
+
+    layer_id: int
+    """
+    The :func:`id` of the layer it was evaluated for.
+
+    Layers are keyed by identity rather than by value: a pass has to evaluate a layer
+    that is the child of several parents once, and two layers that happen to hold equal
+    parameters are still two layers with two results.
+    """
+
+
+@dataclass
+class QueryCache:
+    """
+    The results one pass over the layers has computed so far.
+
+    Layers form a directed acyclic graph, not a tree: a layer that is the child of
+    several parents must only be evaluated once per pass. Every method that walks the
+    graph takes this cache as a ``cache`` keyword argument and hands it down to the
+    calls it makes on its own children; the top level caller may omit it and gets a
+    fresh one.
+    """
+
+    results: Dict[QueryCacheKey, Any] = field(default_factory=dict)
+    """
+    The result of every query evaluated so far, per layer.
+    """
+
+    def has(self, query: LayerQuery, layer: Layer) -> bool:
+        """
+        :param query: The query to look up.
+        :param layer: The layer to look it up for.
+        :return: Whether the result is already in this cache.
+        """
+        return QueryCacheKey(query, id(layer)) in self.results
+
+    def get(self, query: LayerQuery, layer: Layer) -> Any:
+        """
+        :param query: The query to look up.
+        :param layer: The layer to look it up for.
+        :return: The cached result.
+        :raises KeyError: If the query was not evaluated for that layer yet.
+        """
+        return self.results[QueryCacheKey(query, id(layer))]
+
+    def set(self, query: LayerQuery, layer: Layer, result: Any) -> Any:
+        """
+        Record the result of a query for a layer.
+
+        :param query: The query that was evaluated.
+        :param layer: The layer it was evaluated for.
+        :param result: The result.
+        :return: That same result, so that a caller can ``return cache.set(...)``.
+        """
+        self.results[QueryCacheKey(query, id(layer))] = result
+        return result
+
+
+def memoized(query: LayerQuery):
     """
     Memoize a bottom-up query of a layer by the identity of the layer.
 
-    Layers form a directed acyclic graph, not a tree: a layer that is the child of
-    several parents must only be evaluated once per query. The wrapped method receives a
-    ``cache`` keyword argument that it has to hand down to the calls it makes on its own
-    children; the top level caller may omit it.
-
-    :param name: The namespace of this query inside the shared cache.
+    :param query: The query the wrapped method evaluates.
     :return: The decorator.
     """
 
     def decorator(method):
         @functools.wraps(method)
-        def wrapper(self, *args, cache: Optional[Dict] = None, **kwargs):
+        def wrapper(self, *args, cache: Optional[QueryCache] = None, **kwargs):
             if cache is None:
-                cache = {}
-            key = (name, id(self))
-            if key not in cache:
-                cache[key] = method(self, *args, cache=cache, **kwargs)
-            return cache[key]
+                cache = QueryCache()
+            if not cache.has(query, self):
+                cache.set(query, self, method(self, *args, cache=cache, **kwargs))
+            return cache.get(query, self)
 
         return wrapper
 
     return decorator
+
+
+@dataclass
+class Edge:
+    """
+    One edge of an inner layer: a node of that layer, and the node of one of its child
+    layers that it points at.
+    """
+
+    node: int
+    """
+    The index of the node inside the layer the edge belongs to.
+    """
+
+    child_layer_index: int
+    """
+    The index of the child layer the edge points into, within
+    :attr:`InnerLayer.child_layers`.
+    """
+
+    child_node: int
+    """
+    The index of the node inside that child layer.
+    """
 
 
 @dataclass
@@ -284,7 +398,7 @@ class Layer(
 
     @abstractmethod
     def log_likelihood_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         """
         Calculate the log-likelihood of every node of this layer.
@@ -297,7 +411,7 @@ class Layer(
 
     @abstractmethod
     def cumulative_distribution_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         """
         Calculate the cumulative distribution function of every node of this layer.
@@ -313,7 +427,7 @@ class Layer(
         self,
         event: SimpleEvent,
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
     ) -> npt.NDArray:
         """
         Calculate the probability of a simple event for every node of this layer.
@@ -327,7 +441,7 @@ class Layer(
 
     @abstractmethod
     def support_of_nodes(
-        self, variables: SortedSet, cache: Optional[Dict] = None
+        self, variables: SortedSet, cache: Optional[QueryCache] = None
     ) -> List[Event]:
         """
         Calculate the support of every node of this layer.
@@ -340,7 +454,7 @@ class Layer(
 
     @abstractmethod
     def log_mode_of_nodes(
-        self, variables: SortedSet, cache: Optional[Dict] = None
+        self, variables: SortedSet, cache: Optional[QueryCache] = None
     ) -> Tuple[List[Event], npt.NDArray]:
         """
         Calculate the mode of every node of this layer.
@@ -358,7 +472,7 @@ class Layer(
         center: npt.NDArray,
         requested: npt.NDArray,
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
     ) -> npt.NDArray:
         """
         Calculate the moment of every node of this layer.
@@ -395,7 +509,7 @@ class Layer(
         event: SimpleEvent,
         variables: SortedSet,
         singleton_allowed: bool,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Tuple[Layer, npt.NDArray]:
         """
@@ -422,7 +536,7 @@ class Layer(
         events: List[SimpleEvent],
         variables: SortedSet,
         singleton_allowed: bool,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Optional[Tuple[Layer, npt.NDArray]]:
         """
@@ -451,7 +565,7 @@ class Layer(
         self,
         point: Dict[Variable, Any],
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Tuple[Layer, npt.NDArray]:
         """
@@ -554,7 +668,7 @@ class Layer(
 
     @abstractmethod
     def marginal(
-        self, kept: npt.NDArray, cache: Optional[Dict] = None
+        self, kept: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> Optional[Layer]:
         """
         Restrict this layer to a subset of the variables.
@@ -567,7 +681,7 @@ class Layer(
         raise NotImplementedError
 
     @abstractmethod
-    def remap_variables(self, remap: npt.NDArray, cache: Optional[Dict] = None):
+    def remap_variables(self, remap: npt.NDArray, cache: Optional[QueryCache] = None):
         """
         Rewrite the variable indices of this layer in-place.
 
@@ -576,7 +690,7 @@ class Layer(
         """
         raise NotImplementedError
 
-    def simplify(self, cache: Optional[Dict] = None) -> Layer:
+    def simplify(self, cache: Optional[QueryCache] = None) -> Layer:
         """
         Remove layers that have no effect on the represented distribution.
 
@@ -630,7 +744,7 @@ class Layer(
             SumLayer,
         )
 
-        cache: Dict = {}
+        cache = QueryCache()
         return all(
             layer.is_deterministic_own(variables, cache)
             for layer in self.all_layers()
@@ -690,7 +804,7 @@ class Layer(
         self,
         variables: SortedSet,
         result: RustworkxProbabilisticCircuit,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         progress_bar: Optional[tqdm.tqdm] = None,
     ) -> List[Unit]:
         """
@@ -710,6 +824,46 @@ class Layer(
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.number_of_nodes})"
+
+    # %% serialization
+
+    @classmethod
+    def serialized_fields(cls) -> List[dataclasses.Field]:
+        """
+        :return: The dataclass fields that describe a layer, which are the ones its
+            constructor takes. The caches a layer fills in on its own are declared with
+            ``init=False`` and are left out.
+        """
+        return [field_ for field_ in dataclasses.fields(cls) if field_.init]
+
+    def to_json(self, **kwargs) -> Dict[str, Any]:
+        """
+        Serialize this layer through the fields it declares.
+
+        The parameter arrays, the child layers and the sparse edge and weight blocks are
+        all types that :mod:`krrood.adapters.json_serializer` serializes generically, so
+        a layer type is serializable by declaring its fields and none of them has to
+        write a method per field.
+
+        :param kwargs: Keyword arguments to hand on to the nested ``to_json`` calls.
+        :return: The JSON dict.
+        """
+        result = super().to_json(**kwargs)
+        for field_ in self.serialized_fields():
+            result[field_.name] = json_serializer.to_json(
+                getattr(self, field_.name), **kwargs
+            )
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            **{
+                field_.name: json_serializer.from_json(data[field_.name], **kwargs)
+                for field_ in cls.serialized_fields()
+                if field_.name in data
+            }
+        )
 
 
 @dataclass(eq=False, repr=False)
@@ -738,22 +892,23 @@ class InnerLayer(Layer[RustworkxUnitType], ABC):
         """
         self._variables_cache = None
 
-    def remap_variables(self, remap: npt.NDArray, cache: Optional[Dict] = None):
+    def remap_variables(self, remap: npt.NDArray, cache: Optional[QueryCache] = None):
         if cache is None:
-            cache = {}
-        if id(self) in cache:
+            cache = QueryCache()
+        if cache.has(LayerQuery.REMAP_VARIABLES, self):
             return
-        cache[id(self)] = True
+        cache.set(LayerQuery.REMAP_VARIABLES, self, True)
         for child_layer in self.child_layers:
             child_layer.remap_variables(remap, cache)
         self.reset_variables()
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["child_layers"] = [
-            child_layer.to_json(**kwargs) for child_layer in self.child_layers
-        ]
-        return result
+    @abstractmethod
+    def iterate_edges(self) -> Iterator[Edge]:
+        """
+        :return: Yields every edge from a node of this layer to a node of one of its
+            child layers.
+        """
+        raise NotImplementedError
 
 
 @dataclass

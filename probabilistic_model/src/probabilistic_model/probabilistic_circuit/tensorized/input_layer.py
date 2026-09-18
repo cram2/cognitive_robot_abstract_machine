@@ -23,8 +23,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     ForwardSampleAssignment,
     Layer,
     LayerConverter,
+    LayerQuery,
+    QueryCache,
     RustworkxUnitType,
-    SparseSumLayer,
+    SumLayer,
     memoized,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.rustworkx_conversion import (
@@ -139,7 +141,7 @@ def assemble_input_layer(
         for bucket in range(len(ordered_types))
     ]
 
-    return SparseSumLayer(child_layers, log_weights), log_probabilities
+    return SumLayer(child_layers, log_weights), log_probabilities
 
 
 @dataclass(eq=False, repr=False)
@@ -179,7 +181,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         """
         [self.variable] = np.asarray(value, dtype=np.int64)
 
-    def remap_variables(self, remap: npt.NDArray, cache: Optional[Dict] = None):
+    def remap_variables(self, remap: npt.NDArray, cache: Optional[QueryCache] = None):
         self.variable = int(remap[self.variable])
 
     def column_of(self, x: npt.NDArray) -> npt.NDArray:
@@ -242,18 +244,18 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
 
     # %% queries
 
-    @memoized("support")
+    @memoized(LayerQuery.SUPPORT)
     def support_of_nodes(
-        self, variables: SortedSet, cache: Optional[Dict] = None
+        self, variables: SortedSet, cache: Optional[QueryCache] = None
     ) -> List[Event]:
         variable = variables[self.variable]
         return [
             distribution.support for distribution in self.node_distributions(variable)
         ]
 
-    @memoized("log_mode")
+    @memoized(LayerQuery.LOG_MODE)
     def log_mode_of_nodes(
-        self, variables: SortedSet, cache: Optional[Dict] = None
+        self, variables: SortedSet, cache: Optional[QueryCache] = None
     ) -> Tuple[List[Event], npt.NDArray]:
         variable = variables[self.variable]
         modes = [
@@ -264,14 +266,14 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
             [value for _, value in modes], dtype=float
         )
 
-    @memoized("moment")
+    @memoized(LayerQuery.MOMENT)
     def moment_of_nodes(
         self,
         order: npt.NDArray,
         center: npt.NDArray,
         requested: npt.NDArray,
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
     ) -> npt.NDArray:
         result = np.zeros((self.number_of_nodes, len(order)))
         if not requested[self.variable]:
@@ -388,14 +390,13 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         event: SimpleEvent,
         variables: SortedSet,
         singleton_allowed: bool,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Tuple[Layer, npt.NDArray]:
         if cache is None:
-            cache = {}
-        key = ("truncated", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.TRUNCATED, self):
+            return cache.get(LayerQuery.TRUNCATED, self)
 
         variable = variables[self.variable]
         assignment = event[variable]
@@ -413,9 +414,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         if log_probabilities is not None:
             log_probabilities[id(layer)] = node_log_probabilities
 
-        result = (layer, node_log_probabilities)
-        cache[key] = result
-        return result
+        return cache.set(LayerQuery.TRUNCATED, self, (layer, node_log_probabilities))
 
     @classmethod
     def concatenate(cls, layers: List[Self]) -> Optional[Self]:
@@ -437,14 +436,13 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         events: List[SimpleEvent],
         variables: SortedSet,
         singleton_allowed: bool,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Optional[Tuple[Layer, npt.NDArray]]:
         if cache is None:
-            cache = {}
-        key = ("batched truncated", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.BATCHED_TRUNCATED, self):
+            return cache.get(LayerQuery.BATCHED_TRUNCATED, self)
 
         variable = variables[self.variable]
 
@@ -472,21 +470,21 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         )
         log_probabilities[id(layer)] = node_log_probabilities
 
-        cache[key] = (layer, node_log_probabilities)
-        return cache[key]
+        return cache.set(
+            LayerQuery.BATCHED_TRUNCATED, self, (layer, node_log_probabilities)
+        )
 
     def log_conditional_of_point(
         self,
         point: Dict[Variable, Any],
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         log_probabilities: Optional[Dict[int, npt.NDArray]] = None,
     ) -> Tuple[Layer, npt.NDArray]:
         if cache is None:
-            cache = {}
-        key = ("conditional", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.CONDITIONAL, self):
+            return cache.get(LayerQuery.CONDITIONAL, self)
 
         variable = variables[self.variable]
 
@@ -506,9 +504,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         if log_probabilities is not None:
             log_probabilities[id(layer)] = node_log_probabilities
 
-        result = (layer, node_log_probabilities)
-        cache[key] = result
-        return result
+        return cache.set(LayerQuery.CONDITIONAL, self, (layer, node_log_probabilities))
 
     def rebuild(
         self,
@@ -521,7 +517,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         return self.select_nodes(alive)
 
     def marginal(
-        self, kept: npt.NDArray, cache: Optional[Dict] = None
+        self, kept: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> Optional[Layer]:
         if not kept[self.variable]:
             return None
@@ -553,13 +549,13 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         self,
         variables: SortedSet,
         result: RustworkxProbabilisticCircuit,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
         progress_bar: Optional[tqdm.tqdm] = None,
     ) -> List[Unit]:
         if cache is None:
-            cache = {}
-        if id(self) in cache:
-            return cache[id(self)]
+            cache = QueryCache()
+        if cache.has(LayerQuery.TO_RUSTWORKX, self):
+            return cache.get(LayerQuery.TO_RUSTWORKX, self)
 
         variable = variables[self.variable]
         if progress_bar:
@@ -573,13 +569,7 @@ class InputLayer(Layer[RustworkxUnitType], ABC):
         if progress_bar:
             progress_bar.update(self.number_of_nodes)
 
-        cache[id(self)] = units
-        return units
-
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["variable"] = self.variable
-        return result
+        return cache.set(LayerQuery.TO_RUSTWORKX, self, units)
 
 
 @dataclass(eq=False, repr=False)
@@ -615,13 +605,12 @@ class ContinuousLayer(InputLayer[RustworkxUnitType], ABC):
         self,
         event: SimpleEvent,
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
     ) -> npt.NDArray:
         if cache is None:
-            cache = {}
-        key = ("probability_of_simple_event", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.PROBABILITY_OF_SIMPLE_EVENT, self):
+            return cache.get(LayerQuery.PROBABILITY_OF_SIMPLE_EVENT, self)
 
         interval: Interval = event[variables[self.variable]]
         result = np.zeros(self.number_of_nodes)
@@ -632,12 +621,11 @@ class ContinuousLayer(InputLayer[RustworkxUnitType], ABC):
             values = self.cumulative_distribution_of_nodes_from_column(bounds[:, 0])
             result += values[1] - values[0]
 
-        cache[key] = result
-        return result
+        return cache.set(LayerQuery.PROBABILITY_OF_SIMPLE_EVENT, self, result)
 
-    @memoized("cumulative_distribution")
+    @memoized(LayerQuery.CUMULATIVE_DISTRIBUTION)
     def cumulative_distribution_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         return self.cumulative_distribution_of_nodes_from_column(self.column_of(x))
 
@@ -797,20 +785,6 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer[RustworkxUnitType], ABC):
         memo[id(self)] = result
         return result
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["interval"] = self.interval.tolist()
-        result["bounds"] = self.bounds.tolist()
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(
-            data["variable"],
-            np.array(data["interval"]),
-            bounds=np.array(data["bounds"]),
-        )
-
 
 @dataclass(eq=False, repr=False)
 class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
@@ -885,9 +859,9 @@ class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
             layers[0].tolerance,
         )
 
-    @memoized("log_likelihood")
+    @memoized(LayerQuery.LOG_LIKELIHOOD)
     def log_likelihood_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         column = self.column_of(x).astype(float).reshape(-1, 1)
         hit = np.abs(column - self.location) < self.tolerance
@@ -956,19 +930,3 @@ class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
         )
         memo[id(self)] = result
         return result
-
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["location"] = self.location.tolist()
-        result["density_cap"] = self.density_cap.tolist()
-        result["tolerance"] = self.tolerance
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(
-            data["variable"],
-            np.array(data["location"]),
-            np.array(data["density_cap"]),
-            data.get("tolerance", 1e-6),
-        )

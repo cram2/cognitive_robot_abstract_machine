@@ -40,7 +40,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.helper import (
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     LayerWithDepth,
     ProductLayer,
-    SparseSumLayer,
+    SumLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     DiracDeltaLayer,
@@ -98,8 +98,13 @@ class SparseArrayTestCase(unittest.TestCase):
         np.testing.assert_array_equal(sorted_sparse.data, np.array([20.0, 10.0, 30.0]))
 
     def test_json_round_trip(self):
+        """
+        A sparse array is serialized by the general dataclass serializer, without a
+        method of its own.
+        """
         sparse = SparseArray.from_coordinates([0, 1], [1, 0], [1.5, -2.5], (2, 2))
-        restored = SparseArray.from_json(sparse.to_json())
+        restored = from_json(to_json(sparse))
+        self.assertIsInstance(restored, SparseArray)
         np.testing.assert_array_equal(restored.to_dense(), sparse.to_dense())
         self.assertEqual(restored.shape, sparse.shape)
 
@@ -181,7 +186,7 @@ class TruncationOfInputLayersTestCase(unittest.TestCase):
 
     def test_an_impossible_node_is_removed_but_its_siblings_survive(self):
         layer = uniform_layer_of(0, [(0, 1), (2, 3)])
-        root = SparseSumLayer(
+        root = SumLayer(
             [layer],
             [
                 SparseArray.from_coordinates(
@@ -561,7 +566,7 @@ class HelperTestCase(unittest.TestCase):
         )
 
         mixture = mixture_of([product], [np.log(1.0)])
-        self.assertIsInstance(mixture, SparseSumLayer)
+        self.assertIsInstance(mixture, SumLayer)
         np.testing.assert_allclose(
             LayeredProbabilisticCircuit(SortedSet([x, y]), mixture).likelihood(
                 np.array([[0.5, 1.0]])

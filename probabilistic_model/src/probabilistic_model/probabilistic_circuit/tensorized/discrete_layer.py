@@ -11,7 +11,7 @@ from random_events.set import Set
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, List, Optional, Self, Tuple
+from typing_extensions import List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.distributions import (
     DiscreteDistribution,
@@ -19,8 +19,12 @@ from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
 )
 from probabilistic_model.exceptions import ShapeMismatchError
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import memoized
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import RustworkxUnitType
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
+    LayerQuery,
+    QueryCache,
+    RustworkxUnitType,
+    memoized,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import InputLayer
 from probabilistic_model.utils import MissingDict
 
@@ -38,9 +42,9 @@ class DiscreteLayer(InputLayer[RustworkxUnitType], ABC):
     """
     The states of the variable, sorted ascending.
 
-    A state is identified by the hash of the domain element for symbolic variables and by
-    the value itself for integer variables, which is the representation that the events
-    of this package use.
+    A state is identified by the hash of the domain element for symbolic variables and
+    by the value itself for integer variables, which is the representation that the
+    events of this package use.
     """
 
     log_probabilities: npt.NDArray
@@ -99,19 +103,17 @@ class DiscreteLayer(InputLayer[RustworkxUnitType], ABC):
         self,
         event: SimpleEvent,
         variables: SortedSet,
-        cache: Optional[Dict] = None,
+        cache: Optional[QueryCache] = None,
     ) -> npt.NDArray:
         if cache is None:
-            cache = {}
-        key = ("probability_of_simple_event", id(self))
-        if key in cache:
-            return cache[key]
+            cache = QueryCache()
+        if cache.has(LayerQuery.PROBABILITY_OF_SIMPLE_EVENT, self):
+            return cache.get(LayerQuery.PROBABILITY_OF_SIMPLE_EVENT, self)
 
         selected = self.selected_states(event[variables[self.variable]])
         result = np.exp(self.log_probabilities[:, selected]).sum(axis=1)
 
-        cache[key] = result
-        return result
+        return cache.set(LayerQuery.PROBABILITY_OF_SIMPLE_EVENT, self, result)
 
     def log_truncated_of_assignment(
         self, assignment: AbstractCompositeSet, singleton_allowed: bool
@@ -157,9 +159,9 @@ class DiscreteLayer(InputLayer[RustworkxUnitType], ABC):
         found = self.states[positions] == values
         return np.where(found, positions, -1)
 
-    @memoized("log_likelihood")
+    @memoized(LayerQuery.LOG_LIKELIHOOD)
     def log_likelihood_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         indices = self.state_indices_of(self.column_of(x))
         result = np.full((len(indices), self.number_of_nodes), -np.inf)
@@ -168,9 +170,9 @@ class DiscreteLayer(InputLayer[RustworkxUnitType], ABC):
             result[known] = self.log_probabilities[:, indices[known]].T
         return result
 
-    @memoized("cumulative_distribution")
+    @memoized(LayerQuery.CUMULATIVE_DISTRIBUTION)
     def cumulative_distribution_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         raise NotImplementedError
 
@@ -203,13 +205,18 @@ class DiscreteLayer(InputLayer[RustworkxUnitType], ABC):
         cls, distributions: List[DiscreteDistribution]
     ) -> Tuple[npt.NDArray, npt.NDArray]:
         """
-        Collect the states and the probability block of a list of discrete distributions.
+        Collect the states and the probability block of a list of discrete
+        distributions.
 
         :param distributions: The distributions.
         :return: The sorted states and the logarithmic probabilities.
         """
         states = sorted(
-            {state for distribution in distributions for state in distribution.probabilities}
+            {
+                state
+                for distribution in distributions
+                for state in distribution.probabilities
+            }
         )
         state_to_column = {state: index for index, state in enumerate(states)}
 
@@ -255,20 +262,6 @@ class DiscreteLayer(InputLayer[RustworkxUnitType], ABC):
         memo[id(self)] = result
         return result
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["states"] = self.states.tolist()
-        result["log_probabilities"] = self.log_probabilities.tolist()
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(
-            data["variable"],
-            np.array(data["states"], dtype=np.int64),
-            np.array(data["log_probabilities"], dtype=float),
-        )
-
 
 @dataclass(eq=False, repr=False)
 class SymbolicLayer(DiscreteLayer[SymbolicDistribution]):
@@ -276,9 +269,7 @@ class SymbolicLayer(DiscreteLayer[SymbolicDistribution]):
     A layer of categorical distributions over one symbolic variable.
     """
 
-    def node_distribution(
-        self, index: int, variable: Variable
-    ) -> SymbolicDistribution:
+    def node_distribution(self, index: int, variable: Variable) -> SymbolicDistribution:
         return SymbolicDistribution(
             variable=variable, probabilities=self.probabilities_of_node(index)
         )
@@ -320,9 +311,9 @@ class IntegerLayer(DiscreteLayer[IntegerDistribution]):
             [state in assignment for state in self.states.tolist()], dtype=bool
         )
 
-    @memoized("cumulative_distribution")
+    @memoized(LayerQuery.CUMULATIVE_DISTRIBUTION)
     def cumulative_distribution_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         column = np.asarray(self.column_of(x), dtype=float).reshape(-1, 1)
         reached = column >= self.states.reshape(1, -1)

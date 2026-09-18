@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Any, Dict, Self, Tuple
+from typing_extensions import Any, Self, Tuple
 
 
 @dataclass(eq=False)
@@ -17,6 +17,10 @@ class SparseArray:
 
     ``eq=False`` because the default field-tuple comparison would call ``==`` on the
     ``data``/``indices`` arrays, which raises once they hold more than one element.
+
+    It is a plain dataclass of numpy arrays, so
+    :class:`krrood.adapters.json_serializer.DataclassJSONSerializer` serializes it
+    without this class, or the layers that hold one, writing anything of their own.
     """
 
     data: npt.NDArray
@@ -130,25 +134,6 @@ class SparseArray:
 
     def __deepcopy__(self, memo=None) -> Self:
         return self.copy()
-
-    def to_json(self) -> Dict[str, Any]:
-        """
-        :return: A JSON serializable description of this array.
-        """
-        return {
-            "data": self.data.tolist(),
-            "indices": self.indices.tolist(),
-            "shape": list(self.shape),
-        }
-
-    @classmethod
-    def from_json(cls, data: Dict[str, Any]) -> Self:
-        """
-        :param data: A description created by :meth:`to_json`.
-        :return: The sparse array.
-        """
-        indices = np.asarray(data["indices"], dtype=np.int64).reshape(-1, 2)
-        return cls(np.asarray(data["data"]), indices, tuple(data["shape"]))
 
 
 def embedded_logsumexp(values: npt.NDArray, axis: int) -> npt.NDArray:

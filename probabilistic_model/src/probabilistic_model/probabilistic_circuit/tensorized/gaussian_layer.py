@@ -9,7 +9,7 @@ from random_events.interval import Interval, reals
 from random_events.variable import Variable
 from scipy.stats import norm
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, List, Optional, Self, Tuple
+from typing_extensions import List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
@@ -18,6 +18,8 @@ from probabilistic_model.distributions.gaussian import (
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
     Layer,
+    LayerQuery,
+    QueryCache,
     memoized,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
@@ -59,9 +61,9 @@ class GaussianLayer(ContinuousLayer[GaussianDistribution]):
         if self.location.shape != self.scale.shape:
             raise ShapeMismatchError(self.location.shape, self.scale.shape)
 
-    @memoized("log_likelihood")
+    @memoized(LayerQuery.LOG_LIKELIHOOD)
     def log_likelihood_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         column = self.column_of(x).astype(float).reshape(-1, 1)
         return norm.logpdf(column, loc=self.location, scale=self.scale)
@@ -211,21 +213,11 @@ class GaussianLayer(ContinuousLayer[GaussianDistribution]):
         memo[id(self)] = result
         return result
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["location"] = self.location.tolist()
-        result["scale"] = self.scale.tolist()
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(
-            data["variable"], np.array(data["location"]), np.array(data["scale"])
-        )
-
 
 @dataclass(eq=False, repr=False)
-class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianDistribution]):
+class TruncatedGaussianLayer(
+    ContinuousLayerWithFiniteSupport[TruncatedGaussianDistribution]
+):
     """
     A layer of truncated Gaussian distributions over one continuous variable.
 
@@ -271,15 +263,15 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
             - self.cumulative_distribution_to_lower
         )
 
-    @memoized("log_likelihood")
+    @memoized(LayerQuery.LOG_LIKELIHOOD)
     def log_likelihood_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         column = self.column_of(x).astype(float).reshape(-1, 1)
         with np.errstate(divide="ignore"):
-            density = norm.logpdf(
-                column, loc=self.location, scale=self.scale
-            ) - np.log(self.normalizing_constant)
+            density = norm.logpdf(column, loc=self.location, scale=self.scale) - np.log(
+                self.normalizing_constant
+            )
         return np.where(self.included_condition(self.column_of(x)), density, -np.inf)
 
     def cumulative_distribution_of_nodes_from_column(
@@ -373,19 +365,3 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
         )
         memo[id(self)] = result
         return result
-
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        result = super().to_json(**kwargs)
-        result["location"] = self.location.tolist()
-        result["scale"] = self.scale.tolist()
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(
-            data["variable"],
-            np.array(data["interval"]),
-            np.array(data["location"]),
-            np.array(data["scale"]),
-            bounds=np.array(data["bounds"]),
-        )

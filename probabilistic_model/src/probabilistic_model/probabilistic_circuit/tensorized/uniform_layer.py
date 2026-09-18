@@ -7,10 +7,14 @@ import numpy.typing as npt
 from random_events.interval import Interval
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Dict, List, Optional, Self, Tuple
+from typing_extensions import List, Optional, Self, Tuple
 
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import memoized
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer import (
+    LayerQuery,
+    QueryCache,
+    memoized,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer import (
     ContinuousLayerWithFiniteSupport,
 )
@@ -33,9 +37,9 @@ class UniformLayer(ContinuousLayerWithFiniteSupport[UniformDistribution]):
         with np.errstate(divide="ignore"):
             return -np.log(self.upper - self.lower)
 
-    @memoized("log_likelihood")
+    @memoized(LayerQuery.LOG_LIKELIHOOD)
     def log_likelihood_of_nodes(
-        self, x: npt.NDArray, cache: Optional[Dict] = None
+        self, x: npt.NDArray, cache: Optional[QueryCache] = None
     ) -> npt.NDArray:
         return np.where(
             self.included_condition(self.column_of(x)),
