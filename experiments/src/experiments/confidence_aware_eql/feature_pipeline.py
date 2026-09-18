@@ -1,18 +1,22 @@
 """Turn semantic objects into a feature dataframe for confidence-aware evaluation.
 
 The out-of-distribution check needs the features of an object as a row of a
-dataframe. This module bridges the semantic objects of a world to that dataframe: the
-object's class together with its collision geometry's volume and aspect ratio are
-kept as the features the confidence model is learned on.
+dataframe. This module bridges the semantic objects of a world to that dataframe:
+:class:`Feature` names one column each and reads its own value off an object, through
+the :class:`ObjectFeature` that measures it.
 """
 
 from __future__ import annotations
 
 import enum
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import pandas as pd
 from semantic_digital_twin.world_description.geometry import Mesh
-from typing_extensions import Any, List
+from typing_extensions import Any, Dict, List, Type
+
+# %% object classes
 
 
 class ObjectClass(enum.StrEnum):
@@ -43,6 +47,9 @@ class ObjectClass(enum.StrEnum):
     BREAD = "Bread"
 
 
+# %% features
+
+
 class Feature(enum.StrEnum):
     """The columns of the feature dataframe :func:`extract_feature_dataframe` produces.
 
@@ -59,50 +66,97 @@ class Feature(enum.StrEnum):
     ASPECT_RATIO = "aspect_ratio"
     """The object's height over its widest horizontal extent."""
 
+    def extract(self, instance: Any) -> Any:
+        """Read this feature's value off one semantic object.
 
-def _collision_volume(instance: Any) -> float:
-    """Sum the watertight collision mesh volume of an object's root body.
+        :param instance: The semantic object to measure.
+        :return: The value this feature's column holds for that object.
+        """
+        features: Dict[Feature, Type[ObjectFeature]] = {
+            Feature.CLASS: SemanticClass,
+            Feature.VOLUME: CollisionVolume,
+            Feature.ASPECT_RATIO: AspectRatio,
+        }
+        return features[self](instance).value()
+
+
+@dataclass
+class ObjectFeature(ABC):
+    """Measures the value one :class:`Feature` holds for a semantic object."""
+
+    instance: Any
+    """The semantic object being measured."""
+
+    @abstractmethod
+    def value(self) -> Any:
+        """
+        :return: The measured value.
+        """
+
+
+@dataclass
+class SemanticClass(ObjectFeature):
+    """The class an object's semantic annotation is an instance of."""
+
+    def value(self) -> ObjectClass:
+        """
+        :return: The object's class as an :class:`ObjectClass` member.
+        """
+        return ObjectClass(type(self.instance).__name__)
+
+
+@dataclass
+class CollisionVolume(ObjectFeature):
+    """The volume an object's root body collision geometry encloses.
 
     A collision mesh that is not watertight has no well-defined enclosed volume and is
-    excluded from the sum rather than raising, since a real object is commonly made of
-    several convex collision pieces and only some of them need to be watertight for
-    the total to still be meaningful.
-
-    :param instance: The semantic object whose root body's collision volume is summed.
-    :return: The total volume, in cubic meters; ``0.0`` if no collision shape is watertight.
+    left out of the sum rather than raising, since a real object is commonly made of
+    several convex collision pieces and only some of them need to be watertight for the
+    total to still be meaningful.
     """
-    return sum(
-        shape.volume
-        for shape in instance.root.collision
-        if isinstance(shape, Mesh) and shape.mesh.is_watertight
-    )
+
+    def value(self) -> float:
+        """
+        :return: The total volume, in cubic meters; ``0.0`` if no collision shape is
+            watertight.
+        """
+        return sum(
+            shape.volume
+            for shape in self.instance.root.collision
+            if isinstance(shape, Mesh) and shape.mesh.is_watertight
+        )
 
 
-def _aspect_ratio(instance: Any) -> float:
-    """The height of an object's root body collision geometry over its widest horizontal extent.
+@dataclass
+class AspectRatio(ObjectFeature):
+    """How tall an object stands relative to how wide it spreads."""
 
-    :param instance: The semantic object whose shape is measured.
-    :return: The extent along the vertical axis divided by the greater of the two
-        horizontal extents.
-    """
-    minimum, maximum = instance.root.collision.combined_mesh.bounds
-    horizontal_extent, vertical_extent = maximum[:2] - minimum[:2], maximum[2] - minimum[2]
-    return float(vertical_extent / max(horizontal_extent))
+    def value(self) -> float:
+        """
+        :return: The collision geometry's extent along the vertical axis divided by the
+            greater of its two horizontal extents.
+        """
+        minimum, maximum = self.instance.root.collision.combined_mesh.bounds
+        horizontal_extent = maximum[:2] - minimum[:2]
+        vertical_extent = maximum[2] - minimum[2]
+        return float(vertical_extent / max(horizontal_extent))
+
+
+# %% extraction
 
 
 def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
-    """Extract the class, volume, and aspect ratio of each object as a feature dataframe.
+    """Extract every :class:`Feature` from each object.
 
-    The feature values are read from each object's own collision geometry directly,
-    which a data access object does not carry.
+    The feature values are read from each object directly, including from collision
+    geometry a data access object does not carry.
 
     :param objects: The semantic objects whose features are extracted.
-    :return: One row per object with a class, volume, and aspect ratio column.
+    :return: One row per object, with a column per feature.
     """
     return pd.DataFrame(
         {
-            Feature.CLASS: [ObjectClass(type(instance).__name__) for instance in objects],
-            Feature.VOLUME: [_collision_volume(instance) for instance in objects],
-            Feature.ASPECT_RATIO: [_aspect_ratio(instance) for instance in objects],
+            feature: [feature.extract(instance) for instance in objects]
+            for feature in Feature
         }
     )
