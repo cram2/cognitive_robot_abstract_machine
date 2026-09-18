@@ -14,6 +14,9 @@ from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import a, variable, set_of
 import krrood.entity_query_language.factories as eql
+from krrood.entity_query_language.verbalization.grammar.query.assembler import (
+    QueryAssembler,
+)
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 from ...dataset.department_and_employee import Department, Employee
@@ -273,4 +276,63 @@ def test_ranked_report_generalises_to_the_average_aggregate():
         "For the ProfitAndLossStatement "
         "with the highest average of the amount of money of its revenue, "
         "report the month of the begin of its period and the average"
+    )
+
+
+# %% ranking among aggregates of one kind
+
+
+@dataclass
+class Invoice:
+    period: Period
+    net: Money
+    tax: Money
+
+
+def test_two_aggregates_of_one_kind_have_different_signatures():
+    """
+    The structural signature separates two aggregates of one kind over different chains
+    — it is what decides which selected column a query is ranked by, so aggregates that
+    describe different navigations must not collide.
+    """
+    invoice = variable(Invoice, domain=None)
+    signature = QueryAssembler._expression_signature
+    assert signature(eql.sum(invoice.net.amount)) != signature(
+        eql.sum(invoice.tax.amount)
+    )
+
+
+def test_a_restated_aggregate_keeps_its_signature():
+    """
+    The signature is structural, not identity-based: ``ordered_by(sum(x))`` restated for
+    a selected ``sum(x)`` is a second object describing the same aggregate and still
+    matches.
+    """
+    invoice = variable(Invoice, domain=None)
+    signature = QueryAssembler._expression_signature
+    assert signature(eql.sum(invoice.net.amount)) == signature(
+        eql.sum(invoice.net.amount)
+    )
+
+
+def test_ranking_names_the_ordered_by_aggregate_not_the_first_selected():
+    """
+    With two aggregates of one kind selected, the ranking frame names the one the query
+    is ordered by — here the second selected — and only that one reduces to *"the sum"*
+    in the body.
+    """
+    invoice = variable(Invoice, domain=None)
+    net = eql.sum(invoice.net.amount)
+    tax = eql.sum(invoice.tax.amount)
+    query = a(
+        set_of(invoice.period.begin.month, net, tax)
+        .grouped_by(invoice.period.begin.month)
+        .ordered_by(tax, descending=True)
+        .limit(1)
+    )
+    text = verbalize_expression(query)
+    assert text == (
+        "For the Invoice with the highest sum of the amount of its tax, "
+        "report the month of the begin of its period, "
+        "the sum of the amount of its net, and the sum"
     )

@@ -276,13 +276,14 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             order_key
         )
 
-    def _expression_signature(self, expression: SymbolicExpression) -> Tuple:
+    @staticmethod
+    def _expression_signature(expression: SymbolicExpression) -> Tuple:
         """:return: a structural key for *expression* — its kind, root variable, and attribute path —
         so two distinct objects describing the same navigation/aggregate compare equal.
         """
         if isinstance(expression, Aggregator):
             kind = type(expression).__name__
-            chain, root = walk_chain(expression._chain_expression_)
+            chain, root = walk_chain(expression._child_)
         else:
             kind = ""
             chain, root = walk_chain(expression)
