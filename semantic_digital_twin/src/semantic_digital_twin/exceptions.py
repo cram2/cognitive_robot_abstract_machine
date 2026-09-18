@@ -2,6 +2,7 @@ from __future__ import annotations, absolute_import
 
 from dataclasses import dataclass, field, Field
 from datetime import timedelta
+from http import HTTPStatus
 from pathlib import Path
 from typing import Dict, Set
 from uuid import UUID
@@ -1339,6 +1340,35 @@ class PathResolutionError(ParsingError):
 
 
 @dataclass
+class DatasetServerError(ParsingError):
+    """
+    Raised when a dataset server does not answer with what was asked of it.
+    """
+
+    url: str = field(kw_only=True)
+    """
+    The address that was requested.
+    """
+
+    status_code: int = field(kw_only=True)
+    """
+    The status the server answered with.
+    """
+
+    def error_message(self) -> str:
+        return f"The dataset server answered {self.status_code} for '{self.url}'."
+
+    def suggest_correction(self) -> str:
+        if self.status_code == HTTPStatus.NOT_FOUND:
+            return (
+                "check that the dataset server serves the directory this path is under."
+            )
+        return (
+            "check that the dataset server is reachable and serving the dataset root."
+        )
+
+
+@dataclass
 class WorldEntityNotFoundError(UsageError):
     name_or_hash: Union[str, PrefixedName, int]
 
@@ -1868,3 +1898,70 @@ class NoSupportingSurfaceError(UsageError):
             "attach a supporting surface region to the annotation, or give its root "
             "body geometry with an upward facing face."
         )
+
+
+@dataclass
+class DuplicateSimulatorPropertyError(UsageError):
+    """
+    Raised when an entity carries more than one simulator property of a type of which a
+    simulator reads exactly one.
+    """
+
+    property_type: Type
+    """
+    The type of property attached more than once.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The entity already carries a {self.property_type.__name__} simulator "
+            "property."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Modify the existing property in place instead of attaching a second one; "
+            "HasSimulatorProperties.get_simulator_property_of_type returns it."
+        )
+
+
+@dataclass
+class SimulationNotStartedError(UsageError):
+    """
+    Raised when a simulation is advanced before it was started.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation was advanced too early.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The simulation of the world rooted at {self.world_name} has to be started "
+            "before it can be advanced."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Call start() first, or drive the simulation inside a with block."
+
+
+@dataclass
+class SimulationAlreadyRunningError(UsageError):
+    """
+    Raised when a simulation is started while it is already running.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation was started twice.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The simulation of the world rooted at {self.world_name} is already "
+            "running."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Stop the simulation before starting it again."

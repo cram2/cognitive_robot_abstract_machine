@@ -668,10 +668,13 @@ class WrappedTable(TableLike):
         """
         type_endpoint = wrapped_field.type_endpoint
 
-        # check underspecified generic fields
+        # An underspecified generic class still gets its own polymorphic root table when
+        # the class diagram maps a concrete parametrization of it elsewhere, so such a
+        # field is only dropped if nothing in the diagram could ever fill it.
         if (
             wrapped_field.is_underspecified_generic
             and isclass(type_endpoint)
+            and type_endpoint not in self.ormatic.mapped_classes
             and not self.is_stored_as_a_value(type_endpoint)
             and not any(
                 [

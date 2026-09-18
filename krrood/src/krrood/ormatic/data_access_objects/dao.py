@@ -712,42 +712,74 @@ class DataAccessObject(HasGeneric[T]):
         :param collection_relationships: The collection relationship entries.
         :param state: The conversion state.
         """
-        for relationship in single_relationships:
-            value = getattr(source_object, relationship.key)
-            if value is None:
-                setattr(self, relationship.key, None)
-            else:
-                setattr(
-                    self,
-                    relationship.key,
-                    self._get_or_queue_dao(value, state, relationship.domain_type),
-                )
+        for single_relationship in single_relationships:
+            self._fill_single_relationship(source_object, single_relationship, state)
 
-        for relationship in collection_relationships:
-            source_collection = getattr(source_object, relationship.key)
-
-            if relationship.association_class is not None:
-                dao_collection = []
-                for item in source_collection:
-                    association_dao = relationship.association_class()
-                    association_dao.target = self._get_or_queue_dao(
-                        item, state, relationship.domain_type
-                    )
-                    dao_collection.append(association_dao)
-            else:
-                dao_collection = [
-                    self._get_or_queue_dao(item, state, relationship.domain_type)
-                    for item in source_collection
-                ]
-
-            # The instrumented DAO attribute expects an iterable duck-typed as its own
-            # collection class; an immutable domain container (tuple) is held as a
-            # list at the ORM layer (see WrappedTable.create_many_to_many_relationship),
-            # so it must be assigned as one here too.
-            assignable_container_type = (
-                list if type(source_collection) is tuple else type(source_collection)
+        for collection_relationship in collection_relationships:
+            self._fill_collection_relationship(
+                source_object, collection_relationship, state
             )
-            setattr(self, relationship.key, assignable_container_type(dao_collection))
+
+    def _fill_single_relationship(
+        self,
+        source_object: Any,
+        relationship: SingleRelationship,
+        state: ToDataAccessObjectState,
+    ) -> None:
+        """
+        Populate a single-valued relationship attribute from a source object.
+
+        :param source_object: The source of the relationship value.
+        :param relationship: The single-valued relationship entry.
+        :param state: The conversion state.
+        """
+        value = getattr(source_object, relationship.key)
+        if value is None:
+            setattr(self, relationship.key, None)
+        else:
+            setattr(
+                self,
+                relationship.key,
+                self._get_or_queue_dao(value, state, relationship.domain_type),
+            )
+
+    def _fill_collection_relationship(
+        self,
+        source_object: Any,
+        relationship: CollectionRelationship,
+        state: ToDataAccessObjectState,
+    ) -> None:
+        """
+        Populate a collection-valued relationship attribute from a source object.
+
+        :param source_object: The source of the relationship values.
+        :param relationship: The collection-valued relationship entry.
+        :param state: The conversion state.
+        """
+        source_collection = getattr(source_object, relationship.key)
+
+        if relationship.association_class is not None:
+            dao_collection = []
+            for item in source_collection:
+                association_dao = relationship.association_class()
+                association_dao.target = self._get_or_queue_dao(
+                    item, state, relationship.domain_type
+                )
+                dao_collection.append(association_dao)
+        else:
+            dao_collection = [
+                self._get_or_queue_dao(item, state, relationship.domain_type)
+                for item in source_collection
+            ]
+
+        # The instrumented DAO attribute expects an iterable duck-typed as its own
+        # collection class; an immutable domain container (tuple) is held as a
+        # list at the ORM layer (see WrappedTable.create_many_to_many_relationship),
+        # so it must be assigned as one here too.
+        assignable_container_type = (
+            list if type(source_collection) is tuple else type(source_collection)
+        )
+        setattr(self, relationship.key, assignable_container_type(dao_collection))
 
     def _get_or_queue_dao(
         self,
@@ -758,11 +790,20 @@ class DataAccessObject(HasGeneric[T]):
         """
         Resolve a source object to a DAO, queuing it if necessary.
 
+        Constructing through a parametrized alias (``GenericClass[float](...)``) leaves
+        the alias on the instance, while a bare construction leaves nothing. That alias
+        is the object's own type argument, so it is preferred over ``expected_type``,
+        which only describes the field the object is reached through: a shared object
+        then resolves to the same DAO class no matter which field reaches it first,
+        which matters because the first resolution is the one this state keeps.
+
         :param source_object: The object to resolve.
         :param state: The conversion state.
-        :param expected_type: The expected domain type.
+        :param expected_type: The expected domain type of the field being filled.
         :return: The corresponding DAO instance.
         """
+        expected_type = getattr(source_object, "__orig_class__", None) or expected_type
+
         # Check if already built
         existing = state.get(source_object)
         if existing is not None:

@@ -45,7 +45,10 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     Vector3,
 )
-from semantic_digital_twin.world_description.mesh_file_storage import MeshFileStorage
+from semantic_digital_twin.world_description.mesh_file_storage import (
+    MeshFileSources,
+    MeshFileStorage,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import (
@@ -705,11 +708,22 @@ class Mesh(Shape):
         return copy_mesh
 
     @property
+    def local_file(self) -> Path:
+        """
+        The mesh's file on this machine.
+
+        A :attr:`filename` naming a file this machine does not hold is answered by
+        whichever registered source claims it, which copies it here first. The material
+        and texture files the mesh refers to by name sit beside the answer.
+        """
+        return MeshFileSources().resolve(self.filename)
+
+    @property
     def unscaled_mesh(self) -> trimesh.Trimesh:
         """
         The mesh exactly as the file describes it, before this shape's scale is applied.
         """
-        mesh = self._load_in_meters(self.filename, process=False)
+        mesh = self._load_in_meters(str(self.local_file), process=False)
         if mesh.visual.kind != "vertex":
             # Welding duplicate vertices is what makes a mesh watertight, which volume
             # and boolean operations require; formats like STL give every face its own

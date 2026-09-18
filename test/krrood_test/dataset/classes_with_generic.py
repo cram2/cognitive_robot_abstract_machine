@@ -25,6 +25,20 @@ class FirstGeneric(Generic[T], SubClassSafeGeneric):
 class SubClassGenericThatUpdatesGenericTypeToBuiltInType(FirstGeneric[int]): ...
 
 
+@dataclass(eq=False)
+class BareGenericFieldHolder:
+    """
+    Holds a field typed to a bare, unparametrized generic class.
+
+    ``FirstGeneric`` never binds its own type parameter, but its concrete
+    parametrizations, such as :class:`SubClassGenericThatUpdatesGenericTypeToBuiltInType`,
+    are mapped, so ``item`` must round trip polymorphically through that base rather than
+    being dropped.
+    """
+
+    item: FirstGeneric
+
+
 @dataclass
 class SubClassGenericThatRecreatesAField(FirstGeneric[int]):
     generic_attribute_using_generic: List[int] = field(default_factory=list)

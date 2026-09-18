@@ -43,7 +43,7 @@ grounds the query, and returns a verified `CausalCircuit` in one call.
 Code: `causal_query.py` (`BranchingAtomCountCausalQuery.run`), `dataset.py`,
 `domain.py` (`MutagenesisAtom.bond_count`,
 `MutagenesisMoleculeAggregations.branching_atom_count`).
-Tests: `test/causal_reasoning_test/test_causal_query.py`.
+Tests: `test/experiments_test/causal_reasoning_test/test_causal_query.py`.
 
 ## What a branching atom is
 

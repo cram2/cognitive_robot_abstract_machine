@@ -9,7 +9,8 @@ This module provides an annotator for:
 
 The plane detection uses:
 
-* RANSAC for robust model fitting
+* RANSAC for robust model fitting, seeded on request so that the same cloud gives the
+  same plane every time
 * Distance threshold for inlier selection
 * Plane equation in ax + by + cz + d = 0 form
 
@@ -20,6 +21,7 @@ The plane detection uses:
 from __future__ import annotations
 
 from timeit import default_timer
+from typing import Optional
 
 import numpy as np
 import open3d as o3d
@@ -60,6 +62,12 @@ class PlaneAnnotator(ThreadedAnnotator):
 
                 self.num_iterations: int = 50
                 """"""
+
+                self.random_seed: Optional[int] = None
+                """
+                Seed for the random samples RANSAC draws, so that the same cloud gives
+                the same plane every time; ``None`` leaves the samples unseeded.
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -107,6 +115,8 @@ class PlaneAnnotator(ThreadedAnnotator):
         camera_intrinsics = self.get_cas().get(CASViews.CAMERA_INTRINSIC)
         # print(f"Loaded cloud with {len(cloud.points)} points")
 
+        if self.descriptor.parameters.random_seed is not None:
+            o3d.utility.random.seed(self.descriptor.parameters.random_seed)
         plane_model, inliers = cloud.segment_plane(
             distance_threshold=self.descriptor.parameters.distance_threshold,
             ransac_n=3,

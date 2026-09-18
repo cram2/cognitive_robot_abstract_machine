@@ -7,6 +7,7 @@ conditioning against backdoor adjustment.
 
 from __future__ import annotations
 
+import experiments.orm.ormatic_interface  # type: ignore  # noqa: F401
 import numpy as np
 import pytest
 
