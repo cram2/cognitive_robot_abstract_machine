@@ -6,8 +6,11 @@ name: Upstream reviews
 # session cannot reach, so the read happens here and the session reads this job's
 # log. Dispatch-only on purpose: nothing about this should run on a timer.
 #
-# Runs unchanged in any fork - the upstream comes from .claude/stack/stack.toml
+# Runs unchanged in any fork - the upstream comes from basstler/stack.toml
 # and the fork owner from the runner's own context, so no repository is named here.
+#
+# A runner starts with nothing installed and no session hook runs on it, so this job
+# installs the package's requirements itself before invoking a module.
 
 on:
   workflow_dispatch:
@@ -41,6 +44,12 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install the basstler dependencies
+        run: |
+          set -euo pipefail
+          source .claude/hooks/resolve-personal-notes-config.sh
+          pip install "./${BASSTLER_PACKAGE_DIRECTORY}"
+
       - name: Read upstream review threads
         env:
           # gh is preinstalled on the runner; this is the only credential it needs,
@@ -61,4 +70,5 @@ jobs:
           if [ "${{ inputs.include_resolved }}" = "true" ]; then
             ARGUMENTS+=(--include-resolved)
           fi
-          python3 .claude/upstream_reviews/upstream_reviews.py "${ARGUMENTS[@]}"
+          source .claude/hooks/resolve-personal-notes-config.sh
+          python3 -m "${UPSTREAM_REVIEWS_MODULE}" "${ARGUMENTS[@]}"

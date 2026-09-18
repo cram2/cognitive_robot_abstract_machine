@@ -1,0 +1,7 @@
+# Stands in for the real basstler/pyproject.toml in a scratch clone: check-setup.sh
+# requires the file to exist and reads the dependency declaration out of it.
+[project]
+name = "basstler"
+# One dependency that is certainly installed wherever these tests run, so the dependency
+# check has a green baseline it cannot flake on.
+dependencies = ["pytest>=1"]

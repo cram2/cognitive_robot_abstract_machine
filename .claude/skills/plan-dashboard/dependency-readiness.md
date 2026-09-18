@@ -6,7 +6,7 @@ actually safe to stack new work on top of item X's dependencies?"), so
 this procedure lives here once instead of being restated in each skill.
 
 Source the shared config script if you haven't already this session in
-this same bash call — it defines `CHECK_DEPENDENCY_READINESS_SCRIPT`, used
+this same bash call — it defines `CHECK_DEPENDENCY_READINESS_MODULE`, used
 below (this has to stay a literal path: it's the one file that defines
 every other constant referenced by name in this system, so nothing "more
 shared" exists yet for it to point at):
@@ -20,7 +20,7 @@ For the item's `depends_on` list, follow `pr-data-fetching.md`'s procedure
 state into `/tmp/pr_data.json`. Then run:
 
 ```bash
-python3 "${CHECK_DEPENDENCY_READINESS_SCRIPT}" \
+python3 -m "${CHECK_DEPENDENCY_READINESS_MODULE}" \
   --plan /tmp/plan.yaml \
   --pr-data /tmp/pr_data.json \
   --item <item-id>
