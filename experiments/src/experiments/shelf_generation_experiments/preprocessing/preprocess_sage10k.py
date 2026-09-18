@@ -1135,7 +1135,17 @@ class Sage10kPreprocessingRun:
             return [future.result() for future in futures]
 
 
-if __name__ == "__main__":
+# %% command-line entry point
+
+
+def main() -> None:
+    """
+    Run the sage10k preprocessing pipeline once, reading its database URIs and scenes
+    root from the environment, and print its progress summary.
+
+    See :meth:`Sage10kPreprocessingRun.run` for why this is safe to run as this module's
+    own entry point (``python -m ...preprocess_sage10k``).
+    """
     sage10k_database_uri = os.environ.get("SAGE10k_DATABASE_URI")
     processed_database_uri = os.environ.get("SAGE10K_PROCESSED_DATABASE_URI")
     scenes_root = os.environ.get("SAGE10K_SCENES_ROOT")
@@ -1154,3 +1164,7 @@ if __name__ == "__main__":
         processed_database_uri=processed_database_uri,
         scenes_root=Path(scenes_root),
     ).run()
+
+
+if __name__ == "__main__":
+    main()
