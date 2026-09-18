@@ -277,8 +277,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         )
 
     def _expression_signature(self, expression: SymbolicExpression) -> Tuple:
-        """:return: a structural key for *expression* — its kind, root variable, and attribute path —
-        so two distinct objects describing the same navigation/aggregate compare equal.
+        """:return: a structural key for *expression* — its kind, root variable, and the key each
+        step of its chain states for itself — so two distinct objects describing the same
+        navigation/aggregate compare equal and two describing different ones do not.
         """
         if isinstance(expression, Aggregator):
             kind = type(expression).__name__
@@ -287,7 +288,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             kind = ""
             chain, root = walk_chain(expression)
         root_id = root._id_ if isinstance(root, Variable) else None
-        path = tuple((step._attribute_name_, step._owner_class_) for step in chain)
+        path = tuple(step._structural_key_ for step in chain)
         return (kind, root_id, path)
 
     def _with_superlative(
