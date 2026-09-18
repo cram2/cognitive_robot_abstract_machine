@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import replace
+import uuid
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, replace
+from itertools import groupby
 
 from typing_extensions import List, Optional, Tuple
 
@@ -63,6 +66,116 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Punctuation,
     RankingWords,
 )
+
+# %% how a report's rows are named
+
+
+def group_label(
+    key: SymbolicExpression,
+    number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
+) -> VerbalizationFragment:
+    """:return: a group key as a bare label in *number* — *"department"* / *"departments"* for an
+    attribute key, the type name for a variable key — naming the group itself rather than one
+    member's navigation (*"the department of an Employee"*).
+
+    >>> employee = variable(Employee, [])
+    >>> verbalize_expression(a(set_of(employee.department, sum(employee.salary)).grouped_by(
+    ...     employee.department)))
+    'For each department, report the sum of salaries of Employees'
+    """
+    if isinstance(key, Attribute):
+        return RoleFragment.for_attribute(
+            key._owner_class_, key._attribute_name_, number=number
+        )
+    return RoleFragment.for_type(key._type_, number=number)
+
+
+@dataclass(frozen=True)
+class RankedRow(ABC):
+    """
+    What one row of a ranked report is — the thing its *"For the <row> with the highest
+    <aggregate>"* frame names.
+
+    A report ranks whatever its rows are, so the frame has to name that and nothing
+    else: a superlative attached to the wrong noun claims the query returns something it
+    does not.
+    """
+
+    @abstractmethod
+    def head(self, number: GrammaticalNumber) -> VerbalizationFragment:
+        """:return: the noun the frame heads the row with, in *number*."""
+
+    @property
+    @abstractmethod
+    def referent_id(self) -> Optional[uuid.UUID]:
+        """:return: the referent this row introduces, which the body's mentions resolve back to, or
+        ``None`` when it introduces none.
+        """
+
+
+@dataclass(frozen=True)
+class EntityRow(RankedRow):
+    """
+    A row of an ungrouped report: the entity every column navigates from.
+
+    Naming it lets the columns pronominalise to it (*"its period"*).
+    """
+
+    subject: Variable
+    """
+    The single root the columns are written on.
+    """
+
+    def head(self, number: GrammaticalNumber) -> VerbalizationFragment:
+        """:return: the entity as a referring noun in *number* (*"the Statement"* / *"Statements"*)."""
+        return RoleFragment.for_variable(
+            self.subject._type_.__name__, self.subject, number=number
+        )
+
+    @property
+    def referent_id(self) -> Optional[uuid.UUID]:
+        """:return: the entity's own referent id, so the body can pronominalise to it."""
+        return subject_referent_id(self.subject)
+
+
+@dataclass(frozen=True)
+class GroupRow(RankedRow):
+    """
+    A row of a grouped report: the group, named by its keys.
+
+    Grouping collapses each group to a single row, so the report ranks groups even
+    though its columns are written on a member — *"the month with the highest sum"*, not
+    *"the Statement with the highest sum"*, whose sum would be one statement's own
+    rather than the month's.
+    """
+
+    keys: Tuple[SymbolicExpression, ...]
+    """
+    The GROUP BY keys the row is identified by.
+    """
+
+    def head(self, number: GrammaticalNumber) -> VerbalizationFragment:
+        """:return: the keys as bare labels in *number*, joined with *"and"* for a composite key."""
+        return oxford_comma(
+            [group_label(key, number) for key in self.keys],
+            Conjunctions.AND.as_fragment(),
+        )
+
+    @property
+    def referent_id(self) -> Optional[uuid.UUID]:
+        """:return: ``None`` — a group is not an entity of the model, so nothing refers back to it
+        as one; the body names its keys again instead.
+        """
+        return None
+
+    def named(self) -> NounPhrase:
+        """:return: the group as a definite noun phrase (*"the year and month"*) — how a column
+        restating the keys says which group the row is.
+        """
+        return NounPhrase(
+            head=self.head(GrammaticalNumber.SINGULAR),
+            definiteness=Definiteness.DEFINITE,
+        )
 
 
 class QueryAssembler(Assembler[Query, QueryPlan]):
@@ -189,25 +302,22 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         self, node: SetOf, plan: QueryPlan, report: ReportPlan
     ) -> VerbalizationFragment:
         """:return: a grouped/aggregated report whose rows are ranked *by an aggregate* — framed as
-        *"For the <entity> with the highest <aggregate>, report <columns>"* (singular for
-        ``limit(1)``, *"the three <entities> with the highest …"* for ``n > 1``). Naming the entity
-        first lets the columns pronominalise to it (*"its period"*) and the aggregate, named once in
-        the frame, reduce to *"the sum"* in the body. A ranking by a plain attribute (or a tuple with
+        *"For the <row> with the highest <aggregate>, report <columns>"* (singular for ``limit(1)``,
+        *"the three <rows> with the highest …"* for ``n > 1``). The aggregate, named once in the
+        frame, reduces to *"the sum"* in the body. A ranking by a plain attribute (or a tuple with
         no single root) keeps the attribute-keyed reframe, which already names its basis.
         """
-        subject = self._tuple_subject(node, plan)
         aggregate = self._ranked_aggregate_column(node, plan.ranking)
-        if subject is None or aggregate is None:
+        row = self._ranked_row(node, plan, report)
+        if row is None or aggregate is None:
             return self._assemble_ranked_set_of(node, plan)
         number = (
             GrammaticalNumber.PLURAL
             if plan.ranking.limit_number > 1
             else GrammaticalNumber.SINGULAR
         )
-        subject_noun = NounPhrase(
-            head=RoleFragment.for_variable(
-                subject._type_.__name__, subject, number=number
-            ),
+        row_noun = NounPhrase(
+            head=row.head(number),
             number=number,
             definiteness=Definiteness.DEFINITE,
             pre_head=(
@@ -218,12 +328,12 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             modifiers=[
                 self._highest_aggregate_modifier(aggregate, plan.ranking.direction)
             ],
-            referent_id=subject_referent_id(subject),
+            referent_id=row.referent_id,
         )
         header = PhraseFragment(
             parts=[
                 self._sentence_initial(Keywords.FOR.as_fragment()),
-                subject_noun,
+                row_noun,
                 Punctuation.COMMA.as_fragment(),
                 Keywords.REPORT.as_fragment(),
             ]
@@ -231,10 +341,49 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         return self._query_body(
             node,
             plan,
-            self._selections.prose(node._selected_variables_),
+            self._ranked_columns_prose(node, report),
             where_items=[self._where_clause(plan)],
             find_header=header,
         )
+
+    def _ranked_columns_prose(
+        self, node: SetOf, report: ReportPlan
+    ) -> VerbalizationFragment:
+        """:return: the ranked report's columns as prose, with each run of group keys named as the
+        group it identifies (*"the month"*, *"the year and month"*) rather than by a member's
+        navigation to it (*"the month of the begin of its period"*).
+
+        The row is the group, so a column restating its key says which group the row is, not how one
+        member reaches it — the same naming the frame uses, and the same reason.
+        """
+        key_ids = {key._id_ for key in report.group_keys}
+        if not key_ids:
+            return self._selections.prose(node._selected_variables_)
+        fragments: List[VerbalizationFragment] = []
+        for is_key, run in groupby(
+            node._selected_variables_, key=lambda column: column._id_ in key_ids
+        ):
+            if is_key:
+                fragments.append(GroupRow(keys=tuple(run)).named())
+                continue
+            fragments.extend(self.context.child(column) for column in run)
+        return oxford_comma(fragments, Conjunctions.AND.as_fragment())
+
+    def _ranked_row(
+        self, node: SetOf, plan: QueryPlan, report: ReportPlan
+    ) -> Optional[RankedRow]:
+        """:return: what one row of a ranked report is — its group, when the report groups; the
+        entity every column navigates from, when it does not — or ``None`` when the columns share no
+        single root to name.
+
+        Grouping collapses each group to one row, so a grouped report ranks groups even though its
+        columns are written on a member (*"the month with the highest sum"*, not *"the Statement
+        with the highest sum"*, whose sums would be one statement's own).
+        """
+        if report.is_grouped:
+            return GroupRow(keys=tuple(report.group_keys))
+        subject = self._tuple_subject(node, plan)
+        return None if subject is None else EntityRow(subject=subject)
 
     def _ranked_aggregate_column(
         self, node: SetOf, ranking
@@ -533,7 +682,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         'Report the distinct departments'
         """
         labels = oxford_comma(
-            [self._group_label(key, GrammaticalNumber.PLURAL) for key in keys],
+            [group_label(key, GrammaticalNumber.PLURAL) for key in keys],
             Conjunctions.AND.as_fragment(),
         )
         return PhraseFragment(
@@ -557,7 +706,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         'For each department, report the sum of salaries of Employees'
         """
         labels = oxford_comma(
-            [self._group_label(key) for key in keys], Conjunctions.AND.as_fragment()
+            [group_label(key) for key in keys], Conjunctions.AND.as_fragment()
         )
         having = node._having_expression_
         key_phrase = labels
@@ -575,26 +724,6 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
                 Keywords.REPORT.as_fragment(),
             ]
         )
-
-    def _group_label(
-        self,
-        key: SymbolicExpression,
-        number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
-    ) -> VerbalizationFragment:
-        """:return: a group key as a bare label in *number* — *"department"* / *"departments"* for an
-        attribute key, the type name for a variable key — naming the group itself rather than one
-        member's navigation (*"the department of an Employee"*).
-
-        >>> employee = variable(Employee, [])
-        >>> verbalize_expression(a(set_of(employee.department, sum(employee.salary)).grouped_by(
-        ...     employee.department)))
-        'For each department, report the sum of salaries of Employees'
-        """
-        if isinstance(key, Attribute):
-            return RoleFragment.for_attribute(
-                key._owner_class_, key._attribute_name_, number=number
-            )
-        return RoleFragment.for_type(key._type_, number=number)
 
     @staticmethod
     def _sentence_initial(fragment: RoleFragment) -> VerbalizationFragment:

@@ -49,11 +49,15 @@ class AggregatorRule(PhraseRule):
             )
         # A computed quantity is a referring expression: named in full when first introduced (the
         # reported column), a later mention of the same aggregate (a HAVING / ordering on it) is the
-        # general repeat-reduction's job — "the sum of salaries of Employees" → "the sum".
+        # general repeat-reduction's job — "the sum of salaries of Employees" → "the sum". That
+        # shortening only identifies the quantity while nothing else is a sum, since an aggregate is
+        # told apart by what it aggregates rather than by a determiner; where a sibling shares the
+        # word, the aggregate does not refer and every mention names it in full.
+        word_names_this_aggregate_alone = kind not in context.refer.shared_aggregations
         return NounPhrase(
             head=kind.as_fragment(),
             definiteness=Definiteness.DEFINITE,
             modifiers=kind.complement(child_fragment),
-            referent_id=node._id_,
+            referent_id=node._id_ if word_names_this_aggregate_alone else None,
             subject_of_modifiers=False,
         )

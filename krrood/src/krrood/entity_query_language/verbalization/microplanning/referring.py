@@ -15,6 +15,7 @@ from krrood.entity_query_language.core.variable import (
     Literal,
     Variable,
 )
+from krrood.entity_query_language.operators.aggregators import Aggregator
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.query.query import Entity, Query
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -33,7 +34,10 @@ from krrood.entity_query_language.verbalization.value_lexicon import type_noun
 from krrood.entity_query_language.verbalization.relational_attributes import (
     relational_verb,
 )
-from krrood.entity_query_language.verbalization.vocabulary.english import Keywords
+from krrood.entity_query_language.verbalization.vocabulary.english import (
+    Aggregations,
+    Keywords,
+)
 from krrood.entity_query_language.query.aggregation_structure import (
     aggregation_source_root,
     selected_aggregator,
@@ -516,6 +520,12 @@ class ReferringExpressions:
     Same-noun-group disambiguation, assigned lazily in discourse order by the coreference pass.
     """
 
+    shared_aggregations: Set[Aggregations] = field(default_factory=set)
+    """
+    The aggregations more than one aggregate in the scanned expression is built from — the
+    ones whose word names several quantities rather than one.
+    """
+
     @classmethod
     def from_expression(cls, expression: SymbolicExpression) -> ReferringExpressions:
         """
@@ -532,7 +542,37 @@ class ReferringExpressions:
             head_nouns=grouping.head_nouns(),
             type_alternatives=grouping.type_alternatives(),
             distinguishers=grouping.distinguisher_index(),
+            shared_aggregations=cls._shared_aggregations(expression),
         )
+
+    @staticmethod
+    def _shared_aggregations(expression: SymbolicExpression) -> Set[Aggregations]:
+        """:return: The aggregations more than one aggregate in *expression* is built from.
+
+        Aggregates are counted one per node rather than per navigation, so two separately
+        written ``sum(x)`` objects over one chain count as two. They carry different referent
+        ids, so no mention of either is ever a repeat of the other, and counting them apart
+        changes no wording.
+
+        :param expression: Root expression to scan.
+
+        >>> employee = variable(Employee, [])
+        >>> query = an(set_of(sum(employee.salary), sum(employee.starting_salary)))
+        >>> ReferringExpressions.from_expression(query).shared_aggregations == {Aggregations.SUM}
+        True
+        """
+        aggregates_per_aggregation: Dict[Aggregations, Set[uuid.UUID]] = defaultdict(
+            set
+        )
+        for node in expression._all_expressions_:
+            if isinstance(node, Aggregator):
+                aggregation = Aggregations.for_aggregator(type(node))
+                aggregates_per_aggregation[aggregation].add(node._id_)
+        return {
+            aggregation
+            for aggregation, aggregates in aggregates_per_aggregation.items()
+            if len(aggregates) > 1
+        }
 
     @classmethod
     def _group_referents_by_noun(

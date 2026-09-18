@@ -138,13 +138,14 @@ def _pnl_query(n: int):
 
 def test_set_of_limit_renders_ranking_and_suppresses_ordered_by():
     text = verbalize_expression(_pnl_query(3))
-    # Ranked by an aggregate → "the three <entity> with the highest <aggregate>" (names the basis),
+    # Ranked by an aggregate → "the three <group> with the highest <aggregate>" (names the basis),
     # the aggregate reduced to "the sum" in the body, the such-that folded, no trailing "grouped by".
     assert text == (
-        "For the three ProfitAndLossStatements "
-        "with the highest sum of the amount of money of their revenue, "
-        "report their period and the sum "
-        "such that the begin and end of their period have the same month"
+        "For the three periods "
+        "with the highest sum of the amount of money of the revenue "
+        "of a ProfitAndLossStatement, "
+        "report the period and the sum "
+        "such that the begin and end of its period have the same month"
     )
     # the ranking conveys the ordering — no standalone clause
     assert "ordered by" not in text
@@ -160,7 +161,7 @@ def test_set_of_limit_ascending_is_bottom():
         set_of(pnl.period, revenue).grouped_by(pnl.period).ordered_by(revenue).limit(2)
     )
     text = verbalize_expression(q)
-    assert text.startswith("For the two ProfitAndLossStatements with the lowest sum")
+    assert text.startswith("For the two periods with the lowest sum")
     assert "(" not in text
     assert "ordered by" not in text
     assert "grouped by" not in text
@@ -187,30 +188,31 @@ def _top_revenue_month_query(*, by_year: bool = False):
 def test_grouped_aggregation_limit_one_ranks_the_aggregate():
     """
     A grouped aggregation taking the single highest group identifies the winner by the
-    value it is ranked by — 'with the highest <aggregate>' — names the entity first so
-    the body pronominalises to it, and reduces the aggregate to 'the sum' on its second
-    mention.
+    value it is ranked by — 'with the highest <aggregate>' — names the group the row is,
+    and reduces the aggregate to 'the sum' on its second mention.
 
     Never restates the grouping.
     """
     text = verbalize_expression(_top_revenue_month_query())
     assert text == (
-        "For the ProfitAndLossStatement "
-        "with the highest sum of the amount of money of its revenue, "
-        "report the month of the begin of its period and the sum"
+        "For the month "
+        "with the highest sum of the amount of money of the revenue "
+        "of a ProfitAndLossStatement, "
+        "report the month and the sum"
     )
     assert "grouped by" not in text
 
 
 def test_grouped_aggregation_limit_one_folds_co_owned_keys():
     """
-    Co-owned group keys (year, month of the same begin) fold into one genitive.
+    Co-owned group keys (year, month of the same begin) name one group, not one each.
     """
     text = verbalize_expression(_top_revenue_month_query(by_year=True))
     assert text == (
-        "For the ProfitAndLossStatement "
-        "with the highest sum of the amount of money of its revenue, "
-        "report the year and month of the begin of its period and the sum"
+        "For the year and month "
+        "with the highest sum of the amount of money of the revenue "
+        "of a ProfitAndLossStatement, "
+        "report the year and month and the sum"
     )
     assert "grouped by" not in text
 
@@ -227,7 +229,10 @@ def test_grouped_aggregation_limit_one_ascending_is_lowest():
         .limit(1)
     )
     text = verbalize_expression(query)
-    assert "the lowest sum of the amount of money of its revenue" in text
+    assert (
+        "the lowest sum of the amount of money of the revenue of a ProfitAndLossStatement"
+        in text
+    )
     assert "grouped by" not in text
 
 
@@ -248,9 +253,10 @@ def test_ranked_report_reduces_only_the_ranked_aggregate():
     )
     text = verbalize_expression(query)
     assert text == (
-        "For the ProfitAndLossStatement "
-        "with the highest sum of the amount of money of its revenue, "
-        "report the month of the begin of its period, the sum, "
+        "For the month "
+        "with the highest sum of the amount of money of the revenue "
+        "of a ProfitAndLossStatement, "
+        "report the month, the sum, "
         "and the average of the amount of money of its revenue"
     )
 
@@ -270,7 +276,8 @@ def test_ranked_report_generalises_to_the_average_aggregate():
     )
     text = verbalize_expression(query)
     assert text == (
-        "For the ProfitAndLossStatement "
-        "with the highest average of the amount of money of its revenue, "
-        "report the month of the begin of its period and the average"
+        "For the month "
+        "with the highest average of the amount of money of the revenue "
+        "of a ProfitAndLossStatement, "
+        "report the month and the average"
     )
