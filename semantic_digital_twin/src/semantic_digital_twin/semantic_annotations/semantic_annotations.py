@@ -898,7 +898,10 @@ class Wall(HasApertures):
         return [
             door
             for door in self._world.get_semantic_annotations_by_type(Door)
-            if door.entry_way and InsideOf(door.entry_way.root, self.root)() > 0.1
+            if door.entry_way
+            and InsideOf(
+                door.entry_way.root, self.root, minimum_containment_ratio=0.1
+            )()
         ]
 
     @classmethod

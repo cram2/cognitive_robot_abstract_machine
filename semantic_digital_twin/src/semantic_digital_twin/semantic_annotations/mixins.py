@@ -940,8 +940,8 @@ class HasSupportingSurface(IsStorageSpace):
         bodies = variable_from(self._world.bodies_with_collision)
         body = entity(bodies).where(
             is_supported_by(
-                supported_body=bodies,
-                supporting_body=self.root,
+                supported=bodies,
+                supporting=self.root,
             )
         )
         objects = an(
