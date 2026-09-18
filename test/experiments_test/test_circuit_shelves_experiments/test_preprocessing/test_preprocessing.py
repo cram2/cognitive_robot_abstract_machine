@@ -24,14 +24,17 @@ from semantic_digital_twin.orm.ormatic_interface import (
     Sage10kRotationDAO,
     Sage10kSizeDAO,
 )
+from experiments.shelf_generation_experiments.preprocessing.classification import (
+    ObjectTypeClassifier,
+    ShelfMembershipClassifier,
+)
+from experiments.shelf_generation_experiments.preprocessing.mesh_measurement import (
+    MeshMeasurements,
+)
 from experiments.shelf_generation_experiments.preprocessing.preprocess_sage10k import (
     PreprocessedObject,
-    MeshBounds,
-    MeshMeasurements,
-    ObjectTypeClassifier,
     Sage10kPreprocessingRun,
     ShelfContents,
-    ShelfMembershipClassifier,
 )
 from experiments.shelf_generation_experiments.utils import MeshCandidate, ObjectType
 from krrood.ormatic.utils import create_engine
@@ -41,9 +44,17 @@ from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentShelf,
     RelationalCircuitExperimentShelfLayer,
 )
-from semantic_digital_twin.spatial_types import Point2, Pose, Pose2D
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point2,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.geometry import (
+    Scale,
+    VolumetricBoundingBox,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -56,6 +67,23 @@ def _empty_world() -> tuple[World, Body]:
     with world.modify_world():
         world.add_body(root)
     return world, root
+
+
+def _bounding_box(bottom: float, top: float) -> VolumetricBoundingBox:
+    """
+    A bounding box whose footprint is centred on its own local origin, spanning *bottom*
+    to *top* on z -- the only shape these tests need, since none of them exercise a mesh
+    whose footprint isn't centred on its own origin.
+    """
+    return VolumetricBoundingBox(
+        min_x=0.0,
+        min_y=0.0,
+        min_z=bottom,
+        max_x=0.0,
+        max_y=0.0,
+        max_z=top,
+        origin=HomogeneousTransformationMatrix(),
+    )
 
 
 def _eg_object(
@@ -88,7 +116,7 @@ def _shelf(
     width: float = 2.0, length: float = 2.0, yaw: float = 0.0, height: float = 2.0
 ) -> PreprocessedObject:
     """
-    A shelf whose origin sits at z=1.0, so a matching ``MeshBounds(bottom=-1.0,
+    A shelf whose origin sits at z=1.0, so a matching ``_bounding_box(bottom=-1.0,
     top=1.0)`` places its base at 0.0 and its top at 2.0.
     """
     return _eg_object(
@@ -127,11 +155,7 @@ def _layers_by_shelf(
         shelf.layers
         for shelf in Sage10kPreprocessingRun._shelves_with_layers(
             objects,
-            {
-                "room_1_shelf_1_src": MeshBounds(
-                    footprint_center_x=0.0, footprint_center_y=0.0, bottom=-1.0, top=1.0
-                )
-            },
+            {"room_1_shelf_1_src": _bounding_box(bottom=-1.0, top=1.0)},
             {"room_1_shelf_1"},
             MeshMeasurements(source_id_to_path={}),
         )
@@ -269,7 +293,7 @@ def test_position_is_corrected_to_the_meshs_bounding_box_center(
     assert float(corrected.position.y) == pytest.approx(2.0)
 
 
-def test_measured_footprint_center_fields_are_ordinary_floats(tmp_path: Path) -> None:
+def test_measured_bounds_fields_are_ordinary_floats(tmp_path: Path) -> None:
     """
     A mesh is measured with numpy, whose scalars pass for floats everywhere except at the
     database driver: PostgreSQL is handed their repr and rejects the statement, while
@@ -280,8 +304,12 @@ def test_measured_footprint_center_fields_are_ordinary_floats(tmp_path: Path) ->
 
     bounds = measurements.bounds("book_src")
 
-    assert type(bounds.footprint_center_x) is float
-    assert type(bounds.footprint_center_y) is float
+    assert type(bounds.min_x) is float
+    assert type(bounds.min_y) is float
+    assert type(bounds.min_z) is float
+    assert type(bounds.max_x) is float
+    assert type(bounds.max_y) is float
+    assert type(bounds.max_z) is float
 
 
 def test_position_correction_is_rotated_by_the_objects_own_yaw(
@@ -632,11 +660,7 @@ def test_a_shelf_of_no_measurable_height_reads_as_sitting_at_its_base() -> None:
 
     shelves = Sage10kPreprocessingRun._shelves_with_layers(
         objects,
-        {
-            "room_1_shelf_1_src": MeshBounds(
-                footprint_center_x=0.0, footprint_center_y=0.0, bottom=0.0, top=0.0
-            )
-        },
+        {"room_1_shelf_1_src": _bounding_box(bottom=0.0, top=0.0)},
         {"room_1_shelf_1"},
         MeshMeasurements(source_id_to_path={}),
     )
@@ -674,11 +698,7 @@ def test_a_shelf_keeps_its_own_pose_and_measured_height() -> None:
     """
     [shelf] = Sage10kPreprocessingRun._shelves_with_layers(
         _three_layer_shelf(),
-        {
-            "room_1_shelf_1_src": MeshBounds(
-                footprint_center_x=0.0, footprint_center_y=0.0, bottom=-1.0, top=1.0
-            )
-        },
+        {"room_1_shelf_1_src": _bounding_box(bottom=-1.0, top=1.0)},
         {"room_1_shelf_1"},
         MeshMeasurements(source_id_to_path={}),
     )
@@ -710,11 +730,7 @@ def test_a_shelfs_theme_is_the_object_type_its_objects_have_the_most_of() -> Non
 
     [shelf] = Sage10kPreprocessingRun._shelves_with_layers(
         objects,
-        {
-            "room_1_shelf_1_src": MeshBounds(
-                footprint_center_x=0.0, footprint_center_y=0.0, bottom=-1.0, top=1.0
-            )
-        },
+        {"room_1_shelf_1_src": _bounding_box(bottom=-1.0, top=1.0)},
         {"room_1_shelf_1"},
         MeshMeasurements(source_id_to_path={}),
     )
@@ -738,11 +754,7 @@ def test_a_tied_theme_breaks_alphabetically_by_type_value() -> None:
 
     [shelf] = Sage10kPreprocessingRun._shelves_with_layers(
         objects,
-        {
-            "room_1_shelf_1_src": MeshBounds(
-                footprint_center_x=0.0, footprint_center_y=0.0, bottom=-1.0, top=1.0
-            )
-        },
+        {"room_1_shelf_1_src": _bounding_box(bottom=-1.0, top=1.0)},
         {"room_1_shelf_1"},
         MeshMeasurements(source_id_to_path={}),
     )
@@ -836,11 +848,7 @@ def test_a_shelf_like_object_is_not_counted_as_another_shelfs_content() -> None:
 
     [extracted_shelf] = Sage10kPreprocessingRun._shelves_with_layers(
         [shelf, nested_shelf_like_object, book],
-        {
-            "room_1_shelf_1_src": MeshBounds(
-                footprint_center_x=0.0, footprint_center_y=0.0, bottom=-1.0, top=1.0
-            )
-        },
+        {"room_1_shelf_1_src": _bounding_box(bottom=-1.0, top=1.0)},
         shelf_ids,
         MeshMeasurements(source_id_to_path={}),
     )
@@ -940,11 +948,7 @@ def test_extraction_from_the_kept_objects_matches_extraction_from_all_of_them() 
     for processed_object in every_object:
         contents.collect(processed_object)
 
-    bounds_by_source_id = {
-        "room_1_shelf_1_src": MeshBounds(
-            footprint_center_x=0.0, footprint_center_y=0.0, bottom=-1.0, top=1.0
-        )
-    }
+    bounds_by_source_id = {"room_1_shelf_1_src": _bounding_box(bottom=-1.0, top=1.0)}
     measurements = MeshMeasurements(source_id_to_path={})
     assert [
         _shelf_snapshot(shelf)
@@ -1055,28 +1059,6 @@ def test_extracted_contents_spawn_within_the_layer_footprint(tmp_path: Path) -> 
     assert abs(corpus_y) <= shelf_face / 2
 
 
-# %% Sage10kPreprocessingRun._measure_meshes_in_parallel -- mesh measurement split across processes
-
-
-def test_parallel_measurement_matches_sequential_measurement(tmp_path: Path) -> None:
-    """
-    Measuring across worker processes must find the same bounds a single sequential pass
-    would, for both a cached mesh and one that is missing.
-    """
-    scene_directory_a = _cache_off_center_mesh(tmp_path / "a", "mesh_a")
-    scene_directory_b = _cache_off_center_mesh(tmp_path / "b", "mesh_b")
-    source_id_to_path = {"mesh_a": scene_directory_a, "mesh_b": scene_directory_b}
-    sequential = MeshMeasurements(source_id_to_path=source_id_to_path)
-
-    parallel_bounds = Sage10kPreprocessingRun._measure_meshes_in_parallel(
-        source_id_to_path, ["mesh_a", "mesh_b", "missing"], worker_count=2
-    )
-
-    assert parallel_bounds["mesh_a"] == sequential.bounds("mesh_a")
-    assert parallel_bounds["mesh_b"] == sequential.bounds("mesh_b")
-    assert parallel_bounds["missing"] is None
-
-
 # %% Sage10kPreprocessingRun._partition_round_robin -- splitting rooms into shards
 
 
@@ -1131,7 +1113,6 @@ def test_sharded_object_pass_writes_every_object_exactly_once(tmp_path: Path) ->
     results = run._process_objects_in_parallel(
         room_ids=["room_1", "room_2", "room_3"],
         source_id_to_path={},
-        bounds_by_source_id={},
         shelf_ids=set(),
         worker_count=2,
     )
@@ -1178,19 +1159,9 @@ def test_sharded_object_pass_keeps_shelf_contents_regardless_of_shard(
     processed_uri = f"sqlite:///{tmp_path}/processed.db"
     processed_engine = create_engine(processed_uri)
     Base.metadata.create_all(bind=processed_engine)
-    bounds_by_source_id = {
-        "shelf_1_src": MeshBounds(
-            footprint_center_x=0.0,
-            footprint_center_y=0.0,
-            bottom=-1.0,
-            top=1.0,
-        ),
-        "book_1_src": MeshBounds(
-            footprint_center_x=0.0,
-            footprint_center_y=0.0,
-            bottom=0.0,
-            top=0.1,
-        ),
+    source_id_to_path = {
+        "shelf_1_src": _cache_off_center_mesh(tmp_path / "shelf", "shelf_1_src"),
+        "book_1_src": _cache_off_center_mesh(tmp_path / "book", "book_1_src"),
     }
 
     run = Sage10kPreprocessingRun(
@@ -1200,8 +1171,7 @@ def test_sharded_object_pass_keeps_shelf_contents_regardless_of_shard(
     )
     results = run._process_objects_in_parallel(
         room_ids=["room_1", "room_2"],
-        source_id_to_path={},
-        bounds_by_source_id=bounds_by_source_id,
+        source_id_to_path=source_id_to_path,
         shelf_ids={"shelf_1"},
         worker_count=2,
     )
@@ -1264,18 +1234,14 @@ def test_only_shelf_relevant_meshes_are_measured(tmp_path: Path) -> None:
             session, ShelfMembershipClassifier()
         )
     assert shelf_contents.relevant_source_ids == {"shelf_1_src", "book_1_src"}
-    # Mirrors Sage10kPreprocessingRun.run(): narrowing bounds_by_source_id alone is not
-    # enough, since MeshMeasurements.bounds() lazily re-measures anything it finds a
-    # path for -- so source_id_to_path itself must be narrowed before either the
-    # measurement pass or the object pass sees it.
+    # Mirrors Sage10kPreprocessingRun.run(): MeshMeasurements.bounds() lazily measures
+    # anything it finds a path for, so source_id_to_path itself must be narrowed before
+    # the object pass sees it -- narrowing only which meshes get measured is not enough.
     relevant_source_id_to_path = {
         source_id: path
         for source_id, path in full_source_id_to_path.items()
         if source_id in shelf_contents.relevant_source_ids
     }
-    bounds_by_source_id = Sage10kPreprocessingRun._measure_meshes_in_parallel(
-        relevant_source_id_to_path, shelf_contents.relevant_source_ids, worker_count=1
-    )
 
     run = Sage10kPreprocessingRun(
         sage10k_database_uri=raw_uri,
@@ -1285,7 +1251,6 @@ def test_only_shelf_relevant_meshes_are_measured(tmp_path: Path) -> None:
     run._process_objects_in_parallel(
         room_ids=["room_1", "room_2"],
         source_id_to_path=relevant_source_id_to_path,
-        bounds_by_source_id=bounds_by_source_id,
         shelf_ids=shelf_contents.shelf_ids,
         worker_count=2,
     )

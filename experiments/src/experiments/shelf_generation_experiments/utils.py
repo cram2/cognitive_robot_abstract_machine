@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import random
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -308,10 +309,18 @@ def build_source_id_to_path(scenes_root: Path) -> dict[str, Path]:
     Each scene directory is expected to contain an ``objects/`` sub- folder with files
     named ``{source_id}.ply``.
 
+    A source_id found under more than one scene directory is left out of the result
+    rather than resolved to either one: source_ids are short, hash-like strings, and two
+    scenes' independent generation processes can produce the same one for two unrelated
+    meshes (confirmed against the live sage10k corpus: ~30 of 564,896 distinct
+    source_ids collide this way). Picking one scene would silently measure objects in
+    the other against the wrong mesh's bounding box.
+
     :param scenes_root: Root directory that contains individual scene folders.
-    :return:``{source_id: scene_directory}`` for every PLY file found under any scene.
+    :return:``{source_id: scene_directory}`` for every unambiguous PLY file found under
+        any scene.
     """
-    mapping: dict[str, Path] = {}
+    scene_directories_by_source_id: dict[str, list[Path]] = defaultdict(list)
     for scene_directory in scenes_root.iterdir():
         objects_directory = scene_directory / "objects"
         if not objects_directory.is_dir():
@@ -319,5 +328,9 @@ def build_source_id_to_path(scenes_root: Path) -> dict[str, Path]:
         for ply_file in objects_directory.glob("*.ply"):
             texture_file = objects_directory / f"{ply_file.stem}_texture.png"
             if texture_file.exists():
-                mapping[ply_file.stem] = scene_directory
-    return mapping
+                scene_directories_by_source_id[ply_file.stem].append(scene_directory)
+    return {
+        source_id: scene_directories[0]
+        for source_id, scene_directories in scene_directories_by_source_id.items()
+        if len(scene_directories) == 1
+    }

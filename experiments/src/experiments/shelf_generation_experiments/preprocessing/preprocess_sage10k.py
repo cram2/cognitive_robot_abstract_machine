@@ -9,19 +9,27 @@ from collections.abc import Iterable, Iterator
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Optional
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 import numpy as np
-import trimesh
 from sklearn.cluster import DBSCAN
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from experiments.shelf_generation_experiments.preprocessing.classification import (
+    ObjectTypeClassifier,
+    ShelfMembershipClassifier,
+)
+from experiments.shelf_generation_experiments.preprocessing.mesh_measurement import (
+    MeshMeasurements,
+)
+from experiments.shelf_generation_experiments.preprocessing.record_writer import (
+    BatchedRecordWriter,
+)
 from experiments.shelf_generation_experiments.utils import (
     ObjectType,
     build_source_id_to_path,
 )
-from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
 from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentObject2D,
@@ -29,593 +37,18 @@ from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentShelfLayer,
 )
 from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
     Point2,
     Pose,
     Pose2D,
 )
-from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.geometry import (
+    Scale,
+    VolumetricBoundingBox,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.orm.ormatic_interface import Sage10kObjectDAO
-
-
-def _rotate_offset_into_frame(offset: Point2, frame_yaw_radians: float) -> Point2:
-    """
-    Express *offset*, currently an offset along the world axes, in the axes of a frame
-    rotated by *frame_yaw_radians*.
-
-    Needed wherever an object's offset from a rotated parent is stored for later re-use
-    *inside* that parent: keeping the offset on the world axes makes it mean something
-    different once the parent's own rotation is applied again.
-
-    :param offset: The offset along the world axes.
-    :param frame_yaw_radians: Yaw of the target frame, in radians.
-    :return: The same offset expressed in the target frame's axes.
-    """
-    cosine = math.cos(frame_yaw_radians)
-    sine = math.sin(frame_yaw_radians)
-    offset_x = float(offset.x)
-    offset_y = float(offset.y)
-    return Point2(
-        x=offset_x * cosine + offset_y * sine,
-        y=-offset_x * sine + offset_y * cosine,
-    )
-
-
-# %% classification
-@dataclass(frozen=True)
-class ObjectTypeClassifier:
-    """
-    Maps the free-form, near-instance-specific ``object_type`` strings found in the raw
-    sage10k dataset (e.g. ``"book2"``, ``"bookchair8eba7fdc"``) onto the generalized
-    :class:`ObjectType` categories.
-
-    Matching is a case-insensitive, ordered keyword lookup: the raw string is tested
-    against each category's keywords in turn, and the first category with a matching
-    keyword wins. Furniture/surface categories (shelf, table, desk, ...) are checked
-    before small-item categories, since the dataset frequently names an item together
-    with the furniture it sits on (e.g. ``"bookshelf"``, ``"candletable"``) and the
-    furniture is usually the more useful category for scene- layout purposes. This is a
-    best-effort heuristic, not a guaranteed- correct classification -- raw strings that
-    combine two plausible categories in an unusual order may be mapped to the "wrong"
-    one.
-    """
-
-    _keywords_by_type: ClassVar[tuple[tuple[ObjectType, tuple[str, ...]], ...]] = (
-        # -- Furniture -----------------------------------------------------
-        (ObjectType.WORKBENCH, ("workbench",)),
-        (ObjectType.DISPLAYCASE, ("displaycase", "showcase")),
-        (ObjectType.WARDROBE, ("wardrobe", "closet")),
-        (ObjectType.DRESSER, ("dresser",)),
-        (ObjectType.LOCKER, ("locker",)),
-        (ObjectType.PANTRY, ("pantry",)),
-        (ObjectType.VANITY, ("vanity",)),
-        (ObjectType.NIGHTSTAND, ("nightstand",)),
-        (ObjectType.SIDEBOARD, ("sideboard", "console", "credenza")),
-        (ObjectType.SHELF, ("shelf", "shelv", "rack", "bookcase")),
-        (ObjectType.CABINET, ("cabinet",)),
-        (ObjectType.DESK, ("desk",)),
-        (ObjectType.COUNTER, ("counter", "countertop")),
-        (ObjectType.SOFA, ("sofa", "couch")),
-        (ObjectType.BENCH, ("bench",)),
-        (ObjectType.BED, ("bed", "crib")),
-        (
-            ObjectType.CHAIR,
-            ("chair", "stool", "armchair", "ottoman", "pouf", "barstool"),
-        ),
-        (ObjectType.TABLE, ("table", "island")),
-        (ObjectType.CART, ("cart", "trolley")),
-        (ObjectType.CRATE, ("crate", "pallet")),
-        (ObjectType.TOOLBOX, ("toolbox",)),
-        (ObjectType.PEDESTAL, ("pedestal", "podium", "plinth")),
-        (
-            ObjectType.STAND,
-            ("stand", "holder", "hanger", "easel", "coatrack", "clothingrack"),
-        ),
-        # -- Plants (checked early: "pot" and "table" are common substrings of
-        # "pottedplant"/"planttable"-style compounds, and the plant is the more
-        # useful category for those) --------------------------------------
-        (
-            ObjectType.PLANT,
-            (
-                "plant",
-                "succulent",
-                "fern",
-                "cactus",
-                "ficus",
-                "orchid",
-                "palm",
-                "bamboo",
-                "flower",
-                "tree",
-            ),
-        ),
-        # -- Kitchen / dining ------------------------------------------------
-        (ObjectType.CUTTING_BOARD, ("cuttingboard", "cutting_board")),
-        (ObjectType.DISHWASHER, ("dishwasher",)),
-        (ObjectType.REFRIGERATOR, ("fridge", "refrigerator", "freezer")),
-        (ObjectType.SINK, ("sink",)),
-        (ObjectType.OVEN, ("oven", "stove")),
-        (ObjectType.MICROWAVE, ("microwave",)),
-        (ObjectType.SMALL_APPLIANCE, ("toaster", "coffeemaker", "kettle", "blender")),
-        (ObjectType.DISPENSER, ("dispenser",)),
-        (ObjectType.CUTLERY, ("cutlery", "fork", "spoon", "spatula", "rollingpin")),
-        (ObjectType.KNIFE, ("knife",)),
-        (ObjectType.CUP, ("cup", "mug", "tumbler", "teacup")),
-        (ObjectType.GLASS, ("glass", "wineglass")),
-        (ObjectType.PLATE, ("plate",)),
-        (ObjectType.BOWL, ("bowl",)),
-        (ObjectType.BOTTLE, ("bottle",)),
-        (ObjectType.JAR, ("jar", "shaker", "spicejar")),
-        (ObjectType.UTENSIL, ("utensil",)),
-        (ObjectType.POT, ("pot", "peppergrinder")),
-        (ObjectType.TRAY, ("tray",)),
-        # -- Lighting --------------------------------------------------------
-        (ObjectType.CHANDELIER, ("chandelier",)),
-        (ObjectType.NEON_SIGN, ("neon",)),
-        (ObjectType.CANDLE, ("candle", "candelabra", "candlestick", "lantern")),
-        (ObjectType.LAMP, ("lamp",)),
-        (
-            ObjectType.LIGHT_FIXTURE,
-            ("light", "sconce", "fixture", "pendant", "ledstrip", "lightstrip"),
-        ),
-        # -- Electronics (checked before decor/art: "printer" and
-        # "smartphone" would otherwise match ART's "print"/"art" substrings)
-        # ---------------------------------------------------------------
-        (ObjectType.TELEVISION, ("tv", "television")),
-        (ObjectType.PROJECTOR, ("projector",)),
-        (ObjectType.COMPUTER, ("computer", "laptop")),
-        (ObjectType.KEYBOARD, ("keyboard",)),
-        (ObjectType.MOUSE, ("mouse",)),
-        (ObjectType.MONITOR, ("monitor", "screen")),
-        (ObjectType.CAMERA, ("camera",)),
-        (ObjectType.SPEAKER, ("speaker",)),
-        (ObjectType.PHONE, ("phone", "smartphone")),
-        (ObjectType.PRINTER, ("printer",)),
-        (ObjectType.REMOTE_CONTROL, ("remote", "controller")),
-        # -- Decor / art -------------------------------------------------------
-        (ObjectType.MIRROR, ("mirror",)),
-        (ObjectType.CLOCK, ("clock",)),
-        (
-            ObjectType.SCULPTURE,
-            ("sculpture", "figurine", "statue", "bust", "mannequin"),
-        ),
-        (ObjectType.VASE, ("vase", "urn", "planter")),
-        (ObjectType.TAPESTRY, ("tapestry", "wallhanging", "banner", "flag")),
-        (ObjectType.FRAME, ("frame", "pictureframe")),
-        (ObjectType.PEGBOARD, ("pegboard",)),
-        (
-            ObjectType.SIGN,
-            ("sign", "menuboard", "whiteboard", "blackboard", "chart", "map"),
-        ),
-        (
-            ObjectType.ART,
-            (
-                "art",
-                "painting",
-                "poster",
-                "print",
-                "picture",
-                "canvas",
-                "mural",
-                "decor",
-                "ornament",
-                "brassdecor",
-                "stainedglass",
-                "globe",
-                "seashell",
-            ),
-        ),
-        # -- Food --------------------------------------------------------------
-        (
-            ObjectType.FOOD,
-            (
-                "apple",
-                "fig",
-                "pastry",
-                "cannedgood",
-                "canned",
-                "condiment",
-                "croissant",
-                "bakingpowder",
-                "flourbag",
-                "bread",
-                "herb",
-                "spice",
-            ),
-        ),
-        # -- Reading / office --------------------------------------------------
-        (
-            ObjectType.BOOK,
-            (
-                "book",
-                "notebook",
-                "magazine",
-                "notepad",
-                "tome",
-                "volume",
-                "folio",
-                "textbook",
-                "cookbook",
-                "hardcover",
-                "novel",
-                "codex",
-            ),
-        ),
-        (ObjectType.PEN, ("pen", "pencil", "crayon", "quill")),
-        (
-            ObjectType.OFFICE_SUPPLY,
-            (
-                "stapler",
-                "paperclip",
-                "ruler",
-                "folder",
-                "eraser",
-                "tape",
-                "scissors",
-                "businesscard",
-            ),
-        ),
-        # -- Bath / personal care ----------------------------------------------
-        (ObjectType.TOILET, ("toilet",)),
-        (ObjectType.BATHTUB, ("bathtub", "shower")),
-        (ObjectType.TOWEL, ("towel", "napkin")),
-        (
-            ObjectType.PERSONAL_CARE_PRODUCT,
-            (
-                "soap",
-                "shampoo",
-                "lotion",
-                "conditioner",
-                "toothbrush",
-                "toothpaste",
-                "cosmetic",
-                "perfume",
-                "sanitizer",
-                "bodywash",
-                "hairproduct",
-                "comb",
-                "brush",
-                "diaper",
-                "syringe",
-                "medicalsupply",
-                "stethoscope",
-            ),
-        ),
-        # -- Tools / hardware ----------------------------------------------------
-        (
-            ObjectType.TOOL,
-            (
-                "tool",
-                "wrench",
-                "hammer",
-                "screwdriver",
-                "drill",
-                "pliers",
-                "sander",
-                "scale",
-                "gauge",
-            ),
-        ),
-        (
-            ObjectType.HARDWARE,
-            (
-                "gear",
-                "wire",
-                "pipe",
-                "hook",
-                "outlet",
-                "cable",
-                "circuit",
-                "socket",
-                "cog",
-                "chip",
-                "sensor",
-                "router",
-                "key",
-                "button",
-            ),
-        ),
-        (ObjectType.LADDER, ("ladder",)),
-        (ObjectType.SAFETY_EQUIPMENT, ("extinguisher", "smokedetector", "firealarm")),
-        # -- Containers ----------------------------------------------------------
-        (ObjectType.TRASH, ("trash", "waste")),
-        (ObjectType.BASKET, ("basket",)),
-        (ObjectType.BIN, ("bin",)),
-        (ObjectType.BOX, ("box",)),
-        (ObjectType.BUCKET, ("bucket",)),
-        (
-            ObjectType.CONTAINER,
-            ("container", "case", "can", "barrel", "tub", "trunk", "caddy"),
-        ),
-        # -- Structural / architectural --------------------------------------
-        (ObjectType.WINDOW, ("window",)),
-        (ObjectType.DOOR, ("door",)),
-        (ObjectType.FIREPLACE, ("fireplace",)),
-        (ObjectType.VENT, ("vent", "radiator")),
-        (
-            ObjectType.PANEL,
-            (
-                "panel",
-                "tile",
-                "wallpaper",
-                "molding",
-                "column",
-                "beam",
-                "arch",
-                "grille",
-                "trim",
-            ),
-        ),
-        # -- Textiles --------------------------------------------------------
-        (ObjectType.PILLOW, ("pillow", "cushion")),
-        (ObjectType.TEXTILE, ("textile", "fabric", "rug", "carpet", "blanket")),
-        # -- Misc ---------------------------------------------------------------
-        (ObjectType.APPAREL, ("shoe", "watch", "glasses")),
-        (
-            ObjectType.SPORTS_EQUIPMENT,
-            ("dumbbell", "treadmill", "elliptical", "kettlebell"),
-        ),
-        (ObjectType.VEHICLE, ("car", "bike", "tire")),
-        (
-            ObjectType.RETAIL_FIXTURE,
-            (
-                "cashregister",
-                "register",
-                "checkout",
-                "pricetag",
-                "coin",
-                "display",
-                "kiosk",
-                "station",
-                "booth",
-            ),
-        ),
-        (ObjectType.TOY, ("toy",)),
-        (ObjectType.WASHING_MACHINE, ("washingmachine", "washer")),
-        (ObjectType.DRYER, ("dryer",)),
-    )
-
-    def classify(self, raw_type: str) -> ObjectType:
-        """
-        Return the :class:`ObjectType` category whose keywords best match *raw_type*.
-
-        :param raw_type: A raw, near-instance-specific ``object_type`` string from the
-            sage10k dataset (e.g. ``"book2"``).
-        :return: The best-matching generalized category, or :attr:`ObjectType.OTHER` if
-            no keyword matches.
-        """
-        normalized = raw_type.strip().lower()
-        for object_type, keywords in self._keywords_by_type:
-            if any(keyword in normalized for keyword in keywords):
-                return object_type
-        return ObjectType.OTHER
-
-
-@dataclass(frozen=True)
-class ShelfMembershipClassifier:
-    """
-    Decides whether a free-form furniture name from the raw sage10k dataset (e.g.
-    ``"bookshelf2"``, ``"storagecabinet"``) describes shelf-like storage furniture at
-    all.
-
-    Matching is a case-insensitive substring lookup against a fixed keyword set. This
-    is the gate deciding which furniture enters training as a shelf -- a name outside
-    the keyword set answers ``False`` rather than being admitted as some catch-all
-    kind of shelf, which would let every table and chair in the dataset in.
-
-    A shelf's kind is no longer classified from its furniture name; see
-    :attr:`~experiments.shelf_generation_experiments.shelf_schema.RelationalCircuitExperimentShelf.theme_dominant_type`,
-    which is derived from what is actually placed on the shelf instead.
-    """
-
-    _KEYWORDS: ClassVar[tuple[str, ...]] = (
-        "bookshelf",
-        "bookcase",
-        "book_shelf",
-        "book_case",
-        "cabinet",
-        "sideboard",
-        "console",
-        "credenza",
-        "shelf",
-        "shelv",
-        "rack",
-    )
-    """
-    Keywords identifying shelf-like furniture, matched as substrings of the raw name.
-    """
-
-    def is_shelf_like(self, raw_type: str) -> bool:
-        """
-        Decide whether a raw furniture name describes shelf-like storage furniture.
-
-        :param raw_type: The dataset's free-form name for the furniture.
-        :return:``True`` when the name matches a modelled shelf-like keyword.
-        """
-        normalized_type = raw_type.lower()
-        return any(keyword in normalized_type for keyword in self._KEYWORDS)
-
-
-@dataclass(frozen=True)
-class CorrectedPosition:
-    """
-    An object's horizontal position after the mesh-centring correction, with the
-    provenance of that position.
-    """
-
-    position: Point2
-    """
-    The object's position in world coordinates.
-    """
-
-    is_mesh_corrected: bool
-    """
-    Whether :attr:`position` is the mesh's measured bounding-box centre rather than the
-    dataset's unmodified recorded position.
-    """
-
-
-@dataclass(frozen=True)
-class MeshBounds:
-    """
-    The measurements taken from one mesh: where its horizontal centre sits relative to
-    its origin, and how far it reaches vertically.
-
-    Kept as plain floats rather than :class:`~semantic_digital_twin.spatial_types.spatial_types.Point2`:
-    this crosses process boundaries twice, as the return value of
-    :meth:`MeshMeasurements._load_mesh_bounds` under
-    :meth:`Sage10kPreprocessingRun._measure_meshes_in_parallel`
-    and again as part of the ``bounds_by_source_id`` argument handed to
-    :meth:`Sage10kPreprocessingRun._process_room_shard`, and a
-    :class:`Point2`'s casadi-backed value cannot be pickled across a
-    :class:`~concurrent.futures.ProcessPoolExecutor` boundary.
-    """
-
-    footprint_center_x: float
-    """
-    Horizontal centre of the mesh's bounding box along x, in the mesh's own frame.
-    """
-
-    footprint_center_y: float
-    """
-    Horizontal centre of the mesh's bounding box along y, in the mesh's own frame.
-    """
-
-    bottom: float
-    """
-    Lowest point of the mesh, in its own frame.
-    """
-
-    top: float
-    """
-    Highest point of the mesh, in its own frame.
-    """
-
-    @property
-    def height(self) -> float:
-        """
-        The mesh's total vertical size.
-        """
-        return self.top - self.bottom
-
-
-@dataclass
-class MeshMeasurements:
-    """
-    Measures cached meshes, so an object's recorded position can be corrected onto its
-    mesh's true horizontal centre and a shelf's real base and top can be located.
-
-    A sage10k object's recorded position is its mesh's local origin, which the dataset
-    does not guarantee to be that mesh's centre -- much as a room's recorded position is
-    its lower-left corner.
-    """
-
-    source_id_to_path: dict[str, Path]
-    """
-    Maps a mesh's source id to the cached scene directory holding it, as returned by
-    :func:`build_source_id_to_path`.
-    """
-
-    _bounds_by_source_id: dict[str, Optional[MeshBounds]] = field(default_factory=dict)
-    """
-    Memoizes each measured mesh, since many objects share one asset.
-
-    ``None`` records that a mesh was not available to measure.
-    """
-
-    @property
-    def measured_mesh_count(self) -> int:
-        """
-        How many distinct meshes were actually loaded and measured.
-        """
-        return sum(bounds is not None for bounds in self._bounds_by_source_id.values())
-
-    def corrected_position(
-        self, source_id: str, position: Point2, yaw_degrees: float
-    ) -> CorrectedPosition:
-        """
-        Correct *position* onto the true centre of *source_id*'s mesh.
-
-        Falls back to *position* unchanged, flagged as uncorrected, when the mesh is not
-        cached locally, so preprocessing still runs on a partial mesh cache without
-        silently passing off uncorrected data as corrected.
-
-        :param source_id: Identifies the object's mesh asset.
-        :param position: The object's recorded world position.
-        :param yaw_degrees: The object's own yaw, which the mesh-local offset is rotated
-            by to reach world axes.
-        :return: The corrected position and whether the mesh supplied it.
-        """
-        bounds = self.bounds(source_id)
-        if bounds is None:
-            return CorrectedPosition(position=position, is_mesh_corrected=False)
-        # _rotate_offset_into_frame(offset, theta) is R(-theta); negating the angle
-        # gives R(+theta), the forward rotation into world axes.
-        world_offset = _rotate_offset_into_frame(
-            Point2(x=bounds.footprint_center_x, y=bounds.footprint_center_y),
-            math.radians(-yaw_degrees),
-        )
-        return CorrectedPosition(
-            position=Point2(
-                x=position.x + world_offset.x, y=position.y + world_offset.y
-            ),
-            is_mesh_corrected=True,
-        )
-
-    def bounds(self, source_id: str) -> Optional[MeshBounds]:
-        """
-        The measurements of *source_id*'s mesh, loading it on first request.
-
-        :param source_id: Identifies the mesh asset to measure.
-        :return: The mesh's measurements, or ``None`` when it is not cached.
-        """
-        if source_id not in self._bounds_by_source_id:
-            self._bounds_by_source_id[source_id] = self._measure(source_id)
-        return self._bounds_by_source_id[source_id]
-
-    def _measure(self, source_id: str) -> Optional[MeshBounds]:
-        """
-        Load *source_id*'s mesh and measure its bounding box.
-
-        :param source_id: Identifies the mesh asset to measure.
-        :return: The mesh's measurements, or ``None`` when it is not cached.
-        """
-        return MeshMeasurements._load_mesh_bounds(
-            source_id, self.source_id_to_path.get(source_id)
-        )
-
-    @staticmethod
-    def _load_mesh_bounds(
-        source_id: str, scene_directory: Optional[Path]
-    ) -> Optional[MeshBounds]:
-        """
-        Load and measure *source_id*'s mesh from *scene_directory*.
-
-        A staticmethod so a parallel measurement pass can submit it to a worker process
-        directly (it pickles by reference, like a free function, rather than needing a
-        live :class:`MeshMeasurements` instance).
-
-        :param source_id: Identifies the mesh asset to measure.
-        :param scene_directory: The cached scene directory holding the mesh, or ``None``
-            when it is not cached locally.
-        :return: The mesh's measurements, or ``None`` when it is not cached.
-        """
-        if scene_directory is None:
-            return None
-        mesh = trimesh.load(
-            str(scene_directory / "objects" / f"{source_id}.ply"), process=False
-        )
-        minimum_bound, maximum_bound = mesh.bounds
-        # The bounds are numpy scalars, which pass for floats until PostgreSQL is
-        # handed their repr instead of a number, so they are converted here rather
-        # than at every place a measurement ends up in a stored field.
-        return MeshBounds(
-            footprint_center_x=float((minimum_bound[0] + maximum_bound[0]) / 2),
-            footprint_center_y=float((minimum_bound[1] + maximum_bound[1]) / 2),
-            bottom=float(minimum_bound[2]),
-            top=float(maximum_bound[2]),
-        )
 
 
 # %% preprocessing's own raw-object representation
@@ -757,9 +190,8 @@ class ShelfContents:
     Mesh measurement -- and so mesh-corrected positions -- only ever feeds layer
     extraction (:meth:`Sage10kPreprocessingRun._shelves_with_layers`), which only ever
     reads shelves and their own contents. Every other mesh in the raw dataset can be
-    measured for nothing, so this is the scope
-    :meth:`Sage10kPreprocessingRun._measure_meshes_in_parallel` should be run against
-    instead of every distinct source id in the dataset.
+    measured for nothing, so this is the scope the object pass's mesh lookups should be
+    narrowed to instead of every distinct source id in the dataset.
     """
 
     objects: list[PreprocessedObject] = field(default_factory=list)
@@ -822,7 +254,9 @@ class ShelfContents:
         ):
             self.objects.append(processed_object)
 
-    def shelf_bounds(self, measurements: MeshMeasurements) -> dict[str, MeshBounds]:
+    def shelf_bounds(
+        self, measurements: MeshMeasurements
+    ) -> dict[str, VolumetricBoundingBox]:
         """
         Measure the kept shelves' meshes, which is what locates their base and top.
 
@@ -842,70 +276,6 @@ class ShelfContents:
             for source_id in shelf_source_ids
             if (bounds := measurements.bounds(source_id)) is not None
         }
-
-
-@dataclass
-class BatchedRecordWriter:
-    """
-    Stores records one at a time, committing and detaching them periodically.
-
-    Detaching, rather than only expiring, is what lets a stored record be released: an
-    expired instance stays registered with the session and so stays alive for the whole
-    run.
-    """
-
-    session: Session
-    """
-    Session on the processed database.
-    """
-
-    label: str
-    """
-    Name used in the progress output.
-    """
-
-    stored_count: int = 0
-    """
-    Records stored so far.
-    """
-
-    commit_batch_size: float = 500
-    """
-    How many records to stage before committing and detaching them.
-    """
-
-    def store(self, record: Any) -> None:
-        """
-        Convert *record* to its data access object and stage it for the next commit.
-
-        :param record: The processed record to persist.
-        """
-        self.session.add(to_dao(record))
-        self.stored_count += 1
-        if self.stored_count % self.commit_batch_size == 0:
-            self._commit()
-            print(f"  committed {self.stored_count} {self.label}")
-
-    def store_all(self, records: Iterable[Any]) -> None:
-        """
-        Store every record in *records* and commit what is left over.
-
-        :param records: The processed records to persist.
-        """
-        for record in records:
-            self.store(record)
-        self.finish()
-
-    def finish(self) -> None:
-        """
-        Commit whatever has not been committed yet and report the total.
-        """
-        self._commit()
-        print(f"Stored {self.stored_count} {self.label}.")
-
-    def _commit(self) -> None:
-        self.session.commit()
-        self.session.expunge_all()
 
 
 @dataclass
@@ -934,6 +304,15 @@ class ObjectPassShardResult:
     Layers across this shard's own :attr:`shelf_count` shelves.
     """
 
+    measured_mesh_count: int
+    """
+    Distinct meshes this shard measured for itself.
+
+    A source_id belongs to exactly one scene directory, so no two shards ever measure
+    the same one -- summing this across shards gives the true corpus-wide count, the
+    same as a single shared measurement pass would have.
+    """
+
 
 @dataclass
 class PreprocessingSummary:
@@ -946,11 +325,6 @@ class PreprocessingSummary:
     """
     Every shard's own counts from
     :meth:`Sage10kPreprocessingRun._process_objects_in_parallel`.
-    """
-
-    measured_source_id_count: int
-    """
-    How many of the shelf-relevant source ids had a mesh actually cached and measured.
     """
 
     relevant_source_id_count: int
@@ -1002,15 +376,23 @@ class PreprocessingSummary:
         """
         return sum(result.layer_count for result in self.shard_results)
 
+    @property
+    def measured_source_id_count(self) -> int:
+        """
+        How many of the shelf-relevant source ids had a mesh actually cached and
+        measured, across every shard.
+        """
+        return sum(result.measured_mesh_count for result in self.shard_results)
+
     def report(self) -> None:
         """
         Print the run's progress summary.
         """
         print(
             f"Corrected {self.corrected_count}/{self.stored_count} object positions "
-            f"across {self.worker_count} workers against "
+            f"across {self.worker_count} workers, which measured "
             f"{self.measured_source_id_count}/{self.relevant_source_id_count} "
-            f"shelf-relevant cached meshes."
+            f"shelf-relevant meshes along the way."
         )
         print(
             f"Extracted {self.layer_count} layers from {self.shelf_count}/"
@@ -1026,8 +408,15 @@ class Sage10kPreprocessingRun:
     """
     Orchestrates one run of the sage10k preprocessing pipeline against a pair of
     database URIs: dropping and rebuilding the processed schema, discovering shelves and
-    rooms, measuring shelf-relevant meshes, and running the read-convert-write object
-    pass across worker processes.
+    rooms, and running the read-convert-write object pass across worker processes.
+
+    Mesh measurement has no pass of its own: a source_id names a mesh cached under
+    exactly one scene directory (never shared between rooms -- confirmed against the
+    live sage10k corpus, see :func:`~experiments.shelf_generation_experiments.utils.build_source_id_to_path`),
+    so nothing is gained by measuring ahead of time in a separate, shared pool. Each
+    shard's own :meth:`_process_room_shard` measures a mesh the first time one of its
+    own objects needs it, memoized by :class:`MeshMeasurements` for the rest of that
+    shard's run, and never reports it back to this process or another shard.
 
     Also carries the shelf-layer extraction algorithm itself
     (:meth:`_shelves_with_layers` down through :meth:`_layers_of_shelf` and its smaller
@@ -1036,13 +425,11 @@ class Sage10kPreprocessingRun:
     the module.
 
     Holds only the run's own configuration -- URIs and worker-pool tuning -- never a
-    database session or engine: :meth:`_process_objects` and :meth:`_measure_meshes`
-    delegate to :meth:`_process_objects_in_parallel` and the
-    :meth:`_measure_meshes_in_parallel` staticmethod, which in turn submit
-    :meth:`_process_room_shard` and (via :meth:`MeshMeasurements._load_mesh_bounds`)
-    per-mesh measurement to their own worker pools -- each shard builds its own
-    worker-local sessions from :attr:`sage10k_database_uri`/:attr:`processed_database_uri`
-    rather than sharing a connection held here. :meth:`_process_objects_in_parallel` and
+    database session or engine: :meth:`_process_objects` delegates to
+    :meth:`_process_objects_in_parallel`, which submits :meth:`_process_room_shard` to
+    its own worker pool -- each shard builds its own worker-local sessions from
+    :attr:`sage10k_database_uri`/:attr:`processed_database_uri` rather than sharing a
+    connection held here. :meth:`_process_objects_in_parallel` and
     :meth:`_process_room_shard` read those URIs straight off ``self`` instead of taking
     them as parameters: a bound instance method pickles by pickling the instance behind
     it, and this dataclass holds nothing but URIs and worker-pool tuning, so it pickles
@@ -1066,30 +453,12 @@ class Sage10kPreprocessingRun:
     :func:`build_source_id_to_path` to locate shelf-relevant meshes.
     """
 
-    mesh_measurement_worker_cap: int = 128
-    """
-    Upper bound on parallel workers for mesh measurement, independent of the host's core
-    count.
-
-    Measurement is disk-I/O bound, so beyond a point more workers thrash the disk
-    instead of finishing faster.
-    """
-
     object_pass_worker_cap: int = 32
     """
     Upper bound on parallel workers for the read-convert-write object pass.
 
     The constraint here is concurrent write throughput to the processed database, not
     CPU, so this stays far below the host's core count.
-    """
-
-    mesh_measurement_chunk_size: int = 1000
-    """
-    Source ids handed to one worker process per round trip during parallel mesh
-    measurement.
-
-    Too small and inter-process communication dominates; too large and work balances
-    poorly across workers.
     """
 
     stream_chunk_size: ClassVar[int] = 2000
@@ -1147,12 +516,12 @@ class Sage10kPreprocessingRun:
         expressing their poses in the shelf's content frame -- is applied once here
         instead.
 
-        Mesh measurement and the read-convert-write object pass each run across
-        several worker processes: the object pass splits by room, since a shelf
-        and everything standing on it always share one, so each shard resolves
-        both its own objects and its own shelves start to finish and writes them
-        to the processed database itself. Only the summary counts
-        :class:`PreprocessingSummary` reports are gathered back into this process.
+        The read-convert-write object pass runs across several worker processes,
+        split by room, since a shelf and everything standing on it always share one:
+        each shard resolves both its own objects and its own shelves start to finish,
+        measuring their meshes itself along the way, and writes them to the processed
+        database itself. Only the summary counts :class:`PreprocessingSummary` reports
+        are gathered back into this process.
 
         The processed database is dropped and rebuilt, so a re-run replaces the
         stored dataset rather than appending a second copy of it.
@@ -1180,27 +549,16 @@ class Sage10kPreprocessingRun:
         shelf_contents, room_ids = self._discover_shelves_and_rooms()
         print(f"Found {len(shelf_contents.shelf_ids)} shelves among the raw objects.")
 
-        # Narrowed to relevant_source_ids before it reaches either the measurement pass
-        # or the object pass: MeshMeasurements.bounds() lazily re-measures anything it
-        # finds a path for, so leaving the full corpus in this dict would silently
-        # re-measure every other cached mesh one at a time during the object pass,
-        # defeating the point of scoping measurement at all.
+        # Narrowed to relevant_source_ids before it reaches the object pass:
+        # MeshMeasurements.bounds() lazily measures anything it finds a path for, so
+        # leaving the full corpus in this dict would silently measure every other
+        # cached mesh one at a time during the object pass, defeating the point of
+        # scoping measurement at all.
         relevant_source_id_to_path = {
             source_id: path
             for source_id, path in build_source_id_to_path(self.scenes_root).items()
             if source_id in shelf_contents.relevant_source_ids
         }
-        bounds_by_source_id, mesh_measurement_worker_count = self._measure_meshes(
-            shelf_contents.relevant_source_ids, relevant_source_id_to_path
-        )
-        measured_count = MeshMeasurements(
-            source_id_to_path=relevant_source_id_to_path,
-            _bounds_by_source_id=bounds_by_source_id,
-        ).measured_mesh_count
-        print(
-            f"Measured {measured_count}/{len(shelf_contents.relevant_source_ids)} "
-            f"shelf-relevant meshes across {mesh_measurement_worker_count} workers."
-        )
 
         object_pass_worker_count = Sage10kPreprocessingRun._available_worker_count(
             cap=self.object_pass_worker_cap
@@ -1208,13 +566,11 @@ class Sage10kPreprocessingRun:
         shard_results = self._process_objects(
             room_ids,
             relevant_source_id_to_path,
-            bounds_by_source_id,
             shelf_contents.shelf_ids,
             object_pass_worker_count,
         )
         PreprocessingSummary(
             shard_results=shard_results,
-            measured_source_id_count=measured_count,
             relevant_source_id_count=len(shelf_contents.relevant_source_ids),
             total_shelf_id_count=len(shelf_contents.shelf_ids),
             worker_count=object_pass_worker_count,
@@ -1260,74 +616,10 @@ class Sage10kPreprocessingRun:
         sage10k_engine.dispose()
         return shelf_contents, room_ids
 
-    def _measure_meshes(
-        self, relevant_source_ids: set[str], source_id_to_path: dict[str, Path]
-    ) -> tuple[dict[str, Optional[MeshBounds]], int]:
-        """
-        Measure every shelf-relevant mesh across a capped worker pool.
-
-        :param relevant_source_ids: Source ids of the shelves and of the objects
-            standing on them -- see :attr:`ShelfContents.relevant_source_ids`. Every
-            other mesh in the raw dataset is left unmeasured, since nothing downstream
-            of layer extraction reads its correction.
-        :param source_id_to_path: Maps a mesh's source id to its cached scene directory.
-        :return: The measurements, by source id, and the worker count used.
-        """
-        worker_count = Sage10kPreprocessingRun._available_worker_count(
-            cap=self.mesh_measurement_worker_cap
-        )
-        bounds_by_source_id = Sage10kPreprocessingRun._measure_meshes_in_parallel(
-            source_id_to_path,
-            relevant_source_ids,
-            worker_count,
-            chunk_size=self.mesh_measurement_chunk_size,
-        )
-        return bounds_by_source_id, worker_count
-
-    @staticmethod
-    def _measure_meshes_in_parallel(
-        source_id_to_path: dict[str, Path],
-        source_ids: Iterable[str],
-        worker_count: int,
-        chunk_size: int = 1000,
-    ) -> dict[str, Optional[MeshBounds]]:
-        """
-        Measure every mesh in *source_ids* across *worker_count* processes.
-
-        Loading and parsing hundreds of thousands of mesh files is disk-I/O and CPU
-        bound but embarrassingly parallel, since each mesh is measured independently of
-        every other. Running it as its own pass, ahead of the object read-convert-write
-        pass, is what lets that pass share one already-measured map instead of every
-        worker re- measuring meshes another worker also happens to need.
-
-        :param source_id_to_path: Maps a mesh's source id to its cached scene directory,
-            as returned by :func:`build_source_id_to_path`.
-        :param source_ids: The distinct source ids to measure.
-        :param worker_count: How many worker processes to measure with.
-        :param chunk_size: Source ids handed to one worker per round trip.
-        :return: The measurements, by source id; ``None`` for a source id whose mesh is
-            not cached locally.
-        """
-        source_id_list = list(source_ids)
-        scene_directories = [
-            source_id_to_path.get(source_id) for source_id in source_id_list
-        ]
-        with ProcessPoolExecutor(
-            max_workers=worker_count, mp_context=multiprocessing.get_context("spawn")
-        ) as pool:
-            measurements = pool.map(
-                MeshMeasurements._load_mesh_bounds,
-                source_id_list,
-                scene_directories,
-                chunksize=chunk_size,
-            )
-        return dict(zip(source_id_list, measurements))
-
     def _process_objects(
         self,
         room_ids: list[str],
         source_id_to_path: dict[str, Path],
-        bounds_by_source_id: dict[str, Optional[MeshBounds]],
         shelf_ids: set[str],
         worker_count: int,
     ) -> list[ObjectPassShardResult]:
@@ -1339,7 +631,6 @@ class Sage10kPreprocessingRun:
         return self._process_objects_in_parallel(
             room_ids,
             source_id_to_path,
-            bounds_by_source_id,
             shelf_ids,
             worker_count,
         )
@@ -1403,10 +694,11 @@ class Sage10kPreprocessingRun:
         :param maximum_relative_y: Half the shelf's length, inset by the margin.
         :return: Whether the position falls within the inset footprint.
         """
-        local_offset = _rotate_offset_into_frame(
-            Point2(x=position.x - shelf.pose.x, y=position.y - shelf.pose.y),
-            float(shelf.pose.yaw),
+        world_offset = Point2(x=position.x - shelf.pose.x, y=position.y - shelf.pose.y)
+        shelf_T_world = HomogeneousTransformationMatrix.from_xyz_rpy(
+            yaw=-float(shelf.pose.yaw)
         )
+        local_offset = world_offset.transform(shelf_T_world)
         return (
             abs(float(local_offset.x)) <= maximum_relative_x
             and abs(float(local_offset.y)) <= maximum_relative_y
@@ -1448,10 +740,13 @@ class Sage10kPreprocessingRun:
         content_frame_yaw_radians = RelationalCircuitExperimentShelf.content_frame_yaw(
             float(shelf.pose.yaw)
         )
-        local_offset = _rotate_offset_into_frame(
-            Point2(x=object_.pose.x - shelf.pose.x, y=object_.pose.y - shelf.pose.y),
-            content_frame_yaw_radians,
+        world_offset = Point2(
+            x=object_.pose.x - shelf.pose.x, y=object_.pose.y - shelf.pose.y
         )
+        content_T_world = HomogeneousTransformationMatrix.from_xyz_rpy(
+            yaw=-content_frame_yaw_radians
+        )
+        local_offset = world_offset.transform(content_T_world)
         yaw_radians = Sage10kPreprocessingRun._wrap_angle_radians(
             float(object_.pose.yaw) - content_frame_yaw_radians
         )
@@ -1479,7 +774,7 @@ class Sage10kPreprocessingRun:
         bounds = measurements.bounds(object_.source_id)
         if bounds is None:
             return float(object_.pose.z)
-        return float(object_.pose.z) + bounds.bottom
+        return float(object_.pose.z) + bounds.min_z
 
     @staticmethod
     def _relative_height(
@@ -1522,7 +817,7 @@ class Sage10kPreprocessingRun:
     def _layers_of_shelf(
         shelf: PreprocessedObject,
         members: list[PreprocessedObject],
-        shelf_bounds: MeshBounds,
+        shelf_bounds: VolumetricBoundingBox,
         edge_margin_fraction: float,
         measurements: MeshMeasurements,
     ) -> list[RelationalCircuitExperimentShelfLayer]:
@@ -1591,8 +886,8 @@ class Sage10kPreprocessingRun:
         )
         # The shelf's recorded position is its mesh's origin, so its real base and
         # top follow from where the mesh reaches around that origin.
-        base_height = float(shelf.pose.z) + shelf_bounds.bottom
-        top_height = float(shelf.pose.z) + shelf_bounds.top
+        base_height = float(shelf.pose.z) + shelf_bounds.min_z
+        top_height = float(shelf.pose.z) + shelf_bounds.max_z
         # A slab sits at the underside of what stands on it, not at those objects'
         # centres. Averaging the centres would put every slab roughly half an object
         # height too high, and since spawning places slabs at the height recorded
@@ -1629,7 +924,7 @@ class Sage10kPreprocessingRun:
     @staticmethod
     def _shelves_with_layers(
         objects: list[PreprocessedObject],
-        bounds_by_source_id: dict[str, MeshBounds],
+        bounds_by_source_id: dict[str, VolumetricBoundingBox],
         shelf_ids: set[str],
         measurements: MeshMeasurements,
         edge_margin_fraction: float = default_edge_margin_fraction,
@@ -1723,7 +1018,6 @@ class Sage10kPreprocessingRun:
         self,
         room_ids: list[str],
         source_id_to_path: dict[str, Path],
-        bounds_by_source_id: dict[str, Optional[MeshBounds]],
         shelf_ids: set[str],
         shard_label: str,
     ) -> ObjectPassShardResult:
@@ -1735,7 +1029,10 @@ class Sage10kPreprocessingRun:
         a room already owns everything shelf extraction needs for it -- nothing has to
         travel back to the parent process, unlike the objects and shelves themselves,
         which this shard writes straight to the processed database through its own
-        session.
+        session. Mesh measurement is no exception: a source_id belongs to exactly one
+        scene directory, so this shard's own :class:`MeshMeasurements` measures whatever
+        it needs the first time it is asked, and neither receives another shard's
+        measurements nor reports its own back.
 
         Runs in its own, freshly spawned process with its own database connections: a
         connection opened in the parent is not safe to share across processes, so this
@@ -1744,9 +1041,6 @@ class Sage10kPreprocessingRun:
 
         :param room_ids: The rooms this shard is responsible for.
         :param source_id_to_path: Maps a mesh's source id to its cached scene directory.
-        :param bounds_by_source_id: Every mesh's measurements, computed once by
-            :meth:`_measure_meshes_in_parallel` ahead of the object pass, so no shard
-            measures a mesh another shard also happens to need.
         :param shelf_ids: Ids of the raw objects classified as shelf-like.
         :param shard_label: Distinguishes this shard's progress output from the other
             shards running alongside it.
@@ -1756,10 +1050,7 @@ class Sage10kPreprocessingRun:
 
         sage10k_session = Session(create_engine(self.sage10k_database_uri))
         processed_session = Session(create_engine(self.processed_database_uri))
-        measurements = MeshMeasurements(
-            source_id_to_path=source_id_to_path,
-            _bounds_by_source_id=dict(bounds_by_source_id),
-        )
+        measurements = MeshMeasurements(source_id_to_path=source_id_to_path)
         classifier = ObjectTypeClassifier()
         shelf_contents = ShelfContents(shelf_ids=shelf_ids)
 
@@ -1795,13 +1086,13 @@ class Sage10kPreprocessingRun:
             corrected_count=corrected_count,
             shelf_count=len(shelves),
             layer_count=sum(len(shelf.layers) for shelf in shelves),
+            measured_mesh_count=measurements.measured_mesh_count,
         )
 
     def _process_objects_in_parallel(
         self,
         room_ids: list[str],
         source_id_to_path: dict[str, Path],
-        bounds_by_source_id: dict[str, Optional[MeshBounds]],
         shelf_ids: set[str],
         worker_count: int,
     ) -> list[ObjectPassShardResult]:
@@ -1817,8 +1108,6 @@ class Sage10kPreprocessingRun:
 
         :param room_ids: Every room id to distribute across shards.
         :param source_id_to_path: Maps a mesh's source id to its cached scene directory.
-        :param bounds_by_source_id: Every mesh's measurements, computed ahead of this
-            pass.
         :param shelf_ids: Ids of the raw objects classified as shelf-like.
         :param worker_count: How many worker processes to split the work across.
         :return: One result per shard.
@@ -1838,7 +1127,6 @@ class Sage10kPreprocessingRun:
                     self._process_room_shard,
                     shard,
                     source_id_to_path,
-                    bounds_by_source_id,
                     shelf_ids,
                     f"shard {index + 1}/{len(shards)}",
                 )
