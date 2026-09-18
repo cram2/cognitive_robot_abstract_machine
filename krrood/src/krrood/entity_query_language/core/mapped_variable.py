@@ -550,13 +550,9 @@ class Attribute(SingleValueMapping[T]):
         :raises NotNumberLikeFieldError: If this attribute does not exist or is not
             number-like.
         """
-        from krrood.entity_query_language.query.query import Query
+        from krrood.entity_query_language.query.query import variable_rooted
 
-        resolved_type = self._type_
-        if resolved_type is None:
-            root = self._chain_root_
-            if isinstance(root, Query):
-                resolved_type = root._rerooted_on_selection_(self)._type_
+        resolved_type = variable_rooted(self)._type_
         is_number_like = (
             resolved_type is not None
             and issubclass(resolved_type, compatible_types)
