@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 
 import experiments
-import experiments.confidence_aware_eql.robocasa_data
 import experiments.control_loop_experiments.benchmark
 import experiments.control_loop_experiments.scenarios
 import coraplex.orm.ormatic_interface
@@ -18,11 +17,6 @@ ignored_classes |= set(
 )
 ignored_classes |= set(
     classes_of_module(experiments.control_loop_experiments.control_loop_profiler)
-)
-# robocasa loading results describe a one-off load attempt (including the raw
-# exception a failed instance raised), not data meant to be persisted
-ignored_classes |= set(
-    classes_of_module(experiments.confidence_aware_eql.robocasa_data)
 )
 
 # Create an ORMatic object with the classes to be mapped
