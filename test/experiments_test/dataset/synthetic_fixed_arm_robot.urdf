@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<robot name="synthetic_fixed_arm_robot">
+  <link name="base_link"/>
+  <link name="arm_link"/>
+  <link name="gripper_link"/>
+
+  <joint name="arm_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="arm_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="10" velocity="1"/>
+  </joint>
+
+  <joint name="gripper_joint" type="prismatic">
+    <parent link="arm_link"/>
+    <child link="gripper_link"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="0" upper="0.05" effort="10" velocity="1"/>
+  </joint>
+</robot>

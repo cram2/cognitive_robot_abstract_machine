@@ -188,3 +188,9 @@ CLAUDE.local.md
 # Tracking a generated file made every branch switch fail while a checkout held its own
 # copy, which is what git refuses to overwrite.
 **/ormatic_interface.py
+
+# Rosbags recorded off the real robot. Gigabytes of raw camera stream that nothing in
+# the repository can regenerate and no review can read: the frames a test needs are
+# committed as captures instead (experiments/src/experiments/montessori/resources/captures).
+rosbags/
+!experiments/src/experiments/montessori/resources/captures/*.png

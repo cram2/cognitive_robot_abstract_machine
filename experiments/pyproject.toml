@@ -10,6 +10,7 @@ license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
     "line_profiler",
+    "opencv-python>=4.11.0.86",  # The Montessori perception package decodes and rectifies camera frames with it
     "coraplex",
     "giskardpy",
     "krrood",
