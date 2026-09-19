@@ -92,50 +92,50 @@ class TestOrmInterfacesBuiltOnlyByTheXdistController:
 
 
 @pytest.fixture
-def current_interfaces(workspace: WorkspaceOrmInterfaces) -> WorkspaceOrmInterfaces:
+def importable_interfaces(workspace: WorkspaceOrmInterfaces) -> WorkspaceOrmInterfaces:
     """
-    The interfaces of a checkout that has been built since its sources last changed.
+    The interfaces of a checkout that still match the classes they map.
     """
     workspace.regenerate()
     return workspace
 
 
 @pytest.fixture
-def outdated_interfaces(
-    current_interfaces: WorkspaceOrmInterfaces,
+def stale_interfaces(
+    importable_interfaces: WorkspaceOrmInterfaces,
 ) -> WorkspaceOrmInterfaces:
     """
-    The interfaces of a checkout that has not been built since its sources changed.
+    The interfaces of a checkout that has lost one of them.
     """
-    current_interfaces.interfaces[0].remove()
-    return current_interfaces
+    importable_interfaces.interfaces[0].remove()
+    return importable_interfaces
 
 
 class TestWhenAChoiceBuilds:
     """
-    A run builds the interfaces every time, never, or only when the checkout has not
-    built them since its sources changed.
+    A run builds the interfaces every time, never, or only when the checkout holds one
+    that can no longer be imported.
     """
 
     def test_never_skips_a_checkout_that_has_none(
-        self, outdated_interfaces: WorkspaceOrmInterfaces
+        self, stale_interfaces: WorkspaceOrmInterfaces
     ):
-        assert OrmBuild.NEVER.builds(outdated_interfaces) is False
+        assert OrmBuild.NEVER.builds(stale_interfaces) is False
 
-    def test_always_builds_a_current_checkout(
-        self, current_interfaces: WorkspaceOrmInterfaces
+    def test_always_builds_a_checkout_whose_interfaces_import(
+        self, importable_interfaces: WorkspaceOrmInterfaces
     ):
-        assert OrmBuild.ALWAYS.builds(current_interfaces) is True
+        assert OrmBuild.ALWAYS.builds(importable_interfaces) is True
 
-    def test_auto_skips_a_current_checkout(
-        self, current_interfaces: WorkspaceOrmInterfaces
+    def test_auto_skips_a_checkout_whose_interfaces_import(
+        self, importable_interfaces: WorkspaceOrmInterfaces
     ):
-        assert OrmBuild.AUTO.builds(current_interfaces) is False
+        assert OrmBuild.AUTO.builds(importable_interfaces) is False
 
-    def test_auto_builds_an_outdated_checkout(
-        self, outdated_interfaces: WorkspaceOrmInterfaces
+    def test_auto_builds_a_checkout_with_a_stale_interface(
+        self, stale_interfaces: WorkspaceOrmInterfaces
     ):
-        assert OrmBuild.AUTO.builds(outdated_interfaces) is True
+        assert OrmBuild.AUTO.builds(stale_interfaces) is True
 
 
 class TestTheChoiceReachesTheProcessesOfARun:
@@ -144,7 +144,7 @@ class TestTheChoiceReachesTheProcessesOfARun:
     command line, so the choice is read off the arguments as they were given.
     """
 
-    def test_a_run_stating_no_choice_builds_what_is_outdated(self, monkeypatch):
+    def test_a_run_stating_no_choice_builds_what_no_longer_imports(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", [PYTEST_COMMAND])
         monkeypatch.delenv(PytestEnvironmentVariable.ORM_BUILD, raising=False)
 
