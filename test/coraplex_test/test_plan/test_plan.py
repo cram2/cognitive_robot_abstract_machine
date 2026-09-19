@@ -12,6 +12,8 @@ from krrood.rustworkx_utils.graph_visualizer_base import (
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     ApproachDirection,
+    InsertionPosition,
+    NodeDetail,
     VerticalAlignment,
     Arms,
 )
@@ -21,7 +23,8 @@ from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.factories import code, sequential, parallel, execute_single
-from coraplex.plans.failures import EmptyUnderspecified
+from coraplex.exceptions import CannotInsertBesideRoot
+from coraplex.plans.failures import EmptyUnderspecified, PlanFailure
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import PlanNode, ActionNode
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -366,6 +369,93 @@ def test_set_layer_index_insert_before():
     assert node4.layer_index == 1
 
 
+# %% sibling insertion
+
+
+def sequential_children_plan() -> tuple[Plan, PlanNode, list[PlanNode]]:
+    """
+    :return: A plan with a root that has three children, the root and its children.
+    """
+    root = PlanNode()
+    children = [PlanNode(), PlanNode(), PlanNode()]
+
+    plan = Plan()
+    plan.add_node(root)
+    for child in children:
+        plan.add_edge(root, child)
+
+    return plan, root, children
+
+
+def test_insert_before_makes_node_left_neighbour():
+    """
+    A node inserted before a child takes that child's position and pushes it right.
+    """
+    plan, root, (first, second, third) = sequential_children_plan()
+    inserted = PlanNode()
+
+    plan.insert_before(second, inserted)
+
+    assert root.children == [first, inserted, second, third]
+    assert inserted.right_neighbour is second
+    assert inserted.left_neighbour is first
+
+
+def test_insert_after_makes_node_right_neighbour():
+    """
+    A node inserted after a child is placed between that child and the following one.
+    """
+    plan, root, (first, second, third) = sequential_children_plan()
+    inserted = PlanNode()
+
+    plan.insert_after(second, inserted)
+
+    assert root.children == [first, second, inserted, third]
+    assert inserted.left_neighbour is second
+    assert plan.nodes == [root, first, second, inserted, third]
+
+
+def test_insert_after_last_child_appends():
+    """
+    Inserting after the rightmost child appends and keeps the plan a tree.
+    """
+    plan, root, (first, second, third) = sequential_children_plan()
+    inserted = PlanNode()
+
+    plan.insert_after(third, inserted)
+
+    assert root.children == [first, second, third, inserted]
+    assert inserted.right_neighbour is None
+    plan.validate()
+
+
+@pytest.mark.parametrize("position", list(InsertionPosition))
+def test_every_position_inserts_the_node(position):
+    """
+    Every position knows how to place a node, so none of them leaves the plan without
+    the node it was asked to insert.
+    """
+    plan, root, (first, second, third) = sequential_children_plan()
+    inserted = PlanNode()
+
+    position.insert(plan, second, inserted)
+
+    assert inserted in plan.nodes
+
+
+def test_insert_beside_root_raises():
+    """
+    The root has no parent that could hold a sibling.
+    """
+    plan, root, _ = sequential_children_plan()
+
+    with pytest.raises(CannotInsertBesideRoot):
+        plan.insert_before(root, PlanNode())
+
+    with pytest.raises(CannotInsertBesideRoot):
+        plan.insert_after(root, PlanNode())
+
+
 def test_get_previous_nodes():
 
     root = PlanNode()
@@ -429,8 +519,8 @@ def _torso_position(world):
 
 def test_sequence_runs_all_motions(immutable_model_world):
     """
-    Every motion of a sequence is executed, so the torso ends at the target of the *last*
-    motion.
+    Every motion of a sequence is executed, so the torso ends at the target of the
+    *last* motion.
 
     The robot starts in the LOW configuration, so a final HIGH motion proves the second
     motion actually ran.
@@ -477,8 +567,9 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     with simulated_robot:
         plan.perform()
 
-    assert isinstance(plan.root.children[1].children[0].designator, NavigateAction)
-    assert len(plan.root.children[1].children) == 1
+    underspecified = plan.root.children[1]
+    assert isinstance(underspecified.current_candidate.designator, NavigateAction)
+    assert len(underspecified.children) == 1
 
 
 def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
@@ -768,3 +859,65 @@ def test_a_plan_node_is_drawn_in_the_color_of_its_state():
     )
 
     assert visualizer.node_color(node.index) == LifeCycleValues.FAILED.color.to_hex()
+
+
+def test_the_execution_details_of_a_node_are_named():
+    """
+    Every detail of a node is reported under the name it is shown by, instead of as a
+    pre-formatted line.
+    """
+    node = PlanNode()
+    node.status = LifeCycleValues.FAILED
+    node.result = object()
+    node.reason = PlanFailure()
+
+    execution = node.node_info.to_dict()[NodeDetail.EXECUTION]
+
+    assert execution == {
+        NodeDetail.STATUS: LifeCycleValues.FAILED.name,
+        NodeDetail.START_TIME: node.start_time,
+        NodeDetail.END_TIME: node.end_time,
+        NodeDetail.RESULT: node.result,
+        NodeDetail.REASON: node.reason,
+    }
+
+
+def test_a_designator_node_reports_the_parameters_of_its_designator():
+    """
+    A designator node adds the parameters its designator was built with as a section of
+    its own.
+    """
+    action = ParkArmsAction(Arms.LEFT)
+    node = ActionNode(designator=action)
+
+    designator_section = node.node_info.sections[-1]
+
+    assert designator_section.heading == NodeDetail.DESIGNATOR_PARAMETER
+    assert designator_section.entries == {
+        NodeDetail.DESIGNATOR_TYPE: ParkArmsAction.__name__,
+        **action.designator_parameter,
+    }
+
+
+def test_a_node_is_labelled_by_the_designator_it_manages():
+    """
+    A designator node is drawn as its designator, not as the node class managing it.
+    """
+    node = ActionNode(designator=ParkArmsAction(Arms.LEFT))
+
+    assert node.node_label == ParkArmsAction.__name__
+
+
+def test_the_details_of_a_node_are_drawn_as_lines():
+    """
+    The visualization takes the detail lines of a node from its node info.
+    """
+    node = PlanNode()
+    plan = Plan()
+    plan.add_node(node)
+
+    visualizer = plan._create_visualizer(
+        backend=GraphVisualizerBackend.CYTOSCAPE, layout=GraphLayout.LAYERED
+    )
+
+    assert visualizer.node_details(node.index) == node.node_info.to_lines()

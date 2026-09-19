@@ -9,6 +9,7 @@ from typing import Optional, Any, List, Type, TYPE_CHECKING, Iterable
 
 from typing_extensions import Union
 
+from coraplex.datastructures.enums import NodeDetail
 from coraplex.plans.designator import Designator
 from giskardpy.motion_statechart.goals.templates import NodeListGoal
 from giskardpy.motion_statechart.graph_node import Goal
@@ -21,10 +22,12 @@ from coraplex.plans.executables import (
 )
 from coraplex.plans.failures import PlanFailure
 from coraplex.plans.motion_state_chart_building import BuildsMotionStateChart
+from coraplex.plans.node_info import NodeInfo, NodeInfoSection
 from coraplex.plans.plan_entity import PlanEntity
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import Task
+    from coraplex.language import SequentialNode
     from coraplex.datastructures.dataclasses import Context
     from coraplex.robot_plans.actions.base import ActionDescription
     from coraplex.robot_plans.motions.base import BaseMotion
@@ -353,6 +356,24 @@ class PlanNode(PlanEntity):
         Perform the node without managing the fields of this node.
         """
 
+    def notify_children(self) -> None:
+        """
+        Notifies every child, including the ones that only appear while the earlier
+        children are being notified.
+
+        A plan transformation applied to a child can put further children here, and
+        those have to be expanded too instead of staying unexpanded leaves.
+        """
+        # Keyed by identity, holding the node itself: expanding a child simplifies the
+        # plan, which can remove nodes and free their graph index for a later one.
+        notified: Dict[int, PlanNode] = {}
+        pending = self.children
+        while pending:
+            notified.update({id(child): child for child in pending})
+            for child in pending:
+                child.notify()
+            pending = [child for child in self.children if id(child) not in notified]
+
     def parse(self) -> Executable: ...
 
     @property
@@ -375,17 +396,32 @@ class PlanNode(PlanEntity):
             for node in [self] + self.descendants
         )
 
-    def __node_info__(self):
-        return [
-            f"status: {self.status.name}",
-            f"start: {self.start_time}",
-            f"end: {self.end_time}",
-            f"result: {self.result}",
-            f"reason: {self.reason}",
-        ]
+    @property
+    def node_info(self) -> NodeInfo:
+        """
+        :return: How far this node got and what came out of it.
+        """
+        return NodeInfo(
+            [
+                NodeInfoSection(
+                    NodeDetail.EXECUTION,
+                    {
+                        NodeDetail.STATUS: self.status.name,
+                        NodeDetail.START_TIME: self.start_time,
+                        NodeDetail.END_TIME: self.end_time,
+                        NodeDetail.RESULT: self.result,
+                        NodeDetail.REASON: self.reason,
+                    },
+                )
+            ]
+        )
 
-    def __node_label__(self):
-        return f"{self.__class__.__name__}"
+    @property
+    def node_label(self) -> str:
+        """
+        :return: The name this node is drawn under.
+        """
+        return type(self).__name__
 
 
 @dataclass(eq=False, repr=False)
@@ -432,25 +468,27 @@ class DesignatorNode(PlanNode, ABC):
     def __hash__(self):
         return id(self)
 
-    def __node_info__(self):
-        parent_infos = super().__node_info__()
-        designator_field = [
-            f"{field.name}: {getattr(self.designator, field.name)}"
-            for field in self.designator.fields
-        ]
-        parent_infos.append(
-            "---------------- Designator Parameter --------------------"
+    @property
+    def node_info(self) -> NodeInfo:
+        """
+        :return: The execution details of this node, followed by the designator it
+            manages.
+        """
+        info = super().node_info
+        info.sections.append(
+            NodeInfoSection(
+                NodeDetail.DESIGNATOR_PARAMETER,
+                {
+                    NodeDetail.DESIGNATOR_TYPE: type(self.designator).__name__,
+                    **self.designator.designator_parameter,
+                },
+            )
         )
-        parent_infos.extend(
-            [
-                f"Designator Type: {self.designator.__class__.__name__}",
-                *designator_field,
-            ]
-        )
-        return parent_infos
+        return info
 
-    def __node_label__(self):
-        return f"{self.designator.__class__.__name__}"
+    @property
+    def node_label(self) -> str:
+        return type(self.designator).__name__
 
 
 @dataclass(eq=False, repr=False)
@@ -518,10 +556,10 @@ class ActionNode(DesignatorNode, BuildsMotionStateChart):
     def notify(self):
         if not self.children:
             self.action.expand()
+            self.plan.apply_plan_transformations(self)
 
         # recursively expand nested actions, conditions are only evaluated during execution
-        for child in self.children:
-            child.notify()
+        self.notify_children()
 
     @property
     def body_children(self) -> List[PlanNode]:

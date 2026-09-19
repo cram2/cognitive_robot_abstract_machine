@@ -192,8 +192,7 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
         plan.perform()
 
     assert plan.root.status == LifeCycleValues.SUCCEEDED
-    candidate = plan.root.children[0]
-    assert isinstance(candidate.designator, NavigateAction)
+    assert isinstance(plan.root.current_candidate.designator, NavigateAction)
     assert plan.root.parse() is not None
     assert plan.root._action_iterator is None, (
         "the action iterator must be released once grounding succeeds, so any resources a "
@@ -230,8 +229,7 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
         plan.perform()
 
     assert plan.root.status == LifeCycleValues.SUCCEEDED
-    candidate = plan.root.children[-1]
-    assert isinstance(candidate.designator, NavigateAction)
+    assert isinstance(plan.root.current_candidate.designator, NavigateAction)
     assert plan.root.parse() is not None
 
 
@@ -300,7 +298,7 @@ def test_isolation_rejected_candidate_never_touches_real_world(
 
     assert plan.root.status == LifeCycleValues.SUCCEEDED
     assert len(plan.root.children) == 1
-    assert plan.root.children[0].designator.fail_on_attempt_number is None
+    assert plan.root.children[0].children[0].designator.fail_on_attempt_number is None
 
     probe = _registered_probes[probe_key]
     assert len(probe.calls) == 3
@@ -375,7 +373,7 @@ def test_real_failure_keeps_state_and_next_trial_reflects_it(
     # Both the failed and the accepted candidate are attached to the tree - a real
     # failure is not undone, only worked around by trying the next candidate.
     assert [
-        child.designator.fail_on_attempt_number for child in plan.root.children
+        child.children[0].designator.fail_on_attempt_number for child in plan.root.children
     ] == [
         2,
         None,

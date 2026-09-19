@@ -122,30 +122,6 @@ def reachability_location(
     )
 
 
-def accessing_location(
-    container: Union[Drawer, Cabinet], context: Context, arm: Arms
-) -> Location:
-    """
-    Factory that creates a location for robot base poses for opening and closing
-    container.
-
-    :param container: The container that should be accessed
-    :param context: Plan context in which to create the location
-    :param arm: Arm with which to access the container
-    :returns: A location that is accessible from the container.
-    """
-    return reachability_location(
-        container.handle.root,
-        context,
-        arm,
-        GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            ViewManager.get_end_effector_view(Arms.BOTH, context.robot),
-        ),
-    )
-
-
 def visibility_location(target: Union[Pose, Body], context: Context) -> Location:
     """
     Factory that creates a location for robot base poses from which the target is
