@@ -7,6 +7,7 @@ import pytest
 
 from giskardpy.executor import Executor, NoPacing
 from giskardpy.middleware.ros2 import rospy
+from giskardpy.middleware.ros2.client_presence import ClientWatchdog, HeartbeatPresence
 from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.exceptions import (
     GiskardWorldUpdateNotReceivedError,
@@ -450,6 +451,7 @@ def control_loop(init_rospy) -> ControlLoopFixture:
         control_loop=ControlLoop(
             executor=executor,
             action_server=action_server,
+            client_watchdog=ClientWatchdog(presence=HeartbeatPresence(node=rospy.get_node())),
             feedback_publisher=ActionFeedbackPublisher(
                 executor=executor, action_server=action_server
             ),

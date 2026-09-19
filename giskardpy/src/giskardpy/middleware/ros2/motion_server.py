@@ -9,13 +9,15 @@ from typing import Any, Dict, List
 import rclpy
 from json_msgs.action import JsonAction
 
-from giskardpy.data_types.exceptions import DontPrintStackTrace
+from giskardpy.data_types.exceptions import DoesntPrintStackTrace
 from giskardpy.executor import Executor, RealTimePacer
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
+from giskardpy.middleware.ros2.client_presence import ClientWatchdog
 from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from giskardpy.middleware.ros2.exceptions import (
+    ClientDisconnectedError,
     ExecutionCanceledException,
     RequiredWorldUpdateNotReceivedError,
     UnserializableGoalError,
@@ -59,6 +61,12 @@ class MotionServer:
     control_loop: ControlLoop
     """
     Executes a compiled motion statechart.
+    """
+
+    client_watchdog: ClientWatchdog
+    """
+    Watches the client of the running goal, so that a motion nobody waits for any more
+    is stopped instead of run to its end.
     """
 
     world_updates: IncomingWorldUpdates
@@ -167,12 +175,13 @@ class MotionServer:
         error: Exception | None = None
         try:
             goal = MotionGoal.from_json(json.loads(self.action_server.goal_msg.goal))
+            self.client_watchdog.watch(goal.client)
             self.wait_for_required_world_updates(goal.required_position)
             self.compile_goal(goal)
             self.control_loop.run()
         except Exception as exception:
             if not isinstance(
-                exception, (DontPrintStackTrace, ExecutionCanceledException)
+                exception, (DoesntPrintStackTrace, ExecutionCanceledException)
             ):
                 traceback.print_exc()
             error = exception
@@ -185,8 +194,13 @@ class MotionServer:
         """
         Wait until the world contains the change the goal was built on.
 
+        The change is the one the client published, so a client that left is never going
+        to deliver it and waiting out the timeout would only delay the answer.
+
         :raises RequiredWorldUpdateNotReceivedError: If that change does not arrive
             within ``world_update_timeout``.
+        :raises ClientDisconnectedError: If the client of the goal disconnects while its
+            change is awaited.
         """
         if required_position is None:
             return
@@ -195,6 +209,8 @@ class MotionServer:
             self.world_updates.apply_all()
             if self.world_updates.has_applied(required_position):
                 return
+            if self.client_watchdog.is_client_gone():
+                raise ClientDisconnectedError(client=self.client_watchdog.client)
             if time.monotonic() >= deadline:
                 raise RequiredWorldUpdateNotReceivedError(
                     current_sequence_number=self.world_synchronizer.published_sequence_number,
@@ -227,6 +243,7 @@ class MotionServer:
         here cannot make it wait forever.
         """
         try:
+            self.client_watchdog.stop_watching()
             self.control_loop.stop()
             if self.executor.motion_statechart is not None:
                 self.executor.motion_statechart.cleanup_nodes(

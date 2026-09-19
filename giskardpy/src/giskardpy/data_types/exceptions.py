@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from krrood.exceptions import DataclassException
 
 
-class DontPrintStackTrace:
+class DoesntPrintStackTrace:
     """
     Marker mixin for exceptions whose stack trace should not be printed.
     """

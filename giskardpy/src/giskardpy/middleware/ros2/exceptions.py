@@ -8,10 +8,11 @@ from dataclasses import dataclass
 from typing import List, Type
 
 from giskardpy.data_types.exceptions import (
-    DontPrintStackTrace,
+    DoesntPrintStackTrace,
     GiskardException,
     SetupException,
 )
+from semantic_digital_twin.adapters.ros.messages import MetaData
 from semantic_digital_twin.world_description.world_entity import Connection
 
 
@@ -85,7 +86,49 @@ class ExecutionCanceledException(ExecutionException):
 
 
 @dataclass
-class WorldModelModifiedDuringMotionError(ExecutionException, DontPrintStackTrace):
+class ClientDisconnectedError(ExecutionException, DoesntPrintStackTrace):
+    """
+    Raised when the client that sent the running goal disconnected.
+
+    Nobody is waiting for the motion any more, so it is stopped instead of being run to
+    its end.
+    """
+
+    client: MetaData
+    """
+    The client that sent the goal and is now gone.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The client '{self.client.node_name}' (process {self.client.process_id}) "
+            f"that sent this goal is gone."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Restart the client and send the goal again."
+
+
+@dataclass
+class NoWatchedClientError(GiskardException):
+    """
+    Raised when a presence check is asked about a client while it watches none.
+    """
+
+    check_type: Type
+    """
+    The check that was asked.
+    """
+
+    def error_message(self) -> str:
+        return f"'{self.check_type.__name__}' is not watching a client."
+
+    def suggest_correction(self) -> str:
+        return "Only ask a check about a client that it started watching."
+
+
+@dataclass
+class WorldModelModifiedDuringMotionError(ExecutionException, DoesntPrintStackTrace):
     """
     Raised when another process modified the world model while a motion was running.
 
@@ -103,7 +146,7 @@ class WorldModelModifiedDuringMotionError(ExecutionException, DontPrintStackTrac
 
 
 @dataclass
-class RequiredWorldUpdateNotReceivedError(ExecutionException, DontPrintStackTrace):
+class RequiredWorldUpdateNotReceivedError(ExecutionException, DoesntPrintStackTrace):
     """
     Raised when a goal names a change of the client's world that never arrived.
 
@@ -145,7 +188,7 @@ class RequiredWorldUpdateNotReceivedError(ExecutionException, DontPrintStackTrac
 
 
 @dataclass
-class GiskardWorldUpdateNotReceivedError(ExecutionException, DontPrintStackTrace):
+class GiskardWorldUpdateNotReceivedError(ExecutionException, DoesntPrintStackTrace):
     """
     Raised when the changes Giskard made during a goal never reached the client.
 

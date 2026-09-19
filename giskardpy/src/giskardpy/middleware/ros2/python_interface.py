@@ -10,6 +10,7 @@ import rclpy
 from json_msgs.action import JsonAction
 from json_msgs.action._json_action import JsonAction_Result
 from giskardpy.middleware.ros2 import rospy
+from giskardpy.middleware.ros2.client_presence import ClientHeartbeatPublisher
 from giskardpy.middleware.ros2.exceptions import NoActiveGoalToCancelError
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
@@ -23,6 +24,7 @@ from rclpy import Context, Parameter, Future
 from rclpy.action.client import ClientGoalHandle
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from semantic_digital_twin.adapters.ros.messages import MetaData
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -54,6 +56,11 @@ class GiskardWrapper:
     Keeps this world in step with the world Giskard controls around a goal.
     """
 
+    heartbeat_publisher: ClientHeartbeatPublisher = field(init=False, default=None)
+    """
+    Announces to Giskard that this client is still waiting for its goal.
+    """
+
     _motion_statechart: MotionStatechart | None = field(
         init=False, default=None, repr=False
     )
@@ -69,9 +76,21 @@ class GiskardWrapper:
         self.world_updates = ClientWorldUpdates(
             world_synchronizer=WorldSynchronizer.of_world(self.world)
         )
+        self.heartbeat_publisher = ClientHeartbeatPublisher(
+            node=self.node_handle,
+            client=self.client,
+            giskard_node_name=self.giskard_node_name,
+        )
         giskard_topic = f"{self.giskard_node_name}/command"
         self._client = MyActionClient(self.node_handle, JsonAction, giskard_topic)
         sleep(0.3)
+
+    @property
+    def client(self) -> MetaData:
+        """
+        Who this client is, as it names itself in its goals and its heartbeats.
+        """
+        return self.world_updates.world_synchronizer.meta_data
 
     @property
     def robot_name(self) -> PrefixedName:
@@ -137,6 +156,7 @@ class GiskardWrapper:
         goal_msg = JsonAction.Goal()
         goal = MotionGoal.for_motion_statechart(
             motion_statechart,
+            client=self.client,
             required_position=self.world_updates.required_position(),
         )
         goal_msg.goal = json.dumps(goal.to_json())
