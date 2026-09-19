@@ -21,7 +21,7 @@ from giskardpy.middleware.ros2.command_publishing import (
     MinimumVelocity,
 )
 from giskardpy.middleware.ros2.control_loop import ControlLoop
-from giskardpy.middleware.ros2.input_synchronization import (
+from semantic_digital_twin.adapters.ros.input_synchronization import (
     LatestJointStateSynchronizer,
     PendingJointStateSynchronizer,
     OdometrySynchronizer,
@@ -122,7 +122,10 @@ class RobotInterfaceConfig(ABC):
             odometry_topic = search_for_unique_publisher_of_type(Odometry)
         assert isinstance(joint, (OmniDrive, DifferentialDrive))
         synchronizer = OdometrySynchronizer(
-            world=self.world, topic_name=odometry_topic, connection=joint
+            world=self.world,
+            node=rospy.get_node(),
+            topic_name=odometry_topic,
+            connection=joint,
         )
         self.motion_server.inputs.synchronizers.append(synchronizer)
         if sync_in_control_loop and self.server_config.is_closed_loop:
@@ -135,7 +138,9 @@ class RobotInterfaceConfig(ABC):
         Tell Giskard to sync a 6dof joint with a tf frame.
         """
         if self.tf_frame_synchronizer is None:
-            self.tf_frame_synchronizer = TfFrameSynchronizer(world=self.world)
+            self.tf_frame_synchronizer = TfFrameSynchronizer(
+                world=self.world, node=rospy.get_node()
+            )
             self.motion_server.inputs.synchronizers.insert(
                 0, self.tf_frame_synchronizer
             )
@@ -152,12 +157,16 @@ class RobotInterfaceConfig(ABC):
         if group_name is None:
             group_name = self.robot.name
         self.motion_server.inputs.synchronizers.append(
-            PendingJointStateSynchronizer(world=self.world, topic_name=topic_name)
+            PendingJointStateSynchronizer(
+                world=self.world, node=rospy.get_node(), topic_name=topic_name
+            )
         )
         if not self.server_config.is_closed_loop or group_name != self.robot.name:
             return
         self.control_loop.inputs.synchronizers.append(
-            LatestJointStateSynchronizer(world=self.world, topic_name=topic_name)
+            LatestJointStateSynchronizer(
+                world=self.world, node=rospy.get_node(), topic_name=topic_name
+            )
         )
 
     # %% commanding the robot

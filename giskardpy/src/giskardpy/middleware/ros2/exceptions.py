@@ -5,14 +5,13 @@ Exceptions raised while executing a trajectory on a robot.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Type
+from typing import List
 
 from giskardpy.data_types.exceptions import (
     DontPrintStackTrace,
     GiskardException,
     SetupException,
 )
-from semantic_digital_twin.world_description.world_entity import Connection
 
 
 @dataclass
@@ -325,79 +324,3 @@ class FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(FollowJointTrajectoryError):
     """
     Raised when the action server reports a goal tolerance violation.
     """
-
-
-@dataclass
-class AlreadyTrackedByTfFrameError(SetupException):
-    """
-    Raised when a connection is registered for tf tracking a second time.
-    """
-
-    connection_name: str
-    """
-    The name of the connection that is already tracked.
-    """
-
-    tf_parent_frame: str
-    """
-    The tf parent frame the connection is already tracked with.
-    """
-
-    tf_child_frame: str
-    """
-    The tf child frame the connection is already tracked with.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Connection '{self.connection_name}' is already tracked with a tf frame: "
-            f"'{self.tf_parent_frame}'<-'{self.tf_child_frame}'"
-        )
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class UnboundMessageTypeError(SetupException):
-    """
-    Raised when a topic synchronizer does not name the type of its messages.
-    """
-
-    synchronizer_type: Type
-    """
-    The synchronizer whose message type is unknown.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"'{self.synchronizer_type.__name__}' does not name the type of the "
-            f"messages it reads."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            f"Declare it in the bases of '{self.synchronizer_type.__name__}', as in "
-            f"'TopicInputSynchronizer[Odometry]'."
-        )
-
-
-@dataclass
-class ConnectionCannotBeTrackedByTfFrameError(SetupException):
-    """
-    Raised when a connection without 6 degrees of freedom is registered for tf tracking.
-    """
-
-    connection: Connection
-    """
-    The connection that cannot be tracked.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Can only sync Connection6DoF with tf, but '{str(self.connection.name)}' is of "
-            f"type '{type(self.connection).__name__}'."
-        )
-
-    def suggest_correction(self) -> str:
-        return ""

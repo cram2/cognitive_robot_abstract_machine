@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Self, List
 
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -25,8 +26,10 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasNeck,
+    HasLidar,
     HasOneArm,
     HasTorso,
     HasMobileBase,
@@ -411,7 +414,34 @@ class HSRBTorso(Torso, HasOneArm[HSRBArm], HasNeck[HSRBNeck]):
 
 
 @dataclass(eq=False)
-class HSRBMobileBase(MobileBase[OmniDrive], HasTorso[HSRBTorso]):
+class HSRBBaseLidar(Lidar):
+    """
+    The Hokuyo scanner sweeping the floor around the HSRB's base.
+    """
+
+    @classmethod
+    def with_source(
+        cls, robot_root: KinematicStructureEntity, source: LidarSource
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "base_range_sensor_link"
+            ),
+            scan_pattern=ScanPattern(
+                minimum_angle=-2.098758,
+                maximum_angle=2.098758,
+                angle_increment=0.0043633,
+                minimum_range=0.012,
+                maximum_range=60.0,
+            ),
+            source=source,
+        )
+
+
+@dataclass(eq=False)
+class HSRBMobileBase(
+    MobileBase[OmniDrive], HasTorso[HSRBTorso], HasLidar[HSRBBaseLidar]
+):
 
     @classproperty
     def forward_axis(cls) -> Vector3:

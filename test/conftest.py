@@ -244,6 +244,22 @@ def count_worlds():
 
 
 @pytest.fixture()
+def mini_world() -> World:
+    """
+    A world of two bodies joined by a revolute connection about the z axis.
+    """
+    world = World()
+    with world.modify_world():
+        body = Body(name=PrefixedName("root"))
+        body2 = Body(name=PrefixedName("tip"))
+        connection = RevoluteConnection.create_with_dofs(
+            world=world, parent=body, child=body2, axis=Vector3.Z()
+        )
+        world.add_connection(connection)
+    return world
+
+
+@pytest.fixture()
 def world_with_two_bodies() -> tuple[World, Body, Body]:
     """A fresh world with an unconnected parent and child body, ready to receive a connection."""
     world = World()

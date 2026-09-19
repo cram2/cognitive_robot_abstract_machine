@@ -13,12 +13,7 @@ from nav_msgs.msg import Odometry
 from numpy.testing import assert_allclose
 from sensor_msgs.msg import JointState
 
-from giskardpy.middleware.ros2.exceptions import (
-    AlreadyTrackedByTfFrameError,
-    ConnectionCannotBeTrackedByTfFrameError,
-    UnboundMessageTypeError,
-)
-from giskardpy.middleware.ros2.input_synchronization import (
+from semantic_digital_twin.adapters.ros.input_synchronization import (
     LatestJointStateSynchronizer,
     OdometrySynchronizer,
     PendingJointStateSynchronizer,
@@ -26,6 +21,11 @@ from giskardpy.middleware.ros2.input_synchronization import (
     TopicInputSynchronizer,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import (
+    AlreadyTrackedByTfFrameError,
+    ConnectionCannotBeTrackedByTfFrameError,
+    UnboundMessageTypeError,
+)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -177,11 +177,11 @@ def test_odometry_synchronizer_buffers_odometry_messages():
 
 
 def test_pending_joint_state_synchronizer_writes_a_message_once(
-    init_rospy, mini_world: World
+    rclpy_node, mini_world: World
 ):
     [connection] = mini_world.connections
     synchronizer = PendingJointStateSynchronizer(
-        world=mini_world, topic_name="joint_states"
+        world=mini_world, node=rclpy_node, topic_name="joint_states"
     )
     synchronizer.latest_message = joint_state_message(connection.name.name, 0.42)
 
@@ -191,11 +191,11 @@ def test_pending_joint_state_synchronizer_writes_a_message_once(
 
 
 def test_latest_joint_state_synchronizer_rewrites_its_message_every_cycle(
-    init_rospy, mini_world: World
+    rclpy_node, mini_world: World
 ):
     [connection] = mini_world.connections
     synchronizer = LatestJointStateSynchronizer(
-        world=mini_world, topic_name="joint_states"
+        world=mini_world, node=rclpy_node, topic_name="joint_states"
     )
     synchronizer.latest_message = joint_state_message(connection.name.name, 0.42)
 
@@ -205,11 +205,11 @@ def test_latest_joint_state_synchronizer_rewrites_its_message_every_cycle(
     assert mini_world.state[connection.raw_dof.id].position == 0.42
 
 
-def test_synchronizer_writes_nothing_without_a_message(init_rospy, mini_world: World):
+def test_synchronizer_writes_nothing_without_a_message(rclpy_node, mini_world: World):
     [connection] = mini_world.connections
     position_before_apply = mini_world.state[connection.raw_dof.id].position
     synchronizer = PendingJointStateSynchronizer(
-        world=mini_world, topic_name="joint_states"
+        world=mini_world, node=rclpy_node, topic_name="joint_states"
     )
 
     assert synchronizer.apply() is False
@@ -220,14 +220,17 @@ def test_synchronizer_writes_nothing_without_a_message(init_rospy, mini_world: W
 
 
 def test_odometry_synchronizer_writes_the_pose_into_the_drive(
-    init_rospy, omni_drive_world: World
+    rclpy_node, omni_drive_world: World
 ):
     connection = omni_drive_world.get_connection_by_name("root_T_base")
     expected_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.5, y=-2.5, yaw=0.75
     )
     synchronizer = OdometrySynchronizer(
-        world=omni_drive_world, topic_name="odom", connection=connection
+        world=omni_drive_world,
+        node=rclpy_node,
+        topic_name="odom",
+        connection=connection,
     )
     synchronizer.latest_message = odometry_message(expected_pose)
 
@@ -243,7 +246,7 @@ def test_odometry_synchronizer_writes_the_pose_into_the_drive(
 
 
 def test_apply_writes_the_looked_up_transform_into_the_connection(
-    init_rospy, tracked_connection
+    rclpy_node, tracked_connection
 ):
     """
     The origin the synchronizer assigns has to carry the frames of the connection it
@@ -251,7 +254,7 @@ def test_apply_writes_the_looked_up_transform_into_the_connection(
     transform into the parent frame and rejects one without a reference frame.
     """
     world, connection = tracked_connection
-    synchronizer = TfFrameSynchronizer(world=world)
+    synchronizer = TfFrameSynchronizer(world=world, node=rclpy_node)
     synchronizer.tf_wrapper = RecordedTransformLookup(
         parent_T_child=make_pose_stamped(1.0, -2.0, 0.5)
     )
@@ -270,14 +273,14 @@ def test_apply_writes_the_looked_up_transform_into_the_connection(
 
 
 def test_apply_writes_nothing_without_a_tracked_connection(
-    init_rospy, world_with_two_bodies
+    rclpy_node, world_with_two_bodies
 ):
     """
     A synchronizer that tracks nothing must report that it did not write, so the loop
     around it does not recompute the forward kinematics for no reason.
     """
     world, _, _ = world_with_two_bodies
-    synchronizer = TfFrameSynchronizer(world=world)
+    synchronizer = TfFrameSynchronizer(world=world, node=rclpy_node)
 
     assert not synchronizer.apply()
 
@@ -285,12 +288,12 @@ def test_apply_writes_nothing_without_a_tracked_connection(
 # %% rejecting connections it cannot write
 
 
-def test_tracking_a_connection_twice_is_rejected(init_rospy, tracked_connection):
+def test_tracking_a_connection_twice_is_rejected(rclpy_node, tracked_connection):
     """
     A second pair of frames for the same connection would silently overwrite the first.
     """
     world, connection = tracked_connection
-    synchronizer = TfFrameSynchronizer(world=world)
+    synchronizer = TfFrameSynchronizer(world=world, node=rclpy_node)
     synchronizer.track(connection, tf_parent_frame="map", tf_child_frame="odom")
 
     with pytest.raises(AlreadyTrackedByTfFrameError):
@@ -300,7 +303,7 @@ def test_tracking_a_connection_twice_is_rejected(init_rospy, tracked_connection)
 
 
 def test_tracking_a_connection_without_six_degrees_of_freedom_is_rejected(
-    init_rospy, world_with_two_bodies
+    rclpy_node, world_with_two_bodies
 ):
     """
     Only a connection with all six degrees of freedom can follow an arbitrary transform.
@@ -309,7 +312,7 @@ def test_tracking_a_connection_without_six_degrees_of_freedom_is_rejected(
     with world.modify_world():
         connection = FixedConnection(parent=parent, child=child)
         world.add_connection(connection)
-    synchronizer = TfFrameSynchronizer(world=world)
+    synchronizer = TfFrameSynchronizer(world=world, node=rclpy_node)
 
     with pytest.raises(ConnectionCannotBeTrackedByTfFrameError):
         synchronizer.track(connection, tf_parent_frame="map", tf_child_frame="odom")

@@ -18,7 +18,7 @@ from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from giskardpy.middleware.ros2.graceful_shutdown import GracefulShutdownSignals
 from giskardpy.middleware.ros2.cycle_counter import CycleCounter
-from giskardpy.middleware.ros2.input_synchronization import WorldStateInputs
+from semantic_digital_twin.adapters.ros.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.motion_server import MotionServer
 from giskardpy.middleware.ros2.post_goal_plotters import (
     GoalGanttChartPlotter,

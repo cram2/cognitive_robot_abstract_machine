@@ -2,21 +2,21 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Generic, List, Tuple, Type, Union
 
 from nav_msgs.msg import Odometry
-from rclpy.subscription import Subscription
+from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from typing_extensions import TypeVar
+from typing_extensions import Dict, List, Tuple, Union
 
-from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.exceptions import (
+from semantic_digital_twin.adapters.ros.latest_message_subscriber import (
+    LatestMessageSubscriber,
+    MessageType,
+)
+from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
+from semantic_digital_twin.exceptions import (
     AlreadyTrackedByTfFrameError,
     ConnectionCannotBeTrackedByTfFrameError,
-    UnboundMessageTypeError,
 )
-from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -27,8 +27,6 @@ from semantic_digital_twin.world_description.connections import (
 )
 
 # %% base classes
-
-MessageType = TypeVar("MessageType")
 
 
 @dataclass
@@ -60,7 +58,7 @@ class InputSynchronizer(ABC):
 @dataclass
 class WorldStateInputs:
     """
-    All inputs that one loop of Giskard reads before it computes anything.
+    All inputs that one loop reads before it computes anything.
     """
 
     world: World
@@ -120,56 +118,11 @@ class WorldStateInputs:
 
 @dataclass
 class TopicInputSynchronizer(
-    InputSynchronizer, Generic[MessageType], SubClassSafeGeneric, ABC
+    LatestMessageSubscriber[MessageType], InputSynchronizer, ABC
 ):
     """
-    Buffers the latest message of a topic and applies it on demand.
-
-    Subclasses name the type of their messages by binding the generic parameter, as in
-    ``TopicInputSynchronizer[Odometry]``.
+    Applies the latest message of a topic on demand.
     """
-
-    topic_name: str
-    """
-    Name of the topic the inputs are read from.
-    """
-
-    latest_message: MessageType | None = field(init=False, default=None)
-    """
-    The most recently received message, or ``None`` if nothing was received yet.
-    """
-
-    subscription: Subscription = field(init=False)
-    """
-    The subscription feeding ``latest_message``.
-    """
-
-    def __post_init__(self):
-        if not self.topic_name.startswith("/"):
-            self.topic_name = f"/{self.topic_name}"
-        self.subscription = rospy.get_node().create_subscription(
-            self.message_type(), self.topic_name, self.buffer_message, 1
-        )
-        rospy.get_node().get_logger().info(f"Subscribed to {self.topic_name}")
-
-    @classmethod
-    def message_type(cls) -> Type[MessageType]:
-        """
-        The type of the messages published on ``topic_name``.
-
-        :raises UnboundMessageTypeError: If the class does not bind the generic
-            parameter.
-        """
-        message_types = cls.get_generic_type_parameters()
-        if not message_types or isinstance(message_types[0], TypeVar):
-            raise UnboundMessageTypeError(synchronizer_type=cls)
-        return message_types[0]
-
-    def buffer_message(self, message: MessageType) -> None:
-        """
-        Remember the message so that the next :meth:`apply` can use it.
-        """
-        self.latest_message = message
 
     def apply(self) -> bool:
         message = self.take_message()
@@ -189,9 +142,6 @@ class TopicInputSynchronizer(
         """
         Write the message into the world state.
         """
-
-    def close(self) -> None:
-        rospy.get_node().destroy_subscription(self.subscription)
 
 
 # %% joint states
@@ -289,13 +239,18 @@ class TfFrameSynchronizer(InputSynchronizer):
     Maps each tracked connection to its tf parent and child frame.
     """
 
+    node: Node = field(kw_only=True)
+    """
+    The node the tf lookups are made with.
+    """
+
     tf_wrapper: TFWrapper = field(init=False)
     """
     Provides the tf lookups.
     """
 
     def __post_init__(self):
-        self.tf_wrapper = TFWrapper(node=rospy.get_node())
+        self.tf_wrapper = TFWrapper(node=self.node)
 
     def track(
         self, connection: Connection6DoF, tf_parent_frame: str, tf_child_frame: str

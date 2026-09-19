@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Union
 
 from typing_extensions import (
-    TYPE_CHECKING,
     Type,
     TypeVar,
     Generic,
@@ -15,16 +14,12 @@ from typing_extensions import (
     Unpack,
 )
 
-from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.patterns.subclass_safe_generic import (
     SubClassSafeGeneric,
 )
 from krrood.utils import get_generic_type_parameters
+from semantic_digital_twin.datastructures.lidar_reading import LidarReading
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.world_description.world_modification import (
-    synchronized_attribute_modification,
-)
 
 logger = logging.getLogger("semantic_digital_twin")
 
@@ -45,6 +40,7 @@ TGenericRightFinger = TypeVar("TGenericRightFinger")
 TGenericFingers = TypeVarTuple("TGenericFingers")
 TGenericArms = TypeVarTuple("TGenericArms")
 TGenericSensors = TypeVarTuple("TGenericSensors")
+TGenericLidar = TypeVar("TGenericLidar")
 
 
 @dataclass(eq=False)
@@ -58,6 +54,34 @@ class RobotPartMixin(ABC):
         """
         Validation method that describes assumptions made about the robot part.
         """
+
+    def validate_assumptions(self):
+        """
+        Checks the assumptions of every mixin this robot part combines.
+
+        ..note:: Calling :meth:`validate` would reach only one mixin, since a part
+            combining several of them resolves the name to the first.
+        """
+        for mixin in self._narrowest_mixins():
+            mixin.validate(self)
+
+    def _narrowest_mixins(self) -> list[Type[RobotPartMixin]]:
+        """
+        :return: The mixins stating this part's assumptions, leaving out every mixin
+            another one of them narrows.
+        """
+        mixins = [
+            ancestor
+            for ancestor in type(self).__mro__
+            if issubclass(ancestor, RobotPartMixin) and "validate" in vars(ancestor)
+        ]
+        return [
+            mixin
+            for mixin in mixins
+            if not any(
+                other is not mixin and issubclass(other, mixin) for other in mixins
+            )
+        ]
 
 
 @dataclass(eq=False)
@@ -316,3 +340,24 @@ class HasNeck(Generic[TGenericNeck], SubClassSafeGeneric, RobotPartMixin, ABC):
 
     def validate(self):
         assert self.neck is not None, f"Expected neck, got None"
+
+
+@dataclass(eq=False)
+class HasLidar(Generic[TGenericLidar], SubClassSafeGeneric, RobotPartMixin, ABC):
+    """
+    Mixin class for robots or robot parts that have a lidar as their direct child.
+    """
+
+    lidar: TGenericLidar = field(default=None, kw_only=True)
+    """
+    The lidar attached to the robot part.
+    """
+
+    def validate(self):
+        assert self.lidar is not None, "Expected lidar, got None"
+
+    def get_lidar_reading(self) -> LidarReading:
+        """
+        :return: The most recent sweep of the attached lidar.
+        """
+        return self.lidar.get_lidar_reading()

@@ -926,7 +926,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             1. Deepcopy the resulting world to ensure that all parts of the robot are initialized in the correct order
             2. Assert that the copied world is the same as the original world
             3. Assert that the robot semantic annotation has a default camera.
-            4. Call validate method on all robot parts inheriting froma RobotPartMixin
+            4. Check the assumptions of every mixin each robot part combines
 
         :return: True if the robot semantic annotation is valid, False otherwise.
         """
@@ -947,7 +947,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             assert part._robot == self, f"Part {part} refers to wrong robot"
 
             if isinstance(part, RobotPartMixin):
-                part.validate()
+                part.validate_assumptions()
 
         return True
 
