@@ -1,15 +1,21 @@
 import numpy as np
+from copy import deepcopy
+from dataclasses import dataclass, field
 
 from krrood.symbolic_math.float_variable_data import (
     FloatVariableData,
 )
 from krrood.symbolic_math.symbolic_math import Vector, VariableParameters, FloatVariable
+from semantic_digital_twin.collision_checking.collision_manager import (
+    CollisionConsumer,
+)
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowAllCollisions,
     AvoidCollisionBetweenGroups,
+    AvoidExternalCollisions,
     AvoidSelfCollisions,
 )
 from semantic_digital_twin.collision_checking.collision_variable_managers import (
@@ -17,6 +23,7 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     SelfCollisionVariableManager,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world import World
 
 
@@ -278,6 +285,65 @@ def test_collision_rules_survive_merge(pr2_world_copy):
     assert len(world.collision_manager.rules) == expected
 
 
+def test_a_copied_world_keeps_the_distances_its_collision_rules_were_given(
+    _pr2_world_setup,
+):
+    """
+    A copy is used to try a motion out before it is run, so a copy whose rules fell back
+    to their default distances answers for a robot that keeps less clearance than the
+    one that goes on to execute.
+    """
+    original = [
+        (type(rule), rule.buffer_zone_distance, rule.violated_distance)
+        for rule in _pr2_world_setup.collision_manager.default_rules
+    ]
+
+    copied = [
+        (type(rule), rule.buffer_zone_distance, rule.violated_distance)
+        for rule in deepcopy(_pr2_world_setup).collision_manager.default_rules
+    ]
+
+    assert copied == original
+
+
+# %% rules only name bodies that can collide
+
+
+def test_an_avoid_rule_leaves_out_subset_bodies_that_cannot_collide(pr2_world_copy):
+    """
+    A body with no geometry can never be the reason two things are kept apart, so naming
+    one in a rule only misstates what that rule covers.
+    """
+    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    without_geometry = pr2_world_copy.get_body_by_name("l_force_torque_adapter_link")
+    with_geometry = pr2_world_copy.get_body_by_name("l_force_torque_link")
+    assert not without_geometry.has_collision()
+    assert with_geometry.has_collision()
+
+    rule = AvoidExternalCollisions(
+        robot=robot, body_subset={without_geometry, with_geometry}
+    )
+
+    assert rule.body_subset == {with_geometry}
+
+
+def test_no_collision_rule_names_a_body_that_cannot_collide(pr2_world_copy):
+    """
+    Every rule the robot installs is built from bodies that carry geometry, and stays
+    that way whichever rule is added next.
+    """
+    for rule in pr2_world_copy.collision_manager.rules:
+        rule.update(pr2_world_copy)
+
+    named = {
+        body
+        for rule in pr2_world_copy.collision_manager.rules
+        for body in rule.referenced_bodies
+    }
+
+    assert sorted(str(body.name) for body in named if not body.has_collision()) == []
+
+
 # %% whether a robot touches anything
 
 
@@ -294,7 +360,7 @@ def test_robot_is_in_collision_reports_a_contact_of_its_own(cylinder_bot_world):
         [
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=10,
-                violated_distance=0.0,
+                violated_distance=10,
                 body_group_a=[robot.root],
                 body_group_b=[environment],
             )
@@ -303,6 +369,40 @@ def test_robot_is_in_collision_reports_a_contact_of_its_own(cylinder_bot_world):
     collision_manager.update_collision_matrix()
 
     assert robot.is_in_collision
+
+
+def test_robot_is_not_in_collision_while_it_keeps_its_distance(cylinder_bot_world):
+    """
+    A pair is watched from far enough away to see it coming, so being reported says only
+    that the two are being watched.
+
+    The robot counts as in collision once it comes within the distance the rule says
+    must not be violated, and not before.
+    """
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+        "environment"
+    )
+    collision_manager = cylinder_bot_world.collision_manager
+    collision_manager.extend_temporary_rule(
+        [
+            AvoidCollisionBetweenGroups(
+                buffer_zone_distance=10,
+                violated_distance=0.1,
+                body_group_a=[robot.root],
+                body_group_b=[environment],
+            )
+        ]
+    )
+    collision_manager.update_collision_matrix()
+    [contact] = [
+        contact
+        for contact in collision_manager.compute_collisions().contacts
+        if contact.body_a is environment or contact.body_b is environment
+    ]
+
+    assert contact.distance > 0.1
+    assert not robot.is_in_collision
 
 
 def test_robot_is_not_in_collision_when_nothing_is_checked(cylinder_bot_world):
@@ -315,3 +415,38 @@ def test_robot_is_not_in_collision_when_nothing_is_checked(cylinder_bot_world):
     collision_manager.update_collision_matrix()
 
     assert not robot.is_in_collision
+
+
+# %% consumers stay out of the serialized model
+
+
+@dataclass
+class ConsumerHoldingSomethingUnserializable(CollisionConsumer):
+    """
+    A consumer carrying a value no JSON serializer knows, as a live ROS publisher does.
+    """
+
+    live_handle: object = field(default_factory=object)
+    """
+    Stands in for the node a visualization publisher keeps hold of.
+    """
+
+    def on_compute_collisions(self, collision_results):
+        pass
+
+    def on_world_model_update(self, world):
+        pass
+
+    def on_collision_matrix_update(self):
+        pass
+
+
+def test_a_consumer_does_not_have_to_be_serializable(pr2_world_copy):
+    """
+    Consumers are live observers, not part of the model, so attaching one must not make
+    the world's modification history unserializable.
+    """
+    collision_manager = pr2_world_copy.collision_manager
+    collision_manager.add_collision_consumer(ConsumerHoldingSomethingUnserializable())
+
+    assert "collision_consumers" not in collision_manager.to_json()

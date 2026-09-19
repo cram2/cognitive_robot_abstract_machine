@@ -42,7 +42,7 @@ Next, we will write a simple plan where the robot parks its arms, moves somewher
 from coraplex.robot_plans import *
 from coraplex.execution_environment import simulated_robot
 from coraplex.robot_plans.actions.composite.transporting import TransportAction, MoveTorsoAction
-from coraplex.datastructures.enums import Arms, Grasp
+from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import *
 from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2, TorsoState
@@ -51,12 +51,17 @@ from coraplex.datastructures.dataclasses import Context
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
-context = Context(world, pr2_view)
+# A location draws its candidates from a costmap, so a seed is what makes this
+# example run the same way twice.
+context = Context(world, pr2_view, sampling_seed=0)
 
-description = TransportAction(world.get_semantic_annotations_by_type(Milk)[0],
-                              Pose.from_xyz_quaternion(2.4, 2.8, 1,
-                                                       0.0, 0.0, 0.0, 1.0, reference_frame=world.root),
-                              Arms.LEFT)
+description = TransportAction(
+    world.get_semantic_annotations_by_type(Milk)[0],
+    Arms.LEFT,
+    target_location=Pose.from_xyz_quaternion(
+        2.4, 3, 1.05, 0.0, 0.0, 0.0, 1.0, reference_frame=world.root
+    ),
+)
 plan = sequential([MoveTorsoAction(TorsoState.HIGH),
                    description], context=context).plan
 with simulated_robot:

@@ -5,8 +5,8 @@ from typing_extensions import Optional, Tuple
 from krrood.entity_query_language.predicate import symbolic_function
 from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.robots.robot_parts import (
+    Arm,
     EndEffector,
-    KinematicChain,
     AbstractRobot,
     Neck,
 )
@@ -45,7 +45,8 @@ class ViewManager:
         return None
 
     @staticmethod
-    def get_arm_view(arm: Arms, robot_view: AbstractRobot) -> Optional[KinematicChain]:
+    @symbolic_function
+    def get_arm_view(arm: Arms, robot_view: AbstractRobot) -> Optional[Arm]:
         """
         Get the arm view for a given arm and robot view.
 
@@ -59,7 +60,7 @@ class ViewManager:
     @staticmethod
     def get_all_arm_views(
         arm: Arms, robot_view: AbstractRobot
-    ) -> Optional[Tuple[KinematicChain]]:
+    ) -> Optional[Tuple[Arm, ...]]:
         """
         Get all possible arm views for a given arm and robot view.
 

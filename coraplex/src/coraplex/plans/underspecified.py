@@ -11,7 +11,7 @@ from coraplex.plans.executables import (
     GiskardExecutable,
     UnderspecifiedExecutable,
 )
-from coraplex.plans.failures import PlanFailure
+from coraplex.plans.failures import RECOVERABLE_FAILURES
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import ActionNode, ExecutionBoundaryNode
 from krrood.entity_query_language.query.match import Match
@@ -82,7 +82,7 @@ class ActionTrial:
         and longer run of blocks, most of them already-undone ones.
 
         :param action: The grounded action to try out.
-        :return: True if `action` runs to completion without raising a `PlanFailure`.
+        :return: True if `action` runs to completion without failing.
         """
         context = self._copy()
         world = context.world
@@ -98,7 +98,7 @@ class ActionTrial:
             try:
                 candidate.perform()
                 return True
-            except PlanFailure:
+            except RECOVERABLE_FAILURES:
                 return False
             finally:
                 # Undo the model changes before leaving the reset context restores the

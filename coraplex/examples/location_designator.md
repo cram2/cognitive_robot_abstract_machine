@@ -45,7 +45,9 @@ from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
-context = Context(world, pr2_view)
+# A location draws its candidates from a costmap, so a seed is what makes this
+# example run the same way twice.
+context = Context(world, pr2_view, sampling_seed=0)
 
 origin_pose = pr2_view.root.global_pose
 ```
@@ -99,8 +101,13 @@ with simulated_robot:
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.execution_environment import simulated_robot
 from coraplex.locations.factories import reachability_location
+from coraplex.view_manager import ViewManager
 
-location = reachability_location(world.get_body_by_name("milk.stl"), context=context, arm=Arms.LEFT)
+location = reachability_location(
+    world.get_body_by_name("milk.stl"),
+    context=context,
+    arm=ViewManager.get_arm_view(Arms.LEFT, context.robot),
+)
 
 plan = execute_single(NavigateAction(next(iter(location))), context=context)
 
@@ -175,7 +182,11 @@ with world.modify_world():
         )
     )
 
-location = accessing_location(world.get_semantic_annotations_by_type(Drawer)[0], context=context, arm=Arms.LEFT)
+location = accessing_location(
+    world.get_semantic_annotations_by_type(Drawer)[0],
+    context=context,
+    arm=ViewManager.get_arm_view(Arms.LEFT, context.robot),
+)
 
 print(next(iter(location)))
 ```

@@ -41,7 +41,6 @@ dependencies = [
     "polytope",
     "semantic_digital_twin",
     "trimesh",
-    "cgal",
     "giskardpy",
     "krrood",
 ]

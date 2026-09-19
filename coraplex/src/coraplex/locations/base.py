@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import cast
 
 from typing_extensions import (
@@ -24,6 +24,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Copula,
     Noun,
 )
+from coraplex.locations.sampling import CandidateDraw
 
 if TYPE_CHECKING:
     from coraplex.alternative_motion_mapping import AlternativeMotion
@@ -43,7 +44,11 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Point3,
+    Pose,
+    Quaternion,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -72,9 +77,13 @@ class Location(Iterable[Pose]):
     Backend that generates pose candidates.
     """
 
-    validators: List[PoseValidator]
+    validator: Optional[PoseValidator] = None
     """
-    Validators that are used to check if a generated pose is valid.
+    What a generated pose is checked against, or ``None`` to take every pose the
+    generator offers.
+
+    One rather than several: a location asks one question, and a caller reading the
+    answer off afterwards needs to know which validator to read it from.
     """
 
     standing_violated_distance: float = 0.05
@@ -82,6 +91,38 @@ class Location(Iterable[Pose]):
     How close in meters the robot may come to its surroundings at a candidate pose
     before that pose counts as in collision.
     """
+
+    draw: CandidateDraw = field(default_factory=CandidateDraw)
+    """
+    The terms this location's candidates are drawn on.
+
+    Belongs here rather than to any one of the maps that constrain this location: the
+    terms decide how the merged result is drawn from, which is what this location
+    iterates. Its sample count is far more than :attr:`candidates_to_validate`, since
+    most candidates are refused cheaply before any of them is judged properly.
+    """
+
+    candidates_to_validate: int = 50
+    """
+    How many candidates are checked for reachability before the location gives up.
+
+    Only candidates that got that far count: judging one drives the robot to see whether
+    it arrives, while a pose standing in collision is thrown out cheaply beforehand. A
+    budget spent on the cheap refusals would leave a target hemmed in by furniture with
+    none of its reachable poses ever tried.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Fix this location's draw to the plan it belongs to.
+
+        A plan that pins its seed is asking every location inside it to repeat, so a
+        draw that names no seed of its own takes the plan's. A draw handed one already
+        keeps it.
+        """
+        if self.draw.seed is not None or self.context is None:
+            return
+        self.draw = replace(self.draw, seed=self.context.sampling_seed)
 
     @property
     def world(self):
@@ -136,13 +177,12 @@ class Location(Iterable[Pose]):
         test_robot = cast(
             AbstractRobot, test_world.get_semantic_annotation_by_id(self.robot.id)
         )
-        for validator in self.validators:
-            validator.context = Context(
+        if self.validator is not None:
+            self.validator.context = Context(
                 world=test_world,
                 robot=test_robot,
                 alternative_motion_mappings=self.context.alternative_motion_mappings,
                 motion_tolerances=self.context.motion_tolerances,
-                ticks_per_motion=self.context.ticks_per_motion,
             )
 
         if self.context.debug:
@@ -157,7 +197,8 @@ class Location(Iterable[Pose]):
         # Save to current rules to restore them later
         rules_of_the_run = list(test_world.collision_manager.temporary_rules)
 
-        for pose_candidate in self.generator:
+        validated = 0
+        for pose_candidate in self.generator.candidates(self.draw):
 
             # A candidate says where to stand and which way to look, which is the
             # heading NavigateAction is handed. Turning it into a base pose the same way
@@ -189,37 +230,23 @@ class Location(Iterable[Pose]):
                 logger.debug(f"Candidate pose in collision, skipping")
                 continue
 
-            if all(
-                validator(pose_candidate=pose_candidate)
-                for validator in self.validators
-            ):
+            validated += 1
+            if self.validator is None or self.validator(pose_candidate=pose_candidate):
                 yield pose_candidate
 
-    def merge(self, other: Location) -> Location:
-        """
-        Merge this location with another location, merging the generator backends and
-        validators.
-
-        :param other: The other location to merge with.
-        :return: A new location that is the merge of this location and the other
-            location.
-        """
-        return Location(
-            self.context,
-            self.target_pose,
-            self.generator.merge(other.generator),
-            self.validators + other.validators,
-        )
-
-    def __and__(self, other: Location) -> Location:
-        return self.merge(other)
+            if validated >= self.candidates_to_validate:
+                logger.debug(
+                    f"Validated {validated} candidates without another one to offer, "
+                    f"giving up"
+                )
+                return
 
 
 @dataclass
 class DeferredLocation(Iterable[Pose]):
     """
     Lazily rebuilds a concrete :class:`Location` from current world state on each
-    iteration, so its pose generator and validators reflect the world at the moment the
+    iteration, so its pose generator and validator reflect the world at the moment the
     location is consumed (execution time) rather than when the plan was constructed.
 
     .. warning::
@@ -240,15 +267,24 @@ class DeferredLocation(Iterable[Pose]):
 
 
 @dataclass
-class PoseGeneratorBackend:
+class PoseGeneratorBackend(ABC):
     """
     Generator backend base class for poses, generates pose candidates which are checked
-    against a set of validators.
+    against a validator.
     """
 
     @abstractmethod
-    def __iter__(self) -> Iterator[Pose]:
-        pass
+    def candidates(self, draw: CandidateDraw) -> Iterator[Pose]:
+        """
+        Draw pose candidates from this backend.
+
+        The only way to draw from a backend, so the terms are always named where the
+        draw is asked for: every backend says what it does with the ones it is given,
+        and none of them is chosen on a caller's behalf.
+
+        :param draw: The terms to draw the candidates on.
+        :return: The pose candidates, in the order they should be tried.
+        """
 
     def merge(self, other: PoseGeneratorBackend) -> PoseGeneratorBackend:
         """

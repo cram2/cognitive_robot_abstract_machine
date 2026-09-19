@@ -271,6 +271,43 @@ class TestStallDetection:
         assert unreachable.unique_name in str(exception_info.value)
         assert reachable.unique_name not in str(exception_info.value)
 
+    def test_a_motion_whose_running_tasks_all_reached_their_goals_is_not_stalled(
+        self, cylinder_bot_world: World
+    ):
+        """
+        A task at its goal has nothing left to approach, so it must not keep alive the
+        guard that stops finished work from reading as a stall.
+
+        Nothing ends a task for reaching its goal, so a task that arrived keeps running,
+        and a motion also holds invariants that sit at zero error for its whole length.
+        Counting either as work still in progress makes every wait after the last goal
+        was reached a stall.
+        """
+        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        arrived = CartesianPosition(
+            root_link=cylinder_bot_world.root,
+            tip_link=bot,
+            goal_point=Point3(0, 0, 0, reference_frame=bot),
+        )
+        progressing = StillProgressing(monitored_node=arrived, timeout=STALL_TIMEOUT)
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_nodes([arrived, progressing])
+        motion_statechart.add_node(progressing.cancel_motion())
+
+        context = MotionStatechartContext(world=cylinder_bot_world)
+        executor = Executor(context)
+        executor.compile(motion_statechart=motion_statechart)
+        for _ in range(
+            2
+            * ceil(
+                STALL_TIMEOUT.total_seconds() / context.qp_controller_config.control_dt
+            )
+        ):
+            executor.tick()
+
+        assert arrived.goal_reached_state == ObservationStateValues.TRUE
+        assert progressing.observation_state == ObservationStateValues.TRUE
+
     def test_stall_time_does_not_accumulate_before_the_goal_starts(
         self, cylinder_bot_world: World
     ):

@@ -2,9 +2,28 @@ from datetime import timedelta
 
 
 class ActionConfig:
-    pick_up_prepose_distance = 0.03
+    approach_clearance = 0.1
+    """
+    The gap in meters between an object and the gripper waiting to close on it.
+    """
 
-    grasping_prepose_distance = 0.03
+    retreat_distance = 0.1
+    """
+    The height in meters the gripper rises by once it holds an object.
+    """
+
+    reach_fraction = 0.5
+    """
+    The fraction of an arm's length the robot stands off what it reaches for.
+    """
+
+    accessing_reach_fraction = 0.66
+    """
+    The fraction of an arm's length the robot stands off a container it opens or closes.
+
+    A container is pulled open towards the robot, so it stands further back than it does
+    to reach something that stays where it is.
+    """
 
     navigate_keep_joint_states = True
 

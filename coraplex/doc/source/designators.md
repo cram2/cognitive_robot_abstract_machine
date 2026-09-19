@@ -86,10 +86,11 @@ The grounded designator is carried out. If it fails (e.g., object moved, pose bl
   - Propose good places and orientations for doing something (e.g., where to stand to see or reach an object, where to place an item).
   - They balance feasibility (reachability, visibility, collision‑free) and preference (shorter, safer, semantically meaningful).
 
-Objects the robot acts on are not a separate designator class. They are referenced directly as `Body` instances of
-the semantic digital twin world, usually obtained from the world model (for example via `world.get_body_by_name(...)`)
-or by querying the belief state with the Entity Query Language. Action designators that operate on an object take such a
-`Body` as their `object_designator` argument.
+Objects the robot acts on are not a separate designator class. They are referenced directly as entities of the
+semantic digital twin world, usually obtained from the world model (for example via `world.get_body_by_name(...)`)
+or by querying the belief state with the Entity Query Language. An action designator that takes hold of an object
+takes the semantic annotation saying where it may be grasped as its `graspable_object` argument; one that only needs
+the object itself, such as placing, takes the `Body` as its `object_designator` argument.
 
 ## How designators fit into a plan
 

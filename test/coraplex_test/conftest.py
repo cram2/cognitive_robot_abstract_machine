@@ -45,6 +45,8 @@ from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
+from ..conftest import SAMPLING_SEED
+
 
 @pytest.fixture(scope="session")
 def viz_marker_publisher():
@@ -59,7 +61,7 @@ def viz_marker_publisher():
 def mutable_model_world(pr2_apartment_world):
     world = deepcopy(pr2_apartment_world)
     pr2 = world.get_semantic_annotations_by_type(PR2)[0]
-    return world, pr2, Context(world, pr2)
+    return world, pr2, Context(world, pr2, sampling_seed=SAMPLING_SEED)
 
 
 @pytest.fixture(scope="function")
@@ -67,7 +69,7 @@ def immutable_model_world(pr2_apartment_world):
     world = pr2_apartment_world
     pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
     state = deepcopy(world.state._data)
-    yield world, pr2, Context(world, pr2)
+    yield world, pr2, Context(world, pr2, sampling_seed=SAMPLING_SEED)
     world.state._data[:] = state
     world.notify_state_change()
 
@@ -86,7 +88,11 @@ def mutable_simple_pr2_world(simple_pr2_world_setup):
     world, robot_view, context = simple_pr2_world_setup
     copy_world = deepcopy(world)
     robot_view = world.get_semantic_annotations_by_type(PR2)[0]
-    return world, robot_view, Context(copy_world, robot_view)
+    return (
+        world,
+        robot_view,
+        Context(copy_world, robot_view, sampling_seed=SAMPLING_SEED),
+    )
 
 
 @pytest.fixture(scope="function")
@@ -104,7 +110,7 @@ def coraplex_testing_session():
 @pytest.fixture(scope="function")
 def immutable_stretch_apartment_world(stretch_apartment_world):
     robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
-    context = Context(stretch_apartment_world, robot)
+    context = Context(stretch_apartment_world, robot, sampling_seed=SAMPLING_SEED)
     state = deepcopy(stretch_apartment_world.state._data)
 
     yield stretch_apartment_world, robot, context
