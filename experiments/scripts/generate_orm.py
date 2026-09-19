@@ -5,6 +5,7 @@ import experiments
 import experiments.control_loop_experiments.benchmark
 import experiments.control_loop_experiments.scenarios
 import coraplex.orm.ormatic_interface
+import segmind.orm.ormatic_interface
 
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.utils import classes_of_module
@@ -21,7 +22,10 @@ ignored_classes |= set(
 
 # Create an ORMatic object with the classes to be mapped
 ormatic = ORMatic.from_package(
-    [experiments], [coraplex.orm.ormatic_interface], ignored_classes, type_mappings={}
+    [experiments],
+    [coraplex.orm.ormatic_interface, segmind.orm.ormatic_interface],
+    ignored_classes,
+    type_mappings={},
 )
 logging.getLogger("krrood").setLevel(logging.DEBUG)
 
