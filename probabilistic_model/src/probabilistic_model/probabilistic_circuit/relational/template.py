@@ -46,10 +46,11 @@ class RelationalDistributionTemplate(ABC):
         :param part: The query part being grounded.
         :param index: Position of the part in its parent list; used as fallback prefix
             when ``part`` does not carry a symbolic variable.
-        :return: ``str(part.variable)`` if ``part`` carries one, else ``str(index)``.
+        :return: The prefix taken from ``part``'s variable, or ``str(index)`` when it
+            carries none.
         """
         return (
-            str(part.variable)
+            str(part._variable_)
             if isinstance(part, AbstractMatchExpression)
             else str(index)
         )

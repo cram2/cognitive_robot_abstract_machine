@@ -181,7 +181,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
 
     @property
     def designator_type(self) -> Type:
-        return self.underspecified_action.type
+        return self.underspecified_action._type_
 
     def _pull_next_action(self) -> Optional[ActionDescription]:
         """

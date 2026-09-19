@@ -36,6 +36,7 @@ from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
     CanBehaveLikeAVariable,
+    HasSymbolicOperations,
     Attribute,
 )
 from krrood.entity_query_language.core.variable import (
@@ -146,7 +147,7 @@ def distribution_of(
     :param match: The match whose conditions describe the distribution.
     :param marginalize_for: Optionally, a subset of the match's free variables to
         narrow the result to (further marginalization), e.g. ``distribution_of(match,
-        marginalize_for=(match.variable.outcome,))``. Without it, every one of the
+        marginalize_for=(match.outcome,))``. Without it, every one of the
         match's free variables is kept.
     :return: Distribution descriptor.
     """
@@ -385,9 +386,12 @@ def _quantify_or_build_match(
 
     The behaviour is selected by the runtime type of ``arg``:
 
-    * If ``arg`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`
-      (an entity, a set expression, a variable or an attribute), it is quantified with
-      ``quantifier_type``. Raw selectables that are not already a
+    * If ``arg`` stands for an expression - a
+      :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression` (an
+      entity, a set expression, a variable or an attribute), or a
+      :class:`~krrood.entity_query_language.query.match.Match`, which contributes the
+      query carrying its pattern - it is quantified with ``quantifier_type``. Raw
+      selectables that are not already a
       :class:`~krrood.entity_query_language.query.query.Query` are first wrapped with
       :py:func:`entity`.
     * Otherwise ``arg`` is treated as a type (or a callable factory) and a structural
@@ -395,6 +399,10 @@ def _quantify_or_build_match(
       and generative-ready through a
       :class:`~krrood.entity_query_language.backends.GenerativeBackend`. Restrict the search to
       specific instances with :meth:`~krrood.entity_query_language.query.match.Match.from_`.
+      The match reads like an instance of the matched class, both statically (the
+      overloads return ``Union[T, Match[T]]``, so IDEs offer the class's own attributes)
+      and at runtime (attribute access is delegated symbolically, see
+      :meth:`~krrood.entity_query_language.query.match.Match.__getattr__`).
 
     :param arg: An entity/set/variable/attribute to quantify, or a type/callable to match.
     :param quantifier_type: The result quantifier to apply (``An`` or ``The``).
@@ -402,12 +410,13 @@ def _quantify_or_build_match(
     :param target_type: Optional explicit type for callable factories (match path only).
     :return: A quantified query, or a ``Match`` builder.
     """
-    if isinstance(arg, SymbolicExpression):
+    if isinstance(arg, (SymbolicExpression, HasSymbolicOperations)):
+        arg = SymbolicExpression._as_operand_(arg)
         if not isinstance(arg, Query):
             arg = entity(arg)
         return arg._quantify_(quantifier_type, quantification_constraint=quantification)
 
-    match_ = Match(factory=arg, type_=target_type)
+    match_ = Match(_factory_=arg, _declared_type_=target_type)
     match_._quantifier_type_ = quantifier_type
     return match_
 
@@ -434,7 +443,7 @@ def an(
     quantification: None = ...,
     *,
     target_type: None = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -452,7 +461,7 @@ def an(
     quantification: None = ...,
     *,
     target_type: Type[T] = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -495,7 +504,7 @@ def a(
     quantification: None = ...,
     *,
     target_type: None = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -513,7 +522,7 @@ def a(
     quantification: None = ...,
     *,
     target_type: Type[T] = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -551,7 +560,7 @@ def the(
     entity_: Type[T],
     *,
     target_type: None = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -567,7 +576,7 @@ def the(
     entity_: Callable[..., T],
     *,
     target_type: Type[T] = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload

@@ -1029,8 +1029,8 @@ def test_explanation_lifecycle_tied_to_instance():
             parent=prismatic_connection.child, child=handle
         ).from_(world.connections)
         drawers = inference(Drawer)(
-            container=fixed_connection.expression.parent,
-            handle=fixed_connection.expression.child,
+            container=fixed_connection.parent,
+            handle=fixed_connection.child,
         ).tolist()
         assert drawers, "Need at least one inferred Drawer for this test"
 
@@ -1067,6 +1067,6 @@ def drawer_rule(doors_and_drawers_world):
         parent=prismatic_connection.child, child=handle
     ).from_(world.connections)
     return inference(Drawer)(
-        container=fixed_connection.expression.parent,
-        handle=fixed_connection.expression.child,
+        container=fixed_connection.parent,
+        handle=fixed_connection.child,
     )

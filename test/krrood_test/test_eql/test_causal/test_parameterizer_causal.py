@@ -68,7 +68,7 @@ def test_without_cause_no_search_cause_variables_are_registered():
 
 def test_causes_effect_condition_registers_its_effect_variable():
     match = a(Pick)(arm=cause, status=...)
-    match.causes_effect(match.variable.status == Status.SUCCESS)
+    match.causes_effect(match.status == Status.SUCCESS)
     parameters = UnderspecifiedParameters(match)
     assert len(parameters.effect_variables_from_causes_effect) == 1
     assert parameters.effect_variables_from_causes_effect[0].name == "Pick.status"
@@ -82,9 +82,7 @@ def test_without_causes_effect_no_effect_variables_are_registered():
 
 def test_causes_effect_conjunction_registers_every_effect_variable():
     match = a(Pick)(arm=cause, status=...)
-    match.causes_effect(
-        match.variable.status == Status.SUCCESS, match.variable.arm == 0.3
-    )
+    match.causes_effect(match.status == Status.SUCCESS, match.arm == 0.3)
     parameters = UnderspecifiedParameters(match)
     names = {v.name for v in parameters.effect_variables_from_causes_effect}
     assert names == {"Pick.status", "Pick.arm"}

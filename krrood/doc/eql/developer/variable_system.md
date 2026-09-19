@@ -15,17 +15,25 @@ kernelspec:
 
 EQL variables are more than just placeholders; they are active components of the execution graph that know how to resolve data from object instances.
 
-## `CanBehaveLikeAVariable`
+## `HasSymbolicOperations`
 
-The {py:class}`~krrood.entity_query_language.core.mapped_variable.CanBehaveLikeAVariable` mixin is what makes EQL so "pythonic." It overrides standard Python dunder methods to capture operations and turn them into symbolic expressions.
+The {py:class}`~krrood.entity_query_language.core.mapped_variable.HasSymbolicOperations` mixin is what makes EQL so "pythonic." It overrides standard Python dunder methods to capture operations and turn them into symbolic expressions.
 
 - **`__getattr__`**: Captures attribute access and returns an {py:class}`~krrood.entity_query_language.core.mapped_variable.Attribute`.
 - **`__getitem__`**: Captures indexing and returns an {py:class}`~krrood.entity_query_language.core.mapped_variable.Index`.
 - **`__call__`**: Captures method calls and returns a {py:class}`~krrood.entity_query_language.core.mapped_variable.Call`.
+- **`__eq__` and the other comparisons**: Return a {py:class}`~krrood.entity_query_language.operators.comparator.Comparator`.
+- **The arithmetic dunders**: Return an {py:class}`~krrood.entity_query_language.operators.arithmetic.ArithmeticOperation`.
 
 ```{hint}
 This is why you can write `robot.name == "R2D2"`. The `robot` variable captures the `.name` access and returns a symbolic `Attribute` node.
 ```
+
+Each operation is built on the expression the implementation reports as `_symbolic_expression_`, which is what lets something that is *not* itself part of the expression graph offer the same operations: a {py:class}`~krrood.entity_query_language.query.match.Match` reports the query it lowers to, so `a(Drawer).body` is that query's attribute.
+
+## `CanBehaveLikeAVariable`
+
+The {py:class}`~krrood.entity_query_language.core.mapped_variable.CanBehaveLikeAVariable` mixin is the other half: the expression those operations are built *on*. It reports itself as `_symbolic_expression_`, and holds the mappings taken from it, so writing the same one twice gives one node rather than two - which is why `robot.name is robot.name`.
 
 ## Mapped Variables
 
@@ -54,6 +62,7 @@ Standard attribute access on an iterable valued attribute will return the iterab
 ```
 
 ## API Reference
+- {py:class}`~krrood.entity_query_language.core.mapped_variable.HasSymbolicOperations`
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.CanBehaveLikeAVariable`
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.Attribute`

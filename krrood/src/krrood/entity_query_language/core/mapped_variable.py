@@ -12,14 +12,17 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
+from inspect import isclass
 from typing import Self
 
 from typing_extensions import (
     TYPE_CHECKING,
+    Generic,
     Iterable,
     Any,
     Type,
     Optional,
+    Set,
     Tuple,
     Dict,
     List,
@@ -66,127 +69,139 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(eq=False, repr=False)
-class CanBehaveLikeAVariable(Selectable[T], ABC):
+def attribute_names_for_completion(type_: Any) -> Set[str]:
     """
-    This class adds the monitoring/tracking behavior on variables that tracks attribute
-    access, calling, and comparison operations.
+    Collect the non-dunder attribute and annotation names of a type, for interactive
+    completion on expressions that stand for a value of that type.
+
+    :param type_: The value type whose attribute names to collect; anything that is not
+        a class yields no names.
+    :return: The collected names.
+    """
+    names: Set[str] = set()
+    if not isinstance(type_, type):
+        return names
+    names.update(
+        name
+        for name in dir(type_)
+        if not (name.startswith("__") and name.endswith("__"))
+    )
+    for klass in type_.__mro__:
+        names.update(getattr(klass, "__annotations__", {}).keys())
+    return names
+
+
+class HasSymbolicOperations(Generic[T], ABC):
+    """
+    Something that stands for a value of type ``T``, on which every operation builds a
+    symbolic expression instead of computing an answer: reading an attribute, indexing,
+    calling, comparing and arithmetic.
+
+    Implementations differ only in *which* expression the operation is built on, which
+    they report as :attr:`_symbolic_expression_`: an expression that is itself a variable
+    reports itself, while something that merely stands for one - a match, whose lowered
+    query carries its pattern - reports that expression. The operations themselves are
+    written once, here.
     """
 
-    _known_mapped_variables_: Dict[MappedVariableCacheItem, MappedVariable] = field(
-        init=False, default_factory=dict
-    )
+    _type_: Optional[Type[T]]
     """
-    A storage of created MappedVariable instances to prevent recreating same mapping
-    multiple times.
+    The type of the value this stands for, whose attributes and operations are offered.
+    """
+
+    _id_: uuid.UUID
+    """
+    The identity this is hashed by, since comparing two of these builds a
+    :class:`~krrood.entity_query_language.operators.comparator.Comparator` rather than
+    answering whether they are the same.
     """
 
     __iter__ = None
     """
-    Prevent iteration on this class.
+    Prevent iteration, which :meth:`__getitem__` would otherwise supply through Python's
+    legacy sequence protocol - endlessly, since every index is a valid expression.
     """
 
-    def _get_mapped_variable_(
-        self, type_: Type[MappedVariable], *args, **kwargs
-    ) -> MappedVariable:
+    @property
+    @abstractmethod
+    def _symbolic_expression_(self) -> CanBehaveLikeAVariable[T]:
         """
-        Retrieves or creates a MappedVariable instance based on the provided arguments.
+        :return: The expression every symbolic operation on this is built on.
+        """
+        ...
 
-        :param type_: The type of the MappedVariable to retrieve or create.
-        :param args: Positional arguments to pass to the MappedVariable constructor.
-        :param kwargs: Keyword arguments to pass to the MappedVariable constructor.
-        :return: The retrieved or created MappedVariable instance.
+    def _is_own_name_(self, name: str) -> bool:
         """
-        cache_item = MappedVariableCacheItem(type_, self, args, kwargs)
-        if cache_item in self._known_mapped_variables_:
-            return self._known_mapped_variables_[cache_item]
-        else:
-            instance = type_(**cache_item.all_kwargs)
-            self._known_mapped_variables_[cache_item] = instance
-            return instance
-
-    def _get_mapped_variable_key_(self, type_: Type[MappedVariable], *args, **kwargs):
+        :param name: A name that this does not define.
+        :return: Whether the name belongs to this object's own machinery rather than to
+            the value type, making a missing one a genuine :class:`AttributeError`. An
+            expression that is itself a variable claims no such names, since the value
+            type may define any of them.
         """
-        Generates a hashable key for the given type and arguments.
-
-        :param type_: The type of the mapped variable to generate a key for, e.g.,
-            Attribute, Index, etc.
-        :param args: Positional arguments to pass to the MappedVariable constructor.
-        :param kwargs: Keyword arguments to pass to the MappedVariable constructor.
-        :return: The generated hashable key.
-        """
-        args = (self,) + args
-        all_kwargs = merge_args_and_kwargs(type_, args, kwargs, ignore_first=True)
-        return convert_args_and_kwargs_into_hashable_key(all_kwargs)
+        return False
 
     def __getattr__(self, name: str) -> Attribute[T]:
-        # Dunder names are never symbolic attribute access. Mapping them would (a) let copy/pickle
-        # and other machinery that probes optional dunder hooks recurse into endless variable
-        # creation, and (b) blur language semantics. Access a dunder-named member symbolically via a
-        # :func:`symbolic_function` instead. SymbolicDunderAccessError is an AttributeError so that
-        # optional-hook probing still treats it as a missing attribute.
+        """
+        Read a name that is not this object's own as an attribute of the value type.
+
+        Dunder names are never symbolic: mapping them would let ``copy``, ``pickle`` and
+        anything else probing optional dunder hooks recurse into endless expression
+        creation, and would blur the language's semantics - access a dunder-named member
+        symbolically through a :func:`symbolic_function` instead.
+        :class:`~krrood.entity_query_language.exceptions.SymbolicDunderAccessError` is an
+        :class:`AttributeError` so that such probing still reads it as a missing
+        attribute.
+        """
         if name.startswith("__") and name.endswith("__"):
             raise SymbolicDunderAccessError(name)
-        return self._get_mapped_variable_(Attribute, name)
+        if self._is_own_name_(name):
+            raise AttributeError(name)
+        return self._symbolic_expression_._get_mapped_variable_(Attribute, name)
 
     def __dir__(self) -> List[str]:
         """
-        Surface the wrapped value type's attributes for interactive completion.
+        Surface the value type's attributes for interactive completion.
 
-        ``__getattr__`` already makes every non-dunder name a valid (symbolic)
-        attribute, but completion engines list ``__dir__`` only — which would otherwise
-        show just this expression's own members. We union those with the public
-        attributes of the value type so e.g. ``case_variable.<tab>`` offers the case
-        type's fields.
-
-        ``_type_`` is read from ``__dict__`` directly (never ``getattr``, which routes
-        through ``__getattr__`` and would return a :class:`MappedVariable` instead of
-        ``None``). This does not affect attribute resolution in any way.
+        :meth:`__getattr__` already makes every public name a valid symbolic attribute,
+        but completion engines list :meth:`__dir__` only - which would otherwise show
+        just this object's own members.
         """
         names = set(super().__dir__())
-        type_ = self.__dict__.get("_type_")
-        if isinstance(type_, type):
-            names.update(
-                name
-                for name in dir(type_)
-                if not (name.startswith("__") and name.endswith("__"))
-            )
-            for klass in type_.__mro__:
-                names.update(getattr(klass, "__annotations__", {}).keys())
+        names.update(attribute_names_for_completion(self._type_))
         return sorted(names)
 
     def __getitem__(self, key: Any) -> Index[T]:
         indexing = (
             IndexByExpression if isinstance(key, SymbolicExpression) else IndexByValue
         )
-        return self._get_mapped_variable_(indexing, key)
+        return self._symbolic_expression_._get_mapped_variable_(indexing, key)
 
     def __call__(self, *args, **kwargs) -> Call[T]:
-        return self._get_mapped_variable_(Call, args, kwargs)
+        return self._symbolic_expression_._get_mapped_variable_(Call, args, kwargs)
 
     def __eq__(self, other) -> Comparator:
-        return Comparator(self, other, operator.eq)
+        return Comparator(self._symbolic_expression_, other, operator.eq)
 
     def __ne__(self, other) -> Comparator:
-        return Comparator(self, other, operator.ne)
+        return Comparator(self._symbolic_expression_, other, operator.ne)
 
     def __lt__(self, other) -> Comparator:
-        return Comparator(self, other, operator.lt)
+        return Comparator(self._symbolic_expression_, other, operator.lt)
 
     def __le__(self, other) -> Comparator:
-        return Comparator(self, other, operator.le)
+        return Comparator(self._symbolic_expression_, other, operator.le)
 
     def __gt__(self, other) -> Comparator:
-        return Comparator(self, other, operator.gt)
+        return Comparator(self._symbolic_expression_, other, operator.gt)
 
     def __ge__(self, other) -> Comparator:
-        return Comparator(self, other, operator.ge)
+        return Comparator(self._symbolic_expression_, other, operator.ge)
 
     def _arithmetic_(
         self, other: Any, math_operator: MathOperator
     ) -> ArithmeticOperation:
         """
-        Build a binary arithmetic operation with this variable as the left operand.
+        Build a binary arithmetic operation with this as the left operand.
 
         :param other: The right operand.
         :param math_operator: The operator to apply.
@@ -196,13 +211,13 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
             ArithmeticOperation,
         )
 
-        return ArithmeticOperation(self, other, math_operator)
+        return ArithmeticOperation(self._symbolic_expression_, other, math_operator)
 
     def _reflected_arithmetic_(
         self, other: Any, math_operator: MathOperator
     ) -> ArithmeticOperation:
         """
-        Build a binary arithmetic operation with this variable as the right operand.
+        Build a binary arithmetic operation with this as the right operand.
 
         This is used for the reflected dunders (``other <op> self``) so that the operand
         order is preserved for non-commutative operators such as subtraction and
@@ -216,7 +231,7 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
             ArithmeticOperation,
         )
 
-        return ArithmeticOperation(other, self, math_operator)
+        return ArithmeticOperation(other, self._symbolic_expression_, math_operator)
 
     def __add__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other, MathOperator.ADD)
@@ -265,10 +280,71 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
             UnaryArithmeticOperation,
         )
 
-        return UnaryArithmeticOperation(self, MathOperator.NEGATE)
+        return UnaryArithmeticOperation(self._symbolic_expression_, MathOperator.NEGATE)
 
     def __hash__(self):
-        return super().__hash__()
+        return hash(self._id_)
+
+
+@dataclass(eq=False, repr=False)
+class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
+    """
+    An expression the symbolic operations attach to: it is the value they are built on,
+    and it holds the mappings taken from it, so writing the same one twice gives one
+    node rather than two.
+
+    :class:`HasSymbolicOperations` says what can be written; this says what it is written
+    on. Anything that stands for a value but is no expression - a match - implements the
+    former alone and reports one of these as :attr:`_symbolic_expression_`.
+    """
+
+    _known_mapped_variables_: Dict[MappedVariableCacheItem, MappedVariable] = field(
+        init=False, default_factory=dict
+    )
+    """
+    A storage of created MappedVariable instances to prevent recreating same mapping
+    multiple times.
+    """
+
+    @property
+    def _symbolic_expression_(self) -> CanBehaveLikeAVariable[T]:
+        """
+        :return: This variable, which is what its own operations are built on.
+        """
+        return self
+
+    def _get_mapped_variable_(
+        self, type_: Type[MappedVariable], *args, **kwargs
+    ) -> MappedVariable:
+        """
+        Retrieves or creates a MappedVariable instance based on the provided arguments.
+
+        :param type_: The type of the MappedVariable to retrieve or create.
+        :param args: Positional arguments to pass to the MappedVariable constructor.
+        :param kwargs: Keyword arguments to pass to the MappedVariable constructor.
+        :return: The retrieved or created MappedVariable instance.
+        """
+        cache_item = MappedVariableCacheItem(type_, self, args, kwargs)
+        if cache_item in self._known_mapped_variables_:
+            return self._known_mapped_variables_[cache_item]
+        else:
+            instance = type_(**cache_item.all_kwargs)
+            self._known_mapped_variables_[cache_item] = instance
+            return instance
+
+    def _get_mapped_variable_key_(self, type_: Type[MappedVariable], *args, **kwargs):
+        """
+        Generates a hashable key for the given type and arguments.
+
+        :param type_: The type of the mapped variable to generate a key for, e.g.,
+            Attribute, Index, etc.
+        :param args: Positional arguments to pass to the MappedVariable constructor.
+        :param kwargs: Keyword arguments to pass to the MappedVariable constructor.
+        :return: The generated hashable key.
+        """
+        args = (self,) + args
+        all_kwargs = merge_args_and_kwargs(type_, args, kwargs, ignore_first=True)
+        return convert_args_and_kwargs_into_hashable_key(all_kwargs)
 
 
 @dataclass(eq=False, repr=False)
@@ -550,13 +626,9 @@ class Attribute(SingleValueMapping[T]):
         :raises NotNumberLikeFieldError: If this attribute does not exist or is not
             number-like.
         """
-        from krrood.entity_query_language.query.query import Query
+        from krrood.entity_query_language.query.query import variable_rooted
 
-        resolved_type = self._type_
-        if resolved_type is None:
-            root = self._chain_root_
-            if isinstance(root, Query):
-                resolved_type = root._rerooted_on_selection_(self)._type_
+        resolved_type = variable_rooted(self)._type_
         is_number_like = (
             resolved_type is not None
             and issubclass(resolved_type, compatible_types)
@@ -687,13 +759,25 @@ class Call(SingleValueMapping[T]):
 
     def _update_type_(self) -> None:
         """
-        Resolve ``_type_`` to what the called thing returns.
+        Read the called value's return type.
 
-        A method is not a field, so the attribute naming it resolves to no type of its
-        own; the return annotation is then read off the method on its owner class.
+        The child stands either for a callable itself - a function or method, whose own
+        hints carry the return type - or for an instance of a class that defines
+        ``__call__``, where the return type is that method's. A method is not a field
+        though, so an attribute naming one resolves to no type of its own; the return
+        annotation is then read off the method on its owner class instead. An
+        unannotated callable leaves the type unknown.
         """
-        if self._child_._type_ is not None:
-            self._type_ = get_type_hints_of_object(self._child_._type_)["return"]
+        called = self._child_._type_
+        if called is not None:
+            type_hints = get_type_hints_of_object(called)
+            if (
+                "return" not in type_hints
+                and isclass(called)
+                and "__call__" in dir(called)
+            ):
+                type_hints = get_type_hints_of_object(called.__call__)
+            self._type_ = type_hints.get("return")
             return
         if isinstance(self._child_, Attribute):
             self._type_ = get_method_return_type(

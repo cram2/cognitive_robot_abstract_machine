@@ -66,6 +66,7 @@ from krrood.entity_query_language.core.base_expressions import (
     UnificationDict,
 )
 from krrood.entity_query_language.evaluable import Evaluable
+from krrood.entity_query_language.query.query_modifiers import HasQueryModifiers
 from krrood.entity_query_language.cache_data import (
     SeenSet,
 )
@@ -77,6 +78,7 @@ from krrood.entity_query_language.core.variable import (
 from krrood.entity_query_language.enums import DomainSource
 from krrood.entity_query_language.exceptions import (
     AmbiguousQueryAttribute,
+    AmbiguousQuerySubject,
     UnselectedQueryVariable,
     UnsupportedNegation,
     NonPositiveLimitValue,
@@ -171,6 +173,7 @@ def modifies_query_structure(modifier):
 @dataclass(eq=False, repr=False)
 class Query(
     Evaluable,
+    HasQueryModifiers[T],
     MultiArityExpressionThatPerformsACartesianProduct,
     CanBehaveLikeAVariable[T],
     ABC,
@@ -186,6 +189,10 @@ class Query(
     )
     """
     The variables that are selected by the query.
+
+    Read through :meth:`_as_operand_`, so a value that only stands for an expression - a
+    match, whose query carries its pattern - selects that expression rather than itself,
+    which nothing binds a row to.
     """
 
     _distinct_on: Tuple[Selectable, ...] = field(default_factory=tuple, init=False)
@@ -248,6 +255,9 @@ class Query(
     """
 
     def __post_init__(self):
+        self._selected_variables_ = tuple(
+            self._as_operand_(selected) for selected in self._selected_variables_
+        )
         self._operation_children_ = tuple(self._selected_variables_)
         MultiArityExpressionThatPerformsACartesianProduct.__post_init__(self)
 
@@ -339,9 +349,33 @@ class Query(
                     expression._replace_child_(
                         child, self._rerooted_on_selection_(child)
                     )
+                elif self._is_self_(child):
+                    expression._replace_child_(
+                        child, self._selection_standing_for_self_()
+                    )
                 elif not isinstance(child, Query):
                     pending.append(child)
         return condition
+
+    def _is_self_(self, expression: SymbolicExpression) -> bool:
+        """
+        :param expression: An expression appearing in this query's conditions.
+        :return: Whether the expression is this query itself, rather than a nested
+            subquery that is a scope of its own. Matched by identifier for the reason
+            :meth:`_is_attribute_of_self_` records.
+        """
+        return isinstance(expression, Query) and expression._id_ == self._id_
+
+    def _selection_standing_for_self_(self) -> Selectable:
+        """
+        :return: The variable this query stands for where its own conditions use the
+            query as a value, as ``a(Robot) == some_robot`` does.
+        :raises AmbiguousQuerySubject: If the query selects several variables, so it
+            stands for no single one.
+        """
+        if len(self._selected_variables_) != 1:
+            raise AmbiguousQuerySubject(self)
+        return self._selected_variables_[0]
 
     def _is_attribute_of_self_(self, expression: SymbolicExpression) -> bool:
         """
@@ -1081,6 +1115,25 @@ class Entity(Query[T]):
     def selected_variable(self):
         return self._selected_variables_[0] if self._selected_variables_ else None
 
+    @cached_property
+    def _type__(self) -> Optional[Type[T]]:
+        """
+        A query over one variable stands for the value that variable takes, so it is of
+        that variable's type.
+
+        ..note:: An ``Attribute`` reads its owning class off its child, so this is also
+            what lets a chain taken from the query resolve its own type.
+
+        ..warning:: A selection that is not a :class:`Selectable` — a ``Comparator``, an
+            ``Aggregator`` — declares no ``_type_``, and reading one off it would be
+            captured as a symbolic attribute instead of raising, which reaches back into
+            this query while it is still being built.
+        """
+        selected = self.selected_variable
+        if not isinstance(selected, Selectable):
+            return None
+        return selected._type_
+
     @property
     def selected_aggregator(self) -> "Optional[Aggregator]":
         """
@@ -1110,3 +1163,25 @@ class Entity(Query[T]):
                 if chain_root(child)._id_ not in group_key_root_ids
             ]
         return super().aggregated_selections(group_key_root_ids)
+
+
+def variable_rooted(expression: SymbolicExpression) -> SymbolicExpression:
+    """
+    The form of an expression rooted at a variable rather than at a query.
+
+    A chain taken from a query names the same thing as the same chain taken from the
+    variable that query selects, so a reader that identifies an expression by how it is
+    written has to see both in the one form.
+
+    :param expression: An expression that may be a chain rooted at a query.
+    :return: The chain re-rooted onto that query's selection, or the expression itself
+        when it is not rooted at a query.
+    :raises AmbiguousQueryAttribute: If it is rooted at a query selecting several
+        variables, which leaves the chain no single subject to be re-rooted onto.
+    """
+    if not isinstance(expression, MappedVariable):
+        return expression
+    root = expression._chain_root_
+    if not isinstance(root, Query):
+        return expression
+    return root._rerooted_on_selection_(expression)

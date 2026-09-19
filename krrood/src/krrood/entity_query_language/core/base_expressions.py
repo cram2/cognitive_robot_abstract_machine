@@ -343,16 +343,35 @@ class SymbolicExpression(AbstractContextManager, HasExpression):
         :return: A tuple of the updated child expressions corresponding to the provided
             ``children`` arguments.
         """
-        from krrood.entity_query_language.core.variable import Literal
-
-        children = [
-            v if isinstance(v, SymbolicExpression) else Literal(_value_=v)
-            for v in children
-        ]
+        children = [self._as_operand_(child) for child in children]
         embedded_children = tuple(v._as_embeddable_child_(self) for v in children)
         for child in embedded_children:
             child._parent_ = self
         return embedded_children
+
+    @staticmethod
+    def _as_operand_(value: Any, name: Optional[str] = None) -> SymbolicExpression:
+        """
+        Read a value as the expression it contributes where an operand is expected.
+
+        Something that only stands for a value - a match, which is not part of the
+        expression graph - contributes the expression it reports, so that it can be
+        operated on from either side. Anything that is no expression at all is a literal.
+
+        :param value: The value given where an expression is expected.
+        :param name: The name to give a literal, where the operand is a named one.
+        :return: The expression the value contributes.
+        """
+        from krrood.entity_query_language.core.mapped_variable import (
+            HasSymbolicOperations,
+        )
+        from krrood.entity_query_language.core.variable import Literal
+
+        if isinstance(value, SymbolicExpression):
+            return value
+        if isinstance(value, HasSymbolicOperations):
+            return value._symbolic_expression_
+        return Literal(_value_=value, _name__=name)
 
     def _as_embeddable_child_(self, parent: SymbolicExpression) -> SymbolicExpression:
         """
@@ -1330,7 +1349,12 @@ class UnificationDict(UserDict):
     """
 
     def __getitem__(self, key: Selectable[T]) -> T:
-        key = self._id_expression_map_[key._id_]
+        """
+        :param key: The expression whose bound value to read, or something standing for
+            one - a match, which is read as the query it selects.
+        :return: The value bound to that expression in this row.
+        """
+        key = self._id_expression_map_[SymbolicExpression._as_operand_(key)._id_]
         return super().__getitem__(key)
 
     @cached_property

@@ -88,7 +88,7 @@ class Sage10kOpenDoor(ActionDescription):
         # -- appended directly rather than via Match.where(), since that would re-add
         # it to the Entity a second time.
         free_space_condition = gcs.constrain_to_free_space(
-            reach_query.expression.target_pose_offset_robot
+            reach_query.target_pose_offset_robot
         )
         reach_query._where_conditions_.append(free_space_condition)
         reach_action = reach_query

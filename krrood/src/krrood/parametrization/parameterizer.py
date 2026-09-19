@@ -205,7 +205,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
     """
 
     def __post_init__(self):
-        self.statement.expression.build()
+        self.statement._get_expression_().build()
         self._random_event_compiler = WhereExpressionToRandomEventTranslator(
             and_(*self.statement._where_conditions_)
         )
@@ -241,7 +241,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
         """
         result = {v.name: v for v in self._random_event_compiler.variables.values()}
 
-        for attribute_match in self.statement.matches_with_variables:
+        for attribute_match in self.statement._matches_with_variables_:
             if attribute_match.assigned_value is None:
                 continue
 
@@ -586,7 +586,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
         domain_objects = attribute_match.assigned_value.tolist()
 
         if not domain_objects:
-            raise EmptyVariableDomain(attribute_match.variable)
+            raise EmptyVariableDomain(attribute_match._variable_)
 
         if not type_ is None and issubclass(type_, compatible_types):
             return self._extract_variables_from_primitive_krrood_variable(
@@ -702,7 +702,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
             )
             attribute_match = [
                 match
-                for match in self.statement.matches_with_variables
+                for match in self.statement._matches_with_variables_
                 if match.name_from_variable_access_path == variable_.name
             ]
             attribute_match = attribute_match[0] if attribute_match else None

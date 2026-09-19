@@ -4,6 +4,7 @@ import pytest
 from krrood.entity_query_language.factories import (
     a,
     and_,
+    entity,
     for_all,
     not_,
     or_,
@@ -72,12 +73,12 @@ def assert_equal_events(actual: Event, expected: Event) -> None:
 def test_underspecification_with_where():
     pose = underspecified_pose()
     query = pose.where(
-        pose.variable.position.y > 0.0,
-        pose.variable.position.x == 0.0,
-        pose.variable.position.y < 10.0,
-        pose.variable.position.z >= -1.0,
-        pose.variable.position.z <= 1.0,
-        pose.variable.orientation.x != 1.0,
+        pose.position.y > 0.0,
+        pose.position.x == 0.0,
+        pose.position.y < 10.0,
+        pose.position.z >= -1.0,
+        pose.position.z <= 1.0,
+        pose.orientation.x != 1.0,
     )
 
     translated = translate_where_conditions(query)
@@ -98,17 +99,17 @@ def test_underspecification_with_where():
 
 
 def test_disjunction_of_conjunctions():
-    pose_variable = underspecified_pose().variable
+    pose = underspecified_pose()
 
     translated = translate(
         or_(
-            pose_variable.position.x == 0,
+            pose.position.x == 0,
             and_(
-                pose_variable.position.z >= -1,
-                pose_variable.position.z <= 1,
-                pose_variable.position.y < 10,
+                pose.position.z >= -1,
+                pose.position.z <= 1,
+                pose.position.y < 10,
             ),
-            and_(pose_variable.orientation.z > 0),
+            and_(pose.orientation.z > 0),
         )
     )
 
@@ -143,13 +144,12 @@ def test_disjunction_of_conjunctions():
 
 def test_where_condition_outside_disjunctive_normal_form():
     pose = underspecified_pose()
-    pose_variable = pose.variable
     query = pose.where(
         or_(
-            pose_variable.position.x > 0.0,
-            pose_variable.position.y > 0.0,
+            pose.position.x > 0.0,
+            pose.position.y > 0.0,
         ),
-        pose_variable.position.x < 10.0,
+        pose.position.x < 10.0,
     )
 
     translated = translate_where_conditions(query)
@@ -172,14 +172,14 @@ def test_where_condition_outside_disjunctive_normal_form():
 
 
 def test_disjunction_nested_in_conjunction_keeps_shared_variable():
-    pose_variable = underspecified_pose().variable
+    pose = underspecified_pose()
 
     translated = translate(
         and_(
-            pose_variable.position.x > 0.0,
+            pose.position.x > 0.0,
             or_(
-                pose_variable.position.x < 1.0,
-                pose_variable.position.x > 5.0,
+                pose.position.x < 1.0,
+                pose.position.x > 5.0,
             ),
         )
     )
@@ -195,21 +195,21 @@ def test_disjunction_nested_in_conjunction_keeps_shared_variable():
 
 
 def test_negation_equals_inverted_comparator():
-    pose_variable = underspecified_pose().variable
+    pose = underspecified_pose()
 
-    translated = translate(not_(pose_variable.position.x > 0.0))
+    translated = translate(not_(pose.position.x > 0.0))
 
-    assert_equal_events(translated, translate(pose_variable.position.x <= 0.0))
+    assert_equal_events(translated, translate(pose.position.x <= 0.0))
 
 
 def test_negated_conjunction_is_disjunction_of_negations():
-    pose_variable = underspecified_pose().variable
+    pose = underspecified_pose()
 
     translated = translate(
         not_(
             and_(
-                pose_variable.position.x > 0.0,
-                pose_variable.position.y > 0.0,
+                pose.position.x > 0.0,
+                pose.position.y > 0.0,
             )
         )
     )
@@ -218,11 +218,25 @@ def test_negated_conjunction_is_disjunction_of_negations():
         translated,
         translate(
             or_(
-                pose_variable.position.x <= 0.0,
-                pose_variable.position.y <= 0.0,
+                pose.position.x <= 0.0,
+                pose.position.y <= 0.0,
             )
         ),
     )
+
+
+# %% conditions rooted at the query rather than at the variable
+
+
+def test_query_rooted_condition_translates_like_the_variable_rooted_one():
+    """
+    A chain taken from the query names the same field as one taken from the variable it
+    selects, so the translator builds the same random-events variable from either.
+    """
+    position = variable(KRROODPosition, domain=[])
+    query = entity(variable(KRROODPosition, domain=[]))
+
+    assert_equal_events(translate(query.x > 0.0), translate(position.x > 0.0))
 
 
 # %% conditions without a random event representation
@@ -240,7 +254,7 @@ def test_quantified_where_condition():
 
 
 def test_comparison_between_two_variables_is_refused():
-    pose_variable = underspecified_pose().variable
+    pose = underspecified_pose()
 
     with pytest.raises(WhereExpressionHasNoRandomEventRepresentation):
-        translate(pose_variable.position.x > pose_variable.position.y)
+        translate(pose.position.x > pose.position.y)
