@@ -167,18 +167,30 @@ class GeometricConstraintBuilder:
         frame_P_current: Point3,
         max_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
+        frame_P_goal: Optional[Point3] = None,
         max_violation: sm.ScalarData = np.inf,
         name: Optional[str] = None,
     ) -> None:
         """
-        Adds constraints to limit the translational velocity of frame_P_current.
+        Adds constraints to bound the tip's speed toward frame_P_goal.
+
+        The bounded quantity is the time derivative of the distance between frame_P_current
+        and frame_P_goal. When the tip travels straight at the goal, that derivative equals
+        the tip's actual speed, so the bound caps the Euclidean norm of the tip velocity.
+        Measuring against the root origin instead (frame_P_goal unset) only bounds the
+        radial component and leaves motion across the root direction unconstrained.
 
         Be aware that the velocity is relative to frame.
         :param frame_P_current: a vector describing a 3D point. It should depend on
             active dofs.
+        :param frame_P_goal: the point the tip is driven toward. Defaults to the root
+            origin, which only bounds the radial speed.
         :param max_violation: m/s
         """
-        translation_error = frame_P_current.norm()
+        if frame_P_goal is None:
+            translation_error = frame_P_current.norm()
+        else:
+            translation_error = frame_P_current.euclidean_distance(frame_P_goal)
         translation_error = sm.if_eq_zero(
             translation_error, sm.Scalar(0.01), translation_error
         )
@@ -198,19 +210,31 @@ class GeometricConstraintBuilder:
         frame_R_current: RotationMatrix,
         max_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
+        frame_R_goal: Optional[RotationMatrix] = None,
         max_violation: sm.ScalarData = LargeNumber,
         name: Optional[str] = None,
     ) -> None:
         """
-        Add velocity constraints to limit the velocity of frame_R_current.
+        Add velocity constraints to bound the tip's angular speed toward frame_R_goal.
+
+        The bounded quantity is the time derivative of the angle between frame_R_current
+        and frame_R_goal. When the tip turns straight at the goal, that derivative equals
+        the tip's actual angular speed. Measuring against the root orientation instead
+        (frame_R_goal unset) leaves turning that keeps the current-to-root angle constant
+        unconstrained.
 
         Be aware that the velocity is relative to frame.
         :param frame_R_current: Rotation matrix describing the current rotation. It
             should depend on active dofs.
+        :param frame_R_goal: the orientation the tip is driven toward. Defaults to the
+            root orientation, which only bounds the current-to-root angle rate.
         :param max_velocity: rad/s
         """
-        root_Q_tipCurrent = frame_R_current.to_quaternion()
-        angle_error = root_Q_tipCurrent.to_axis_angle()[1]
+        if frame_R_goal is None:
+            angle_error = frame_R_current.to_quaternion().to_axis_angle()[1]
+        else:
+            angle_error = frame_R_current.rotational_error(frame_R_goal)
+        angle_error = sm.if_eq_zero(angle_error, sm.Scalar(0.01), angle_error)
         self.collection.add_velocity_constraint(
             upper_velocity_limit=max_velocity,
             lower_velocity_limit=-max_velocity,
