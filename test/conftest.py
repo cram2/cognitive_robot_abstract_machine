@@ -1,13 +1,13 @@
-import gc
 import os
 import threading
 import time
 from copy import deepcopy
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
-import objgraph
 import pytest
+from xdist import get_xdist_worker_id, is_xdist_controller, is_xdist_worker
 
 from semantic_digital_twin.api import (
     ConnectionSpecification,
@@ -25,6 +25,12 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 
+from .living_worlds import (
+    LeakedWorldsAcrossWorkersError,
+    LivingWorlds,
+    WorkerTally,
+    WorldTallyLedger,
+)
 from .orm_interface_build import ORM_BUILD_OPTION, OrmBuild
 from .pytest_environment import PytestEnvironmentVariable
 
@@ -48,13 +54,12 @@ from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
-from typing_extensions import List, Type, TypeVar
+from typing_extensions import Iterator, List, Type, TypeVar
 
 CallbackT = TypeVar("CallbackT", bound=Callback)
 """
 The kind of publisher a test started.
 """
-
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
@@ -173,6 +178,22 @@ The structure of fixtures in this conftest:
 """
 
 
+LIVING_WORLDS = pytest.StashKey[LivingWorlds]()
+"""
+Where a run keeps the record of which test created each world.
+"""
+
+
+def world_tally_ledger(config: pytest.Config) -> WorldTallyLedger:
+    """
+    :param config: The run's configuration.
+    :return: The ledger every process of this run shares to combine their tallies.
+    """
+    return WorldTallyLedger(
+        directory=Path(config.rootpath) / WorldTallyLedger.DIRECTORY_NAME
+    )
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
     """
     Let a run state when it builds the ORM interfaces it reads.
@@ -196,12 +217,76 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def pytest_configure(config):
+def pytest_configure(config: pytest.Config) -> None:
+    """
+    Give the run its own ROS domain, and start recording the worlds it creates.
+
+    ..note:: The record starts here rather than in a fixture so that it also sees the
+        worlds a test module creates while it is being imported.
+    """
     worker = os.environ.get(PytestEnvironmentVariable.XDIST_WORKER)
 
     if worker:
         worker_num = int(worker.removeprefix("gw"))
         os.environ["ROS_DOMAIN_ID"] = str(100 + worker_num)
+    else:
+        # The one process not split off as an xdist worker: either the controller of a
+        # distributed run, which never runs a test itself, or the whole run when it is
+        # not distributed at all. Either way, exactly one process reaches here, before
+        # any process has written a tally for this run.
+        world_tally_ledger(config).clear()
+
+    living_worlds = LivingWorlds(world_type=World)
+    living_worlds.watch()
+    config.stash[LIVING_WORLDS] = living_worlds
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """
+    Attribute the worlds created from now on to the test that is about to run.
+    """
+    item.config.stash[LIVING_WORLDS].current_test = item.nodeid
+
+
+def pytest_sessionfinish(session: pytest.Session) -> None:
+    """
+    Write this process's final world tally where every process of the run can read it
+    back, and once every process has, enforce a limit on their combined total.
+
+    ..note:: An xdist worker only writes its tally, since the combined limit needs
+        every worker's tally to be meaningful. The controller of a distributed run
+        never ran a test, so it only enforces the combined limit, once every worker
+        has written its own. A run that was not distributed at all does both: it is
+        the only process, so its own tally already is the combined total.
+
+    ..note:: The limit is enforced here rather than in a fixture, since there is no
+        fixture left to tear down once the session is finishing. Raising the
+        combined-limit error would still fail the run, but as an uncaught exception
+        during hook teardown, reported as an internal error rather than a clean
+        test-run failure - so it is caught here and turned into a terminal message
+        plus a failing exit status instead.
+    """
+    ledger = world_tally_ledger(session.config)
+
+    if not is_xdist_controller(session):
+        living_worlds = session.config.stash[LIVING_WORLDS]
+        ledger.record(
+            WorkerTally(
+                worker=get_xdist_worker_id(session),
+                left_behind=living_worlds.collect_surviving_worlds(),
+            )
+        )
+
+    if is_xdist_worker(session):
+        return
+
+    try:
+        ledger.enforce_combined_limit()
+    except LeakedWorldsAcrossWorkersError as error:
+        terminal_reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        if terminal_reporter is not None:
+            terminal_reporter.write_line(str(error), red=True)
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
 
 @pytest.fixture(scope="session")
@@ -228,14 +313,13 @@ def cleanup_after_test(_session_class_diagram):
 
 
 @pytest.fixture(autouse=True, scope="module")
-def count_worlds():
+def check_for_leaked_worlds(request: pytest.FixtureRequest) -> Iterator[None]:
+    """
+    Fail a test module that leaves too many worlds in memory, naming the tests that
+    created the ones that survived.
+    """
     yield
-    gc.collect()
-    world_in_mem = objgraph.count("World")
-    if world_in_mem > 30:
-        raise MemoryError(
-            "Something is leaking worlds, there are more than 20 worlds in memory after the test"
-        )
+    request.config.stash[LIVING_WORLDS].enforce_limit(module=request.node.nodeid)
 
 
 #############################################
