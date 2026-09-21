@@ -6,7 +6,6 @@
 # information on how to map them.
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-import importlib.util
 import logging
 import os
 from dataclasses import is_dataclass
@@ -23,23 +22,12 @@ from krrood.ormatic.custom_types import NumpyType
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
 
-from segmind.event_feed import EventFeed, EventRow, Subscription
 from segmind.event_segmentation import Segmind
-from segmind.exceptions import DashboardNeedsFlask, OptionalDependency
 
 ignored_classes = {
     SubclassJSONSerializer,
-    EventFeed,
-    EventRow,
-    Subscription,
-    DashboardNeedsFlask,
     Segmind,
 }
-
-if importlib.util.find_spec(OptionalDependency.FLASK) is not None:
-    from segmind.dashboard.server import DashboardAddress, LiveEventDashboard
-
-    ignored_classes |= {DashboardAddress, LiveEventDashboard}
 
 dependencies = []
 

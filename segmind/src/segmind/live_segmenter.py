@@ -36,7 +36,6 @@ from segmind.detectors.spatial_relation_detector_nodes import (
     SupportDetector,
 )
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
-from segmind.event_feed import ReceivesDetectedEvents
 from segmind.event_logger import EventLogger
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 from segmind.utils import PropagatingThread
@@ -96,11 +95,6 @@ class LiveSegmenter(PropagatingThread):
     detectors: List[AbstractDetector] = field(kw_only=True)
     """
     The detectors ticked.
-    """
-
-    listeners: List[ReceivesDetectedEvents] = field(kw_only=True, default_factory=list)
-    """
-    Told about the events of every tick, as they are detected.
     """
 
     pause_between_ticks: float = field(kw_only=True, default=0.01)
@@ -172,15 +166,10 @@ class LiveSegmenter(PropagatingThread):
 
     def tick(self) -> None:
         """
-        Tick the detectors once, while no other thread changes the world, and tell every
-        listener what that tick detected.
+        Tick the detectors once, while no other thread changes the world.
         """
         with self.world._world_lock:
-            detected_before = len(self.event_logger.get_events())
             self.executor.tick()
-            detected = self.event_logger.get_events()[detected_before:]
-        for listener in self.listeners:
-            listener.receive(detected)
 
     def _run(self) -> None:
         while not self.kill_event.is_set():

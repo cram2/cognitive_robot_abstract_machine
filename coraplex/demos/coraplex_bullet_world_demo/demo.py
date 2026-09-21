@@ -139,7 +139,6 @@ segmentation = Segmind.watching_bodies_named(
     world,
     ("milk.stl", "bowl.stl", "spoon.stl"),
     detectors=(PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector),
-    show_live_events=True,
 )
 
 with simulated_robot, segmentation:

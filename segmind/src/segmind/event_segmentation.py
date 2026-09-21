@@ -1,6 +1,5 @@
 """
-SegMind itself: what it watches, what it is asked to detect, and what it shows of it
-while a run goes on.
+SegMind itself: what it watches and what it is asked to detect while a run goes on.
 """
 
 from __future__ import annotations
@@ -8,23 +7,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from typing_extensions import (
-    List,
-    Optional,
-    Self,
-    Sequence,
-    TYPE_CHECKING,
-    Type,
-)
+from typing_extensions import List, Self, Sequence, Type
 
 from segmind import event_logger
 from segmind.detectors.base import AbstractDetector
 from segmind.live_segmenter import LiveSegmenter
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
-
-if TYPE_CHECKING:
-    from segmind.dashboard.server import LiveEventDashboard
 
 logger = logging.getLogger(__name__)
 
@@ -55,21 +44,9 @@ class Segmind:
     Without any, everything SegMind can detect.
     """
 
-    show_live_events: bool = False
-    """
-    Whether the events are served as a page while the run goes on. The page is
-    segmind's ``dashboard`` extra, which is why it is reached for where it is asked
-    for rather than imported here, so nothing needs flask while this is off.
-    """
-
     segmenter: LiveSegmenter = field(init=False)
     """
     Ticks the detectors against the world while the run goes on.
-    """
-
-    dashboard: Optional[LiveEventDashboard] = field(init=False, default=None)
-    """
-    Serves the page, between entering and leaving a run that asks for one.
     """
 
     def __post_init__(self) -> None:
@@ -81,7 +58,6 @@ class Segmind:
         world: World,
         names: Sequence[str],
         detectors: Sequence[Type[AbstractDetector]] = (),
-        show_live_events: bool = False,
     ) -> Self:
         """
         SegMind watching the bodies a run names.
@@ -89,13 +65,11 @@ class Segmind:
         :param world: The world the run takes place in.
         :param names: The names of the bodies to watch.
         :param detectors: The kinds of detector asked for.
-        :param show_live_events: Whether to serve the events as a page while it runs.
         """
         return cls(
             world=world,
             bodies=[world.get_body_by_name(name) for name in names],
             detectors=detectors,
-            show_live_events=show_live_events,
         )
 
     @property
@@ -123,17 +97,9 @@ class Segmind:
 
     def __enter__(self) -> Self:
         logger.info("SegMind detectors: %s", ", ".join(self.detector_names))
-        if self.show_live_events:
-            from segmind.dashboard.server import LiveEventDashboard
-
-            self.dashboard = LiveEventDashboard.watching(self.segmenter)
-            self.dashboard.start()
         self.segmenter.start()
         return self
 
     def __exit__(self, exception_type, exception, traceback) -> None:
         self.segmenter.stop()
-        if self.dashboard is not None:
-            self.dashboard.stop()
-            self.dashboard = None
         self.report_detected_events()

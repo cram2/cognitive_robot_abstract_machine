@@ -91,24 +91,3 @@ def test_what_happens_while_a_run_is_watched_is_detected(milk_in_the_apartment):
         if isinstance(event, TranslationEvent)
     ]
     assert translation.tracked_object is milk
-
-
-def test_a_run_showing_its_events_serves_them_only_while_it_goes_on(
-    milk_in_the_apartment,
-):
-    world, milk, _ = milk_in_the_apartment
-    segmentation = Segmind(world=world, bodies=[milk], show_live_events=True)
-
-    with segmentation:
-        dashboard = segmentation.dashboard
-        assert dashboard.feed in segmentation.segmenter.listeners
-        assert dashboard.port > 0
-
-    assert segmentation.dashboard is None
-
-
-def test_a_run_that_shows_nothing_serves_nothing(milk_in_the_apartment):
-    world, milk, _ = milk_in_the_apartment
-
-    with Segmind(world=world, bodies=[milk]) as segmentation:
-        assert segmentation.dashboard is None
