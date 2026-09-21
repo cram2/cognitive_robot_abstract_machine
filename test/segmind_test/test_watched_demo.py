@@ -1,0 +1,116 @@
+"""
+Tests for a demo stating what it wants watched, what it wants detected and whether it
+shows the events while it runs.
+"""
+
+from __future__ import annotations
+
+import threading
+from collections import Counter
+
+from segmind.datastructures.events import TranslationEvent
+from segmind.detector_selection import DetectorSelection
+from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
+from segmind.watched_demo import WatchedDemo
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+
+from .test_detectors.test_detection_without_casadi import (  # noqa: F401 (fixture)
+    RESTING_ON_THE_TABLE,
+    milk_in_the_apartment,
+)
+
+TICK_TIMEOUT = 10.0
+"""
+Seconds a test waits for the watching thread to have detected something.
+"""
+
+MOVED_ALONG_X = 0.2
+"""
+How far a test moves the milk while the demo is watched.
+"""
+
+
+def _stand_the_milk_on_the_table(milk) -> None:
+    """
+    Put the milk where it rests on the table, so a move of it is a move from rest.
+    """
+    rest_x, rest_y, rest_z = RESTING_ON_THE_TABLE
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        rest_x, rest_y, rest_z, reference_frame=milk.parent_connection.parent
+    )
+
+
+def test_a_demo_watches_the_bodies_it_names(milk_in_the_apartment):
+    world, milk, box = milk_in_the_apartment
+
+    watched_demo = WatchedDemo.watching_bodies_named(
+        world, (milk.name.name, box.name.name)
+    )
+
+    assert watched_demo.bodies == [milk, box]
+
+
+def test_a_demo_is_given_every_detector_what_it_asks_for_is_read_from(
+    milk_in_the_apartment,
+):
+    """
+    A demo says what it wants detected; the detectors that is concluded from come with
+    it, and the kinds ticked are named once each.
+    """
+    world, milk, _ = milk_in_the_apartment
+
+    watched_demo = WatchedDemo(world=world, bodies=[milk], detectors=[PickUpDetector])
+
+    assert Counter(watched_demo.detector_names) == Counter(
+        detector_type.__name__
+        for detector_type in DetectorSelection.of(PickUpDetector).detector_types
+    )
+
+
+def test_what_happens_while_a_demo_is_watched_is_detected(milk_in_the_apartment):
+    world, milk, _ = milk_in_the_apartment
+    _stand_the_milk_on_the_table(milk)
+    watched_demo = WatchedDemo(world=world, bodies=[milk])
+    translated = threading.Event()
+    watched_demo.segmenter.event_logger.add_callback(
+        TranslationEvent, lambda event: translated.set()
+    )
+
+    with watched_demo:
+        rest_x, rest_y, rest_z = RESTING_ON_THE_TABLE
+        milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            rest_x + MOVED_ALONG_X,
+            rest_y,
+            rest_z,
+            reference_frame=milk.parent_connection.parent,
+        )
+        seen = translated.wait(TICK_TIMEOUT)
+
+    assert seen
+    [translation] = [
+        event
+        for event in watched_demo.segmenter.event_logger.get_events()
+        if isinstance(event, TranslationEvent)
+    ]
+    assert translation.tracked_object is milk
+
+
+def test_a_demo_showing_its_events_serves_them_only_while_it_runs(
+    milk_in_the_apartment,
+):
+    world, milk, _ = milk_in_the_apartment
+    watched_demo = WatchedDemo(world=world, bodies=[milk], show_live_events=True)
+
+    with watched_demo:
+        dashboard = watched_demo.dashboard
+        assert dashboard.feed in watched_demo.segmenter.listeners
+        assert dashboard.port > 0
+
+    assert watched_demo.dashboard is None
+
+
+def test_a_demo_that_shows_nothing_serves_nothing(milk_in_the_apartment):
+    world, milk, _ = milk_in_the_apartment
+
+    with WatchedDemo(world=world, bodies=[milk]) as watched_demo:
+        assert watched_demo.dashboard is None

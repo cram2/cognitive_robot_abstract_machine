@@ -1,4 +1,3 @@
-import logging
 import os
 
 from coraplex.datastructures.dataclasses import Context
@@ -12,14 +11,13 @@ from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTor
 
 from coraplex.testing import setup_world
 from krrood.entity_query_language.factories import an, entity, variable, the
-from segmind import event_logger
 from segmind.detectors.coarse_event_detector_nodes import (
     PickUpDetector,
     PlacingDetector,
 )
 from segmind.detectors.grasp_detector_nodes import GraspDetector
 from segmind.detectors.spatial_relation_detector_nodes import ContainmentDetector
-from segmind.live_segmenter import LiveSegmenter
+from segmind.watched_demo import WatchedDemo
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
@@ -37,20 +35,6 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import FixedConnection
 
-DETECTORS = (PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector)
-"""
-What SegMind is asked to detect in this demo. Every detector these are read from is
-brought along; the full list is printed when the demo starts.
-"""
-
-SHOW_LIVE_EVENTS = True
-"""
-Whether the demo serves a page listing the events as they are detected, at
-http://127.0.0.1:5000 while the plan runs.
-
-It is segmind's dashboard extra, so nothing here needs flask while it is off.
-"""
-
 world = setup_world()
 
 spoon = STLParser(
@@ -65,16 +49,12 @@ bowl = STLParser(
 ).parse()
 
 with world.modify_world():
-    # On the island countertop, whose top face is at 0.9468, plus how far the bowl's
-    # lowest point sits below its own origin.
     world.merge_world_at_pose(
         bowl,
         HomogeneousTransformationMatrix.from_xyz_quaternion(
             2.4, 2.2, 0.9793, reference_frame=world.root
         ),
     )
-    # Resting on the drawer's floor: its bounding box reaches 13.8 mm higher than the
-    # floor itself, so a spoon put at the box's own height would lie in the air.
     connection = FixedConnection(
         parent=world.get_body_by_name("cabinet10_drawer_top"),
         child=spoon.root,
@@ -155,40 +135,12 @@ plan = sequential(
     context=context,
 ).plan
 
-segmenter = LiveSegmenter.watching(
+watched_demo = WatchedDemo.watching_bodies_named(
     world,
-    [world.get_body_by_name(name) for name in ("milk.stl", "bowl.stl", "spoon.stl")],
-    detectors=DETECTORS,
+    ("milk.stl", "bowl.stl", "spoon.stl"),
+    detectors=(PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector),
+    show_live_events=True,
 )
-print(
-    "SegMind detectors:",
-    ", ".join(
-        dict.fromkeys(type(detector).__name__ for detector in segmenter.detectors)
-    ),
-    flush=True,
-)
-dashboard = None
-if SHOW_LIVE_EVENTS:
-    from segmind.dashboard.server import LiveEventDashboard
 
-    dashboard = LiveEventDashboard.watching(segmenter)
-    dashboard.start()
-    print(
-        f"SegMind live events: http://{dashboard.address.host}:{dashboard.port}",
-        flush=True,
-    )
-
-with simulated_robot, segmenter:
+with simulated_robot, watched_demo:
     plan.perform()
-
-if dashboard is not None:
-    dashboard.stop()
-
-# What SegMind detected is reported at debug level, which nothing shows by default, and
-# this demo is meant to be read off the console.
-detected_events = logging.getLogger(event_logger.__name__)
-detected_events.setLevel(logging.DEBUG)
-detected_events.addHandler(logging.StreamHandler())
-
-segmenter.event_logger.print_events()
-segmenter.write_event_records_where_requested()
