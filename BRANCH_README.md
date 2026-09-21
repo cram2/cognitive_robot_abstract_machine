@@ -1,7 +1,8 @@
 # segmind-live-1-numeric-reads
 
-Where this branch stands, written on 2026-09-17 at `78657a8f04` so the work can be picked
-up again later. Delete this file before the branch is merged.
+Where this branch stands, written on 2026-09-17 at `78657a8f04` and brought up to date on
+2026-09-21 with the review of pull request #10, so the work can be picked up again later.
+Delete this file before the branch is merged.
 
 ## What the branch is for
 
@@ -50,6 +51,12 @@ lets it run on a thread of its own beside a plan.
 | `423ed2cb4a` | A grasp needs **both** fingers to touch — see the note below |
 | `4eef76093d` | A run is built from the detectors it asks for, each bringing what it needs |
 | `78657a8f04` | The bullet world demo asks for grasping |
+| `a0ec761ae5` | **review:** a support is read along the world's own up; the view relations are left as they were |
+| `df6b38bb52` | **review:** the apartment's heights are explained in the pull request, not beside the numbers |
+| `b4bfbc317a` | **review:** `WatchedDemo` holds a demo's SegMind wiring; nothing is printed |
+| `ce52da3613` | **review:** a `WatchedDemo` is left out of the episode tables |
+| `623517e32a` | **review:** the ground-truth report and the event records it reads move to `segmind-demo-event-report` |
+| `4aa87a2d68` | **review:** grasping is read among the agent's events, in `agent_event_detector_nodes.py` |
 
 ### The message of `423ed2cb4a` does not match its contents
 
@@ -67,16 +74,15 @@ force-pushing.
 .venv/bin/python coraplex/demos/coraplex_bullet_world_demo/demo.py
 ```
 
-- `DETECTORS` at the top of the demo says what SegMind is asked to detect. The demo
-  prints the full list of detectors that actually run when it starts.
-- `SHOW_LIVE_EVENTS = True` serves a live page at <http://127.0.0.1:5000> while the plan
+- The `WatchedDemo` at the end of the demo says which bodies are watched and what
+  SegMind is asked to detect. The kinds of detector that actually run are logged when it
+  starts, and every event detected is put on the console when it ends.
+- `show_live_events=True` serves a live page at <http://127.0.0.1:5000> while the plan
   runs, showing the events as they are detected. Drawing the statechart on the page
-  lives on its own branch, see "Related local branches". Set it to `False` and nothing
+  lives on its own branch, see "Related local branches". Leave it out and nothing
   imports flask.
-- It prints the detected events at the end. `SEGMIND_EVENTS_FILE=/tmp/events.json` also
-  writes them as JSON.
-- To score a run against the ground truth:
-  `.venv/bin/python segmind/scripts/report_demo_events.py bullet_world`
+- To score a run against the ground truth, take
+  `segmind/scripts/report_demo_events.py` from `segmind-demo-event-report`.
 
 **Run the demo alone, in the foreground.** It needs a lot of memory: runs started in the
 background were killed for low memory, and starting a pytest session beside a running
@@ -130,8 +136,8 @@ These are the rules that took the most work to get right; each has tests.
   (`SegmindContext.spent_interaction_events`), so a hand that loses its grip and takes
   hold again is not a second pick-up.
 - **The dashboard** hides Contact, LossOfContact, Translation, StopTranslation, Rotation
-  and StopRotation (`LiveEventDashboard.hidden_event_types`). The event feed keeps every event, so the
-  events file and the report script still see them all.
+  and StopRotation (`LiveEventDashboard.hidden_event_types`). The event feed keeps every
+  event, so anything else reading it still sees them all.
 
 ## Open questions and next steps
 
@@ -147,17 +153,17 @@ These are the rules that took the most work to get right; each has tests.
      the object was let go;
    - a grasp is lost only once the hand has let go for several ticks, not on a single
      tick without contact from both fingers.
-   With every kind of detector running (before `DETECTORS` existed) the same demo gave
-   exactly one pick-up and one placing per object, so it is the timing of a smaller set
-   of detectors that exposes this.
+   With every kind of detector running (before the demo named the ones it asks for) the
+   same demo gave exactly one pick-up and one placing per object, so it is the timing of
+   a smaller set of detectors that exposes this.
 2. **SegMind reports a fault in the plan here, and that is correct.** Reaching for the
    milk, the gripper collides with the bowl and closes on it: a `GraspEvent` and
    `LossOfGraspEvent` for the bowl come just before the milk loses its support. The plan
    should not do that, so this is SegMind detecting an execution error, not a detection
    error to fix.
 3. **The message of `423ed2cb4a`** (see above).
-4. **`SHOW_LIVE_EVENTS = True` binds port 5000 on every run**, including runs launched by
-   `report_demo_events.py`. Two demos at once will fail to start the page.
+4. **`show_live_events=True` binds port 5000 on every run**, including runs launched by
+   the ground-truth report. Two demos at once will fail to start the page.
 5. **`scripts/format_docstrings.py` does not run**: `docformatter` is not installed in the
    venv. `black` was used on every file touched instead.
 
