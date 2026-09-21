@@ -28,7 +28,10 @@ from segmind.detectors.spatial_relation_detector_nodes import (
     LossOfSupportDetector,
     SupportDetector,
 )
-from segmind.detectors.grasp_detector_nodes import GraspDetector, LossOfGraspDetector
+from segmind.detectors.agent_event_detector_nodes import (
+    GraspDetector,
+    LossOfGraspDetector,
+)
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

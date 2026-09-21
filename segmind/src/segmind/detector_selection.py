@@ -11,9 +11,9 @@ from typing_extensions import List, Self, Tuple, Type
 
 # every kind of detector has to be defined before the kinds are searched
 from segmind.detectors import (  # noqa: F401
+    agent_event_detector_nodes,
     atomic_event_detectors_nodes,
     coarse_event_detector_nodes,
-    grasp_detector_nodes,
     spatial_relation_detector_nodes,
 )
 from segmind.detectors.base import AbstractDetector

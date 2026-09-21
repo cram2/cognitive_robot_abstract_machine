@@ -17,7 +17,10 @@ from segmind.detectors.coarse_event_detector_nodes import (
     PickUpDetector,
     PlacingDetector,
 )
-from segmind.detectors.grasp_detector_nodes import GraspDetector, LossOfGraspDetector
+from segmind.detectors.agent_event_detector_nodes import (
+    GraspDetector,
+    LossOfGraspDetector,
+)
 from segmind.detectors.spatial_relation_detector_nodes import (
     ContainmentDetector,
     InsertionDetector,

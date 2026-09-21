@@ -18,7 +18,7 @@ from segmind.datastructures.events import (
 )
 from segmind.detectors.base import SegmindContext
 from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
-from segmind.detectors.grasp_detector_nodes import GraspDetector
+from segmind.detectors.agent_event_detector_nodes import GraspDetector
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 
 from .test_detection_without_casadi import milk_in_the_apartment  # noqa: F401

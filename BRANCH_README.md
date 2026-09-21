@@ -55,7 +55,7 @@ lets it run on a thread of its own beside a plan.
 
 It is titled *"added Insertion imagination through Mujoco for Segmind to detect"*, but
 it contains only the two-sided grasp rule
-(`segmind/src/segmind/detectors/grasp_detector_nodes.py`) and its test
+(`segmind/src/segmind/detectors/agent_event_detector_nodes.py`) and its test
 (`test/segmind_test/test_detectors/test_grasps.py`). There is no insertion or MuJoCo code
 on this branch, committed or not. If insertion imagination was meant to go in, it is
 not here. The commit is already pushed, so correcting the message means amending it and

@@ -1,5 +1,10 @@
 """
-Detecting that an agent has taken hold of an object, and that it has let go again.
+Detecting what an agent does to an object rather than what happens to it: taking hold of
+one, and letting go of it again.
+
+What is read here is a relation between a body and the hand of an agent, which is what
+sets it apart from the relations any two bodies stand in, and from the events read off
+other events.
 """
 
 from __future__ import annotations

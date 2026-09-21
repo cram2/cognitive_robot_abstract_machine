@@ -15,7 +15,7 @@ from segmind.detectors.coarse_event_detector_nodes import (
     PickUpDetector,
     PlacingDetector,
 )
-from segmind.detectors.grasp_detector_nodes import GraspDetector
+from segmind.detectors.agent_event_detector_nodes import GraspDetector
 from segmind.detectors.spatial_relation_detector_nodes import ContainmentDetector
 from segmind.watched_demo import WatchedDemo
 from semantic_digital_twin.adapters.mesh import STLParser
