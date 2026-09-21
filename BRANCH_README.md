@@ -15,9 +15,11 @@ Work for every other demo (Tracy, Stretch, the four tool demos) was deliberately
 removed to keep this branch about one demo. See "Other demos" below for what was learned
 there and has to be rebuilt.
 
-The first three commits (`0123ed83fc`, `ce4777512b`, `a1d6d7a1af`) make SegMind read the
-world as plain numbers instead of building CasADi expressions every tick, which is what
-lets it run on a thread of its own beside a plan.
+The first three commits (`0123ed83fc`, `ce4777512b`, `a1d6d7a1af`) made SegMind read the
+world as plain numbers instead of building CasADi expressions every tick. `6bacbb404c`
+undoes that: the crash it was written for is fixed on main by #603, so the detectors read
+`global_pose` like everything else and the twin keeps only the support predicate SegMind
+depends on. The live page moved to `segmind-live-dashboard` in `7b4f9a0694`.
 
 ## Where it stands
 
@@ -59,6 +61,9 @@ lets it run on a thread of its own beside a plan.
 | `4aa87a2d68` | **review:** grasping is read among the agent's events, in `agent_event_detector_nodes.py` |
 | `75758c86b6`, `6073caa30b` | **review:** the class a run instantiates is `Segmind`, in `segmind/event_segmentation.py` |
 | `d265d8e6d9` | **review:** the inline comments this branch added are gone, into docstrings where they said something |
+| `c82cb41ae0` | main merged in, two import blocks resolved |
+| `7b4f9a0694` | **review:** the live page moves to `segmind-live-dashboard` |
+| `6bacbb404c` | **review:** the numeric spatial types are gone; the segfault they existed for is fixed on main (#603) |
 
 ### The message of `423ed2cb4a` does not match its contents
 
@@ -79,10 +84,8 @@ force-pushing.
 - The `Segmind` at the end of the demo says which bodies are watched and what
   SegMind is asked to detect. The kinds of detector that actually run are logged when it
   starts, and every event detected is put on the console when it ends.
-- `show_live_events=True` serves a live page at <http://127.0.0.1:5000> while the plan
-  runs, showing the events as they are detected. Drawing the statechart on the page
-  lives on its own branch, see "Related local branches". Leave it out and nothing
-  imports flask.
+- The live page lives on `segmind-live-dashboard`, with the statechart tab on
+  `segmind-live-statechart-page`.
 - To score a run against the ground truth, take
   `segmind/scripts/report_demo_events.py` from `segmind-demo-event-report`.
 
@@ -137,9 +140,7 @@ These are the rules that took the most work to get right; each has tests.
 - **An event is evidence for one interaction only**
   (`SegmindContext.spent_interaction_events`), so a hand that loses its grip and takes
   hold again is not a second pick-up.
-- **The dashboard** hides Contact, LossOfContact, Translation, StopTranslation, Rotation
-  and StopRotation (`LiveEventDashboard.hidden_event_types`). The event feed keeps every
-  event, so anything else reading it still sees them all.
+- **The live page** is no longer on this branch; it is on `segmind-live-dashboard`.
 
 ## Open questions and next steps
 
@@ -164,8 +165,10 @@ These are the rules that took the most work to get right; each has tests.
    should not do that, so this is SegMind detecting an execution error, not a detection
    error to fix.
 3. **The message of `423ed2cb4a`** (see above).
-4. **`show_live_events=True` binds port 5000 on every run**, including runs launched by
-   the ground-truth report. Two demos at once will fail to start the page.
+4. **The demo detects fewer of the small motion events than it did reading numbers**:
+   29 against 37-45 over the same run, the same 10 of 12 transport events either way.
+   What is lost is Translation/Support churn, because the tick is slower; the tick rate
+   is the lever if it ever matters.
 5. **`scripts/format_docstrings.py` does not run**: `docformatter` is not installed in the
    venv. `black` was used on every file touched instead.
 
