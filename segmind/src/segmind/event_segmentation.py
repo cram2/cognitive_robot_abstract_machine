@@ -87,13 +87,18 @@ class Segmind:
         """
         Put every event detected on the console, which is where a run is read.
 
-        SegMind reports what it detected at debug level, which nothing shows by default.
+        SegMind reports what it detected at debug level, which nothing shows by default,
+        and a run that already has a handler of its own would otherwise show each event
+        through both.
         """
         detected_events = logging.getLogger(event_logger.__name__)
         detected_events.setLevel(logging.DEBUG)
         if not detected_events.handlers:
             detected_events.addHandler(logging.StreamHandler())
+        propagated = detected_events.propagate
+        detected_events.propagate = False
         self.segmenter.event_logger.print_events()
+        detected_events.propagate = propagated
 
     def __enter__(self) -> Self:
         logger.info("SegMind detectors: %s", ", ".join(self.detector_names))
