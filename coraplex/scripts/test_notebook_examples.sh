@@ -36,4 +36,5 @@ fi
 
 mv *.ipynb tmp
 cd tmp
-treon -v --exclude=migrate_neems.ipynb --exclude=improving_actions.ipynb
+# one kernel at a time: parallel kernels race for the same ZMQ ports and die on start
+treon --thread 1 -v --exclude=improving_actions.ipynb

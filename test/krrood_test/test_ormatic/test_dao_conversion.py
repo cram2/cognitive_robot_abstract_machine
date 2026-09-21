@@ -2,14 +2,152 @@
 Reproduction tests for bugs found during the ORMatic package review.
 """
 
+import pytest
 from sqlalchemy import select
 
+from krrood.ormatic.data_access_objects.conversion_order import HoldingOrder
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.helper import to_dao, get_dao_class
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
+from krrood.ormatic.exceptions import ConversionOrderCycle
 from krrood.ormatic.ormatic import ORMatic
+from krrood.entity_query_language.core.mapped_variable import Attribute
+from ..dataset.alternative_mappings_construction_order import (
+    BuildFirst,
+    BuildFirstAssociation,
+    BuildFirstMapping,
+    EntryPointMapping,
+    HoldsAnEntrypointMapping,
+    OneSideOfAHoldingCycleMapping,
+    OtherSideOfAHoldingCycleMapping,
+    OwnsAHolder,
+)
 from ..dataset.example_classes import *
 from ..dataset.ormatic_interface import *
+
+
+def test_an_alternative_mapping_is_handed_the_domain_object_it_holds():
+    """
+    A mapping builds its domain object out of what it holds, so a held mapping is
+    converted before the mapping holding it, even where the declared dependencies alone
+    would convert the holder first.
+    """
+    build_first = BuildFirst("first")
+    held = EntryPointMapping(build_first, BuildFirstAssociation(build_first))
+    holder = HoldsAnEntrypointMapping(held)
+    owner = OwnsAHolder(holder)
+    state = FromDataAccessObjectState()
+    # Inserted in this order, the declared dependencies alone sort the holder first.
+    state._build_class_dependencies(
+        [BuildFirstMapping, HoldsAnEntrypointMapping, EntryPointMapping]
+    )
+    state._alternative_mappings_being_referenced[held].append(
+        (holder, Attribute(_attribute_name_="entrypoint", _child_=None))
+    )
+    state._alternative_mappings_being_referenced[holder].append(
+        (owner, Attribute(_attribute_name_="holder", _child_=None))
+    )
+
+    state.convert_alternative_mappings_to_domain_objects()
+
+    assert owner.holder.entrypoint is state.resolve_alternative_mapping(held)
+
+
+def test_each_holder_of_the_same_type_is_handed_its_own_held_domain_object():
+    """
+    The order between two mapping types is decided once for all of their instances, and
+    every holder is still handed the domain object of the mapping it holds itself.
+    """
+    build_first = BuildFirst("first")
+    first_held = EntryPointMapping(build_first, BuildFirstAssociation(build_first))
+    second_held = EntryPointMapping(build_first, BuildFirstAssociation(build_first))
+    first_holder = HoldsAnEntrypointMapping(first_held)
+    second_holder = HoldsAnEntrypointMapping(second_held)
+    first_owner = OwnsAHolder(first_holder)
+    second_owner = OwnsAHolder(second_holder)
+    state = FromDataAccessObjectState()
+    state._build_class_dependencies(
+        [BuildFirstMapping, HoldsAnEntrypointMapping, EntryPointMapping]
+    )
+    for held, holder in ((first_held, first_holder), (second_held, second_holder)):
+        state._alternative_mappings_being_referenced[held].append(
+            (holder, Attribute(_attribute_name_="entrypoint", _child_=None))
+        )
+    for holder, owner in ((first_holder, first_owner), (second_holder, second_owner)):
+        state._alternative_mappings_being_referenced[holder].append(
+            (owner, Attribute(_attribute_name_="holder", _child_=None))
+        )
+
+    state.convert_alternative_mappings_to_domain_objects()
+
+    assert first_owner.holder.entrypoint is state.resolve_alternative_mapping(
+        first_held
+    )
+    assert second_owner.holder.entrypoint is state.resolve_alternative_mapping(
+        second_held
+    )
+
+
+def test_mappings_that_hold_each_other_have_no_conversion_order():
+    """
+    Mappings holding one another leave no order that converts each of them after what it
+    holds, so the conversion reports the cycle instead of silently picking a side.
+    """
+    one_side = OneSideOfAHoldingCycleMapping()
+    other_side = OtherSideOfAHoldingCycleMapping(one_side)
+    one_side.other_side = other_side
+    state = FromDataAccessObjectState()
+    state._build_class_dependencies(
+        [OneSideOfAHoldingCycleMapping, OtherSideOfAHoldingCycleMapping]
+    )
+    state._alternative_mappings_being_referenced[one_side].append(
+        (other_side, Attribute(_attribute_name_="one_side", _child_=None))
+    )
+    state._alternative_mappings_being_referenced[other_side].append(
+        (one_side, Attribute(_attribute_name_="other_side", _child_=None))
+    )
+
+    with pytest.raises(ConversionOrderCycle) as raised:
+        state.convert_alternative_mappings_to_domain_objects()
+
+    assert {
+        (constraint.earlier, constraint.later) for constraint in raised.value.cycle
+    } == {
+        (OneSideOfAHoldingCycleMapping, OtherSideOfAHoldingCycleMapping),
+        (OtherSideOfAHoldingCycleMapping, OneSideOfAHoldingCycleMapping),
+    }
+    assert all(
+        isinstance(constraint, HoldingOrder) for constraint in raised.value.cycle
+    )
+
+
+def test_a_declared_dependency_decides_where_holding_disagrees():
+    """
+    A mapping declaring what to wait for is converted after it even where it holds it,
+    which is how the author of a pair of mappings holding each other breaks the cycle.
+    """
+    build_first = BuildFirstMapping("first")
+    entrypoint = EntryPointMapping(
+        build_first, BuildFirstAssociation(BuildFirst("first"))
+    )
+    build_first.backreference_to_entrypoint = entrypoint
+    state = FromDataAccessObjectState()
+    state._build_class_dependencies([BuildFirstMapping, EntryPointMapping])
+    state._alternative_mappings_being_referenced[build_first].append(
+        (entrypoint, Attribute(_attribute_name_="build_first", _child_=None))
+    )
+    state._alternative_mappings_being_referenced[entrypoint].append(
+        (
+            build_first,
+            Attribute(_attribute_name_="backreference_to_entrypoint", _child_=None),
+        )
+    )
+
+    state.convert_alternative_mappings_to_domain_objects()
+
+    assert state.resolve_alternative_mapping(
+        entrypoint
+    ).build_first is state.resolve_alternative_mapping(build_first)
 
 
 def test_shared_state_does_not_rerun_post_init(session, database, monkeypatch):

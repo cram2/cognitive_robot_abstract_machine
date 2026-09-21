@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
+from enum import StrEnum
 
-from typing_extensions import Generic, TypeVar
+from typing_extensions import Any, ClassVar, Dict, Generic, Self, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityReference,
+)
 from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -16,80 +20,92 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 
 
+class DegreeOfFreedomVariableJSONKey(StrEnum):
+    """
+    The keys of the JSON a degree of freedom variable is serialized to.
+    """
+
+    DEGREE_OF_FREEDOM = "dof"
+    """
+    The reference to the degree of freedom the variable belongs to.
+    """
+
+
 @dataclass(eq=False, init=False)
-class PositionVariable(sm.FloatVariable):
+class DegreeOfFreedomVariable(sm.FloatVariable):
+    """
+    A variable standing for one derivative of a degree of freedom.
+
+    It is serialized as a reference to its degree of freedom, so it is read back as the
+    variable of the degree of freedom with that id in the reading world.
+    """
+
+    derivative: ClassVar[Derivatives]
+    """
+    The derivative of the degree of freedom this variable stands for.
+    """
+
+    dof: DegreeOfFreedom = field(kw_only=True)
+    """
+    Backreference.
+    """
+
+    def __init__(self, name: str, dof: DegreeOfFreedom):
+        super().__init__(name)
+        self.dof = dof
+
+    def resolve(self) -> float:
+        return self.dof._world.state[self.dof.id][self.derivative]
+
+    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+        result = {}
+        WorldEntityReference(DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM).write(
+            result, self.dof
+        )
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        dof = WorldEntityReference(
+            DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM
+        ).resolve(data, **kwargs)
+        return dof.variables[cls.derivative]
+
+
+@dataclass(eq=False, init=False)
+class PositionVariable(DegreeOfFreedomVariable):
     """
     Describes the position of a degree of freedom.
     """
 
-    dof: DegreeOfFreedom = field(kw_only=True)
-    """
-    Backreference.
-    """
-
-    def __init__(self, name: str, dof: DegreeOfFreedom):
-        super().__init__(name)
-        self.dof = dof
-
-    def resolve(self) -> float:
-        return self.dof._world.state[self.dof.id].position
+    derivative = Derivatives.position
 
 
-@dataclass(eq=False)
-class VelocityVariable(sm.FloatVariable):
+@dataclass(eq=False, init=False)
+class VelocityVariable(DegreeOfFreedomVariable):
     """
     Describes the velocity of a degree of freedom.
     """
 
-    dof: DegreeOfFreedom = field(kw_only=True)
-    """
-    Backreference.
-    """
-
-    def __init__(self, name: str, dof: DegreeOfFreedom):
-        super().__init__(name)
-        self.dof = dof
-
-    def resolve(self) -> float:
-        return self.dof._world.state[self.dof.id].velocity
+    derivative = Derivatives.velocity
 
 
-@dataclass(eq=False)
-class AccelerationVariable(sm.FloatVariable):
+@dataclass(eq=False, init=False)
+class AccelerationVariable(DegreeOfFreedomVariable):
     """
     Describes the acceleration of a degree of freedom.
     """
 
-    dof: DegreeOfFreedom = field(kw_only=True)
-    """
-    Backreference.
-    """
-
-    def __init__(self, name: str, dof: DegreeOfFreedom):
-        super().__init__(name)
-        self.dof = dof
-
-    def resolve(self) -> float:
-        return self.dof._world.state[self.dof.id].acceleration
+    derivative = Derivatives.acceleration
 
 
-@dataclass(eq=False)
-class JerkVariable(sm.FloatVariable):
+@dataclass(eq=False, init=False)
+class JerkVariable(DegreeOfFreedomVariable):
     """
     Describes the jerk of a degree of freedom.
     """
 
-    dof: DegreeOfFreedom = field(kw_only=True)
-    """
-    Backreference.
-    """
-
-    def __init__(self, name: str, dof: DegreeOfFreedom):
-        super().__init__(name)
-        self.dof = dof
-
-    def resolve(self) -> float:
-        return self.dof._world.state[self.dof.id].jerk
+    derivative = Derivatives.jerk
 
 
 T = TypeVar("T")

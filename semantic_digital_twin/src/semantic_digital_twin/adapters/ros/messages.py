@@ -205,7 +205,7 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         state = data.get(SnapshotField.STATE, {})
         return cls(
             modifications=[
-                WorldModelModificationBlock.from_json(m, **kwargs)
+                from_json(m, **kwargs)
                 for m in data.get(SnapshotField.MODIFICATIONS, [])
             ],
             ids=from_json(state[SnapshotField.IDS]),
@@ -227,9 +227,7 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         """
         with world.modify_world():
             for modification in json_data.get(SnapshotField.MODIFICATIONS, []):
-                WorldModelModificationBlock.apply_from_json(
-                    world, modification, **kwargs
-                )
+                from_json(modification, **kwargs).apply(world)
 
         state = json_data.get(SnapshotField.STATE, {})
         ids = from_json(state[SnapshotField.IDS])

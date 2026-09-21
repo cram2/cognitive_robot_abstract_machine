@@ -1382,11 +1382,15 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         self.remove_unreachable_nodes(result)
         return self
 
-    def log_conditional_in_place(
-        self, point: Dict[Variable, Any]
-    ) -> Tuple[Optional[Self], float]:
+    def _condition_leaves_in_place(self, point: Dict[Variable, Any]) -> Optional[Unit]:
+        """
+        Push ``point`` into every leaf and sum unit's own forward pass, in place, and
+        drop whatever that leaves with zero probability. Every unit that survives stays
+        exactly where it was: this alone neither marginalizes, merges nor moves a unit.
 
-        # do forward pass
+        :param point: The value to condition each of the given variables on.
+        :return: The surviving root, or ``None`` if ``point`` has no probability.
+        """
         for layer in reversed(self.layers):
             for unit in layer:
                 if unit.is_leaf:
@@ -1399,7 +1403,6 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                 else:
                     raise NotImplementedError()
 
-        # clean the circuit up
         root = self.root
         [
             self.graph.remove_node(node.index)
@@ -1410,9 +1413,33 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         self._invalidate_topology_cache()
 
         if root not in self.graph.nodes():
-            return None, -np.inf
+            return None
 
         self.remove_unreachable_nodes(root)
+        return root
+
+    def log_conditional_in_place(
+        self, point: Dict[Variable, Any], preserve_structure: bool = False
+    ) -> Tuple[Optional[Self], float]:
+        """
+        Condition the circuit on a point, in place.
+
+        :param point: The value to condition each of the given variables on.
+        :param preserve_structure: Skip the rebuild below, which marginalizes the
+            conditioned variables out and simplifies -- like :meth:`marginal_in_place`,
+            unlike :meth:`restrict_to_variables_in_place`, flattening nested sums and
+            erasing which branch a unit belonged to. Keeps that structure, at the cost
+            of leaving the conditioned variables' point leaves in place.
+        :return: The conditioned circuit, or ``None`` if the point has no probability,
+            and the point's log-likelihood.
+        """
+        root = self._condition_leaves_in_place(point)
+        if root is None:
+            return None, -np.inf
+
+        if preserve_structure:
+            self.normalize()
+            return self, root.result_of_current_query
 
         # simplify dirac parts
         remaining_variables = [v for v in self.variables if v not in point]

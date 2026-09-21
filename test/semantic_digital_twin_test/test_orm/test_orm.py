@@ -15,6 +15,7 @@ from semantic_digital_twin.adapters.ros.world_fetcher import (
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.robots.pr2 import PR2, PR2RightArm
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection

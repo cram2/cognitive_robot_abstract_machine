@@ -13,7 +13,11 @@ from random_events.product_algebra import VariableMap
 from random_events.variable import Variable, Continuous, Integer, Symbolic
 from typing_extensions import Self
 
-from probabilistic_model.learning.jpt.variables import AnnotatedVariable
+from probabilistic_model.learning.jpt.variables import (
+    AnnotatedVariable,
+    infer_variables_from_dataframe,
+)
+from probabilistic_model.learning.learning_method import LearningMethod
 from probabilistic_model.learning.nyga_induction import NygaInduction
 from probabilistic_model.distributions.distributions import (
     DiracDeltaDistribution,
@@ -32,15 +36,19 @@ from probabilistic_model.utils import MissingDict
 
 
 @dataclass
-class JointProbabilityTree(SubclassJSONSerializer):
+class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
     """
     Class that implements the JPT learning algorithm for probabilistic circuits.
     """
 
-    annotated_variables: Iterable[AnnotatedVariable]
+    annotated_variables: tuple[AnnotatedVariable, ...] = field(default_factory=tuple)
     """
-    The variables from initialization. Since variables will be overwritten as soon as the model is learned,
-    we need to store the variables from initialization here.
+    The variables from initialization, sorted.
+
+    Since variables will be overwritten as soon as the model is learned, we need to
+    store the variables from initialization here.
+
+    Left empty when the variables are only known at :meth:`fit` time.
     """
 
     targets: Optional[Iterable[Variable]] = field(default=None)
@@ -243,13 +251,30 @@ class JointProbabilityTree(SubclassJSONSerializer):
 
         return result
 
-    def fit(self, data: pd.DataFrame) -> ProbabilisticCircuit:
+    def fit(
+        self,
+        data: pd.DataFrame,
+        variables: Optional[Iterable[AnnotatedVariable]] = None,
+    ) -> ProbabilisticCircuit:
         """
-        Fit the model to the data.
+        Fit the model to the data, into a circuit of its own.
 
         :param data: The data to fit the model to.
+        :param variables: The annotated variables to fit over, replacing the ones given
+            at initialization, with all of them as targets and features. ``None`` keeps
+            the initialized ones, or infers them from the data if none were given at
+            initialization either.
         :return: The fitted model.
         """
+        if variables is None and not self.annotated_variables:
+            variables = infer_variables_from_dataframe(data)
+        if variables is not None:
+            self.annotated_variables = tuple(sorted(variables))
+            self.set_targets_and_features(None, None)
+            self.dependencies = VariableMap(
+                {var: list(self.targets) for var in self.features}
+            )
+        self.probabilistic_circuit = ProbabilisticCircuit()
         self.root = SumUnit(probabilistic_circuit=self.probabilistic_circuit)
         preprocessed_data = self.preprocess_data(data)
 

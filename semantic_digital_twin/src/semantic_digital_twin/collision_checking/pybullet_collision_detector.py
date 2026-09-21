@@ -267,7 +267,7 @@ def load_convex_mesh_shape(
             mesh=mesh, mesh_decomposer=mesh_decomposer
         )
     else:
-        obj_pkg_filename = mesh.filename
+        obj_pkg_filename = str(mesh.local_file)
     return bullet.load_convex_shape(
         obj_pkg_filename,
         single_shape=single_shape,

@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 
+from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import from_json
 from semantic_digital_twin.adapters.ros.world_fetcher import (
     FetchWorldServer,
@@ -247,7 +248,12 @@ def test_get_payload_as_json(rclpy_node, pr2_world_state_reset):
     )
 
     payload = json.loads(fetcher.get_payload_as_json())
-    assert len(payload["modifications"][0]["modifications"]) == expected_payload_length
+    # Each block's own `modifications` field is generically serialized by
+    # DataclassJSONSerializer, which tags a list with its collection type.
+    assert (
+        len(payload["modifications"][0]["modifications"][JSONField.ITEMS])
+        == expected_payload_length
+    )
 
 
 def test_pr2_semantic_annotation(rclpy_node, pr2_world_state_reset):

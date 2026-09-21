@@ -2,7 +2,7 @@
 Loading the CTU Mutagenesis dataset (https://relational.fel.cvut.cz/dataset/Mutagenesis)
 into :class:`~experiments.causal_reasoning.mutagenesis.domain.MutagenesisMolecule`
 instances, plus a synthetic generator with the same shape for the CI-safe pairing
-:mod:`test.causal_reasoning_test.test_mutagenesis_pipeline` needs alongside its
+:mod:`test.experiments_test.causal_reasoning_test.test_mutagenesis_pipeline` needs alongside its
 live-dataset tests.
 """
 

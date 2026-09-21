@@ -82,6 +82,20 @@ def get_module_of_type(type_: Union[Type, _SpecialForm]) -> str:
     return type_.__module__
 
 
+def resolve_class_from_full_name(fully_qualified_class_name: str) -> Type:
+    """
+    Import and return the class named by a fully qualified name of the form
+    ``"module.submodule.ClassName"``, as written by :func:`get_full_class_name` or
+    :func:`module_and_class_name`.
+
+    :param fully_qualified_class_name: The fully qualified class name.
+    :return: The resolved class.
+    """
+    module_name, class_name = fully_qualified_class_name.rsplit(".", 1)
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name)
+
+
 def get_default_value(dataclass_type, field_name):
     """
     Return the default value for a given field in a dataclass.

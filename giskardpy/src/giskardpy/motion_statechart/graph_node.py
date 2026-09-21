@@ -44,6 +44,7 @@ from giskardpy.motion_statechart.exceptions import (
     NodeNotBuiltError,
     TerminalNodeInConditionError,
     MissingErrorSignalError,
+    NodeStateVariableNotSerializableError,
 )
 from giskardpy.motion_statechart.plotters.plot_specs import (
     NodePlotSpec,
@@ -405,6 +406,13 @@ class NodeStateVariable(FloatVariable):
     def __init__(self, name: str, motion_statechart_node: MotionStatechartNode):
         super().__init__(name)
         self.motion_statechart_node = motion_statechart_node
+
+    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+        """
+        :raises NodeStateVariableNotSerializableError: Always, since JSON cannot refer to
+            the node this variable belongs to.
+        """
+        raise NodeStateVariableNotSerializableError(variable=self)
 
     @property
     def display_name(self) -> str:

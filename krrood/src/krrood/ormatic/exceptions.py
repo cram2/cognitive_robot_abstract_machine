@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing_extensions import Type, Any, TYPE_CHECKING
+from typing_extensions import Type, Any, List, TYPE_CHECKING
 
 from sqlalchemy.orm import RelationshipProperty
 
@@ -9,6 +9,9 @@ from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
     from krrood.ormatic.data_access_objects.alternative_mappings import FunctionMapping
+    from krrood.ormatic.data_access_objects.conversion_order import (
+        ConversionOrderConstraint,
+    )
 
 
 @dataclass
@@ -156,3 +159,27 @@ class UnsupportedColumnType(DataclassException, TypeError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class ConversionOrderCycle(DataclassException, ValueError):
+    """
+    Raised when the alternative mappings of a conversion cannot be put in any order,
+    because the orders they ask for form a cycle.
+    """
+
+    cycle: List[ConversionOrderConstraint]
+    """
+    The constraints that close the cycle, each one putting its earlier mapping type
+    before its later one.
+    """
+
+    def error_message(self) -> str:
+        orders = "; ".join(constraint.description() for constraint in self.cycle)
+        return f"No order converts these alternative mappings: {orders}."
+
+    def suggest_correction(self) -> str:
+        corrections = "; ".join(
+            constraint.suggest_correction() for constraint in self.cycle
+        )
+        return f"break the cycle by one of: {corrections}."

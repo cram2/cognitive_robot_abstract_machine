@@ -1817,7 +1817,7 @@ class World(HasSimulatorProperties):
     ) -> None:
         """
         Merge a world into the existing one by merging degrees of freedom, states,
-        connections, and bodies. This removes all bodies and connections from `other`.
+        connections, bodies and actuators. This removes all of them from `other`.
 
         :param other: The world to be added.
         :param root_connection: If provided, this connection will be used to connect the
@@ -2620,6 +2620,10 @@ class World(HasSimulatorProperties):
 
         for kinematic_structure_entity in self.kinematic_structure_entities:
             self.remove_kinematic_structure_entity(kinematic_structure_entity)
+
+        # actuators reference degrees of freedom, so they go first
+        for actuator in copy(self.actuators):
+            self.remove_actuator(actuator)
 
         for degree_of_freedom in copy(self.degrees_of_freedom):
             self.remove_degree_of_freedom(degree_of_freedom)

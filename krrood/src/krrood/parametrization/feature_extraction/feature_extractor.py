@@ -275,24 +275,26 @@ class FeatureExtractor:
 
     def preprocess_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Preprocess the dataframe for JointProbabilityTrees by converting enum columns to
-        hashes.
+        Check the dataframe's columns are of types a JointProbabilityTree can be fitted
+        on.
 
-        Boolean columns are left as ``bool``, not converted to ``int``:
-        ``infer_variables_from_dataframe`` types a ``bool`` column as a two-valued
-        ``Symbolic`` variable, which is what JPT needs to split on it by category rather
-        than by a numeric threshold over an otherwise-unbounded domain a plain ``int``
-        column would infer as.
+        Enum and boolean columns are left as they are: ``infer_variables_from_dataframe``
+        types either as a ``Symbolic`` variable over the values present, which is what
+        JPT needs to split on it by category rather than by a numeric threshold. An enum
+        member itself is also what a query later conditions on, so its leaf keeps the
+        member's own hash; storing the hash as a number instead would round it through
+        a float and never match the member again.
 
         :param df: The dataframe to preprocess.
         :return: The dataframe in a JPT compatible format.
+        :raises UnsupportedFeatureTypeError: If a column's type cannot be fitted on.
         """
         feature_map = dict(zip(df.columns, self.features))
         for column in df.columns:
             feature = feature_map[column]
             if isinstance(feature._type_, enum.EnumType):
-                df[column] = df[column].apply(lambda x: hash(x))
-            elif feature._type_ not in compatible_types and feature._type_ is not None:
+                continue
+            if feature._type_ not in compatible_types and feature._type_ is not None:
                 raise UnsupportedFeatureTypeError(
                     feature_type=feature._type_, column_name=column
                 )

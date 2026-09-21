@@ -834,7 +834,7 @@ class EQLTranslator:
         bound_query = self.session.scalars(self.sql_query)
 
         if issubclass(self.quantifier_type, The):
-            return bound_query.one()
+            return [bound_query.one()]
 
         elif issubclass(self.quantifier_type, An):
             return bound_query.all()

@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Self
 import numpy as np
 from typing_extensions import Optional, Tuple, assert_never
 
-from krrood.adapters.exceptions import JSON_TYPE_NAME
+from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json
 from krrood.utils import get_full_class_name
 from semantic_digital_twin.semantic_annotations.natural_language import (
@@ -910,7 +910,7 @@ class Sage10kRoom(Sage10kWithID):
 
     def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
-            JSON_TYPE_NAME: get_full_class_name(self.__class__),
+            JSONField.TYPE: get_full_class_name(self.__class__),
             "id": self.id,
             "room_type": self.room_type,
             "dimensions": to_json(self.dimensions, **kwargs),

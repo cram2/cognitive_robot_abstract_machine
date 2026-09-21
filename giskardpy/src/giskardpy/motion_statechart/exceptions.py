@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from typing_extensions import TYPE_CHECKING, Type
 
+from krrood.adapters.exceptions import JSONSerializationError
 from krrood.exceptions import DataclassException
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
 from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
@@ -12,6 +13,7 @@ from semantic_digital_twin.collision_checking.collision_detector import ClosestP
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import (
         MotionStatechartNode,
+        NodeStateVariable,
         TrinaryCondition,
     )
     from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
@@ -663,3 +665,25 @@ class EmptyDebugExpressionTrajectoryError(MotionStatechartError):
 
     def suggest_correction(self) -> str:
         return "Call tick() at least once before plotting, or configure debug expressions to record."
+
+
+@dataclass
+class NodeStateVariableNotSerializableError(JSONSerializationError):
+    """
+    Raised when a node state variable is serialized to JSON, which has no way to refer
+    to the node the variable belongs to.
+    """
+
+    variable: NodeStateVariable
+    """
+    The variable that was serialized.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Cannot serialize {self.variable}, since JSON cannot refer to the node it "
+            f"belongs to."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""

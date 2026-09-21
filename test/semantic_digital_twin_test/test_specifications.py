@@ -546,7 +546,7 @@ def test_world_specification_with_robot():
 
     odom_body = world.get_body_by_name("odom")
     assert odom_body is not None
-    assert isinstance(odom_body.parent_connection, Connection6DoF)
+    assert isinstance(odom_body.parent_connection, FixedConnection)
     assert odom_body.parent_connection.parent is world.root
 
     drive = world.get_body_by_name("base_footprint").parent_connection
@@ -606,7 +606,7 @@ def test_world_specification_with_several_robots():
     assert len(odom_bodies) == 2
     assert odom_bodies[0].name != odom_bodies[1].name
     for odom_body in odom_bodies:
-        assert isinstance(odom_body.parent_connection, Connection6DoF)
+        assert isinstance(odom_body.parent_connection, FixedConnection)
         assert odom_body.parent_connection.parent is world.root
 
     odom_positions = sorted(
@@ -1823,12 +1823,6 @@ def test_part_bindings_survive_orm_round_trip():
     assert [binding.field_name for binding in reconstructed.part_bindings] == ["handle"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="ormatic maps no specification-valued field, so a persisted specification "
-    "comes back without its root_specification and with empty part bindings. Remove "
-    "this marker once the generator maps those fields.",
-)
 def test_annotation_specification_survives_orm_round_trip(empty_world):
     reconstructed = to_dao(_drawer_specification_with_handle()).from_dao()
 

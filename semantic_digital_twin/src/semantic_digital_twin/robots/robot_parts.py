@@ -33,6 +33,7 @@ from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NoJointStateWithType,
     UselessConceptError,
@@ -49,7 +50,10 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     RobotPartMixin,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Agent,
+    Table,
+)
 from semantic_digital_twin.spatial_types import (
     Quaternion,
     Vector3,
@@ -73,10 +77,13 @@ from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
     Scale,
 )
+from semantic_digital_twin.world_description.connection_properties import JointServo
 from semantic_digital_twin.world_description.world_entity import (
     Body,
+    GravityCompensation,
     KinematicStructureEntity,
     Connection,
+    PositionServo,
 )
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
@@ -370,6 +377,56 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
             if isinstance(connection, ActiveConnection)
         ]
 
+    def _setup_servos(self) -> None:
+        """
+        Declare the servos driving this part's joints in a physical simulation (see
+        :meth:`_declare_servo`). Does nothing by default: such a part is moved
+        kinematically.
+        """
+
+    def _declare_servo(
+        self, connection: ActiveConnection1DOF, servo: JointServo
+    ) -> None:
+        """
+        Drive one of this part's joints with a position servo in a physical simulation:
+        the servo's gains become a
+        :class:`~semantic_digital_twin.world_description.world_entity.PositionServo`
+        actuator on the joint's degree of freedom, its dynamics the joint's own.
+
+        A joint that follows another joint's degree of freedom, such as a gripper's
+        mimic joints, gets the dynamics but no actuator of its own: the servo already
+        driving that degree of freedom drives it too.
+
+        :param connection: The joint to drive.
+        :param servo: What drives it.
+        """
+        connection.dynamics = servo.dynamics
+        if any(
+            connection.raw_dof in actuator.dofs for actuator in self._world.actuators
+        ):
+            return
+        actuator = PositionServo(
+            name=PrefixedName(
+                f"{connection.raw_dof.name.name}_servo",
+                prefix=connection.raw_dof.name.prefix,
+            ),
+            gains=servo.gains,
+        )
+        actuator.add_dof(connection.raw_dof)
+        self._world.add_actuator(actuator)
+
+    def _compensate_gravity(self) -> None:
+        """
+        Let a physical simulation carry the weight of this part's bodies, as a servoed
+        part holds its own weight.
+        """
+        for body in self.bodies:
+            compensation = body.get_simulator_property_of_type(GravityCompensation)
+            if compensation is None:
+                body.add_simulator_property(GravityCompensation(fraction=1.0))
+                continue
+            compensation.fraction = 1.0
+
 
 @dataclass(eq=False)
 class KinematicChain(AbstractRobotPart, ABC):
@@ -601,6 +658,27 @@ TGenericDrive = TypeVar("TGenericDrive", bound=WheeledDrive)
 
 
 @dataclass(eq=False)
+class MountingTable(Table, AbstractRobotPart, ABC):
+    """
+    The table a stationary robot is bolted onto: the robot's base and, at the same
+    time, a table objects can stand on, with everything the :class:`Table` annotation
+    offers such as its supporting surface.
+    """
+
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self) -> List[JointState]:
+        return []
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(root=robot_root)
+
+
+@dataclass(eq=False)
 class MobileBase(AbstractRobotPart, Generic[TGenericDrive], ABC):
     """
     The base of a robot.
@@ -810,6 +888,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             for robot_part in self._robot_parts:
                 robot_part.setup_hardware_interfaces()
                 robot_part.add_joint_states(robot_part.setup_joint_states())
+                robot_part._setup_servos()
             self._setup_collision_rules()
             self._setup_velocity_limits()
             return self

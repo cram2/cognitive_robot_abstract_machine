@@ -135,3 +135,35 @@ camera (and, with `with_world_frame=True`, a `map` root body placing the camera 
 for frames that carry a world-to-camera transform).
 
 Requires the `huggingface_hub` and `py7zr` packages.
+
+## Reading a dataset from a server
+
+The loaders above download a dataset and keep it locally, which stops working once a
+corpus is measured in terabytes. Such a dataset can be served over http instead and read
+an entry at a time, with a local cache holding only what has actually been used.
+
+```python
+from semantic_digital_twin.adapters.dataset_server import DatasetServer
+from semantic_digital_twin.world_description.mesh_file_storage import MeshFileSources
+
+MeshFileSources().use(DatasetServer.from_environment())
+```
+
+`DatasetServer.from_environment` reads the server's address from
+`SEMANTIC_DIGITAL_TWIN_DATASET_SERVER`, the dataset's location on the machine serving it
+from `SEMANTIC_DIGITAL_TWIN_DATASET_ROOT`, and where to keep its files from
+`SEMANTIC_DIGITAL_TWIN_MESH_CACHE`, which defaults to the directory this package keeps
+everything else it downloads in. A world loaded afterwards needs nothing further: a
+mesh's files are fetched the first time something asks for its geometry, and never again.
+
+For a description parsed from a file, pass the server as a path resolver instead, which
+needs no registration:
+
+```python
+WorldSpecification.from_urdf(path, path_resolver=CompositePathResolver([server]))
+```
+
+Anything that serves a directory tree and answers a directory with a json listing can be
+the server. nginx does both without code, through
+[`autoindex`](https://nginx.org/en/docs/http/ngx_http_autoindex_module.html#autoindex) and
+[`autoindex_format`](https://nginx.org/en/docs/http/ngx_http_autoindex_module.html#autoindex_format).

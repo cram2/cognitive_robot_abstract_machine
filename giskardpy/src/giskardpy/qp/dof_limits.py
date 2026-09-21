@@ -28,6 +28,7 @@ from giskardpy.qp.pos_in_vel_limits import (
     shifted_velocity_profile,
     compute_immediate_slowdown_profile,
 )
+from giskardpy.qp.solvers.linear_program_solver_highs import LinearProgramSolverHighs
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.math import model_predictive_control
 from krrood.symbolic_math.symbolic_math import Scalar, FloatVariable
@@ -224,7 +225,6 @@ class DegreeOfFreedomLimitProfiler:
         degree_of_freedom_symbols: DerivativeMap[FloatVariable],
         lower_limits: DerivativeMap[float],
         upper_limits: DerivativeMap[float],
-        solver_class: type[QPSolver],
         time_step: float,
         prediction_horizon: int,
     ) -> VelocityBoundProfiles:
@@ -236,7 +236,6 @@ class DegreeOfFreedomLimitProfiler:
             freedom.
         :param lower_limits: Lower position, velocity, acceleration, and jerk limits.
         :param upper_limits: Upper position, velocity, acceleration, and jerk limits.
-        :param solver_class: QP solver used to compute the nominal braking profile.
         :param time_step: Duration of a single horizon step.
         :param prediction_horizon: Number of steps in the prediction horizon.
         """
@@ -255,7 +254,6 @@ class DegreeOfFreedomLimitProfiler:
             jerk_limit=jerk_limit,
             time_step=time_step,
             prediction_horizon=prediction_horizon,
-            solver_class=solver_class,
         )
         velocity_lower_bound = self._directional_velocity_bound(
             velocity_profile=velocity_profile,
@@ -312,18 +310,19 @@ class DegreeOfFreedomLimitProfiler:
         jerk_limit: float,
         time_step: float,
         prediction_horizon: int,
-        solver_class: type[QPSolver],
     ) -> tuple[npt.NDArray, npt.NDArray]:
         """
         Solves an MPC that drives the degree of freedom from full velocity to rest,
         returning the nominal velocity and acceleration braking profiles.
+
+        The MPC is a linear program solved to a vertex, so the velocity levels are exact
+        rather than accurate only up to a solver tolerance.
 
         :param initial_velocity: Velocity the profile starts braking from.
         :param acceleration_limit: Acceleration limit applied at every horizon step.
         :param jerk_limit: Jerk limit applied at every horizon step.
         :param time_step: Duration of a single horizon step.
         :param prediction_horizon: Number of steps in the prediction horizon.
-        :param solver_class: QP solver used to solve the MPC.
         """
         profile = gm.simple_model_predictive_control(
             vel_limit=initial_velocity,
@@ -335,7 +334,7 @@ class DegreeOfFreedomLimitProfiler:
             ph=prediction_horizon,
             q_weight=(0, 0, 0),
             lin_weight=(-1, 0, 0),
-            solver_class=solver_class,
+            solver_class=LinearProgramSolverHighs,
         )
         return (
             profile[:prediction_horizon],
@@ -397,7 +396,6 @@ class DegreeOfFreedomLimitProfiler:
         degree_of_freedom_symbols: DerivativeMap[FloatVariable],
         lower_limits: DerivativeMap[float],
         upper_limits: DerivativeMap[float],
-        solver_class: type[QPSolver],
         time_step: float,
         prediction_horizon: int,
         epsilon: float = 0.00001,
@@ -411,7 +409,6 @@ class DegreeOfFreedomLimitProfiler:
             freedom.
         :param lower_limits: Lower position, velocity, acceleration, and jerk limits.
         :param upper_limits: Upper position, velocity, acceleration, and jerk limits.
-        :param solver_class: QP solver used to compute the nominal braking profile.
         :param time_step: Duration of a single horizon step.
         :param prediction_horizon: Number of steps in the prediction horizon.
         :param epsilon: Tolerance below which a velocity bound violation is ignored.
@@ -423,7 +420,6 @@ class DegreeOfFreedomLimitProfiler:
             degree_of_freedom_symbols=degree_of_freedom_symbols,
             lower_limits=lower_limits,
             upper_limits=upper_limits,
-            solver_class=solver_class,
             time_step=time_step,
             prediction_horizon=prediction_horizon,
         )
@@ -715,7 +711,6 @@ class DegreeOfFreedomLimitProfiler:
                 degree_of_freedom_symbols=degree_of_freedom.variables,
                 lower_limits=lower_limits,
                 upper_limits=upper_limits,
-                solver_class=qp_controller_config.qp_solver_class,
                 time_step=qp_controller_config.model_predictive_control_time_step,
                 prediction_horizon=qp_controller_config.prediction_horizon,
             )

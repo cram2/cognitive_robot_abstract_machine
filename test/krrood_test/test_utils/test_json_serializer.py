@@ -1,3 +1,4 @@
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -6,14 +7,15 @@ from typing import Dict, Any, Self
 
 import numpy as np
 import pytest
+from sortedcontainers import SortedSet
 
 from krrood.adapters.exceptions import (
     MissingTypeError,
     InvalidTypeFormatError,
     UnknownModuleError,
     ClassNotFoundError,
-    JSON_TYPE_NAME,
 )
+from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
     to_json,
@@ -166,6 +168,26 @@ class ClassWithDict(DataclassJSONSerializer):
     a: Dict[str, int]
 
 
+@dataclass
+class ClassWithList(DataclassJSONSerializer):
+    a: list
+
+
+@dataclass
+class ClassWithSet(DataclassJSONSerializer):
+    a: set
+
+
+@dataclass
+class ClassWithTuple(DataclassJSONSerializer):
+    a: tuple
+
+
+@dataclass
+class ClassWithSortedSet(DataclassJSONSerializer):
+    a: SortedSet
+
+
 class CustomEnum(str, Enum):
     A = "a"
     B = "b"
@@ -178,8 +200,8 @@ def test_roundtrip_dog_and_cat():
     dog_json = dog.to_json()
     cat_json = cat.to_json()
 
-    assert dog_json[JSON_TYPE_NAME] == get_full_class_name(Dog)
-    assert cat_json[JSON_TYPE_NAME] == get_full_class_name(Cat)
+    assert dog_json[JSONField.TYPE] == get_full_class_name(Dog)
+    assert cat_json[JSONField.TYPE] == get_full_class_name(Cat)
 
     dog2 = SubclassJSONSerializer.from_json(dog_json)
     cat2 = SubclassJSONSerializer.from_json(cat_json)
@@ -194,7 +216,7 @@ def test_deep_subclass_discovery():
     b = Bulldog(name="Butch", age=4, breed="Bulldog", stubborn=True)
     b_json = b.to_json()
 
-    assert b_json[JSON_TYPE_NAME] == get_full_class_name(Bulldog)
+    assert b_json[JSONField.TYPE] == get_full_class_name(Bulldog)
 
     b2 = SubclassJSONSerializer.from_json(b_json)
     assert isinstance(b2, Bulldog)
@@ -203,7 +225,7 @@ def test_deep_subclass_discovery():
 
 def test_unknown_module_raises_unknown_module_error():
     with pytest.raises(UnknownModuleError):
-        SubclassJSONSerializer.from_json({JSON_TYPE_NAME: "non.existent.Class"})
+        SubclassJSONSerializer.from_json({JSONField.TYPE: "non.existent.Class"})
 
 
 def test_missing_type_raises_missing_type_error():
@@ -213,7 +235,7 @@ def test_missing_type_raises_missing_type_error():
 
 def test_invalid_type_format_raises_invalid_type_format_error():
     with pytest.raises(InvalidTypeFormatError):
-        SubclassJSONSerializer.from_json({JSON_TYPE_NAME: "NotAQualifiedName"})
+        SubclassJSONSerializer.from_json({JSONField.TYPE: "NotAQualifiedName"})
 
 
 essential_existing_module = "krrood.utils"
@@ -222,7 +244,7 @@ essential_existing_module = "krrood.utils"
 def test_class_not_found_raises_class_not_found_error():
     with pytest.raises(ClassNotFoundError):
         SubclassJSONSerializer.from_json(
-            {JSON_TYPE_NAME: f"{essential_existing_module}.DoesNotExist"}
+            {JSONField.TYPE: f"{essential_existing_module}.DoesNotExist"}
         )
 
 
@@ -257,6 +279,18 @@ def test_list_of_enums():
     data = to_json(obj)
     result = from_json(data)
     assert result == obj
+
+
+def test_string_enum_member_comes_back_as_the_member():
+    """
+    Regression test: a member of an enum that is also a ``str`` used to be written as
+    its bare string, since it passed as a leaf value, and so came back as a plain
+    ``str`` that merely compared equal to the member.
+    """
+    data = json.loads(json.dumps(to_json(CustomEnum.A)))
+    result = from_json(data)
+    assert type(result) is CustomEnum
+    assert result is CustomEnum.A
 
 
 def test_exception():
@@ -384,6 +418,52 @@ def test_dataclass_dict():
     data = to_json(cls)
     result = from_json(data)
     assert result == cls
+
+
+def test_dataclass_list():
+    cls = ClassWithList([3, 1, 2])
+    data = to_json(cls)
+    assert data["a"] == {
+        JSONField.COLLECTION_TYPE: get_full_class_name(list),
+        JSONField.ITEMS: [3, 1, 2],
+    }
+    result = from_json(data)
+    assert result == cls
+    assert isinstance(result.a, list)
+
+
+def test_dataclass_set():
+    cls = ClassWithSet({1, 2, 3})
+    data = to_json(cls)
+    assert data["a"][JSONField.COLLECTION_TYPE] == get_full_class_name(set)
+    assert sorted(data["a"][JSONField.ITEMS]) == [1, 2, 3]
+    result = from_json(data)
+    assert result == cls
+    assert isinstance(result.a, set)
+
+
+def test_dataclass_tuple():
+    cls = ClassWithTuple((3, 1, 2))
+    data = to_json(cls)
+    assert data["a"] == {
+        JSONField.COLLECTION_TYPE: get_full_class_name(tuple),
+        JSONField.ITEMS: [3, 1, 2],
+    }
+    result = from_json(data)
+    assert result == cls
+    assert isinstance(result.a, tuple)
+
+
+def test_dataclass_sorted_set():
+    cls = ClassWithSortedSet(SortedSet([3, 1, 2]))
+    data = to_json(cls)
+    assert data["a"] == {
+        JSONField.COLLECTION_TYPE: get_full_class_name(SortedSet),
+        JSONField.ITEMS: [1, 2, 3],
+    }
+    result = from_json(data)
+    assert result == cls
+    assert isinstance(result.a, SortedSet)
 
 
 # %% durations

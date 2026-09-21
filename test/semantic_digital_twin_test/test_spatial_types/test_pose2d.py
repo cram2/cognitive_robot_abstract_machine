@@ -5,7 +5,6 @@ import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import SpatialTypeNotJsonSerializable
 from semantic_digital_twin.spatial_types import (
     Point2,
     Pose2D,
@@ -207,11 +206,6 @@ class TestPose2DJSON:
         assert p2_restored.x.to_np() == pytest.approx(1.0, abs=1e-6)
         assert p2_restored.y.to_np() == pytest.approx(-2.0, abs=1e-6)
         assert p2_restored.yaw.to_np() == pytest.approx(0.3, abs=1e-6)
-
-    def test_to_json_symbolic_raises(self):
-        p2 = Pose2D(x=sm.FloatVariable(name="x"), y=0, yaw=0)
-        with pytest.raises(SpatialTypeNotJsonSerializable):
-            p2.to_json()
 
     def test_to_json_contains_data_key(self):
         p2 = Pose2D(x=1.0, y=2.0, yaw=0.5)
