@@ -5,17 +5,11 @@ as a plan, changes the world.
 
 from __future__ import annotations
 
-import json
 import threading
 import time
 from collections import Counter
 
-from krrood.adapters.json_serializer import from_json, to_json
-from segmind.datastructures.events import (
-    StopTranslationEvent,
-    SupportEvent,
-    TranslationEvent,
-)
+from segmind.datastructures.events import StopTranslationEvent, TranslationEvent
 from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import (
     StopTranslationDetector,
@@ -25,9 +19,7 @@ from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.live_segmenter import (
     EVENT_COMBINING_DETECTOR_TYPES,
     OBJECT_DETECTOR_TYPES,
-    EventRecord,
     LiveSegmenter,
-    SegmindEnvironmentVariable,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
@@ -202,13 +194,6 @@ def test_stopping_ends_the_watching_thread(milk_in_the_apartment):
 # %% watching the objects a plan handles
 
 
-def _milk_resting_on_the_table(milk) -> None:
-    rest_x, rest_y, rest_z = RESTING_ON_THE_TABLE
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        rest_x, rest_y, rest_z, reference_frame=milk.parent_connection.parent
-    )
-
-
 def test_watching_bodies_ticks_every_object_detector_for_each_body(
     milk_in_the_apartment,
 ):
@@ -269,61 +254,3 @@ def test_watching_for_what_is_asked_watches_each_body_with_what_that_is_read_fro
             (PickUpDetector, None): 1,
         }
     )
-
-
-# %% handing detected events over
-
-
-def test_an_event_record_names_the_event_and_its_bodies(milk_in_the_apartment):
-    _, milk, box = milk_in_the_apartment
-
-    record = EventRecord.of(SupportEvent(tracked_object=milk, with_object=box))
-
-    assert record == EventRecord(
-        event_type=SupportEvent.__name__,
-        tracked_object=milk.name.name,
-        with_object=box.name.name,
-    )
-
-
-def test_an_event_record_survives_json():
-    record = EventRecord(
-        event_type=TranslationEvent.__name__,
-        tracked_object="milk.stl",
-        with_object=None,
-    )
-
-    assert from_json(json.loads(json.dumps(to_json(record)))) == record
-
-
-def test_written_events_read_back_as_their_records(milk_in_the_apartment, tmp_path):
-    world, milk, _ = milk_in_the_apartment
-    _milk_resting_on_the_table(milk)
-    segmenter = LiveSegmenter.watching(world, [milk])
-    segmenter.tick()
-    events_file = tmp_path / "events.json"
-
-    segmenter.write_event_records(events_file)
-
-    records = EventRecord.read_all(events_file)
-    assert records == [
-        EventRecord.of(event) for event in segmenter.event_logger.get_events()
-    ]
-    assert SupportEvent.__name__ in {record.event_type for record in records}
-
-
-def test_events_are_written_where_the_environment_asks(
-    milk_in_the_apartment, tmp_path, monkeypatch
-):
-    world, milk, _ = milk_in_the_apartment
-    _milk_resting_on_the_table(milk)
-    segmenter = LiveSegmenter.watching(world, [milk])
-    segmenter.tick()
-    events_file = tmp_path / "requested.json"
-    monkeypatch.setenv(SegmindEnvironmentVariable.EVENTS_FILE, str(events_file))
-
-    segmenter.write_event_records_where_requested()
-
-    assert EventRecord.read_all(events_file) == [
-        EventRecord.of(event) for event in segmenter.event_logger.get_events()
-    ]

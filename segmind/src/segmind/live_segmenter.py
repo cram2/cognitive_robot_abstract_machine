@@ -1,22 +1,15 @@
 """
-Watching a world with SegMind while something else, such as a plan, changes it, and
-handing what was detected over as records of names.
+Watching a world with SegMind while something else, such as a plan, changes it.
 """
 
 from __future__ import annotations
 
-import json
-import os
 import time
 from dataclasses import dataclass, field
-from enum import StrEnum
-from pathlib import Path
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json
-from typing_extensions import Any, Dict, List, Optional, Self, Sequence, Tuple, Type
+from typing_extensions import List, Self, Sequence, Tuple, Type
 
-from segmind.datastructures.events import EventWithTrackedObjects
 from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import (
     ContactDetector,
@@ -75,89 +68,6 @@ EVENT_COMBINING_DETECTOR_TYPES: Tuple[Type[AbstractDetector], ...] = (
 """
 The detectors that combine the events already detected about any body.
 """
-
-
-class SegmindEnvironmentVariable(StrEnum):
-    """
-    Environment variables a watched run reads.
-    """
-
-    EVENTS_FILE = "SEGMIND_EVENTS_FILE"
-    """
-    When set, the file a watched run writes the events SegMind detected to.
-    """
-
-
-# %% records of detected events
-
-
-class EventRecordField(StrEnum):
-    """
-    The keys an event record is written under.
-    """
-
-    EVENT_TYPE = "event_type"
-    TRACKED_OBJECT = "tracked_object"
-    WITH_OBJECT = "with_object"
-
-
-@dataclass(frozen=True)
-class EventRecord(SubclassJSONSerializer):
-    """
-    A detected event, named by its type and the names of its bodies, so it can be read
-    in a process that holds no world.
-    """
-
-    event_type: str
-    """
-    The name of the event's class.
-    """
-
-    tracked_object: str
-    """
-    The name of the body the event is about.
-    """
-
-    with_object: Optional[str] = None
-    """
-    The name of the other body involved, if any.
-    """
-
-    @classmethod
-    def of(cls, event: EventWithTrackedObjects) -> Self:
-        """
-        :return: The record of ``event``.
-        """
-        return cls(
-            event_type=type(event).__name__,
-            tracked_object=event.tracked_object.name.name,
-            with_object=(
-                None if event.with_object is None else event.with_object.name.name
-            ),
-        )
-
-    @classmethod
-    def read_all(cls, path: Path) -> List[Self]:
-        """
-        :return: The records a watched run wrote to ``path``.
-        """
-        return [from_json(item) for item in json.loads(path.read_text())]
-
-    def to_json(self, **kwargs) -> Dict[str, Any]:
-        return {
-            **super().to_json(**kwargs),
-            EventRecordField.EVENT_TYPE: self.event_type,
-            EventRecordField.TRACKED_OBJECT: self.tracked_object,
-            EventRecordField.WITH_OBJECT: self.with_object,
-        }
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(
-            event_type=data[EventRecordField.EVENT_TYPE],
-            tracked_object=data[EventRecordField.TRACKED_OBJECT],
-            with_object=data[EventRecordField.WITH_OBJECT],
-        )
 
 
 # %% watching on a thread of its own
@@ -271,23 +181,6 @@ class LiveSegmenter(PropagatingThread):
             detected = self.event_logger.get_events()[detected_before:]
         for listener in self.listeners:
             listener.receive(detected)
-
-    def write_event_records(self, path: Path) -> None:
-        """
-        Write the record of every event detected so far to ``path``.
-        """
-        records = [EventRecord.of(event) for event in self.event_logger.get_events()]
-        path.write_text(json.dumps([record.to_json() for record in records]))
-
-    def write_event_records_where_requested(self) -> None:
-        """
-        Write the record of every event detected so far to the file named by
-        :attr:`SegmindEnvironmentVariable.EVENTS_FILE`, if that variable is set.
-        """
-        requested = os.environ.get(SegmindEnvironmentVariable.EVENTS_FILE)
-        if requested is None:
-            return
-        self.write_event_records(Path(requested))
 
     def _run(self) -> None:
         while not self.kill_event.is_set():
