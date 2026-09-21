@@ -1,6 +1,6 @@
 """
-A demo watched by SegMind: what it watches, what it is asked to detect, and what it
-shows of it while it runs.
+Segmenting what happens in a world into events while a run goes on: what is watched,
+what is to be detected, and what is shown of it meanwhile.
 """
 
 from __future__ import annotations
@@ -30,22 +30,23 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class WatchedDemo:
+class EventSegmentation:
     """
-    SegMind watching a demo while its plan runs.
+    SegMind segmenting a run into events while it goes on.
 
-    Entering it starts watching and leaving it stops, so a demo states what it wants
-    watched and what it wants detected, and keeps the rest to its plan.
+    Entering it starts the detectors and leaving it stops them and reports what they
+    detected, so a run states what it wants watched and what it wants detected, and
+    keeps the rest to its plan.
     """
 
     world: World
     """
-    The world the demo runs in.
+    The world the run takes place in.
     """
 
     bodies: List[Body]
     """
-    The bodies the demo's plan handles, which the detectors watch.
+    The bodies the run handles, which the detectors watch.
     """
 
     detectors: Sequence[Type[AbstractDetector]] = ()
@@ -56,18 +57,19 @@ class WatchedDemo:
 
     show_live_events: bool = False
     """
-    Whether the events are served as a page while the demo runs. It is segmind's
-    ``dashboard`` extra, so nothing here needs flask while this is off.
+    Whether the events are served as a page while the run goes on. The page is
+    segmind's ``dashboard`` extra, which is why it is reached for where it is asked
+    for rather than imported here, so nothing needs flask while this is off.
     """
 
     segmenter: LiveSegmenter = field(init=False)
     """
-    Ticks the detectors against the world while the demo runs.
+    Ticks the detectors against the world while the run goes on.
     """
 
     dashboard: Optional[LiveEventDashboard] = field(init=False, default=None)
     """
-    Serves the page, between entering and leaving a demo that asks for one.
+    Serves the page, between entering and leaving a run that asks for one.
     """
 
     def __post_init__(self) -> None:
@@ -82,9 +84,9 @@ class WatchedDemo:
         show_live_events: bool = False,
     ) -> Self:
         """
-        A watch over the bodies a demo names.
+        A segmentation watching the bodies a run names.
 
-        :param world: The world the demo runs in.
+        :param world: The world the run takes place in.
         :param names: The names of the bodies to watch.
         :param detectors: The kinds of detector asked for.
         :param show_live_events: Whether to serve the events as a page while it runs.
@@ -109,7 +111,7 @@ class WatchedDemo:
 
     def report_detected_events(self) -> None:
         """
-        Put every event detected on the console, which is where a demo is read.
+        Put every event detected on the console, which is where a run is read.
 
         SegMind reports what it detected at debug level, which nothing shows by default.
         """

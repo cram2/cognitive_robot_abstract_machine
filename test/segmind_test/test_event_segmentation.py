@@ -1,6 +1,6 @@
 """
-Tests for a demo stating what it wants watched, what it wants detected and whether it
-shows the events while it runs.
+Tests for a run stating what it wants watched, what it wants detected and whether it
+shows the events while it goes on.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from collections import Counter
 from segmind.datastructures.events import TranslationEvent
 from segmind.detector_selection import DetectorSelection
 from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
-from segmind.watched_demo import WatchedDemo
+from segmind.event_segmentation import EventSegmentation
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 from .test_detectors.test_detection_without_casadi import (  # noqa: F401 (fixture)
@@ -26,7 +26,7 @@ Seconds a test waits for the watching thread to have detected something.
 
 MOVED_ALONG_X = 0.2
 """
-How far a test moves the milk while the demo is watched.
+How far a test moves the milk while the run is watched.
 """
 
 
@@ -40,43 +40,45 @@ def _stand_the_milk_on_the_table(milk) -> None:
     )
 
 
-def test_a_demo_watches_the_bodies_it_names(milk_in_the_apartment):
+def test_a_run_watches_the_bodies_it_names(milk_in_the_apartment):
     world, milk, box = milk_in_the_apartment
 
-    watched_demo = WatchedDemo.watching_bodies_named(
+    event_segmentation = EventSegmentation.watching_bodies_named(
         world, (milk.name.name, box.name.name)
     )
 
-    assert watched_demo.bodies == [milk, box]
+    assert event_segmentation.bodies == [milk, box]
 
 
-def test_a_demo_is_given_every_detector_what_it_asks_for_is_read_from(
+def test_a_run_is_given_every_detector_what_it_asks_for_is_read_from(
     milk_in_the_apartment,
 ):
     """
-    A demo says what it wants detected; the detectors that is concluded from come with
+    A run says what it wants detected; the detectors that is concluded from come with
     it, and the kinds ticked are named once each.
     """
     world, milk, _ = milk_in_the_apartment
 
-    watched_demo = WatchedDemo(world=world, bodies=[milk], detectors=[PickUpDetector])
+    event_segmentation = EventSegmentation(
+        world=world, bodies=[milk], detectors=[PickUpDetector]
+    )
 
-    assert Counter(watched_demo.detector_names) == Counter(
+    assert Counter(event_segmentation.detector_names) == Counter(
         detector_type.__name__
         for detector_type in DetectorSelection.of(PickUpDetector).detector_types
     )
 
 
-def test_what_happens_while_a_demo_is_watched_is_detected(milk_in_the_apartment):
+def test_what_happens_while_a_run_is_watched_is_detected(milk_in_the_apartment):
     world, milk, _ = milk_in_the_apartment
     _stand_the_milk_on_the_table(milk)
-    watched_demo = WatchedDemo(world=world, bodies=[milk])
+    event_segmentation = EventSegmentation(world=world, bodies=[milk])
     translated = threading.Event()
-    watched_demo.segmenter.event_logger.add_callback(
+    event_segmentation.segmenter.event_logger.add_callback(
         TranslationEvent, lambda event: translated.set()
     )
 
-    with watched_demo:
+    with event_segmentation:
         rest_x, rest_y, rest_z = RESTING_ON_THE_TABLE
         milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             rest_x + MOVED_ALONG_X,
@@ -89,28 +91,30 @@ def test_what_happens_while_a_demo_is_watched_is_detected(milk_in_the_apartment)
     assert seen
     [translation] = [
         event
-        for event in watched_demo.segmenter.event_logger.get_events()
+        for event in event_segmentation.segmenter.event_logger.get_events()
         if isinstance(event, TranslationEvent)
     ]
     assert translation.tracked_object is milk
 
 
-def test_a_demo_showing_its_events_serves_them_only_while_it_runs(
+def test_a_run_showing_its_events_serves_them_only_while_it_goes_on(
     milk_in_the_apartment,
 ):
     world, milk, _ = milk_in_the_apartment
-    watched_demo = WatchedDemo(world=world, bodies=[milk], show_live_events=True)
+    event_segmentation = EventSegmentation(
+        world=world, bodies=[milk], show_live_events=True
+    )
 
-    with watched_demo:
-        dashboard = watched_demo.dashboard
-        assert dashboard.feed in watched_demo.segmenter.listeners
+    with event_segmentation:
+        dashboard = event_segmentation.dashboard
+        assert dashboard.feed in event_segmentation.segmenter.listeners
         assert dashboard.port > 0
 
-    assert watched_demo.dashboard is None
+    assert event_segmentation.dashboard is None
 
 
-def test_a_demo_that_shows_nothing_serves_nothing(milk_in_the_apartment):
+def test_a_run_that_shows_nothing_serves_nothing(milk_in_the_apartment):
     world, milk, _ = milk_in_the_apartment
 
-    with WatchedDemo(world=world, bodies=[milk]) as watched_demo:
-        assert watched_demo.dashboard is None
+    with EventSegmentation(world=world, bodies=[milk]) as event_segmentation:
+        assert event_segmentation.dashboard is None
