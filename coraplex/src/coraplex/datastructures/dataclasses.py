@@ -84,6 +84,14 @@ class Context(PlanEntity):
     Should pre -and postconditions of actions be evaluated in this plan.
     """
 
+    segment_events: bool = field(default=True)
+    """
+    Should what happens while this plan runs be segmented into events.
+
+    A run that is watched ticks detectors against the world beside the plan, which costs
+    time a run that only has to perform the plan need not spend.
+    """
+
     query_backend: QueryBackend = field(
         default_factory=EntityQueryLanguageGenerativeBackend
     )

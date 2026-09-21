@@ -1,4 +1,5 @@
 import os
+from contextlib import nullcontext
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
@@ -135,10 +136,14 @@ plan = sequential(
     context=context,
 ).plan
 
-segmentation = Segmind.watching_bodies_named(
-    world,
-    ("milk.stl", "bowl.stl", "spoon.stl"),
-    detectors=(PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector),
+segmentation = (
+    Segmind.watching_bodies_named(
+        world,
+        ("milk.stl", "bowl.stl", "spoon.stl"),
+        detectors=(PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector),
+    )
+    if context.segment_events
+    else nullcontext()
 )
 
 with simulated_robot, segmentation:

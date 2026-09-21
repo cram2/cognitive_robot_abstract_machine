@@ -48,3 +48,17 @@ def test_default_context_logs_at_info(immutable_model_world):
         assert coraplex_logger.level == logging.INFO
     finally:
         coraplex_logger.setLevel(previous_level)
+
+
+# %% segmenting what happens while a plan runs
+
+
+def test_a_run_is_watched_unless_it_says_otherwise(immutable_model_world):
+    """
+    Watching a run costs a detector tick beside every step of the plan, so a run that
+    only has to perform its plan can say so.
+    """
+    world, robot, _ = immutable_model_world
+
+    assert Context(world, robot).segment_events
+    assert not Context(world, robot, segment_events=False).segment_events
