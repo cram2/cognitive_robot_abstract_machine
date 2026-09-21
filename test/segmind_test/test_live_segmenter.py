@@ -8,13 +8,22 @@ from __future__ import annotations
 import threading
 import time
 from collections import Counter
+from dataclasses import dataclass, field
 
-from segmind.datastructures.events import StopTranslationEvent, TranslationEvent
+from giskardpy.motion_statechart.context import MotionStatechartContext
+from typing_extensions import List
+
+from segmind.datastructures.events import (
+    DetectionEvent,
+    StopTranslationEvent,
+    TranslationEvent,
+)
 from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import (
     StopTranslationDetector,
     TranslationDetector,
 )
+from segmind.detectors.base import AbstractDetector, SegmindContext
 from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.live_segmenter import (
     EVENT_COMBINING_DETECTOR_TYPES,
@@ -22,9 +31,8 @@ from segmind.live_segmenter import (
     LiveSegmenter,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.world_entity import Body
 
-from .dataset.detector_counting_its_ticks import DetectorCountingItsTicks
-from .dataset.detector_taking_its_time import DetectorTakingItsTime
 from .conftest import RESTING_ON_THE_TABLE
 
 TICK_TIMEOUT = 10.0
@@ -46,6 +54,63 @@ CHANGES_WHILE_WATCHED = 20
 """
 How many changes a test makes to the world while it is watched.
 """
+
+
+# %% detectors that detect nothing, to watch the watching itself
+
+
+@dataclass(eq=False, repr=False)
+class DetectorCountingItsTicks(AbstractDetector):
+    """
+    Detects nothing, and records how often and on which thread it was ticked.
+    """
+
+    ticks: int = field(default=0, init=False)
+    """
+    How often this detector was ticked.
+    """
+
+    tick_threads: List[int] = field(default_factory=list, init=False)
+    """
+    The identifier of the thread each tick ran on, in order.
+    """
+
+    ticked: threading.Event = field(default_factory=threading.Event, init=False)
+    """
+    Set once this detector has been ticked.
+    """
+
+    def update_context_and_events(
+        self,
+        context: MotionStatechartContext,
+        segmind_context: SegmindContext,
+        tracked_objects: List[Body],
+    ) -> List[DetectionEvent]:
+        self.ticks += 1
+        self.tick_threads.append(threading.get_ident())
+        self.ticked.set()
+        return []
+
+
+@dataclass(eq=False, repr=False)
+class DetectorTakingItsTime(AbstractDetector):
+    """
+    Detects nothing, and spends a fixed time on every tick.
+    """
+
+    seconds_per_tick: float = 0.02
+    """
+    How long each tick takes.
+    """
+
+    def update_context_and_events(
+        self,
+        context: MotionStatechartContext,
+        segmind_context: SegmindContext,
+        tracked_objects: List[Body],
+    ) -> List[DetectionEvent]:
+        time.sleep(self.seconds_per_tick)
+        return []
 
 
 # %% watching on a thread of its own
