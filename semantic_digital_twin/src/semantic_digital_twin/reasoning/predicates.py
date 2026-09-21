@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from abc import ABC
 from copy import deepcopy
-from enum import IntEnum
 from dataclasses import dataclass
 from typing import Optional, Any
 
 import numpy as np
-import numpy.typing as npt
 import trimesh.boolean
 from trimesh.collision import CollisionManager
 from typing_extensions import List, TYPE_CHECKING, Iterable, Type
@@ -33,7 +31,6 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
     UnreachableException,
 )
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.spatial_types import Vector3, Point3, math
 from semantic_digital_twin.spatial_types.numeric import NumericTransform
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -276,6 +273,10 @@ def is_supported_by(
     An object rests on what touches it from underneath, which is read off where the two
     meet rather than from where their middles lie: a container carries its own middle
     above what stands on its floor, and a wall's bounding box reaches far past the wall.
+    Underneath is read along the world's own up, the direction a body is held up
+    against. How far apart the two are is read from the detector's answer rather than
+    left to the range it was asked for, since a detector may report the closest pair it
+    found whatever range it was given.
 
     :param supported_body: Object that is supported
     :param supporting_body: Object that potentially supports the first object
@@ -315,22 +316,12 @@ def is_supported_by(
     touch = collision_detector.check_collision_between_bodies(
         supported_body, supporting_body, distance=contact_tolerance
     )
-    # How far apart the two are is read from the answer rather than left to the range
-    # asked for: a detector may report the closest pair it found whatever range it was
-    # given, and which detector answers is not this predicate's to know.
     if touch is None or touch.distance >= contact_tolerance:
         return False
 
-    return (
-        ViewDependentSpatialRelation.signed_distance_along_axis(
-            supported_body.numeric_global_transform.to_np(),
-            ViewAxis.VERTICAL,
-            touch.root_P_point_on_body_b,
-            supported_body.numeric_center_of_mass.to_np(),
-            VIEW_DIRECTION_EPS,
-        )
-        < 0.0
-    )
+    root_P_touch = touch.root_P_point_on_body_b
+    root_P_center_of_mass = supported_body.numeric_center_of_mass.to_np()
+    return root_P_touch[2] < root_P_center_of_mass[2]
 
 
 @symbolic_function
@@ -431,33 +422,6 @@ class PointSpatialRelation(Symbol, ABC):
     """
 
 
-VIEW_DIRECTION_EPS = 1e-12
-"""
-Guards a point of view's direction against division by a degenerate axis.
-"""
-
-
-class ViewAxis(IntEnum):
-    """
-    Axis of a point of view that a spatial relation is measured along.
-    """
-
-    DEPTH = 0
-    """
-    Points ahead of the point of view; behind and in front of are measured along it.
-    """
-
-    LATERAL = 1
-    """
-    Points to the point of view's side; left of and right of are measured along it.
-    """
-
-    VERTICAL = 2
-    """
-    Points up from the point of view; above and below are measured along it.
-    """
-
-
 @dataclass
 class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
 
@@ -466,14 +430,14 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
     The reference spot from where to look at the bodies.
     """
 
-    eps: float = VIEW_DIRECTION_EPS
+    eps: float = 1e-12
     """
     A small value to avoid division by zero.
     """
 
     spatial_relation_result: bool = False
 
-    def _signed_distance_along_direction(self, index: ViewAxis) -> float:
+    def _signed_distance_along_direction(self, index: int) -> float:
         """
         Calculate the spatial relation between self.point and self.other with respect to
         a given reference point (self.point_of_semantic_annotation) and a specified axis
@@ -485,37 +449,19 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
         :return: The signed distance between the first and the second points along the
             given direction.
         """
-        return self.signed_distance_along_axis(
-            self.point_of_view.to_np(),
-            index,
-            self.point.to_np(),
-            self.other.to_np(),
-            self.eps,
+        ref_np = self.point_of_view.to_np()
+        front_world = ref_np[:3, index]
+        front_norm = front_world / (np.linalg.norm(front_world) + self.eps)
+        front_norm = Vector3(
+            x=front_norm[0],
+            y=front_norm[1],
+            z=front_norm[2],
+            reference_frame=self.point_of_view.reference_frame,
         )
 
-    @staticmethod
-    def signed_distance_along_axis(
-        reference_T_point_of_view: NpMatrix4x4,
-        axis: ViewAxis,
-        point: npt.NDArray[np.float64],
-        other: npt.NDArray[np.float64],
-        eps: float,
-    ) -> float:
-        """
-        How far ``point`` lies past ``other`` along one axis of a point of view.
-
-        Works entirely in numpy, so a caller holding numeric geometry never has to build
-        a symbolic expression to compare two positions.
-
-        :param reference_T_point_of_view: The spot the two points are looked at from.
-        :param axis: Which of the point of view's axes to measure along.
-        :param point: The point being placed, as a homogeneous coordinate.
-        :param other: The point it is placed relative to, as a homogeneous coordinate.
-        :param eps: Guards against dividing by a degenerate axis of length zero.
-        """
-        direction = reference_T_point_of_view[:3, axis]
-        direction = direction / (np.linalg.norm(direction) + eps)
-        return float(direction @ (point[:3] - other[:3]))
+        s_body = front_norm.dot(self.point.to_vector3())
+        s_other = front_norm.dot(self.other.to_vector3())
+        return (s_body - s_other).compile()()
 
 
 @dataclass
@@ -526,9 +472,7 @@ class LeftOf(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = (
-            self._signed_distance_along_direction(ViewAxis.LATERAL) > 0.0
-        )
+        self.spatial_relation_result = self._signed_distance_along_direction(1) > 0.0
         return self.spatial_relation_result
 
 
@@ -540,9 +484,7 @@ class RightOf(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = (
-            self._signed_distance_along_direction(ViewAxis.LATERAL) < 0.0
-        )
+        self.spatial_relation_result = self._signed_distance_along_direction(1) < 0.0
         return self.spatial_relation_result
 
 
@@ -554,9 +496,7 @@ class Above(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = (
-            self._signed_distance_along_direction(ViewAxis.VERTICAL) > 0.0
-        )
+        self.spatial_relation_result = self._signed_distance_along_direction(2) > 0.0
         return self.spatial_relation_result
 
 
@@ -568,9 +508,7 @@ class Below(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = (
-            self._signed_distance_along_direction(ViewAxis.VERTICAL) < 0.0
-        )
+        self.spatial_relation_result = self._signed_distance_along_direction(2) < 0.0
         return self.spatial_relation_result
 
 
@@ -582,9 +520,7 @@ class Behind(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = (
-            self._signed_distance_along_direction(ViewAxis.DEPTH) < 0.0
-        )
+        self.spatial_relation_result = self._signed_distance_along_direction(0) < 0.0
         return self.spatial_relation_result
 
 
@@ -596,7 +532,7 @@ class InFrontOf(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.result = self._signed_distance_along_direction(ViewAxis.DEPTH) > 0.0
+        self.result = self._signed_distance_along_direction(0) > 0.0
         return self.result
 
 
