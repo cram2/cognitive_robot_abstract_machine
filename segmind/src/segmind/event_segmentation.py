@@ -1,6 +1,6 @@
 """
-Segmenting what happens in a world into events while a run goes on: what is watched,
-what is to be detected, and what is shown of it meanwhile.
+SegMind itself: what it watches, what it is asked to detect, and what it shows of it
+while a run goes on.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class EventSegmentation:
+class Segmind:
     """
     SegMind segmenting a run into events while it goes on.
 
@@ -84,7 +84,7 @@ class EventSegmentation:
         show_live_events: bool = False,
     ) -> Self:
         """
-        A segmentation watching the bodies a run names.
+        SegMind watching the bodies a run names.
 
         :param world: The world the run takes place in.
         :param names: The names of the bodies to watch.

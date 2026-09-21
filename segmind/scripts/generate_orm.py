@@ -24,7 +24,7 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
 
 from segmind.event_feed import EventFeed, EventRow, Subscription
-from segmind.event_segmentation import EventSegmentation
+from segmind.event_segmentation import Segmind
 from segmind.exceptions import DashboardNeedsFlask, OptionalDependency
 
 ignored_classes = {
@@ -33,7 +33,7 @@ ignored_classes = {
     EventRow,
     Subscription,
     DashboardNeedsFlask,
-    EventSegmentation,
+    Segmind,
 }
 
 if importlib.util.find_spec(OptionalDependency.FLASK) is not None:

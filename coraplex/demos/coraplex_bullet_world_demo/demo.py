@@ -17,7 +17,7 @@ from segmind.detectors.coarse_event_detector_nodes import (
 )
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
 from segmind.detectors.spatial_relation_detector_nodes import ContainmentDetector
-from segmind.event_segmentation import EventSegmentation
+from segmind.event_segmentation import Segmind
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
@@ -135,12 +135,12 @@ plan = sequential(
     context=context,
 ).plan
 
-event_segmentation = EventSegmentation.watching_bodies_named(
+segmentation = Segmind.watching_bodies_named(
     world,
     ("milk.stl", "bowl.stl", "spoon.stl"),
     detectors=(PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector),
     show_live_events=True,
 )
 
-with simulated_robot, event_segmentation:
+with simulated_robot, segmentation:
     plan.perform()
