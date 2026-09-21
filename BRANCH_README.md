@@ -53,10 +53,12 @@ lets it run on a thread of its own beside a plan.
 | `78657a8f04` | The bullet world demo asks for grasping |
 | `a0ec761ae5` | **review:** a support is read along the world's own up; the view relations are left as they were |
 | `df6b38bb52` | **review:** the apartment's heights are explained in the pull request, not beside the numbers |
-| `b4bfbc317a` | **review:** `WatchedDemo` holds a demo's SegMind wiring; nothing is printed |
-| `ce52da3613` | **review:** a `WatchedDemo` is left out of the episode tables |
+| `b4bfbc317a` | **review:** `EventSegmentation` holds a run's SegMind wiring; nothing is printed |
+| `ce52da3613` | **review:** an `EventSegmentation` is left out of the episode tables |
 | `623517e32a` | **review:** the ground-truth report and the event records it reads move to `segmind-demo-event-report` |
 | `4aa87a2d68` | **review:** grasping is read among the agent's events, in `agent_event_detector_nodes.py` |
+| `75758c86b6` | **review:** the class is `EventSegmentation`, in `segmind/event_segmentation.py` |
+| `d265d8e6d9` | **review:** the inline comments this branch added are gone, into docstrings where they said something |
 
 ### The message of `423ed2cb4a` does not match its contents
 
@@ -74,7 +76,7 @@ force-pushing.
 .venv/bin/python coraplex/demos/coraplex_bullet_world_demo/demo.py
 ```
 
-- The `WatchedDemo` at the end of the demo says which bodies are watched and what
+- The `EventSegmentation` at the end of the demo says which bodies are watched and what
   SegMind is asked to detect. The kinds of detector that actually run are logged when it
   starts, and every event detected is put on the console when it ends.
 - `show_live_events=True` serves a live page at <http://127.0.0.1:5000> while the plan
