@@ -168,7 +168,8 @@ def test_a_body_only_one_side_of_a_hand_touches_is_not_grasped(pr2_world_copy):
     """
     A hand holds what is between its fingers. Brushing something with one of them, as a
     gripper does on its way past whatever stands near what it is reaching for, is not
-    taking hold of it.
+    taking hold of it. The contact detector is asked to read the robot too, so that the
+    touch against the hand can be seen at all.
     """
     gripper = _left_gripper(pr2_world_copy)
     thumb_x, thumb_y, thumb_z = gripper.thumb.tip.numeric_global_pose.position
@@ -180,13 +181,11 @@ def test_a_body_only_one_side_of_a_hand_touches_is_not_grasped(pr2_world_copy):
         pr2_world_copy,
         [
             GraspDetector(tracked_object=box),
-            # asked to read the robot too, so that the touch can be seen at all
             ContactDetector(tracked_object=box, exclude_robot=False),
         ],
     )
     executor.tick()
 
-    # it really is against the hand, and still not held by it
     assert any(
         body in gripper.thumb.bodies
         for body in _events_of(executor, ContactEvent, box, with_object=True)
@@ -307,7 +306,8 @@ def test_an_object_is_picked_up_when_an_agent_lifts_it_off_what_it_rested_on(
 def test_an_object_is_placed_where_the_agent_let_go_of_it(pr2_world_copy):
     """
     A placing is where the object was released, so a surface it has not been let go
-    onto is not somewhere it was put down.
+    onto is not somewhere it was put down. The box is moved out of the hand and onto
+    the surface beside it.
     """
     gripper = _left_gripper(pr2_world_copy)
     box = _box_in_the_hand_of(pr2_world_copy, gripper)
@@ -325,7 +325,6 @@ def test_an_object_is_placed_where_the_agent_let_go_of_it(pr2_world_copy):
     executor.tick()
     assert _events_of(executor, PlacingEvent, box) == []
 
-    # out of the hand and onto the surface beside it
     x, y, z = box.numeric_global_pose.position
     box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x + MOVED_ASIDE, y, z, reference_frame=pr2_world_copy.root
@@ -357,7 +356,8 @@ def test_a_held_object_does_not_come_to_rest_on_what_it_brushes(pr2_world_copy):
 def test_taking_hold_again_mid_carry_is_not_a_second_pick_up(pr2_world_copy):
     """
     One loss of what held an object up is one pick-up: a hand that loses its grip and
-    takes hold again while carrying has not picked the object up a second time.
+    takes hold again while carrying has not picked the object up a second time. The box
+    goes into the air and back into the hand, with nothing holding it up in between.
     """
     gripper = _left_gripper(pr2_world_copy)
     box = _box_at(pr2_world_copy, RESTING_PLACE)
@@ -379,7 +379,6 @@ def test_taking_hold_again_mid_carry_is_not_a_second_pick_up(pr2_world_copy):
     executor.tick()
     assert len(_events_of(executor, PickUpEvent, box)) == 1
 
-    # the grip is lost and taken again, with nothing holding the box up in between
     _move_to(box, IN_THE_AIR)
     executor.tick()
     _move_to(box, held)

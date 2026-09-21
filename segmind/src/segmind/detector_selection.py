@@ -1,5 +1,8 @@
 """
 Choosing the detectors a run uses from what it is asked to detect.
+
+Every kind of detector has to be defined before the kinds are searched, which is what
+the imports of the detector modules below are for.
 """
 
 from __future__ import annotations
@@ -9,7 +12,6 @@ from dataclasses import dataclass
 from krrood.utils import recursive_subclasses
 from typing_extensions import List, Self, Tuple, Type
 
-# every kind of detector has to be defined before the kinds are searched
 from segmind.detectors import (  # noqa: F401
     agent_event_detector_nodes,
     atomic_event_detectors_nodes,

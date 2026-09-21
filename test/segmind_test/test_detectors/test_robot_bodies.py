@@ -99,10 +99,14 @@ def test_an_object_resting_on_the_environment_is_supported_by_it(cylinder_bot_wo
 
 
 def test_an_object_on_a_gripper_is_not_supported_by_the_gripper(pr2_world_copy):
+    """
+    A gripper holds what it touches, which is what the detector has to disregard, so the
+    box is stood where the hand really reaches it: one the hand does not touch would be
+    disregarded for want of contact instead. With the robot left out there would be
+    nothing to disregard, so the run is the one that reads the robot too.
+    """
     palm = pr2_world_copy.get_body_by_name("l_gripper_palm_link")
     box = _box_resting_on(pr2_world_copy, palm, sunk_by=SUNK_INTO_A_GRIPPER)
-    # A gripper holds what it touches, which is what the detector has to disregard; a
-    # box the hand does not even reach would be disregarded for want of contact.
     assert contact(box, palm)
     gripper_bodies = {
         body
@@ -110,8 +114,6 @@ def test_an_object_on_a_gripper_is_not_supported_by_the_gripper(pr2_world_copy):
         for body in end_effector.bodies
     }
 
-    # With the robot left out there would be nothing to disregard, so this asks what a
-    # run reading the robot too makes of the hand.
     assert gripper_bodies.isdisjoint(
         _supporters_detected_for(pr2_world_copy, box, exclude_robot=False)
     )

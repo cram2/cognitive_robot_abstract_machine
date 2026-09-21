@@ -23,8 +23,6 @@ from krrood.ormatic.custom_types import NumpyType
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
 
-# How a run is watched and what it shows while it watches, neither of which is
-# something an episode stores.
 from segmind.event_feed import EventFeed, EventRow, Subscription
 from segmind.event_segmentation import EventSegmentation
 from segmind.exceptions import DashboardNeedsFlask, OptionalDependency
@@ -38,8 +36,6 @@ ignored_classes = {
     EventSegmentation,
 }
 
-# The dashboard needs flask; without it the package scan skips the dashboard's modules,
-# so there is nothing of it to leave out.
 if importlib.util.find_spec(OptionalDependency.FLASK) is not None:
     from segmind.dashboard.server import DashboardAddress, LiveEventDashboard
 

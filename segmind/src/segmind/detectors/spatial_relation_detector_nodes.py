@@ -44,6 +44,11 @@ class SupportDetector(AbstractDetector):
         """
         Detects newly established support relationships.
 
+        A held object is carried rather than resting, so what it brushes on the way does
+        not become something it rests on. What already holds it up is left alone, so
+        taking hold of something that still stands on a surface does not take that
+        surface away from it.
+
         :param context: The current motion statechart context.
         :param segmind_context: The shared SegmindContext containing the information required to track events.
         :param objects_to_check: Bodies that should be evaluated for new supports.
@@ -52,10 +57,6 @@ class SupportDetector(AbstractDetector):
 
         events = []
         latest_support = segmind_context.latest_support
-        # A held object is carried rather than resting, so what it brushes on the way
-        # does not become something it rests on. What already holds it up is left
-        # alone, so taking hold of something that still stands on a surface does not
-        # take that surface away from it.
         carried_by_nothing = [
             body
             for body in objects_to_check
