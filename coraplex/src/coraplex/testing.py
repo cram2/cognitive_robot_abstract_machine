@@ -132,9 +132,6 @@ def setup_world() -> World:
         apartment_world.merge_world(pr2_sem_world, c_root_bf)
         c_root_bf.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2.5, 0, reference_frame=apartment_root)
 
-    # The milk and the cereal stand on the island countertop, whose top face is at
-    # 0.9468; each height is that plus how far the mesh's lowest point sits below its
-    # own origin, so the object rests on the surface instead of hovering over it.
     apartment_world.get_body_by_name("milk.stl").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(
             2.37, 2, 1.0345, reference_frame=apartment_world.root
