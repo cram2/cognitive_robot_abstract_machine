@@ -45,6 +45,24 @@ box would hang in the air beside it rather than being held.
 """
 
 
+def _top_of(body: Body) -> float:
+    """
+    :return: How high the top of ``body``'s collision geometry stands in the world.
+    """
+    world = body._world
+    boxes = body.collision.as_bounding_box_collection_in_frame(world.root)
+    return max(box.max_z for box in boxes)
+
+
+def _bottom_of(body: Body) -> float:
+    """
+    :return: How low the bottom of ``body``'s collision geometry hangs in the world.
+    """
+    world = body._world
+    boxes = body.collision.as_bounding_box_collection_in_frame(world.root)
+    return min(box.min_z for box in boxes)
+
+
 def _box_resting_on(
     world: World, supporter: Body, sunk_by: float = SUNK_INTO_WHAT_IT_RESTS_ON
 ) -> Body:
@@ -62,8 +80,8 @@ def _box_resting_on(
         world.add_connection(
             Connection6DoF.create_with_dofs(world=world, parent=world.root, child=box)
         )
-    x, y, _ = supporter.numeric_global_pose.position
-    top = supporter.numeric_global_bounds.upper[2]
+    x, y, _ = supporter.global_pose.to_position().to_np()[:3]
+    top = _top_of(supporter)
     box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x,
         y,

@@ -21,8 +21,6 @@ from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 
-from .test_detection_without_casadi import milk_in_the_apartment  # noqa: F401
-
 LIFTS_APART = timedelta(minutes=5)
 """
 How far apart in time a test lifts the same object twice; farther than any interaction
@@ -41,7 +39,7 @@ def _logged(events: List[DetectionEvent]) -> SegmindContext:
 
 
 def _translation_of(body, at: datetime) -> TranslationEvent:
-    pose = body.numeric_global_pose
+    pose = body.global_pose
     return TranslationEvent(
         tracked_object=body, start_pose=pose, current_pose=pose, timestamp=at
     )

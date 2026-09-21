@@ -33,10 +33,7 @@ from segmind.statecharts.segmind_statechart import SegmindStatechart
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
-from .test_detection_without_casadi import (  # noqa: F401 (fixture)
-    RESTING_ON_THE_TABLE,
-    milk_in_the_apartment,
-)
+from ..conftest import RESTING_ON_THE_TABLE
 
 TICKS_WITHOUT_ANYTHING_MOVING = 4
 """
@@ -90,7 +87,7 @@ def test_a_contact_that_lasts_is_not_reported_lost_by_another_bodys_detector(
     milk_in_the_apartment,
 ):
     world, milk, box = milk_in_the_apartment
-    box_x, box_y, box_z = box.numeric_global_pose.position
+    box_x, box_y, box_z = box.global_pose.to_position().to_np()[:3]
     _place(milk, box_x, box_y, box_z)
 
     segmind_context = _ticked_while_nothing_moves(
@@ -119,7 +116,7 @@ def test_a_containment_that_lasts_is_not_reported_lost_by_another_bodys_detector
     milk_in_the_apartment,
 ):
     world, milk, box = milk_in_the_apartment
-    box_x, box_y, box_z = box.numeric_global_pose.position
+    box_x, box_y, box_z = box.global_pose.to_position().to_np()[:3]
     _place(milk, box_x, box_y, box_z)
 
     segmind_context = _ticked_while_nothing_moves(

@@ -1,4 +1,3 @@
-from collections import Counter
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List
@@ -8,6 +7,7 @@ import numpy as np
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.reasoning.predicates import (
+    RESTING_CONTACT_TOLERANCE,
     contact,
     visible,
     Above,
@@ -20,9 +20,7 @@ from semantic_digital_twin.reasoning.predicates import (
     occluding_bodies,
     is_supported_by,
     reachable,
-    RESTING_CONTACT_TOLERANCE,
     is_place_occupied,
-    InsideOf,
 )
 from semantic_digital_twin.reasoning.robot_predicates import (
     robot_in_collision,
@@ -55,8 +53,6 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
     KinematicStructureEntity,
 )
-
-from ...casadi_calls import CasadiCalls
 
 BALL_RADIUS = 0.5
 """
@@ -433,308 +429,6 @@ def test_supporting(two_block_world):
     assert not is_supported_by(center, top)
 
 
-# %% checks after the first call no CasADi
-
-
-def _stand_on(center: Body, top: Body, gap: float = 0.0) -> None:
-    """
-    Stand ``top`` on ``center``, leaving ``gap`` between the faces that meet.
-    """
-    with center._world.modify_world():
-        top.parent_connection.parent_T_connection_expression = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                reference_frame=center, z=1.0 + gap
-            )
-        )
-
-
-def _region_over_the_upper_half_of(body: Body) -> Region:
-    """
-    A region the size of ``body``, fixed half a body above it.
-    """
-    region = Region(name=PrefixedName("region"))
-    region.area = ShapeCollection(
-        [
-            Box(
-                scale=Scale(1.0, 1.0, 1.0),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    reference_frame=region
-                ),
-            )
-        ]
-    )
-    with body._world.modify_world():
-        body._world.add_connection(
-            FixedConnection(
-                parent=body,
-                child=region,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    z=0.5, reference_frame=body
-                ),
-            )
-        )
-    return region
-
-
-def test_checking_support_again_calls_no_casadi(two_block_world):
-    """
-    The first check reads each shape's origin out once; checks after it run on numbers
-    alone, so they can run on a thread that does not own the world.
-    """
-    center, top = two_block_world
-    _stand_on(center, top)
-    is_supported_by(top, center)
-
-    with CasadiCalls() as casadi_calls:
-        supported = is_supported_by(top, center)
-
-    assert supported
-    assert casadi_calls.calls_by_caller == Counter()
-
-
-def test_checking_a_body_in_a_region_again_calls_no_casadi(two_block_world):
-    center, _ = two_block_world
-    region = _region_over_the_upper_half_of(center)
-    is_body_in_region(center, region)
-
-    with CasadiCalls() as casadi_calls:
-        fraction = is_body_in_region(center, region)
-
-    assert fraction == 0.5
-    assert casadi_calls.calls_by_caller == Counter()
-
-
-# %% a body resting on a surface without sinking into it
-
-
-def test_a_body_resting_within_the_contact_tolerance_is_supported(two_block_world):
-    """
-    A body set down on a surface comes to rest a hair above it, so a support judged by
-    overlapping volume alone would never hold.
-    """
-    center, top = two_block_world
-    _stand_on(center, top, gap=RESTING_CONTACT_TOLERANCE / 2)
-
-    assert is_supported_by(top, center)
-
-
-def test_a_body_hovering_beyond_the_contact_tolerance_is_not_supported(two_block_world):
-    center, top = two_block_world
-    _stand_on(center, top, gap=RESTING_CONTACT_TOLERANCE * 2)
-
-    assert not is_supported_by(top, center)
-
-
-def test_a_body_inside_another_s_bounding_box_but_not_touching_it_is_not_supported():
-    """
-    A body rests on what it touches. A large or hollow shape, such as a wall, has a
-    bounding box enclosing a great deal of empty space, and a body standing in that
-    space is held up by nothing.
-    """
-    world = World()
-    ball = Body(name=PrefixedName("ball"))
-    ball.collision = ShapeCollection(
-        [
-            Sphere(
-                radius=BALL_RADIUS,
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    reference_frame=ball
-                ),
-            )
-        ],
-        reference_frame=ball,
-    )
-    beside_the_ball = Body(name=PrefixedName("beside_the_ball"))
-    beside_the_ball.collision = ShapeCollection(
-        [
-            Box(
-                scale=Scale(0.05, 0.05, 0.05),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    reference_frame=beside_the_ball
-                ),
-            )
-        ],
-        reference_frame=beside_the_ball,
-    )
-    corner = BALL_RADIUS * 0.9
-    with world.modify_world():
-        world.add_connection(
-            FixedConnection(
-                parent=ball,
-                child=beside_the_ball,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    corner, corner, corner, reference_frame=ball
-                ),
-            )
-        )
-
-    assert not is_supported_by(beside_the_ball, ball)
-
-
-def test_a_body_standing_in_a_container_is_supported_by_it():
-    """
-    A body put inside a container rests on its floor, though the container's walls rise
-    above the body and carry the container's own middle higher than the body's.
-    """
-    world = World()
-    container = Body(name=PrefixedName("container"))
-    container.collision = ShapeCollection(
-        [
-            Box(
-                scale=Scale(1.0, 1.0, CONTAINER_FLOOR_THICKNESS),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    reference_frame=container
-                ),
-            ),
-            *(
-                Box(
-                    scale=Scale(0.05, 1.0, CONTAINER_WALL_HEIGHT),
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        side * 0.5,
-                        0.0,
-                        CONTAINER_WALL_HEIGHT / 2,
-                        reference_frame=container,
-                    ),
-                )
-                for side in (-1, 1)
-            ),
-        ],
-        reference_frame=container,
-    )
-    content = Body(name=PrefixedName("content"))
-    content.collision = ShapeCollection(
-        [
-            Box(
-                scale=Scale(0.05, 0.05, 0.05),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    reference_frame=content
-                ),
-            )
-        ],
-        reference_frame=content,
-    )
-    with world.modify_world():
-        world.add_connection(
-            FixedConnection(
-                parent=container,
-                child=content,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    z=CONTAINER_FLOOR_THICKNESS / 2 + 0.025, reference_frame=container
-                ),
-            )
-        )
-
-    assert is_supported_by(content, container)
-
-
-def test_bodies_a_gap_apart_are_in_contact_within_a_threshold_that_spans_it(
-    two_block_world,
-):
-    """
-    The threshold says how close counts as touching, so a gap narrower than it is
-    contact.
-    """
-    center, top = two_block_world
-    _stand_on(center, top, gap=RESTING_CONTACT_TOLERANCE / 2)
-
-    assert contact(center, top, threshold=RESTING_CONTACT_TOLERANCE)
-
-
-# %% containment
-
-
-@pytest.fixture(scope="function")
-def container_and_content():
-    """
-    A box twice the size of the one placed inside it, which a test can move.
-
-    The inner box's corners sit well inside the outer box's faces, so a test moves it
-    without landing any corner exactly on a boundary.
-    """
-    container = Body(name=PrefixedName("container"))
-    container.collision = ShapeCollection(
-        [
-            Box(
-                scale=Scale(2.0, 2.0, 2.0),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    reference_frame=container
-                ),
-            )
-        ],
-        reference_frame=container,
-    )
-    content = Body(name=PrefixedName("content"))
-    content.collision = ShapeCollection(
-        [
-            Box(
-                scale=Scale(1.0, 1.0, 1.0),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    reference_frame=content
-                ),
-            )
-        ],
-        reference_frame=content,
-    )
-    world = World()
-    with world.modify_world():
-        world.add_connection(
-            FixedConnection(
-                parent=container,
-                child=content,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    reference_frame=container
-                ),
-            )
-        )
-    return container, content
-
-
-def _place_content(container: Body, content: Body, z: float) -> None:
-    """
-    Move the inner box to a height above the outer box's own frame.
-    """
-    with container._world.modify_world():
-        content.parent_connection.parent_T_connection_expression = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=container, z=z)
-        )
-
-
-def test_a_body_within_another_is_entirely_contained(container_and_content):
-    container, content = container_and_content
-
-    assert InsideOf(content, container)() == 1.0
-
-
-def test_a_body_beyond_another_is_not_contained_at_all(container_and_content):
-    container, content = container_and_content
-    _place_content(container, content, z=5.0)
-
-    assert InsideOf(content, container)() == 0.0
-
-
-def test_a_body_crossing_another_is_contained_in_proportion(container_and_content):
-    """
-    Half the inner box's corners are still inside the outer box once it is lifted far
-    enough that its top face clears the outer box's own.
-    """
-    container, content = container_and_content
-    _place_content(container, content, z=1.0)
-
-    assert InsideOf(content, container)() == 0.5
-
-
-def test_checking_containment_again_calls_no_casadi(container_and_content):
-    container, content = container_and_content
-    _place_content(container, content, z=1.0)
-    InsideOf(content, container)()
-
-    with CasadiCalls() as casadi_calls:
-        ratio = InsideOf(content, container)()
-
-    assert ratio == 0.5
-    assert casadi_calls.calls_by_caller == Counter()
-
-
 def test_is_body_in_gripper(pr2_world_copy):
     pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
 
@@ -1081,3 +775,161 @@ def test_nothing_occludes_a_body_in_clear_line_of_sight():
         world.add_semantic_annotation(camera)
 
     assert occluding_bodies(camera, target) == []
+
+
+# %% a body resting on a surface without sinking into it
+
+
+def _stand_on(center: Body, top: Body, gap: float = 0.0) -> None:
+    """
+    Stand ``top`` on ``center``, leaving ``gap`` between the faces that meet.
+    """
+    with center._world.modify_world():
+        top.parent_connection.parent_T_connection_expression = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                reference_frame=center, z=1.0 + gap
+            )
+        )
+
+
+def test_a_body_resting_within_the_contact_tolerance_is_supported(two_block_world):
+    """
+    A body set down on a surface comes to rest a hair above it, so a support judged by
+    overlapping volume alone would never hold.
+    """
+    center, top = two_block_world
+    _stand_on(center, top, gap=RESTING_CONTACT_TOLERANCE / 2)
+
+    assert is_supported_by(top, center)
+
+
+def test_a_body_hovering_beyond_the_contact_tolerance_is_not_supported(two_block_world):
+    center, top = two_block_world
+    _stand_on(center, top, gap=RESTING_CONTACT_TOLERANCE * 2)
+
+    assert not is_supported_by(top, center)
+
+
+def test_a_body_inside_another_s_bounding_box_but_not_touching_it_is_not_supported():
+    """
+    A body rests on what it touches. A large or hollow shape, such as a wall, has a
+    bounding box enclosing a great deal of empty space, and a body standing in that
+    space is held up by nothing.
+    """
+    world = World()
+    ball = Body(name=PrefixedName("ball"))
+    ball.collision = ShapeCollection(
+        [
+            Sphere(
+                radius=BALL_RADIUS,
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=ball
+                ),
+            )
+        ],
+        reference_frame=ball,
+    )
+    beside_the_ball = Body(name=PrefixedName("beside_the_ball"))
+    beside_the_ball.collision = ShapeCollection(
+        [
+            Box(
+                scale=Scale(0.05, 0.05, 0.05),
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=beside_the_ball
+                ),
+            )
+        ],
+        reference_frame=beside_the_ball,
+    )
+    corner = BALL_RADIUS * 0.9
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection(
+                parent=ball,
+                child=beside_the_ball,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    corner, corner, corner, reference_frame=ball
+                ),
+            )
+        )
+
+    assert not is_supported_by(beside_the_ball, ball)
+
+
+def test_a_body_standing_in_a_container_is_supported_by_it():
+    """
+    A body put inside a container rests on its floor, though the container's walls rise
+    above the body and carry the container's own middle higher than the body's.
+    """
+    world = World()
+    container = Body(name=PrefixedName("container"))
+    container.collision = ShapeCollection(
+        [
+            Box(
+                scale=Scale(1.0, 1.0, CONTAINER_FLOOR_THICKNESS),
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=container
+                ),
+            ),
+            *(
+                Box(
+                    scale=Scale(0.05, 1.0, CONTAINER_WALL_HEIGHT),
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        side * 0.5,
+                        0.0,
+                        CONTAINER_WALL_HEIGHT / 2,
+                        reference_frame=container,
+                    ),
+                )
+                for side in (-1, 1)
+            ),
+        ],
+        reference_frame=container,
+    )
+    content = Body(name=PrefixedName("content"))
+    content.collision = ShapeCollection(
+        [
+            Box(
+                scale=Scale(0.05, 0.05, 0.05),
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=content
+                ),
+            )
+        ],
+        reference_frame=content,
+    )
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection(
+                parent=container,
+                child=content,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    z=CONTAINER_FLOOR_THICKNESS / 2 + 0.025, reference_frame=container
+                ),
+            )
+        )
+
+    assert is_supported_by(content, container)
+
+
+def test_bodies_a_gap_apart_are_in_contact_within_a_threshold_that_spans_it(
+    two_block_world,
+):
+    """
+    The threshold says how close counts as touching, so a gap narrower than it is
+    contact.
+    """
+    center, top = two_block_world
+    _stand_on(center, top, gap=RESTING_CONTACT_TOLERANCE / 2)
+
+    assert contact(center, top, threshold=RESTING_CONTACT_TOLERANCE)
+
+
+def test_a_body_does_not_support_itself(two_block_world):
+    """
+    Asking whether a body rests on itself is asking a collision detector to check a body
+    against itself, which it refuses.
+    """
+    center, _ = two_block_world
+
+    assert not is_supported_by(center, center)

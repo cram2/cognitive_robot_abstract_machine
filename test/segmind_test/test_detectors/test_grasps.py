@@ -79,6 +79,14 @@ def _left_gripper(world: World) -> EndEffector:
     return gripper
 
 
+def _bottom_of(body: Body) -> float:
+    """
+    :return: How low the bottom of ``body``'s collision geometry hangs in the world.
+    """
+    boxes = body.collision.as_bounding_box_collection_in_frame(body._world.root)
+    return min(box.min_z for box in boxes)
+
+
 def _box_at(
     world: World, position: Tuple[float, float, float], size: float = BOX_SIZE
 ) -> Body:
@@ -115,7 +123,7 @@ def _box_in_the_hand_of(world: World, gripper: EndEffector) -> Body:
     That is where a held object sits: between the fingers, clear of the wrist and the
     rest of the arm.
     """
-    return _box_at(world, gripper.tool_frame.numeric_global_pose.position)
+    return _box_at(world, gripper.tool_frame.global_pose.to_position().to_np()[:3])
 
 
 def _executor_for(
@@ -172,8 +180,8 @@ def test_a_body_only_one_side_of_a_hand_touches_is_not_grasped(pr2_world_copy):
     touch against the hand can be seen at all.
     """
     gripper = _left_gripper(pr2_world_copy)
-    thumb_x, thumb_y, thumb_z = gripper.thumb.tip.numeric_global_pose.position
-    _, finger_y, _ = gripper.finger.tip.numeric_global_pose.position
+    thumb_x, thumb_y, thumb_z = gripper.thumb.tip.global_pose.to_position().to_np()[:3]
+    _, finger_y, _ = gripper.finger.tip.global_pose.to_position().to_np()[:3]
     past_the_thumb = thumb_y + BESIDE_THE_THUMB * (1 if thumb_y > finger_y else -1)
     box = _box_at(pr2_world_copy, (thumb_x, past_the_thumb, thumb_z))
 
@@ -248,9 +256,9 @@ def _surface_under(world: World, box: Body, aside: float = 0.0) -> Body:
             [Box(scale=Scale(TABLE_SIZE, TABLE_SIZE, TABLE_SIZE))]
         ),
     )
-    x, y, _ = box.numeric_global_pose.position
+    x, y, _ = box.global_pose.to_position().to_np()[:3]
     x += aside
-    bottom = box.numeric_global_bounds.lower[2]
+    bottom = _bottom_of(box)
     with world.modify_world():
         world.add_connection(
             FixedConnection(
@@ -268,7 +276,7 @@ def _raise_by(box: Body, height: float) -> None:
     """
     Move ``box`` straight up by ``height``.
     """
-    x, y, z = box.numeric_global_pose.position
+    x, y, z = box.global_pose.to_position().to_np()[:3]
     box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x, y, z + height, reference_frame=box.parent_connection.parent
     )
@@ -297,7 +305,7 @@ def test_an_object_is_picked_up_when_an_agent_lifts_it_off_what_it_rested_on(
     executor.tick()
     assert _events_of(executor, PickUpEvent, box) == []
 
-    _move_to(box, gripper.tool_frame.numeric_global_pose.position)
+    _move_to(box, gripper.tool_frame.global_pose.to_position().to_np()[:3])
     executor.tick()
 
     assert len(_events_of(executor, PickUpEvent, box)) == 1
@@ -325,7 +333,7 @@ def test_an_object_is_placed_where_the_agent_let_go_of_it(pr2_world_copy):
     executor.tick()
     assert _events_of(executor, PlacingEvent, box) == []
 
-    x, y, z = box.numeric_global_pose.position
+    x, y, z = box.global_pose.to_position().to_np()[:3]
     box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x + MOVED_ASIDE, y, z, reference_frame=pr2_world_copy.root
     )
@@ -372,7 +380,7 @@ def test_taking_hold_again_mid_carry_is_not_a_second_pick_up(pr2_world_copy):
             PickUpDetector(),
         ],
     )
-    held = gripper.tool_frame.numeric_global_pose.position
+    held = gripper.tool_frame.global_pose.to_position().to_np()[:3]
 
     executor.tick()
     _move_to(box, held)

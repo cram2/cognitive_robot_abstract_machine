@@ -73,20 +73,9 @@ class EpisodeSegmenterExecutor(Executor):
         Compiles the provided statechart and initializes the episode segmenter for execution.
         """
         super().compile(motion_statechart)
-        self.read_geometry_out()
         self.detect_holes()
         if self.player:
             self.player.start()
-
-    def read_geometry_out(self):
-        """
-        Reads every collidable body's shapes into numbers, so that no tick of the
-        detectors reads a symbolic value to reach them.
-        """
-        for body in self.context.world.bodies_with_collision:
-            for shape in body.collision:
-                shape.numeric_origin
-            body.collision.combined_mesh
 
     def detect_holes(self):
         """

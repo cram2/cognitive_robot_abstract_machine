@@ -32,7 +32,6 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
 )
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import Vector3, Point3, math
-from semantic_digital_twin.spatial_types.numeric import NumericTransform
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
@@ -254,8 +253,8 @@ How far above a surface a body may stand and still rest on it.
 
 A body is set down by a motion that stops where it can rather than exactly on the
 surface, so a support read from overlapping volume alone would hold for almost no
-placement at all. Measured on a robot stacking boxes, a placement missed the surface
-it was aimed at by 1.9 mm; this leaves room for that while staying far below the
+placement at all. Measured on a robot stacking boxes, a placement missed the surface it
+was aimed at by 1.9 mm; this leaves room for that while staying far below the
 centimetres by which a body that is genuinely in the air clears a surface.
 """
 
@@ -273,10 +272,6 @@ def is_supported_by(
     An object rests on what touches it from underneath, which is read off where the two
     meet rather than from where their middles lie: a container carries its own middle
     above what stands on its floor, and a wall's bounding box reaches far past the wall.
-    Underneath is read along the world's own up, the direction a body is held up
-    against. How far apart the two are is read from the detector's answer rather than
-    left to the range it was asked for, since a detector may report the closest pair it
-    found whatever range it was given.
 
     :param supported_body: Object that is supported
     :param supporting_body: Object that potentially supports the first object
@@ -288,28 +283,7 @@ def is_supported_by(
         stand and still rest on it.
     :return: True if the second object is supported by the first object, False otherwise
     """
-    supported_body_origin = NumericTransform.identity(supported_body)
-    boxes_of_supported_body = (
-        supported_body.collision.as_bounding_box_collection_at_origin(
-            supported_body_origin
-        ).extend_downwards(contact_tolerance)
-    )
-    boxes_of_supporting_body = (
-        supporting_body.collision.as_bounding_box_collection_at_origin(
-            supported_body_origin
-        )
-    )
-
-    intersection = (
-        boxes_of_supported_body.event & boxes_of_supporting_body.event
-    ).bounding_box()
-
-    if intersection.is_empty():
-        return False
-
-    z_intersection: Interval = intersection[SpatialVariables.z.value]
-    size = sum([si.upper - si.lower for si in z_intersection.simple_sets])
-    if size >= max_intersection_height:
+    if supported_body is supporting_body:
         return False
 
     collision_detector = supported_body._world.collision_manager.collision_detector
@@ -320,8 +294,39 @@ def is_supported_by(
         return False
 
     root_P_touch = touch.root_P_point_on_body_b
-    root_P_center_of_mass = supported_body.numeric_center_of_mass.to_np()
-    return root_P_touch[2] < root_P_center_of_mass[2]
+    if not Below(
+        Point3(
+            x=root_P_touch[0],
+            y=root_P_touch[1],
+            z=root_P_touch[2],
+            reference_frame=supported_body._world.root,
+        ),
+        supported_body.center_of_mass,
+        supported_body.global_transform,
+    )():
+        return False
+
+    bounding_box_supported_body = (
+        supported_body.collision.as_bounding_box_collection_at_origin(
+            HomogeneousTransformationMatrix(reference_frame=supported_body)
+        ).event
+    )
+    bounding_box_supporting_body = (
+        supporting_body.collision.as_bounding_box_collection_at_origin(
+            HomogeneousTransformationMatrix(reference_frame=supported_body)
+        ).event
+    )
+
+    intersection = (
+        bounding_box_supported_body & bounding_box_supporting_body
+    ).bounding_box()
+
+    if intersection.is_empty():
+        return True
+
+    z_intersection: Interval = intersection[SpatialVariables.z.value]
+    size = sum([si.upper - si.lower for si in z_intersection.simple_sets])
+    return size < max_intersection_height
 
 
 @symbolic_function
@@ -369,11 +374,9 @@ def is_body_in_region(body: Body, region: Region) -> float:
     region_mesh_local = region.area.combined_mesh
 
     # Transform copies of the meshes into the world frame
-    body_mesh = body_mesh_local.copy().apply_transform(
-        body.numeric_global_transform.to_np()
-    )
+    body_mesh = body_mesh_local.copy().apply_transform(body.global_transform.to_np())
     region_mesh = region_mesh_local.copy().apply_transform(
-        region.numeric_global_transform.to_np()
+        region.global_transform.to_np()
     )
     intersection = trimesh.boolean.intersection([body_mesh, region_mesh])
 
@@ -554,21 +557,40 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
     def compute_containment_ratio(self) -> float:
         """
         Compute the containment ratio of self.body inside self.other.
-
-        Both bodies' geometry is carried into the world frame as plain coordinates, so
-        neither the meshes themselves nor a box enclosing them is ever built.
         """
-        body_mesh = self.body.combined_mesh
-        if body_mesh is None or body_mesh.is_empty:
+        if self.other.combined_mesh is None:
             return 0.0
 
-        world_P_body = self.body.numeric_global_transform.transform_points(
-            body_mesh.vertices
-        )
-        inside = self.other.numeric_global_bounds.contains(world_P_body)
+        # Get meshes in their local (body) frames
+        mesh_a_local = self.body.combined_mesh
+        mesh_b_local = self.other.combined_mesh
+
+        # Check if either mesh is empty
+        if (
+            mesh_a_local is None
+            or mesh_a_local.is_empty
+            or mesh_b_local is None
+            or mesh_b_local.is_empty
+        ):
+            return 0.0
+
+        # Transform meshes from body frame to world frame
+        mesh_a = mesh_a_local.copy()
+        mesh_a.apply_transform(self.body.global_transform.to_np())
+
+        mesh_b = mesh_b_local.copy()
+        mesh_b.apply_transform(self.other.global_transform.to_np())
+
+        # Use bounding box of mesh_b to check if mesh_a is inside mesh_b
+        mesh_b_bbox = mesh_b.bounding_box
+
+        if not mesh_b_bbox.is_watertight:
+            return 0.0
+
+        inside = mesh_b_bbox.contains(mesh_a.vertices)
         if len(inside) == 0:
             return 0.0
-        return float(inside.sum()) / len(inside)
+        return sum(inside) / len(inside)
 
 
 @dataclass

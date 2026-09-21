@@ -38,7 +38,6 @@ from semantic_digital_twin.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.spatial_types.numeric import NumericPose
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
     )
@@ -2258,24 +2257,6 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         p = Point3(x=pos_x, y=pos_y, z=pos_z)
         r = Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z)
         return cls(p, r, reference_frame=reference_frame)
-
-    @classmethod
-    def from_numeric_pose(
-        cls,
-        numeric_pose: NumericPose,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-    ) -> Self:
-        """
-        Build a pose from one that was read out into numbers.
-
-        :param numeric_pose: The numbers to build the pose from.
-        :param reference_frame: The frame the pose is expressed in.
-        """
-        return cls.from_xyz_quaternion(
-            *numeric_pose.position,
-            *numeric_pose.quaternion,
-            reference_frame=reference_frame,
-        )
 
     @classmethod
     def from_xyz_axis_angle(

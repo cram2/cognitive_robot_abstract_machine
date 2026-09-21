@@ -49,11 +49,6 @@ from semantic_digital_twin.exceptions import (
     ReferenceFrameMismatchError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties, UniqueSimulatorProperty
-from semantic_digital_twin.spatial_types.numeric import (
-    NumericPoint3,
-    NumericPose,
-    NumericTransform,
-)
 from semantic_digital_twin.world_description.connection_properties import ServoGains
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -61,7 +56,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
 )
 from semantic_digital_twin.utils import camel_case_split
-from semantic_digital_twin.world_description.geometry import Bounds, Mesh
+from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import (
     ShapeCollection,
@@ -432,60 +427,6 @@ class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
         return self._world.compute_forward_kinematics(self._world.root, self)
 
     @property
-    def numeric_global_transform(self) -> NumericTransform:
-        """
-        Computes the transform of the KinematicStructureEntity in the world frame, as
-        plain numbers.
-
-        Unlike :attr:`global_transform`, this builds no symbolic expression, so it is
-        safe to read from a thread other than the one that owns the world.
-
-        :return: NumericTransform representing the global transform.
-        """
-        return NumericTransform(
-            matrix=self._world.compute_forward_kinematics_np(self._world.root, self),
-            reference_frame=self._world.root,
-        )
-
-    @property
-    def numeric_global_bounds(self) -> Bounds[np.ndarray]:
-        """
-        Computes the axis-aligned region enclosing this entity's geometry in the world
-        frame, as plain numbers.
-
-        :return: The region's lower and upper corner, or an empty region if the entity
-            has no geometry.
-        """
-        mesh = self.combined_mesh
-        if mesh is None or mesh.is_empty:
-            return Bounds.empty()
-        return Bounds.from_points(
-            self.numeric_global_transform.transform_points(mesh.vertices)
-        )
-
-    @property
-    def numeric_center_of_mass(self) -> NumericPoint3:
-        """
-        Computes the center of mass of this KinematicStructureEntity in the world frame,
-        as plain numbers.
-
-        Unlike :attr:`center_of_mass`, this builds no symbolic expression. A mesh that
-        encloses no volume has no mass to center, so it is centered in the middle of its
-        bounds.
-
-        :return: NumericPoint3 holding the center of mass.
-        """
-        mesh = self.combined_mesh
-        center_of_mass = mesh.center_mass
-        if not np.all(np.isfinite(center_of_mass)):
-            center_of_mass = mesh.bounds.mean(axis=0)
-        body_P_center = np.append(center_of_mass, 1.0)
-        return NumericPoint3.from_coordinates(
-            self.numeric_global_transform.to_np() @ body_P_center,
-            reference_frame=self._world.root,
-        )
-
-    @property
     def global_pose(self) -> Pose:
         """
         Computes the Pose of the KinematicStructureEntity in the world frame.
@@ -493,18 +434,6 @@ class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
         :return: Pose representing the global pose.
         """
         return self._world.compute_forward_kinematics(self._world.root, self).to_pose()
-
-    @property
-    def numeric_global_pose(self) -> NumericPose:
-        """
-        The pose of the KinematicStructureEntity in the world frame, as plain numbers.
-
-        Unlike :attr:`global_pose`, this builds no symbolic expression, so it is safe to
-        read from a thread other than the one that owns the world.
-        """
-        return NumericPose.from_transformation_matrix(
-            self._world.compute_forward_kinematics_np(self._world.root, self)
-        )
 
     @property
     def parent_connection(self) -> Connection:
@@ -904,7 +833,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         return [x for x in self.bodies if x.has_collision()]
 
     def as_bounding_box_collection_at_origin(
-        self, origin: NumericTransform
+        self, origin: HomogeneousTransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all bodies
@@ -930,7 +859,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            NumericTransform.identity(reference_frame)
+            HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
     def _referenced_semantic_annotations(

@@ -14,10 +14,7 @@ from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.event_segmentation import Segmind
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
-from .test_detectors.test_detection_without_casadi import (  # noqa: F401 (fixture)
-    RESTING_ON_THE_TABLE,
-    milk_in_the_apartment,
-)
+from .conftest import RESTING_ON_THE_TABLE
 
 TICK_TIMEOUT = 10.0
 """

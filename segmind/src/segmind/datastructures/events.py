@@ -12,7 +12,7 @@ from segmind.datastructures.object_tracker import (
     ObjectTrackerFactory,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
-from semantic_digital_twin.spatial_types.numeric import NumericPose
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -130,12 +130,12 @@ class MotionEvent(EventWithTrackedObjects, ABC):
     vice versa.
     """
 
-    start_pose: NumericPose = field(kw_only=True)
+    start_pose: Pose = field(kw_only=True)
     """
     The pose of the object at the start of the event, in the world frame.
     """
 
-    current_pose: NumericPose = field(kw_only=True)
+    current_pose: Pose = field(kw_only=True)
     """
     The pose of the object at the end of the event, in the world frame.
     """
@@ -198,7 +198,7 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     Bounding box of the object.
     """
 
-    pose: NumericPose = field(init=False)
+    pose: Pose = field(init=False)
     """
     Pose of the object, in the world frame.
     """
@@ -210,7 +210,7 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     Bounding box of the second object in contact.
     """
 
-    with_object_pose: Optional[NumericPose] = field(init=False, default=None)
+    with_object_pose: Optional[Pose] = field(init=False, default=None)
     """
     Pose of the second object in contact, in the world frame.
     """
@@ -218,16 +218,16 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     def __post_init__(self):
         self.bounding_box = VolumetricBoundingBox.from_mesh(
             self.tracked_object.collision.combined_mesh,
-            origin=self.tracked_object.numeric_global_transform,
+            origin=self.tracked_object.global_pose.to_homogeneous_matrix(),
         )
-        self.pose = self.tracked_object.numeric_global_pose
+        self.pose = self.tracked_object.global_pose
 
         if self.with_object is not None:
             self.with_object_bounding_box = VolumetricBoundingBox.from_mesh(
                 self.with_object.collision.combined_mesh,
-                origin=self.with_object.numeric_global_transform,
+                origin=self.with_object.global_pose.to_homogeneous_matrix(),
             )
-            self.with_object_pose = self.with_object.numeric_global_pose
+            self.with_object_pose = self.with_object.global_pose
 
 
 @dataclass(init=False, unsafe_hash=True)

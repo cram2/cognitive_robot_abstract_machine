@@ -18,7 +18,7 @@ from segmind.datastructures.events import (
 )
 from segmind.detectors.base import SegmindContext, AbstractDetector
 from semantic_digital_twin.reasoning.predicates import contact
-from semantic_digital_twin.spatial_types.numeric import NumericPose
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -131,7 +131,7 @@ class MotionDetector(AbstractDetector):
     Threshold for the rotation error between two poses to be considered rotation.
     """
 
-    _pose_history: Dict[Body, List[NumericPose]] = field(
+    _pose_history: Dict[Body, List[Pose]] = field(
         default_factory=dict, init=False, repr=False
     )
     """
@@ -160,7 +160,7 @@ class MotionDetector(AbstractDetector):
         events = []
         for obj in tracked_objs:
             poses = self._pose_history.setdefault(obj, [])
-            poses.append(obj.numeric_global_pose)
+            poses.append(obj.global_pose)
             if len(poses) < self.window_size:
                 continue
 
@@ -173,7 +173,7 @@ class MotionDetector(AbstractDetector):
 
     @abstractmethod
     def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[NumericPose]
+        self, context: SegmindContext, obj: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
         Subclass-specific logic to trigger a Motion or StopMotion event.
@@ -189,7 +189,7 @@ class MotionDetector(AbstractDetector):
         """
         pass
 
-    def _is_moving(self, poses: List[NumericPose]) -> bool:
+    def _is_moving(self, poses: List[Pose]) -> bool:
         """
         Determines whether an object is moving by evaluating the distance between the
         first and the last recorded position of the window.
@@ -197,9 +197,12 @@ class MotionDetector(AbstractDetector):
         :param poses: The pose window of the body, oldest first.
         :return: True if the object is moving, False otherwise.
         """
-        return poses[0].euclidean_distance(poses[-1]) > self.distance_threshold
+        return (
+            poses[0].to_position().euclidean_distance(poses[-1].to_position())
+            > self.distance_threshold
+        )
 
-    def _is_rotating(self, poses: List[NumericPose]) -> bool:
+    def _is_rotating(self, poses: List[Pose]) -> bool:
         """
         Determines whether an object is rotating by evaluating the rotation error
         between the first and the last recorded pose of the window.
@@ -207,7 +210,14 @@ class MotionDetector(AbstractDetector):
         :param poses: The pose window of the body, oldest first.
         :return: True if the object is rotating, False otherwise.
         """
-        return poses[0].rotational_distance(poses[-1]) > self.rotation_threshold
+        return (
+            float(
+                poses[0]
+                .to_rotation_matrix()
+                .rotational_distance(poses[-1].to_rotation_matrix())
+            )
+            > self.rotation_threshold
+        )
 
 
 @dataclass(eq=False, repr=False)
@@ -219,7 +229,7 @@ class TranslationDetector(MotionDetector):
     """
 
     def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[NumericPose]
+        self, context: SegmindContext, obj: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
         Triggers a TranslationEvent when an object starts moving.
@@ -260,7 +270,7 @@ class StopTranslationDetector(MotionDetector):
     counterpart = TranslationDetector
 
     def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[NumericPose]
+        self, context: SegmindContext, obj: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
         Triggers a StopTranslationEvent when an object that was moving comes to a stop.
@@ -301,7 +311,7 @@ class RotationDetector(MotionDetector):
     """
 
     def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[NumericPose]
+        self, context: SegmindContext, obj: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
         Triggers a RotationEvent when an object starts rotating.
@@ -342,7 +352,7 @@ class StopRotationDetector(MotionDetector):
     counterpart = RotationDetector
 
     def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[NumericPose]
+        self, context: SegmindContext, obj: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
         Triggers a StopRotationEvent when an object that was rotating comes to a stop.
