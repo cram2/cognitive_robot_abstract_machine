@@ -9,6 +9,7 @@ import shutil
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields, Field
+from enum import StrEnum, auto
 from functools import cached_property
 from pathlib import Path
 
@@ -303,6 +304,30 @@ class Texture:
         self.repeat = tuple(float(value) for value in self.repeat)
 
 
+class SurfaceFinish(StrEnum):
+    """
+    How a surface reflects the light that falls on it.
+    """
+
+    MATTE = auto()
+    """
+    Scatters light evenly in every direction, so the surface shows its own color and
+    keeps a sharp boundary against whatever rests on it.
+    """
+
+    GLOSSY = auto()
+    """
+    Scatters light unevenly, so the surface shows its own color under a highlight that
+    moves with the viewpoint.
+    """
+
+    MIRROR = auto()
+    """
+    Reflects light directionally, so the surface shows what stands on and above it
+    rather than its own color.
+    """
+
+
 @dataclass
 class Scale:
     """
@@ -424,6 +449,15 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     Only meaningful for primitive shapes (:class:`Box`, :class:`Cylinder`,
     :class:`Sphere`); :class:`Mesh` shapes carry their own texture as part of their
     trimesh visual instead.
+    """
+
+    finish: Optional[SurfaceFinish] = None
+    """
+    How this shape's surface takes light, or ``None`` where nobody has stated it.
+
+    ..note:: ``None`` is deliberately distinct from :attr:`SurfaceFinish.MATTE`, so a
+        reader deciding how to look at the surface can tell a surface nobody described
+        from one described as matte.
     """
 
     @property
@@ -668,7 +702,11 @@ class Mesh(Shape):
         if vertex_colors is not None:
             file_type = "obj"
         return cls.from_trimesh(
-            mesh=mesh, origin=origin, scale=scale, file_type=file_type
+            mesh=mesh,
+            origin=origin,
+            scale=scale,
+            file_type=file_type,
+            finish=from_json(data.get("finish"), **kwargs),
         )
 
     @classmethod
@@ -831,6 +869,7 @@ class Mesh(Shape):
         texture_file_path: Optional[str] = None,
         directory: Optional[Path] = None,
         file_type: str = "obj",
+        finish: Optional[SurfaceFinish] = None,
     ) -> "Mesh":
         """
         Create a Mesh by exporting a trimesh to a file.
@@ -849,6 +888,7 @@ class Mesh(Shape):
         :param directory: Where to place the mesh's own directory inside of /tmp, defaulting to a root
             that is removed when this process exits.
         :param file_type: Format to export the mesh in.
+        :param finish: How the exported mesh's surface takes light.
         :return: Mesh reading from the exported file.
         """
         file_type = file_type.lower()
@@ -878,6 +918,7 @@ class Mesh(Shape):
             origin=origin,
             scale=scale,
             filename=str(mesh_file_path),
+            finish=finish,
         )
 
     @classmethod

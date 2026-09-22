@@ -286,7 +286,12 @@ class ManifestKey(KeySpecification, Enum):
     The manifest's top-level list of items.
     """
 
-    def render(self, value: str, opening_the_item: bool = False) -> str:
+    def render(
+        self,
+        value: str,
+        opening_the_item: bool = False,
+        field_indent: str = ITEM_FIELD_INDENT,
+    ) -> str:
         """
         The manifest line setting this key to *value*, newline included.
 
@@ -295,9 +300,13 @@ class ManifestKey(KeySpecification, Enum):
         :param value: The value to write.
         :param opening_the_item: Whether this is the item block's first line, which
             carries the list marker instead of the key indent.
+        :param field_indent: The whitespace this item's own fields are indented by,
+            read from the block being edited rather than assumed, since a manifest
+            written before this module's own convention keeps whichever indentation
+            it already has.
         :return: The rendered line.
         """
-        prefix = ITEM_MARKER if opening_the_item else ITEM_FIELD_INDENT
+        prefix = ITEM_MARKER if opening_the_item else field_indent
         written = f'"{value}"' if self.style is ValueStyle.DOUBLE_QUOTED else value
         return f"{prefix}{self.key}: {written}\n"
 
@@ -910,6 +919,28 @@ def locate_item_block(
     )
 
 
+def existing_field_indent(manifest_lines: list[str], start: int, end: int) -> str:
+    """
+    The whitespace this item's own fields are indented by, in the manifest they live in.
+
+    Read from the block itself rather than assumed: a manifest written before
+    ``/plan-create``'s own convention keeps whichever indentation it already has, and a
+    fixed indent would silently nest a patched field under whichever key happens to
+    precede it instead of beside it.
+
+    :param manifest_lines: The manifest, split into lines.
+    :param start: The block's first line (the ``- id:`` line).
+    :param end: One past the block's last line.
+    :return: The leading whitespace of the block's second populated line, or this
+        module's own default when the block holds only its opening line.
+    """
+    for index in range(start + 1, end):
+        if manifest_lines[index].strip():
+            stripped = manifest_lines[index].lstrip(" ")
+            return manifest_lines[index][: len(manifest_lines[index]) - len(stripped)]
+    return ITEM_FIELD_INDENT
+
+
 def apply_item_fields(
     manifest_text: str,
     plan_identifier: str,
@@ -933,8 +964,9 @@ def apply_item_fields(
     """
     lines = manifest_text.split("\n")
     start, end = locate_item_block(lines, plan_identifier, item_identifier)
+    field_indent = existing_field_indent(lines, start, end)
     for manifest_key, value in values_by_key.items():
-        rendered = manifest_key.render(value).rstrip("\n")
+        rendered = manifest_key.render(value, field_indent=field_indent).rstrip("\n")
         existing = next(
             (
                 index

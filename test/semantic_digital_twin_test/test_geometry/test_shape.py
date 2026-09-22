@@ -19,6 +19,7 @@ from semantic_digital_twin.world_description.geometry import (
     Mesh,
     Scale,
     Sphere,
+    SurfaceFinish,
     Texture,
 )
 from semantic_digital_twin.world_description.mesh_file_storage import MeshFileStorage
@@ -318,6 +319,57 @@ def test_textured_primitive_survives_serialization():
 
     assert restored.texture == box.texture
     assert restored == box
+
+
+# %% how a surface takes light
+
+
+SHAPE_CONSTRUCTORS = [
+    pytest.param(Box, id="box"),
+    pytest.param(Sphere, id="sphere"),
+    pytest.param(Cylinder, id="cylinder"),
+    pytest.param(Mesh.box, id="mesh"),
+]
+"""
+A no-argument callable per concrete shape class, since each reconstructs itself from
+JSON in its own way and the finish has to survive all of them.
+"""
+
+
+@pytest.mark.parametrize("build_shape", SHAPE_CONSTRUCTORS)
+def test_a_shape_states_no_finish_until_one_is_declared(build_shape):
+    """
+    An unannotated shape reports that its finish is unknown rather than defaulting to
+    one, so a reader can tell a surface nobody described from a surface described as
+    matte.
+    """
+    assert build_shape().finish is None
+
+
+@pytest.mark.parametrize("build_shape", SHAPE_CONSTRUCTORS)
+@pytest.mark.parametrize("finish", list(SurfaceFinish))
+def test_a_declared_finish_survives_serialization(build_shape, finish):
+    """
+    A shape's finish round-trips through serialization, so a receiver reads the same
+    light behaviour the sender declared.
+    """
+    shape = build_shape()
+    shape.finish = finish
+
+    restored = from_json(to_json(shape))
+
+    assert restored.finish is finish
+
+
+@pytest.mark.parametrize("build_shape", SHAPE_CONSTRUCTORS)
+def test_an_undeclared_finish_survives_serialization_as_undeclared(build_shape):
+    """
+    A shape whose finish was never declared keeps saying so after a round-trip, instead
+    of arriving with one the sender never stated.
+    """
+    restored = from_json(to_json(build_shape()))
+
+    assert restored.finish is None
 
 
 # %% the volume a shape encloses

@@ -4,6 +4,7 @@ import pytest
 from krrood.entity_query_language.factories import (
     a,
     and_,
+    entity,
     for_all,
     not_,
     or_,
@@ -223,6 +224,20 @@ def test_negated_conjunction_is_disjunction_of_negations():
             )
         ),
     )
+
+
+# %% conditions rooted at the query rather than at the variable
+
+
+def test_query_rooted_condition_translates_like_the_variable_rooted_one():
+    """
+    A chain taken from the query names the same field as one taken from the variable it
+    selects, so the translator builds the same random-events variable from either.
+    """
+    position = variable(KRROODPosition, domain=[])
+    query = entity(variable(KRROODPosition, domain=[]))
+
+    assert_equal_events(translate(query.x > 0.0), translate(position.x > 0.0))
 
 
 # %% conditions without a random event representation

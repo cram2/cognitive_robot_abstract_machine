@@ -172,9 +172,29 @@ class FeatureExtractor:
                 continue
 
             symbolic_attribute = getattr(symbolic_root, column.name)
-            symbolic_attribute._type_ = get_python_type_from_sqlalchemy_column(column)
+            symbolic_attribute._type_ = FeatureExtractor._type_of_column_value(
+                column, value
+            )
             result.append(symbolic_attribute)
         return result
+
+    @staticmethod
+    def _type_of_column_value(column: sqlalchemy.Column, value: Any) -> type:
+        """
+        The python type of what a column holds.
+
+        A column storing enum members of any enum says only :class:`enum.Enum`, which
+        has no members of its own to build a domain from, so the value standing in it
+        says which enum it is.
+
+        :param column: The column the value was read from.
+        :param value: The value read from it.
+        :return: The type a variable over this column ranges over.
+        """
+        column_type = get_python_type_from_sqlalchemy_column(column)
+        if column_type is enum.Enum:
+            return type(value)
+        return column_type
 
     @staticmethod
     def _process_many_to_one(

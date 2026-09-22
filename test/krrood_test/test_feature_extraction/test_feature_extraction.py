@@ -11,9 +11,11 @@ from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
+from random_events.set import Set
 from random_events.variable import Symbolic
 from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
+    ApproachSceneObject,
     NestedAction,
     KRROODPose,
     KRROODPosition,
@@ -26,6 +28,26 @@ from ..dataset.example_classes import (
     ExampleString,
 )
 from ..dataset.semantic_world_like_classes import Body
+
+
+def test_an_entity_carrying_an_enum_keeps_that_enums_members_as_its_domain():
+    """
+    A polymorphic enum column says only that some enum is stored in it, so the concrete
+    enum has to come from the value standing there; without it the variable describing
+    the entity's kind has no members to be conditioned on.
+    """
+    action = a(ApproachSceneObject)(
+        target=SceneObject(type=SceneObjectType.TABLE), speed=...
+    )
+
+    parameters = UnderspecifiedParameters(action)
+
+    [kind] = [
+        variable
+        for name, variable in parameters.variables.items()
+        if name.endswith(".type")
+    ]
+    assert kind.domain == Set.from_iterable(SceneObjectType)
 
 
 @pytest.fixture

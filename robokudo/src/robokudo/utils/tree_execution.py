@@ -35,9 +35,22 @@ from robokudo.identifier import BBIdentifier
 if TYPE_CHECKING:
     from py_trees.behaviour import Behaviour
     from py_trees_ros.trees import BehaviourTree
+    from robokudo.annotators.query import QueryActionServer
     from robokudo.cas import CAS
 
 _T = TypeVar("_T")
+
+
+def _query_is_active() -> bool:
+    """
+    Check whether the current behavior tree is handling a query.
+    """
+    blackboard = Blackboard()
+    if not blackboard.exists(BBIdentifier.QUERY_SERVER):
+        return False
+
+    query_server: QueryActionServer = blackboard.get(BBIdentifier.QUERY_SERVER)
+    return query_server.is_active()
 
 
 def _tick_tree_until(
@@ -121,10 +134,13 @@ def run_tree_once(
     one_shot = ae_root.root
 
     def stop_condition(tick_count: int) -> Optional[Status]:
-        if (
-            one_shot.status in (Status.SUCCESS, Status.FAILURE)
-            or tick_count >= max_iterations
-        ):
+        if tick_count >= max_iterations:
+            return one_shot.status
+
+        if one_shot.status is Status.SUCCESS and _query_is_active():
+            return None
+
+        if one_shot.status in (Status.SUCCESS, Status.FAILURE):
             return one_shot.status
         return None
 

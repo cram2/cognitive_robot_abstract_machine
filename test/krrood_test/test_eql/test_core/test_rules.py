@@ -4,6 +4,7 @@ from krrood.entity_query_language.factories import (
     entity,
     variable,
     and_,
+    not_,
     inference,
     an,
     refinement,
@@ -16,7 +17,10 @@ from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.rules.conclusion import Add
-from krrood.entity_query_language.rules.conclusion_selector import Refinement
+from krrood.entity_query_language.rules.conclusion_selector import (
+    Alternative,
+    Refinement,
+)
 from ...dataset.eql_rule_tree_doc_example import (
     ExampleConnection,
     ExampleView,
@@ -182,6 +186,85 @@ def test_conditions_root_resolves_after_insert_at_clones_an_already_parented_con
         "so its primary parent chain must resolve to query's own (now-grown) "
         "conditions root"
     )
+
+
+def parent_chain_of(expression):
+    """
+    Walk an expression's primary parents until nothing is left, or until one repeats.
+
+    :param expression: The node to walk up from.
+    :return: The nodes walked through, ending either at the graph's root or at the first
+        node reached twice, which is what a cycle looks like from here.
+    """
+    walked = []
+    while expression is not None and not any(seen is expression for seen in walked):
+        walked.append(expression)
+        expression = expression._parent_
+    return walked
+
+
+def test_splicing_beside_a_condition_the_new_branch_wraps_leaves_the_branch_alone():
+    """
+    A rule's condition can be the very node another rule's condition wraps, since
+    reading an attribute answers with the same node every time.
+
+    The anchor then has a parent inside the branch being spliced in, and re-pointing
+    that parent at the splice is what would make the branch hold what holds it.
+    """
+    drawer = variable(Drawer, domain=[])
+    correct = drawer.correct
+    incorrect = not_(drawer.correct)
+    drawers = deduced_variable(Drawer)
+    query = an(entity(drawers).where(correct))
+    query.build()
+
+    Alternative.insert_at(query._conditions_root_, incorrect)
+
+    assert any(child is correct for child in incorrect._children_), (
+        "the branch being spliced in still reads the attribute it was written over, "
+        "rather than the node it was spliced beside"
+    )
+
+
+def test_a_rule_whose_condition_the_next_rule_wraps_is_still_answered():
+    """
+    Both rules are reachable and answer, which is the whole point of splicing the second
+    one in beside the first.
+    """
+    handle = Handle(name="Handle1")
+    container = Container(name="Container1")
+    drawer = variable(
+        Drawer,
+        domain=[
+            Drawer(handle=handle, container=container, correct=True),
+            Drawer(handle=handle, container=container, correct=False),
+        ],
+    )
+    cupboard = variable(Container, domain=[container])
+    correct = drawer.correct
+    # Written before the query, so the attribute's first parent is this branch rather
+    # than the rule tree -- which is what the splice must not mistake for its own edge.
+    incorrect = not_(drawer.correct)
+    views = deduced_variable(View)
+    query = an(entity(views).where(correct))
+    with query:
+        add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+    query.build()
+
+    spliced = Alternative.insert_at(query._conditions_root_, incorrect)
+    with spliced:
+        add(
+            views,
+            inference(Wardrobe)(
+                handle=drawer.handle, body=drawer.container, container=cupboard
+            ),
+        )
+
+    assert parent_chain_of(correct)[-1]._parent_ is None, (
+        "the splice must leave a graph whose parents run out at a root, rather than "
+        "one where walking up from a rule's condition comes back to it"
+    )
+    assert {type(view) for view in query.tolist()} == {Door, Wardrobe}
 
 
 def test_generate_drawers_from_query(handles_and_containers_world):

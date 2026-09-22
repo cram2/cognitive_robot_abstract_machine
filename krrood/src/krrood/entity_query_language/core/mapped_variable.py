@@ -44,6 +44,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 from krrood.entity_query_language.exceptions import (
     MultipleValuesAlongAccessPath,
+    NoValueAlongAccessPath,
     NotNumberLikeFieldError,
     ReadOnlyMapping,
     SymbolicDunderAccessError,
@@ -411,12 +412,14 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
         :param instance: The instance to be updated.
         :param value: The value to set.
+        :raises MultipleValuesAlongAccessPath: If a step reaches more than one value,
+            leaving the rest of the chain without one value to follow.
+        :raises NoValueAlongAccessPath: If a step reaches no value at all, leaving the
+            rest of the chain with nothing to follow.
         """
         current = instance
         for domain_mapping in self._access_path_[:-1]:
-            if not isinstance(domain_mapping, SingleValueMapping):
-                raise MultipleValuesAlongAccessPath(self, domain_mapping)
-            current = next(domain_mapping._apply_mapping_(current))
+            current = self._value_reached_by_(domain_mapping, current)
 
         self._set_child_instance_value_(current, value)
 
@@ -457,13 +460,31 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         :return: The value the chain leads to.
         :raises MultipleValuesAlongAccessPath: If a step reaches more than one value,
             leaving the rest of the chain without one value to follow.
+        :raises NoValueAlongAccessPath: If a step reaches no value at all, leaving the
+            rest of the chain with nothing to follow.
         """
         current = instance
         for domain_mapping in self._access_path_:
-            if not isinstance(domain_mapping, SingleValueMapping):
-                raise MultipleValuesAlongAccessPath(self, domain_mapping)
-            current = next(domain_mapping._apply_mapping_(current))
+            current = self._value_reached_by_(domain_mapping, current)
         return current
+
+    def _value_reached_by_(self, step: MappedVariable, instance: Any) -> Any:
+        """
+        :param step: One step of this chain's access path.
+        :param instance: The value that step is applied to.
+        :return: The one value the step reaches from it.
+        :raises MultipleValuesAlongAccessPath: If the step reaches one value per element
+            rather than a single one.
+        :raises NoValueAlongAccessPath: If the step reaches no value -- an attribute the
+            instance does not have, or a key nothing is stored under. Reported as itself,
+            since the exhaustion it is read from would otherwise surface far away as an
+            unrelated failure of whatever generator is following the chain.
+        """
+        if not isinstance(step, SingleValueMapping):
+            raise MultipleValuesAlongAccessPath(self, step)
+        for reached in step._apply_mapping_(instance):
+            return reached
+        raise NoValueAlongAccessPath(self, step, instance)
 
     def get_clean_name_from_mapped_variable(self) -> str:
         """
@@ -550,13 +571,9 @@ class Attribute(SingleValueMapping[T]):
         :raises NotNumberLikeFieldError: If this attribute does not exist or is not
             number-like.
         """
-        from krrood.entity_query_language.query.query import Query
+        from krrood.entity_query_language.query.query import variable_rooted
 
-        resolved_type = self._type_
-        if resolved_type is None:
-            root = self._chain_root_
-            if isinstance(root, Query):
-                resolved_type = root._rerooted_on_selection_(self)._type_
+        resolved_type = variable_rooted(self)._type_
         is_number_like = (
             resolved_type is not None
             and issubclass(resolved_type, compatible_types)

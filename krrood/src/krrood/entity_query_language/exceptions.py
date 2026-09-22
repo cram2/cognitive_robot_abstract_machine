@@ -345,6 +345,42 @@ class MultipleValuesAlongAccessPath(UsageError):
 
 
 @dataclass
+class NoValueAlongAccessPath(UsageError):
+    """
+    Raised when a chain is followed from a value outside query evaluation and a step maps
+    that value to none, leaving the rest of the chain with nothing to follow.
+    """
+
+    chain: MappedVariable
+    """
+    The chain that was being followed.
+    """
+
+    step: MappedVariable
+    """
+    The step along it that reaches no value.
+    """
+
+    instance: Any
+    """
+    The value the chain was being followed from.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.chain._name_} passes through {self.step._name_}, which reaches no "
+            f"value on the given {type(self.instance).__name__}, so the rest of the "
+            f"access path has nothing to follow."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Follow the chain from a value that has something at every step of it, or "
+            "check for the missing one before following it."
+        )
+
+
+@dataclass
 class UnselectedQueryVariable(UsageError):
     """
     Raised when a query over several variables is indexed by a variable it does not

@@ -864,6 +864,24 @@ class SceneObject:
 
 
 @dataclass
+class ApproachSceneObject:
+    """
+    An action standing for one whose argument is a whole entity carrying an enum, so a
+    query over it has to describe that entity's own kind as well as its own fields.
+    """
+
+    target: SceneObject
+    """
+    The object approached, named outright rather than described.
+    """
+
+    speed: float
+    """
+    How fast it is approached, which a query may leave underspecified.
+    """
+
+
+@dataclass
 class SceneRoom:
     position: KRROODPosition
     orientation: KRROODOrientation
