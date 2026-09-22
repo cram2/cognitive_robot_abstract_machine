@@ -6,6 +6,7 @@ import hashlib
 import threading
 import time
 import urllib.parse
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from http.server import ThreadingHTTPServer
@@ -50,6 +51,7 @@ from cramera.knowledge.queryable_knowledge import (
 from cramera.knowledge.question_matching import QuestionMatcher, QuestionMatchResult
 from cramera.knowledge.workspace_classes import WorkspaceClassIndex
 from cramera.live.query import LiveQuerySource, NoQuerySourceRegistered
+from cramera.live.world_query import WorldQuerySource
 from cramera.live.markers import MarkerEntry, MarkerStore
 from cramera.live.shape_catalog import ShapeEntry, served_mesh_file, shape_entry
 from cramera.live.transforms import TransformGraph, TransformSnapshot
@@ -58,6 +60,7 @@ from cramera.palette import ObjectPalette
 from cramera.robot_parts import RobotPartAnnotation
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from coraplex.plans.plan import Plan
     from coraplex.plans.plan_node import MotionNode, PlanNode
     from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -443,8 +446,7 @@ class BridgeStatus:
 
     query: bool
     """
-    Whether a running demo offered its state to be questioned (see
-    :meth:`Bridge.register_query_source`).
+    Whether an attached world or an explicit source can answer live queries.
     """
 
     sequence_number: int
@@ -548,7 +550,14 @@ class Bridge:
 
     query_source: Optional[LiveQuerySource] = None
     """
-    What the running demo offers to be queried about, once it registers itself.
+    Explicit source overriding the attached world's default queries.
+    """
+
+    _world_query_source: WorldQuerySource | None = field(
+        default=None, init=False, repr=False
+    )
+    """
+    Automatic source owned by the current world attachment.
     """
 
     _query_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -683,21 +692,28 @@ class Bridge:
     """
 
     # %% what the visualization drives
-    def attach(self, world: World) -> None:
+    def attach(self, world: World) -> WorldQuerySource:
         """
         Bind to the world a demo is executing and publish its geometry catalog.
 
         :param world: The world the demo is executing in.
+        :return: The query source owned by this attachment.
         """
         self.world = world
         self._model_revision += 1
         self.bind()
         self._refresh_bundle_signature()
+        self._world_query_source = WorldQuerySource(world)
         logger.info(
             "attached to world (robot=%s, %d joints)",
             type(self.robot).__name__ if self.robot else "?",
             len(self._connections),
         )
+        return self._world_query_source
+
+    def release_world_queries(self, source: WorldQuerySource) -> None:
+        if self._world_query_source is source:
+            self._world_query_source = None
 
     def observe_motion_started(self, node: MotionNode) -> None:
         """
@@ -999,7 +1015,8 @@ class Bridge:
                 movable=True,
                 plan=bool(self.plan_state.nodes),
                 chart=bool(self.chart_state.nodes),
-                query=self.query_source is not None,
+                query=self.query_source is not None
+                or self._world_query_source is not None,
                 sequence_number=self.sequence_number,
                 model_version=self._model_revision,
                 bundle_signature=bundle_signature,
@@ -1022,13 +1039,24 @@ class Bridge:
 
     def _registered_query_source(self) -> LiveQuerySource:
         """
-        The registered query source.
+        The explicit source, or the attached world's automatic source.
 
         :raises NoQuerySourceRegistered: When no demo offered one.
         """
-        if self.query_source is None:
+        source = (
+            self.query_source
+            if self.query_source is not None
+            else self._world_query_source
+        )
+        if source is None:
             raise NoQuerySourceRegistered()
-        return self.query_source
+        return source
+
+    @contextmanager
+    def _query_scope(self) -> Iterator[LiveQuerySource]:
+        source = self._registered_query_source()
+        with source.read_scope(), self._query_lock:
+            yield source
 
     def query_title(self) -> str:
         """
@@ -1036,7 +1064,8 @@ class Bridge:
 
         :raises NoQuerySourceRegistered: When no demo offered one.
         """
-        return self._registered_query_source().title()
+        with self._query_scope() as source:
+            return source.title()
 
     def query_presets(self) -> List[Preset]:
         """
@@ -1045,11 +1074,14 @@ class Bridge:
 
         :raises NoQuerySourceRegistered: When no demo offered one.
         """
-        presets = self._registered_query_source().presets()
-        with self._query_lock:
-            return [
-                preset.worded(self._scope_runner(preset.scope)) for preset in presets
-            ]
+        with self._query_scope() as source:
+            return self._worded_presets(source)
+
+    def _worded_presets(self, source: LiveQuerySource) -> list[Preset]:
+        return [
+            preset.worded(self._scope_runner(source, preset.scope))
+            for preset in source.presets()
+        ]
 
     def match_question(self, text: str) -> QuestionMatchResult:
         """
@@ -1064,8 +1096,9 @@ class Bridge:
         :param text: The question as asked, in natural language.
         :raises NoQuerySourceRegistered: When no demo offered one.
         """
-        unlisted = self._registered_query_source().unlisted_presets()
-        return QuestionMatcher(self.query_presets() + unlisted).match(text)
+        with self._query_scope() as source:
+            presets = self._worded_presets(source) + source.unlisted_presets()
+            return QuestionMatcher(presets).match(text)
 
     def query_scopes(self) -> List[QueryScope]:
         """
@@ -1073,9 +1106,8 @@ class Bridge:
 
         :raises NoQuerySourceRegistered: When no demo offered one.
         """
-        return [
-            knowledge.scope for knowledge in self._registered_query_source().knowledge()
-        ]
+        with self._query_scope() as source:
+            return [knowledge.scope for knowledge in source.knowledge()]
 
     def query_variables(
         self, scope: QueryScope = QueryScope.CURRENT_STATE
@@ -1087,7 +1119,11 @@ class Bridge:
         :raises NoQuerySourceRegistered: When no demo offered one.
         :raises UnknownQueryScope: When the demo offers no such body of knowledge.
         """
-        return [domain.name for domain in self._queryable_knowledge(scope).domains]
+        with self._query_scope() as source:
+            return [
+                domain.name
+                for domain in self._queryable_knowledge(source, scope).domains
+            ]
 
     def query_vocabulary(
         self, scope: QueryScope = QueryScope.CURRENT_STATE
@@ -1099,22 +1135,26 @@ class Bridge:
         :raises NoQuerySourceRegistered: When no demo offered one.
         :raises UnknownQueryScope: When the demo offers no such body of knowledge.
         """
-        knowledge = self._queryable_knowledge(scope)
-        return QueryVocabulary(
-            domains=knowledge.domains,
-            extra_names=knowledge.extra_names,
-            class_index=WorkspaceClassIndex.of_repository(),
-        )
+        with self._query_scope() as source:
+            knowledge = self._queryable_knowledge(source, scope)
+            return QueryVocabulary(
+                domains=knowledge.domains,
+                extra_names=knowledge.extra_names,
+                class_index=WorkspaceClassIndex.of_repository(),
+            )
 
-    def _queryable_knowledge(self, scope: QueryScope) -> QueryableKnowledge:
+    def _queryable_knowledge(
+        self, source: LiveQuerySource, scope: QueryScope
+    ) -> QueryableKnowledge:
         """
         What answers questions of one scope.
 
+        :param source: The source selected for this operation.
         :param scope: The body of knowledge being asked.
         :raises NoQuerySourceRegistered: When no demo offered one.
         :raises UnknownQueryScope: When the demo offers no such body of knowledge.
         """
-        for knowledge in self._registered_query_source().knowledge():
+        for knowledge in source.knowledge():
             if knowledge.scope is scope:
                 return knowledge
         raise UnknownQueryScope(name=scope.value)
@@ -1140,21 +1180,24 @@ class Bridge:
         :raises NoQuerySourceRegistered: When no demo offered one.
         :raises UnknownQueryScope: When the demo offers no such body of knowledge.
         """
-        with self._query_lock:
-            return self._scope_runner(scope).run(code)
+        with self._query_scope() as source:
+            return self._scope_runner(source, scope).run(code)
 
-    def _scope_runner(self, scope: QueryScope) -> EqlQueryRunner:
+    def _scope_runner(
+        self, source: LiveQuerySource, scope: QueryScope
+    ) -> EqlQueryRunner:
         """
         The runner answering questions of one scope, over the demo's current state.
 
-        Krrood's SymbolGraph singleton is not threadsafe, so callers hold
-        :attr:`_query_lock` around whatever they do with the runner.
+        Callers hold the source's read scope and :attr:`_query_lock` until the
+        answer has been rendered.
 
+        :param source: The source selected for this operation.
         :param scope: The body of knowledge being asked.
         :raises NoQuerySourceRegistered: When no demo offered one.
         :raises UnknownQueryScope: When the demo offers no such body of knowledge.
         """
-        knowledge = self._queryable_knowledge(scope)
+        knowledge = self._queryable_knowledge(source, scope)
         return EqlQueryRunner(
             domains=knowledge.domains,
             extra_names=knowledge.extra_names,

@@ -38,6 +38,13 @@ The scene supports orbit, pan, zoom, robot following and click-to-inspect. The g
 panel displays the plan, statecharts, robot kinematics and transforms. EQL results
 can highlight entities in the scene and replay a recorded time interval.
 
+Attaching a world automatically enables **Live world** queries in the EQL panel.
+The presets list scene bodies, semantic annotations, handles, supporting surfaces,
+robots and arms. Their variables (`body`, `annotation`, `handle`, `surface`, `robot`,
+`arm`) refer to native semantic digital twin entities and reflect subsequent world
+changes. Missing annotations produce empty results; geometry alone does not imply
+semantic labels. A demo can override these defaults with `register_query_source`.
+
 The EQL editor executes trusted local Python statements against the loaded world.
 The Python server listens only on loopback and rejects requests from remote
 origins. Run queries you trust in the same local environment as the viewer.

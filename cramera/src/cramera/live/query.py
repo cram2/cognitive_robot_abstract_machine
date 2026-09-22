@@ -1,5 +1,5 @@
 """
-What a running demo has to offer for its own state to be queryable.
+What a live source offers for its state to be queryable.
 
 The bridge depends on this abstraction only, so a demo supplies its domain vocabulary
 without cramera knowing anything about that demo.
@@ -8,12 +8,16 @@ without cramera knowing anything about that demo.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextlib import nullcontext
 from dataclasses import dataclass
 
-from typing_extensions import List
+from typing_extensions import List, TYPE_CHECKING
 
 from cramera.knowledge.presets import Preset
 from cramera.knowledge.queryable_knowledge import QueryableKnowledge
+
+if TYPE_CHECKING:
+    from contextlib import AbstractContextManager
 
 
 class NoQuerySourceRegistered(Exception):
@@ -31,11 +35,14 @@ class NoQuerySourceRegistered(Exception):
 @dataclass
 class LiveQuerySource(ABC):
     """
-    One running demo's queryable state.
+    Queryable state from an attached world or a running demo.
 
     A source declares what its state *is*; how a question is compiled, evaluated and
     rendered is not its concern.
     """
+
+    def read_scope(self) -> AbstractContextManager[object]:
+        return nullcontext()
 
     @abstractmethod
     def title(self) -> str:

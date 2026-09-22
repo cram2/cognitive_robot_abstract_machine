@@ -23,6 +23,7 @@
  *   listens  live:changed {on, url}      answer from the demo instead of the recording
  * ==========================================================================*/
 Panels.define('eql', function (root, bus) {
+  const QUERY_HINT = 'Choose a preset below or type an EQL query.';
   root.innerHTML =
     '<div class="panel-head">' +
     '  <h2>EQL · entity query language</h2>' +
@@ -120,6 +121,7 @@ Panels.define('eql', function (root, bus) {
 
   function showSource(status, presets, scopes) {
     knowledgeStatus.textContent = status;
+    input.placeholder = presets.length ? presets[0].code : QUERY_HINT;
     buildPresets(presets, scopes);
     loadVocabulary();
   }
