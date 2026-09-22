@@ -53,14 +53,14 @@ with world.modify_world():
     world.merge_world_at_pose(
         bowl,
         HomogeneousTransformationMatrix.from_xyz_quaternion(
-            2.4, 2.2, 0.9793, reference_frame=world.root
+            2.4, 2.2, 0.98, reference_frame=world.root
         ),
     )
     connection = FixedConnection(
         parent=world.get_body_by_name("cabinet10_drawer_top"),
         child=spoon.root,
         parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-            -0.05, -0.05, -0.0138
+            -0.05, -0.05, -0.01
         ),
     )
     world.merge_world(spoon, connection)
@@ -108,14 +108,14 @@ plan = sequential(
             next(
                 an(entity(variable(Milk, domain=world.semantic_annotations))).evaluate()
             ),
-            Pose.from_xyz_rpy(4.9, 3.3, 0.8103, yaw=1.57, reference_frame=world.root),
+            Pose.from_xyz_rpy(4.9, 3.3, 0.81, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
             next(
                 an(entity(variable(Bowl, domain=world.semantic_annotations))).evaluate()
             ),
-            Pose.from_xyz_rpy(5, 3.3, 0.7551, yaw=1.57, reference_frame=world.root),
+            Pose.from_xyz_rpy(5, 3.3, 0.76, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
@@ -124,7 +124,7 @@ plan = sequential(
                     entity(variable(Spoon, domain=world.semantic_annotations))
                 ).evaluate()
             ),
-            Pose.from_xyz_rpy(5.1, 3.3, 0.729, yaw=1.57, reference_frame=world.root),
+            Pose.from_xyz_rpy(5.1, 3.3, 0.73, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
             GraspDescription(
                 ApproachDirection.FRONT,
