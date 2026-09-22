@@ -18,6 +18,8 @@ from krrood.parametrization.feature_extraction.aggregations import (
     aggregation_statistic,
 )
 
+from experiments.causal_reasoning.comparison.domain import RelationalDomain
+
 
 class MutagenesisElement(StrEnum):
     """
@@ -154,6 +156,24 @@ class MutagenesisMoleculeAggregations(AggregationStatistic[MutagenesisMolecule])
     """
 
     @aggregation_statistic("atoms")
+    def atom_count(self) -> int:
+        """
+        Count of atoms, of any element.
+
+        A larger molecule has more of every kind of atom and bond and is more often
+        mutagenic, so it confounds every question about a count.
+        """
+        element_variable = variable(MutagenesisAtom, self.instance.atoms).element
+        [result] = (
+            entity(count_range(element_variable))
+            .where(
+                or_(*(element_variable == element for element in MutagenesisElement))
+            )
+            .tolist()
+        )
+        return result
+
+    @aggregation_statistic("atoms")
     def chlorine_count(self) -> int:
         """
         Count of chlorine atoms.
@@ -205,3 +225,31 @@ class MutagenesisMoleculeAggregations(AggregationStatistic[MutagenesisMolecule])
             .tolist()
         )
         return result
+
+
+# %% the molecule as a relational example
+
+
+class PartField(StrEnum):
+    """
+    The molecule's exchangeable-part fields.
+    """
+
+    ATOMS = "atoms"
+    BONDS = "bonds"
+
+
+def molecule_domain() -> RelationalDomain:
+    """
+    :return: The molecule as the comparison sees it: its atoms and bonds as
+        exchangeable parts, mutagenicity as the effect.
+    """
+    return RelationalDomain(
+        example_class=MutagenesisMolecule,
+        aggregation_class=MutagenesisMoleculeAggregations,
+        effect_field="mutagenic",
+        noun="molecule",
+        plural="molecules",
+        effect_phrase="the molecule is mutagenic",
+        part_nouns={PartField.ATOMS: "atom", PartField.BONDS: "bond"},
+    )

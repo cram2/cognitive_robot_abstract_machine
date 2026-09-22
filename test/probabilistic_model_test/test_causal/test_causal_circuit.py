@@ -204,6 +204,42 @@ def _build_correlated_circuit() -> tuple:
     return circuit, x, w, y
 
 
+def _build_circuit_with_a_union_and_a_single_range_on_the_cause() -> tuple:
+    """
+    Two branches whose supports on x are written differently in the joint support: one
+    holds x as a union of two ranges, the other as one of those ranges alone.
+
+        Union:  x∈[0,1] ∪ [2,3] (an equal mixture), y∈[0,1]    weight 0.5
+        Single: x∈[0,1],                             y∈[5,6]    weight 0.5
+
+    Ground truth: x∈[0,1] has probability 0.75 and x∈[2,3] has 0.25.
+    """
+    x, y = Continuous("x"), Continuous("y")
+    circuit = ProbabilisticCircuit()
+
+    def uniform(variable, lower, upper):
+        return leaf(
+            UniformDistribution(
+                variable=variable, interval=closed(lower, upper).simple_sets[0]
+            ),
+            circuit,
+        )
+
+    split_x = SumUnit(probabilistic_circuit=circuit)
+    split_x.add_subcircuit(uniform(x, 0, 1), math.log(0.5))
+    split_x.add_subcircuit(uniform(x, 2, 3), math.log(0.5))
+    union = ProductUnit(probabilistic_circuit=circuit)
+    union.add_subcircuit(split_x)
+    union.add_subcircuit(uniform(y, 0, 1))
+    single = ProductUnit(probabilistic_circuit=circuit)
+    single.add_subcircuit(uniform(x, 0, 1))
+    single.add_subcircuit(uniform(y, 5, 6))
+    root = SumUnit(probabilistic_circuit=circuit)
+    root.add_subcircuit(union, math.log(0.5))
+    root.add_subcircuit(single, math.log(0.5))
+    return circuit, x, y
+
+
 def _build_nested_overlap_circuit() -> tuple:
     """
     SumUnit-rooted mixture whose components all overlap on x without being identical:
@@ -1405,6 +1441,22 @@ class ExtractDisjointRegionsTestCase(unittest.TestCase):
         )
         self.assertAlmostEqual(probabilities[0], 0.5, delta=0.05)
         self.assertAlmostEqual(probabilities[1], 0.5, delta=0.05)
+
+    def test_a_range_is_one_region_however_the_support_writes_it(self):
+        """
+        A range of the cause that one branch holds on its own and another holds inside a
+        union is the same region, counted once.
+        """
+        circuit, x, y = _build_circuit_with_a_union_and_a_single_range_on_the_cause()
+        causal_circuit = CausalCircuit.from_probabilistic_circuit(
+            circuit, MarginalDeterminismTreeNode.from_causal_graph([x], [y]), [x], [y]
+        )
+        regions = causal_circuit._extract_disjoint_regions_for_variable(x)
+        self.assertEqual(len(regions), 2)
+        self.assertAlmostEqual(sum(region.probability for region in regions), 1.0)
+        self.assertEqual(
+            sorted(round(region.probability, 6) for region in regions), [0.25, 0.75]
+        )
 
     def test_matches_the_marginalized_version_on_a_circuit_with_one_true_region(self):
         # on a circuit whose cause variable genuinely has one contiguous support

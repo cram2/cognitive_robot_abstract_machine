@@ -14,18 +14,23 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
-from typing_extensions import List
+from typing_extensions import Any, Dict, List, Sequence
 
+from experiments.causal_reasoning.comparison.dataset import EffectRate, ExampleDataset
 from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisAtom,
     MutagenesisBond,
     MutagenesisBondType,
     MutagenesisElement,
     MutagenesisMolecule,
+    MutagenesisMoleculeAggregations,
+    molecule_domain,
 )
 from experiments.causal_reasoning.mutagenesis.exceptions import (
     MutagenesisDatasetUnavailableError,
 )
+
+# %% the CTU database
 
 
 @dataclass(frozen=True)
@@ -151,6 +156,9 @@ def fetch_mutagenesis_molecules(
     ]
 
 
+# %% a synthetic stand-in
+
+
 def synthetic_mutagenesis_molecules(
     random_state: np.random.Generator,
     molecule_count: int = 20,
@@ -206,3 +214,45 @@ def synthetic_mutagenesis_molecules(
             )
         )
     return molecules
+
+
+# %% a set of molecules
+
+
+def mutagenesis_dataset(molecules: Sequence[MutagenesisMolecule]) -> ExampleDataset:
+    """
+    :param molecules: The molecules.
+    :return: The molecules as the comparison sees them.
+    """
+    return ExampleDataset(molecule_domain(), list(molecules))
+
+
+def mutagenicity_summaries(
+    dataset: ExampleDataset,
+) -> Dict[str, Dict[Any, EffectRate]]:
+    """
+    How often the molecules are mutagenic, by the ``ind1`` indicator, by how many
+    branching atoms they have, by how many of their bonds are aromatic and by how many
+    atoms they hold at all.
+
+    :param dataset: The molecules.
+    :return: The rates per summary's title.
+    """
+    return {
+        "ind1": dataset.effect_rate_by(lambda molecule: molecule.indicator_1),
+        "branching atoms": dataset.effect_rate_by(
+            lambda molecule: MutagenesisMoleculeAggregations(
+                instance=molecule
+            ).branching_atom_count()
+        ),
+        "aromatic bonds": dataset.effect_rate_by(
+            lambda molecule: MutagenesisMoleculeAggregations(
+                instance=molecule
+            ).aromatic_bond_count()
+        ),
+        "atoms": dataset.effect_rate_by(
+            lambda molecule: MutagenesisMoleculeAggregations(
+                instance=molecule
+            ).atom_count()
+        ),
+    }

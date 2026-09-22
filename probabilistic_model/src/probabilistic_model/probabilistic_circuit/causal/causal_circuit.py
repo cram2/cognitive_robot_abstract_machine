@@ -961,24 +961,22 @@ class CausalCircuit:
         Union[AbstractCompositeSet, AbstractSimpleSet, int, float, bool, enum.Enum]
     ]:
         """
-        Split *value* into its individual elements if it is a union of more than one
-        (several disjoint ranges for a :class:`~random_events.interval.Interval` --
-        which both :class:`~random_events.variable.Continuous` and
-        :class:`~random_events.variable.Integer` use as their domain -- or several
-        values for a discrete :class:`~random_events.set.Set`), otherwise return it
-        unchanged.
+        Split *value* into its individual elements: the disjoint ranges of a
+        :class:`~random_events.interval.Interval` -- which both
+        :class:`~random_events.variable.Continuous` and
+        :class:`~random_events.variable.Integer` use as their domain -- or the values
+        of a discrete :class:`~random_events.set.Set`.
 
-        *value* is only ever composite (and thus splittable) when the branch it came
-        from mixes several ranges or values with positive probability; a branch whose
-        leaf is a single deterministic point instead yields one of
-        :data:`~random_events.variable.compatible_types` directly, which has no
-        `simple_sets` to split.
+        A composite set holding one element is split all the same, so that a range one
+        branch holds on its own and another holds inside a union come back as the same
+        element and are recognised as one region. A value that is not a composite set,
+        one of :data:`~random_events.variable.compatible_types` read off a
+        deterministic leaf, is returned as it is.
 
         :param value: A single support value read off a joint support's simple set.
-        :returns: The union's elements, or ``[value]`` if *value* is not a multi-element
-            union.
+        :returns: The elements of *value*.
         """
-        if isinstance(value, AbstractCompositeSet) and len(value.simple_sets) > 1:
+        if isinstance(value, AbstractCompositeSet):
             return list(value.simple_sets)
         return [value]
 
