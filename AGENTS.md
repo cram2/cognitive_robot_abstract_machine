@@ -125,7 +125,7 @@
 ## Version Control
 - Commits must be authored in the name of the human user running the tool, using their own configured git `user.name` and `user.email`. Never author or amend a commit as an assistant/agent identity.
 - Do not attribute authorship or co-authorship to an assistant: no `Co-Authored-By:` trailer for Claude or any assistant, and no `noreply@anthropic.com` (or similar) as author or committer. The commit's authorship reflects the person responsible for it.
-- It is fine — and encouraged — to acknowledge assistant help in the commit message body with a short plain line, for example `Made with the help of Claude`. Keep it a note, not an author/co-author trailer.
+- It is fine — and encouraged — to acknowledge assistant help in the commit message body with a short plain line, for example `Made with AI assistance`. Do NOT add any info mentioning the particular model or the AI service. Keep it a note, not an author/co-author trailer.
 - This applies to every contributor and every tool.
 
 ## Misc

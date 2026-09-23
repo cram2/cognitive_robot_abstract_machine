@@ -169,29 +169,49 @@ def is_builtin_type(type_object: Any):
     )
 
 
+def get_import_root_from_path(path: Path) -> Path:
+    """
+    Find the directory an import of a path is resolved against.
+
+    :param path: The file system path to find the import root of.
+    :return: The nearest ancestor of the path that is not itself a package.
+    """
+    root = Path(path).resolve()
+    while (root / "__init__.py").exists():
+        parent = root.parent
+        if parent == root:
+            break
+        root = parent
+    return root
+
+
 def get_import_path_from_path(path: str) -> Optional[str]:
     """
     Convert a file system path to a Python import path.
 
     :param path: The file system path to convert.
-    :return: The Python import path.
+    :return: The Python import path, or None if the path is not inside a package.
     """
-    package_name = os.path.abspath(path)
-    packages = package_name.split(os.path.sep)
-    parent_package_idx = 0
-    for i in range(len(packages)):
-        if i == 0:
-            current_path = package_name
-        else:
-            current_path = "/" + "/".join(packages[:-i])
-        if os.path.exists(os.path.join(current_path, "__init__.py")):
-            parent_package_idx -= 1
-        else:
-            break
-    package_name = (
-        ".".join(packages[parent_package_idx:]) if parent_package_idx < 0 else None
-    )
-    return package_name
+    absolute_path = Path(path).resolve()
+    root = get_import_root_from_path(absolute_path)
+    if root == absolute_path:
+        return None
+    return str(absolute_path.relative_to(root)).replace(os.path.sep, ".")
+
+
+def make_path_importable(path: Path) -> None:
+    """
+    Put the directory an import of a path is resolved against on the search path.
+
+    ..note:: Generated code is written wherever its caller chose, which need not be a
+        directory Python already searches, so importing it back requires saying where
+        to look for it.
+
+    :param path: The file system path that is about to be imported.
+    """
+    root = str(get_import_root_from_path(path))
+    if root not in sys.path:
+        sys.path.insert(0, root)
 
 
 def get_function_import_data(func: Callable) -> Tuple[str, str]:

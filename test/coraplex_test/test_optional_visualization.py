@@ -4,23 +4,29 @@ Visualization is opt-in and preserves native demonstration ownership.
 
 from dataclasses import dataclass, field
 from importlib.metadata import EntryPoint, EntryPoints
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 import rclpy
 
 import coraplex.visualization as visualization_module
-from coraplex.datastructures.enums import VisualizationBackend
+from coraplex.datastructures.enums import VisualizationBackend, VisualizationOption
+from coraplex.exceptions import (
+    UnknownVisualizationOption,
+    VisualizationBackendUnavailable,
+)
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_callbacks import PlanCallback
 from coraplex.plans.plan_node import PlanNode
 from coraplex.visualization import (
     PlanVisualization,
-    UnknownVisualizationOption,
-    VisualizationBackendUnavailable,
-    VisualizationOption,
     WorldVisualization,
+    HeadlessVisualization,
+    RvizVisualization,
+    RerunVisualization,
+    PluginVisualization,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.adapters.rerun import RerunMode
@@ -108,7 +114,7 @@ def test_explicit_backend_selection_uses_installed_provider(
     selected = WorldVisualization.from_environment(world).start()
     plan = sequential([]).plan
     selected.attach_plan(plan)
-    provider = selected.cramera_visualization
+    provider = selected.provider
 
     installed_scene.assert_called_once_with(
         group=VisualizationOption.PROVIDER_GROUP,
@@ -128,10 +134,10 @@ def test_provider_can_observe_plan_node_returned_by_demo(installed_scene) -> Non
     """
     The native PlanNode demo API and direct Plan API share one observer boundary.
     """
-    selected = WorldVisualization(World(), backend=VisualizationBackend.CRAMERA).start()
+    selected = PluginVisualization(World()).start()
     root = sequential([])
     selected.attach_plan(root)
-    assert selected.cramera_visualization.plans == [root.plan]
+    assert selected.provider.plans == [root.plan]
     selected.stop()
 
 
@@ -141,7 +147,7 @@ def test_missing_provider_has_actionable_native_error(monkeypatch) -> None:
     """
     monkeypatch.setattr(visualization_module, "entry_points", Mock(return_value=[]))
     with pytest.raises(VisualizationBackendUnavailable) as caught:
-        WorldVisualization(World(), backend=VisualizationBackend.CRAMERA).start()
+        PluginVisualization(World()).start()
     assert caught.value.backend is VisualizationBackend.CRAMERA
 
 
@@ -160,7 +166,7 @@ def test_none_backend_leaves_world_callbacks_unchanged() -> None:
     """
     world = World()
     callbacks = list(world.state.state_change_callbacks)
-    selected = WorldVisualization(world).start()
+    selected = HeadlessVisualization(world).start()
     selected.attach_plan(sequential([]))
     assert world.state.state_change_callbacks == callbacks
     assert not selected.is_rendering
@@ -173,13 +179,12 @@ def test_rviz_stops_publishers_without_destroying_borrowed_node(
     """
     The adapter releases its publishers while leaving the host ROS node usable.
     """
-    selected = WorldVisualization(
+    selected = RvizVisualization(
         cylinder_bot_world,
-        backend=VisualizationBackend.RVIZ,
         ros_node=rclpy_node,
         collision_visualization=True,
     ).start()
-    publisher = selected.rviz_publisher
+    publisher = selected.publisher
     assert publisher._collision_publisher is not None
     selected.stop()
     assert rclpy_node.context.ok()
@@ -203,10 +208,8 @@ def test_demonstration_keeps_all_repetitions_and_explicit_viewer(
     try:
         demonstration.run()
         selected = demonstration.visualization
-        assert len(selected.cramera_visualization.plans) == demonstration.repetitions
-        assert all(
-            isinstance(plan, Plan) for plan in selected.cramera_visualization.plans
-        )
+        assert len(selected.provider.plans) == demonstration.repetitions
+        assert all(isinstance(plan, Plan) for plan in selected.provider.plans)
         assert selected.is_rendering
     finally:
         demonstration.stop_visualization()
@@ -219,11 +222,11 @@ def test_starting_provider_twice_registers_only_once(installed_scene) -> None:
     """
     Starting the same visualization twice retains its single provider.
     """
-    selected = WorldVisualization(World(), backend=VisualizationBackend.CRAMERA)
+    selected = PluginVisualization(World())
     selected.start()
-    provider = selected.cramera_visualization
+    provider = selected.provider
     selected.start()
-    assert selected.cramera_visualization is provider
+    assert selected.provider is provider
     assert installed_scene.call_count == 1
     selected.stop()
     selected.stop()
@@ -235,7 +238,7 @@ def test_non_visualization_entry_point_is_rejected(installed_scene) -> None:
     """
     installed_scene.return_value[0].load.return_value = World
     with pytest.raises(VisualizationBackendUnavailable):
-        WorldVisualization(World(), backend=VisualizationBackend.CRAMERA).start()
+        PluginVisualization(World()).start()
 
 
 def test_rviz_releases_a_context_it_owns(cylinder_bot_world) -> None:
@@ -243,9 +246,7 @@ def test_rviz_releases_a_context_it_owns(cylinder_bot_world) -> None:
     A standalone RViz adapter cleans its own ROS resources on stop.
     """
     assert not rclpy.ok()
-    selected = WorldVisualization(
-        cylinder_bot_world, backend=VisualizationBackend.RVIZ
-    ).start()
+    selected = RvizVisualization(cylinder_bot_world).start()
     assert rclpy.ok()
     selected.stop()
     assert not rclpy.ok()
@@ -274,7 +275,7 @@ def test_unavailable_ros_is_reported_without_starting(monkeypatch) -> None:
     """
     monkeypatch.setattr(visualization_module, "VizMarkerPublisher", None)
     with pytest.raises(VisualizationBackendUnavailable) as caught:
-        WorldVisualization(World(), backend=VisualizationBackend.RVIZ).start()
+        RvizVisualization(World()).start()
     assert VisualizationBackend.RVIZ.value in caught.value.error_message()
     assert caught.value.suggest_correction()
 
@@ -283,6 +284,7 @@ def test_unknown_rerun_mode_is_reported(monkeypatch) -> None:
     """
     Unsupported Rerun output modes produce a named configuration failure.
     """
+    monkeypatch.setenv(VisualizationOption.BACKEND, VisualizationBackend.RERUN)
     monkeypatch.setenv(VisualizationOption.RERUN_MODE, "missing-mode")
     with pytest.raises(UnknownVisualizationOption) as caught:
         WorldVisualization.from_environment(World())
@@ -340,8 +342,8 @@ def test_native_entry_point_collection_loads_selected_provider(monkeypatch) -> N
         visualization_module, "entry_points", Mock(return_value=providers)
     )
     monkeypatch.setattr(EntryPoint, "load", Mock(return_value=ObservedScene))
-    selected = WorldVisualization(World(), backend=VisualizationBackend.CRAMERA).start()
-    assert isinstance(selected.cramera_visualization, ObservedScene)
+    selected = PluginVisualization(World()).start()
+    assert isinstance(selected.provider, ObservedScene)
     selected.stop()
 
 
@@ -349,12 +351,12 @@ def test_attaching_same_plan_twice_observes_it_once(installed_scene) -> None:
     """
     A plan and its root node identify the same observation subscription.
     """
-    selected = WorldVisualization(World(), backend=VisualizationBackend.CRAMERA).start()
+    selected = PluginVisualization(World()).start()
     root = sequential([])
     try:
         selected.attach_plan(root)
         selected.attach_plan(root.plan)
-        assert selected.cramera_visualization.plans == [root.plan]
+        assert selected.provider.plans == [root.plan]
         assert [callback.plan for callback in root.plan.node_callbacks] == [root.plan]
     finally:
         selected.stop()
@@ -364,8 +366,8 @@ def test_stop_accepts_a_callback_already_removed_by_caller(installed_scene) -> N
     """
     Removing a subscription externally must not prevent provider cleanup.
     """
-    selected = WorldVisualization(World(), backend=VisualizationBackend.CRAMERA).start()
-    provider = selected.cramera_visualization
+    selected = PluginVisualization(World()).start()
+    provider = selected.provider
     plan = sequential([]).plan
     selected.attach_plan(plan)
     plan.node_callbacks.clear()
@@ -379,11 +381,7 @@ def test_scope_closes_temporary_visualizations(installed_scene) -> None:
     A temporary viewer remains reachable for cleanup through its active scope.
     """
     with visualization_module.VisualizationSession():
-        provider = (
-            WorldVisualization(World(), backend=VisualizationBackend.CRAMERA)
-            .start()
-            .cramera_visualization
-        )
+        provider = PluginVisualization(World()).start().provider
         assert not provider.stopped
     assert provider.stopped
 
@@ -395,11 +393,7 @@ def test_scope_closes_resources_and_propagates_abort(installed_scene, error) -> 
     """
     with pytest.raises(type(error)) as caught:
         with visualization_module.VisualizationSession():
-            provider = (
-                WorldVisualization(World(), backend=VisualizationBackend.CRAMERA)
-                .start()
-                .cramera_visualization
-            )
+            provider = PluginVisualization(World()).start().provider
             raise error
     assert caught.value is error
     assert provider.stopped
@@ -410,22 +404,10 @@ def test_nested_scope_restores_outer_owner(installed_scene) -> None:
     Leaving an inner scope keeps outer resources open and restores registration.
     """
     with visualization_module.VisualizationSession():
-        outer = (
-            WorldVisualization(World(), backend=VisualizationBackend.CRAMERA)
-            .start()
-            .cramera_visualization
-        )
+        outer = PluginVisualization(World()).start().provider
         with visualization_module.VisualizationSession():
-            inner = (
-                WorldVisualization(World(), backend=VisualizationBackend.CRAMERA)
-                .start()
-                .cramera_visualization
-            )
-        restored = (
-            WorldVisualization(World(), backend=VisualizationBackend.CRAMERA)
-            .start()
-            .cramera_visualization
-        )
+            inner = PluginVisualization(World()).start().provider
+        restored = PluginVisualization(World()).start().provider
         assert inner.stopped
         assert not outer.stopped
         assert not restored.stopped
@@ -446,7 +428,7 @@ def test_scope_releases_retained_demonstration_session(
     with visualization_module.VisualizationSession():
         demonstration.run()
         session = demonstration.ros_session
-        provider = demonstration.visualization.cramera_visualization
+        provider = demonstration.visualization.provider
         assert session.spin_thread.is_alive()
     assert provider.stopped
     assert not session.spin_thread.is_alive()
@@ -505,7 +487,7 @@ def test_unscoped_browser_demo_releases_owned_ros_session(
     )
     demonstration.acquire_world()
     session = demonstration.ros_session
-    provider = demonstration.visualization.cramera_visualization
+    provider = demonstration.visualization.provider
     try:
         demonstration.tear_down()
         assert not session.spin_thread.is_alive()
@@ -514,3 +496,38 @@ def test_unscoped_browser_demo_releases_owned_ros_session(
         assert not provider.stopped
     finally:
         demonstration.stop_visualization()
+
+
+# %% backend configuration isolation
+@pytest.mark.parametrize(
+    "backend",
+    [
+        VisualizationBackend.NONE,
+        VisualizationBackend.RVIZ,
+        VisualizationBackend.CRAMERA,
+    ],
+)
+def test_backend_selection_ignores_rerun_settings(
+    monkeypatch: pytest.MonkeyPatch,
+    backend: VisualizationBackend,
+) -> None:
+    monkeypatch.setenv(VisualizationOption.BACKEND, backend)
+    monkeypatch.setenv(VisualizationOption.RERUN_MODE, "missing-mode")
+    world = World()
+    selected = WorldVisualization.from_environment(world)
+    assert selected.backend is backend
+    assert selected.world is world
+
+
+def test_default_rerun_selection_reads_its_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "world.rrd"
+    monkeypatch.delenv(VisualizationOption.BACKEND, raising=False)
+    monkeypatch.setenv(VisualizationOption.RERUN_MODE, RerunMode.SAVE.value)
+    monkeypatch.setenv(VisualizationOption.RERUN_TARGET, str(target))
+    selected = WorldVisualization.from_environment(World(), VisualizationBackend.RERUN)
+    assert isinstance(selected, RerunVisualization)
+    assert selected.mode is RerunMode.SAVE
+    assert selected.target == str(target)

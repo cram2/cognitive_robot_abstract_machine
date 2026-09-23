@@ -300,7 +300,7 @@ class RippleDownRules(ABC):
                 f"Could not load the python file for the model {model_name} from {model_dir}. "
                 f"Make sure the file exists and is valid."
             )
-            raise RDRLoadError(model_name, model_dir)
+            raise RDRLoadError(model_name, model_dir) from e
         rdr.save_dir = load_dir
         rdr.model_name = model_name
         return rdr

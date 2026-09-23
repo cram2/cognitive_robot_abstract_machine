@@ -12,8 +12,6 @@ WORKDIR /opt/ros
 COPY setup_ros_workspace.sh /tmp/setup_ros_workspace.sh
 COPY setup_workspace.py /tmp/setup_workspace.py
 RUN OVERLAY_WS=$OVERLAY_WS bash /tmp/setup_ros_workspace.sh \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

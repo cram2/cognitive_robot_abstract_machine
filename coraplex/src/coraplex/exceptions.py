@@ -7,7 +7,12 @@ from typing_extensions import TYPE_CHECKING, Type, List
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
-from coraplex.datastructures.enums import Arms, ExecutionType
+from coraplex.datastructures.enums import (
+    Arms,
+    ExecutionType,
+    VisualizationBackend,
+    VisualizationOption,
+)
 from coraplex.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
@@ -20,6 +25,61 @@ if TYPE_CHECKING:
     )
 
 
+# %% visualization
+@dataclass
+class UnknownVisualizationOption(DataclassException):
+    """
+    A configuration value does not name a supported visualization option.
+    """
+
+    variable: VisualizationOption
+    """
+    The environment setting containing the unknown value.
+    """
+
+    value: str
+    """
+    The rejected value.
+    """
+
+    def error_message(self) -> str:
+        """
+        Identify the rejected environment setting and value.
+        """
+        return f"Unknown visualization option {self.variable}={self.value!r}."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to select a supported renderer configuration.
+        """
+        return "Choose a supported visualization backend or Rerun mode."
+
+
+@dataclass
+class VisualizationBackendUnavailable(DataclassException):
+    """
+    A selected renderer has no available provider.
+    """
+
+    backend: VisualizationBackend
+    """
+    The renderer that could not be started.
+    """
+
+    def error_message(self) -> str:
+        """
+        Identify the renderer whose provider could not be loaded.
+        """
+        return f"Visualization backend {self.backend.value!r} is unavailable."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to make the selected provider available.
+        """
+        return "Install the selected visualization provider or select another backend."
+
+
+# %% plan execution
 @dataclass
 class ContextIsUnavailable(DataclassException):
     """

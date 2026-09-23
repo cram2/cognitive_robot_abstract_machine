@@ -1,4 +1,6 @@
-"""Optional world visualization selected without changing a robot plan."""
+"""
+Optional world visualization selected without changing a robot plan.
+"""
 
 from __future__ import annotations
 
@@ -8,15 +10,18 @@ from collections.abc import Callable
 from contextlib import ExitStack
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
-from enum import StrEnum
+from functools import partial
 from importlib.metadata import entry_points
 from types import TracebackType
 
 from typing_extensions import TYPE_CHECKING, ClassVar, Self
 
-from coraplex.datastructures.enums import VisualizationBackend
+from coraplex.datastructures.enums import VisualizationBackend, VisualizationOption
+from coraplex.exceptions import (
+    UnknownVisualizationOption,
+    VisualizationBackendUnavailable,
+)
 from coraplex.plans.plan_node import PlanNode
-from krrood.exceptions import DataclassException
 from semantic_digital_twin.adapters.rerun import RerunAdapter, RerunMode
 
 if TYPE_CHECKING:
@@ -39,91 +44,65 @@ except ImportError:
 # %% provider contract
 @dataclass
 class PlanVisualization(ABC):
-    """A visualization provider observing a world and its executed plans."""
+    """
+    A visualization provider observing a world and its executed plans.
+    """
 
     world: World
-    """The world presented by this provider."""
+    """
+    The world presented by this provider.
+    """
 
     @abstractmethod
     def start(self) -> Self:
-        """Start serving this world and return the provider."""
+        """
+        Start serving this world and return the provider.
+        """
 
     @abstractmethod
     def stop(self) -> None:
-        """Stop serving and release resources owned by this provider."""
+        """
+        Stop serving and release resources owned by this provider.
+        """
 
     @abstractmethod
     def plan_callback(self, plan: Plan) -> PlanCallback:
-        """Create an execution observer for a plan.
+        """
+        Create an execution observer for a plan.
 
         :param plan: The plan to observe.
         :return: A callback registered by the visualization owner.
         """
 
 
-class VisualizationOption(StrEnum):
-    """Configuration names for optional visualization providers."""
-
-    BACKEND = "CORAPLEX_VISUALIZATION"
-    """Environment setting selecting the renderer."""
-    RERUN_MODE = "CORAPLEX_RERUN_MODE"
-    """Environment setting selecting Rerun's output mode."""
-    RERUN_TARGET = "CORAPLEX_RERUN_TARGET"
-    """Environment setting selecting Rerun's file or server."""
-    PROVIDER_GROUP = "coraplex.visualizations"
-    """Installed entry points implementing PlanVisualization."""
-
-
-@dataclass
-class UnknownVisualizationOption(DataclassException):
-    """A configuration value does not name a supported visualization option."""
-
-    variable: VisualizationOption
-    """The environment setting containing the unknown value."""
-    value: str
-    """The rejected value."""
-
-    def error_message(self) -> str:
-        """Identify the rejected environment setting and value."""
-        return f"Unknown visualization option {self.variable}={self.value!r}."
-
-    def suggest_correction(self) -> str:
-        """Describe how to select a supported renderer configuration."""
-        return "Choose a supported visualization backend or Rerun mode."
-
-
-@dataclass
-class VisualizationBackendUnavailable(DataclassException):
-    """A selected renderer has no available provider."""
-
-    backend: VisualizationBackend
-    """The renderer that could not be started."""
-
-    def error_message(self) -> str:
-        """Identify the renderer whose provider could not be loaded."""
-        return f"Visualization backend {self.backend.value!r} is unavailable."
-
-    def suggest_correction(self) -> str:
-        """Describe how to make the selected provider available."""
-        return "Install the selected visualization provider or select another backend."
-
-
 # %% visualization owner
 @dataclass
 class VisualizationSession:
-    """Close visualizations acquired in a context when execution leaves that context."""
+    """
+    Close visualizations acquired in a context when execution leaves that context.
+    """
 
     _current: ClassVar[ContextVar[VisualizationSession | None]] = ContextVar(
         "visualization_session", default=None
     )
-    """The cleanup scope active in the current execution context."""
+    """
+    The cleanup scope active in the current execution context.
+    """
+
     _cleanup: ExitStack = field(default_factory=ExitStack, init=False)
-    """Resource cleanup callbacks in reverse acquisition order."""
+    """
+    Resource cleanup callbacks in reverse acquisition order.
+    """
+
     _token: Token[VisualizationSession | None] = field(init=False)
-    """The previous scope restored when this context exits."""
+    """
+    The previous scope restored when this context exits.
+    """
 
     def __enter__(self) -> Self:
-        """Make this session the owner of subsequently started visualizations."""
+        """
+        Make this session the owner of subsequently started visualizations.
+        """
         self._token = self._current.set(self)
         return self
 
@@ -133,7 +112,8 @@ class VisualizationSession:
         exception: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """Close acquired resources and restore the enclosing session.
+        """
+        Close acquired resources and restore the enclosing session.
 
         :param exception_type: The exception type raised inside the scope, if any.
         :param exception: The original exception propagated after cleanup.
@@ -146,14 +126,18 @@ class VisualizationSession:
 
     @classmethod
     def is_active(cls) -> bool:
-        """Return whether the current context owns visualization cleanup."""
+        """
+        Return whether the current context owns visualization cleanup.
+        """
         return cls._current.get() is not None
 
     @classmethod
     def register(cls, cleanup: Callable[[], None]) -> None:
-        """Register cleanup in the active session, if one exists.
+        """
+        Register cleanup in the active session, if one exists.
 
-        :param cleanup: Release an acquired resource without requiring its caller to retain it.
+        :param cleanup: Release an acquired resource without requiring its caller to
+            retain it.
         """
         current = cls._current.get()
         if current is not None:
@@ -161,33 +145,25 @@ class VisualizationSession:
 
 
 @dataclass
-class WorldVisualization:
-    """Own a selected renderer and the execution observers attached to it."""
+class WorldVisualization(ABC):
+    """
+    Own a selected renderer and the execution observers attached to it.
+    """
 
     world: World
-    """The observed world."""
-    backend: VisualizationBackend = VisualizationBackend.NONE
-    """The explicitly selected renderer."""
-    ros_node: Node | None = field(default=None, kw_only=True)
-    """A borrowed ROS node, or a node created for an RViz renderer."""
-    collision_visualization: bool = field(default=False, kw_only=True)
-    """Whether the RViz renderer also publishes native collision results."""
-    rerun_mode: RerunMode = field(default=RerunMode.SPAWN, kw_only=True)
-    """Where the native Rerun adapter sends its recording."""
-    rerun_target: str | None = field(default=None, kw_only=True)
-    """The Rerun output file or server."""
-    rviz_publisher: VizMarkerPublisher | None = field(default=None, init=False)
-    """The owned RViz marker publisher."""
-    rerun_adapter: RerunAdapter | None = field(default=None, init=False)
-    """The owned native Rerun adapter."""
-    cramera_visualization: PlanVisualization | None = field(default=None, init=False)
-    """The optional installed browser visualization provider."""
-    _callbacks: list[PlanCallback] = field(default_factory=list, init=False)
-    """Plan callbacks registered by this owner."""
-    _owns_node: bool = field(default=False, init=False)
-    """Whether this owner created its ROS node."""
-    _owns_context: bool = field(default=False, init=False)
-    """Whether this owner initialized its ROS context."""
+    """
+    The observed world.
+    """
+
+    backend: ClassVar[VisualizationBackend]
+    """
+    The explicitly selected renderer.
+    """
+
+    _cleanup: ExitStack = field(default_factory=ExitStack, init=False, repr=False)
+    """
+    Resource cleanup callbacks in reverse acquisition order.
+    """
 
     @classmethod
     def from_environment(
@@ -197,8 +173,9 @@ class WorldVisualization:
         *,
         ros_node: Node | None = None,
         collision_visualization: bool = False,
-    ) -> Self:
-        """Read optional renderer settings while preserving the supplied default.
+    ) -> WorldVisualization:
+        """
+        Read optional renderer settings while preserving the supplied default.
 
         :param world: The world to visualize.
         :param default_backend: Renderer used without an explicit setting.
@@ -210,97 +187,248 @@ class WorldVisualization:
             .strip()
             .lower()
         )
-        mode = (
-            os.environ.get(VisualizationOption.RERUN_MODE, RerunMode.SPAWN.value)
-            .strip()
-            .lower()
-        )
         if backend not in {member.value for member in VisualizationBackend}:
             raise UnknownVisualizationOption(VisualizationOption.BACKEND, backend)
-        if mode not in {member.value for member in RerunMode}:
-            raise UnknownVisualizationOption(VisualizationOption.RERUN_MODE, mode)
-        return cls(
-            world=world,
-            backend=VisualizationBackend(backend),
-            ros_node=ros_node,
-            collision_visualization=collision_visualization,
-            rerun_mode=RerunMode(mode),
-            rerun_target=os.environ.get(VisualizationOption.RERUN_TARGET),
-        )
+        constructors = {
+            VisualizationBackend.NONE: partial(HeadlessVisualization, world),
+            VisualizationBackend.RVIZ: partial(
+                RvizVisualization,
+                world,
+                ros_node=ros_node,
+                collision_visualization=collision_visualization,
+            ),
+            VisualizationBackend.RERUN: partial(RerunVisualization, world),
+            VisualizationBackend.CRAMERA: partial(PluginVisualization, world),
+        }
+        visualization = constructors[VisualizationBackend(backend)]()
+        visualization._configure_from_environment()
+        return visualization
+
+    def _configure_from_environment(self) -> None:
+        pass
 
     @property
+    @abstractmethod
     def is_rendering(self) -> bool:
         """:return: Whether this owner has a started renderer."""
-        return any(
-            renderer is not None
-            for renderer in (
-                self.rviz_publisher,
-                self.rerun_adapter,
-                self.cramera_visualization,
-            )
-        )
+
+    @abstractmethod
+    def _start(self, cleanup: ExitStack) -> None:
+        pass
 
     def start(self) -> Self:
-        """Start the selected renderer once.
+        """
+        Start the selected renderer once.
 
         :return: This visualization owner.
         """
         if self.is_rendering:
             return self
-        match self.backend:
-            case VisualizationBackend.RVIZ:
-                self._start_rviz()
-            case VisualizationBackend.RERUN:
-                self.rerun_adapter = RerunAdapter(
-                    _world=self.world,
-                    mode=self.rerun_mode,
-                    target=self.rerun_target,
-                    state_history=True,
-                )
-            case VisualizationBackend.CRAMERA:
-                providers = entry_points(
-                    group=VisualizationOption.PROVIDER_GROUP, name=self.backend.value
-                )
-                if len(providers) != 1:
-                    raise VisualizationBackendUnavailable(self.backend)
-                provider_type = next(iter(providers)).load()
-                if not issubclass(provider_type, PlanVisualization):
-                    raise VisualizationBackendUnavailable(self.backend)
-                self.cramera_visualization = provider_type(world=self.world).start()
+        with ExitStack() as cleanup:
+            self._start(cleanup)
+            self._cleanup = cleanup.pop_all()
         if self.is_rendering:
             VisualizationSession.register(self.stop)
         return self
 
-    def _start_rviz(self) -> None:
-        """Start native marker publishing, borrowing an existing ROS node if supplied."""
+    def stop(self) -> None:
+        """
+        Remove owned observers and renderers, retaining borrowed ROS resources.
+        """
+        self._cleanup.close()
+
+    def attach_plan(self, plan: Plan | PlanNode) -> None:
+        pass
+
+    def finish_execution(self) -> None:
+        self.stop()
+
+
+# %% headless execution
+@dataclass
+class HeadlessVisualization(WorldVisualization):
+    backend: ClassVar[VisualizationBackend] = VisualizationBackend.NONE
+    """
+    Headless execution without a renderer.
+    """
+
+    @property
+    def is_rendering(self) -> bool:
+        return False
+
+    def _start(self, cleanup: ExitStack) -> None:
+        pass
+
+
+# %% native RViz publishing
+@dataclass
+class RvizVisualization(WorldVisualization):
+    backend: ClassVar[VisualizationBackend] = VisualizationBackend.RVIZ
+    """
+    Native ROS marker publishing.
+    """
+
+    ros_node: Node | None = field(default=None, kw_only=True)
+    """
+    A borrowed ROS node, or a node created for an RViz renderer.
+    """
+
+    collision_visualization: bool = field(default=False, kw_only=True)
+    """
+    Whether the RViz renderer also publishes native collision results.
+    """
+
+    publisher: VizMarkerPublisher | None = field(default=None, init=False)
+    """
+    The owned RViz marker publisher.
+    """
+
+    @property
+    def is_rendering(self) -> bool:
+        return self.publisher is not None
+
+    def _start(self, cleanup: ExitStack) -> None:
+        """
+        Start native marker publishing, borrowing an existing ROS node if supplied.
+        """
         if VizMarkerPublisher is None:
             raise VisualizationBackendUnavailable(self.backend)
         if self.ros_node is None:
-            self._owns_context = not rclpy.ok()
-            if self._owns_context:
+            if not rclpy.ok():
                 rclpy.init()
+                cleanup.callback(self._shutdown_context)
             self.ros_node = rclpy.create_node("coraplex_visualization")
-            self._owns_node = True
-        self.rviz_publisher = VizMarkerPublisher(_world=self.world, node=self.ros_node)
+            cleanup.callback(self._destroy_node, self.ros_node)
+        self.publisher = VizMarkerPublisher(_world=self.world, node=self.ros_node)
+        cleanup.callback(self._stop_publisher, self.publisher)
         if self.collision_visualization:
-            self.rviz_publisher.with_collision_visualization()
+            self.publisher.with_collision_visualization()
+
+    def _shutdown_context(self) -> None:
+        if rclpy.ok():
+            rclpy.shutdown()
+
+    def _destroy_node(self, node: Node) -> None:
+        try:
+            node.destroy_node()
+        finally:
+            self.ros_node = None
+
+    def _stop_publisher(self, publisher: VizMarkerPublisher) -> None:
+        try:
+            publisher.stop()
+        finally:
+            self.publisher = None
+
+
+# %% native Rerun recording
+@dataclass
+class RerunVisualization(WorldVisualization):
+    backend: ClassVar[VisualizationBackend] = VisualizationBackend.RERUN
+    """
+    Native Rerun recording.
+    """
+
+    mode: RerunMode = field(default=RerunMode.SPAWN, kw_only=True)
+    """
+    Where the native Rerun adapter sends its recording.
+    """
+
+    target: str | None = field(default=None, kw_only=True)
+    """
+    The Rerun output file or server.
+    """
+
+    adapter: RerunAdapter | None = field(default=None, init=False)
+    """
+    The owned native Rerun adapter.
+    """
+
+    def _configure_from_environment(self) -> None:
+        mode = (
+            os.environ.get(VisualizationOption.RERUN_MODE, RerunMode.SPAWN.value)
+            .strip()
+            .lower()
+        )
+        if mode not in {member.value for member in RerunMode}:
+            raise UnknownVisualizationOption(VisualizationOption.RERUN_MODE, mode)
+        self.mode = RerunMode(mode)
+        self.target = os.environ.get(VisualizationOption.RERUN_TARGET)
+
+    @property
+    def is_rendering(self) -> bool:
+        return self.adapter is not None
+
+    def _start(self, cleanup: ExitStack) -> None:
+        self.adapter = RerunAdapter(
+            _world=self.world,
+            mode=self.mode,
+            target=self.target,
+            state_history=True,
+        )
+        cleanup.callback(self._stop_adapter, self.adapter)
+
+    def _stop_adapter(self, adapter: RerunAdapter) -> None:
+        try:
+            adapter.stop()
+        finally:
+            self.adapter = None
+
+
+# %% installed plan visualization
+@dataclass
+class PluginVisualization(WorldVisualization):
+    backend: ClassVar[VisualizationBackend] = VisualizationBackend.CRAMERA
+    """
+    The installed browser visualization.
+    """
+
+    provider: PlanVisualization | None = field(default=None, init=False)
+    """
+    The optional installed browser visualization provider.
+    """
+
+    _callbacks: list[PlanCallback] = field(default_factory=list, init=False)
+    """
+    Plan callbacks registered by this owner.
+    """
+
+    @property
+    def is_rendering(self) -> bool:
+        return self.provider is not None
+
+    def _start(self, cleanup: ExitStack) -> None:
+        providers = entry_points(
+            group=VisualizationOption.PROVIDER_GROUP, name=self.backend.value
+        )
+        if len(providers) != 1:
+            raise VisualizationBackendUnavailable(self.backend)
+        provider_type = next(iter(providers)).load()
+        if not isinstance(provider_type, type) or not issubclass(
+            provider_type, PlanVisualization
+        ):
+            raise VisualizationBackendUnavailable(self.backend)
+        self.provider = provider_type(world=self.world)
+        cleanup.callback(self._stop_provider, self.provider)
+        cleanup.callback(self._remove_callbacks)
+        self.provider.start()
 
     def attach_plan(self, plan: Plan | PlanNode) -> None:
-        """Observe a plan through the running optional provider.
+        """
+        Observe a plan through the running optional provider.
 
         :param plan: A plan or its root node.
         """
-        if self.cramera_visualization is None:
+        if self.provider is None:
             return
         observed_plan = plan.plan if isinstance(plan, PlanNode) else plan
         if any(callback.plan is observed_plan for callback in self._callbacks):
             return
-        callback = self.cramera_visualization.plan_callback(observed_plan)
+        callback = self.provider.plan_callback(observed_plan)
         observed_plan.node_callbacks.append(callback)
         self._callbacks.append(callback)
 
-    def stop(self) -> None:
-        """Remove owned observers and renderers, retaining borrowed ROS resources."""
+    def _remove_callbacks(self) -> None:
         for callback in self._callbacks:
             callback.plan.node_callbacks[:] = [
                 registered
@@ -308,20 +436,12 @@ class WorldVisualization:
                 if registered is not callback
             ]
         self._callbacks.clear()
-        if self.cramera_visualization is not None:
-            self.cramera_visualization.stop()
-            self.cramera_visualization = None
-        if self.rerun_adapter is not None:
-            self.rerun_adapter.stop()
-            self.rerun_adapter = None
-        if self.rviz_publisher is not None:
-            self.rviz_publisher.stop()
-            self.rviz_publisher = None
-        if self._owns_node:
-            self.ros_node.destroy_node()
-            self.ros_node = None
-            self._owns_node = False
-        if self._owns_context:
-            if rclpy.ok():
-                rclpy.shutdown()
-            self._owns_context = False
+
+    def _stop_provider(self, provider: PlanVisualization) -> None:
+        try:
+            provider.stop()
+        finally:
+            self.provider = None
+
+    def finish_execution(self) -> None:
+        pass

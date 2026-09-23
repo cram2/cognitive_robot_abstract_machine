@@ -99,6 +99,32 @@ class VisualizationBackend(StrEnum):
     """Use an installed browser visualization provider."""
 
 
+class VisualizationOption(StrEnum):
+    """
+    Configuration names for optional visualization providers.
+    """
+
+    BACKEND = "CORAPLEX_VISUALIZATION"
+    """
+    Environment setting selecting the renderer.
+    """
+
+    RERUN_MODE = "CORAPLEX_RERUN_MODE"
+    """
+    Environment setting selecting Rerun's output mode.
+    """
+
+    RERUN_TARGET = "CORAPLEX_RERUN_TARGET"
+    """
+    Environment setting selecting Rerun's file or server.
+    """
+
+    PROVIDER_GROUP = "coraplex.visualizations"
+    """
+    Installed entry points implementing PlanVisualization.
+    """
+
+
 class Arms(IntEnum):
     """
     Enum for Arms.
