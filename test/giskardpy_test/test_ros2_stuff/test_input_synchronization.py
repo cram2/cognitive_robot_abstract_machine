@@ -19,11 +19,16 @@ from giskardpy.middleware.ros2.exceptions import (
     UnboundMessageTypeError,
 )
 from giskardpy.middleware.ros2.input_synchronization import (
-    LatestJointStateSynchronizer,
     OdometrySynchronizer,
     PendingJointStateSynchronizer,
     TfFrameSynchronizer,
     TopicInputSynchronizer,
+    WorldStateInputs,
+)
+from giskardpy.middleware.ros2.robot_interface_config import RobotInterfaceConfig
+from giskardpy.middleware.ros2.server_config import (
+    ExecutionMode,
+    GiskardServerConfig,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -61,6 +66,108 @@ class RecordedTransformLookup:
 
     def lookup_pose(self, target_frame: str, source_frame: str) -> PoseStamped:
         return self.parent_T_child
+
+
+@dataclass
+class ControlLoopMimic:
+    """
+    Holds the inputs a control loop reads in every cycle.
+    """
+
+    inputs: WorldStateInputs
+    """
+    The inputs read before every tick of the controller.
+    """
+
+
+@dataclass
+class MotionServerMimic:
+    """
+    Holds the inputs read between goals and the control loop that executes a goal.
+    """
+
+    inputs: WorldStateInputs
+    """
+    The inputs read while no goal is executed.
+    """
+
+    control_loop: ControlLoopMimic
+    """
+    The loop that executes a goal.
+    """
+
+
+@dataclass
+class ContextMimic:
+    """
+    Holds the world a motion is executed in.
+    """
+
+    world: World
+    """
+    The world whose state the inputs write.
+    """
+
+
+@dataclass
+class ExecutorMimic:
+    """
+    Holds the context of the motion.
+    """
+
+    context: ContextMimic
+    """
+    The context whose world the inputs write.
+    """
+
+
+@dataclass
+class RobotMimic:
+    """
+    A robot that is only known by its name.
+    """
+
+    name: str
+    """
+    The name that joint state topics are grouped under.
+    """
+
+
+@dataclass
+class GiskardMimic:
+    """
+    Offers the parts of Giskard that a robot interface configures.
+    """
+
+    executor: ExecutorMimic
+    """
+    The executor whose world the inputs write.
+    """
+
+    robot: RobotMimic
+    """
+    The robot the interface talks to.
+    """
+
+    server_config: GiskardServerConfig
+    """
+    Decides whether the robot is commanded in a closed loop.
+    """
+
+    motion_server: MotionServerMimic
+    """
+    The server whose inputs the interface registers.
+    """
+
+
+@dataclass
+class JointStateTopicInterface(RobotInterfaceConfig):
+    """
+    Reads the state of the robot from a single joint state topic.
+    """
+
+    def setup(self):
+        self.sync_joint_state_topic("joint_states")
 
 
 def latest_message_field_type(synchronizer_type: type) -> Any:
@@ -146,7 +253,6 @@ def tracked_connection(world_with_two_bodies):
 
 def test_joint_state_synchronizers_read_joint_state_messages():
     assert PendingJointStateSynchronizer.message_type() is JointState
-    assert LatestJointStateSynchronizer.message_type() is JointState
 
 
 def test_odometry_synchronizer_reads_odometry_messages():
@@ -163,9 +269,6 @@ def test_synchronizer_without_bound_message_type_is_rejected():
 def test_joint_state_synchronizers_buffer_joint_state_messages():
     assert (
         latest_message_field_type(PendingJointStateSynchronizer) == Optional[JointState]
-    )
-    assert (
-        latest_message_field_type(LatestJointStateSynchronizer) == Optional[JointState]
     )
 
 
@@ -188,21 +291,6 @@ def test_pending_joint_state_synchronizer_writes_a_message_once(
     assert synchronizer.apply() is True
     assert mini_world.state[connection.raw_dof.id].position == 0.42
     assert synchronizer.apply() is False
-
-
-def test_latest_joint_state_synchronizer_rewrites_its_message_every_cycle(
-    init_rospy, mini_world: World
-):
-    [connection] = mini_world.connections
-    synchronizer = LatestJointStateSynchronizer(
-        world=mini_world, topic_name="joint_states"
-    )
-    synchronizer.latest_message = joint_state_message(connection.name.name, 0.42)
-
-    assert synchronizer.apply() is True
-    mini_world.state[connection.raw_dof.id].position = 1.0
-    assert synchronizer.apply() is True
-    assert mini_world.state[connection.raw_dof.id].position == 0.42
 
 
 def test_synchronizer_writes_nothing_without_a_message(init_rospy, mini_world: World):
@@ -313,3 +401,34 @@ def test_tracking_a_connection_without_six_degrees_of_freedom_is_rejected(
 
     with pytest.raises(ConnectionCannotBeTrackedByTfFrameError):
         synchronizer.track(connection, tf_parent_frame="map", tf_child_frame="odom")
+
+
+# %% closed loop
+
+
+def test_closed_loop_does_not_rewrite_a_joint_state_it_already_wrote(
+    init_rospy, mini_world: World
+):
+    [connection] = mini_world.connections
+    control_loop_inputs = WorldStateInputs(world=mini_world)
+    interface = JointStateTopicInterface()
+    interface.attach(
+        GiskardMimic(
+            executor=ExecutorMimic(context=ContextMimic(world=mini_world)),
+            robot=RobotMimic(name="robot"),
+            server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
+            motion_server=MotionServerMimic(
+                inputs=WorldStateInputs(world=mini_world),
+                control_loop=ControlLoopMimic(inputs=control_loop_inputs),
+            ),
+        )
+    )
+    interface.setup()
+    [synchronizer] = control_loop_inputs.synchronizers
+    synchronizer.buffer_message(joint_state_message(connection.name.name, 0.42))
+
+    control_loop_inputs.apply_inputs()
+    mini_world.state[connection.raw_dof.id].position = 1.0
+    control_loop_inputs.apply_inputs()
+
+    assert mini_world.state[connection.raw_dof.id].position == 1.0
