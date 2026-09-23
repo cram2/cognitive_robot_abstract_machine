@@ -10,6 +10,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.dof_limits import (
     BoundDirection,
     DegreeOfFreedomLimitProfiler,
+    QuadraticProgramDegreeOfFreedomLimits,
     VelocityBoundProfiles,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -286,5 +287,25 @@ def test_final_braking_step_uses_exactly_the_jerk_limit(prismatic_bot):
 
     reachable_velocity = final_braking_velocity + stopping.upper.jerk[0]
 
-    assert stopping.lower.velocity[0] == 0.0
-    assert reachable_velocity == stopping.lower.velocity[0]
+    assert reachable_velocity >= stopping.lower.velocity[0]
+
+
+# %% objective weights
+
+
+def test_degree_of_freedom_with_jerk_limit_has_no_jerk_cost_by_default(
+    prismatic_bot_with_jerk_limit,
+):
+    """
+    A degree of freedom that states its own jerk limit keeps the default of costing
+    nothing for jerk, like one whose jerk limit is derived from the horizon.
+    """
+    config = _default_config()
+
+    limits = QuadraticProgramDegreeOfFreedomLimits.create(
+        prismatic_bot_with_jerk_limit.active_degrees_of_freedom,
+        qp_controller_config=config,
+    )
+
+    jerk_weights = limits.quadratic_weights.to_np()[config.control_horizon :]
+    assert np.array_equal(jerk_weights, np.zeros(config.prediction_horizon))

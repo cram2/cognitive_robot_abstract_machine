@@ -897,7 +897,7 @@ class QuadraticProgramDegreeOfFreedomLimits:
     def normalize_degree_of_freedom_weight(
         self,
         variable_limit: float | None,
-        base_weight: float,
+        base_weight: float | None,
         horizon_index: int,
         total_horizon_length: int,
         growth_factor: float,
@@ -907,7 +907,8 @@ class QuadraticProgramDegreeOfFreedomLimits:
         ramps it over the horizon so later time steps are penalized more.
 
         :param variable_limit: Limit of the free variable used to normalize the weight.
-        :param base_weight: Base objective weight before normalization and ramping.
+        :param base_weight: Base objective weight before normalization and ramping,
+            ``None`` if the free variable is not weighted.
         :param horizon_index: Index of the horizon step the weight applies to.
         :param total_horizon_length: Horizon length over which the weight is ramped.
         :param growth_factor: Factor scaling the weight at the start of the horizon.
@@ -923,7 +924,7 @@ class QuadraticProgramDegreeOfFreedomLimits:
             slope = (weight - start) / total_horizon_length
             return slope * horizon_index + start
 
-        if variable_limit is None:
+        if variable_limit is None or base_weight is None:
             return 0.0
         weight = linear(horizon_index, base_weight, total_horizon_length, growth_factor)
 
