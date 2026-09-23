@@ -30,7 +30,7 @@ set -euo pipefail
 # that same pattern, not a new one.
 #
 # Every user-facing message string, and the comment-JSON parsing, live in
-# plan_updates_since_support.py rather than inline here - so this script
+# plan_updates_since_support rather than inline here - so this script
 # never carries its own copy of text the test suite also has to check
 # against, and the comment-parsing logic is real, testable Python rather
 # than an inline `python3 -c` snippet. See that module's own docstring.
@@ -47,7 +47,6 @@ if ! command -v python3 > /dev/null 2>&1; then
   exit 1
 fi
 
-SUPPORT_SCRIPT="${SCRIPT_DIR}/plan_updates_since_support.py"
 GITHUB_API_BASE_URL="https://api.github.com"
 
 # github_api_token: prints GH_TOKEN, else GITHUB_TOKEN, and fails with a
@@ -66,7 +65,7 @@ github_api_token() {
 # print_issue_comments_since: prints every comment on
 # repository#issue_number created or updated at or after since_timestamp_utc
 # (an "YYYY-MM-DDTHH:MM:SSZ" string), formatted by
-# plan_updates_since_support.py's format_issue_comments.
+# plan_updates_since_support's format_issue_comments.
 print_issue_comments_since() {
   local repository="$1" issue_number="$2" since_timestamp_utc="$3"
   local path="repos/${repository}/issues/${issue_number}/comments?since=${since_timestamp_utc}&per_page=100"
@@ -83,7 +82,7 @@ print_issue_comments_since() {
       "${GITHUB_API_BASE_URL}/${path}")"
   fi
 
-  printf '%s' "${response}" | python3 "${SUPPORT_SCRIPT}" print-comments
+  printf '%s' "${response}" | python3 -m "${PLAN_UPDATES_SINCE_SUPPORT_MODULE}" print-comments
 }
 
 PLAN_ID=""
@@ -141,7 +140,7 @@ PLAN_DIRECTORY="$(plan_directory_path "${PLAN_ID}")"
 echo "=== Changes to ${PLAN_DIRECTORY} (${SINCE_SHA}..${NEW_SHA}) ==="
 DELTA="$(git diff "${SINCE_SHA}" "${NEW_SHA}" -- "${PLAN_DIRECTORY}")"
 if [ -z "${DELTA}" ]; then
-  python3 "${SUPPORT_SCRIPT}" print-no-changes-message
+  python3 -m "${PLAN_UPDATES_SINCE_SUPPORT_MODULE}" print-no-changes-message
 else
   printf '%s\n' "${DELTA}"
 fi
@@ -152,13 +151,13 @@ TRACKING_ISSUE="$(git show "FETCH_HEAD:${MANIFEST_PATH}" \
 
 if [ -z "${TRACKING_ISSUE}" ]; then
   echo "=== Tracking issue ==="
-  python3 "${SUPPORT_SCRIPT}" print-no-tracking-issue-message
+  python3 -m "${PLAN_UPDATES_SINCE_SUPPORT_MODULE}" print-no-tracking-issue-message
 else
   DEFAULT_REPOSITORY="$(git show "FETCH_HEAD:${MANIFEST_PATH}" \
     | grep -oE '^default_repository:[[:space:]]*.+$' | head -1 \
     | sed -E 's/^default_repository:[[:space:]]*//' || true)"
   if [ -z "${DEFAULT_REPOSITORY}" ]; then
-    python3 "${SUPPORT_SCRIPT}" print-no-default-repository-message \
+    python3 -m "${PLAN_UPDATES_SINCE_SUPPORT_MODULE}" print-no-default-repository-message \
       "${PLAN_ID}" "${TRACKING_ISSUE}"
     exit 1
   fi

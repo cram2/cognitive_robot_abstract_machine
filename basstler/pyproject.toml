@@ -1,0 +1,75 @@
+# Installed only where the repository root is not the working directory: the package is
+# designed to be imported straight from that root with no install, since cloud sessions
+# run on fresh clones with no pip step. Built with an explicit package-dir mapping
+# because the package *is* this directory rather than living under one.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "basstler"
+description = "Workflow tooling: stacked-pull-request maintenance, plan dashboards, personal-notes hooks and upstream review reading."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "LGPL-3.0-only"
+authors = [
+    {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"}
+]
+maintainers = [
+    {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"}
+]
+keywords = ["stacked-pull-requests", "developer-tooling", "github", "workflow", "agents"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Utilities",
+]
+
+# Stated here and nowhere else, as every package in this repository states them: a
+# session start, an Actions workflow and `pip install ./basstler` all install from this
+# one list. `basstler.dependencies` is what reads it.
+dependencies = [
+    "pyyaml>=6",
+    "jinja2>=3",
+    "markdown>=3",
+    "nh3>=0.2",
+]
+dynamic = ["version"]
+
+[project.urls]
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+
+[tool.setuptools.dynamic]
+# The version comes from the repository's own root VERSION file, written into
+# _version.py by scripts/sync_version.py - the same mechanism every other package here
+# uses, so one bump moves all of them together.
+version = {attr = "basstler._version.__version__"}
+
+[tool.setuptools]
+packages = ["basstler"]
+
+# The files the modules resolve beside themselves rather than by an argument:
+# render_common.py finds the page templates as `Path(__file__).parent / "templates"`,
+# stack.py and plan_item_mode.py find their committed defaults beside themselves, and
+# upstream_reviews.py finds its GraphQL documents as `Path(__file__).parent / "queries"`.
+# An install that left them out would import and then fail at the first render, the first
+# configuration read, or the first query. pyproject.toml is here because
+# `basstler.dependencies` reads the declaration out of it at runtime.
+[tool.setuptools.package-data]
+basstler = [
+    "templates/*.html",
+    "queries/*.graphql",
+    "stack.toml",
+    "plan-item-modes.toml",
+    "pyproject.toml",
+]
+
+[tool.setuptools.package-dir]
+basstler = "."

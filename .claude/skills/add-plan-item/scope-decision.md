@@ -31,7 +31,7 @@ git ls-tree <base-branch> -- <paths the work touches>
 Empty output means those files do not exist on the base yet, so whichever
 unlanded item introduces them is a candidate owner of this work.
 
-`${CHECK_SCOPE_OVERLAP_SCRIPT}` runs this against every candidate branch at
+`${CHECK_SCOPE_OVERLAP_MODULE}` runs this against every candidate branch at
 once and reports which paths are missing from the base and which unlanded
 branches already touch them. Prefer it over running the command by hand — it is
 the step most often skipped, and skipping it is how the collisions above
@@ -53,7 +53,7 @@ Weighing the two parts usually settles it at a glance.
 
 Two items that built the same thing will not show up as an overlapping path if
 they named it differently. Read what the candidate branches actually changed —
-`${CHECK_SCOPE_OVERLAP_SCRIPT}` reports each one's full changed-file list for
+`${CHECK_SCOPE_OVERLAP_MODULE}` reports each one's full changed-file list for
 exactly this — and compare intent, not just filenames. When it happens, decide
 which copy survives *before* either lands; afterwards it is a merge conflict
 instead of a choice.

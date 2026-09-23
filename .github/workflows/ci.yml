@@ -69,10 +69,10 @@ jobs:
             exit 1
           fi
 
-  test_claude_dev_tooling:
-    # The .claude/ agent-tooling scripts (e.g. the plan-dashboard skill) are
-    # plain, dependency-light Python - they don't need the heavy docker-based
-    # matrix above, which is scoped to the robotics packages.
+  test_basstler:
+    # The basstler package - the agent tooling the .claude/ hooks and skills run
+    # - is plain, dependency-light Python. It doesn't need the heavy
+    # docker-based matrix above, which is scoped to the robotics packages.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -81,8 +81,10 @@ jobs:
           python-version: '3.12'
       - run: |
           source .claude/hooks/resolve-personal-notes-config.sh
-          pip install pytest -r "${PLAN_DASHBOARD_REQUIREMENTS_FILE}"
+          pip install pytest "./${BASSTLER_PACKAGE_DIRECTORY}"
+      # --confcutdir stops pytest walking up to the repository-root
+      # test/conftest.py, which imports the robotics stack this job
+      # deliberately does not install.
       - run: |
           source .claude/hooks/resolve-personal-notes-config.sh
-          python -m pytest "${PLAN_DASHBOARD_TESTS_DIRECTORY}" "${HOOKS_TESTS_DIRECTORY}" \
-            "${STACK_TESTS_DIRECTORY}" "${ADD_PLAN_ITEM_TESTS_DIRECTORY}"
+          python -m pytest "${BASSTLER_TESTS_DIRECTORY}" --confcutdir="${BASSTLER_TESTS_DIRECTORY}"

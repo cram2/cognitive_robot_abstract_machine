@@ -6,9 +6,9 @@ allowed-tools: Bash, Read
 
 # Plan Item Mode
 
-Sets the execution mode the plan-item skills resolve. Every mechanical part is
-`plan_item_mode.py`'s; this skill only reads what the user asked for and calls
-it. `${EXECUTION_MODES_DOCUMENT}` is where the modes are defined and where what
+Sets the execution mode the plan-item skills resolve. Every mechanical part
+belongs to the module the commands below run; this skill only reads what the
+user asked for and calls it. `${EXECUTION_MODES_DOCUMENT}` is where the modes are defined and where what
 each one obliges is stated — read it if the user asks what a mode means rather
 than restating it here.
 
@@ -35,7 +35,7 @@ naming both in one run is one commit on the notes branch instead of two:
 
 ```bash
 source .claude/hooks/resolve-personal-notes-config.sh
-python3 "${PLAN_ITEM_MODE_SCRIPT}" set \
+python3 -m "${PLAN_ITEM_MODE_MODULE}" set \
     --skill kickoff --skill resolve --mode <mode>
 ```
 
@@ -45,8 +45,8 @@ pinned, the mode, and the file it wrote.
 ## 3. Confirm it from the file, not from the write
 
 ```bash
-python3 "${PLAN_ITEM_MODE_SCRIPT}" resolve --skill kickoff
-python3 "${PLAN_ITEM_MODE_SCRIPT}" resolve --skill resolve
+python3 -m "${PLAN_ITEM_MODE_MODULE}" resolve --skill kickoff
+python3 -m "${PLAN_ITEM_MODE_MODULE}" resolve --skill resolve
 ```
 
 Report the `mode` and `source` these come back with. `source` is the part worth

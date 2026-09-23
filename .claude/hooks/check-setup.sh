@@ -84,9 +84,9 @@ git_identity_precedence_note() {
 # file at a time, instead of here with a single clear answer.
 MISSING_TOOLING=""
 for tooling_path in \
-    "${BUILD_DASHBOARD_SCRIPT}" \
+    "${BASSTLER_PACKAGE_DIRECTORY}/__init__.py" \
     "${REFRESH_DASHBOARD_SCRIPT}" \
-    "${PLAN_DASHBOARD_REQUIREMENTS_FILE}" \
+    "${BASSTLER_PYPROJECT_FILE}" \
     "${PLAN_SCHEMA_DOCUMENT}"; do
   [ -f "${tooling_path}" ] || MISSING_TOOLING="${MISSING_TOOLING} ${tooling_path}"
 done
@@ -94,7 +94,7 @@ if [ -n "${MISSING_TOOLING}" ]; then
   report tooling_files needs-setup \
     "this checkout is missing:${MISSING_TOOLING} - merge the plan-dashboard tooling into your fork's default branch first"
 else
-  report tooling_files ok "plan-dashboard scripts, schema reference and requirements are all present"
+  report tooling_files ok "the basstler package, its metadata, the refresh entry point and the schema reference are all present"
 fi
 
 # %% session-start wiring
@@ -171,38 +171,25 @@ fi
 
 # %% plan-dashboard dependencies
 
-# Derived from requirements.txt itself rather than a second hand-written list
-# of import names, which would silently go stale the moment that file changes.
-# Distribution names are what requirements.txt states, so they're what gets
-# looked up - no pyyaml/yaml-style mapping to maintain anywhere.
+# Reported rather than installed here: this script is read-only, and running
+# it must never change the answer it gives. ./session-start.sh installs them
+# (see install_dependencies in ./resolve-personal-notes-config.sh), so on a
+# clone whose notes branch resolves, this row reports what that run just did.
+#
+# The lookup itself is missing_dependencies, beside that installer, so both
+# read the same declaration the same way. What stays here is the two reasons
+# it can answer nothing, because they are this script's rows to word.
 if ! command -v python3 > /dev/null 2>&1; then
-  report dashboard_dependencies needs-setup "python3 is not on PATH, so the plan-dashboard scripts cannot run at all"
-elif [ ! -f "${PLAN_DASHBOARD_REQUIREMENTS_FILE}" ]; then
-  report dashboard_dependencies needs-setup "cannot check: ${PLAN_DASHBOARD_REQUIREMENTS_FILE} is missing"
+  report dashboard_dependencies needs-setup "python3 is not on PATH, so the plan-dashboard modules cannot run at all"
+elif [ ! -f "${BASSTLER_PYPROJECT_FILE}" ]; then
+  report dashboard_dependencies needs-setup "cannot check: ${BASSTLER_PYPROJECT_FILE} is missing"
 else
-  MISSING_DEPENDENCIES="$(python3 - "${PLAN_DASHBOARD_REQUIREMENTS_FILE}" <<'PYTHON'
-import re
-import sys
-from importlib.metadata import PackageNotFoundError, distribution
-
-missing = []
-for line in open(sys.argv[1], encoding="utf-8"):
-    requirement = line.split("#", 1)[0].strip()
-    if not requirement:
-        continue
-    name = re.split(r"[<>=!~;\[ ]", requirement, maxsplit=1)[0]
-    try:
-        distribution(name)
-    except PackageNotFoundError:
-        missing.append(name)
-print(" ".join(missing))
-PYTHON
-)"
+  MISSING_DEPENDENCIES="$(missing_dependencies)"
   if [ -z "${MISSING_DEPENDENCIES}" ]; then
-    report dashboard_dependencies ok "every requirement in ${PLAN_DASHBOARD_REQUIREMENTS_FILE} is installed"
+    report dashboard_dependencies ok "every dependency ${BASSTLER_PYPROJECT_FILE} declares is installed"
   else
     report dashboard_dependencies needs-setup \
-      "not installed:${MISSING_DEPENDENCIES// / } - run: pip install -r ${PLAN_DASHBOARD_REQUIREMENTS_FILE}"
+      "not installed:${MISSING_DEPENDENCIES// / } - run: pip install ${MISSING_DEPENDENCIES}"
   fi
 fi
 

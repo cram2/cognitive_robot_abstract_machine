@@ -1,3 +1,0 @@
-# One requirement that is certainly installed wherever these tests run, so the
-# dependency check has a green baseline it cannot flake on.
-pytest>=1
