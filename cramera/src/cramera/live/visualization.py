@@ -254,7 +254,7 @@ class LiveVisualization(PlanVisualization):
 
     def start(self) -> LiveVisualization:
         """
-        Attach the bridge to the world and start serving the viewer.
+        Start serving the world and its default live queries to the viewer.
 
         :return: This visualization.
         """
@@ -302,7 +302,7 @@ class LiveVisualization(PlanVisualization):
 
     def stop(self) -> None:
         """
-        Finalize this session's recording and release its callbacks and server.
+        Finalize the recording and release this session's callbacks, server and queries.
         """
         for callback in self._plan_callbacks:
             callback.stop()

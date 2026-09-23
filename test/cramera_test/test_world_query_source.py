@@ -1,3 +1,7 @@
+"""
+World query domains expose native entities and follow semantic model changes.
+"""
+
 from __future__ import annotations
 
 import pytest
@@ -23,6 +27,12 @@ from semantic_digital_twin.world_description.world_entity import (
 # %% native world fixtures
 @pytest.fixture()
 def annotated_robot_world(pr2_world_copy: World) -> World:
+    """
+    Add a table and handle to an isolated robot world.
+
+    :param pr2_world_copy: The robot scene receiving semantic annotations.
+    :return: The scene containing robot parts, a supporting surface and a handle.
+    """
     table = Body(name=PrefixedName("query_table"))
     handle = Body(name=PrefixedName("query_handle"))
     with pr2_world_copy.modify_world():
@@ -39,6 +49,11 @@ def annotated_robot_world(pr2_world_copy: World) -> World:
 def test_empty_world_exposes_only_native_current_state_domains(
     world_with_two_bodies: tuple[World, Body, Body],
 ) -> None:
+    """
+    An empty scene exposes each native domain without fabricated entities.
+
+    :param world_with_two_bodies: An empty world and two bodies not yet added to it.
+    """
     world, _, _ = world_with_two_bodies
     source = WorldQuerySource(world)
 
@@ -61,6 +76,12 @@ def test_empty_world_exposes_only_native_current_state_domains(
 def test_each_empty_world_preset_returns_an_empty_answer(
     world_with_two_bodies: tuple[World, Body, Body], domain_name: WorldQueryName
 ) -> None:
+    """
+    Presets over empty native domains return successful answers with no rows.
+
+    :param world_with_two_bodies: An empty world and two bodies not yet added to it.
+    :param domain_name: The domain whose preset is executed.
+    """
     world, _, _ = world_with_two_bodies
     source = WorldQuerySource(world)
     [knowledge] = source.knowledge()
@@ -77,6 +98,11 @@ def test_each_empty_world_preset_returns_an_empty_answer(
 def test_robotless_world_keeps_bodies_and_semantic_annotations_queryable(
     world_with_two_bodies: tuple[World, Body, Body],
 ) -> None:
+    """
+    Scene bodies and annotations remain available without robot annotations.
+
+    :param world_with_two_bodies: The world and bodies forming a table with a handle.
+    """
     world, parent, child = world_with_two_bodies
     handle = Handle(root=child)
     table = Table(root=parent)
@@ -98,6 +124,11 @@ def test_robotless_world_keeps_bodies_and_semantic_annotations_queryable(
 def test_domains_preserve_native_robot_and_annotation_instances(
     annotated_robot_world: World,
 ) -> None:
+    """
+    Query domains retain the identities and order of the world's native entities.
+
+    :param annotated_robot_world: The scene containing entities for every query domain.
+    """
     [knowledge] = WorldQuerySource(annotated_robot_world).knowledge()
 
     for domain in knowledge.domains:
@@ -118,6 +149,12 @@ def test_domains_preserve_native_robot_and_annotation_instances(
 def test_each_annotated_world_preset_returns_its_native_entities(
     annotated_robot_world: World, domain_name: WorldQueryName
 ) -> None:
+    """
+    Each preset renders exactly the entities in its corresponding native domain.
+
+    :param annotated_robot_world: The scene containing entities for every query domain.
+    :param domain_name: The populated domain whose preset is executed.
+    """
     source = WorldQuerySource(annotated_robot_world)
     [knowledge] = source.knowledge()
     index = [domain.name for domain in knowledge.domains].index(domain_name)
@@ -139,6 +176,11 @@ def test_each_annotated_world_preset_returns_its_native_entities(
 def test_presets_offer_each_domain_with_its_own_label(
     world_with_two_bodies: tuple[World, Body, Body],
 ) -> None:
+    """
+    Named presets cover each domain and consistently select current world state.
+
+    :param world_with_two_bodies: The empty scene used to inspect preset metadata.
+    """
     world, _, _ = world_with_two_bodies
     source = WorldQuerySource(world)
 
@@ -159,6 +201,11 @@ def test_presets_offer_each_domain_with_its_own_label(
 def test_domains_follow_body_and_annotation_additions_and_removals(
     world_with_two_bodies: tuple[World, Body, Body],
 ) -> None:
+    """
+    Fresh domains reflect model edits while previously returned domains stay intact.
+
+    :param world_with_two_bodies: The scene and bodies added before removing a handle.
+    """
     world, parent, child = world_with_two_bodies
     source = WorldQuerySource(world)
     [initial] = source.knowledge()
@@ -189,6 +236,11 @@ def test_domains_follow_body_and_annotation_additions_and_removals(
 def test_read_scope_uses_the_native_world_lock(
     world_with_two_bodies: tuple[World, Body, Body],
 ) -> None:
+    """
+    Query reads share the exact lock used for native world updates.
+
+    :param world_with_two_bodies: The scene providing the native synchronization lock.
+    """
     world, _, _ = world_with_two_bodies
 
     assert WorldQuerySource(world).read_scope() is world.state.world_lock

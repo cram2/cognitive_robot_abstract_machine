@@ -1,3 +1,5 @@
+"""Live world queries preserve source selection, locking and attachment ownership."""
+
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
@@ -31,15 +33,24 @@ if TYPE_CHECKING:
 
 # %% source selection
 class ResponseField(StrEnum):
+    """Response fields describing live query availability and execution."""
+
     QUERY = "query"
+    """Whether the bridge can answer live queries."""
     PRESETS = "presets"
+    """Queries offered by the selected source."""
     CODE = "code"
+    """The executable expression submitted for a query."""
     SCOPE = "scope"
+    """The body of knowledge selected for an expression."""
     OK = "ok"
+    """Whether the request completed successfully."""
 
 
 @dataclass
 class CountsReads(CurrentStateOnlySource):
+    """A query source recording how many operations enter its read scope."""
+
     reads: int = 0
     """
     Number of operations that entered this source's read scope.
@@ -47,12 +58,19 @@ class CountsReads(CurrentStateOnlySource):
 
     @contextmanager
     def read_scope(self) -> Iterator[None]:
+        """Count the operation entering the source's read boundary."""
         self.reads += 1
         yield
 
 
 class TestAutomaticWorldQueries:
+    """World attachments supply defaults while explicit sources retain precedence."""
+
     def test_attach_enables_current_state_queries(self, world: World) -> None:
+        """Attaching a world enables queries without registering an explicit source.
+
+        :param world: The robotless scene attached to the bridge.
+        """
         bridge = Bridge()
         bridge.attach(world)
 
@@ -61,6 +79,10 @@ class TestAutomaticWorldQueries:
         assert bridge.query_source is None
 
     def test_every_default_preset_runs_without_a_robot(self, world: World) -> None:
+        """Robotless scenes support execution and wording of every default preset.
+
+        :param world: The scene supplying the default query domains.
+        """
         bridge = Bridge()
         bridge.attach(world)
 
@@ -74,6 +96,10 @@ class TestAutomaticWorldQueries:
             assert bridge.match_question(preset.text).preset == preset
 
     def test_reattach_replaces_default_domains(self, world: World) -> None:
+        """A new attachment replaces the bodies exposed by automatic queries.
+
+        :param world: The populated scene attached before an empty replacement.
+        """
         bridge = Bridge()
         bridge.attach(world)
         first_count = len(bridge.query_vocabulary().domains[0].objects)
@@ -87,6 +113,11 @@ class TestAutomaticWorldQueries:
     def test_explicit_source_keeps_precedence(
         self, world: World, register_first: bool
     ) -> None:
+        """Explicit sources override default queries regardless of attachment order.
+
+        :param world: The scene providing automatic queries.
+        :param register_first: Whether to register the explicit source before attaching.
+        """
         source = GrowingRecordSource()
         bridge = Bridge()
         if register_first:
@@ -106,6 +137,11 @@ class TestAutomaticWorldQueries:
     def test_an_operation_keeps_its_source_when_registration_changes(
         self, world: World, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """A source replacement affects subsequent operations, not an active request.
+
+        :param world: The scene providing the original query source.
+        :param monkeypatch: Replaces preset retrieval with a source-changing operation.
+        """
         bridge = Bridge()
         bridge.attach(world)
         source = bridge._registered_query_source()
@@ -113,6 +149,7 @@ class TestAutomaticWorldQueries:
         original_presets = source.presets
 
         def change_source() -> list[Preset]:
+            """Register a replacement source while returning the original presets."""
             bridge.register_query_source(CurrentStateOnlySource())
             return original_presets()
 
@@ -122,6 +159,7 @@ class TestAutomaticWorldQueries:
         assert bridge.query_title() == CurrentStateOnlySource().title()
 
     def test_custom_sources_participate_in_read_scopes(self) -> None:
+        """Each bridge query operation enters the explicit source's read scope."""
         source = CountsReads()
         bridge = Bridge(query_source=source)
 
@@ -135,6 +173,10 @@ class TestAutomaticWorldQueries:
         assert source.reads == 6
 
     def test_explicit_world_source_is_not_replaced(self, world: World) -> None:
+        """A manually registered world source survives a different world attachment.
+
+        :param world: The world retained by the explicit source.
+        """
         source = WorldQuerySource(world)
         bridge = Bridge(query_source=source)
 
@@ -146,6 +188,10 @@ class TestAutomaticWorldQueries:
     def test_queries_read_current_poses_without_changing_world_versions(
         self, world: World
     ) -> None:
+        """Pose queries observe world changes without modifying model or state versions.
+
+        :param world: The scene whose connection pose changes between queries.
+        """
         bridge = Bridge()
         bridge.attach(world)
         code = (
@@ -169,15 +215,23 @@ class TestAutomaticWorldQueries:
 
 # %% concurrent world updates
 class TestWorldQueryLocking:
+    """Query results stay consistent with the locked native world state."""
+
     def test_native_world_stays_locked_through_result_rendering(
         self, world: World, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Rendering holds the world lock against acquisition from another thread.
+
+        :param world: The scene whose lock protects the query results.
+        :param monkeypatch: Adds a competing lock attempt during result rendering.
+        """
         bridge = Bridge()
         bridge.attach(world)
         original_render = RowRenderer.rows_of
         competing_reads: list[bool] = []
 
         def try_read() -> bool:
+            """Return whether the world lock can be acquired without waiting."""
             acquired = world.state.world_lock.acquire(blocking=False)
             if acquired:
                 world.state.world_lock.release()
@@ -186,6 +240,12 @@ class TestWorldQueryLocking:
         with ThreadPoolExecutor(max_workers=1) as executor:
 
             def render(renderer: RowRenderer, result: Any) -> Any:
+                """Check lock ownership before rendering the query result.
+
+                :param renderer: The renderer producing response rows.
+                :param result: The evaluated query result to render.
+                :return: The rows produced by the original renderer.
+                """
                 competing_reads.append(executor.submit(try_read).result(timeout=10))
                 return original_render(renderer, result)
 
@@ -202,6 +262,13 @@ class TestWorldQueryLocking:
 def visualization(
     world: World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> Iterator[LiveVisualization]:
+    """Provide a visualization with isolated recordings and a replaceable server.
+
+    :param world: The scene presented by the visualization.
+    :param monkeypatch: Redirects storage and replaces the server with a recorder.
+    :param tmp_path: The temporary directory holding recordings.
+    :yield: The visualization, stopped again during fixture cleanup.
+    """
     monkeypatch.setenv("CRAMERA_DATA", str(tmp_path))
     monkeypatch.setattr(
         visualization_module, "serve", lambda passed_bridge, port: ServerRecorder()
@@ -212,9 +279,15 @@ def visualization(
 
 
 class TestWorldQueryLifetime:
+    """Automatic queries follow the lifetime of their owning world attachment."""
+
     def test_stop_releases_default_queries(
         self, visualization: LiveVisualization
     ) -> None:
+        """Stopping the owning visualization removes its automatic query source.
+
+        :param visualization: The visualization acquiring the default queries.
+        """
         visualization.start()
         visualization.stop()
 
@@ -223,6 +296,10 @@ class TestWorldQueryLifetime:
             visualization.bridge.query_presets()
 
     def test_restart_restores_queries(self, visualization: LiveVisualization) -> None:
+        """Restarting a stopped visualization restores automatic query availability.
+
+        :param visualization: The visualization stopped and started again.
+        """
         visualization.start()
         visualization.stop()
         visualization.start()
@@ -232,6 +309,10 @@ class TestWorldQueryLifetime:
     def test_stop_preserves_explicit_source(
         self, visualization: LiveVisualization
     ) -> None:
+        """Stopping a visualization leaves an explicitly registered source available.
+
+        :param visualization: The visualization whose bridge receives a custom source.
+        """
         source = CurrentStateOnlySource()
         visualization.bridge.register_query_source(source)
         visualization.start()
@@ -242,6 +323,10 @@ class TestWorldQueryLifetime:
     def test_stop_preserves_a_newer_world_attachment(
         self, visualization: LiveVisualization
     ) -> None:
+        """Cleanup of an older attachment does not remove a newer attachment's queries.
+
+        :param visualization: The visualization whose bridge is reattached after startup.
+        """
         visualization.start()
         visualization.bridge.attach(visualization.world)
         visualization.stop()
@@ -251,7 +336,19 @@ class TestWorldQueryLifetime:
     def test_failed_start_releases_default_queries(
         self, visualization: LiveVisualization, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Failure to start the server releases automatic queries acquired earlier.
+
+        :param visualization: The visualization whose server startup fails.
+        :param monkeypatch: Replaces server startup with a failing implementation.
+        """
+
         def fail_start(bridge: Bridge, port: int) -> None:
+            """Reject server startup after the world has been attached.
+
+            :param bridge: The bridge offered for serving.
+            :param port: The requested listening port.
+            :raises OSError: Always, to represent a server startup failure.
+            """
             raise OSError()
 
         monkeypatch.setattr(visualization_module, "serve", fail_start)
@@ -264,9 +361,20 @@ class TestWorldQueryLifetime:
     def test_failed_finalization_still_releases_default_queries(
         self, visualization: LiveVisualization, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Recording finalization errors cannot retain the automatic query source.
+
+        :param visualization: The visualization whose recording cannot be finalized.
+        :param monkeypatch: Replaces recording finalization with a failing implementation.
+        """
         visualization.start()
 
         def fail_finalize(bridge: Bridge, recording: Any) -> None:
+            """Reject finalization of an otherwise active recording.
+
+            :param bridge: The bridge holding the recording.
+            :param recording: The capture offered for finalization.
+            :raises OSError: Always, to represent a finalization failure.
+            """
             raise OSError()
 
         with monkeypatch.context() as context:
@@ -279,9 +387,17 @@ class TestWorldQueryLifetime:
 
 # %% browser endpoint contract
 class TestWorldQueriesOverHttp:
+    """Automatic world queries use the existing preset and query endpoints."""
+
     def test_presets_execute_over_the_existing_endpoint(
         self, world: World, bridge: Bridge, server: str
     ) -> None:
+        """Every advertised world preset executes successfully over HTTP.
+
+        :param world: The scene supplying automatic presets.
+        :param bridge: The bridge served by the local endpoint.
+        :param server: The base URL for preset discovery and query execution.
+        """
         bridge.attach(world)
 
         payload = get_json(server + "/presets")

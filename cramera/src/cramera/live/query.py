@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 class NoQuerySourceRegistered(Exception):
     """
-    Raised when the bridge is asked a question and no demo offered to answer it.
+    Raised when a query has neither an explicit source nor an attached world source.
     """
 
     def __init__(self) -> None:
@@ -42,6 +42,13 @@ class LiveQuerySource(ABC):
     """
 
     def read_scope(self) -> AbstractContextManager[object]:
+        """
+        Define the scope for reading query metadata, evaluating and rendering answers.
+
+        Sources needing synchronized reads override this method to supply their lock.
+
+        :return: A context manager that performs no synchronization by default.
+        """
         return nullcontext()
 
     @abstractmethod
