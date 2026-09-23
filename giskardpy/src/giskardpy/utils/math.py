@@ -224,28 +224,6 @@ def axis_angle_from_rpy(
     return axis_angle_from_quaternion(*quaternion_from_rpy(roll, pitch, yaw))
 
 
-def gauss(n: float) -> float:
-    return (n**2 + n) / 2
-
-
-def max_velocity_from_horizon_and_jerk(
-    prediction_horizon: int,
-    vel_limit: float,
-    acc_limit: float,
-    jerk_limit: float,
-    sample_period: float,
-    max_derivative: Derivatives,
-):
-    n2 = int((prediction_horizon) / 2)
-    vel_jerk_limited = (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period**2
-    vel_acc_limits = acc_limit * sample_period * prediction_horizon
-    if max_derivative == Derivatives.jerk:
-        return min(vel_limit, vel_acc_limits, vel_jerk_limited)
-    if max_derivative == Derivatives.acceleration:
-        return min(vel_limit, vel_acc_limits)
-    return vel_limit
-
-
 @memoize
 def model_predictive_control(
     upper_limits: Tuple[Tuple[float, ...], ...],

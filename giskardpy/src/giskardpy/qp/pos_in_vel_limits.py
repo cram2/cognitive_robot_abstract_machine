@@ -2,7 +2,7 @@ from copy import copy
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Tuple, List
+from typing_extensions import Tuple
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import (
@@ -233,35 +233,3 @@ def compute_immediate_slowdown_profile(
     jerk_profile = (acceleration_profile - acceleration_profile2) / delta_time
 
     return Vector(velocity_profile), acceleration_profile, jerk_profile
-
-
-def implicit_velocity_profile(
-    acceleration_limit: float,
-    jerk_limit: float,
-    delta_time: float,
-    prediction_horizon: int,
-) -> List[float]:
-    """
-    Build the velocity profile implied by ramping up acceleration under jerk and
-    acceleration limits.
-
-    Integrates jerk into acceleration and acceleration into velocity over the horizon
-    and returns the profile reversed, so it represents the velocities to brake from
-    while ending at rest.
-
-    :param acceleration_limit: Maximum allowed acceleration.
-    :param jerk_limit: Maximum allowed change of acceleration per time step.
-    :param delta_time: Duration of a single time step.
-    :param prediction_horizon: Number of time steps in the profile.
-    :return: The implied velocity profile, ordered from the highest velocity down to
-        rest.
-    """
-    velocity_profile = [0, 0]  # because last two vel are always 0
-    velocity = 0
-    acceleration = 0
-    for i in range(prediction_horizon - 2):
-        acceleration += jerk_limit * delta_time
-        acceleration = min(acceleration, acceleration_limit)
-        velocity += acceleration * delta_time
-        velocity_profile.append(velocity)
-    return list(reversed(velocity_profile))

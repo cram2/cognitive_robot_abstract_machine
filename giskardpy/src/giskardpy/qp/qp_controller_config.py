@@ -83,7 +83,11 @@ class QPControllerConfig:
 
     horizon_weight_gain_scalar: float = 0.1
     """
-    Decides how much the dof_weights decrease over the prediction horizon.
+    Fraction of the dof_weights applied at the first step of the prediction horizon.
+
+    The weights grow linearly from this fraction to the full weight at the end of the
+    horizon, so the controller prefers using the early steps, whose commands are the
+    ones that get executed.
 
     .. warning:: Only change if you really know what you are doing.
     """
