@@ -536,3 +536,32 @@ def test_constraint_collection_groups_constraints_by_enforcement_strategy(
     assert set(constraints.get_equality_constraint_blocks()) == {IntegralStrategy}
     assert set(constraints.get_inequality_constraint_blocks()) == {VelocityStrategy}
     assert QPDataTwoSidedInequalityFactory.qp_data_type() is QPDataTwoSidedInequality
+
+
+def test_integral_strategy_bounds_slack_by_the_slack_limits_of_the_constraint(
+    prismatic_bot2,
+):
+    constraints = ConstraintCollection()
+    dof1 = prismatic_bot2.active_degrees_of_freedom[0]
+    constraints.add_inequality_constraint(
+        task_expression=dof1.variables.position,
+        lower_error=0,
+        upper_error=1,
+        quadratic_weight=1,
+        reference_velocity=1,
+        lower_slack_limit=-0.1,
+        upper_slack_limit=0.2,
+    )
+    [constraint] = constraints.inequality_constraints
+    strategy = IntegralStrategy(
+        degrees_of_freedom=prismatic_bot2.active_degrees_of_freedom,
+        constraints=constraints.inequality_constraints,
+        qp_controller_config=QPControllerConfig(
+            target_frequency=20, prediction_horizon=10
+        ),
+    )
+
+    slack_variables = strategy.create_slack_variables()
+
+    assert slack_variables.lower_bounds.to_np()[0] == constraint.lower_slack_limit
+    assert slack_variables.upper_bounds.to_np()[0] == constraint.upper_slack_limit

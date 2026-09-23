@@ -17,7 +17,6 @@ from giskardpy.qp.constraint import (
     GiskardConstraint,
     GiskardEqualityConstraint,
     GiskardInequalityConstraint,
-    LargeNumber,
 )
 from giskardpy.qp.dof_limits import DirectLimits
 from giskardpy.qp.exceptions import ConstraintTypeMismatchError
@@ -251,12 +250,12 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
 
     def create_slack_variables(self) -> DirectLimits:
         """
-        Creates one slack variable per constraint with normalized weights.
+        Creates one slack variable per constraint, bounded by the constraint's slack
+        limits, with normalized weights.
         """
-        number_of_slack_variables = len(self.constraints)
         return DirectLimits(
-            lower_bounds=Vector([-LargeNumber] * number_of_slack_variables),
-            upper_bounds=Vector([LargeNumber] * number_of_slack_variables),
+            lower_bounds=Vector([c.lower_slack_limit for c in self.constraints]),
+            upper_bounds=Vector([c.upper_slack_limit for c in self.constraints]),
             quadratic_weights=Vector(
                 [
                     normalize_slack_weight(
