@@ -65,6 +65,12 @@ def shifted_velocity_profile(
         if condition > 0:
             velocity_if_cases.append((condition, sm.Vector(velocity_result)))
             acceleration_if_cases.append((condition, sm.Vector(acceleration_result)))
+    # A distance shorter than the last braking step would leave only rest, so the degree
+    # of freedom could never close it; the first step covers it instead.
+    shortest_braking_distance, _ = velocity_if_cases[0]
+    remaining_distance_profile = sm.Vector.zeros(velocity_profile.shape[0])
+    remaining_distance_profile[0] = distance / delta_time
+    velocity_if_cases[0] = (shortest_braking_distance, remaining_distance_profile)
     velocity_if_cases.append(
         (
             2 * velocity_if_cases[-1][0] - velocity_if_cases[-2][0],

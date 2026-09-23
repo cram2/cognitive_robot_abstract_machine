@@ -298,3 +298,37 @@ def test_dof_limits_no_position_limits(prismatic_world_no_position_limits):
     assert np.allclose(
         lower_vel, -VELOCITY_LIMIT, atol=1e-3
     ), "Without position limits, lower velocity bounds must be flat"
+
+
+# %% reaching a position limit
+
+LIMIT_REACHING_TOLERANCE = 1e-3
+
+
+def test_joint_goal_at_upper_limit_is_reached(prismatic_bot):
+    """
+    A joint goal placed exactly on a position limit is reached, instead of the joint
+    stopping short of the limit.
+    """
+    connection = _connection(prismatic_bot)
+    upper = connection.dof.limits.upper.position
+
+    msc = MotionStatechart()
+    joint_goal = JointPositionList(
+        goal_state=JointState.from_mapping({connection: upper}),
+        threshold=LIMIT_REACHING_TOLERANCE,
+    )
+    msc.add_node(joint_goal)
+    end = EndMotion()
+    msc.add_node(end)
+    end.start_condition = joint_goal.observation_variable
+
+    kin_sim = Executor(
+        MotionStatechartContext(
+            world=prismatic_bot, qp_controller_config=_default_config()
+        )
+    )
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+
+    assert np.isclose(connection.position, upper, atol=LIMIT_REACHING_TOLERANCE)

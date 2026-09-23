@@ -264,9 +264,9 @@ def test_compute_horizon_bounds_flat_at_center(prismatic_bot):
 
 def test_final_braking_step_uses_exactly_the_jerk_limit(prismatic_bot):
     """
-    A degree of freedom that rides the last braking level into a position limit stops
-    with exactly the full jerk limit, so the first step's velocity is not confined to a
-    window as narrow as a solver's tolerance.
+    A degree of freedom that rides the last braking level into a position limit can stop
+    with the full jerk limit, so the first step's velocity is not confined to a window
+    as narrow as a solver's tolerance.
     """
     profiler = DegreeOfFreedomLimitProfiler(
         QPControllerConfig.create_with_simulation_defaults()
