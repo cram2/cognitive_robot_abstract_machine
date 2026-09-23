@@ -21,7 +21,7 @@ from giskardpy.middleware.ros2.exceptions import (
     UnserializableGoalError,
 )
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
-from giskardpy.middleware.ros2.input_synchronization import WorldStateInputs
+from semantic_digital_twin.adapters.ros.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.post_goal_plotters import PostGoalPlotter
 from giskardpy.middleware.ros2.world_updates import IncomingWorldUpdates

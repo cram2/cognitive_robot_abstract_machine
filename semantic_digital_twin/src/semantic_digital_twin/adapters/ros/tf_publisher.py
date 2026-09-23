@@ -18,6 +18,7 @@ from krrood.symbolic_math.symbolic_math import (
     CompiledFunction,
 )
 from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
+from semantic_digital_twin.adapters.ros.ros2_node import Ros2Node
 from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
@@ -83,14 +84,9 @@ class TfFrameNames:
 
 
 @dataclass(eq=False)
-class TfPublisherModelCallback(ModelChangeCallback):
+class TfPublisherModelCallback(ModelChangeCallback, Ros2Node):
     """
     Publishes the TF tree of the world.
-    """
-
-    node: Node = field(kw_only=True)
-    """
-    Ros2 node used to publish tf messages.
     """
 
     ignored_kinematic_structure_entities: set[KinematicStructureEntity] = field(
@@ -193,17 +189,12 @@ class TfPublisherModelCallback(ModelChangeCallback):
 
 
 @dataclass(eq=False)
-class TFPublisher(StateChangeCallback):
+class TFPublisher(StateChangeCallback, Ros2Node):
     """
     On state change, publishes the TF tree of the world.
 
     Puts a frame in every kinematic structure entity that is not in the ignored_bodies
     set.
-    """
-
-    node: Node = field(kw_only=True)
-    """
-    Ros2 node used to publish tf messages.
     """
 
     ignored_kinematic_structure_entities: set[KinematicStructureEntity] = field(

@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from geometry_msgs.msg import Point as RosPoint
-from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 
+from semantic_digital_twin.adapters.ros.ros2_node import Ros2Node
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheckingResult,
     ClosestPoints,
@@ -100,7 +100,7 @@ class ClassifiedContact:
 
 
 @dataclass
-class CollisionVisualizationMarkerPublisher(CollisionConsumer):
+class CollisionVisualizationMarkerPublisher(CollisionConsumer, Ros2Node):
     """
     Publishes the closest-points results of collision checks as an RViz marker.
 
@@ -112,11 +112,6 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer):
 
     .. warning:: To see something in Rviz add a MarkerArray plugin, set the topic
         name, and make sure the fixed frame is the tf root.
-    """
-
-    node: Node = field(kw_only=True)
-    """
-    The ROS2 node that will be used to publish the visualization marker.
     """
 
     topic_name: str = "/semworld/viz_marker"

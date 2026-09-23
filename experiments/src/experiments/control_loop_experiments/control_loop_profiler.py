@@ -12,7 +12,7 @@ from typing_extensions import Self
 from giskardpy.executor import Executor
 from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
-from giskardpy.middleware.ros2.input_synchronization import WorldStateInputs
+from semantic_digital_twin.adapters.ros.input_synchronization import WorldStateInputs
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.qp.qp_controller import QPController
 from krrood.adapters.json_serializer import SubclassJSONSerializer

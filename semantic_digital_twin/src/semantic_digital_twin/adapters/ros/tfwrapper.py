@@ -5,7 +5,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional, List, TYPE_CHECKING, TypeVar
 
-import rclpy
 from geometry_msgs.msg import (
     PoseStamped,
     Vector3Stamped,
@@ -18,6 +17,8 @@ from rclpy.time import Time
 from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 
+from semantic_digital_twin.adapters.ros.ros2_node import Ros2Node
+
 if TYPE_CHECKING:
     from networkx import MultiDiGraph
 
@@ -29,14 +30,9 @@ TransformableMsg = TypeVar(
 
 
 @dataclass
-class TFWrapper:
+class TFWrapper(Ros2Node):
     """
     A wrapper for ROS2's very beautiful tf library.
-    """
-
-    node: rclpy.node.Node = None
-    """
-    The ROS2 node that this TFWrapper is associated with.
     """
 
     tf_buffer_size: Optional[Duration] = None

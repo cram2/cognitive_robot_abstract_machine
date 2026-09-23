@@ -12,20 +12,16 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+from semantic_digital_twin.adapters.ros.ros2_node import Ros2Node
 
 
 @dataclass
-class FetchWorldServer:
+class FetchWorldServer(Ros2Node):
     """
     A ros service that allows other processes to fetch the entire world modification
     list from this world.
 
     The modification list is sent via a JSON string message.
-    """
-
-    node: Node
-    """
-    The rclpy node used to create the service.
     """
 
     world: World
