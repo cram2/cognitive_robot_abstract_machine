@@ -22,7 +22,6 @@ from typing_extensions import (
     Optional,
     TYPE_CHECKING,
 )
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.plan_node import DesignatorNode
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from krrood.entity_query_language.evaluable import Evaluable
@@ -72,6 +71,7 @@ from cramera.recording_fields import SceneField
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from coraplex.datastructures.enums import Arms
     from coraplex.plans.designator import Designator
     from coraplex.plans.plan import Plan
     from coraplex.plans.plan_node import MotionNode, PlanNode
@@ -88,10 +88,7 @@ class DesignatorParameter(StrEnum):
     """Native designator parameters naming the selected arms."""
 
     ARM = "arm"
-    """A single arm selection."""
-
-    ARMS = "arms"
-    """Multiple arm selections."""
+    """The native arm selection, including both arms."""
 
 
 # %% viewer payload shapes
@@ -1485,12 +1482,9 @@ class Bridge:
         """
         if designator is None:
             return
-        parameters = designator.designator_parameter
-        arm = parameters.get(DesignatorParameter.ARM)
-        if arm is None:
-            arm = parameters.get(DesignatorParameter.ARMS)
+        arm: Arms | None = designator.designator_parameter.get(DesignatorParameter.ARM)
         if arm is not None:
-            entry.arm = arm.name if isinstance(arm, Arms) else str(arm)
+            entry.arm = arm.name
         target = self._designator_target(designator)
         if target:
             entry.target = target

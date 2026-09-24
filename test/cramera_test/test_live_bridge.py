@@ -13,6 +13,7 @@ from coraplex.language import SequentialNode
 from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import ActionNode, MotionNode
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.robot_plans.motions.base import BaseMotion
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -47,7 +48,7 @@ from cramera.knowledge.enums import PlanNodeGroup
 from cramera.live.chart_structure import ChartEdgeEntry
 from cramera.live.bridge import Bridge
 
-from .dataset.plan_metadata import ArmSelectionAction, BodyTargetMotion
+from .dataset.plan_metadata import BodyTargetMotion
 from .test_robot_parts import ArmPart, EndEffectorPart, NamedBody, OneArmedRobot
 
 
@@ -85,7 +86,7 @@ def plan_bridge() -> (
     bridge = Bridge()
     target = Body(name=PrefixedName("milk.stl", prefix="world"))
     motion = MotionNode(designator=BodyTargetMotion(target_body=target))
-    action = ActionNode(designator=ArmSelectionAction(arm=Arms.RIGHT))
+    action = ActionNode(designator=ParkArmsAction(arm=Arms.RIGHT))
     condition = ConditionNode(condition=True, pre_condition=True, action_node=action)
     root = SequentialNode()
     plan = Plan()
