@@ -7,10 +7,8 @@ prediction horizon.
 from __future__ import annotations
 
 import enum
-from collections.abc import Iterator
 from copy import copy
 from dataclasses import dataclass, field
-from itertools import product
 from uuid import UUID
 
 import numpy as np
@@ -630,15 +628,46 @@ class DegreeOfFreedomLimitProfiler:
 
 
 @dataclass
-class QuadraticProgramDegreeOfFreedomLimits:
+class DecisionVariableSlot:
     """
-    Builds a :class:`DirectLimits` holding the bounds and weights of the robot's free
-    variables (velocity and jerk decision variables across the prediction horizon).
+    One decision variable of the QP: a derivative of a degree of freedom at one step of
+    the prediction horizon.
+    """
+
+    derivative: Derivatives
+    """
+    Derivative the decision variable holds.
+    """
+
+    step: int
+    """
+    Step of the prediction horizon the decision variable belongs to.
+    """
+
+    degree_of_freedom: DegreeOfFreedom
+    """
+    Degree of freedom the decision variable belongs to.
+    """
+
+    @property
+    def debug_name(self) -> str:
+        """
+        Human readable name of the decision variable, used for debugging.
+        """
+        short_label = {Derivatives.velocity: "vel", Derivatives.jerk: "jerk"}
+        return f"{self.degree_of_freedom.name}_{short_label[self.derivative]}_k_{self.step}"
+
+
+@dataclass
+class DegreeOfFreedomDecisionVariables:
+    """
+    The velocity and jerk decision variables of the robot's degrees of freedom across the
+    prediction horizon, with their bounds and objective weights.
     """
 
     degrees_of_freedom: list[DegreeOfFreedom]
     """
-    Degrees of freedom contributing decision variable slots.
+    Degrees of freedom contributing decision variables.
     """
 
     qp_controller_config: QPControllerConfig
@@ -654,24 +683,10 @@ class QuadraticProgramDegreeOfFreedomLimits:
     def __post_init__(self):
         self.profiler = DegreeOfFreedomLimitProfiler(self.qp_controller_config)
 
-    @classmethod
-    def create(
-        cls,
-        degrees_of_freedom: list[DegreeOfFreedom],
-        qp_controller_config: QPControllerConfig,
-    ) -> DirectLimits:
+    def direct_limits(self) -> DirectLimits:
         """
-        Builds the :class:`DirectLimits` for the given degrees of freedom and
-        configuration.
-
-        :param degrees_of_freedom: Degrees of freedom to build limits for.
-        :param qp_controller_config: Controller configuration providing horizon and
-            weights.
+        Returns the bounds, weights, and names of the decision variables.
         """
-        self = cls(
-            degrees_of_freedom=degrees_of_freedom,
-            qp_controller_config=qp_controller_config,
-        )
         lower_bounds, upper_bounds = self.free_variable_bounds()
         quadratic_weights, linear_weights = self.init_weights()
         return DirectLimits(
@@ -679,41 +694,37 @@ class QuadraticProgramDegreeOfFreedomLimits:
             upper_bounds=upper_bounds,
             quadratic_weights=quadratic_weights,
             linear_weights=linear_weights,
-            names=self.make_names(),
+            names=[slot.debug_name for slot in self.slots],
         )
 
-    def active_slots(self) -> Iterator[tuple[Derivatives, int, DegreeOfFreedom]]:
+    def number_of_steps(self, derivative: Derivatives) -> int:
         """
-        Yields every active decision variable slot as a ``(derivative, time_step, dof)``
-        tuple. The order defines the layout shared by bounds, weights, and names so they
-        stay aligned.
-        """
-        qp_controller_config = self.qp_controller_config
-        max_derivative = qp_controller_config.max_derivative
-        for derivative, time_step in product(
-            [Derivatives.velocity, Derivatives.jerk],
-            range(qp_controller_config.prediction_horizon),
-        ):
-            if time_step >= qp_controller_config.prediction_horizon - (
-                max_derivative - derivative
-            ):
-                continue
-            for degree_of_freedom in self.degrees_of_freedom:
-                yield derivative, time_step, degree_of_freedom
+        Returns the number of prediction horizon steps that have a decision variable
+        for ``derivative``.
 
-    def make_names(self) -> list[str]:
+        :param derivative: Derivative whose decision variables are counted.
         """
-        Creates a debug name for every free variable slot.
+        return self.qp_controller_config.prediction_horizon - (
+            self.qp_controller_config.max_derivative - derivative
+        )
+
+    @property
+    def slots(self) -> list[DecisionVariableSlot]:
         """
-        short_label = {Derivatives.velocity: "vel", Derivatives.jerk: "jerk"}
+        Every decision variable, in the order shared by bounds, weights, and names.
+        """
         return [
-            f"{dof.name}_{short_label[derivative]}_k_{time_step}"
-            for derivative, time_step, dof in self.active_slots()
+            DecisionVariableSlot(
+                derivative=derivative, step=step, degree_of_freedom=degree_of_freedom
+            )
+            for derivative in (Derivatives.velocity, Derivatives.jerk)
+            for step in range(self.number_of_steps(derivative))
+            for degree_of_freedom in self.degrees_of_freedom
         ]
 
     def free_variable_bounds(self) -> tuple[sm.Vector, sm.Vector]:
         """
-        Computes the lower and upper box limits of every free variable slot.
+        Computes the lower and upper box limits of every decision variable.
         """
         horizon_bounds: dict[UUID, DegreeOfFreedomLimits[sm.Vector]] = {
             degree_of_freedom.id: self.profiler.compute(degree_of_freedom)
@@ -721,18 +732,18 @@ class QuadraticProgramDegreeOfFreedomLimits:
         }
         lower_bounds = []
         upper_bounds = []
-        for derivative, t, degree_of_freedom in self.active_slots():
-            lower_bounds.append(
-                horizon_bounds[degree_of_freedom.id].lower[derivative][t]
-            )
-            upper_bounds.append(
-                horizon_bounds[degree_of_freedom.id].upper[derivative][t]
-            )
+        for slot in self.slots:
+            bounds = horizon_bounds[slot.degree_of_freedom.id]
+            lower_bounds.append(bounds.lower[slot.derivative][slot.step])
+            upper_bounds.append(bounds.upper[slot.derivative][slot.step])
         return sm.Vector(lower_bounds), sm.Vector(upper_bounds)
 
     def init_weights(self) -> tuple[sm.Vector, sm.Vector]:
         """
-        Computes the quadratic and linear objective weights of every free variable slot.
+        Computes the quadratic and linear objective weights of every decision variable.
+
+        The weights ramp up to their full value at the last step with a velocity
+        decision variable.
         """
         qp_controller_config = self.qp_controller_config
         decision_variable_limits = {
@@ -742,17 +753,18 @@ class QuadraticProgramDegreeOfFreedomLimits:
             )
             for degree_of_freedom in self.degrees_of_freedom
         }
+        last_velocity_step = self.number_of_steps(Derivatives.velocity) - 1
         quadratic_weights = []
-        for derivative, t, degree_of_freedom in self.active_slots():
+        for slot in self.slots:
             normalized_weight = self.normalize_degree_of_freedom_weight(
-                variable_limit=decision_variable_limits[degree_of_freedom.id][
-                    derivative
+                variable_limit=decision_variable_limits[slot.degree_of_freedom.id][
+                    slot.derivative
                 ],
                 base_weight=qp_controller_config.get_degree_of_freedom_weight(
-                    degree_of_freedom.name, derivative
+                    slot.degree_of_freedom.name, slot.derivative
                 ),
-                horizon_index=t,
-                total_horizon_length=qp_controller_config.prediction_horizon - 3,
+                horizon_index=slot.step,
+                total_horizon_length=last_velocity_step,
                 growth_factor=qp_controller_config.horizon_weight_gain_scalar,
             )
             quadratic_weights.append(normalized_weight)

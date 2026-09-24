@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, Joi
 from giskardpy.qp.dof_limits import (
     BoundDirection,
     DegreeOfFreedomLimitProfiler,
-    QuadraticProgramDegreeOfFreedomLimits,
+    DegreeOfFreedomDecisionVariables,
     VelocityBoundProfiles,
 )
 from giskardpy.qp.exceptions import DegreeOfFreedomBrakingExceedsHorizonError
@@ -195,10 +195,10 @@ def test_braking_that_does_not_fit_the_horizon_raises(
     )
 
     with pytest.raises(DegreeOfFreedomBrakingExceedsHorizonError) as error:
-        QuadraticProgramDegreeOfFreedomLimits.create(
-            prismatic_world_with_low_jerk_limit.active_degrees_of_freedom,
+        DegreeOfFreedomDecisionVariables(
+            degrees_of_freedom=prismatic_world_with_low_jerk_limit.active_degrees_of_freedom,
             qp_controller_config=config,
-        )
+        ).direct_limits()
 
     assert error.value.minimum_prediction_horizon == (
         braking.number_of_steps + NUMBER_OF_RESTING_STEPS
@@ -423,10 +423,10 @@ def test_degree_of_freedom_with_jerk_limit_has_no_jerk_cost_by_default(
     """
     config = _default_config()
 
-    limits = QuadraticProgramDegreeOfFreedomLimits.create(
-        prismatic_bot_with_jerk_limit.active_degrees_of_freedom,
+    limits = DegreeOfFreedomDecisionVariables(
+        degrees_of_freedom=prismatic_bot_with_jerk_limit.active_degrees_of_freedom,
         qp_controller_config=config,
-    )
+    ).direct_limits()
 
     jerk_weights = limits.quadratic_weights.to_np()[config.control_horizon :]
     assert np.array_equal(jerk_weights, np.zeros(config.prediction_horizon))
@@ -446,9 +446,10 @@ def _first_jerk_weight(world: World) -> float:
     config = _default_config()
     degree_of_freedom = _single_dof(world)
     config.set_dof_weight(degree_of_freedom.name, Derivatives.jerk, JERK_WEIGHT)
-    limits = QuadraticProgramDegreeOfFreedomLimits.create(
-        world.active_degrees_of_freedom, qp_controller_config=config
-    )
+    limits = DegreeOfFreedomDecisionVariables(
+        degrees_of_freedom=world.active_degrees_of_freedom,
+        qp_controller_config=config,
+    ).direct_limits()
     return float(limits.quadratic_weights.to_np()[config.control_horizon])
 
 

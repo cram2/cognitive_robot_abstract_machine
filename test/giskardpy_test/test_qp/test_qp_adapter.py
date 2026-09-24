@@ -4,7 +4,7 @@ import numpy as np
 
 import pytest
 
-from giskardpy.qp.dof_limits import DirectLimits, QuadraticProgramDegreeOfFreedomLimits
+from giskardpy.qp.dof_limits import DirectLimits, DegreeOfFreedomDecisionVariables
 from giskardpy.qp.enforcement_strategy import (
     SystemDynamicsStrategy,
     IntegralStrategy,
@@ -89,9 +89,10 @@ def test_DofLimits(prismatic_bot):
         target_frequency=target_frequency, prediction_horizon=prediction_horizon
     )
     expected_jerk_limit = _jerk_bound_derived_from_braking_time(1.0, config)
-    limits = QuadraticProgramDegreeOfFreedomLimits.create(
-        prismatic_bot.active_degrees_of_freedom, qp_controller_config=config
-    )
+    limits = DegreeOfFreedomDecisionVariables(
+        degrees_of_freedom=prismatic_bot.active_degrees_of_freedom,
+        qp_controller_config=config,
+    ).direct_limits()
     assert np.allclose(
         limits.lower_bounds.evaluate(),
         np.array([-1.0] * 8 + [-expected_jerk_limit] * 10),
@@ -128,9 +129,10 @@ def test_DofLimits_two_joints(prismatic_bot2):
     )
     expected_jerk_limit1 = _jerk_bound_derived_from_braking_time(1.0, config)
     expected_jerk_limit2 = _jerk_bound_derived_from_braking_time(0.5, config)
-    limits = QuadraticProgramDegreeOfFreedomLimits.create(
-        prismatic_bot2.active_degrees_of_freedom, qp_controller_config=config
-    )
+    limits = DegreeOfFreedomDecisionVariables(
+        degrees_of_freedom=prismatic_bot2.active_degrees_of_freedom,
+        qp_controller_config=config,
+    ).direct_limits()
     expected_limits = np.array(
         [1.0, 0.5] * 8 + [expected_jerk_limit1, expected_jerk_limit2] * 10
     )
