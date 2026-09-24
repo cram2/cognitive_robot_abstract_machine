@@ -8,6 +8,8 @@ from typing import Dict, Type
 
 from typing_extensions import TYPE_CHECKING
 
+from giskardpy.qp.exceptions import BrakingTimeExceedsHorizonError
+from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
@@ -17,6 +19,12 @@ if TYPE_CHECKING:
     from giskardpy.qp.solvers.qp_solver import QPSolver
 
 logger = logging.getLogger(__name__)
+
+NUMBER_OF_RESTING_STEPS = 2
+"""
+Number of final prediction horizon steps whose velocity is fixed at zero, so that every
+plan ends at rest.
+"""
 
 
 @dataclass
@@ -29,8 +37,8 @@ class QPControllerConfig:
     Tuning works the following way:
         1. Look at the frequency you get feedback from the robot and choose a frequency slightly below it.
             e.g. joint_states publishes at 100hz -> start with 90hz for the controller.
-        2. Set prediction horizon to 7. This is often the fastest reasonable config.
-        3. If the robot is NOT moving smoothly, increase prediction horizon until it does or giskard becomes unable to keep up with the frequency.
+        2. Leave the prediction horizon unset, so it is derived from the braking time.
+        3. If the robot is NOT moving smoothly, increase the braking time until it does.
         4. If Giskard cannot keep up with the frequency, reduce hz and go back to step 2.
     """
 
@@ -53,18 +61,26 @@ class QPControllerConfig:
         Pick 20. It is high enough to be stable and low enough for quick simulations.
     """
 
-    prediction_horizon: int = field(default=7)
+    braking_time: float = field(default=0.3)
+    """
+    Time, in seconds, a degree of freedom without a jerk limit of its own takes to brake
+    from its velocity limit to rest.
+
+    It sets that degree of freedom's jerk limit to ``4 * velocity_limit / braking_time**2``,
+    independent of the control frequency. Increasing it makes the motion smoother and
+    less aggressive, and lengthens the derived prediction horizon.
+    """
+
+    prediction_horizon: int | None = field(default=None)
     """
     The prediction horizon in time steps used for the QP formulation.
 
     Each step will have a length of 1/hz, meaning the prediction horizon in seconds is
-    prediction_horizon / hz.
+    prediction_horizon / hz. Every plan must come to rest within it, so it has to cover
+    the braking time. ``None`` derives the shortest horizon that does.
 
-    Increasing this value will:
-        - make the commands produced by Giskard smoother
-        - increase the computational cost of the controller.
-    You'll want a value that is as high as necessary and as low as possible.
-    .. note:: Typically values between 7 and 30 are good. Larger values often increase the computational cost too much.
+    .. note:: Larger values increase the computational cost of the controller and slow
+        down tracking of moving goals.
     .. warning:: Minimum value is 4, otherwise it becomes impossible to integrate jerk into the QP formulation.
     """
 
@@ -133,8 +149,20 @@ class QPControllerConfig:
             )
         self.model_predictive_control_time_step = self.control_dt
 
+        minimum_prediction_horizon = (
+            self.number_of_braking_steps + NUMBER_OF_RESTING_STEPS
+        )
+        if self.prediction_horizon is None:
+            self.prediction_horizon = minimum_prediction_horizon
         if self.prediction_horizon < 4:
             raise ValueError("prediction horizon must be >= 4.")
+        if self.prediction_horizon < minimum_prediction_horizon:
+            raise BrakingTimeExceedsHorizonError(
+                prediction_horizon=self.prediction_horizon,
+                minimum_prediction_horizon=minimum_prediction_horizon,
+                braking_time=self.braking_time,
+                time_step=self.control_dt,
+            )
 
     @cached_property
     def control_dt(self) -> float:
@@ -144,22 +172,29 @@ class QPControllerConfig:
         return 1 / self.target_frequency
 
     @property
+    def number_of_braking_steps(self) -> int:
+        """
+        Number of time steps a degree of freedom without a jerk limit of its own needs to
+        brake from its velocity limit to rest.
+        """
+        return JerkLimitedBraking.number_of_steps_for_braking_time(
+            braking_time=self.braking_time, time_step=self.control_dt
+        )
+
+    @property
     def control_horizon(self) -> int:
         """
-        Number of time steps over which commands are applied, two fewer than the
-        prediction horizon because the final two steps only bring the system to rest.
+        Number of time steps over which commands are applied, fewer than the prediction
+        horizon by the final steps that only bring the system to rest.
         """
-        return self.prediction_horizon - 2
+        return self.prediction_horizon - NUMBER_OF_RESTING_STEPS
 
     @classmethod
     def create_with_simulation_defaults(cls):
         """
         Creates a configuration with the default values used for kinematic simulation.
         """
-        return cls(
-            target_frequency=20,
-            prediction_horizon=7,
-        )
+        return cls(target_frequency=20)
 
     def set_dof_weight(
         self, dof_name: PrefixedName, derivative: Derivatives, weight: float

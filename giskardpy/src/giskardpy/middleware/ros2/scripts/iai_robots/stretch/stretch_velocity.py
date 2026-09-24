@@ -20,7 +20,7 @@ def main():
         robot_interface_config=StretchVelocityInterface(),
         server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
         qp_controller_config=QPControllerConfig(
-            target_frequency=25, prediction_horizon=30
+            target_frequency=25, braking_time=1.15, prediction_horizon=30
         ),
     )
     giskard.live()

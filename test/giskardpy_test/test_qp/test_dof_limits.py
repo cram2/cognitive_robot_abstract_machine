@@ -13,7 +13,12 @@ from giskardpy.qp.dof_limits import (
     QuadraticProgramDegreeOfFreedomLimits,
     VelocityBoundProfiles,
 )
-from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.qp.exceptions import DegreeOfFreedomBrakingExceedsHorizonError
+from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
+from giskardpy.qp.qp_controller_config import (
+    NUMBER_OF_RESTING_STEPS,
+    QPControllerConfig,
+)
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -151,6 +156,62 @@ def test_resolve_limits_without_position_limits(prismatic_world_no_position_limi
 
     assert lower_limits.position is None
     assert upper_limits.position is None
+
+
+# %% jerk limit from the braking time
+
+
+@pytest.mark.parametrize("target_frequency", [20, 50, 100])
+def test_derived_jerk_limit_follows_the_braking_time_at_every_control_frequency(
+    prismatic_bot, target_frequency
+):
+    config = QPControllerConfig(target_frequency=target_frequency)
+    degree_of_freedom = _single_dof(prismatic_bot)
+
+    lower_limits, upper_limits = DegreeOfFreedomLimitProfiler(config)._resolve_limits(
+        degree_of_freedom
+    )
+
+    expected_jerk_limit = (
+        4 * degree_of_freedom.limits.upper.velocity / config.braking_time**2
+    )
+    assert upper_limits.jerk == pytest.approx(expected_jerk_limit)
+    assert lower_limits.jerk == pytest.approx(-expected_jerk_limit)
+
+
+def test_declared_jerk_limit_is_kept(prismatic_bot_with_jerk_limit):
+    degree_of_freedom = _single_dof(prismatic_bot_with_jerk_limit)
+
+    lower_limits, upper_limits = _profiler()._resolve_limits(degree_of_freedom)
+
+    assert upper_limits.jerk == degree_of_freedom.limits.upper.jerk
+    assert lower_limits.jerk == degree_of_freedom.limits.lower.jerk
+
+
+def test_braking_that_does_not_fit_the_horizon_raises(
+    prismatic_world_with_low_jerk_limit,
+):
+    """
+    A degree of freedom that cannot brake from its velocity limit to rest before the
+    resting steps of the horizon is rejected, whether or not it has position limits.
+    """
+    config = _default_config()
+    degree_of_freedom = _single_dof(prismatic_world_with_low_jerk_limit)
+    braking = JerkLimitedBraking(
+        velocity_limit=degree_of_freedom.limits.upper.velocity,
+        jerk_limit=degree_of_freedom.limits.upper.jerk,
+        time_step=config.control_dt,
+    )
+
+    with pytest.raises(DegreeOfFreedomBrakingExceedsHorizonError) as error:
+        QuadraticProgramDegreeOfFreedomLimits.create(
+            prismatic_world_with_low_jerk_limit.active_degrees_of_freedom,
+            qp_controller_config=config,
+        )
+
+    assert error.value.minimum_prediction_horizon == (
+        braking.number_of_steps + NUMBER_OF_RESTING_STEPS
+    )
 
 
 def test_unconstrained_velocity_bounds_are_flat():

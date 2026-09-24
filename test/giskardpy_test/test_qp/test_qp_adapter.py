@@ -70,15 +70,27 @@ def test_direct_limits_empty():
     assert empty.names == []
 
 
+def _jerk_bound_derived_from_braking_time(
+    velocity_limit: float, config: QPControllerConfig
+) -> float:
+    """
+    The bound on a jerk decision variable, which is jerk times the squared time step,
+    for a degree of freedom whose jerk limit is derived from the configured braking
+    time.
+    """
+    jerk_limit = 4 * velocity_limit / config.braking_time**2
+    return jerk_limit * config.control_dt**2
+
+
 def test_DofLimits(prismatic_bot):
     target_frequency = 20
     prediction_horizon = 10
-    expected_jerk_limit = 1 / target_frequency
+    config = QPControllerConfig(
+        target_frequency=target_frequency, prediction_horizon=prediction_horizon
+    )
+    expected_jerk_limit = _jerk_bound_derived_from_braking_time(1.0, config)
     limits = QuadraticProgramDegreeOfFreedomLimits.create(
-        prismatic_bot.active_degrees_of_freedom,
-        qp_controller_config=QPControllerConfig(
-            target_frequency=target_frequency, prediction_horizon=prediction_horizon
-        ),
+        prismatic_bot.active_degrees_of_freedom, qp_controller_config=config
     )
     assert np.allclose(
         limits.lower_bounds.evaluate(),
@@ -111,13 +123,13 @@ def test_DofLimits(prismatic_bot):
 def test_DofLimits_two_joints(prismatic_bot2):
     target_frequency = 20
     prediction_horizon = 10
-    expected_jerk_limit1 = 1 / target_frequency
-    expected_jerk_limit2 = 1 / (target_frequency * 2)
+    config = QPControllerConfig(
+        target_frequency=target_frequency, prediction_horizon=prediction_horizon
+    )
+    expected_jerk_limit1 = _jerk_bound_derived_from_braking_time(1.0, config)
+    expected_jerk_limit2 = _jerk_bound_derived_from_braking_time(0.5, config)
     limits = QuadraticProgramDegreeOfFreedomLimits.create(
-        prismatic_bot2.active_degrees_of_freedom,
-        qp_controller_config=QPControllerConfig(
-            target_frequency=target_frequency, prediction_horizon=prediction_horizon
-        ),
+        prismatic_bot2.active_degrees_of_freedom, qp_controller_config=config
     )
     expected_limits = np.array(
         [1.0, 0.5] * 8 + [expected_jerk_limit1, expected_jerk_limit2] * 10

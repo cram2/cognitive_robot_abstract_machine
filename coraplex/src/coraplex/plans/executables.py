@@ -252,7 +252,10 @@ class GiskardExecutable(Executable):
             context=MotionStatechartContext(
                 world=self.context.world,
                 qp_controller_config=QPControllerConfig(
-                    target_frequency=50, prediction_horizon=4, verbose=False
+                    target_frequency=50,
+                    braking_time=0.056,
+                    prediction_horizon=4,
+                    verbose=False,
                 ),
             ),
             ros_node=self.context.ros_node,

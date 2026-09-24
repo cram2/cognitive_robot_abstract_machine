@@ -17,7 +17,7 @@ def main():
         world_config=WorldWithHSRConfig(urdf=urdf),
         robot_interface_config=HSRVelocityInterface(),
         qp_controller_config=QPControllerConfig(
-            target_frequency=40, prediction_horizon=15
+            target_frequency=40, braking_time=0.35, prediction_horizon=15
         ),
         server_config=GiskardServerConfig(
             execution_mode=ExecutionMode.CLOSED_LOOP, debug_mode=False

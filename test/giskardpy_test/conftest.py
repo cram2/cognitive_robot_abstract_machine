@@ -241,3 +241,27 @@ def prismatic_bot_with_jerk_limit():
 @pytest.fixture()
 def prismatic_world_no_position_limits():
     return _make_prismatic_world([_symmetric_prismatic_limits(None, 1)])
+
+
+JERK_LIMIT_TOO_LOW_FOR_SHORT_HORIZONS = 1.0
+"""
+A jerk limit with which a joint needs dozens of time steps at 20 Hz to brake from a
+velocity of 1 to rest.
+"""
+
+
+@pytest.fixture(
+    params=[1, None], ids=["with_position_limits", "without_position_limits"]
+)
+def prismatic_world_with_low_jerk_limit(request):
+    """
+    A prismatic joint whose own jerk limit is too low to brake from its velocity limit
+    within a short prediction horizon, with and without position limits.
+    """
+    return _make_prismatic_world(
+        [
+            _symmetric_prismatic_limits(
+                request.param, 1, jerk=JERK_LIMIT_TOO_LOW_FOR_SHORT_HORIZONS
+            )
+        ]
+    )

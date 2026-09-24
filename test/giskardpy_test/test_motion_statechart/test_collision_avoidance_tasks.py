@@ -742,6 +742,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
             world=pr2_with_box,
             qp_controller_config=QPControllerConfig(
                 target_frequency=100,
+                braking_time=0.289,
                 prediction_horizon=30,
             ),
         )
@@ -847,6 +848,7 @@ def _run_and_count_collision_checks(
             world=world,
             qp_controller_config=QPControllerConfig(
                 target_frequency=100,
+                braking_time=0.289,
                 prediction_horizon=30,
             ),
         )

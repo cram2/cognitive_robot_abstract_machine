@@ -21,7 +21,7 @@ def main():
             execution_mode=ExecutionMode.STANDALONE, debug_mode=True
         ),
         qp_controller_config=QPControllerConfig(
-            target_frequency=25, prediction_horizon=30
+            target_frequency=25, braking_time=1.15, prediction_horizon=30
         ),
     )
     giskard.live()
