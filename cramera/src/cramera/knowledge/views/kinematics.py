@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from coraplex.datastructures.enums import Arms, JointType
 from typing_extensions import Any, ClassVar, Dict, List, Optional, TYPE_CHECKING
 
-from cramera.knowledge.enums import EdgeKind, KinematicChainGroup
+from cramera.knowledge.enums import EdgeKind, KinematicChainGroup, SceneEntityPrefix
 from cramera.knowledge.scene_bundle import ParsedUrdf
 from cramera.robot_parts import RobotPartAnnotation, RobotPartRole
 from cramera.knowledge.subgraph import (
@@ -37,11 +37,6 @@ class UrdfViewPayload(GraphPanelPayload):
     Tab identifier used to select this payload type before constructing its view.
     """
 
-    link_prefix: str = "urdf:"
-    """
-    Namespace distinguishing link nodes from other scene entities.
-    """
-
     breadcrumb: str = "URDF"
     """
     Breadcrumb label shown above the tree.
@@ -60,15 +55,6 @@ class UrdfViewPayload(GraphPanelPayload):
         if self.legend is not None:
             options["legend"] = [asdict(entry) for entry in self.legend]
         return options
-
-    def link_id(self, name: str) -> str:
-        """
-        Identify one link in the kinematic graph and scene highlights.
-
-        :param name: The link's name in the robot description.
-        :return: The shared graph and viewer identifier for that link.
-        """
-        return self.link_prefix + name
 
     @classmethod
     def of_tab(cls, knowledge_base: EpisodeKnowledgeBase) -> UrdfViewPayload:
@@ -103,6 +89,7 @@ class UrdfViewPayload(GraphPanelPayload):
 
         # which joint drives each link (child link → its parent joint), for tooltips
         parent_joint = {joint.child: joint for joint in joints}
+        link_identifiers = {link: SceneEntityPrefix.URDF_LINK + link for link in links}
         for link in links:
             joint = parent_joint.get(link)
             lines = ["a URDF Link"]
@@ -112,19 +99,16 @@ class UrdfViewPayload(GraphPanelPayload):
             else:
                 lines.append("root link")
             view.add(
-                payload.link_id(link),
+                link_identifiers[link],
                 link,
                 cls._chain_group(link_to_part.get(link)),
                 lines,
             )
         for joint in joints:
-            if (
-                payload.link_id(joint.parent) in view.details
-                and payload.link_id(joint.child) in view.details
-            ):
+            if joint.parent in link_identifiers and joint.child in link_identifiers:
                 view.add_edge(
-                    payload.link_id(joint.parent),
-                    payload.link_id(joint.child),
+                    link_identifiers[joint.parent],
+                    link_identifiers[joint.child],
                     (
                         EdgeKind.PROPERTY
                         if joint.type != JointType.FIXED
@@ -133,7 +117,7 @@ class UrdfViewPayload(GraphPanelPayload):
                     "%s (%s)" % (joint.name, joint.type.name.lower()),
                 )
         movable_count = sum(1 for joint in joints if joint.type != JointType.FIXED)
-        view.details[payload.link_id(links[0])].lines.append(
+        view.details[link_identifiers[links[0]]].lines.append(
             "%d links · %d joints (%d movable)"
             % (len(links), len(joints), movable_count)
         )

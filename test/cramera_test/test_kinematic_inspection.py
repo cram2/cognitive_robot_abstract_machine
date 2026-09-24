@@ -2,10 +2,12 @@
 Inspect standard robot descriptions and their kinematic graph views.
 """
 
-from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from coraplex.datastructures.enums import JointType
+from cramera.knowledge.enums import SceneEntityPrefix
 from cramera.knowledge.knowledge_base import EpisodeKnowledgeBase
 from cramera.knowledge.scene_bundle import ParsedUrdf, UrdfJoint
 from cramera.knowledge.views.kinematics import UrdfViewPayload
@@ -30,24 +32,7 @@ def test_kinematics_accepts_reordered_joint_attributes(fixture_scene: Path) -> N
 
 
 # %% link identifiers
-def test_link_identifiers_use_the_view_prefix(fixture_scene: Path) -> None:
-    """
-    A view owns its link namespace independently of other views.
-
-    :param fixture_scene: Existing recorded scene fixture and its robot asset.
-    """
-    knowledge_base = EpisodeKnowledgeBase.of_scene(None)
-    view = UrdfViewPayload.of_tab(knowledge_base)
-    prefix = knowledge_base.robot.name + ":"
-    other_view = replace(view, link_prefix=prefix)
-    link = ParsedUrdf.of_scene().links[0]
-
-    assert other_view.link_id(link) == prefix + link
-    assert view.link_id(link) == view.nodes[0].id
-    assert other_view.link_id(link) != view.link_id(link)
-
-
-def test_kinematic_graph_uses_its_view_link_identifiers(fixture_scene: Path) -> None:
+def test_kinematic_graph_uses_shared_link_identifiers(fixture_scene: Path) -> None:
     """
     Nodes, edges and details address the same links as scene highlights.
 
@@ -55,14 +40,43 @@ def test_kinematic_graph_uses_its_view_link_identifiers(fixture_scene: Path) -> 
     """
     view = UrdfViewPayload.of_tab(EpisodeKnowledgeBase.of_scene(None))
     parsed = ParsedUrdf.of_scene()
-    identifiers = {view.link_id(link) for link in parsed.links}
+    identifiers = {SceneEntityPrefix.URDF_LINK + link for link in parsed.links}
 
     assert {node.id for node in view.nodes} == identifiers
     assert set(view.details) == identifiers
     assert {(edge.source, edge.target) for edge in view.edges} == {
-        (view.link_id(joint.parent), view.link_id(joint.child))
+        (
+            SceneEntityPrefix.URDF_LINK + joint.parent,
+            SceneEntityPrefix.URDF_LINK + joint.child,
+        )
         for joint in parsed.joints
     }
+
+
+def test_kinematic_edges_require_both_link_endpoints(
+    fixture_scene: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Joints referencing an absent parent or child never create dangling graph edges.
+
+    :param fixture_scene: Existing recorded scene fixture and its robot asset.
+    :param monkeypatch: The active monkeypatch fixture.
+    """
+    knowledge_base = EpisodeKnowledgeBase.of_scene(None)
+    expected = UrdfViewPayload.of_tab(knowledge_base)
+    parsed = ParsedUrdf.of_scene()
+    parsed.joints.extend(
+        [
+            UrdfJoint("missing_parent", JointType.FIXED, "absent", parsed.links[0]),
+            UrdfJoint("missing_child", JointType.FIXED, parsed.links[0], "absent"),
+        ]
+    )
+    monkeypatch.setattr(ParsedUrdf, "of_scene", lambda scene_name: parsed)
+
+    view = UrdfViewPayload.of_tab(knowledge_base)
+
+    assert view.edges == expected.edges
+    assert {node.id for node in view.nodes} == {node.id for node in expected.nodes}
 
 
 def test_missing_description_returns_an_empty_kinematic_view(

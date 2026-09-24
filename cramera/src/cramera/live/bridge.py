@@ -40,7 +40,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.geometry import Box, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import WorldEntity
-from cramera.knowledge.enums import PlanNodeGroup
+from cramera.knowledge.enums import PlanNodeGroup, SceneEntityPrefix
 from cramera.live.chart_observer import ChartObserver
 from cramera.live.chart_structure import (
     ChartSnapshot,
@@ -54,7 +54,6 @@ from cramera.knowledge.queryable_knowledge import (
     UnknownQueryScope,
 )
 from cramera.knowledge.question_matching import QuestionMatcher, QuestionMatchResult
-from cramera.knowledge.views.kinematics import UrdfViewPayload
 from cramera.live.query import NoQuerySourceRegistered
 from cramera.live.markers import MarkerEntry, MarkerStore
 from cramera.live.shape_catalog import (
@@ -865,10 +864,9 @@ class Bridge:
         :param names: Canonical entity names and existing viewer identifiers.
         :return: Sorted unique highlight identifiers, preserving unknown names.
         """
-        kinematics_view = UrdfViewPayload()
         identifiers = (
             {
-                name: kinematics_view.link_id(name)
+                name: SceneEntityPrefix.URDF_LINK + name
                 for name in WorldObjects(self.world, self.robot).robot_body_names()
             }
             if self.world is not None
