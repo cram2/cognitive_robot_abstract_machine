@@ -184,17 +184,6 @@ class NamesAWorldEntity(Protocol):
     """
 
 
-ALLOWED_CONSTRAINT_GOALS = (
-    "VectorsAligned",
-    "PointingAt",
-    "JointPositionReached",
-    "HeightMonitor",
-    "DistanceMonitor",
-)
-"""giskardpy goal/monitor class names the plan view may request (verified in
-``giskardpy/motion_statechart/monitors``)."""
-
-
 @dataclass
 class MotionNodeProgress:
     """
