@@ -246,6 +246,10 @@ class TestArmSideInference:
 
 
 class TestQueries:
+    """
+    Query results preserve entity identity and report invalid expressions.
+    """
+
     def test_entity_query(self, fixture_scene):
         result = EqlSession.of_active_scene().run(
             "the(entity(scene_object).where(scene_object.name == 'milk'))"
@@ -269,11 +273,10 @@ class TestQueries:
             {"name": "place_area", "kind": "location"},
         ]
 
-    def test_only_a_real_entity_is_treated_as_one(self):
+    def test_only_a_real_entity_is_treated_as_one(self) -> None:
         """
-        A result value is an entity because of its type, not because it happens to carry
-        a ``name``: semantic_digital_twin's ``Body`` is a dataclass with one and must
-        not be reported as an entity to highlight.
+        Recorded and native world entities retain their names, while a name value alone
+        does not identify an entity to highlight.
         """
         milk = BenchObject(
             name="milk",
@@ -284,8 +287,9 @@ class TestQueries:
         )
         body = Body(name=PrefixedName("milk"))
 
-        assert RowRenderer._entity_name(milk) == "milk"
-        assert RowRenderer._entity_name(body) is None
+        assert RowRenderer._entity_name(milk) == milk.name
+        assert RowRenderer._entity_name(body) == str(body.name)
+        assert RowRenderer._entity_name(body.name) is None
 
     def test_an_unknown_name_raises(self, fixture_scene):
         """
