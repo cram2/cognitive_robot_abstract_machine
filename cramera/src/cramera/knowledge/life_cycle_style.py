@@ -5,7 +5,7 @@ Native lifecycle presentation in the graph viewer's JSON shape.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from enum import Enum, StrEnum
+from enum import StrEnum
 
 from typing_extensions import Any
 
@@ -21,33 +21,12 @@ class StatusPresentationField(StrEnum):
 
     STYLES = "statusStyles"
     """
-    Lifecycle styles indexed by native and legacy state names.
+    Lifecycle styles indexed by native state names.
     """
 
     ORDER = "statusOrder"
     """
     Native state names in lifecycle declaration order.
-    """
-
-
-class LegacyLifeCycle(Enum):
-    """
-    Lifecycle names in older recordings and their native equivalents.
-    """
-
-    CREATED = LifeCycleValues.NOT_STARTED
-    """
-    A recorded node that has not started.
-    """
-
-    PAUSE = LifeCycleValues.PAUSED
-    """
-    A recorded paused node.
-    """
-
-    DONE = LifeCycleValues.SUCCEEDED
-    """
-    A recorded successfully completed node.
     """
 
 
@@ -147,7 +126,7 @@ class LifeCycleStyle:
     @classmethod
     def presentation(cls) -> dict[str, Any]:
         """
-        Serialize the native palette, replay aliases and native legend order.
+        Serialize the native palette and legend order.
 
         :return: JSON-ready style and legend entries for a graph payload.
         """
@@ -156,9 +135,6 @@ class LifeCycleStyle:
             state.name: asdict(cls.of_life_cycle(state, metrics))
             for state in LifeCycleValues
         }
-        styles.update(
-            (alias.name, styles[alias.value.name]) for alias in LegacyLifeCycle
-        )
         return {
             StatusPresentationField.STYLES: styles,
             StatusPresentationField.ORDER: [state.name for state in LifeCycleValues],

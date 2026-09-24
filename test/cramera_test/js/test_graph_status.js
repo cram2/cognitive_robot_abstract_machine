@@ -100,7 +100,7 @@ function loadGraphJs(canvas) {
 const PLAN_STYLES = {
   RUNNING: { color: '#123456', width: 19, label: 'in progress from server', show_label: true },
   SUCCEEDED: { color: '#345678', width: 13, label: 'finished from server', show_label: true },
-  CREATED: { color: '#56789a', width: 6, label: 'pending from server', show_label: false, dashes: [2, 6] },
+  NOT_STARTED: { color: '#56789a', width: 6, label: 'pending from server', show_label: false, dashes: [2, 6] },
   FAILED: { color: '#789abc', width: 19, label: 'failure from server', show_label: true },
 };
 
@@ -114,7 +114,7 @@ function planFixture(Graph) {
     nodes: [
       { id: 'p0', label: 'Sequential', group: 'other', status: 'SUCCEEDED' },
       { id: 'p1', label: 'Transport', group: 'event', status: 'RUNNING' },
-      { id: 'p2', label: 'MoveTCP', group: 'robot', status: 'CREATED' },
+      { id: 'p2', label: 'MoveTCP', group: 'robot', status: 'NOT_STARTED' },
       { id: 'p3', label: 'Place', group: 'event', status: 'FAILED' },
       { id: 'p4', label: 'plain', group: 'plan' },
     ],
@@ -180,9 +180,9 @@ test('status renders as a coloured ring + status word', function () {
   assert.strictEqual(node('p1').label, 'Transport\n' + PLAN_STYLES.RUNNING.label);
   assert.strictEqual(node('p0').color.border, PLAN_STYLES.SUCCEEDED.color);
   assert.strictEqual(node('p3').color.border, PLAN_STYLES.FAILED.color);
-  assert.ok(node('p1').borderWidth > node('p2').borderWidth);        // active > created
+  assert.ok(node('p1').borderWidth > node('p2').borderWidth);        // active > pending
   assert.strictEqual(node('p1').borderWidthSelected, node('p1').borderWidth);
-  assert.ok(Array.isArray(node('p2').shapeProperties.borderDashes)); // created: dashed
+  assert.ok(Array.isArray(node('p2').shapeProperties.borderDashes)); // pending: dashed
   assert.strictEqual(node('p2').label, 'MoveTCP');                   // pending status stays out of node label
   assert.strictEqual(node('p4').color, undefined);                   // no status: group style
 });
@@ -343,7 +343,7 @@ test('statechart transition kinds get distinct edge styles', function () {
     key: 'chart', layout: 'hier', arrows: true,
     nodes: [
       { id: 's0', label: 'Goal', group: 'motion_goal', status: 'RUNNING' },
-      { id: 's1', label: 'Move', group: 'robot', status: 'DONE' },
+      { id: 's1', label: 'Move', group: 'robot', status: 'SUCCEEDED' },
     ],
     edges: [
       { from: 's0', to: 's1', kind: 'START' },

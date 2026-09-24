@@ -59,7 +59,7 @@
   };
 
   // %% execution status → node ring
-  // The graph payload derives lifecycle names, colors and replay aliases from Python.
+  // The graph payload derives lifecycle names and colors from Python.
   let statusStyles = {}, statusOrder = [];
   // Transform freshness (cramera.live.transforms), on the frame a connection carries.
   const FRESHNESS_STYLE = {

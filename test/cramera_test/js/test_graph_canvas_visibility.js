@@ -135,7 +135,7 @@ test('a graph tab reached from the step list is built into a visible canvas', as
     '/api/knowledge': { ok: true, nodes: [{ id: 'e1', label: 'Milk', group: 'object' }], edges: [], details: {} },
     '/api/knowledge/view?name=plan': {
       ok: true, layout: 'hier', details: {}, edges: [],
-      nodes: [{ id: 'p1', kind: 'ActionNode', label: 'TransportAction', status: 'CREATED', group: 'action' }],
+      nodes: [{ id: 'p1', kind: 'ActionNode', label: 'TransportAction', status: 'NOT_STARTED', group: 'action' }],
     },
   });
   function click(view) {

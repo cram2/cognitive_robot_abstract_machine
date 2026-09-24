@@ -161,8 +161,8 @@ test('a live plan is drawn with the groups and legend the bridge sent', async fu
     'http://bridge/plan': {
       signature: 's1',
       nodes: [
-        { id: 'a1', kind: 'AttachNode', label: 'AttachNode', status: 'CREATED', group: 'attachment' },
-        { id: 'm1', kind: 'MotionNode', label: 'MotionNode', status: 'CREATED', group: 'motion' },
+        { id: 'a1', kind: 'AttachNode', label: 'AttachNode', status: 'NOT_STARTED', group: 'attachment' },
+        { id: 'm1', kind: 'MotionNode', label: 'MotionNode', status: 'NOT_STARTED', group: 'motion' },
       ],
       legend: [{ group: 'attachment', label: 'Attach / detach' }],
     },
@@ -204,7 +204,7 @@ test('statechart nodes are grouped by the kind of node giskardpy compiled', asyn
         { id: 'g0', name: 'ReachGoal', class_name: 'Goal', life_cycle: 'RUNNING', observation: '1' },
         { id: 't1', parent: 'g0', name: 'CartesianPose', class_name: 'CartesianPose', life_cycle: 'RUNNING', observation: '1' },
         { id: 'm1', parent: 'g0', name: 'PoseReached', class_name: 'PoseReached', life_cycle: 'RUNNING', observation: '0' },
-        { id: 'e1', parent: 'g0', name: 'EndMotion', class_name: 'EndMotion', life_cycle: 'CREATED', observation: '0' },
+        { id: 'e1', parent: 'g0', name: 'EndMotion', class_name: 'EndMotion', life_cycle: 'NOT_STARTED', observation: '0' },
       ],
       edges: [],
     },
@@ -471,7 +471,7 @@ const RECORDED_STATECHARTS = {
   ],
   moments: [
     { chart: 0, lifeCycles: ['RUNNING', 'NOT_STARTED'], observations: ['UNKNOWN', 'FALSE'] },
-    { chart: 0, lifeCycles: ['DONE', 'DONE'], observations: ['TRUE', 'TRUE'] },
+    { chart: 0, lifeCycles: ['SUCCEEDED', 'SUCCEEDED'], observations: ['TRUE', 'TRUE'] },
     { chart: 1, lifeCycles: ['RUNNING'], observations: ['UNKNOWN'] },
   ],
   frames: [-1, 0, 1, 2],
@@ -541,7 +541,7 @@ test('playing on within one statechart re-colours it instead of rebuilding', asy
     shown.bus.emit('scene:frame', { index: 2 });
 
     assert.strictEqual(panel.lastBuild(), built);
-    assert.deepStrictEqual(panel.statuses.at(-1), { g0: 'DONE', m1: 'DONE' });
+    assert.deepStrictEqual(panel.statuses.at(-1), { g0: 'SUCCEEDED', m1: 'SUCCEEDED' });
   } finally {
     shown.instance.destroy();
   }
@@ -643,7 +643,7 @@ test('a view that arrives after the reader moved on is not drawn', async functio
 });
 
 // %% lifecycle labels
-for (const status of ['PAUSED', 'PAUSE', 'INTERRUPTED', 'NOT_STARTED', 'CREATED']) {
+for (const status of ['PAUSED', 'INTERRUPTED', 'NOT_STARTED']) {
   test('the step list labels lifecycle ' + status, async function () {
     const style = { label: 'supplied label for ' + status, color: '#13579b' };
     const panel = loadPanel({

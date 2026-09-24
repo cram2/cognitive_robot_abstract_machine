@@ -17,7 +17,7 @@ from giskardpy.motion_statechart.plotters.styles import DRAWING_METRICS
 from semantic_digital_twin.world_description.geometry import Color
 
 
-# %% native source and replay compatibility
+# %% native source
 @pytest.mark.parametrize("state", LifeCycleValues)
 def test_a_lifecycle_keeps_its_native_name_and_color(state: LifeCycleValues) -> None:
     """
@@ -32,30 +32,18 @@ def test_a_lifecycle_keeps_its_native_name_and_color(state: LifeCycleValues) -> 
     assert style.show_label is (state is not LifeCycleValues.NOT_STARTED)
 
 
-@pytest.mark.parametrize(
-    "alias, state",
-    [
-        ("CREATED", LifeCycleValues.NOT_STARTED),
-        ("PAUSE", LifeCycleValues.PAUSED),
-        ("DONE", LifeCycleValues.SUCCEEDED),
-    ],
-)
-def test_a_legacy_recording_uses_its_native_equivalent(
-    alias: str, state: LifeCycleValues
-) -> None:
+def test_the_palette_contains_only_native_lifecycles() -> None:
     """
-    Legacy spellings share the whole style and never add a duplicate legend entry.
-
-    :param alias: The spelling captured by an older recording.
-    :param state: Its native lifecycle equivalent.
+    Publish exactly the native lifecycle values in the palette and legend.
     """
     presentation = json.loads(json.dumps(LifeCycleStyle.presentation()))
 
-    assert (
-        presentation[StatusPresentationField.STYLES][alias]
-        == presentation[StatusPresentationField.STYLES][state.name]
-    )
-    assert alias not in presentation[StatusPresentationField.ORDER]
+    assert set(presentation[StatusPresentationField.STYLES]) == {
+        state.name for state in LifeCycleValues
+    }
+    assert presentation[StatusPresentationField.ORDER] == [
+        state.name for state in LifeCycleValues
+    ]
 
 
 def test_the_palette_reads_the_current_native_color(
