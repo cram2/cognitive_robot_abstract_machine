@@ -37,7 +37,7 @@ from cramera.body_geometry import NumericPose, POSE_PRECISION, rounded_pose
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
-from semantic_digital_twin.world_description.geometry import Color
+from semantic_digital_twin.world_description.geometry import Color, Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import WorldEntity
 from cramera.knowledge.enums import PlanNodeGroup, SceneEntityPrefix
@@ -114,25 +114,16 @@ class ObjectCatalogEntry:
         """Return the first shape's native color, or native white without geometry."""
         return self.shapes[0].color if self.shapes else Color()
 
-    def mesh_key(self, shape_index: int) -> str:
-        """Identify one shape's served mesh within this object.
-
-        :param shape_index: The shape's position in the native collection.
-        :return: The key used to serve the shape's mesh file.
-        """
-        return "%s#%d" % (self.key, shape_index)
-
     def to_payload(self) -> dict[str, Any]:
         """Describe native shapes with the browser's primitive and asset fields.
 
         :return: The object's geometry payload.
         """
         entries = []
-        for shape_index, shape in enumerate(self.shapes):
-            mesh_key = self.mesh_key(shape_index)
+        for shape in self.shapes:
             mesh_url = (
-                "/mesh?key=" + urllib.parse.quote(mesh_key, safe="")
-                if served_mesh_file(shape) is not None
+                "/mesh?key=" + urllib.parse.quote(shape.filename, safe="")
+                if isinstance(shape, Mesh) and served_mesh_file(shape) is not None
                 else None
             )
             entries.append(asdict(shape_entry(shape, mesh_url)))
@@ -526,9 +517,9 @@ class Bridge:
     bundle_lock: threading.RLock = field(default_factory=threading.RLock)
     """Serializes this session's geometry and recording exports."""
 
-    _mesh_serve: Dict[str, str] = field(default_factory=dict)
+    _mesh_serve: Dict[str, Mesh] = field(default_factory=dict)
     """
-    Object key → absolute mesh path served via the ``/mesh`` endpoint.
+    Native mesh sources allowed through the ``/mesh`` endpoint, keyed by filename.
     """
 
     _plan: Optional[Plan] = None
@@ -867,12 +858,14 @@ class Bridge:
 
     def mesh_path(self, key: str) -> Optional[str]:
         """
-        Absolute path of an object's mesh file, or None if it is not served.
+        Resolved local file of a registered mesh source, or None if it is not served.
 
-        :param key: Mesh key of the object, as published in the geometry catalog.
+        :param key: Native mesh filename published in the geometry catalog.
+        :return: The allowed mesh's existing local file, or None when unavailable.
         """
         with self._lock:
-            return self._mesh_serve.get(key)
+            mesh = self._mesh_serve.get(key)
+        return served_mesh_file(mesh) if mesh is not None else None
 
     def object_body(self, key: str) -> Optional[Body]:
         """
@@ -1277,10 +1270,10 @@ class Bridge:
         Retain native geometry and register its mesh files so new objects can appear
         mid-run.
 
-        :param bodies: The current published bodies, keyed by mesh key.
+        :param bodies: The current published bodies, keyed by their publication keys.
         """
         catalog: List[ObjectCatalogEntry] = []
-        serve: Dict[str, str] = {}
+        serve: Dict[str, Mesh] = {}
         for key, body in (
             item
             for item in bodies.items()
@@ -1291,10 +1284,9 @@ class Bridge:
                 shapes=body.visual or body.collision,
             )
             catalog.append(entry)
-            for shape_index, shape in enumerate(entry.shapes):
-                mesh_file = served_mesh_file(shape)
-                if mesh_file is not None:
-                    serve[entry.mesh_key(shape_index)] = mesh_file
+            for shape in entry.shapes:
+                if isinstance(shape, Mesh):
+                    serve[shape.filename] = shape
         with self._lock:
             self._mesh_serve = serve
             self.object_metadata = catalog

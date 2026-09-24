@@ -4,10 +4,12 @@ Native shape collections remain authoritative for live object geometry.
 
 from pathlib import Path
 import urllib.parse
+from dataclasses import replace
 
 import numpy
 import pytest
 import trimesh
+from PIL import Image
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -29,6 +31,55 @@ from .dataset.mesh_geometry import resolved_textured_mesh
 
 
 # %% catalog geometry
+def test_mesh_urls_reuse_native_sources_across_bodies_and_shape_order(
+    resolved_textured_mesh: Mesh, tmp_path: Path
+) -> None:
+    """
+    Keep source identity stable while preserving different material assets.
+
+    :param resolved_textured_mesh: First native mesh with its texture assets.
+    :param tmp_path: Directory receiving a second material-bearing native export.
+    """
+    second_geometry = resolved_textured_mesh.unscaled_mesh.copy()
+    second_geometry.visual.material.image = Image.new("RGB", (2, 2), (220, 30, 50))
+    second_mesh = Mesh.from_trimesh(second_geometry, directory=tmp_path)
+    repeated_mesh = replace(resolved_textured_mesh, scale=Scale(2, 3, 4))
+    first_body = Body(
+        name=PrefixedName("first"),
+        visual=ShapeCollection(shapes=[resolved_textured_mesh, second_mesh]),
+    )
+    second_body = Body(
+        name=PrefixedName("second"),
+        visual=ShapeCollection(shapes=[repeated_mesh]),
+    )
+    bridge = Bridge()
+    bodies = {str(body.name): body for body in [first_body, second_body]}
+    bridge.publish_bodies(bodies)
+
+    first_entry, second_entry = bridge.object_catalog()
+    first_url, different_url = [shape["mesh"] for shape in first_entry["shapes"]]
+    repeated_shape = second_entry["shapes"][0]
+    assert repeated_shape["mesh"] == first_url
+    assert repeated_shape["scale"] == repeated_mesh.scale.to_np().tolist()
+    assert different_url != first_url
+    numpy.testing.assert_allclose(
+        second_mesh.unscaled_mesh.vertices,
+        resolved_textured_mesh.unscaled_mesh.vertices,
+    )
+    for mesh, url in [
+        (resolved_textured_mesh, first_url),
+        (second_mesh, different_url),
+    ]:
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+        assert query["key"] == [mesh.filename]
+        assert bridge.mesh_path(mesh.filename) == str(mesh.local_file)
+
+    first_body.visual = ShapeCollection(shapes=[second_mesh, resolved_textured_mesh])
+    bridge.publish_bodies(bodies)
+    reordered_urls = [shape["mesh"] for shape in bridge.object_catalog()[0]["shapes"]]
+    assert reordered_urls == [different_url, first_url]
+
+
 def test_catalog_resolves_the_native_mesh_and_its_declared_material(
     resolved_textured_mesh: Mesh,
 ) -> None:

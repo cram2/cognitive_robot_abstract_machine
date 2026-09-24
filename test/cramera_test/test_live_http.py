@@ -9,7 +9,9 @@ module-level ``BRIDGE`` singleton — the concrete proof that
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import asdict
 
@@ -88,7 +90,7 @@ def publish_mesh_object(
     """
     Publish one mesh-backed object on ``bridge``, with a real file behind it.
 
-    The object's mesh is served shape by shape, so its serve key is ``<key>#0``.
+    The mesh's native filename identifies its allowlisted serving URL.
     """
     mesh_file = tmp_path / key
     mesh_file.write_bytes(content)
@@ -190,7 +192,8 @@ class TestMesh:
 
     def test_a_published_meshs_bytes_are_served(self, server, bridge, tmp_path):
         publish_mesh_object(bridge, tmp_path, content=b"solid milk endsolid")
-        status, body = get(server + "/mesh?key=milk.stl%230")
+        mesh_url = bridge.object_catalog()[0]["shapes"][0]["mesh"]
+        status, body = get(server + mesh_url)
         assert status == 200
         assert body == b"solid milk endsolid"
 
@@ -199,24 +202,79 @@ class TestMesh:
             get(server + "/mesh?key=nope.stl")
         assert error.value.code == 404
 
+    def test_an_existing_unpublished_mesh_file_is_not_served(
+        self, server: str, tmp_path: Path
+    ) -> None:
+        """
+        Require catalog registration even when the client names a real file.
+
+        :param server: Running live bridge HTTP endpoint.
+        :param tmp_path: Directory containing an unpublished asset.
+        """
+        mesh_file = tmp_path / "unpublished.obj"
+        mesh_file.write_text("o unpublished\n")
+        mesh_url = "/mesh?key=" + urllib.parse.quote(str(mesh_file), safe="")
+
+        with pytest.raises(urllib.error.HTTPError) as error:
+            get(server + mesh_url)
+
+        assert error.value.code == 404
+
     def test_a_side_asset_is_served_from_the_meshs_directory(
         self, server, bridge, tmp_path
     ):
         publish_mesh_object(bridge, tmp_path, key="board.obj", content=b"o board")
         (tmp_path / "board.mtl").write_bytes(b"newmtl paint")
 
-        status, body = get(server + "/mesh?key=board.obj%230&side=board.mtl")
+        mesh_url = bridge.object_catalog()[0]["shapes"][0]["mesh"]
+        status, body = get(server + mesh_url + "&side=board.mtl")
 
         assert status == 200
         assert body == b"newmtl paint"
+
+    @pytest.mark.parametrize("empty_reference", [False, True])
+    def test_a_missing_registered_mesh_does_not_expose_neighboring_files(
+        self,
+        server: str,
+        bridge: Bridge,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        empty_reference: bool,
+    ) -> None:
+        """
+        Require a real registered mesh before serving any of its neighboring assets.
+
+        :param server: Running live bridge HTTP endpoint.
+        :param bridge: Bridge receiving the native mesh with no backing file.
+        :param tmp_path: Directory containing only the neighboring file.
+        :param monkeypatch: Keeps empty native references inside the test directory.
+        :param empty_reference: Whether the native filename is empty rather than
+            missing.
+        """
+        monkeypatch.chdir(tmp_path)
+        neighbor = tmp_path / "neighbor.txt"
+        neighbor.write_text("A neighboring file is not a registered mesh asset.")
+        filename = "" if empty_reference else str(tmp_path / "missing.obj")
+        body = Body(
+            name=PrefixedName("missing"),
+            visual=ShapeCollection(shapes=[Mesh(filename=filename)]),
+        )
+        bridge.publish_bodies({str(body.name): body})
+        mesh_url = "/mesh?key=" + urllib.parse.quote(filename, safe="")
+
+        with pytest.raises(urllib.error.HTTPError) as error:
+            get(server + mesh_url + "&side=" + neighbor.name)
+
+        assert error.value.code == 404
 
     def test_a_side_asset_outside_the_meshs_directory_is_refused(
         self, server, bridge, tmp_path
     ):
         publish_mesh_object(bridge, tmp_path, key="board.obj", content=b"o board")
+        mesh_url = bridge.object_catalog()[0]["shapes"][0]["mesh"]
 
         with pytest.raises(urllib.error.HTTPError) as error:
-            get(server + "/mesh?key=board.obj%230&side=..%2Fsecret.txt")
+            get(server + mesh_url + "&side=..%2Fsecret.txt")
 
         assert error.value.code == 403
 

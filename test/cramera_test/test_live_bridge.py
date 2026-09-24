@@ -623,7 +623,7 @@ class TestShapeCatalogEntries:
 
         shape = bridge.object_catalog()[0]["shapes"][0]
 
-        serve_key = "montessori/board#0"
+        serve_key = str(mesh_file)
         assert shape["kind"] == "mesh"
         assert shape["format"] == "obj"
         assert shape["mesh"] == "/mesh?key=" + urllib.parse.quote(serve_key, safe="")
