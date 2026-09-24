@@ -192,10 +192,11 @@ class Executor:
     """
 
     @property
-    def time(self) -> float:
-        return (
-            self.control_cycles * self.context.qp_controller_config.control_dt
-        ).total_seconds()
+    def time(self) -> timedelta:
+        """
+        Simulated time of the control cycles executed since the last compile.
+        """
+        return self.control_cycles * self.context.qp_controller_config.control_dt
 
     def __post_init__(self):
         self.pacer.target_frequency = self.context.qp_controller_config.target_frequency
@@ -228,12 +229,16 @@ class Executor:
         self._compiled_world_state_data = self.context.world.state._data
         self._compile_qp_controller(self.context.qp_controller_config)
         if self.trajectory_plotter is not None:
-            self.trajectory_plotter.reset(self.context.world.state, self.time)
+            self.trajectory_plotter.reset(
+                self.context.world.state, self.time.total_seconds()
+            )
         if self.debug_expression_plotter is not None:
             self.debug_expression_plotter.reset(
                 self.motion_statechart.collect_debug_expressions()
             )
-            self.debug_expression_plotter.debug_expression_trajectory.append(self.time)
+            self.debug_expression_plotter.debug_expression_trajectory.append(
+                self.time.total_seconds()
+            )
         self.context.collision_manager.update_collision_matrix()
         # do one tick to immediately active nodes whose start condition is constant true.
         self.motion_statechart.tick(self.context)
@@ -245,7 +250,9 @@ class Executor:
             self.context.collision_manager.compute_collisions()
         self.motion_statechart.tick(self.context)
         if self.debug_expression_plotter is not None:
-            self.debug_expression_plotter.debug_expression_trajectory.append(self.time)
+            self.debug_expression_plotter.debug_expression_trajectory.append(
+                self.time.total_seconds()
+            )
         if self.qp_controller is None:
             return
         next_cmd = self.qp_controller.compute_command(
@@ -260,7 +267,7 @@ class Executor:
         )
         if self.trajectory_plotter is not None:
             self.trajectory_plotter.world_state_trajectory.append(
-                self.context.world.state, self.time
+                self.context.world.state, self.time.total_seconds()
             )
 
     def tick_until_end(self, timeout: int = 1_000):
