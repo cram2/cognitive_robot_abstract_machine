@@ -190,6 +190,10 @@ def _object_entry(
         "color": entry.color.to_hex(),
     }
     shapes = entry.shapes
+    if not shapes:
+        payload[SceneField.SHAPES] = []
+        payload["height"] = 0.0
+        return payload
     payload["height"] = round(float(shapes.combined_mesh.extents[2]), POSE_PRECISION)
     if (
         len(shapes) == 1

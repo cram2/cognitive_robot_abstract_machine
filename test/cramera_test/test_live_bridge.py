@@ -52,27 +52,6 @@ from .dataset.plan_metadata import BodyTargetMotion
 from .test_robot_parts import ArmPart, EndEffectorPart, NamedBody, OneArmedRobot
 
 
-# %% world geometry fixtures
-@dataclass
-class ShapeSet:
-    """
-    A body's shape collection, of which the bridge reads only the shapes.
-    """
-
-    shapes: List[Any] = field(default_factory=list)
-
-
-@dataclass
-class PublishedBody:
-    """
-    A world body as the bridge publishes it: a prefixed name and its shapes.
-    """
-
-    name: str
-    visual: ShapeSet = field(default_factory=ShapeSet)
-    collision: ShapeSet = field(default_factory=ShapeSet)
-
-
 # %% native plan fixtures
 @pytest.fixture()
 def plan_bridge() -> (
@@ -382,30 +361,30 @@ class TestViewerAccessors:
         bridge = Bridge()
         bridge.publish_bodies(
             {
-                bridge.configuration.robot_base_key: PublishedBody(
-                    name="world/base_link"
+                bridge.configuration.robot_base_key: Body(
+                    name=PrefixedName("base_link", prefix="world")
                 ),
-                "milk.stl": PublishedBody(name="world/milk.stl"),
+                "milk.stl": Body(name=PrefixedName("milk.stl", prefix="world")),
             }
         )
         assert bridge.object_keys() == ["milk.stl"]
 
-    def test_an_object_with_unscaled_shapes_falls_back_to_the_default_size(self):
+    def test_a_shapeless_object_keeps_empty_geometry(self):
         """
-        A shapeless published body retains the shared placeholder dimensions.
+        A shapeless published body retains an empty geometry list.
         """
         bridge = Bridge()
-        bridge.publish_bodies({"blob.stl": PublishedBody(name="world/blob.stl")})
-        assert bridge.object_catalog()[0]["shapes"][0]["size"] == (
-            bridge.configuration.default_object_size.to_np().tolist()
+        bridge.publish_bodies(
+            {"blob.stl": Body(name=PrefixedName("blob.stl", prefix="world"))}
         )
+        assert bridge.object_catalog()[0]["shapes"] == []
 
     def test_an_unserved_mesh_has_no_path(self):
         assert Bridge().mesh_path("milk.stl") is None
 
     def test_object_body_returns_the_published_body(self):
         bridge = Bridge()
-        milk = PublishedBody(name="world/milk.stl")
+        milk = Body(name=PrefixedName("milk.stl", prefix="world"))
         bridge.publish_bodies({"milk.stl": milk})
 
         assert bridge.object_body("milk.stl") is milk
@@ -651,7 +630,7 @@ class TestShapeCatalogEntries:
         assert shape["scale"] == [1.0, 2.0, 3.0]
         assert bridge.mesh_path(serve_key) == str(mesh_file)
 
-    def test_a_mesh_shape_whose_file_vanished_becomes_a_default_box(self):
+    def test_a_mesh_shape_whose_file_vanished_reports_the_missing_file(self):
         body = Body(
             name=PrefixedName("board", prefix="montessori"),
             visual=ShapeCollection(shapes=[Mesh(filename="/gone/board.obj")]),
@@ -659,12 +638,8 @@ class TestShapeCatalogEntries:
         bridge = Bridge()
         bridge.publish_bodies({"montessori/board": body})
 
-        shape = bridge.object_catalog()[0]["shapes"][0]
-
-        assert shape["kind"] == "box"
-        assert (
-            shape["size"] == bridge.configuration.default_object_size.to_np().tolist()
-        )
+        with pytest.raises(FileNotFoundError):
+            bridge.object_catalog()
 
     def test_collision_shapes_stand_in_when_a_body_has_no_visual_ones(self):
         """

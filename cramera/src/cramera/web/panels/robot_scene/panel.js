@@ -605,6 +605,7 @@ Panels.define('robot-scene', function (root, bus) {
     (sc.objects || []).forEach(function (o) {
       addObject({
         id: o.id, key: o.key, color: o.color,
+        shapes: o.shapes,
         box: o.box || null,
         meshUrl: o.mesh ? sceneBase + o.mesh : null,
         mtlUrl: o.mtl ? sceneBase + o.mtl : null,

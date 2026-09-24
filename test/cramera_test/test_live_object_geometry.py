@@ -9,6 +9,8 @@ import pytest
 import trimesh
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Color,
@@ -100,18 +102,73 @@ def test_catalog_reuses_collision_geometry_without_visual_shapes() -> None:
     assert bridge.object_metadata[0].shapes is body.collision
 
 
-def test_shapeless_catalog_uses_a_native_placeholder_box() -> None:
+def test_shapeless_catalog_preserves_its_empty_native_geometry() -> None:
     """
-    Represent missing geometry with the same native box used for real geometry.
+    Keep a body addressable without inventing a solid where it has no geometry.
     """
     body = Body(name=PrefixedName("object"))
     bridge = Bridge()
 
     bridge.publish_bodies({str(body.name): body})
 
-    [shape] = bridge.object_metadata[0].shapes
-    assert isinstance(shape, Box)
-    assert shape.scale == bridge.configuration.default_object_size
+    assert bridge.object_metadata[0].shapes is body.collision
+    assert bridge.object_catalog()[0]["shapes"] == []
+    assert bridge.object_body(str(body.name)) is body
+    assert bridge.object_keys() == [str(body.name)]
+
+
+def test_recording_keeps_a_shapeless_body_without_exporting_a_solid(
+    tmp_path: Path,
+) -> None:
+    """
+    Retain identity and spawn pose when no geometry is available to record.
+
+    :param tmp_path: Directory receiving the object's recording assets.
+    """
+    body = Body(name=PrefixedName("empty"))
+    bridge = Bridge()
+    bridge.publish_bodies({str(body.name): body})
+    pose = [1, 2, 3, 0, 0, 0, 1]
+
+    payload = _object_entry(bridge.object_metadata[0], pose, tmp_path)
+
+    assert payload["key"] == str(body.name)
+    assert payload["spawn"] == pose
+    assert payload["shapes"] == []
+    assert "box" not in payload
+    assert "mesh" not in payload
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_shapeless_body_keeps_its_world_pose(
+    world_with_two_bodies: tuple[World, Body, Body],
+) -> None:
+    """
+    Snapshot a native body's pose independently of its empty geometry.
+
+    :param world_with_two_bodies: Native world, parent and unshaped child fixtures.
+    """
+    world, parent, body = world_with_two_bodies
+    parent_T_body = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3)
+    with world.modify_world():
+        world.add_body(parent)
+        world.add_connection(
+            FixedConnection(
+                parent=parent,
+                child=body,
+                parent_T_connection_expression=parent_T_body,
+            )
+        )
+    bridge = Bridge()
+    bridge.attach(world)
+    key = str(body.name)
+    bridge.publish_bodies({key: body})
+
+    bridge.snapshot()
+
+    assert bridge.get_state()["objects"][key] == [1, 2, 3, 0, 0, 0, 1]
+    assert bridge.object_catalog()[0]["shapes"] == []
+    assert bridge.object_body(key) is body
 
 
 def test_live_catalog_does_not_duplicate_the_shapes_classification() -> None:

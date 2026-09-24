@@ -8,7 +8,7 @@ import time
 import urllib.parse
 from collections.abc import Callable
 from contextlib import contextmanager, ExitStack
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -37,7 +37,7 @@ from cramera.body_geometry import NumericPose, POSE_PRECISION, rounded_pose
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
-from semantic_digital_twin.world_description.geometry import Box, Color
+from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import WorldEntity
 from cramera.knowledge.enums import PlanNodeGroup, SceneEntityPrefix
@@ -101,7 +101,7 @@ class ObjectCatalogEntry:
 
     shapes: ShapeCollection
     """
-    Visual geometry, collision geometry, or a placeholder for a shapeless body.
+    The body's native visual geometry, or collision geometry when visuals are absent.
     """
 
     @property
@@ -122,13 +122,10 @@ class ObjectCatalogEntry:
         """
         return "%s#%d" % (self.key, shape_index)
 
-    def to_payload(
-        self, mesh_files: dict[str, str], fallback_size: list[float]
-    ) -> dict[str, Any]:
+    def to_payload(self, mesh_files: dict[str, str]) -> dict[str, Any]:
         """Describe native shapes with the browser's primitive and asset fields.
 
         :param mesh_files: Registered mesh files indexed by their published keys.
-        :param fallback_size: Box dimensions for an unavailable mesh.
         :return: The object's geometry payload.
         """
         entries = []
@@ -139,7 +136,7 @@ class ObjectCatalogEntry:
                 if mesh_key in mesh_files
                 else None
             )
-            entries.append(asdict(shape_entry(shape, mesh_url, fallback_size)))
+            entries.append(asdict(shape_entry(shape, mesh_url)))
         return {
             SceneField.KEY: self.key,
             SceneField.ID: self.id,
@@ -835,11 +832,7 @@ class Bridge:
         """
         with self._lock:
             return [
-                entry.to_payload(
-                    self._mesh_serve,
-                    self.configuration.default_object_size.to_np().tolist(),
-                )
-                for entry in self.object_metadata
+                entry.to_payload(self._mesh_serve) for entry in self.object_metadata
             ]
 
     def object_keys(self) -> List[str]:
@@ -1265,19 +1258,15 @@ class Bridge:
             )
         }
 
-    def _body_shapes(self, body: Body) -> ShapeCollection:
+    @staticmethod
+    def _body_shapes(body: Body) -> ShapeCollection:
         """
-        Select visual geometry, collision geometry, or a native placeholder box.
+        Select native visual geometry, falling back to the collision collection.
 
         :param body: The body whose shapes are read.
-        :return: The nonempty collection to render and record.
+        :return: The original collection, which is empty for a shapeless body.
         """
-        for shape_collection in (body.visual, body.collision):
-            if shape_collection.shapes:
-                return shape_collection
-        return ShapeCollection(
-            shapes=[Box(scale=replace(self.configuration.default_object_size))]
-        )
+        return body.visual or body.collision
 
     @staticmethod
     def _actuated_connections(

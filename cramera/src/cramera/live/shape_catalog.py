@@ -145,18 +145,15 @@ def companion_mtl_url(mesh_file: str, mesh_url: str) -> Optional[str]:
 def shape_entry(
     shape: Shape,
     mesh_url: Optional[str],
-    fallback_size: List[float],
 ) -> ShapeEntry:
     """
     One shape as the viewer builds it.
 
-    A mesh whose backing file is gone degrades to a fallback-sized box, so the body
-    still occupies its place in the scene instead of vanishing.
-
     :param shape: The shape to publish.
     :param mesh_url: URL the shape's mesh is served from, or None for primitives and for
         meshes without a servable file.
-    :param fallback_size: Box extent used when a mesh has no servable file.
+    :raises FileNotFoundError: When the mesh has no servable file.
+    :raises TypeError: When the shape is not a supported native geometry type.
     """
     local_pose = NumericPose.of_matrix(shape.origin.to_np()).rounded()
     position, quaternion = local_pose[:3], local_pose[3:]
@@ -202,14 +199,9 @@ def shape_entry(
             format=Path(shape.filename).suffix.lstrip(".").lower(),
             scale=_rounded_axes(shape.scale),
         )
-    return ShapeEntry(
-        kind=ShapeKind.BOX,
-        position=position,
-        quaternion=quaternion,
-        color=color,
-        opacity=opacity,
-        size=list(fallback_size),
-    )
+    if isinstance(shape, Mesh):
+        raise FileNotFoundError(shape.filename)
+    raise TypeError(f"Unsupported shape type: {type(shape).__name__}")
 
 
 def _rounded_axes(scale: Scale) -> List[float]:

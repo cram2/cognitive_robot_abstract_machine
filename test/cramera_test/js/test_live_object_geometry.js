@@ -2,7 +2,45 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const path = require('node:path');
 const ScenePanelFunctions = require('./scene_panel_functions');
+
+// %% native bodies without geometry
+class EmptyGeometryScene extends ScenePanelFunctions {
+  constructor() {
+    const webDirectory = path.join(__dirname, '../../../cramera/src/cramera/web');
+    const THREE = require(path.join(webDirectory, 'vendor/three.min.js'));
+    super({
+      THREE, objectMeshes: {}, objectPending: {}, objectIdByKey: {}, objectKeyById: {},
+      objectLabels: {}, worldRoot: new THREE.Group(), labelsOn: false, needsRender: false,
+      SCENE: null, playbackSpeedMultiplier: 1, statusEl: null, linkToPart: {},
+      models: [], manager: {}, setTimeout() {}, sceneBase: '/scenes/empty/',
+    }, ['shape-specs.js']);
+    this.scope.makeLabel = () => new THREE.Group();
+    this.scope.refreshFrameAxes = () => {};
+    this.scope.buildPlaceTargetMarker = () => {};
+  }
+}
+
+test('an empty native shape list keeps a body group without drawing a solid', () => {
+  const scene = new EmptyGeometryScene();
+  scene.scope.addObject({ key: 'empty', id: 'empty', shapes: [] });
+  const object = scene.scope.objectMeshes.empty;
+  assert.ok(object);
+  let meshes = 0;
+  object.traverse(child => { if (child.isMesh) meshes += 1; });
+  assert.equal(meshes, 0);
+  assert.equal(scene.scope.objectIdByKey.empty, 'empty');
+});
+
+test('a recorded empty shape list reaches the same body renderer', () => {
+  const scene = new EmptyGeometryScene();
+  const spawned = [];
+  scene.scope.addObject = spec => spawned.push(spec);
+  scene.scope.loadScene({models: [], objects: [{key: 'empty', id: 'empty', shapes: []}]});
+  assert.equal(spawned.length, 1);
+  assert.deepEqual(Array.from(spawned[0].shapes), []);
+});
 
 // %% geometry catalog compatibility
 async function spawnCatalogObject(object) {
