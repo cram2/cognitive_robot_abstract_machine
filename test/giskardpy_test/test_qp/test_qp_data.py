@@ -406,3 +406,15 @@ def test_apply_filters_keeps_dof_columns_without_slack_two_sided_inequality():
     filtered = qp_data.apply_filters()
 
     assert filtered.quadratic_weights.shape[0] == 2
+
+
+# %% Hessian
+
+
+def test_hessian_is_the_sparse_diagonal_of_the_quadratic_weights(larger_qp):
+    qp_data, _ = larger_qp
+
+    hessian = qp_data.hessian
+
+    assert sp.isspmatrix_csc(hessian)
+    np.testing.assert_array_equal(hessian.toarray(), np.diag(qp_data.quadratic_weights))

@@ -102,6 +102,24 @@ class QPDataExplicit(QPData):
         """
         return self.inequality_matrix.toarray()
 
+    @property
+    def hessian(self) -> sp.csc_matrix:
+        """
+        The QP's Hessian matrix, a sparse diagonal matrix of the quadratic weights.
+
+        .. note:: Built directly in CSC form, which is faster than
+            :func:`scipy.sparse.diags`.
+        """
+        number_of_variables = len(self.quadratic_weights)
+        return sp.csc_matrix(
+            (
+                self.quadratic_weights,
+                np.arange(number_of_variables),
+                np.arange(number_of_variables + 1),
+            ),
+            shape=(number_of_variables, number_of_variables),
+        )
+
     def to_two_sided_inequality(self) -> QPDataTwoSidedInequality:
         """
         Converts the explicit QP format to a format with only two-sided inequalities.
