@@ -42,6 +42,16 @@ class SceneField(StrEnum):
     Individually described shapes that compose a scene object's geometry.
     """
 
+    MESH = "mesh"
+    """
+    Bundle-relative path of an object's mesh geometry.
+    """
+
+    MATERIAL_LIBRARY = "mtl"
+    """
+    Bundle-relative path of the material library declared by an object's OBJ mesh.
+    """
+
     PLAN_TREES = "planTrees"
     """
     Nested execution trees captured by the plan observer.

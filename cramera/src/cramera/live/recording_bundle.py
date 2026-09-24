@@ -26,7 +26,7 @@ from cramera.live.live_bundle import bundle_world_models
 from cramera.live.recording import Recording, RecordedFrame, RecordingState
 from cramera.live.recording_segments import derive_segments
 from cramera.mesh_format import MeshFormat
-from cramera.onboard.bundle_urdf import BundledAssets
+from cramera.onboard.bundle_urdf import BundledAssets, companion_material_library
 
 MESH_SUBDIRECTORY = "recording"
 """
@@ -173,7 +173,8 @@ def _object_entry(
     entry: ObjectCatalogEntry, spawn: List[float], output_directory: Path
 ) -> Dict[str, Any]:
     """
-    One loose object's ``scene.json`` entry: an inline box, or a copied/exported mesh.
+    One loose object's ``scene.json`` entry, including its geometry and material
+    library.
 
     An inline box must be centered and aligned with its body. Other local transforms are
     retained in exported mesh geometry.
@@ -197,7 +198,11 @@ def _object_entry(
     ):
         payload["box"] = rounded_scale(shapes[0].scale, POSE_PRECISION)
         return payload
-    payload["mesh"] = _write_object_mesh(entry.key, shapes, output_directory)
+    mesh_path = _write_object_mesh(entry.key, shapes, output_directory)
+    payload[SceneField.MESH] = mesh_path
+    material_library = companion_material_library(output_directory, mesh_path)
+    if material_library is not None:
+        payload[SceneField.MATERIAL_LIBRARY] = material_library
     return payload
 
 
@@ -209,7 +214,8 @@ def _write_object_mesh(
 
     A single untransformed mesh with unit scale is copied with its side assets
     (materials, textures). Other geometry is exported from the collection's combined
-    mesh, which retains each shape's local transform and scale.
+    mesh, which retains each shape's local transform and scale. Each export has its own
+    directory for generated materials and textures.
 
     :param key: The object's catalog key, used as the written file's basename.
     :param shapes: The native geometry selected for the object's catalog entry.
@@ -230,6 +236,7 @@ def _write_object_mesh(
             if assets.copy(source, str(destination)):
                 assets.copy_side_assets(source, str(destination))
                 return "meshes/objects/" + destination.name
-    destination = objects_directory / (key + MeshFormat.OBJ.value)
+    destination = objects_directory / key / (Path(key).name + MeshFormat.OBJ.value)
+    destination.parent.mkdir(parents=True, exist_ok=True)
     shapes.combined_mesh.export(str(destination))
-    return "meshes/objects/" + destination.name
+    return destination.relative_to(output_directory).as_posix()
