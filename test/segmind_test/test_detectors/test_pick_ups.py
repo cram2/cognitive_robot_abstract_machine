@@ -41,7 +41,7 @@ def _logged(events: List[DetectionEvent]) -> SegmindContext:
 def _translation_of(body, at: datetime) -> TranslationEvent:
     pose = body.global_pose
     return TranslationEvent(
-        tracked_object=body, start_pose=pose, current_pose=pose, timestamp=at
+        tracked_object=body, world_T_start_pose=pose, world_T_current_pose=pose, timestamp=at
     )
 
 

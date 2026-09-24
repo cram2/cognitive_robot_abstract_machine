@@ -251,8 +251,8 @@ class TranslationDetector(MotionDetector):
 
         new_event = TranslationEvent(
             tracked_object=obj,
-            start_pose=poses[0],
-            current_pose=poses[-1],
+            world_T_start_pose=poses[0],
+            world_T_current_pose=poses[-1],
         )
 
         context.latest_motion_events[obj] = new_event
@@ -293,8 +293,8 @@ class StopTranslationDetector(MotionDetector):
 
         stop_event = StopTranslationEvent(
             tracked_object=obj,
-            start_pose=latest_motion_event.start_pose,
-            current_pose=poses[-1],
+            world_T_start_pose=latest_motion_event.world_T_start_pose,
+            world_T_current_pose=poses[-1],
         )
 
         context.latest_motion_events.pop(obj, None)
@@ -333,8 +333,8 @@ class RotationDetector(MotionDetector):
 
         new_event = RotationEvent(
             tracked_object=obj,
-            start_pose=poses[0],
-            current_pose=poses[-1],
+            world_T_start_pose=poses[0],
+            world_T_current_pose=poses[-1],
         )
 
         context.latest_rotation_events[obj] = new_event
@@ -375,8 +375,8 @@ class StopRotationDetector(MotionDetector):
 
         stop_event = StopRotationEvent(
             tracked_object=obj,
-            start_pose=latest_rotation_event.start_pose,
-            current_pose=poses[-1],
+            world_T_start_pose=latest_rotation_event.world_T_start_pose,
+            world_T_current_pose=poses[-1],
         )
 
         context.latest_rotation_events.pop(obj, None)

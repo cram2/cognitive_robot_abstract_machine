@@ -130,12 +130,12 @@ class MotionEvent(EventWithTrackedObjects, ABC):
     vice versa.
     """
 
-    start_pose: Pose = field(kw_only=True)
+    world_T_start_pose: Pose = field(kw_only=True)
     """
     The pose of the object at the start of the event, in the world frame.
     """
 
-    current_pose: Pose = field(kw_only=True)
+    world_T_current_pose: Pose = field(kw_only=True)
     """
     The pose of the object at the end of the event, in the world frame.
     """
@@ -198,7 +198,7 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     Bounding box of the object.
     """
 
-    pose: Pose = field(init=False)
+    world_T_tracked_object: Pose = field(init=False)
     """
     Pose of the object, in the world frame.
     """
@@ -210,7 +210,7 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     Bounding box of the second object in contact.
     """
 
-    with_object_pose: Optional[Pose] = field(init=False, default=None)
+    world_T_with_object: Optional[Pose] = field(init=False, default=None)
     """
     Pose of the second object in contact, in the world frame.
     """
@@ -220,14 +220,14 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
             self.tracked_object.collision.combined_mesh,
             origin=self.tracked_object.global_pose.to_homogeneous_matrix(),
         )
-        self.pose = self.tracked_object.global_pose
+        self.world_T_tracked_object = self.tracked_object.global_pose
 
         if self.with_object is not None:
             self.with_object_bounding_box = VolumetricBoundingBox.from_mesh(
                 self.with_object.collision.combined_mesh,
                 origin=self.with_object.global_pose.to_homogeneous_matrix(),
             )
-            self.with_object_pose = self.with_object.global_pose
+            self.world_T_with_object = self.with_object.global_pose
 
 
 @dataclass(init=False, unsafe_hash=True)

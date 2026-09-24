@@ -247,6 +247,40 @@ def test_translation(_simple_apartment_setup):
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 
+def test_a_motion_event_states_its_poses_in_the_world_frame(_simple_apartment_setup):
+    world = _simple_apartment_setup
+    segmind_executor, segmind_context, milk, box1, box2 = _build_executor(world)
+    segmind_executor.compile(SegmindStatechart().build_statechart([TranslationDetector()]))
+    segmind_executor.tick()
+
+    for i in range(5):
+        milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=1 + i * 0.1, y=-3, z=0.25, reference_frame=milk.parent_connection.parent)
+        segmind_executor.tick()
+
+    [translation] = events_of(segmind_context, TranslationEvent)
+    assert translation.world_T_start_pose.reference_frame is world.root
+    assert translation.world_T_current_pose.reference_frame is world.root
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
+
+
+def test_a_contact_event_states_the_poses_of_both_objects_in_the_world_frame(
+    _simple_apartment_setup,
+):
+    world = _simple_apartment_setup
+    segmind_executor, segmind_context, milk, box1, box2 = _build_executor(world)
+    segmind_executor.compile(SegmindStatechart().build_statechart([ContactDetector()]))
+    segmind_executor.tick()
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        box1.global_pose.x, box1.global_pose.y, box1.global_pose.z, reference_frame=milk.parent_connection.parent)
+    segmind_executor.tick()
+
+    [contact_event] = events_of(segmind_context, ContactEvent)
+    assert contact_event.world_T_tracked_object.reference_frame is world.root
+    assert contact_event.world_T_with_object.reference_frame is world.root
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
+
+
 def test_stop_translation(_simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
     statechart = SegmindStatechart().build_statechart(
