@@ -20,7 +20,6 @@ from typing_extensions import (
     FrozenSet,
     List,
     Optional,
-    Tuple,
     TYPE_CHECKING,
 )
 from coraplex.datastructures.enums import Arms
@@ -34,6 +33,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from cramera.logging_setup import get_logger
+from cramera.config import CrameraConfig
 from cramera.body_geometry import NumericPose, POSE_PRECISION, rounded_pose
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -82,12 +82,6 @@ if TYPE_CHECKING:
     from cramera.live.ros_markers import RosMarkerListener
 
 logger = get_logger(__name__)
-
-
-ROBOT_BASE_KEY = "__base__"
-"""
-Key under which the robot's root body is published, instead of as a loose object.
-"""
 
 
 class DesignatorParameter(StrEnum):
@@ -434,15 +428,8 @@ class Bridge:
     snapshots without changing the world.
     """
 
-    REBIND_INTERVAL_SECONDS: ClassVar[float] = 3.0
-    """
-    How long a world binding stays fresh before bodies are re-discovered.
-    """
-
-    DEFAULT_OBJECT_SIZE: ClassVar[Tuple[float, float, float]] = (0.06, 0.06, 0.12)
-    """
-    Fallback size for an object whose shapes carry no scale, in metres.
-    """
+    configuration: CrameraConfig = field(default_factory=CrameraConfig, kw_only=True)
+    """Publication keys, discovery timing and fallback geometry for this session."""
 
     world: Optional[World] = None
     """
@@ -550,12 +537,12 @@ class Bridge:
 
     _bodies: Dict[str, Body] = field(default_factory=dict)
     """
-    Published bodies by mesh key; :data:`ROBOT_BASE_KEY` is the robot root.
+    Published bodies by mesh key, including the configured robot root key.
     """
 
     _last_bind_time: float = 0.0
     """
-    Timestamp of the last world discovery (see :attr:`REBIND_INTERVAL_SECONDS`).
+    Timestamp of the last world discovery.
     """
 
     _lock: threading.Lock = field(default_factory=threading.Lock)
@@ -871,7 +858,9 @@ class Bridge:
         """
         with self._lock:
             return [
-                entry.to_payload(self._mesh_serve, list(self.DEFAULT_OBJECT_SIZE))
+                entry.to_payload(
+                    self._mesh_serve, list(self.configuration.default_object_size)
+                )
                 for entry in self.object_metadata
             ]
 
@@ -880,7 +869,9 @@ class Bridge:
         Mesh keys of the published loose objects, excluding the robot root.
         """
         with self._lock:
-            return [key for key in self._bodies if key != ROBOT_BASE_KEY]
+            return [
+                key for key in self._bodies if key != self.configuration.robot_base_key
+            ]
 
     def _resolve_highlights(self, names: list[str]) -> list[str]:
         """Map native body names to their existing object or robot-link identifiers.
@@ -902,7 +893,7 @@ class Bridge:
                 {
                     str(body.name): key
                     for key, body in self._bodies.items()
-                    if key != ROBOT_BASE_KEY
+                    if key != self.configuration.robot_base_key
                 }
             )
         return sorted({identifiers.get(name, name) for name in names})
@@ -977,7 +968,11 @@ class Bridge:
             return BridgeStatus(
                 running=self.world is not None,
                 robot=type(self.robot).__name__ if self.robot else None,
-                objects=[key for key in self._bodies if key != ROBOT_BASE_KEY],
+                objects=[
+                    key
+                    for key in self._bodies
+                    if key != self.configuration.robot_base_key
+                ],
                 movable=True,
                 plan=bool(self.plan_state.nodes),
                 chart=bool(self.chart_state.nodes),
@@ -1274,7 +1269,7 @@ class Bridge:
         self._connections = self._actuated_connections(self._kinematic_connections)
         bodies: Dict[str, Body] = {}
         if self.robot is not None:
-            bodies[ROBOT_BASE_KEY] = self.robot.root
+            bodies[self.configuration.robot_base_key] = self.robot.root
         try:
             bodies.update(self._discover_overlay_bodies())
         except Exception as error:
@@ -1290,7 +1285,11 @@ class Bridge:
     def overlay_bodies(self) -> List[Body]:
         """Return the independent objects currently published by this session."""
         with self._lock:
-            return [body for key, body in self._bodies.items() if key != ROBOT_BASE_KEY]
+            return [
+                body
+                for key, body in self._bodies.items()
+                if key != self.configuration.robot_base_key
+            ]
 
     def _discover_overlay_bodies(self) -> Dict[str, Body]:
         """Discover movable objects and retain their identity through attachments."""
@@ -1301,8 +1300,7 @@ class Bridge:
             )
         }
 
-    @classmethod
-    def _body_shapes(cls, body: Body) -> ShapeCollection:
+    def _body_shapes(self, body: Body) -> ShapeCollection:
         """
         Select visual geometry, collision geometry, or a native placeholder box.
 
@@ -1312,7 +1310,9 @@ class Bridge:
         for shape_collection in (body.visual, body.collision):
             if shape_collection.shapes:
                 return shape_collection
-        return ShapeCollection(shapes=[Box(scale=Scale(*cls.DEFAULT_OBJECT_SIZE))])
+        return ShapeCollection(
+            shapes=[Box(scale=Scale(*self.configuration.default_object_size))]
+        )
 
     @staticmethod
     def _actuated_connections(
@@ -1342,7 +1342,9 @@ class Bridge:
         serve: Dict[str, str] = {}
         palette = ObjectPalette()
         for index, (key, body) in enumerate(
-            item for item in bodies.items() if item[0] != ROBOT_BASE_KEY
+            item
+            for item in bodies.items()
+            if item[0] != self.configuration.robot_base_key
         ):
             entry = ObjectCatalogEntry(
                 key=key,
@@ -1368,7 +1370,10 @@ class Bridge:
         """
         if self.world is None:
             return
-        if time.time() - self._last_bind_time > self.REBIND_INTERVAL_SECONDS:
+        if (
+            time.time() - self._last_bind_time
+            > self.configuration.rebind_interval_seconds
+        ):
             self.bind()
         frames = {
             str(connection.name): round(float(connection.position), POSE_PRECISION)
@@ -1377,7 +1382,7 @@ class Bridge:
         base_pose: Optional[List[float]] = None
         object_poses: Dict[str, List[float]] = {}
         for name, body in self._bodies.items():
-            if name == ROBOT_BASE_KEY:
+            if name == self.configuration.robot_base_key:
                 base_pose = rounded_pose(body)
             else:
                 object_poses[name] = rounded_pose(body)

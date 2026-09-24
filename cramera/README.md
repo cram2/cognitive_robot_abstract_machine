@@ -34,6 +34,11 @@ observes execution; it offers no robot or plan editing controls.
 Use one live session per `CRAMERA_DATA` directory. Separate simultaneous sessions
 need separate data directories and ports.
 
+`cramera.config.CrameraConfig` holds the live session's robot-root publication key,
+world-discovery interval and placeholder object dimensions. Pass it as
+`Bridge(configuration=...)` when constructing a custom bridge for `LiveVisualization`.
+Each bridge gets its own configuration by default.
+
 The scene supports orbit, pan, zoom, robot following and click-to-inspect. The graph
 panel displays the plan, statecharts, robot kinematics and transforms. EQL results
 can highlight entities in the scene and replay a recorded time interval.

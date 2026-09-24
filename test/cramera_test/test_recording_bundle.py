@@ -144,7 +144,7 @@ class TestLooseObjects:
         )
 
         entry = next(e for e in scene["objects"] if e["key"] == "blob.stl")
-        assert entry["box"] == list(Bridge.DEFAULT_OBJECT_SIZE)
+        assert entry["box"] == list(bridge.configuration.default_object_size)
         assert "mesh" not in entry
 
     def test_a_mesh_shaped_object_is_copied_into_the_bundle(self, tmp_path):

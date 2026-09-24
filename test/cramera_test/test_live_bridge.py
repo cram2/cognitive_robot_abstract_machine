@@ -45,10 +45,7 @@ from typing_extensions import Any, Dict, List, Optional, Tuple
 
 from cramera.knowledge.enums import PlanNodeGroup
 from cramera.live.chart_structure import ChartEdgeEntry
-from cramera.live.bridge import (
-    Bridge,
-    ROBOT_BASE_KEY,
-)
+from cramera.live.bridge import Bridge
 
 from .dataset.plan_metadata import ArmSelectionAction, BodyTargetMotion
 from .test_robot_parts import ArmPart, EndEffectorPart, NamedBody, OneArmedRobot
@@ -384,7 +381,9 @@ class TestViewerAccessors:
         bridge = Bridge()
         bridge.publish_bodies(
             {
-                ROBOT_BASE_KEY: PublishedBody(name="world/base_link"),
+                bridge.configuration.robot_base_key: PublishedBody(
+                    name="world/base_link"
+                ),
                 "milk.stl": PublishedBody(name="world/milk.stl"),
             }
         )
@@ -397,7 +396,7 @@ class TestViewerAccessors:
         bridge = Bridge()
         bridge.publish_bodies({"blob.stl": PublishedBody(name="world/blob.stl")})
         assert bridge.object_catalog()[0]["shapes"][0]["size"] == list(
-            Bridge.DEFAULT_OBJECT_SIZE
+            bridge.configuration.default_object_size
         )
 
     def test_an_unserved_mesh_has_no_path(self):
@@ -662,7 +661,7 @@ class TestShapeCatalogEntries:
         shape = bridge.object_catalog()[0]["shapes"][0]
 
         assert shape["kind"] == "box"
-        assert shape["size"] == list(Bridge.DEFAULT_OBJECT_SIZE)
+        assert shape["size"] == list(bridge.configuration.default_object_size)
 
     def test_collision_shapes_stand_in_when_a_body_has_no_visual_ones(self):
         """
