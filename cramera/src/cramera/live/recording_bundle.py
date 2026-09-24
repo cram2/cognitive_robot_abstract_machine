@@ -187,7 +187,7 @@ def _object_entry(
         "id": entry.id,
         "key": entry.key,
         "spawn": spawn,
-        "color": entry.color,
+        "color": entry.color.to_hex(),
     }
     shapes = entry.shapes
     payload["height"] = round(float(shapes.combined_mesh.extents[2]), POSE_PRECISION)

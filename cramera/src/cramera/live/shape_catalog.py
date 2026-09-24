@@ -17,7 +17,6 @@ from typing_extensions import List, Optional
 
 from semantic_digital_twin.world_description.geometry import (
     Box,
-    Color,
     Cylinder,
     Mesh,
     Scale,
@@ -111,15 +110,6 @@ class ShapeEntry:
     """
 
 
-def is_default_white(color: Color) -> bool:
-    """
-    Whether a colour is the untouched default, meaning no colour was chosen at all.
-
-    :param color: The colour to check.
-    """
-    return (color.R, color.G, color.B, color.A) == (1.0, 1.0, 1.0, 1.0)
-
-
 def served_mesh_file(shape: Shape) -> Optional[str]:
     """
     The mesh file a shape can be served from, or None when it has none.
@@ -156,7 +146,6 @@ def shape_entry(
     shape: Shape,
     mesh_url: Optional[str],
     fallback_size: List[float],
-    fallback_color: str,
 ) -> ShapeEntry:
     """
     One shape as the viewer builds it.
@@ -168,11 +157,10 @@ def shape_entry(
     :param mesh_url: URL the shape's mesh is served from, or None for primitives and for
         meshes without a servable file.
     :param fallback_size: Box extent used when a mesh has no servable file.
-    :param fallback_color: Colour used when the shape carries no colour of its own.
     """
     local_pose = NumericPose.of_matrix(shape.origin.to_np()).rounded()
     position, quaternion = local_pose[:3], local_pose[3:]
-    color = fallback_color if is_default_white(shape.color) else shape.color.to_hex()
+    color = shape.color.to_hex()
     opacity = float(shape.color.A)
     if isinstance(shape, Box):
         return ShapeEntry(

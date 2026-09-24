@@ -24,6 +24,29 @@ from cramera.live.recording_bundle import _object_entry
 
 
 # %% catalog geometry
+@pytest.mark.parametrize("color", [Color(), Color.WHITE(), Color(1, 1, 1, 0.4)])
+def test_white_geometry_keeps_its_native_color(color: Color) -> None:
+    """
+    Keep white and translucent white instead of assigning a palette color.
+
+    :param color: The white appearance assigned to native geometry.
+    """
+    body = Body(
+        name=PrefixedName("white"),
+        visual=ShapeCollection(shapes=[Sphere(radius=0.2, color=color)]),
+    )
+    bridge = Bridge()
+    bridge.publish_bodies({str(body.name): body})
+
+    [entry] = bridge.object_catalog()
+    [shape] = entry["shapes"]
+
+    assert bridge.object_metadata[0].color is color
+    assert entry["color"] == color.to_hex()
+    assert shape["color"] == color.to_hex()
+    assert shape["opacity"] == color.A
+
+
 @pytest.mark.parametrize("color", [Color(0.8, 0.2, 0.7), Color(0.1, 0.6, 0.9, 0.4)])
 def test_catalog_uses_native_color_conversion(color: Color) -> None:
     """

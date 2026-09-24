@@ -37,7 +37,7 @@ from cramera.body_geometry import NumericPose, POSE_PRECISION, rounded_pose
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
-from semantic_digital_twin.world_description.geometry import Box
+from semantic_digital_twin.world_description.geometry import Box, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import WorldEntity
 from cramera.knowledge.enums import PlanNodeGroup
@@ -58,13 +58,11 @@ from cramera.knowledge.views.kinematics import UrdfViewPayload
 from cramera.live.query import NoQuerySourceRegistered
 from cramera.live.markers import MarkerEntry, MarkerStore
 from cramera.live.shape_catalog import (
-    is_default_white,
     served_mesh_file,
     shape_entry,
 )
 from cramera.live.transforms import TransformGraph, TransformSnapshot
 from cramera.world_objects import WorldObjects
-from cramera.palette import ObjectPalette
 from cramera.robot_parts import RobotPartAnnotation
 from cramera.recording_fields import SceneField
 
@@ -107,22 +105,15 @@ class ObjectCatalogEntry:
     Visual geometry, collision geometry, or a placeholder for a shapeless body.
     """
 
-    fallback_color: str
-    """
-    Palette colour applied to shapes with no chosen colour.
-    """
-
     @property
     def id(self) -> str:
         """Return the display identifier derived from the published key."""
         return Path(self.key).stem
 
     @property
-    def color(self) -> str:
-        """Return the first shape's colour, or its assigned palette colour."""
-        if not self.shapes or is_default_white(self.shapes[0].color):
-            return self.fallback_color
-        return self.shapes[0].color.to_hex()
+    def color(self) -> Color:
+        """Return the first shape's native color, or native white without geometry."""
+        return self.shapes[0].color if self.shapes else Color()
 
     def mesh_key(self, shape_index: int) -> str:
         """Identify one shape's served mesh within this object.
@@ -149,13 +140,11 @@ class ObjectCatalogEntry:
                 if mesh_key in mesh_files
                 else None
             )
-            entries.append(
-                asdict(shape_entry(shape, mesh_url, fallback_size, self.fallback_color))
-            )
+            entries.append(asdict(shape_entry(shape, mesh_url, fallback_size)))
         return {
             SceneField.KEY: self.key,
             SceneField.ID: self.id,
-            SceneField.COLOR: self.color,
+            SceneField.COLOR: self.color.to_hex(),
             SceneField.SHAPES: entries,
         }
 
@@ -1340,8 +1329,7 @@ class Bridge:
         """
         catalog: List[ObjectCatalogEntry] = []
         serve: Dict[str, str] = {}
-        palette = ObjectPalette()
-        for index, (key, body) in enumerate(
+        for key, body in (
             item
             for item in bodies.items()
             if item[0] != self.configuration.robot_base_key
@@ -1349,7 +1337,6 @@ class Bridge:
             entry = ObjectCatalogEntry(
                 key=key,
                 shapes=self._body_shapes(body),
-                fallback_color=palette.color_for(index),
             )
             catalog.append(entry)
             for shape_index, shape in enumerate(entry.shapes):
