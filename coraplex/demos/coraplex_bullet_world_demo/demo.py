@@ -137,9 +137,9 @@ plan = sequential(
 ).plan
 
 segmentation = (
-    Segmind.watching_bodies_named(
+    Segmind.watching_semantic_annotations(
         world,
-        ("milk.stl", "bowl.stl", "spoon.stl"),
+        (Milk, Bowl, Spoon),
         detectors=(PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector),
     )
     if context.segment_events

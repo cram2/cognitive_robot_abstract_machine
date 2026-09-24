@@ -8,10 +8,14 @@ from __future__ import annotations
 import threading
 from collections import Counter
 
+import pytest
+
 from segmind.datastructures.events import TranslationEvent
 from segmind.detector_selection import DetectorSelection
 from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.event_segmentation import Segmind
+from segmind.exceptions import NoSemanticAnnotationToWatch
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Food, Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 from .conftest import RESTING_ON_THE_TABLE
@@ -37,12 +41,35 @@ def _stand_the_milk_on_the_table(milk) -> None:
     )
 
 
-def test_a_run_watches_the_bodies_it_names(milk_in_the_apartment):
-    world, milk, box = milk_in_the_apartment
+def test_a_run_watches_the_bodies_of_every_annotation_of_a_type_it_names(
+    milk_annotated_in_the_apartment,
+):
+    world, milk, _ = milk_annotated_in_the_apartment
 
-    segmentation = Segmind.watching_bodies_named(world, (milk.name.name, box.name.name))
+    segmentation = Segmind.watching_semantic_annotations(world, [Milk])
 
-    assert segmentation.bodies == [milk, box]
+    assert segmentation.bodies == milk.bodies
+
+
+def test_a_body_annotated_by_two_of_the_types_named_is_watched_once(
+    milk_annotated_in_the_apartment,
+):
+    world, milk, _ = milk_annotated_in_the_apartment
+
+    segmentation = Segmind.watching_semantic_annotations(world, [Milk, Food])
+
+    assert segmentation.bodies == milk.bodies
+
+
+def test_a_run_cannot_watch_a_type_the_world_holds_no_annotation_of(
+    milk_in_the_apartment,
+):
+    world, _, _ = milk_in_the_apartment
+
+    with pytest.raises(NoSemanticAnnotationToWatch) as raised:
+        Segmind.watching_semantic_annotations(world, [Milk])
+
+    assert raised.value.semantic_annotation_type is Milk
 
 
 def test_a_run_is_given_every_detector_what_it_asks_for_is_read_from(

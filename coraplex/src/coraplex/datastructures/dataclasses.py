@@ -86,10 +86,8 @@ class Context(PlanEntity):
 
     segment_events: bool = field(default=True)
     """
-    Should what happens while this plan runs be segmented into events.
-
-    A run that is watched ticks detectors against the world beside the plan, which costs
-    time a run that only has to perform the plan need not spend.
+    Whether this plan asks for the changes in the world during its execution to be
+    detected as events by SegMind, such as an object being picked up or placed.
     """
 
     query_backend: QueryBackend = field(

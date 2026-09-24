@@ -11,9 +11,13 @@ from typing_extensions import List, Self, Sequence, Type
 
 from segmind import event_logger
 from segmind.detectors.base import AbstractDetector
+from segmind.exceptions import NoSemanticAnnotationToWatch
 from segmind.live_segmenter import LiveSegmenter
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    SemanticAnnotation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,24 +57,43 @@ class Segmind:
         self.segmenter = LiveSegmenter.watching(self.world, self.bodies, self.detectors)
 
     @classmethod
-    def watching_bodies_named(
+    def watching_semantic_annotations(
         cls,
         world: World,
-        names: Sequence[str],
-        detectors: Sequence[Type[AbstractDetector]] = (),
+        semantic_annotation_types: Sequence[type[SemanticAnnotation]],
+        detectors: Sequence[type[AbstractDetector]] = (),
     ) -> Self:
         """
-        SegMind watching the bodies a run names.
+        SegMind watching the bodies of every semantic annotation of the types a run
+        names.
 
         :param world: The world the run takes place in.
-        :param names: The names of the bodies to watch.
+        :param semantic_annotation_types: The types whose annotations in ``world`` have
+            their bodies watched.
         :param detectors: The kinds of detector asked for.
+        :raises NoSemanticAnnotationToWatch: When ``world`` holds no annotation of a
+            type asked for.
         """
-        return cls(
-            world=world,
-            bodies=[world.get_body_by_name(name) for name in names],
-            detectors=detectors,
-        )
+        bodies = [
+            body
+            for semantic_annotation_type in semantic_annotation_types
+            for annotation in cls._annotations_of_type(world, semantic_annotation_type)
+            for body in annotation.bodies
+        ]
+        return cls(world=world, bodies=list(dict.fromkeys(bodies)), detectors=detectors)
+
+    @staticmethod
+    def _annotations_of_type(
+        world: World, semantic_annotation_type: type[SemanticAnnotation]
+    ) -> List[SemanticAnnotation]:
+        """
+        :return: Every annotation of ``world`` of ``semantic_annotation_type``.
+        :raises NoSemanticAnnotationToWatch: When ``world`` holds none.
+        """
+        annotations = world.get_semantic_annotations_by_type(semantic_annotation_type)
+        if not annotations:
+            raise NoSemanticAnnotationToWatch(semantic_annotation_type)
+        return annotations
 
     @property
     def detector_names(self) -> List[str]:

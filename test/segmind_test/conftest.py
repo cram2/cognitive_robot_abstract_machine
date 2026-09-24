@@ -7,6 +7,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 RESTING_ON_THE_TABLE = (-1.7, 0.0, 0.93)
@@ -32,3 +33,18 @@ def milk_in_the_apartment(_simple_apartment_setup):
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x, y, z, yaw=np.pi, reference_frame=milk.parent_connection.parent
     )
+
+
+@pytest.fixture
+def milk_annotated_in_the_apartment(milk_in_the_apartment):
+    """
+    The apartment with its milk annotated as :class:`Milk`, the annotation removed
+    afterwards.
+    """
+    world, milk, box = milk_in_the_apartment
+    annotation = Milk(root=milk)
+    with world.modify_world():
+        world.add_semantic_annotation(annotation)
+    yield world, annotation, box
+    with world.modify_world():
+        world.remove_semantic_annotation(annotation)
