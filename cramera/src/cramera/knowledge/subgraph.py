@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, field
 from typing_extensions import Any, ClassVar, Dict, List, Optional, TYPE_CHECKING
 
 from cramera.knowledge.enums import ColourGroup, EdgeKind
+from cramera.knowledge.life_cycle_style import LifeCycleStyle
 from cramera.payload import CrameraPayload
 
 if TYPE_CHECKING:
@@ -272,8 +273,8 @@ class GraphPanelPayload(CrameraPayload):
     """
     One tab or drill-down of the graph panel, in the shape the frontend reads.
 
-    Every view sends the same four keys; :meth:`panel_options` adds the ones only that
-    view knows about, so no subclass repeats the serialization of nodes and edges.
+    Every view sends the graph data and native lifecycle presentation;
+    :meth:`panel_options` adds the options specific to that view.
     """
 
     nodes: List[GraphNode] = field(default_factory=list)
@@ -325,5 +326,6 @@ class GraphPanelPayload(CrameraPayload):
             "details": {
                 node_id: asdict(entry) for node_id, entry in self.details.items()
             },
+            **LifeCycleStyle.presentation(),
             **self.panel_options(),
         }

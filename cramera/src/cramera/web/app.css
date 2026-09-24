@@ -645,13 +645,7 @@ body.graph-full-open{overflow:hidden}
 .st-dc{font-size:10.5px;color:var(--faint,#5f7196)}
 .st-kids{margin-left:20px;border-left:1px solid var(--line,#26324d);padding-left:8px}
 .st-leaf{display:flex;align-items:center;gap:8px;padding:4px 10px}
-.sp{display:inline-flex;align-items:center;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
-.sp-SUCCEEDED,.sp-DONE{background:rgba(75,211,138,.14);color:#7fe0a8}
-.sp-RUNNING{background:rgba(255,182,72,.16);color:#ffcf8a}
-.sp-FAILED{background:rgba(255,107,139,.16);color:#ff9db1}
-.sp-PAUSED,.sp-PAUSE{background:rgba(91,140,255,.16);color:#a0baff}
-.sp-INTERRUPTED{background:rgba(255,157,107,.16);color:#ffbb98}
-.sp-CREATED,.sp-NOT_STARTED{background:rgba(70,85,122,.25);color:#9aa7c4}
+.sp{--status-color:var(--muted);display:inline-flex;align-items:center;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:color-mix(in srgb,var(--status-color) 16%,transparent);color:color-mix(in srgb,var(--status-color) 70%,white)}
 
 /* ---- Plan step hierarchy ---- */
 .graph-steps{position:absolute;inset:34px 0 0;display:flex;overflow:hidden;padding:0}

@@ -477,12 +477,13 @@ const RECORDED_STATECHARTS = {
   frames: [-1, 0, 1, 2],
 };
 
-function loadRecordedChartPanel() {
+function loadRecordedChartPanel(presentation) {
   return loadPanel({
     '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
     '/api/knowledge/view?name=chart': {
       ok: true, nodes: [], edges: [], details: {}, live: 'chart',
       empty: 'no motion here', recorded: RECORDED_STATECHARTS,
+      ...(presentation || {}),
     },
   });
 }
@@ -496,6 +497,23 @@ async function showRecordedChart(panel) {
   await flush();
   return { instance: instance, bus: bus, root: root };
 }
+
+test('recorded charts retain their palette through status updates and gaps between motions', async function () {
+  const styles = { RUNNING: { label: 'recorded label', color: '#123456' } };
+  const order = ['RUNNING'];
+  const panel = loadRecordedChartPanel({ statusStyles: styles, statusOrder: order });
+  const shown = await showRecordedChart(panel);
+  try {
+    for (const index of [1, 2, 0, 3]) {
+      shown.bus.emit('scene:frame', { index: index });
+      assert.strictEqual(panel.lastBuild().statusStyles, styles);
+      assert.strictEqual(panel.lastBuild().statusOrder, order);
+    }
+    assert.ok(panel.requested.every(url => !url.startsWith('http://bridge')));
+  } finally {
+    shown.instance.destroy();
+  }
+});
 
 test('the replayed statechart is the one the played frame recorded', async function () {
   const panel = loadRecordedChartPanel();
@@ -627,8 +645,9 @@ test('a view that arrives after the reader moved on is not drawn', async functio
 // %% lifecycle labels
 for (const status of ['PAUSED', 'PAUSE', 'INTERRUPTED', 'NOT_STARTED', 'CREATED']) {
   test('the step list labels lifecycle ' + status, async function () {
+    const style = { label: 'supplied label for ' + status, color: '#13579b' };
     const panel = loadPanel({
-      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {}, statusStyles: { [status]: style }, statusOrder: [status] },
       '/api/knowledge/view?name=plan': { ok: true, nodes: [], edges: [], details: {}, live: 'plan' },
       'http://bridge/plan': { signature: 'step', nodes: [
         { id: 'action', kind: 'ActionNode', label: 'Transport', status: status, group: 'action' },
@@ -643,8 +662,11 @@ for (const status of ['PAUSED', 'PAUSE', 'INTERRUPTED', 'NOT_STARTED', 'CREATED'
       await flush();
       bus.emit('live:changed', { on: true, url: 'http://bridge' });
       await flush();
-      const label = { PAUSED: 'paused', PAUSE: 'paused', INTERRUPTED: 'interrupted', NOT_STARTED: 'not started', CREATED: 'not started' }[status];
-      assert.match(root.control('#graph-steps').querySelector('.steps-tree').innerHTML, new RegExp('>' + label + '</span>'));
+      const html = root.control('#graph-steps').querySelector('.steps-tree').innerHTML;
+      assert.match(html, new RegExp('>' + style.label + '</span>'));
+      assert.match(html, new RegExp('--status-color:' + style.color));
+      assert.strictEqual(panel.lastBuild().statusStyles[status], style);
+      assert.deepStrictEqual(panel.lastBuild().statusOrder, [status]);
     } finally {
       instance.destroy();
     }
@@ -655,7 +677,8 @@ for (const status of ['PAUSED', 'PAUSE', 'INTERRUPTED', 'NOT_STARTED', 'CREATED'
 for (const status of ['NOT_STARTED', 'RUNNING', 'PAUSED', 'INTERRUPTED', 'FAILED', 'SUCCEEDED']) {
   test('a parent step keeps native ' + status + ' after its motion succeeds', async function () {
     const panel = loadPanel({
-      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {},
+        statusStyles: { [status]: { color: '#123456', label: status } } },
       '/api/knowledge/view?name=plan': { ok: true, nodes: [], edges: [], details: {}, live: 'plan' },
       'http://bridge/plan': { signature: 'parent-motion', nodes: [
         { id: 'action', kind: 'ActionNode', label: 'Transport', status: status, group: 'action' },
@@ -673,7 +696,36 @@ for (const status of ['NOT_STARTED', 'RUNNING', 'PAUSED', 'INTERRUPTED', 'FAILED
       await flush();
       const html = root.control('#graph-steps').querySelector('.steps-tree').innerHTML;
       const parentRow = html.split('</div>')[0];
-      assert.match(parentRow, new RegExp('class="sp sp-' + status + '"'));
+      assert.match(parentRow, new RegExp('>' + status + '</span>'));
+    } finally {
+      instance.destroy();
+    }
+  });
+}
+
+// %% status text is not markup
+for (const fromPalette of [true, false]) {
+  test('a ' + (fromPalette ? 'supplied label' : 'recorded unknown status') + ' is rendered as text', async function () {
+    const label = '<img src=x onerror=alert(1)> & failed';
+    const status = fromPalette ? 'RUNNING' : label;
+    const style = { label: label, color: '#123456' };
+    const panel = loadPanel({
+      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+      '/api/knowledge/view?name=plan': {
+        ok: true, edges: [], details: {}, statusStyles: fromPalette ? { [status]: style } : {},
+        nodes: [{ id: 'action', kind: 'ActionNode', label: 'Transport', status: status, group: 'action' }],
+      },
+    });
+    const root = makeRoot();
+    const instance = panel.factory(root, makeBus());
+    try {
+      await flush();
+      root.buttons.find(button => button.dataset.view === 'plan').click();
+      await flush();
+      const html = root.control('#graph-steps').querySelector('.steps-tree').innerHTML;
+      assert.doesNotMatch(html, /<img/);
+      assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt; &amp; failed<\/span>/);
+      assert.doesNotMatch(html, /class="sp sp-/);
     } finally {
       instance.destroy();
     }

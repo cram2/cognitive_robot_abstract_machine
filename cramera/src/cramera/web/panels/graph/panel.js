@@ -103,6 +103,7 @@ Panels.define('graph', function (root, bus) {
   const LIVE_ENDPOINT = { plan: '/plan', chart: '/chart', transforms: '/transforms' };
   let tab = DEFAULT_TAB;
   let view = null;            // the currently rendered payload
+  let statusStyles = {}, statusOrder = []; // retained for live and replay-generated views
   const base = {};            // tab -> payload as loaded from the server
   const shown = {};           // tab -> payload currently rendered (drill-downs)
   const stacks = {};          // tab -> parent payloads for the back button
@@ -120,7 +121,6 @@ Panels.define('graph', function (root, bus) {
   // conditions are internal checks that never execute — hidden from this view entirely
   const DETAIL_KINDS = { MotionNode: 'motion', MonitorNode: 'monitor' };
   const STRUCT_KINDS = { SequentialNode: 1, ParallelNode: 1, UnderspecifiedNode: 1 };
-  const STEP_STATUS = { SUCCEEDED: 'done', DONE: 'done', RUNNING: 'running', FAILED: 'failed', PAUSED: 'paused', PAUSE: 'paused', INTERRUPTED: 'interrupted', CREATED: 'not started', NOT_STARTED: 'not started' };
   function stepWords(x) { return String(x || '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim().toLowerCase().replace(/^./, function (c) { return c.toUpperCase(); }); }
   function stepLabel(n) {
     if (n.kind === 'ConditionNode') return 'condition check';
@@ -141,7 +141,13 @@ Panels.define('graph', function (root, bus) {
   // with nothing to report shows no pill rather than an invented "not started"
   function stepPill(status) {
     if (!status) return '';
-    return '<span class="sp sp-' + status + '">' + (STEP_STATUS[status] || String(status).toLowerCase()) + '</span>';
+    const style = statusStyles[status];
+    const label = String(style ? style.label : status).replace(/[&<>]/g, function (character) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[character];
+    });
+    return '<span class="sp"' +
+      (style ? ' style="--status-color:' + style.color + '"' : '') + '>' +
+      label + '</span>';
   }
   // flatten structural containers; keep action/attach as numbered steps, details collapsed
   function stepItems(node) {
@@ -244,6 +250,8 @@ Panels.define('graph', function (root, bus) {
 
   function setView(payload) {
     view = payload;
+    if (payload.statusStyles) statusStyles = payload.statusStyles;
+    if (payload.statusOrder) statusOrder = payload.statusOrder;
     shown[tab] = payload;
     inGraphSet = {};
     payload.nodes.forEach(function (n) { inGraphSet[n.id] = 1; });
@@ -260,6 +268,7 @@ Panels.define('graph', function (root, bus) {
       layout: payload.layout, arrows: !!payload.arrows,
       // a view may name the statuses its legend lists, instead of taking the default
       statusLegend: payload.statusLegend || false,
+      statusStyles: statusStyles, statusOrder: statusOrder,
       key: (payload.key || tab) + '#' + stacks[tab].length,
     });
     updateNav();
