@@ -43,6 +43,17 @@ def make_matcher() -> QuestionMatcher:
 
 # %% recognizing the asked question
 class TestRecognizingAQuestion:
+    def test_exact_collection_wording_beats_a_broader_fuzzy_match(self) -> None:
+        """A collection's exact wording takes precedence over its broader base name."""
+        broad = Preset("Find the degrees_of_freedom of a World", ROBOT_PRESET.code)
+        specific = Preset(
+            "Find the active_degrees_of_freedom of a World", ROBOT_PRESET.code
+        )
+
+        result = QuestionMatcher([broad, specific]).match(specific.text)
+
+        assert result.preset is specific
+
     def test_the_exact_wording_is_recognized(self):
         result = make_matcher().match("which robot is this?")
 
