@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from typing_extensions import TYPE_CHECKING
 
+from krrood.entity_query_language.factories import an, entity, variable
 from cramera.knowledge.query_runner import RowRenderer
 from cramera.knowledge.queryable_knowledge import QueryScope
 from cramera.live import visualization as visualization_module
@@ -20,6 +21,7 @@ from cramera.live.visualization import LiveVisualization
 from cramera.live.world_query import WorldQuerySource
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 from .test_live_http import bridge, get_json, post, server
 from .test_live_query import CurrentStateOnlySource, GrowingRecordSource
@@ -192,12 +194,9 @@ class TestAutomaticWorldQueries:
 
         :param world: The scene whose connection pose changes between queries.
         """
-        bridge = Bridge()
-        bridge.attach(world)
-        code = (
-            Path(__file__).parent / "dataset" / "world_body_positions.eql"
-        ).read_text()
-        before = bridge.run_query(code)
+        body = variable(Body, domain=world.bodies)
+        query = an(entity(body.global_pose))
+        before = RowRenderer().rows_of(query.evaluate()).rows
         connection = world.connections[0]
         connection.origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=Point3(1.0, 2.0, 3.0, reference_frame=connection.parent)
@@ -205,10 +204,9 @@ class TestAutomaticWorldQueries:
         model_version = world.get_world_model_manager().version
         state_version = world.state.version
 
-        after = bridge.run_query(code)
+        after = RowRenderer().rows_of(query.evaluate()).rows
 
-        assert before.ok and after.ok
-        assert after.rows != before.rows
+        assert after != before
         assert world.get_world_model_manager().version == model_version
         assert world.state.version == state_version
 
