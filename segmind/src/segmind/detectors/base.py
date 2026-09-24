@@ -282,12 +282,12 @@ class AbstractDetector(MotionStatechartNode, ABC):
         if self.exclude_robot:
             robot_bodies = set(context.world.robot_bodies_with_collision)
             candidates = [body for body in candidates if body not in robot_bodies]
-        for obj in tracked_objects:
+        for tracked_object in tracked_objects:
             for body in candidates:
-                if body is obj:
+                if body is tracked_object:
                     continue
-                if predicate(obj, body):
-                    related_bodies.setdefault(obj, set()).add(body)
+                if predicate(tracked_object, body):
+                    related_bodies.setdefault(tracked_object, set()).add(body)
         return related_bodies
 
     @abstractmethod

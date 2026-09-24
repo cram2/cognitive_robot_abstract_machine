@@ -110,16 +110,16 @@ class ContainmentDetector(AbstractDetector):
         containment_pairs: Dict[Body, Set[Body]] = {}
         candidates = self.bodies_outside_end_effectors(context.world)
 
-        for obj in tracked_objects:
+        for tracked_object in tracked_objects:
             containers = {
                 body
                 for body in candidates
-                if obj is not body
-                and InsideOf(obj, body).compute_containment_ratio()
+                if tracked_object is not body
+                and InsideOf(tracked_object, body).compute_containment_ratio()
                 > self.containment_threshold
             }
             if containers:
-                containment_pairs[obj] = containers
+                containment_pairs[tracked_object] = containers
 
         return containment_pairs
 
@@ -182,7 +182,7 @@ class InsertionDetector(EventCombiningDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objs: List[Body],
+        tracked_objects: List[Body],
     ) -> List[DetectionEvent]:
         """
         Updates context and processes tracked objects to generate a list of events.
@@ -195,7 +195,7 @@ class InsertionDetector(EventCombiningDetector):
 
         :param context: The current motion statechart context.
         :param segmind_context: The shared SegmindContext containing the information required to track events.
-        :param tracked_objs: List of Body objects to analyze for insertion events.
+        :param tracked_objects: List of Body objects to analyze for insertion events.
         :return List of InsertionEvent objects representing detected insertions.
         """
         events = []

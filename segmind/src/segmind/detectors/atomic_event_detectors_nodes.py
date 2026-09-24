@@ -103,7 +103,7 @@ class MotionDetector(AbstractDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objs: List[Body],
+        tracked_objects: List[Body],
     ) -> List[DetectionEvent]:
         """
         Updates the pose history for each tracked object and checks for motion events.
@@ -111,17 +111,19 @@ class MotionDetector(AbstractDetector):
         :param context: The current motion statechart context.
         :param segmind_context: The shared SegmindContext containing the information
             required to track events.
-        :param tracked_objs: List of bodies to update and check.
+        :param tracked_objects: List of bodies to update and check.
         :return: A list of events triggered during this update.
         """
         events = []
-        for obj in tracked_objs:
-            poses = self._pose_history.setdefault(obj, [])
-            poses.append(obj.global_pose)
+        for tracked_object in tracked_objects:
+            poses = self._pose_history.setdefault(tracked_object, [])
+            poses.append(tracked_object.global_pose)
             if len(poses) < self.window_size:
                 continue
 
-            event = self._check_and_trigger_event(segmind_context, obj, poses)
+            event = self._check_and_trigger_event(
+                segmind_context, tracked_object, poses
+            )
             if event:
                 events.append(event)
 
@@ -130,7 +132,7 @@ class MotionDetector(AbstractDetector):
 
     @abstractmethod
     def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[Pose]
+        self, context: SegmindContext, tracked_object: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
         Subclass-specific logic to trigger a Motion or StopMotion event.
@@ -140,8 +142,8 @@ class MotionDetector(AbstractDetector):
 
         :param context: The shared SegmindContext containing the information required to
             track events.
-        :param obj: The body to check.
-        :param poses: The pose window of ``obj``, oldest first.
+        :param tracked_object: The body to check.
+        :param poses: The pose window of ``tracked_object``, oldest first.
         :return: A MotionEvent, StopMotionEvent or None.
         """
         pass
@@ -187,7 +189,7 @@ class TranslationDetector(MotionDetector):
     """
 
     def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[Pose]
+        self, context: SegmindContext, tracked_object: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
         Reports the object starting to move or, when it was moving, coming to a stop.
@@ -197,17 +199,17 @@ class TranslationDetector(MotionDetector):
 
         :param context: The shared SegmindContext containing the information required to
             track events.
-        :param obj: The object being monitored for movement.
-        :param poses: The pose window of ``obj``, oldest first.
+        :param tracked_object: The object being monitored for movement.
+        :param poses: The pose window of ``tracked_object``, oldest first.
         :return: A TranslationEvent, a StopTranslationEvent or None.
         """
-        latest_motion_event = context.latest_motion_events.get(obj)
+        latest_motion_event = context.latest_motion_events.get(tracked_object)
         if not self._is_moving(poses):
             if latest_motion_event is None:
                 return None
-            context.latest_motion_events.pop(obj)
+            context.latest_motion_events.pop(tracked_object)
             return StopTranslationEvent(
-                tracked_object=obj,
+                tracked_object=tracked_object,
                 world_T_start_pose=latest_motion_event.world_T_start_pose,
                 world_T_current_pose=poses[-1],
             )
@@ -216,11 +218,11 @@ class TranslationDetector(MotionDetector):
             return None
 
         new_event = TranslationEvent(
-            tracked_object=obj,
+            tracked_object=tracked_object,
             world_T_start_pose=poses[0],
             world_T_current_pose=poses[-1],
         )
-        context.latest_motion_events[obj] = new_event
+        context.latest_motion_events[tracked_object] = new_event
         return new_event
 
 
@@ -234,7 +236,7 @@ class RotationDetector(MotionDetector):
     """
 
     def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[Pose]
+        self, context: SegmindContext, tracked_object: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
         Reports the object starting to rotate or, when it was rotating, coming to a
@@ -245,17 +247,17 @@ class RotationDetector(MotionDetector):
 
         :param context: The shared SegmindContext containing the information required to
             track events.
-        :param obj: The object to check.
-        :param poses: The pose window of ``obj``, oldest first.
+        :param tracked_object: The object to check.
+        :param poses: The pose window of ``tracked_object``, oldest first.
         :return: A RotationEvent, a StopRotationEvent or None.
         """
-        latest_rotation_event = context.latest_rotation_events.get(obj)
+        latest_rotation_event = context.latest_rotation_events.get(tracked_object)
         if not self._is_rotating(poses):
             if latest_rotation_event is None:
                 return None
-            context.latest_rotation_events.pop(obj)
+            context.latest_rotation_events.pop(tracked_object)
             return StopRotationEvent(
-                tracked_object=obj,
+                tracked_object=tracked_object,
                 world_T_start_pose=latest_rotation_event.world_T_start_pose,
                 world_T_current_pose=poses[-1],
             )
@@ -264,9 +266,9 @@ class RotationDetector(MotionDetector):
             return None
 
         new_event = RotationEvent(
-            tracked_object=obj,
+            tracked_object=tracked_object,
             world_T_start_pose=poses[0],
             world_T_current_pose=poses[-1],
         )
-        context.latest_rotation_events[obj] = new_event
+        context.latest_rotation_events[tracked_object] = new_event
         return new_event
