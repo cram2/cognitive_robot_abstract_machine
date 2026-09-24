@@ -33,6 +33,11 @@ class UrdfViewPayload(GraphPanelPayload):
 
     TAB: ClassVar[Optional[str]] = "kinematics"
 
+    LINK_PREFIX: ClassVar[str] = "urdf:"
+    """
+    Namespace distinguishing link nodes from other scene entities.
+    """
+
     breadcrumb: str
     """
     Breadcrumb label shown above the tree.
@@ -51,6 +56,16 @@ class UrdfViewPayload(GraphPanelPayload):
         if self.legend is not None:
             options["legend"] = [asdict(entry) for entry in self.legend]
         return options
+
+    @classmethod
+    def link_id(cls, name: str) -> str:
+        """
+        Identify one link in the kinematic graph and scene highlights.
+
+        :param name: The link's name in the robot description.
+        :return: The shared graph and viewer identifier for that link.
+        """
+        return cls.LINK_PREFIX + name
 
     @classmethod
     def of_tab(cls, knowledge_base: EpisodeKnowledgeBase) -> UrdfViewPayload:
@@ -92,18 +107,19 @@ class UrdfViewPayload(GraphPanelPayload):
             else:
                 lines.append("root link")
             view.add(
-                "urdf:" + link,
+                cls.link_id(link),
                 link,
                 cls._chain_group(link_to_part.get(link)),
                 lines,
             )
         for joint in joints:
-            if ("urdf:" + joint.parent) in view.details and (
-                "urdf:" + joint.child
-            ) in view.details:
+            if (
+                cls.link_id(joint.parent) in view.details
+                and cls.link_id(joint.child) in view.details
+            ):
                 view.add_edge(
-                    "urdf:" + joint.parent,
-                    "urdf:" + joint.child,
+                    cls.link_id(joint.parent),
+                    cls.link_id(joint.child),
                     (
                         EdgeKind.PROPERTY
                         if joint.type != JointType.FIXED
@@ -112,7 +128,7 @@ class UrdfViewPayload(GraphPanelPayload):
                     "%s (%s)" % (joint.name, joint.type.name.lower()),
                 )
         movable_count = sum(1 for joint in joints if joint.type != JointType.FIXED)
-        view.details["urdf:" + links[0]].lines.append(
+        view.details[cls.link_id(links[0])].lines.append(
             "%d links · %d joints (%d movable)"
             % (len(links), len(joints), movable_count)
         )

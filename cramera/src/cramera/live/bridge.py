@@ -54,6 +54,7 @@ from cramera.knowledge.queryable_knowledge import (
     UnknownQueryScope,
 )
 from cramera.knowledge.question_matching import QuestionMatcher, QuestionMatchResult
+from cramera.knowledge.views.kinematics import UrdfViewPayload
 from cramera.live.query import (
     NoQuerySourceRegistered,
     QueryKnowledgeSource,
@@ -870,6 +871,30 @@ class Bridge:
         with self._lock:
             return [key for key in self._bodies if key != ROBOT_BASE_KEY]
 
+    def _resolve_highlights(self, names: list[str]) -> list[str]:
+        """Map native body names to their existing object or robot-link identifiers.
+
+        :param names: Canonical entity names and existing viewer identifiers.
+        :return: Sorted unique highlight identifiers, preserving unknown names.
+        """
+        identifiers = (
+            {
+                name: UrdfViewPayload.link_id(name)
+                for name in WorldObjects(self.world, self.robot).robot_body_names()
+            }
+            if self.world is not None
+            else {}
+        )
+        with self._lock:
+            identifiers.update(
+                {
+                    str(body.name): key
+                    for key, body in self._bodies.items()
+                    if key != ROBOT_BASE_KEY
+                }
+            )
+        return sorted({identifiers.get(name, name) for name in names})
+
     def mesh_path(self, key: str) -> Optional[str]:
         """
         Absolute path of an object's mesh file, or None if it is not served.
@@ -1165,7 +1190,9 @@ class Bridge:
         :raises UnknownQueryScope: When the source does not offer this scope.
         """
         with self._query_scope() as knowledge:
-            return self._scope_runner(knowledge, scope).run(code)
+            result = self._scope_runner(knowledge, scope).run(code)
+            result.highlight = self._resolve_highlights(result.highlight)
+            return result
 
     def _scope_runner(
         self, knowledge: list[QueryableKnowledge], scope: QueryScope
