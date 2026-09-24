@@ -36,7 +36,7 @@ def test_native_robot_body_highlights_its_urdf_link() -> None:
     answer = bridge.run_query(an(entity(variable(Body, domain=[body]))))
 
     assert answer.rows[0]["__entity__"] == str(body.name)
-    assert answer.highlight == [UrdfViewPayload.link_id(str(body.name))]
+    assert answer.highlight == [UrdfViewPayload().link_id(str(body.name))]
 
 
 def test_legacy_highlight_identifiers_remain_unchanged() -> None:
@@ -48,7 +48,7 @@ def test_legacy_highlight_identifiers_remain_unchanged() -> None:
     identifiers = [
         key,
         Path(key).stem,
-        UrdfViewPayload.link_id(str(bridge.robot.root.name)),
+        UrdfViewPayload().link_id(str(bridge.robot.root.name)),
     ]
     source = GrowingRecordSource(records=[make_record(name) for name in identifiers])
     bridge.register_query_source(source.knowledge, source.title(), source.presets)

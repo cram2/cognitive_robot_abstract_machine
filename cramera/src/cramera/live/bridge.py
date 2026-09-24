@@ -888,9 +888,10 @@ class Bridge:
         :param names: Canonical entity names and existing viewer identifiers.
         :return: Sorted unique highlight identifiers, preserving unknown names.
         """
+        kinematics_view = UrdfViewPayload()
         identifiers = (
             {
-                name: UrdfViewPayload.link_id(name)
+                name: kinematics_view.link_id(name)
                 for name in WorldObjects(self.world, self.robot).robot_body_names()
             }
             if self.world is not None

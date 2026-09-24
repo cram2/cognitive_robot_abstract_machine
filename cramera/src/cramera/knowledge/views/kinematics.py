@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from cramera.knowledge.knowledge_base import EpisodeKnowledgeBase
 
 
+# %% kinematic graph
 @dataclass(kw_only=True)
 class UrdfViewPayload(GraphPanelPayload):
     """
@@ -32,13 +33,16 @@ class UrdfViewPayload(GraphPanelPayload):
     """
 
     TAB: ClassVar[Optional[str]] = "kinematics"
+    """
+    Tab identifier used to select this payload type before constructing its view.
+    """
 
-    LINK_PREFIX: ClassVar[str] = "urdf:"
+    link_prefix: str = "urdf:"
     """
     Namespace distinguishing link nodes from other scene entities.
     """
 
-    breadcrumb: str
+    breadcrumb: str = "URDF"
     """
     Breadcrumb label shown above the tree.
     """
@@ -57,15 +61,14 @@ class UrdfViewPayload(GraphPanelPayload):
             options["legend"] = [asdict(entry) for entry in self.legend]
         return options
 
-    @classmethod
-    def link_id(cls, name: str) -> str:
+    def link_id(self, name: str) -> str:
         """
         Identify one link in the kinematic graph and scene highlights.
 
         :param name: The link's name in the robot description.
         :return: The shared graph and viewer identifier for that link.
         """
-        return cls.LINK_PREFIX + name
+        return self.link_prefix + name
 
     @classmethod
     def of_tab(cls, knowledge_base: EpisodeKnowledgeBase) -> UrdfViewPayload:
@@ -78,11 +81,13 @@ class UrdfViewPayload(GraphPanelPayload):
 
         :param knowledge_base: The knowledge base whose robot's URDF is rendered.
         """
+        payload = cls(breadcrumb=knowledge_base.robot.name + " · URDF")
         parsed_urdf = ParsedUrdf.of_scene(knowledge_base.scene_name)
         links, joints = parsed_urdf.links, parsed_urdf.joints
         view = SubgraphAccumulator()
         if not links:
-            return cls(breadcrumb=knowledge_base.robot.name + " · URDF (not found)")
+            payload.breadcrumb += " (not found)"
+            return payload
 
         link_to_part = {
             link: part
@@ -107,19 +112,19 @@ class UrdfViewPayload(GraphPanelPayload):
             else:
                 lines.append("root link")
             view.add(
-                cls.link_id(link),
+                payload.link_id(link),
                 link,
                 cls._chain_group(link_to_part.get(link)),
                 lines,
             )
         for joint in joints:
             if (
-                cls.link_id(joint.parent) in view.details
-                and cls.link_id(joint.child) in view.details
+                payload.link_id(joint.parent) in view.details
+                and payload.link_id(joint.child) in view.details
             ):
                 view.add_edge(
-                    cls.link_id(joint.parent),
-                    cls.link_id(joint.child),
+                    payload.link_id(joint.parent),
+                    payload.link_id(joint.child),
                     (
                         EdgeKind.PROPERTY
                         if joint.type != JointType.FIXED
@@ -128,22 +133,19 @@ class UrdfViewPayload(GraphPanelPayload):
                     "%s (%s)" % (joint.name, joint.type.name.lower()),
                 )
         movable_count = sum(1 for joint in joints if joint.type != JointType.FIXED)
-        view.details[cls.link_id(links[0])].lines.append(
+        view.details[payload.link_id(links[0])].lines.append(
             "%d links · %d joints (%d movable)"
             % (len(links), len(joints), movable_count)
         )
-        legend = [
+        payload.legend = [
             LegendEntry(group, group.label) for group in KinematicChainGroup.legend()
         ]
         # force-directed, not hierarchical: the chains read better when the arms and
         # the sensor head spread out around the base than as one wide LR tree
-        return cls(
-            breadcrumb=knowledge_base.robot.name + " · URDF",
-            nodes=view.nodes,
-            edges=view.edges,
-            details=view.details,
-            legend=legend,
-        )
+        payload.nodes = view.nodes
+        payload.edges = view.edges
+        payload.details = view.details
+        return payload
 
     @staticmethod
     def _chain_group(part: RobotPartAnnotation | None) -> KinematicChainGroup:
