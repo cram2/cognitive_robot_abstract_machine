@@ -159,7 +159,7 @@ def bridge(source) -> Bridge:
     """
     live_bridge = Bridge()
     live_bridge.register_query_source(
-        source.knowledge(), source.title(), source.presets(), source.unlisted_presets()
+        source.knowledge, source.title(), source.presets, source.unlisted_presets
     )
     return live_bridge
 
@@ -182,6 +182,46 @@ class TestQueryingARegisteredSource:
         result = bridge.run_query("an(entity(record))")
 
         assert [row["__entity__"] for row in result.rows] == ["first", "second"]
+
+    def test_queries_refresh_replaced_domain_collections(
+        self, bridge: Bridge, source: GrowingRecordSource
+    ) -> None:
+        """
+        A provider exposes a replacement collection on the next query.
+
+        :param bridge: The bridge holding the source's knowledge provider.
+        :param source: The source replacing its current records.
+        """
+        [preset, _] = source.presets()
+        bridge.run_query(preset.code)
+        source.records = [make_record("replacement")]
+
+        answer = bridge.run_query(preset.code)
+
+        assert [row["__entity__"] for row in answer.rows] == [source.records[0].name]
+
+    def test_preset_providers_refresh_visible_and_unlisted_queries(
+        self, source: GrowingRecordSource
+    ) -> None:
+        """
+        Mutable preset collections remain current through their list providers.
+
+        :param source: The source supplying query scopes and valid query definitions.
+        """
+        listed: list[Preset] = []
+        unlisted: list[Preset] = []
+        bridge = Bridge()
+        bridge.register_query_source(
+            source.knowledge, source.title(), listed.copy, unlisted.copy
+        )
+        assert bridge.query_presets() == []
+        listed.extend(source.presets())
+        unlisted.extend(source.unlisted_presets())
+
+        assert [preset.text for preset in bridge.query_presets()] == [
+            preset.text for preset in listed
+        ]
+        assert bridge.match_question(unlisted[0].text).preset is unlisted[0]
 
     def test_the_presets_are_the_sources_own(self, bridge):
         assert [preset.text for preset in bridge.query_presets()] == [
@@ -270,7 +310,7 @@ class TestAskedQuestions:
         live_bridge = Bridge()
         source = CurrentStateOnlySource()
         live_bridge.register_query_source(
-            source.knowledge(), source.title(), source.presets()
+            source.knowledge, source.title(), source.presets
         )
 
         assert not live_bridge.match_question("give me all beta samples").matched
@@ -318,7 +358,7 @@ class TestQueryingByScope:
         live_bridge = Bridge()
         source = CurrentStateOnlySource()
         live_bridge.register_query_source(
-            source.knowledge(), source.title(), source.presets()
+            source.knowledge, source.title(), source.presets
         )
 
         with pytest.raises(UnknownQueryScope):

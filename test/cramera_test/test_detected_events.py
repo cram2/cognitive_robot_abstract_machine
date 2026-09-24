@@ -143,18 +143,18 @@ class TestRecordableEventTypes:
 
 class TestDetectedEventsKnowledge:
     def test_the_knowledge_is_of_the_detected_events_scope(self, detections):
-        knowledge = DetectedEvents(logger=detections).knowledge()
+        [knowledge] = DetectedEvents(logger=detections).knowledge()
 
         assert knowledge.scope is QueryScope.DETECTED_EVENTS
 
     def test_the_domain_is_the_event_variable_a_question_names(self, detections):
-        [domain] = DetectedEvents(logger=detections).knowledge().domains
+        [domain] = DetectedEvents(logger=detections).knowledge()[0].domains
 
         assert domain.name == "event"
         assert domain.entity_type is DetectedEventRecord
 
     def test_the_domain_holds_a_record_per_detection(self, detections):
-        [domain] = DetectedEvents(logger=detections).knowledge().domains
+        [domain] = DetectedEvents(logger=detections).knowledge()[0].domains
 
         assert [record.event_type for record in domain.objects] == [
             PickUpEvent.__name__,
@@ -163,11 +163,11 @@ class TestDetectedEventsKnowledge:
 
     def test_a_detection_made_after_the_last_question_is_answered_too(self, detections):
         events = DetectedEvents(logger=detections)
-        before = len(events.knowledge().domains[0].objects)
+        before = len(events.knowledge()[0].domains[0].objects)
 
         detections.timeline.append(PickUpEvent(tracked_object=collidable_body("cup")))
 
-        assert len(events.knowledge().domains[0].objects) == before + 1
+        assert len(events.knowledge()[0].domains[0].objects) == before + 1
 
 
 class TestAskingForOneKindOfEvent:
@@ -180,7 +180,7 @@ class TestAskingForOneKindOfEvent:
             for preset in events.unlisted_presets()
             if PickUpEvent.__name__ in preset.code
         ]
-        runner = EqlQueryRunner(domains=events.knowledge().domains)
+        runner = EqlQueryRunner(domains=events.knowledge()[0].domains)
 
         answered = runner.run_source(pick_ups.code)
 

@@ -76,7 +76,7 @@ def query_bridge(bridge):
         records=[make_record("first")], stored=[make_record("last week")]
     )
     bridge.register_query_source(
-        source.knowledge(), source.title(), source.presets(), source.unlisted_presets()
+        source.knowledge, source.title(), source.presets, source.unlisted_presets
     )
     return bridge
 
@@ -713,10 +713,10 @@ class TestVocabularyEndpoints:
             records=[make_record("first")], stored=[make_record("last week")]
         )
         bridge.register_query_source(
-            source.knowledge(),
+            source.knowledge,
             source.title(),
-            source.presets(),
-            source.unlisted_presets(),
+            source.presets,
+            source.unlisted_presets,
         )
         return bridge
 
