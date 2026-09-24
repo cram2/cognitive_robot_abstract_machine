@@ -206,13 +206,24 @@ class DegreeOfFreedomLimitProfiler:
     Controller configuration providing horizon length, time step, and solver.
     """
 
+    @property
+    def time_step(self) -> float:
+        """
+        Duration of a single step of the prediction horizon.
+        """
+        return self.qp_controller_config.model_predictive_control_time_step
+
+    @property
+    def prediction_horizon(self) -> int:
+        """
+        Number of steps in the prediction horizon.
+        """
+        return self.qp_controller_config.prediction_horizon
+
     def _compute_position_constrained_velocity_bounds(
         self,
         degree_of_freedom_symbols: DerivativeMap[FloatVariable],
-        lower_limits: DerivativeMap[float],
-        upper_limits: DerivativeMap[float],
-        time_step: float,
-        prediction_horizon: int,
+        limits: DegreeOfFreedomLimits[float],
     ) -> VelocityBoundProfiles:
         """
         Computes per-step velocity bounds that keep the degree of freedom within its
@@ -220,15 +231,14 @@ class DegreeOfFreedomLimitProfiler:
 
         :param degree_of_freedom_symbols: Symbolic current state of the degree of
             freedom.
-        :param lower_limits: Lower position, velocity, acceleration, and jerk limits.
-        :param upper_limits: Upper position, velocity, acceleration, and jerk limits.
-        :param time_step: Duration of a single horizon step.
-        :param prediction_horizon: Number of steps in the prediction horizon.
+        :param limits: Resolved limits of the degree of freedom.
         """
+        time_step = self.time_step
+        lower_limits, upper_limits = limits.lower, limits.upper
         velocity_limit = upper_limits.velocity
         if lower_limits.position is None:
             return VelocityBoundProfiles.unconstrained(
-                velocity_limit, prediction_horizon
+                velocity_limit, self.prediction_horizon
             )
 
         jerk_limit = upper_limits.jerk
@@ -238,8 +248,6 @@ class DegreeOfFreedomLimitProfiler:
             initial_velocity=velocity_limit,
             acceleration_limit=upper_limits.acceleration,
             jerk_limit=jerk_limit,
-            time_step=time_step,
-            prediction_horizon=prediction_horizon,
         )
         velocity_lower_bound = self._directional_velocity_bound(
             velocity_profile=velocity_profile,
@@ -247,7 +255,6 @@ class DegreeOfFreedomLimitProfiler:
             position_error=lower_limits.position - degree_of_freedom_symbols.position,
             jerk_limit=jerk_limit,
             velocity_limit=velocity_limit,
-            time_step=time_step,
             direction=BoundDirection.LOWER,
         )
         velocity_upper_bound = self._directional_velocity_bound(
@@ -256,7 +263,6 @@ class DegreeOfFreedomLimitProfiler:
             position_error=upper_limits.position - degree_of_freedom_symbols.position,
             jerk_limit=jerk_limit,
             velocity_limit=velocity_limit,
-            time_step=time_step,
             direction=BoundDirection.UPPER,
         )
         goal_profile = sm.max(velocity_lower_bound, 0) + sm.min(velocity_upper_bound, 0)
@@ -275,8 +281,6 @@ class DegreeOfFreedomLimitProfiler:
         initial_velocity: float,
         acceleration_limit: float,
         jerk_limit: float,
-        time_step: float,
-        prediction_horizon: int,
     ) -> tuple[npt.NDArray, npt.NDArray]:
         """
         Solves an MPC that drives the degree of freedom from full velocity to rest,
@@ -288,16 +292,15 @@ class DegreeOfFreedomLimitProfiler:
         :param initial_velocity: Velocity the profile starts braking from.
         :param acceleration_limit: Acceleration limit applied at every horizon step.
         :param jerk_limit: Jerk limit applied at every horizon step.
-        :param time_step: Duration of a single horizon step.
-        :param prediction_horizon: Number of steps in the prediction horizon.
         """
+        prediction_horizon = self.prediction_horizon
         profile = gm.simple_model_predictive_control(
             vel_limit=initial_velocity,
             acc_limit=acceleration_limit,
             jerk_limit=jerk_limit,
             current_vel=initial_velocity,
             current_acc=0,
-            dt=time_step,
+            dt=self.time_step,
             ph=prediction_horizon,
             q_weight=(0, 0, 0),
             lin_weight=(-1, 0, 0),
@@ -315,7 +318,6 @@ class DegreeOfFreedomLimitProfiler:
         position_error: sm.Scalar,
         jerk_limit: float,
         velocity_limit: float,
-        time_step: float,
         direction: BoundDirection,
     ) -> sm.Vector:
         """
@@ -329,11 +331,11 @@ class DegreeOfFreedomLimitProfiler:
             against.
         :param jerk_limit: Jerk limit used to cap the first step change.
         :param velocity_limit: Velocity limit clamping the first step change.
-        :param time_step: Duration of a single horizon step.
         :param direction: Whether the bound brakes against the lower or upper position
             limit.
         """
         sign = direction.sign
+        time_step = self.time_step
         velocity_bound, _ = shifted_velocity_profile(
             velocity_profile=velocity_profile,
             acceleration_profile=acceleration_profile,
@@ -361,10 +363,7 @@ class DegreeOfFreedomLimitProfiler:
     def compute_horizon_bounds(
         self,
         degree_of_freedom_symbols: DerivativeMap[FloatVariable],
-        lower_limits: DerivativeMap[float],
-        upper_limits: DerivativeMap[float],
-        time_step: float,
-        prediction_horizon: int,
+        limits: DegreeOfFreedomLimits[float],
         epsilon: float = 0.00001,
     ) -> DegreeOfFreedomLimits[sm.Vector]:
         """
@@ -374,21 +373,14 @@ class DegreeOfFreedomLimitProfiler:
 
         :param degree_of_freedom_symbols: Symbolic current state of the degree of
             freedom.
-        :param lower_limits: Lower position, velocity, acceleration, and jerk limits.
-        :param upper_limits: Upper position, velocity, acceleration, and jerk limits.
-        :param time_step: Duration of a single horizon step.
-        :param prediction_horizon: Number of steps in the prediction horizon.
+        :param limits: Resolved limits of the degree of freedom.
         :param epsilon: Tolerance below which a velocity bound violation is ignored.
         """
-        jerk_limit = upper_limits.jerk
-        acceleration_limit = upper_limits.acceleration
+        jerk_limit = limits.upper.jerk
+        acceleration_limit = limits.upper.acceleration
 
         velocity_bounds = self._compute_position_constrained_velocity_bounds(
-            degree_of_freedom_symbols=degree_of_freedom_symbols,
-            lower_limits=lower_limits,
-            upper_limits=upper_limits,
-            time_step=time_step,
-            prediction_horizon=prediction_horizon,
+            degree_of_freedom_symbols=degree_of_freedom_symbols, limits=limits
         )
         velocity_lower_bound = velocity_bounds.lower_bound
         velocity_upper_bound = velocity_bounds.upper_bound
@@ -403,8 +395,6 @@ class DegreeOfFreedomLimitProfiler:
                 degree_of_freedom_symbols=degree_of_freedom_symbols,
                 goal_profile=velocity_bounds.goal_profile,
                 jerk_limit=jerk_limit,
-                time_step=time_step,
-                prediction_horizon=prediction_horizon,
                 skip_first=velocity_bounds.skip_first,
             )
         )
@@ -422,7 +412,6 @@ class DegreeOfFreedomLimitProfiler:
             velocity_upper_bound=velocity_upper_bound,
             acceleration_profile=acceleration_profile,
             jerk_profile=jerk_profile,
-            time_step=time_step,
         )
 
     def _project_velocity_profiles(
@@ -430,8 +419,6 @@ class DegreeOfFreedomLimitProfiler:
         degree_of_freedom_symbols: DerivativeMap[FloatVariable],
         goal_profile: sm.Vector,
         jerk_limit: float,
-        time_step: float,
-        prediction_horizon: int,
         skip_first: sm.Scalar,
     ) -> tuple[sm.Vector, sm.Vector]:
         """
@@ -442,8 +429,6 @@ class DegreeOfFreedomLimitProfiler:
             freedom.
         :param goal_profile: Goal velocity profile the projection drives towards.
         :param jerk_limit: Jerk limit applied while projecting the velocity profile.
-        :param time_step: Duration of a single horizon step.
-        :param prediction_horizon: Number of steps in the prediction horizon.
         :param skip_first: Flag marking that the first step is already at rest against a
             limit.
         """
@@ -452,8 +437,8 @@ class DegreeOfFreedomLimitProfiler:
             degree_of_freedom_symbols.acceleration,
             goal_profile,
             Scalar(jerk_limit),
-            Scalar(time_step),
-            prediction_horizon,
+            Scalar(self.time_step),
+            self.prediction_horizon,
             skip_first,
         )
         _, _, projected_jerk_profile_violated = compute_immediate_slowdown_profile(
@@ -461,8 +446,8 @@ class DegreeOfFreedomLimitProfiler:
             degree_of_freedom_symbols.acceleration,
             goal_profile,
             Scalar(np.inf),
-            Scalar(time_step),
-            prediction_horizon,
+            Scalar(self.time_step),
+            self.prediction_horizon,
             skip_first,
         )
         return projected_velocity_profile, projected_jerk_profile_violated
@@ -501,7 +486,6 @@ class DegreeOfFreedomLimitProfiler:
         velocity_upper_bound: sm.Vector,
         acceleration_profile: sm.Vector,
         jerk_profile: sm.Vector,
-        time_step: float,
     ) -> DegreeOfFreedomLimits[sm.Vector]:
         """
         Combines the velocity, acceleration, and jerk profiles into the horizon limits,
@@ -511,8 +495,8 @@ class DegreeOfFreedomLimitProfiler:
         :param velocity_upper_bound: Per-step upper velocity bound.
         :param acceleration_profile: Per-step acceleration magnitude.
         :param jerk_profile: Per-step jerk magnitude.
-        :param time_step: Duration of a single horizon step.
         """
+        time_step = self.time_step
         velocity_lower_bound = sm.min(velocity_lower_bound, velocity_upper_bound)
         velocity_upper_bound = sm.max(velocity_lower_bound, velocity_upper_bound)
         acceleration_lower_bounds = -acceleration_profile
@@ -534,7 +518,7 @@ class DegreeOfFreedomLimitProfiler:
 
     def resolve_limits(
         self, degree_of_freedom: DegreeOfFreedom
-    ) -> tuple[DerivativeMap[float], DerivativeMap[float]]:
+    ) -> DegreeOfFreedomLimits[float]:
         """
         Builds the lower and upper limit maps for a degree of freedom, filling in
         unbounded acceleration limits and deriving a jerk limit from the configured
@@ -572,7 +556,7 @@ class DegreeOfFreedomLimitProfiler:
                 degree_of_freedom.limits.lower.jerk, -braking.jerk_limit
             )
 
-        return lower_limits, upper_limits
+        return DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits)
 
     def _braking(self, degree_of_freedom: DegreeOfFreedom) -> JerkLimitedBraking:
         """
@@ -586,7 +570,7 @@ class DegreeOfFreedomLimitProfiler:
         :param degree_of_freedom: Degree of freedom that brakes.
         """
         velocity_limit = degree_of_freedom.limits.upper.velocity
-        time_step = self.qp_controller_config.model_predictive_control_time_step
+        time_step = self.time_step
         if degree_of_freedom.limits.upper.jerk is None:
             braking = JerkLimitedBraking.from_braking_time(
                 velocity_limit=velocity_limit,
@@ -616,15 +600,10 @@ class DegreeOfFreedomLimitProfiler:
         :raises DegreeOfFreedomBrakingExceedsHorizonError: If the degree of freedom
             cannot brake from its velocity limit to rest within the prediction horizon.
         """
-        qp_controller_config = self.qp_controller_config
-        lower_limits, upper_limits = self.resolve_limits(degree_of_freedom)
         self._raise_if_braking_exceeds_horizon(degree_of_freedom)
         return self.compute_horizon_bounds(
             degree_of_freedom_symbols=degree_of_freedom.variables,
-            lower_limits=lower_limits,
-            upper_limits=upper_limits,
-            time_step=qp_controller_config.model_predictive_control_time_step,
-            prediction_horizon=qp_controller_config.prediction_horizon,
+            limits=self.resolve_limits(degree_of_freedom),
         )
 
     def _raise_if_braking_exceeds_horizon(
@@ -758,7 +737,7 @@ class QuadraticProgramDegreeOfFreedomLimits:
         qp_controller_config = self.qp_controller_config
         decision_variable_limits = {
             degree_of_freedom.id: self._decision_variable_limits(
-                upper_limits=self.profiler.resolve_limits(degree_of_freedom)[1],
+                upper_limits=self.profiler.resolve_limits(degree_of_freedom).upper,
                 time_step=qp_controller_config.model_predictive_control_time_step,
             )
             for degree_of_freedom in self.degrees_of_freedom
