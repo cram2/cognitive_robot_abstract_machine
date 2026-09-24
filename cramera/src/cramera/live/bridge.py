@@ -35,6 +35,8 @@ from cramera.body_geometry import NumericPose, POSE_PRECISION, rounded_pose
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from cramera.knowledge.enums import PlanNodeGroup
 from cramera.live.chart_observer import ChartObserver
 from cramera.live.chart_structure import (
@@ -53,11 +55,17 @@ from cramera.knowledge.workspace_classes import WorkspaceClassIndex
 from cramera.live.query import LiveQuerySource, NoQuerySourceRegistered
 from cramera.live.world_query import WorldQuerySource
 from cramera.live.markers import MarkerEntry, MarkerStore
-from cramera.live.shape_catalog import ShapeEntry, served_mesh_file, shape_entry
+from cramera.live.shape_catalog import (
+    color_to_hex,
+    is_default_white,
+    served_mesh_file,
+    shape_entry,
+)
 from cramera.live.transforms import TransformGraph, TransformSnapshot
 from cramera.world_objects import WorldObjects
 from cramera.palette import ObjectPalette
 from cramera.robot_parts import RobotPartAnnotation
+from cramera.recording_fields import SceneField
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -205,70 +213,73 @@ class MotionNodeProgress:
 
 
 # %% viewer payload shapes
-class ObjectKind(StrEnum):
-    """
-    How a loose object's geometry is served to the viewer.
-    """
-
-    MESH = "mesh"
-    """
-    Geometry supplied as a mesh asset.
-    """
-    BOX = "box"
-    """
-    Geometry described by box dimensions.
-    """
-    SHAPES = "shapes"
-    """
-    Geometry composed of individually described shapes.
-    """
-
-
 @dataclass(frozen=True)
 class ObjectCatalogEntry:
     """
-    One loose object's geometry-catalog entry, as the viewer spawns it.
+    One loose object's native geometry and publication identity.
     """
 
     key: str
     """
-    Mesh basename this object is published under.
+    Published key shared by this object's geometry and pose snapshots.
     """
 
-    id: str
+    shapes: ShapeCollection
     """
-    Stem of :attr:`key`, used as the object's display id.
-    """
-
-    kind: ObjectKind
-    """
-    Whether the viewer renders a served mesh or a placeholder box.
+    Visual geometry, collision geometry, or a placeholder for a shapeless body.
     """
 
-    color: str
+    fallback_color: str
     """
-    Colour assigned to this object from the shared palette.
-    """
-
-    mesh: Optional[str] = None
-    """
-    URL the mesh is served from, set only when :attr:`kind` is ``MESH``.
+    Palette colour applied to shapes with no chosen colour.
     """
 
-    format: Optional[str] = None
-    """
-    Mesh file extension, set only when :attr:`kind` is ``MESH``.
-    """
+    @property
+    def id(self) -> str:
+        """Return the display identifier derived from the published key."""
+        return Path(self.key).stem
 
-    size: Optional[List[float]] = None
-    """
-    Box extent in metres, set only when :attr:`kind` is ``BOX``.
-    """
+    @property
+    def color(self) -> str:
+        """Return the first shape's colour, or its assigned palette colour."""
+        if not self.shapes or is_default_white(self.shapes[0].color):
+            return self.fallback_color
+        return color_to_hex(self.shapes[0].color)
 
-    shapes: Optional[List[ShapeEntry]] = None
-    """
-    The body's shapes, set only when :attr:`kind` is ``SHAPES``.
-    """
+    def mesh_key(self, shape_index: int) -> str:
+        """Identify one shape's served mesh within this object.
+
+        :param shape_index: The shape's position in the native collection.
+        :return: The key used to serve the shape's mesh file.
+        """
+        return "%s#%d" % (self.key, shape_index)
+
+    def to_payload(
+        self, mesh_files: dict[str, str], fallback_size: list[float]
+    ) -> dict[str, Any]:
+        """Describe native shapes with the browser's primitive and asset fields.
+
+        :param mesh_files: Registered mesh files indexed by their published keys.
+        :param fallback_size: Box dimensions for an unavailable mesh.
+        :return: The object's geometry payload.
+        """
+        entries = []
+        for shape_index, shape in enumerate(self.shapes):
+            mesh_key = self.mesh_key(shape_index)
+            mesh_url = (
+                "/mesh?key=" + urllib.parse.quote(mesh_key, safe="")
+                if mesh_key in mesh_files
+                else None
+            )
+            entries.append(
+                asdict(shape_entry(shape, mesh_url, fallback_size, self.fallback_color))
+            )
+        return {
+            SceneField.KEY: self.key,
+            SceneField.ID: self.id,
+            SceneField.COLOR: self.color,
+            SceneField.SHAPES: entries,
+        }
 
 
 @dataclass
@@ -961,7 +972,10 @@ class Bridge:
         The geometry catalog the viewer spawns live objects from.
         """
         with self._lock:
-            return [asdict(entry) for entry in self.object_metadata]
+            return [
+                entry.to_payload(self._mesh_serve, list(self.DEFAULT_OBJECT_SIZE))
+                for entry in self.object_metadata
+            ]
 
     def object_keys(self) -> List[str]:
         """
@@ -1302,17 +1316,18 @@ class Bridge:
             )
         }
 
-    @staticmethod
-    def _body_shapes(body: Body) -> List[Any]:
+    @classmethod
+    def _body_shapes(cls, body: Body) -> ShapeCollection:
         """
-        The shapes a body is rendered from: its visual ones, else its collision ones.
+        Select visual geometry, collision geometry, or a native placeholder box.
 
         :param body: The body whose shapes are read.
+        :return: The nonempty collection to render and record.
         """
         for shape_collection in (body.visual, body.collision):
             if shape_collection.shapes:
-                return list(shape_collection.shapes)
-        return []
+                return shape_collection
+        return ShapeCollection(shapes=[Box(scale=Scale(*cls.DEFAULT_OBJECT_SIZE))])
 
     @staticmethod
     def _actuated_connections(
@@ -1333,8 +1348,8 @@ class Bridge:
         """
         Rebuild the geometry catalog the viewer spawns live objects from.
 
-        Each object gets a mesh URL (served by the bridge), its real shapes, or a
-        fallback box size, so objects the viewer does not know yet can appear mid-run.
+        Retain native geometry and register its mesh files so new objects can appear
+        mid-run.
 
         :param bodies: The current published bodies, keyed by mesh key.
         """
@@ -1344,66 +1359,19 @@ class Bridge:
         for index, (key, body) in enumerate(
             item for item in bodies.items() if item[0] != ROBOT_BASE_KEY
         ):
-            color = palette.color_for(index)
-            object_id = Path(key).stem
-            shapes = self._body_shapes(body)
-            if shapes:
-                catalog.append(self._shape_catalog_entry(key, shapes, color, serve))
-                continue
-            catalog.append(
-                ObjectCatalogEntry(
-                    key=key,
-                    id=object_id,
-                    kind=ObjectKind.BOX,
-                    color=color,
-                    size=list(self.DEFAULT_OBJECT_SIZE),
-                )
+            entry = ObjectCatalogEntry(
+                key=key,
+                shapes=self._body_shapes(body),
+                fallback_color=palette.color_for(index),
             )
-        self._mesh_serve = serve
+            catalog.append(entry)
+            for shape_index, shape in enumerate(entry.shapes):
+                mesh_file = served_mesh_file(shape)
+                if mesh_file is not None:
+                    serve[entry.mesh_key(shape_index)] = mesh_file
         with self._lock:
+            self._mesh_serve = serve
             self.object_metadata = catalog
-
-    def _shape_catalog_entry(
-        self,
-        key: str,
-        shapes: List[Any],
-        fallback_color: str,
-        serve: Dict[str, str],
-    ) -> ObjectCatalogEntry:
-        """
-        The catalog entry of a body published shape by shape.
-
-        Mesh shapes are registered in the serve map under a composite key, so each of
-        a body's meshes is downloadable on its own.
-
-        :param key: The body's published key.
-        :param shapes: The body's shapes, as :meth:`_body_shapes` selects them.
-        :param fallback_color: Palette colour used for shapes without one of their own.
-        :param serve: The serve map being built, extended with this body's mesh files.
-        """
-        entries: List[ShapeEntry] = []
-        for shape_index, shape in enumerate(shapes):
-            mesh_url = None
-            mesh_file = served_mesh_file(shape)
-            if mesh_file is not None:
-                serve_key = "%s#%d" % (key, shape_index)
-                serve[serve_key] = mesh_file
-                mesh_url = "/mesh?key=" + urllib.parse.quote(serve_key, safe="")
-            entries.append(
-                shape_entry(
-                    shape,
-                    mesh_url,
-                    fallback_size=list(self.DEFAULT_OBJECT_SIZE),
-                    fallback_color=fallback_color,
-                )
-            )
-        return ObjectCatalogEntry(
-            key=key,
-            id=Path(key).stem,
-            kind=ObjectKind.SHAPES,
-            color=entries[0].color,
-            shapes=entries,
-        )
 
     # %% world snapshot
     def snapshot(self) -> None:

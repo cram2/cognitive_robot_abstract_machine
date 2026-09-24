@@ -1369,7 +1369,7 @@ Panels.define('robot-scene', function (root, bus) {
             return;
           }
           const spec = { id: o.id, key: o.key, color: o.color };
-          if (o.kind === 'shapes' && o.shapes) { spec.shapes = o.shapes; spec.liveBase = liveUrl(); }
+          if (o.shapes) { spec.shapes = o.shapes; spec.liveBase = liveUrl(); }
           else if (o.kind === 'mesh' && o.mesh) { spec.meshUrl = liveUrl() + o.mesh; spec.format = o.format; }
           else spec.box = o.size || [0.06, 0.06, 0.1];
           liveSpawned[o.key] = true;

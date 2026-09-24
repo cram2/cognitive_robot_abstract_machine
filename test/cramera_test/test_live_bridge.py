@@ -410,7 +410,9 @@ class TestViewerAccessors:
     def test_an_object_with_unscaled_shapes_falls_back_to_the_default_size(self):
         bridge = Bridge()
         bridge.publish_bodies({"blob.stl": PublishedBody(name="world/blob.stl")})
-        assert bridge.object_catalog()[0]["size"] == list(Bridge.DEFAULT_OBJECT_SIZE)
+        assert bridge.object_catalog()[0]["shapes"][0]["size"] == list(
+            Bridge.DEFAULT_OBJECT_SIZE
+        )
 
     def test_an_unserved_mesh_has_no_path(self):
         assert Bridge().mesh_path("milk.stl") is None
@@ -624,7 +626,7 @@ class TestShapeCatalogEntries:
 
         entry = bridge.object_catalog()[0]
 
-        assert entry["kind"] == "shapes"
+        assert isinstance(bridge.object_metadata[0].shapes, ShapeCollection)
         assert entry["color"] == "#cc3333"
         box, cylinder, sphere = entry["shapes"]
         assert box["kind"] == "box"
@@ -683,7 +685,7 @@ class TestShapeCatalogEntries:
 
         entry = bridge.object_catalog()[0]
 
-        assert entry["kind"] == "shapes"
+        assert isinstance(bridge.object_metadata[0].shapes, ShapeCollection)
         assert entry["shapes"][0]["size"] == [0.5, 0.5, 0.5]
 
 

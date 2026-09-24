@@ -22,6 +22,26 @@ class SceneField(StrEnum):
     Shared metadata keys in the browser's scene bundle format.
     """
 
+    KEY = "key"
+    """
+    Published key that associates an object's geometry with its poses.
+    """
+
+    ID = "id"
+    """
+    Display identifier of a scene object.
+    """
+
+    COLOR = "color"
+    """
+    Default colour of a scene object.
+    """
+
+    SHAPES = "shapes"
+    """
+    Individually described shapes that compose a scene object's geometry.
+    """
+
     PLAN_TREES = "planTrees"
     """
     Nested execution trees captured by the plan observer.
