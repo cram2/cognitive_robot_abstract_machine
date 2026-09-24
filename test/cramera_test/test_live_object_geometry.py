@@ -21,11 +21,32 @@ from semantic_digital_twin.world_description.geometry import (
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
-from cramera.live.bridge import Bridge
+from cramera.live.bridge import Bridge, ObjectCatalogEntry
 from cramera.live.recording_bundle import _object_entry
 
 
 # %% catalog geometry
+def test_catalog_serializes_native_meshes_without_an_external_file_map(
+    tmp_path: Path,
+) -> None:
+    """
+    Use the entry's native meshes as the complete geometry input.
+
+    :param tmp_path: Directory holding the native mesh file.
+    """
+    mesh_path = tmp_path / "native.obj"
+    Box(scale=Scale(0.2, 0.3, 0.4)).mesh.export(mesh_path)
+    mesh = Mesh(filename=str(mesh_path), scale=Scale(2, 3, 4))
+    entry = ObjectCatalogEntry(key="native", shapes=ShapeCollection(shapes=[mesh]))
+
+    payload = entry.to_payload()
+
+    [shape] = payload["shapes"]
+    assert shape["format"] == mesh_path.suffix.lstrip(".")
+    assert shape["scale"] == mesh.scale.to_np().tolist()
+    assert shape["mesh"].split("?")[0] == "/mesh"
+
+
 @pytest.mark.parametrize("color", [Color(), Color.WHITE(), Color(1, 1, 1, 0.4)])
 def test_white_geometry_keeps_its_native_color(color: Color) -> None:
     """

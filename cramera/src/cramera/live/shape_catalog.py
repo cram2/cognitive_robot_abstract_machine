@@ -152,6 +152,7 @@ def shape_entry(
     :param shape: The shape to publish.
     :param mesh_url: URL the shape's mesh is served from, or None for primitives and for
         meshes without a servable file.
+    :return: The shape's native geometry and appearance in the browser payload.
     :raises FileNotFoundError: When the mesh has no servable file.
     :raises TypeError: When the shape is not a supported native geometry type.
     """

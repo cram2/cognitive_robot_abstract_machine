@@ -122,10 +122,9 @@ class ObjectCatalogEntry:
         """
         return "%s#%d" % (self.key, shape_index)
 
-    def to_payload(self, mesh_files: dict[str, str]) -> dict[str, Any]:
+    def to_payload(self) -> dict[str, Any]:
         """Describe native shapes with the browser's primitive and asset fields.
 
-        :param mesh_files: Registered mesh files indexed by their published keys.
         :return: The object's geometry payload.
         """
         entries = []
@@ -133,7 +132,7 @@ class ObjectCatalogEntry:
             mesh_key = self.mesh_key(shape_index)
             mesh_url = (
                 "/mesh?key=" + urllib.parse.quote(mesh_key, safe="")
-                if mesh_key in mesh_files
+                if served_mesh_file(shape) is not None
                 else None
             )
             entries.append(asdict(shape_entry(shape, mesh_url)))
@@ -831,9 +830,7 @@ class Bridge:
         The geometry catalog the viewer spawns live objects from.
         """
         with self._lock:
-            return [
-                entry.to_payload(self._mesh_serve) for entry in self.object_metadata
-            ]
+            return [entry.to_payload() for entry in self.object_metadata]
 
     def object_keys(self) -> List[str]:
         """
