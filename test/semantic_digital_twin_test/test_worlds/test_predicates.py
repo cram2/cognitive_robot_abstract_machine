@@ -1,3 +1,4 @@
+import inspect
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List
@@ -7,7 +8,6 @@ import numpy as np
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.reasoning.predicates import (
-    RESTING_CONTACT_TOLERANCE,
     contact,
     visible,
     Above,
@@ -62,6 +62,13 @@ The radius of the ball a test stands a body beside, inside its bounding box.
 CONTAINER_FLOOR_THICKNESS = 0.05
 """
 How thick the floor of the container a test stands a body in is.
+"""
+
+RESTING_CONTACT_TOLERANCE = (
+    inspect.signature(is_supported_by).parameters["contact_tolerance"].default
+)
+"""
+How far above a surface a body may stand and still rest on it, as the predicate defaults it.
 """
 
 CONTAINER_WALL_HEIGHT = 0.5

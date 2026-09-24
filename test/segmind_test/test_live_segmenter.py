@@ -26,8 +26,6 @@ from segmind.detectors.atomic_event_detectors_nodes import (
 from segmind.detectors.base import AbstractDetector, SegmindContext
 from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.live_segmenter import (
-    EVENT_COMBINING_DETECTOR_TYPES,
-    OBJECT_DETECTOR_TYPES,
     LiveSegmenter,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -260,18 +258,23 @@ def test_watching_bodies_ticks_every_object_detector_for_each_body(
     milk_in_the_apartment,
 ):
     world, milk, box = milk_in_the_apartment
+    object_detector_types = [
+        detector_type
+        for detector_type in DetectorSelection.everything().detector_types
+        if detector_type.watches_a_body()
+    ]
 
     segmenter = LiveSegmenter.watching(world, [milk, box])
 
     tracked = Counter(
         (type(detector), detector.tracked_object)
         for detector in segmenter.detectors
-        if type(detector) in OBJECT_DETECTOR_TYPES
+        if type(detector) in object_detector_types
     )
     assert tracked == Counter(
         {
             (detector_type, body): 1
-            for detector_type in OBJECT_DETECTOR_TYPES
+            for detector_type in object_detector_types
             for body in (milk, box)
         }
     )
@@ -281,14 +284,19 @@ def test_watching_bodies_combines_their_events_once_for_all_of_them(
     milk_in_the_apartment,
 ):
     world, milk, box = milk_in_the_apartment
+    event_combining_detector_types = [
+        detector_type
+        for detector_type in DetectorSelection.everything().detector_types
+        if not detector_type.watches_a_body()
+    ]
 
     segmenter = LiveSegmenter.watching(world, [milk, box])
 
     assert Counter(
         type(detector)
         for detector in segmenter.detectors
-        if type(detector) in EVENT_COMBINING_DETECTOR_TYPES
-    ) == Counter(EVENT_COMBINING_DETECTOR_TYPES)
+        if type(detector) in event_combining_detector_types
+    ) == Counter(event_combining_detector_types)
 
 
 def test_watching_for_what_is_asked_watches_each_body_with_what_that_is_read_from(

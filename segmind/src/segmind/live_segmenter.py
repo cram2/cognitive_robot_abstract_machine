@@ -8,66 +8,17 @@ import time
 from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from typing_extensions import List, Self, Sequence, Tuple, Type
+from typing_extensions import List, Self, Sequence, Type
 
 from segmind.detector_selection import DetectorSelection
-from segmind.detectors.atomic_event_detectors_nodes import (
-    ContactDetector,
-    LossOfContactDetector,
-    MotionDetector,
-    RotationDetector,
-    StopRotationDetector,
-    StopTranslationDetector,
-    TranslationDetector,
-)
+from segmind.detectors.atomic_event_detectors_nodes import MotionDetector
 from segmind.detectors.base import AbstractDetector, SegmindContext
-from segmind.detectors.coarse_event_detector_nodes import (
-    PickUpDetector,
-    PlacingDetector,
-)
-from segmind.detectors.agent_event_detector_nodes import (
-    GraspDetector,
-    LossOfGraspDetector,
-)
-from segmind.detectors.spatial_relation_detector_nodes import (
-    ContainmentDetector,
-    LossOfContainmentDetector,
-    LossOfSupportDetector,
-    SupportDetector,
-)
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.event_logger import EventLogger
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 from segmind.utils import PropagatingThread
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
-
-OBJECT_DETECTOR_TYPES: Tuple[Type[AbstractDetector], ...] = (
-    ContactDetector,
-    LossOfContactDetector,
-    GraspDetector,
-    LossOfGraspDetector,
-    SupportDetector,
-    LossOfSupportDetector,
-    ContainmentDetector,
-    LossOfContainmentDetector,
-    TranslationDetector,
-    StopTranslationDetector,
-    RotationDetector,
-    StopRotationDetector,
-)
-"""
-The detectors that each watch a single body.
-"""
-
-EVENT_COMBINING_DETECTOR_TYPES: Tuple[Type[AbstractDetector], ...] = (
-    PickUpDetector,
-    PlacingDetector,
-)
-"""
-The detectors that combine the events already detected about any body.
-"""
-
 
 # %% watching on a thread of its own
 
@@ -127,15 +78,16 @@ class LiveSegmenter(PropagatingThread):
 
         :param detectors: The kinds of detector asked for. Every kind they are read from
             is brought along (see :class:`~segmind.detector_selection.DetectorSelection`),
-            so asking for what is to be detected is enough. Without any, every kind of
-            :data:`OBJECT_DETECTOR_TYPES` and :data:`EVENT_COMBINING_DETECTOR_TYPES`.
+            so asking for what is to be detected is enough. Without any, every kind
+            SegMind defines.
         """
-        asked_for = detectors or (
-            *OBJECT_DETECTOR_TYPES,
-            *EVENT_COMBINING_DETECTOR_TYPES,
+        selection = (
+            DetectorSelection.of(*detectors)
+            if detectors
+            else DetectorSelection.everything()
         )
         chosen: List[AbstractDetector] = []
-        for detector_type in DetectorSelection.of(*asked_for).detector_types:
+        for detector_type in selection.detector_types:
             if detector_type.watches_a_body():
                 chosen.extend(detector_type(tracked_object=body) for body in bodies)
             else:

@@ -4,7 +4,7 @@ from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import List, Callable, Any, Tuple, Type
+from typing import List, Callable, Tuple, Type
 
 from typing_extensions import Hashable
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -75,9 +75,11 @@ class AbstractInteractionDetector(AbstractDetector):
     def _find_interaction_events(
         self,
         segmind_context: SegmindContext,
-        primary_event_type: type,
-        secondary_event_type: type,
-        make_event: Callable[[Any, Any], DetectionEvent],
+        primary_event_type: Type[EventWithTrackedObjects],
+        secondary_event_type: Type[EventWithTrackedObjects],
+        make_event: Callable[
+            [EventWithTrackedObjects, EventWithTrackedObjects], DetectionEvent
+        ],
     ) -> List[DetectionEvent]:
         """
         Scans logged events for correlated pairs of primary and secondary event types
@@ -101,20 +103,20 @@ class AbstractInteractionDetector(AbstractDetector):
         :return: List of newly detected interaction events.
         """
         primary_events = [
-            e
-            for e in segmind_context.logger.get_events()
-            if isinstance(e, primary_event_type)
+            event
+            for event in segmind_context.logger.get_events()
+            if isinstance(event, primary_event_type)
         ]
         secondary_events = [
-            e
-            for e in segmind_context.logger.get_events()
-            if isinstance(e, secondary_event_type)
+            event
+            for event in segmind_context.logger.get_events()
+            if isinstance(event, secondary_event_type)
         ]
 
         events = []
         by_object = defaultdict(list)
-        for e in primary_events:
-            by_object[e.tracked_object].append(e)
+        for primary_event in primary_events:
+            by_object[primary_event.tracked_object].append(primary_event)
 
         spent = segmind_context.spent_interaction_events
         for secondary in secondary_events:
@@ -167,7 +169,7 @@ class PlacingDetector(AbstractInteractionDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        obj: List[Body],
+        tracked_objects: List[Body],
     ) -> List[DetectionEvent]:
         """
         Updates the system context with new placing event instances based on past
@@ -177,7 +179,7 @@ class PlacingDetector(AbstractInteractionDetector):
 
         :param context: The current motion statechart context.
         :param segmind_context: The shared SegmindContext containing the information required to track events.
-        :param obj: List of bodies to analyze for potential placing events.
+        :param tracked_objects: List of bodies to analyze for potential placing events.
         :return: List of generated placing events based on observed interactions.
         """
         return self._find_interaction_events(
@@ -228,7 +230,7 @@ class PickUpDetector(AbstractInteractionDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        obj: List[Body],
+        tracked_objects: List[Body],
     ) -> List[DetectionEvent]:
         """
         Updates the context and generates a list of events based on translation events and loss
@@ -238,7 +240,7 @@ class PickUpDetector(AbstractInteractionDetector):
 
         :param context: The current motion statechart context.
         :param segmind_context: The shared SegmindContext containing the information required to track events.
-        :param obj: List of bodies to analyze for potential pickup events.
+        :param tracked_objects: List of bodies to analyze for potential pickup events.
         :return: List of generated pickup events based on observed interactions.
         """
         return self._find_interaction_events(

@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from segmind.datastructures.events import MotionEvent, DetectionEvent, RotationEvent
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from segmind.event_logger import EventLogger
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -220,17 +220,6 @@ class AbstractDetector(MotionStatechartNode, ABC):
         return lost
 
     @staticmethod
-    def bodies_of_robots(world: World) -> Set[Body]:
-        """
-        Every body belonging to a robot of ``world``.
-        """
-        return {
-            body
-            for robot in world.get_semantic_annotations_by_type(AbstractRobot)
-            for body in robot.bodies
-        }
-
-    @staticmethod
     def bodies_outside_end_effectors(world: World) -> List[Body]:
         """
         The collidable bodies of ``world`` that are part of no end effector.
@@ -272,7 +261,7 @@ class AbstractDetector(MotionStatechartNode, ABC):
         if candidates is None:
             candidates = context.world.bodies_with_collision
         if self.exclude_robot:
-            robot_bodies = self.bodies_of_robots(context.world)
+            robot_bodies = set(context.world.robot_bodies_with_collision)
             candidates = [body for body in candidates if body not in robot_bodies]
         for obj in tracked_objects:
             for body in candidates:

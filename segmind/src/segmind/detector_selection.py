@@ -7,6 +7,7 @@ the imports of the detector modules below are for.
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 
 from krrood.utils import recursive_subclasses
@@ -36,6 +37,27 @@ class DetectorSelection:
     """
     Every kind chosen, each after the kinds it is read from.
     """
+
+    @classmethod
+    def everything(cls) -> Self:
+        """
+        :return: Every concrete kind of detector SegMind defines, each after the kinds
+            it is read from.
+        """
+        segmind_modules = {
+            agent_event_detector_nodes.__name__,
+            atomic_event_detectors_nodes.__name__,
+            coarse_event_detector_nodes.__name__,
+            spatial_relation_detector_nodes.__name__,
+        }
+        return cls.of(
+            *(
+                candidate
+                for candidate in recursive_subclasses(AbstractDetector)
+                if not inspect.isabstract(candidate)
+                and candidate.__module__ in segmind_modules
+            )
+        )
 
     @classmethod
     def of(cls, *asked_for: Type[AbstractDetector]) -> Self:

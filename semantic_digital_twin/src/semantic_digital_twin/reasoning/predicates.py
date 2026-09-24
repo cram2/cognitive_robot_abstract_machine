@@ -247,24 +247,12 @@ def compute_euclidean_planar_distance(
     return body1_position.euclidean_distance(body2_position)
 
 
-RESTING_CONTACT_TOLERANCE = 0.005
-"""
-How far above a surface a body may stand and still rest on it.
-
-A body is set down by a motion that stops where it can rather than exactly on the
-surface, so a support read from overlapping volume alone would hold for almost no
-placement at all. Measured on a robot stacking boxes, a placement missed the surface it
-was aimed at by 1.9 mm; this leaves room for that while staying far below the
-centimetres by which a body that is genuinely in the air clears a surface.
-"""
-
-
 @symbolic_function
 def is_supported_by(
     supported_body: Body,
     supporting_body: Body,
     max_intersection_height: float = 0.1,
-    contact_tolerance: float = RESTING_CONTACT_TOLERANCE,
+    contact_tolerance: float = 0.005,
 ) -> bool:
     """
     Checks if one object is supporting another object.
@@ -281,6 +269,13 @@ def is_supported_by(
     :param contact_tolerance: How far apart the two objects may be and still count as
         touching, and so how far above the supporting object the supported object may
         stand and still rest on it.
+
+        A body is set down by a motion that stops where it can rather than exactly on
+        the surface, so a support read from overlapping volume alone would hold for
+        almost no placement at all. Measured on a robot stacking boxes, a placement
+        missed the surface it was aimed at by 1.9 mm; the default leaves room for that
+        while staying far below the centimetres by which a body that is genuinely in
+        the air clears a surface.
     :return: True if the second object is supported by the first object, False otherwise
     """
     if supported_body is supporting_body:
