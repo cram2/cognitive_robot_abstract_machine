@@ -167,26 +167,6 @@ class DegreeOfFreedomBrakingExceedsHorizonError(BrakingExceedsHorizonError):
 
 
 @dataclass
-class OutOfJointLimitsException(InfeasibleException):
-    """
-    Raised when a degree of freedom is outside its position limits and cannot recover.
-    """
-
-    def error_message(self) -> str:
-        return "A degree of freedom is outside its position limits and cannot recover."
-
-
-@dataclass
-class HardConstraintsViolatedException(InfeasibleException):
-    """
-    Raised when hard constraints cannot be satisfied.
-    """
-
-    def error_message(self) -> str:
-        return "Hard constraints cannot be satisfied."
-
-
-@dataclass
 class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
     """
     Raised when the QP problem has no free variables.
