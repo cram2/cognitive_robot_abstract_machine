@@ -254,7 +254,6 @@ class GiskardExecutable(Executable):
                 qp_controller_config=QPControllerConfig(
                     target_frequency=50,
                     braking_time=0.056,
-                    prediction_horizon=4,
                     verbose=False,
                 ),
             ),

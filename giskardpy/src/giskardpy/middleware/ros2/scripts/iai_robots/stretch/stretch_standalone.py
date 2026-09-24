@@ -20,9 +20,7 @@ def main():
         server_config=GiskardServerConfig(
             execution_mode=ExecutionMode.STANDALONE, debug_mode=True
         ),
-        qp_controller_config=QPControllerConfig(
-            target_frequency=25, braking_time=1.15, prediction_horizon=30
-        ),
+        qp_controller_config=QPControllerConfig(target_frequency=25, braking_time=1.15),
     )
     giskard.live()
 

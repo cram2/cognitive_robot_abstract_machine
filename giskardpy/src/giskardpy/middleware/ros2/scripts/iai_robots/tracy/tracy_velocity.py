@@ -26,9 +26,7 @@ def main():
         world_config=WorldWithTracyConfig(urdf=robot_description),
         robot_interface_config=TracyVelocityInterface(),
         server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
-        qp_controller_config=QPControllerConfig(
-            target_frequency=80, braking_time=0.36, prediction_horizon=30
-        ),
+        qp_controller_config=QPControllerConfig(target_frequency=80, braking_time=0.36),
     )
     giskard.live()
 
