@@ -167,7 +167,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
                 world=world,
                 qp_controller_config=QPControllerConfig(
                     target_frequency=50,
-                    braking_time=0.056,
+                    braking_time=0.05,
                     verbose=False,
                 ),
             ),
