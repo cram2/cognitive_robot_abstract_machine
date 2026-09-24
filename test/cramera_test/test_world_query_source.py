@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from cramera.knowledge.query_runner import EqlQueryRunner
+from cramera.knowledge.query_runner import EqlQueryRunner, RowRenderer
 from cramera.knowledge.queryable_knowledge import QueryScope
 from cramera.live.world_query import WorldQueryLabel, WorldQueryName, WorldQuerySource
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -244,3 +244,26 @@ def test_read_scope_uses_the_native_world_lock(
     world, _, _ = world_with_two_bodies
 
     assert WorldQuerySource(world).read_scope() is world.state.world_lock
+
+
+def test_native_world_entities_keep_names_without_declared_domains(
+    annotated_robot_world: World,
+) -> None:
+    """
+    Native query results retain entity names without predefined query domains.
+
+    :param annotated_robot_world: The scene supplying bodies, connections and
+        annotations.
+    """
+    entities = [
+        annotated_robot_world.bodies[0],
+        annotated_robot_world.connections[0],
+        annotated_robot_world.semantic_annotations[0],
+    ]
+
+    result = RowRenderer().rows_of(entities)
+
+    assert [row.values["__entity__"] for row in result.rows] == [
+        str(entity.name) for entity in entities
+    ]
+    assert result.highlight == [str(entity.name) for entity in entities]
