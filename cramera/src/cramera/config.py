@@ -2,7 +2,9 @@
 Configuration shared by a live Cramera visualization session.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from semantic_digital_twin.world_description.geometry import Scale
 
 
 # %% live visualization
@@ -22,7 +24,7 @@ class CrameraConfig:
     Time between periodic discoveries of the world's bodies and connections.
     """
 
-    default_object_size: tuple[float, float, float] = (0.06, 0.06, 0.12)
+    default_object_size: Scale = field(default_factory=lambda: Scale(0.06, 0.06, 0.12))
     """
-    Placeholder box dimensions in metres for bodies without geometry.
+    Native placeholder box dimensions in metres for bodies without geometry.
     """

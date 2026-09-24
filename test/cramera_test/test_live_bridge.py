@@ -396,8 +396,8 @@ class TestViewerAccessors:
         """
         bridge = Bridge()
         bridge.publish_bodies({"blob.stl": PublishedBody(name="world/blob.stl")})
-        assert bridge.object_catalog()[0]["shapes"][0]["size"] == list(
-            bridge.configuration.default_object_size
+        assert bridge.object_catalog()[0]["shapes"][0]["size"] == (
+            bridge.configuration.default_object_size.to_np().tolist()
         )
 
     def test_an_unserved_mesh_has_no_path(self):
@@ -662,7 +662,9 @@ class TestShapeCatalogEntries:
         shape = bridge.object_catalog()[0]["shapes"][0]
 
         assert shape["kind"] == "box"
-        assert shape["size"] == list(bridge.configuration.default_object_size)
+        assert (
+            shape["size"] == bridge.configuration.default_object_size.to_np().tolist()
+        )
 
     def test_collision_shapes_stand_in_when_a_body_has_no_visual_ones(self):
         """

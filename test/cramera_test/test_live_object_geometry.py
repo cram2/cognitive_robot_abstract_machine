@@ -60,7 +60,7 @@ def test_shapeless_catalog_uses_a_native_placeholder_box() -> None:
 
     [shape] = bridge.object_metadata[0].shapes
     assert isinstance(shape, Box)
-    assert shape.scale == Scale(*bridge.configuration.default_object_size)
+    assert shape.scale == bridge.configuration.default_object_size
 
 
 def test_live_catalog_does_not_duplicate_the_shapes_classification() -> None:

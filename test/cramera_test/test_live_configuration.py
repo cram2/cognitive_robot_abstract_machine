@@ -2,6 +2,7 @@
 Session configuration controls publication without changing other viewers.
 """
 
+from dataclasses import replace
 from unittest.mock import patch
 
 import pytest
@@ -15,6 +16,21 @@ from cramera.live.bridge import Bridge
 
 
 # %% session defaults
+def test_placeholder_dimensions_use_independent_native_scales() -> None:
+    """
+    Keep each session's mutable native dimensions separate from other defaults.
+    """
+    first = CrameraConfig()
+    second = CrameraConfig()
+
+    assert isinstance(first.default_object_size, Scale)
+    assert isinstance(second.default_object_size, Scale)
+    original = replace(second.default_object_size)
+    first.default_object_size.x *= 2
+
+    assert second.default_object_size == original
+
+
 def test_configured_robot_root_is_excluded_from_loose_objects() -> None:
     """
     Use the reserved key consistently in the catalog and public status.
@@ -38,7 +54,7 @@ def test_configured_placeholder_geometry_is_isolated_to_its_session() -> None:
     """
     Render each shapeless body with its own session's configured dimensions.
     """
-    configuration = CrameraConfig(default_object_size=(0.2, 0.3, 0.4))
+    configuration = CrameraConfig(default_object_size=Scale(0.2, 0.3, 0.4))
     configured = Bridge(configuration=configuration)
     default = Bridge()
     body = Body(name=PrefixedName("object"))
@@ -46,12 +62,31 @@ def test_configured_placeholder_geometry_is_isolated_to_its_session() -> None:
     for bridge in (configured, default):
         bridge.publish_bodies({str(body.name): body})
         [shape] = bridge.object_metadata[0].shapes
-        assert shape.scale == Scale(*bridge.configuration.default_object_size)
-        assert bridge.object_catalog()[0]["shapes"][0]["size"] == list(
-            bridge.configuration.default_object_size
+        assert shape.scale == bridge.configuration.default_object_size
+        assert bridge.object_catalog()[0]["shapes"][0]["size"] == (
+            bridge.configuration.default_object_size.to_np().tolist()
         )
 
     assert configured.configuration != default.configuration
+
+
+def test_placeholder_shapes_do_not_share_configured_dimensions() -> None:
+    """
+    Editing one placeholder leaves its configuration and neighboring shape intact.
+    """
+    configuration = CrameraConfig(default_object_size=Scale(0.2, 0.3, 0.4))
+    expected = replace(configuration.default_object_size)
+    bridge = Bridge(configuration=configuration)
+    first = Body(name=PrefixedName("first"))
+    second = Body(name=PrefixedName("second"))
+    bridge.publish_bodies({str(first.name): first, str(second.name): second})
+    [first_shape] = bridge.object_metadata[0].shapes
+    [second_shape] = bridge.object_metadata[1].shapes
+
+    first_shape.scale.x *= 2
+
+    assert configuration.default_object_size == expected
+    assert second_shape.scale == expected
 
 
 @pytest.mark.parametrize("interval, expected_bind_count", [(1.0, 1), (3.0, 0)])

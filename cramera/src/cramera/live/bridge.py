@@ -8,7 +8,7 @@ import time
 import urllib.parse
 from collections.abc import Callable
 from contextlib import contextmanager, ExitStack
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from enum import StrEnum
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -37,7 +37,7 @@ from cramera.body_geometry import NumericPose, POSE_PRECISION, rounded_pose
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.geometry import Box
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import WorldEntity
 from cramera.knowledge.enums import PlanNodeGroup
@@ -856,7 +856,8 @@ class Bridge:
         with self._lock:
             return [
                 entry.to_payload(
-                    self._mesh_serve, list(self.configuration.default_object_size)
+                    self._mesh_serve,
+                    self.configuration.default_object_size.to_np().tolist(),
                 )
                 for entry in self.object_metadata
             ]
@@ -1308,7 +1309,7 @@ class Bridge:
             if shape_collection.shapes:
                 return shape_collection
         return ShapeCollection(
-            shapes=[Box(scale=Scale(*self.configuration.default_object_size))]
+            shapes=[Box(scale=replace(self.configuration.default_object_size))]
         )
 
     @staticmethod
