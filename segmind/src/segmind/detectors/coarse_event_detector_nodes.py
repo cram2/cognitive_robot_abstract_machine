@@ -27,10 +27,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from segmind.detectors.atomic_event_detectors_nodes import TranslationDetector
 from segmind.detectors.base import AbstractDetector, SegmindContext
 from segmind.detectors.spatial_relation_detector_nodes import SupportDetector
-from segmind.detectors.agent_event_detector_nodes import (
-    GraspDetector,
-    LossOfGraspDetector,
-)
+from segmind.detectors.agent_event_detector_nodes import GraspDetector
 
 
 @dataclass
@@ -202,7 +199,7 @@ class PlacingDetector(AbstractInteractionDetector):
         """
         return (
             LossOfGraspEvent
-            if self.runs_beside(LossOfGraspDetector)
+            if self.runs_beside(GraspDetector)
             else StopTranslationEvent
         )
 

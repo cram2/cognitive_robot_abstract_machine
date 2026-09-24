@@ -9,11 +9,10 @@ other events.
 
 from __future__ import annotations
 
-from abc import ABC
 from dataclasses import dataclass
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from typing_extensions import List, Optional, Type
+from typing_extensions import List
 
 from segmind.datastructures.events import (
     DetectionEvent,
@@ -28,9 +27,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False)
-class AbstractGraspDetector(AbstractDetector, ABC):
+class GraspDetector(AbstractDetector):
     """
-    Shared reading of which tool frames have hold of which bodies.
+    Reports an object being taken hold of by an agent, and being let go of again.
     """
 
     @staticmethod
@@ -85,13 +84,6 @@ class AbstractGraspDetector(AbstractDetector, ABC):
                     )
         return holding
 
-
-@dataclass(eq=False, repr=False)
-class GraspDetector(AbstractGraspDetector):
-    """
-    Reports an object being taken hold of by an agent.
-    """
-
     def update_context_and_events(
         self,
         context: MotionStatechartContext,
@@ -99,58 +91,23 @@ class GraspDetector(AbstractGraspDetector):
         tracked_objects: List[Body],
     ) -> List[DetectionEvent]:
         """
-        Detects bodies newly taken hold of.
+        Detects bodies newly taken hold of and bodies that are no longer held.
 
         :param context: The current motion statechart context.
         :param segmind_context: The shared SegmindContext holding what is already known.
         :param tracked_objects: The bodies to check.
-        :return: One event per body newly held, per tool frame holding it.
+        :return: One event per body newly held and one per body let go of, per tool
+            frame.
         """
-        events = []
-        for body, tool_frames in self.tool_frames_holding(
-            context, tracked_objects
-        ).items():
-            taken_hold_of = tool_frames - segmind_context.latest_grasps.get(body, set())
-            if not taken_hold_of:
-                continue
-            segmind_context.latest_grasps.setdefault(body, set()).update(taken_hold_of)
-            events.extend(
-                GraspEvent(tracked_object=body, with_object=tool_frame)
-                for tool_frame in taken_hold_of
-            )
-        return events
-
-
-@dataclass(eq=False, repr=False)
-class LossOfGraspDetector(AbstractGraspDetector):
-    """
-    Reports an agent letting go of an object it had hold of.
-    """
-
-    @classmethod
-    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
-        return GraspDetector
-
-    def update_context_and_events(
-        self,
-        context: MotionStatechartContext,
-        segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
-        """
-        Detects bodies that are no longer held.
-
-        :param context: The current motion statechart context.
-        :param segmind_context: The shared SegmindContext holding what is already known.
-        :param tracked_objects: The bodies to check.
-        :return: One event per body let go of, per tool frame that let go.
-        """
-        let_go_of = self.forget_lost_relations(
-            segmind_context.latest_grasps,
-            self.tool_frames_holding(context, tracked_objects),
-            tracked_objects,
-        )
+        holding = self.tool_frames_holding(context, tracked_objects)
+        latest_grasps = segmind_context.latest_grasps
+        taken_hold_of = self.remember_new_relations(latest_grasps, holding)
+        let_go_of = self.forget_lost_relations(latest_grasps, holding, tracked_objects)
         return [
+            GraspEvent(tracked_object=body, with_object=tool_frame)
+            for body, tool_frames in taken_hold_of.items()
+            for tool_frame in tool_frames
+        ] + [
             LossOfGraspEvent(tracked_object=body, with_object=tool_frame)
             for body, tool_frames in let_go_of.items()
             for tool_frame in tool_frames

@@ -20,7 +20,6 @@ from segmind.datastructures.events import (
 )
 from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import (
-    StopTranslationDetector,
     TranslationDetector,
 )
 from segmind.detectors.base import AbstractDetector, SegmindContext
@@ -217,10 +216,7 @@ def test_a_body_that_stopped_as_watching_ends_is_seen_at_rest(milk_in_the_apartm
     translated = threading.Event()
     segmenter = LiveSegmenter(
         world=world,
-        detectors=[
-            TranslationDetector(tracked_object=milk),
-            StopTranslationDetector(tracked_object=milk),
-        ],
+        detectors=[TranslationDetector(tracked_object=milk)],
     )
     segmenter.event_logger.add_callback(
         TranslationEvent, lambda event: translated.set()

@@ -12,8 +12,7 @@ from segmind.detectors.base import AbstractDetector
 from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import (
     ContactDetector,
-    LossOfContactDetector,
-    StopTranslationDetector,
+    MotionDetector,
     TranslationDetector,
 )
 from segmind.detectors.coarse_event_detector_nodes import (
@@ -21,15 +20,11 @@ from segmind.detectors.coarse_event_detector_nodes import (
     PlacingDetector,
 )
 from segmind.detectors.agent_event_detector_nodes import (
-    AbstractGraspDetector,
     GraspDetector,
-    LossOfGraspDetector,
 )
 from segmind.detectors.spatial_relation_detector_nodes import (
     ContainmentDetector,
     InsertionDetector,
-    LossOfContainmentDetector,
-    LossOfSupportDetector,
     SupportDetector,
 )
 
@@ -47,9 +42,7 @@ class DetectorDefinedOutsideSegMind(AbstractDetector):
 PICK_UP_AND_WHAT_IT_IS_READ_FROM = {
     PickUpDetector,
     SupportDetector,
-    LossOfSupportDetector,
     TranslationDetector,
-    StopTranslationDetector,
 }
 """
 The detectors a run asking only for pick-ups uses.
@@ -73,8 +66,7 @@ def test_grasping_is_brought_along_only_when_asked_for():
     selection = DetectorSelection.of(PickUpDetector, GraspDetector)
 
     assert set(selection.detector_types) == PICK_UP_AND_WHAT_IT_IS_READ_FROM | {
-        GraspDetector,
-        LossOfGraspDetector,
+        GraspDetector
     }
 
 
@@ -84,27 +76,15 @@ def test_insertions_bring_contact_and_containment():
     assert set(selection.detector_types) == {
         InsertionDetector,
         ContactDetector,
-        LossOfContactDetector,
         ContainmentDetector,
-        LossOfContainmentDetector,
     }
 
 
-# %% counterparts
+# %% one detector reports both ends of a relation
 
 
-def test_a_detector_brings_the_one_reporting_its_end():
-    assert set(DetectorSelection.of(ContactDetector).detector_types) == {
-        ContactDetector,
-        LossOfContactDetector,
-    }
-
-
-def test_a_detector_reporting_an_end_brings_the_one_reporting_the_beginning():
-    assert set(DetectorSelection.of(LossOfContactDetector).detector_types) == {
-        ContactDetector,
-        LossOfContactDetector,
-    }
+def test_a_detector_reporting_a_relation_is_chosen_alone():
+    assert DetectorSelection.of(ContactDetector).detector_types == (ContactDetector,)
 
 
 # %% the order they tick in
@@ -134,11 +114,8 @@ def test_everything_holds_every_kind_of_detector_segmind_defines():
         PlacingDetector,
         InsertionDetector,
         GraspDetector,
-        LossOfGraspDetector,
         ContactDetector,
-        LossOfContactDetector,
         TranslationDetector,
-        StopTranslationDetector,
     } <= kinds
 
 
@@ -146,7 +123,7 @@ def test_everything_holds_no_kind_that_is_abstract_or_defined_elsewhere():
     kinds = set(DetectorSelection.of_every_kind().detector_types)
 
     assert AbstractDetector not in kinds
-    assert AbstractGraspDetector not in kinds
+    assert MotionDetector not in kinds
     assert DetectorDefinedOutsideSegMind not in kinds
 
 

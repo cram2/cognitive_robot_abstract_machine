@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict, Set, Any, Type
+from typing import Optional, List, Dict, Set, Any
 import numpy as np
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -25,7 +25,10 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass(eq=False, repr=False)
 class ContactDetector(AbstractDetector):
     """
-    Detector responsible for identifying newly established contacts between bodies.
+    Detects contacts between bodies being established and being lost.
+
+    The detector reports a :class:`ContactEvent` when a body touches something new and a
+    :class:`LossOfContactEvent` when it stops touching something it touched.
     """
 
     def update_context_and_events(
@@ -35,76 +38,28 @@ class ContactDetector(AbstractDetector):
         tracked_objects: List[Body],
     ) -> List[DetectionEvent]:
         """
-        Detects newly formed contacts and updates the stored contact state.
-
-        Generates a ContactEvent whenever a new contact between two bodies is detected.
-
-        :param context: The current motion statechart context.
-        :param segmind_context: The shared SegmindContext containing the information
-            required to track events.
-        :param tracked_objects: List of bodies to check for new contacts.
-        :return: List of ContactEvent instances generated during this update.
-        """
-        new_contact_pairs = self.get_relation(context, tracked_objects, contact)
-
-        events = []
-        for obj, contact_list in new_contact_pairs.items():
-            new_contacts = (
-                contact_list
-                if obj not in segmind_context.latest_contact_bodies
-                else contact_list - segmind_context.latest_contact_bodies[obj]
-            )
-            if new_contacts:
-                segmind_context.latest_contact_bodies.setdefault(obj, set()).update(
-                    new_contacts
-                )
-                events.extend(
-                    [
-                        ContactEvent(tracked_object=obj, with_object=c)
-                        for c in new_contacts
-                    ]
-                )
-
-        return events
-
-
-@dataclass(eq=False, repr=False)
-class LossOfContactDetector(AbstractDetector):
-    """
-    Detector responsible for identifying when previously existing contacts between
-    bodies are lost.
-    """
-
-    @classmethod
-    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
-        return ContactDetector
-
-    def update_context_and_events(
-        self,
-        context: MotionStatechartContext,
-        segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
-        """
-        Detects when existing contacts are no longer present and updates the stored
-        contact state accordingly.
-
-        Generates a LossOfContactEvent whenever a previously detected contact no longer
-        exists.
+        Detects newly formed and newly lost contacts and updates the stored contact
+        state.
 
         :param context: The current motion statechart context.
         :param segmind_context: The shared SegmindContext containing the information
             required to track events.
-        :param tracked_objects: List of bodies to check for lost contacts.
-        :return: List of LossOfContactEvent instances generated during this update.
+        :param tracked_objects: List of bodies to check for contacts.
+        :return: The contacts formed, then the contacts lost.
         """
-        new_contact_pairs = self.get_relation(context, tracked_objects, contact)
+        contacts_now = self.get_relation(context, tracked_objects, contact)
+        latest_contacts = segmind_context.latest_contact_bodies
+        new_contacts = self.remember_new_relations(latest_contacts, contacts_now)
         lost_contacts = self.forget_lost_relations(
-            segmind_context.latest_contact_bodies, new_contact_pairs, tracked_objects
+            latest_contacts, contacts_now, tracked_objects
         )
         return [
-            LossOfContactEvent(tracked_object=obj, with_object=other)
-            for obj, others in lost_contacts.items()
+            ContactEvent(tracked_object=body, with_object=other)
+            for body, others in new_contacts.items()
+            for other in others
+        ] + [
+            LossOfContactEvent(tracked_object=body, with_object=other)
+            for body, others in lost_contacts.items()
             for other in others
         ]
 
@@ -225,30 +180,39 @@ class MotionDetector(AbstractDetector):
 @dataclass(eq=False, repr=False)
 class TranslationDetector(MotionDetector):
     """
-    Detector for translation events.
+    Detector for translations.
 
-    Triggers a TranslationEvent when an object starts moving.
+    Reports a :class:`TranslationEvent` when an object starts moving and a
+    :class:`StopTranslationEvent` when an object that was moving stops.
     """
 
     def _check_and_trigger_event(
         self, context: SegmindContext, obj: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
-        Triggers a TranslationEvent when an object starts moving.
+        Reports the object starting to move or, when it was moving, coming to a stop.
 
-        No event is triggered while the object is stationary, or while a motion event
-        for it is already active.
+        No event is reported while the object stays as it was: stationary, or moving
+        while a motion event for it is already active.
 
         :param context: The shared SegmindContext containing the information required to
             track events.
         :param obj: The object being monitored for movement.
         :param poses: The pose window of ``obj``, oldest first.
-        :return: A TranslationEvent if the object started moving, otherwise None.
+        :return: A TranslationEvent, a StopTranslationEvent or None.
         """
+        latest_motion_event = context.latest_motion_events.get(obj)
         if not self._is_moving(poses):
-            return None
+            if latest_motion_event is None:
+                return None
+            context.latest_motion_events.pop(obj)
+            return StopTranslationEvent(
+                tracked_object=obj,
+                world_T_start_pose=latest_motion_event.world_T_start_pose,
+                world_T_current_pose=poses[-1],
+            )
 
-        if context.latest_motion_events.get(obj) is not None:
+        if latest_motion_event is not None:
             return None
 
         new_event = TranslationEvent(
@@ -256,83 +220,47 @@ class TranslationDetector(MotionDetector):
             world_T_start_pose=poses[0],
             world_T_current_pose=poses[-1],
         )
-
         context.latest_motion_events[obj] = new_event
         return new_event
 
 
 @dataclass(eq=False, repr=False)
-class StopTranslationDetector(MotionDetector):
-    """
-    Detector for stop translation events.
-
-    Triggers a StopTranslationEvent when an object that was moving stops.
-    """
-
-    @classmethod
-    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
-        return TranslationDetector
-
-    def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[Pose]
-    ) -> Optional[DetectionEvent]:
-        """
-        Triggers a StopTranslationEvent when an object that was moving comes to a stop.
-
-        Requires an active motion event, which is created by the
-        :class:`TranslationDetector`.
-
-        :param context: The shared SegmindContext containing the information required to
-            track events.
-        :param obj: The object to check for movement.
-        :param poses: The pose window of ``obj``, oldest first.
-        :return: A StopTranslationEvent if the object stopped moving, otherwise None.
-        """
-        if self._is_moving(poses):
-            return None
-
-        latest_motion_event = context.latest_motion_events.get(obj)
-        if latest_motion_event is None:
-            return None
-
-        stop_event = StopTranslationEvent(
-            tracked_object=obj,
-            world_T_start_pose=latest_motion_event.world_T_start_pose,
-            world_T_current_pose=poses[-1],
-        )
-
-        context.latest_motion_events.pop(obj, None)
-
-        return stop_event
-
-
-@dataclass(eq=False, repr=False)
 class RotationDetector(MotionDetector):
     """
-    Detector for rotation events.
+    Detector for rotations.
 
-    Triggers a RotationEvent when an object starts rotating.
+    Reports a :class:`RotationEvent` when an object starts rotating and a
+    :class:`StopRotationEvent` when an object that was rotating stops.
     """
 
     def _check_and_trigger_event(
         self, context: SegmindContext, obj: Body, poses: List[Pose]
     ) -> Optional[DetectionEvent]:
         """
-        Triggers a RotationEvent when an object starts rotating.
+        Reports the object starting to rotate or, when it was rotating, coming to a
+        stop.
 
-        No event is triggered while the object is not rotating, or while a rotation
-        event for it is already active.
+        No event is reported while the object stays as it was: not rotating, or
+        rotating while a rotation event for it is already active.
 
         :param context: The shared SegmindContext containing the information required to
             track events.
         :param obj: The object to check.
         :param poses: The pose window of ``obj``, oldest first.
-        :return: A RotationEvent if the object started rotating, otherwise None.
+        :return: A RotationEvent, a StopRotationEvent or None.
         """
+        latest_rotation_event = context.latest_rotation_events.get(obj)
         if not self._is_rotating(poses):
-            return None
+            if latest_rotation_event is None:
+                return None
+            context.latest_rotation_events.pop(obj)
+            return StopRotationEvent(
+                tracked_object=obj,
+                world_T_start_pose=latest_rotation_event.world_T_start_pose,
+                world_T_current_pose=poses[-1],
+            )
 
-        if context.latest_rotation_events.get(obj) is not None:
+        if latest_rotation_event is not None:
             return None
 
         new_event = RotationEvent(
@@ -340,51 +268,5 @@ class RotationDetector(MotionDetector):
             world_T_start_pose=poses[0],
             world_T_current_pose=poses[-1],
         )
-
         context.latest_rotation_events[obj] = new_event
         return new_event
-
-
-@dataclass(eq=False, repr=False)
-class StopRotationDetector(MotionDetector):
-    """
-    Detector for stop rotation events.
-
-    Triggers a StopRotationEvent when an object that was rotating stops.
-    """
-
-    @classmethod
-    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
-        return RotationDetector
-
-    def _check_and_trigger_event(
-        self, context: SegmindContext, obj: Body, poses: List[Pose]
-    ) -> Optional[DetectionEvent]:
-        """
-        Triggers a StopRotationEvent when an object that was rotating comes to a stop.
-
-        Requires an active rotation event, which is created by the
-        :class:`RotationDetector`.
-
-        :param context: The shared SegmindContext containing the information required to
-            track events.
-        :param obj: The object to check for movement.
-        :param poses: The pose window of ``obj``, oldest first.
-        :return: A StopRotationEvent if the object stopped rotating, otherwise None.
-        """
-        if self._is_rotating(poses):
-            return None
-
-        latest_rotation_event = context.latest_rotation_events.get(obj)
-        if latest_rotation_event is None:
-            return None
-
-        stop_event = StopRotationEvent(
-            tracked_object=obj,
-            world_T_start_pose=latest_rotation_event.world_T_start_pose,
-            world_T_current_pose=poses[-1],
-        )
-
-        context.latest_rotation_events.pop(obj, None)
-
-        return stop_event

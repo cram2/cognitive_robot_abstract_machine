@@ -19,13 +19,10 @@ from segmind.datastructures.events import (
 )
 from segmind.detectors.atomic_event_detectors_nodes import (
     ContactDetector,
-    LossOfContactDetector,
 )
 from segmind.detectors.base import AbstractDetector, SegmindContext
 from segmind.detectors.spatial_relation_detector_nodes import (
     ContainmentDetector,
-    LossOfContainmentDetector,
-    LossOfSupportDetector,
     SupportDetector,
 )
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
@@ -91,7 +88,7 @@ def test_a_contact_that_lasts_is_not_reported_lost_by_another_bodys_detector(
     _place(milk, box_x, box_y, box_z)
 
     segmind_context = _ticked_while_nothing_moves(
-        world, [ContactDetector, LossOfContactDetector], [milk, box]
+        world, [ContactDetector], [milk, box]
     )
 
     assert len(_events_of(segmind_context, ContactEvent, milk)) == 1
@@ -105,7 +102,7 @@ def test_a_support_that_lasts_is_not_reported_lost_by_another_bodys_detector(
     _place(milk, *RESTING_ON_THE_TABLE)
 
     segmind_context = _ticked_while_nothing_moves(
-        world, [SupportDetector, LossOfSupportDetector], [milk, box]
+        world, [SupportDetector], [milk, box]
     )
 
     assert len(_events_of(segmind_context, SupportEvent, milk)) == 1
@@ -120,7 +117,7 @@ def test_a_containment_that_lasts_is_not_reported_lost_by_another_bodys_detector
     _place(milk, box_x, box_y, box_z)
 
     segmind_context = _ticked_while_nothing_moves(
-        world, [ContainmentDetector, LossOfContainmentDetector], [milk, box]
+        world, [ContainmentDetector], [milk, box]
     )
 
     assert len(_events_of(segmind_context, ContainmentEvent, milk)) == 1

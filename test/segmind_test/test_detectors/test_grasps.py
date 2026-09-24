@@ -25,12 +25,10 @@ from segmind.detectors.coarse_event_detector_nodes import (
     PlacingDetector,
 )
 from segmind.detectors.spatial_relation_detector_nodes import (
-    LossOfSupportDetector,
     SupportDetector,
 )
 from segmind.detectors.agent_event_detector_nodes import (
     GraspDetector,
-    LossOfGraspDetector,
 )
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.statecharts.segmind_statechart import SegmindStatechart
@@ -206,7 +204,7 @@ def test_a_body_the_gripper_no_longer_holds_is_let_go_of(pr2_world_copy):
     box = _box_in_the_hand_of(pr2_world_copy, gripper)
     executor = _executor_for(
         pr2_world_copy,
-        [GraspDetector(tracked_object=box), LossOfGraspDetector(tracked_object=box)],
+        [GraspDetector(tracked_object=box)],
     )
     executor.tick()
 
@@ -297,7 +295,6 @@ def test_an_object_is_picked_up_when_an_agent_lifts_it_off_what_it_rested_on(
         [
             GraspDetector(tracked_object=box),
             SupportDetector(tracked_object=box),
-            LossOfSupportDetector(tracked_object=box),
             PickUpDetector(),
         ],
     )
@@ -324,7 +321,6 @@ def test_an_object_is_placed_where_the_agent_let_go_of_it(pr2_world_copy):
         pr2_world_copy,
         [
             GraspDetector(tracked_object=box),
-            LossOfGraspDetector(tracked_object=box),
             SupportDetector(tracked_object=box),
             PlacingDetector(),
         ],
@@ -374,9 +370,7 @@ def test_taking_hold_again_mid_carry_is_not_a_second_pick_up(pr2_world_copy):
         pr2_world_copy,
         [
             GraspDetector(tracked_object=box),
-            LossOfGraspDetector(tracked_object=box),
             SupportDetector(tracked_object=box),
-            LossOfSupportDetector(tracked_object=box),
             PickUpDetector(),
         ],
     )

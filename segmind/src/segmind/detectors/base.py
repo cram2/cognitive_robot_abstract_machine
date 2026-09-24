@@ -174,20 +174,33 @@ class AbstractDetector(MotionStatechartNode, ABC):
         return ()
 
     @classmethod
-    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
-        """
-        :return: For a detector reporting that something has ended, the kind reporting
-            that it began, otherwise None. A run using either of the two uses both.
-        """
-        return None
-
-    @classmethod
     def watches_a_body(cls) -> bool:
         """
         Whether a detector of this kind watches one body. A kind read from the events of
         other detectors concludes over every body those watch instead.
         """
         return not cls.get_required_detector_types()
+
+    @staticmethod
+    def remember_new_relations(
+        remembered: IndexedBodyPairs, holding: IndexedBodyPairs
+    ) -> IndexedBodyPairs:
+        """
+        Remember the relations that hold now and were not remembered before.
+
+        :param remembered: The relations detected so far, per body; the new ones are
+            added to it.
+        :param holding: The relations that hold now, per body.
+        :return: The relations that are new, per body.
+        """
+        new: IndexedBodyPairs = {}
+        for body, relations in holding.items():
+            added = relations - remembered.get(body, set())
+            if not added:
+                continue
+            remembered.setdefault(body, set()).update(added)
+            new[body] = added
+        return new
 
     @staticmethod
     def forget_lost_relations(
