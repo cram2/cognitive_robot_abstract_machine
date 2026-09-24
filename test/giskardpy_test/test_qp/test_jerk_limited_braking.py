@@ -3,10 +3,7 @@ from itertools import product
 
 import pytest
 
-from giskardpy.qp.jerk_limited_braking import (
-    BRAKING_RELATIVE_TOLERANCE,
-    JerkLimitedBraking,
-)
+from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 
 TIME_STEPS = [1 / 20, 1 / 25, 1 / 50, 1 / 80, 1 / 100]
 VELOCITY_LIMITS = [0.013, 0.2, 1.0, 2.5]
@@ -50,7 +47,9 @@ def test_number_of_steps_is_the_fewest_that_remove_the_velocity(
         braking.number_of_steps - 1
     )
 
-    assert removable * jerk_step >= velocity_limit * (1 - BRAKING_RELATIVE_TOLERANCE)
+    assert removable * jerk_step >= velocity_limit * (
+        1 - JerkLimitedBraking.RELATIVE_TOLERANCE
+    )
     assert removable_with_one_step_less * jerk_step < velocity_limit
 
 

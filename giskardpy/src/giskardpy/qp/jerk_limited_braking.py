@@ -1,25 +1,19 @@
 """
-Jerk-limited braking of a single degree of freedom on the controller's grid of equal time
-steps.
+Jerk-limited braking of a single degree of freedom on the controller's grid of equal
+time steps.
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, replace
-
-BRAKING_RELATIVE_TOLERANCE = 1e-9
-"""
-Relative tolerance with which a braking counts as removing a velocity, so that a jerk
-limit derived from a number of steps is not pushed to the next step by rounding.
-"""
+from dataclasses import dataclass, field, replace
 
 
 @dataclass(frozen=True)
 class JerkLimitedBraking:
     """
-    Braking of a degree of freedom from its velocity limit to rest with bounded jerk, on a
-    grid of equal time steps, starting and ending with zero acceleration.
+    Braking of a degree of freedom from its velocity limit to rest with bounded jerk, on
+    a grid of equal time steps, starting and ending with zero acceleration.
     """
 
     velocity_limit: float
@@ -35,6 +29,13 @@ class JerkLimitedBraking:
     time_step: float
     """
     Duration of a single step of the grid.
+    """
+
+    RELATIVE_TOLERANCE: float = field(init=False, default=1e-9)
+    """
+    Relative tolerance with which a braking counts as removing a velocity, so that a
+    jerk limit derived from a number of steps is not pushed to the next step by
+    rounding.
     """
 
     @classmethod
@@ -63,10 +64,11 @@ class JerkLimitedBraking:
         cls, braking_time: float, time_step: float
     ) -> int:
         """
-        Returns the number of steps a braking created by :meth:`from_braking_time` needs.
+        Returns the number of steps a braking created by :meth:`from_braking_time`
+        needs.
 
-        The jerk limit scales with the velocity limit, so every degree of freedom needs the
-        same number of steps.
+        The jerk limit scales with the velocity limit, so every degree of freedom needs
+        the same number of steps.
 
         :param braking_time: Duration of the continuous braking, in seconds.
         :param time_step: Duration of a single step of the grid.
@@ -103,22 +105,19 @@ class JerkLimitedBraking:
             self.velocity_limit / (self.jerk_limit * self.time_step**2)
         )
 
-    @staticmethod
-    def _smallest_number_of_steps(velocity_in_jerk_steps: float) -> int:
+    @classmethod
+    def _smallest_number_of_steps(cls, velocity_in_jerk_steps: float) -> int:
         """
-        Returns the smallest number of steps that removes the given velocity, expressed in
-        units of ``jerk_limit * time_step**2``.
+        Returns the smallest number of steps that removes the given velocity, expressed
+        in units of ``jerk_limit * time_step**2``.
 
-        :param velocity_in_jerk_steps: Velocity to remove, in units of
-            ``jerk_limit * time_step**2``.
+        :param velocity_in_jerk_steps: Velocity to remove, in units of ``jerk_limit *
+            time_step**2``.
         :return: Smallest number of steps that removes the velocity.
         """
-        required = velocity_in_jerk_steps * (1 - BRAKING_RELATIVE_TOLERANCE)
+        required = velocity_in_jerk_steps * (1 - cls.RELATIVE_TOLERANCE)
         number_of_steps = 0
-        while (
-            JerkLimitedBraking._removable_velocity_in_jerk_steps(number_of_steps)
-            < required
-        ):
+        while cls._removable_velocity_in_jerk_steps(number_of_steps) < required:
             number_of_steps += 1
         return number_of_steps
 
