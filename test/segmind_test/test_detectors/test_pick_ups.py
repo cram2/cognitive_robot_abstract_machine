@@ -5,6 +5,7 @@ detected: one pick-up for each time an object is lifted.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from typing_extensions import List
@@ -14,10 +15,15 @@ from segmind.datastructures.events import (
     GraspEvent,
     LossOfSupportEvent,
     PickUpEvent,
+    PlacingEvent,
+    SupportEvent,
     TranslationEvent,
 )
 from segmind.detectors.base import SegmindContext
-from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
+from segmind.detectors.coarse_event_detector_nodes import (
+    AbstractInteractionDetector,
+    PickUpDetector,
+)
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 
@@ -41,7 +47,10 @@ def _logged(events: List[DetectionEvent]) -> SegmindContext:
 def _translation_of(body, at: datetime) -> TranslationEvent:
     pose = body.global_pose
     return TranslationEvent(
-        tracked_object=body, world_T_start_pose=pose, world_T_current_pose=pose, timestamp=at
+        tracked_object=body,
+        world_T_start_pose=pose,
+        world_T_current_pose=pose,
+        timestamp=at,
     )
 
 
@@ -171,3 +180,51 @@ def test_a_grasp_and_a_lift_are_a_pick_up_where_grasps_are_watched_for(
     )
 
     assert len(_pick_ups_concluded_beside_a_grasp_detector(segmind_context)) == 1
+
+
+# %% concluding another kind of interaction
+
+
+@dataclass
+class DetectorOfAPlacingFollowingALossOfSupport(AbstractInteractionDetector):
+    """
+    Concludes a placing from a loss of support detected close to a support, stating only which events
+    it is concluded from and what it concludes.
+    """
+
+    @property
+    def primary_event_type(self):
+        return SupportEvent
+
+    @property
+    def secondary_event_type(self):
+        return LossOfSupportEvent
+
+    def make_event(self, primary, secondary):
+        return PlacingEvent(
+            tracked_object=primary.tracked_object, with_object=secondary.with_object
+        )
+
+    def interaction_key(self, primary, secondary):
+        return secondary.tracked_object, secondary.with_object
+
+
+def test_an_interaction_is_concluded_from_the_events_a_detector_states(
+    milk_in_the_apartment,
+):
+    _, milk, box = milk_in_the_apartment
+    at = datetime.now()
+    segmind_context = _logged(
+        [
+            SupportEvent(tracked_object=milk, with_object=box, timestamp=at),
+            LossOfSupportEvent(tracked_object=milk, with_object=box, timestamp=at),
+        ]
+    )
+
+    [concluded] = DetectorOfAPlacingFollowingALossOfSupport().update_context_and_events(
+        None, segmind_context, []
+    )
+
+    assert isinstance(concluded, PlacingEvent)
+    assert concluded.tracked_object is milk
+    assert concluded.with_object is box

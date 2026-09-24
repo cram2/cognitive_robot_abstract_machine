@@ -4,7 +4,7 @@ from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import List, Callable, Tuple, Type
+from typing import List, Tuple, Type
 
 from typing_extensions import Hashable
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -72,45 +72,74 @@ class AbstractInteractionDetector(AbstractDetector):
         other conclusion of the same interaction, so that it is concluded only once.
         """
 
-    def _find_interaction_events(
+    @property
+    @abstractmethod
+    def primary_event_type(self) -> Type[EventWithTrackedObjects]:
+        """
+        The kind of event the interaction is concluded from, which happens to the
+        tracked object.
+        """
+
+    @property
+    @abstractmethod
+    def secondary_event_type(self) -> Type[EventWithTrackedObjects]:
+        """
+        The kind of event that has to happen close in time to the primary one for the
+        interaction to be concluded.
+        """
+
+    @abstractmethod
+    def make_event(
+        self, primary: EventWithTrackedObjects, secondary: EventWithTrackedObjects
+    ) -> DetectionEvent:
+        """
+        The interaction concluded from ``primary`` and ``secondary``.
+        """
+
+    def update_context_and_events(
         self,
+        context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        primary_event_type: Type[EventWithTrackedObjects],
-        secondary_event_type: Type[EventWithTrackedObjects],
-        make_event: Callable[
-            [EventWithTrackedObjects, EventWithTrackedObjects], DetectionEvent
-        ],
+        tracked_objects: List[Body],
     ) -> List[DetectionEvent]:
         """
-        Scans logged events for correlated pairs of primary and secondary event types
-        and emits a detection event for each new, unseen pairing.
+        Concludes the interactions that the events logged so far amount to.
+
+        :param context: The current motion statechart context.
+        :param segmind_context: The shared SegmindContext containing the information
+            required to track events.
+        :param tracked_objects: The bodies checked this tick.
+        :return: The interactions not concluded before.
+        """
+        return self._find_interaction_events(segmind_context)
+
+    def _find_interaction_events(
+        self, segmind_context: SegmindContext
+    ) -> List[DetectionEvent]:
+        """
+        Scans logged events for correlated pairs of primary and secondary events and
+        emits a detection event for each new, unseen pairing.
 
         For each secondary event, this method searches for a primary event on the same
         tracked object whose timestamp is within :attr:`shift_threshold`. A secondary
         event is evidence of one interaction only, so a later primary cannot conclude a
         second interaction from the same one. If such a pair
         is found and has not been recorded in ``segmind_context.placing_pairs`` before,
-        the pair is registered and a detection event is produced via ``make_event``.
+        the pair is registered and a detection event is produced via :meth:`make_event`.
 
         :param segmind_context: The shared context holding the event logger and
             previously seen interaction pairs.
-        :param primary_event_type: The event type to use as the primary signal
-            (e.g. ``StopTranslationEvent`` for placing, ``TranslationEvent`` for pickup).
-        :param secondary_event_type: The event type to correlate against the primary
-            (e.g. ``SupportEvent`` for placing, ``LossOfSupportEvent`` for pickup).
-        :param make_event: Factory called with ``(primary, secondary)`` to produce the
-            outgoing :class:`DetectionEvent`. Only called once per unique pair.
         :return: List of newly detected interaction events.
         """
         primary_events = [
             event
             for event in segmind_context.logger.get_events()
-            if isinstance(event, primary_event_type)
+            if isinstance(event, self.primary_event_type)
         ]
         secondary_events = [
             event
             for event in segmind_context.logger.get_events()
-            if isinstance(event, secondary_event_type)
+            if isinstance(event, self.secondary_event_type)
         ]
 
         events = []
@@ -132,7 +161,7 @@ class AbstractInteractionDetector(AbstractDetector):
 
                 segmind_context.placing_pairs.add(key)
                 spent.add((type(self), secondary))
-                events.append(make_event(primary, secondary))
+                events.append(self.make_event(primary, secondary))
                 break
 
         return events
@@ -165,35 +194,27 @@ class PlacingDetector(AbstractInteractionDetector):
         """
         return PlacingEvent, secondary.tracked_object, secondary.with_object
 
-    def update_context_and_events(
-        self,
-        context: MotionStatechartContext,
-        segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+    @property
+    def primary_event_type(self) -> Type[EventWithTrackedObjects]:
         """
-        Updates the system context with new placing event instances based on past
-        actions logged in the system. It analyzes and filters specific event types
-        to detect new events that can be generated. This function ensures distinct
-        events are created by maintaining exclusivity through a pairing mechanism.
+        The agent letting go of the object where an agent is watched for, otherwise the
+        object coming to a stop.
+        """
+        return (
+            LossOfGraspEvent
+            if self.runs_beside(LossOfGraspDetector)
+            else StopTranslationEvent
+        )
 
-        :param context: The current motion statechart context.
-        :param segmind_context: The shared SegmindContext containing the information required to track events.
-        :param tracked_objects: List of bodies to analyze for potential placing events.
-        :return: List of generated placing events based on observed interactions.
-        """
-        return self._find_interaction_events(
-            segmind_context,
-            primary_event_type=(
-                LossOfGraspEvent
-                if self.runs_beside(LossOfGraspDetector)
-                else StopTranslationEvent
-            ),
-            secondary_event_type=SupportEvent,
-            make_event=lambda primary, secondary: PlacingEvent(
-                tracked_object=primary.tracked_object,
-                with_object=secondary.with_object,
-            ),
+    @property
+    def secondary_event_type(self) -> Type[EventWithTrackedObjects]:
+        return SupportEvent
+
+    def make_event(
+        self, primary: EventWithTrackedObjects, secondary: EventWithTrackedObjects
+    ) -> DetectionEvent:
+        return PlacingEvent(
+            tracked_object=primary.tracked_object, with_object=secondary.with_object
         )
 
 
@@ -226,30 +247,19 @@ class PickUpDetector(AbstractInteractionDetector):
         """
         return PickUpEvent, primary
 
-    def update_context_and_events(
-        self,
-        context: MotionStatechartContext,
-        segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+    @property
+    def primary_event_type(self) -> Type[EventWithTrackedObjects]:
         """
-        Updates the context and generates a list of events based on translation events and loss
-        of support events. The method identifies pairs of related events that are close in
-        timestamp, determines if they are exclusive, and creates a new event when conditions
-        are met.
+        The agent taking hold of the object where an agent is watched for, otherwise the
+        object moving.
+        """
+        return GraspEvent if self.runs_beside(GraspDetector) else TranslationEvent
 
-        :param context: The current motion statechart context.
-        :param segmind_context: The shared SegmindContext containing the information required to track events.
-        :param tracked_objects: List of bodies to analyze for potential pickup events.
-        :return: List of generated pickup events based on observed interactions.
-        """
-        return self._find_interaction_events(
-            segmind_context,
-            primary_event_type=(
-                GraspEvent if self.runs_beside(GraspDetector) else TranslationEvent
-            ),
-            secondary_event_type=LossOfSupportEvent,
-            make_event=lambda primary, secondary: PickUpEvent(
-                tracked_object=primary.tracked_object,
-            ),
-        )
+    @property
+    def secondary_event_type(self) -> Type[EventWithTrackedObjects]:
+        return LossOfSupportEvent
+
+    def make_event(
+        self, primary: EventWithTrackedObjects, secondary: EventWithTrackedObjects
+    ) -> DetectionEvent:
+        return PickUpEvent(tracked_object=primary.tracked_object)
