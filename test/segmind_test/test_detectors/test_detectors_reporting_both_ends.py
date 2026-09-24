@@ -33,6 +33,8 @@ from segmind.detectors.spatial_relation_detector_nodes import (
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 from ..conftest import RESTING_ON_THE_TABLE, WHERE_THE_MILK_STOOD
 
@@ -42,7 +44,7 @@ How many ticks a test keeps a body moving, which is more than a motion detector'
 """
 
 
-def _ticking(world, detector: AbstractDetector):
+def _ticking(world: World, detector: AbstractDetector):
     """
     :return: An executor ticking only ``detector``, and the context it logs to.
     """
@@ -61,13 +63,13 @@ def _events_of(segmind_context: SegmindContext, event_type):
     ]
 
 
-def _place(body, x: float, y: float, z: float, **orientation) -> None:
+def _place(body: Body, x: float, y: float, z: float, **orientation) -> None:
     body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x, y, z, reference_frame=body.parent_connection.parent, **orientation
     )
 
 
-def _put_back(milk) -> None:
+def _put_back(milk: Body) -> None:
     x, y, z = WHERE_THE_MILK_STOOD
     _place(milk, x, y, z, yaw=np.pi)
 

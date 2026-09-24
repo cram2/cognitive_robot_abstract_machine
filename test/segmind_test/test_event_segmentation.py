@@ -17,6 +17,7 @@ from segmind.event_segmentation import Segmind
 from segmind.exceptions import NoSemanticAnnotationToWatch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Food, Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.world_entity import Body
 
 from .conftest import RESTING_ON_THE_TABLE
 
@@ -31,7 +32,7 @@ How far a test moves the milk while the run is watched.
 """
 
 
-def _stand_the_milk_on_the_table(milk) -> None:
+def _stand_the_milk_on_the_table(milk: Body) -> None:
     """
     Put the milk where it rests on the table, so a move of it is a move from rest.
     """

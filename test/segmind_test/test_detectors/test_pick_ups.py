@@ -26,6 +26,7 @@ from segmind.detectors.coarse_event_detector_nodes import (
 )
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
 from segmind.statecharts.segmind_statechart import SegmindStatechart
+from semantic_digital_twin.world_description.world_entity import Body
 
 LIFTS_APART = timedelta(minutes=5)
 """
@@ -44,7 +45,7 @@ def _logged(events: List[DetectionEvent]) -> SegmindContext:
     return segmind_context
 
 
-def _translation_of(body, at: datetime) -> TranslationEvent:
+def _translation_of(body: Body, at: datetime) -> TranslationEvent:
     pose = body.global_pose
     return TranslationEvent(
         tracked_object=body,

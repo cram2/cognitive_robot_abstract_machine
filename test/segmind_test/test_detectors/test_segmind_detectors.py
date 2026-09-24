@@ -28,6 +28,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -35,7 +36,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _build_executor(world):
+def _build_executor(world: World):
     context = MotionStatechartContext(world=world)
     milk = world.get_body_by_name("milk.stl")
     box1 = world.get_body_by_name("box")

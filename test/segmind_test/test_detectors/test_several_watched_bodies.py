@@ -28,6 +28,7 @@ from segmind.detectors.spatial_relation_detector_nodes import (
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ..conftest import RESTING_ON_THE_TABLE
@@ -39,7 +40,7 @@ How many ticks a test runs while nothing in the world moves.
 
 
 def _ticked_while_nothing_moves(
-    world, detector_types: List[Type[AbstractDetector]], watched: List[Body]
+    world: World, detector_types: List[Type[AbstractDetector]], watched: List[Body]
 ) -> SegmindContext:
     """
     Tick every detector type for every watched body a few times, with nothing moving.
@@ -87,9 +88,7 @@ def test_a_contact_that_lasts_is_not_reported_lost_by_another_bodys_detector(
     box_x, box_y, box_z = box.global_pose.to_position().to_np()[:3]
     _place(milk, box_x, box_y, box_z)
 
-    segmind_context = _ticked_while_nothing_moves(
-        world, [ContactDetector], [milk, box]
-    )
+    segmind_context = _ticked_while_nothing_moves(world, [ContactDetector], [milk, box])
 
     assert len(_events_of(segmind_context, ContactEvent, milk)) == 1
     assert _events_of(segmind_context, LossOfContactEvent, milk) == []
@@ -101,9 +100,7 @@ def test_a_support_that_lasts_is_not_reported_lost_by_another_bodys_detector(
     world, milk, box = milk_in_the_apartment
     _place(milk, *RESTING_ON_THE_TABLE)
 
-    segmind_context = _ticked_while_nothing_moves(
-        world, [SupportDetector], [milk, box]
-    )
+    segmind_context = _ticked_while_nothing_moves(world, [SupportDetector], [milk, box])
 
     assert len(_events_of(segmind_context, SupportEvent, milk)) == 1
     assert _events_of(segmind_context, LossOfSupportEvent, milk) == []
