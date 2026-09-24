@@ -58,7 +58,7 @@ class DetectorSelection:
         """
         if detector_type in chosen:
             return
-        for required in detector_type.requires:
+        for required in detector_type.get_required_detector_types():
             cls._choose(required, chosen)
         chosen.append(detector_type)
         for counterpart in cls._counterparts_of(detector_type):
@@ -75,9 +75,8 @@ class DetectorSelection:
         ending_it = [
             candidate
             for candidate in recursive_subclasses(AbstractDetector)
-            if candidate.counterpart is detector_type
+            if candidate.get_counterpart_detector_type() is detector_type
         ]
-        beginning_it = (
-            [] if detector_type.counterpart is None else [detector_type.counterpart]
-        )
+        beginning = detector_type.get_counterpart_detector_type()
+        beginning_it = [] if beginning is None else [beginning]
         return ending_it + beginning_it

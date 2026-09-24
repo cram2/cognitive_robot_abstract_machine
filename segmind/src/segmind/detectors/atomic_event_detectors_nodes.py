@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict, Set, Any
+from typing import Optional, List, Dict, Set, Any, Type
 import numpy as np
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -75,7 +75,9 @@ class LossOfContactDetector(AbstractDetector):
     bodies are lost.
     """
 
-    counterpart = ContactDetector
+    @classmethod
+    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
+        return ContactDetector
 
     def update_context_and_events(
         self,
@@ -267,7 +269,9 @@ class StopTranslationDetector(MotionDetector):
     Triggers a StopTranslationEvent when an object that was moving stops.
     """
 
-    counterpart = TranslationDetector
+    @classmethod
+    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
+        return TranslationDetector
 
     def _check_and_trigger_event(
         self, context: SegmindContext, obj: Body, poses: List[Pose]
@@ -349,7 +353,9 @@ class StopRotationDetector(MotionDetector):
     Triggers a StopRotationEvent when an object that was rotating stops.
     """
 
-    counterpart = RotationDetector
+    @classmethod
+    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
+        return RotationDetector
 
     def _check_and_trigger_event(
         self, context: SegmindContext, obj: Body, poses: List[Pose]

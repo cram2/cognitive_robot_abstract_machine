@@ -4,7 +4,7 @@ from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import List, Callable, Any, Type
+from typing import List, Callable, Any, Tuple, Type
 
 from typing_extensions import Hashable
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -151,7 +151,9 @@ class PlacingDetector(AbstractInteractionDetector):
     the class helps maintain consistency and prevent duplication of events.
     """
 
-    requires = (SupportDetector, TranslationDetector)
+    @classmethod
+    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+        return (SupportDetector, TranslationDetector)
 
     def interaction_key(
         self, primary: EventWithTrackedObjects, secondary: EventWithTrackedObjects
@@ -210,7 +212,9 @@ class PickUpDetector(AbstractInteractionDetector):
     data and uses a context to manage event pairs and thresholds.
     """
 
-    requires = (SupportDetector, TranslationDetector)
+    @classmethod
+    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+        return (SupportDetector, TranslationDetector)
 
     def interaction_key(
         self, primary: EventWithTrackedObjects, secondary: EventWithTrackedObjects

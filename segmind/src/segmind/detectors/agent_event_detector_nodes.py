@@ -13,7 +13,7 @@ from abc import ABC
 from dataclasses import dataclass
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from typing_extensions import List
+from typing_extensions import List, Optional, Type
 
 from segmind.datastructures.events import (
     DetectionEvent,
@@ -127,7 +127,9 @@ class LossOfGraspDetector(AbstractGraspDetector):
     Reports an agent letting go of an object it had hold of.
     """
 
-    counterpart = GraspDetector
+    @classmethod
+    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
+        return GraspDetector
 
     def update_context_and_events(
         self,

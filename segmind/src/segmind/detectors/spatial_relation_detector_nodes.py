@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List, Dict, Set
+from typing import List, Dict, Optional, Set, Tuple, Type
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from segmind.datastructures.events import (
@@ -99,7 +99,9 @@ class LossOfSupportDetector(AbstractDetector):
     interactions is essential.
     """
 
-    counterpart = SupportDetector
+    @classmethod
+    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
+        return SupportDetector
 
     def update_context_and_events(
         self,
@@ -232,7 +234,9 @@ class LossOfContainmentDetector(BaseContainmentDetector):
 
     """
 
-    counterpart = ContainmentDetector
+    @classmethod
+    def get_counterpart_detector_type(cls) -> Optional[Type[AbstractDetector]]:
+        return ContainmentDetector
 
     def update_context_and_events(
         self,
@@ -276,7 +280,9 @@ class InsertionDetector(AbstractDetector):
     event logs and tracked objects.
     """
 
-    requires = (ContactDetector, ContainmentDetector)
+    @classmethod
+    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+        return (ContactDetector, ContainmentDetector)
 
     shift_threshold: timedelta = timedelta(seconds=15.0)
     """
