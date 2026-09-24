@@ -7,10 +7,10 @@ prediction horizon.
 from __future__ import annotations
 
 import enum
+from collections.abc import Iterator
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import product
-from typing import NamedTuple
 from uuid import UUID
 
 import numpy as np
@@ -46,7 +46,8 @@ goal reachable.
 """
 
 
-class VelocityBoundProfiles(NamedTuple):
+@dataclass
+class VelocityBoundProfiles:
     """
     Per-step velocity bounds of a degree of freedom across the prediction horizon,
     together with the goal velocity profile and the flag marking when the first step is
@@ -72,6 +73,39 @@ class VelocityBoundProfiles(NamedTuple):
     """
     Flag marking that the first step is already at rest against a position limit.
     """
+
+    @classmethod
+    def unconstrained(
+        cls, velocity_limit: float, prediction_horizon: int
+    ) -> VelocityBoundProfiles:
+        """
+        Creates flat bounds at the velocity limit for a degree of freedom without
+        position limits.
+
+        :param velocity_limit: Velocity limit applied at every horizon step.
+        :param prediction_horizon: Number of steps in the prediction horizon.
+        """
+        upper_bound = sm.Vector.ones(prediction_horizon) * velocity_limit
+        return cls(
+            lower_bound=-upper_bound,
+            upper_bound=upper_bound,
+            goal_profile=sm.Vector.zeros(prediction_horizon),
+            skip_first=sm.Scalar.const_false(),
+        )
+
+    def is_violated_by(self, velocity_profile: sm.Vector, epsilon: float) -> sm.Scalar:
+        """
+        Returns whether a velocity profile leaves these bounds or fails to come to rest
+        by the end of the horizon.
+
+        :param velocity_profile: Velocity at each step of the prediction horizon.
+        :param epsilon: Tolerance below which a violation is ignored.
+        """
+        leaves_bounds = sm.logic_or(
+            sm.logic_any(velocity_profile < self.lower_bound - epsilon),
+            sm.logic_any(velocity_profile > self.upper_bound + epsilon),
+        )
+        return sm.logic_or(leaves_bounds, sm.abs(velocity_profile[-1]) >= epsilon)
 
 
 class BoundDirection(enum.Enum):
@@ -193,7 +227,7 @@ class DegreeOfFreedomLimitProfiler:
         """
         velocity_limit = upper_limits.velocity
         if lower_limits.position is None:
-            return self._unconstrained_velocity_bounds(
+            return VelocityBoundProfiles.unconstrained(
                 velocity_limit, prediction_horizon
             )
 
@@ -234,25 +268,6 @@ class DegreeOfFreedomLimitProfiler:
             upper_bound=velocity_upper_bound,
             goal_profile=goal_profile,
             skip_first=skip_first,
-        )
-
-    def _unconstrained_velocity_bounds(
-        self, velocity_limit: float, prediction_horizon: int
-    ) -> VelocityBoundProfiles:
-        """
-        Builds flat velocity bounds at the velocity limit for a degree of freedom
-        without position limits.
-
-        :param velocity_limit: Velocity limit applied at every horizon step.
-        :param prediction_horizon: Number of steps in the prediction horizon.
-        """
-        velocity_upper_bound = sm.Vector.ones(prediction_horizon) * velocity_limit
-        velocity_lower_bound = -velocity_upper_bound
-        return VelocityBoundProfiles(
-            lower_bound=velocity_lower_bound,
-            upper_bound=velocity_upper_bound,
-            goal_profile=sm.Vector.zeros(prediction_horizon),
-            skip_first=sm.Scalar.const_false(),
         )
 
     def _nominal_velocity_profile(
@@ -393,11 +408,8 @@ class DegreeOfFreedomLimitProfiler:
                 skip_first=velocity_bounds.skip_first,
             )
         )
-        needs_relaxed_jerk_limits = self._detect_velocity_bound_violation(
-            projected_velocity_profile=projected_velocity_profile,
-            velocity_lower_bound=velocity_lower_bound,
-            velocity_upper_bound=velocity_upper_bound,
-            epsilon=epsilon,
+        needs_relaxed_jerk_limits = velocity_bounds.is_violated_by(
+            projected_velocity_profile, epsilon
         )
         self._relax_jerk_on_initial_steps(
             jerk_profile=jerk_profile,
@@ -454,34 +466,6 @@ class DegreeOfFreedomLimitProfiler:
             skip_first,
         )
         return projected_velocity_profile, projected_jerk_profile_violated
-
-    def _detect_velocity_bound_violation(
-        self,
-        projected_velocity_profile: sm.Vector,
-        velocity_lower_bound: sm.Vector,
-        velocity_upper_bound: sm.Vector,
-        epsilon: float,
-    ) -> sm.Scalar:
-        """
-        Detects whether the projected velocity profile leaves the velocity bounds or
-        fails to come to rest by the end of the horizon, signalling that the jerk limit
-        must be relaxed.
-
-        :param projected_velocity_profile: Velocity profile projected under the real
-            jerk limit.
-        :param velocity_lower_bound: Per-step lower velocity bound.
-        :param velocity_upper_bound: Per-step upper velocity bound.
-        :param epsilon: Tolerance below which a velocity bound violation is ignored.
-        """
-        velocity_lower_bound_violated = sm.logic_or(
-            sm.logic_any(projected_velocity_profile < velocity_lower_bound - epsilon),
-            sm.abs(projected_velocity_profile[-1]) >= epsilon,
-        )
-        velocity_upper_bound_violated = sm.logic_or(
-            sm.logic_any(projected_velocity_profile > velocity_upper_bound + epsilon),
-            sm.abs(projected_velocity_profile[-1]) >= epsilon,
-        )
-        return sm.logic_or(velocity_lower_bound_violated, velocity_upper_bound_violated)
 
     def _relax_jerk_on_initial_steps(
         self,
@@ -673,6 +657,24 @@ class QuadraticProgramDegreeOfFreedomLimits:
     variables (velocity and jerk decision variables across the prediction horizon).
     """
 
+    degrees_of_freedom: list[DegreeOfFreedom]
+    """
+    Degrees of freedom contributing decision variable slots.
+    """
+
+    qp_controller_config: QPControllerConfig
+    """
+    Controller configuration providing horizon, derivatives, and weights.
+    """
+
+    profiler: DegreeOfFreedomLimitProfiler = field(init=False)
+    """
+    Profiler resolving the limits and horizon bounds of each degree of freedom.
+    """
+
+    def __post_init__(self):
+        self.profiler = DegreeOfFreedomLimitProfiler(self.qp_controller_config)
+
     @classmethod
     def create(
         cls,
@@ -687,36 +689,27 @@ class QuadraticProgramDegreeOfFreedomLimits:
         :param qp_controller_config: Controller configuration providing horizon and
             weights.
         """
-        self = cls()
-        lower_bounds, upper_bounds = self.free_variable_bounds(
-            degrees_of_freedom, qp_controller_config
+        self = cls(
+            degrees_of_freedom=degrees_of_freedom,
+            qp_controller_config=qp_controller_config,
         )
-        quadratic_weights, linear_weights = self.init_weights(
-            degrees_of_freedom, qp_controller_config
-        )
+        lower_bounds, upper_bounds = self.free_variable_bounds()
+        quadratic_weights, linear_weights = self.init_weights()
         return DirectLimits(
             lower_bounds=lower_bounds,
             upper_bounds=upper_bounds,
             quadratic_weights=quadratic_weights,
             linear_weights=linear_weights,
-            names=self.make_names(degrees_of_freedom, qp_controller_config),
+            names=self.make_names(),
         )
 
-    def active_slots(
-        self,
-        degrees_of_freedom: list[DegreeOfFreedom],
-        qp_controller_config: QPControllerConfig,
-    ):
+    def active_slots(self) -> Iterator[tuple[Derivatives, int, DegreeOfFreedom]]:
         """
         Yields every active decision variable slot as a ``(derivative, time_step, dof)``
         tuple. The order defines the layout shared by bounds, weights, and names so they
         stay aligned.
-
-        :param degrees_of_freedom: Degrees of freedom contributing decision variable
-            slots.
-        :param qp_controller_config: Controller configuration providing horizon and
-            derivatives.
         """
+        qp_controller_config = self.qp_controller_config
         max_derivative = qp_controller_config.max_derivative
         for derivative, time_step in product(
             [Derivatives.velocity, Derivatives.jerk],
@@ -726,84 +719,52 @@ class QuadraticProgramDegreeOfFreedomLimits:
                 max_derivative - derivative
             ):
                 continue
-            for degree_of_freedom in degrees_of_freedom:
+            for degree_of_freedom in self.degrees_of_freedom:
                 yield derivative, time_step, degree_of_freedom
 
-    def make_names(
-        self,
-        degrees_of_freedom: list[DegreeOfFreedom],
-        qp_controller_config: QPControllerConfig,
-    ) -> list[str]:
+    def make_names(self) -> list[str]:
         """
         Creates a debug name for every free variable slot.
-
-        :param degrees_of_freedom: Degrees of freedom contributing decision variable
-            slots.
-        :param qp_controller_config: Controller configuration providing horizon and
-            derivatives.
         """
         short_label = {Derivatives.velocity: "vel", Derivatives.jerk: "jerk"}
         return [
             f"{dof.name}_{short_label[derivative]}_k_{time_step}"
-            for derivative, time_step, dof in self.active_slots(
-                degrees_of_freedom, qp_controller_config
-            )
+            for derivative, time_step, dof in self.active_slots()
         ]
 
-    def free_variable_bounds(
-        self,
-        degrees_of_freedom: list[DegreeOfFreedom],
-        qp_controller_config: QPControllerConfig,
-    ) -> tuple[sm.Vector, sm.Vector]:
+    def free_variable_bounds(self) -> tuple[sm.Vector, sm.Vector]:
         """
         Computes the lower and upper box limits of every free variable slot.
-
-        :param degrees_of_freedom: Degrees of freedom contributing decision variable
-            slots.
-        :param qp_controller_config: Controller configuration providing horizon and
-            derivatives.
         """
+        horizon_bounds: dict[UUID, DegreeOfFreedomLimits[sm.Vector]] = {
+            degree_of_freedom.id: self.profiler.compute(degree_of_freedom)
+            for degree_of_freedom in self.degrees_of_freedom
+        }
         lower_bounds = []
         upper_bounds = []
-        profiler = DegreeOfFreedomLimitProfiler(qp_controller_config)
-        cache: dict[UUID, DegreeOfFreedomLimits[sm.Vector]] = {}
-        for degree_of_freedom in degrees_of_freedom:
-            cache[degree_of_freedom.id] = profiler.compute(
-                degree_of_freedom=degree_of_freedom,
+        for derivative, t, degree_of_freedom in self.active_slots():
+            lower_bounds.append(
+                horizon_bounds[degree_of_freedom.id].lower[derivative][t]
             )
-        for derivative, t, degree_of_freedom in self.active_slots(
-            degrees_of_freedom, qp_controller_config
-        ):
-            lower_bounds.append(cache[degree_of_freedom.id].lower[derivative][t])
-            upper_bounds.append(cache[degree_of_freedom.id].upper[derivative][t])
-
+            upper_bounds.append(
+                horizon_bounds[degree_of_freedom.id].upper[derivative][t]
+            )
         return sm.Vector(lower_bounds), sm.Vector(upper_bounds)
 
-    def init_weights(
-        self,
-        degrees_of_freedom: list[DegreeOfFreedom],
-        qp_controller_config: QPControllerConfig,
-    ) -> tuple[sm.Vector, sm.Vector]:
+    def init_weights(self) -> tuple[sm.Vector, sm.Vector]:
         """
         Computes the quadratic and linear objective weights of every free variable slot.
-
-        :param degrees_of_freedom: Degrees of freedom contributing decision variable
-            slots.
-        :param qp_controller_config: Controller configuration providing horizon and
-            weights.
         """
-        profiler = DegreeOfFreedomLimitProfiler(qp_controller_config)
+        qp_controller_config = self.qp_controller_config
         decision_variable_limits = {
             degree_of_freedom.id: self._decision_variable_limits(
-                upper_limits=profiler.resolve_limits(degree_of_freedom)[1],
+                upper_limits=self.profiler.resolve_limits(degree_of_freedom)[1],
                 time_step=qp_controller_config.model_predictive_control_time_step,
             )
-            for degree_of_freedom in degrees_of_freedom
+            for degree_of_freedom in self.degrees_of_freedom
         }
         quadratic_weights = []
-        for derivative, t, degree_of_freedom in self.active_slots(
-            degrees_of_freedom, qp_controller_config
-        ):
+        for derivative, t, degree_of_freedom in self.active_slots():
             normalized_weight = self.normalize_degree_of_freedom_weight(
                 variable_limit=decision_variable_limits[degree_of_freedom.id][
                     derivative

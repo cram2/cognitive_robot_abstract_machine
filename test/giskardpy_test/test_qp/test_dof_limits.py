@@ -309,11 +309,8 @@ def test_joint_goal_respects_the_declared_acceleration_limit(
 
 
 def test_unconstrained_velocity_bounds_are_flat():
-    bounds = _profiler()._unconstrained_velocity_bounds(
-        VELOCITY_LIMIT, PREDICTION_HORIZON
-    )
+    bounds = VelocityBoundProfiles.unconstrained(VELOCITY_LIMIT, PREDICTION_HORIZON)
 
-    assert isinstance(bounds, VelocityBoundProfiles)
     assert np.allclose(bounds.upper_bound.evaluate(), VELOCITY_LIMIT)
     assert np.allclose(bounds.lower_bound.evaluate(), -VELOCITY_LIMIT)
     assert np.allclose(bounds.goal_profile.evaluate(), 0.0)
@@ -364,31 +361,18 @@ def test_relax_jerk_on_initial_steps_relaxes_only_when_needed():
 
 
 def test_detect_velocity_bound_violation():
-    profiler = _profiler()
-    lower_bound = sm.Vector([-1.0] * 5)
-    upper_bound = sm.Vector([1.0] * 5)
+    number_of_steps = 5
+    bounds = VelocityBoundProfiles.unconstrained(VELOCITY_LIMIT, number_of_steps)
     epsilon = 1e-5
 
-    inside = sm.Vector([0.0] * 5)
-    assert not _truth_value(
-        profiler._detect_velocity_bound_violation(
-            inside, lower_bound, upper_bound, epsilon
-        )
-    )
+    inside = sm.Vector([0.0] * number_of_steps)
+    assert not _truth_value(bounds.is_violated_by(inside, epsilon))
 
-    exceeds_upper = sm.Vector([2.0, 0.0, 0.0, 0.0, 0.0])
-    assert _truth_value(
-        profiler._detect_velocity_bound_violation(
-            exceeds_upper, lower_bound, upper_bound, epsilon
-        )
-    )
+    exceeds_upper = sm.Vector([2 * VELOCITY_LIMIT] + [0.0] * (number_of_steps - 1))
+    assert _truth_value(bounds.is_violated_by(exceeds_upper, epsilon))
 
-    nonzero_terminal = sm.Vector([0.0, 0.0, 0.0, 0.0, 0.5])
-    assert _truth_value(
-        profiler._detect_velocity_bound_violation(
-            nonzero_terminal, lower_bound, upper_bound, epsilon
-        )
-    )
+    nonzero_terminal = sm.Vector([0.0] * (number_of_steps - 1) + [VELOCITY_LIMIT / 2])
+    assert _truth_value(bounds.is_violated_by(nonzero_terminal, epsilon))
 
 
 def test_compute_horizon_bounds_flat_at_center(prismatic_bot):
