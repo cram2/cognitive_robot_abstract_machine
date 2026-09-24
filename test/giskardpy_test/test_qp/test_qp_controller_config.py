@@ -8,6 +8,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, Joi
 from giskardpy.qp.exceptions import BrakingTimeExceedsHorizonError
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.qp_controller_config import (
+    MINIMUM_PREDICTION_HORIZON,
     NUMBER_OF_RESTING_STEPS,
     QPControllerConfig,
 )
@@ -39,6 +40,21 @@ def test_default_configuration_keeps_the_former_default_horizon():
     config = QPControllerConfig(target_frequency=20)
 
     assert config.prediction_horizon == former_default_prediction_horizon
+
+
+def test_derived_prediction_horizon_is_at_least_the_minimum():
+    target_frequency = 50
+    braking_time_of_one_step = 2 / target_frequency
+
+    config = QPControllerConfig(
+        target_frequency=target_frequency, braking_time=braking_time_of_one_step
+    )
+
+    assert (
+        config.number_of_braking_steps + NUMBER_OF_RESTING_STEPS
+        < MINIMUM_PREDICTION_HORIZON
+    )
+    assert config.prediction_horizon == MINIMUM_PREDICTION_HORIZON
 
 
 def test_explicit_prediction_horizon_longer_than_the_braking_is_kept():

@@ -26,6 +26,12 @@ Number of final prediction horizon steps whose velocity is fixed at zero, so tha
 plan ends at rest.
 """
 
+MINIMUM_PREDICTION_HORIZON = 4
+"""
+Shortest prediction horizon, in time steps, that can integrate jerk into the QP
+formulation.
+"""
+
 
 @dataclass
 class QPControllerConfig:
@@ -81,7 +87,7 @@ class QPControllerConfig:
 
     .. note:: Larger values increase the computational cost of the controller and slow
         down tracking of moving goals.
-    .. warning:: Minimum value is 4, otherwise it becomes impossible to integrate jerk into the QP formulation.
+    .. warning:: Minimum value is :data:`MINIMUM_PREDICTION_HORIZON`.
     """
 
     dof_weights: Dict[PrefixedName, DerivativeMap[float]] = field(
@@ -153,9 +159,13 @@ class QPControllerConfig:
             self.number_of_braking_steps + NUMBER_OF_RESTING_STEPS
         )
         if self.prediction_horizon is None:
-            self.prediction_horizon = minimum_prediction_horizon
-        if self.prediction_horizon < 4:
-            raise ValueError("prediction horizon must be >= 4.")
+            self.prediction_horizon = max(
+                minimum_prediction_horizon, MINIMUM_PREDICTION_HORIZON
+            )
+        if self.prediction_horizon < MINIMUM_PREDICTION_HORIZON:
+            raise ValueError(
+                f"prediction horizon must be >= {MINIMUM_PREDICTION_HORIZON}."
+            )
         if self.prediction_horizon < minimum_prediction_horizon:
             raise BrakingTimeExceedsHorizonError(
                 prediction_horizon=self.prediction_horizon,
