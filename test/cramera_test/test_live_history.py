@@ -4,6 +4,8 @@ Native state history publication and recording boundaries.
 
 from __future__ import annotations
 
+import pytest
+
 from typing_extensions import TYPE_CHECKING
 
 from coraplex.plans.executables import MotionPlanHistory
@@ -34,6 +36,40 @@ class TestMotionHistoryPublication:
     History subscriptions publish motion changes for the plan's lifetime.
     """
 
+    @pytest.mark.parametrize(
+        "outcome",
+        [
+            LifeCycleValues.SUCCEEDED,
+            LifeCycleValues.FAILED,
+            LifeCycleValues.INTERRUPTED,
+        ],
+    )
+    def test_native_history_owns_pause_completion_and_reset(
+        self, motion_execution: MotionExecution, outcome: LifeCycleValues
+    ) -> None:
+        """
+        Publish the native motion lifecycle throughout a complete attempt.
+
+        :param motion_execution: The plan, chart, and subscriber to exercise.
+        :param outcome: The terminal outcome recorded before resetting the motion.
+        """
+        motion_execution.plan.node_callbacks.append(motion_execution.callback)
+        MotionPlanHistory(
+            statechart=motion_execution.chart,
+            motion_mappings={motion_execution.motion: motion_execution.chart.nodes[0]},
+        )
+        for state in (
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.PAUSED,
+            outcome,
+            LifeCycleValues.NOT_STARTED,
+        ):
+            motion_execution.record(state)
+            assert motion_execution.motion.status is state
+            assert [
+                node.status for node in motion_execution.bridge.plan_state.nodes
+            ] == [motion_execution.plan.root.status, state]
+
     def test_motion_start_publishes_the_bound_chart(
         self, motion_execution: MotionExecution
     ) -> None:
@@ -51,6 +87,8 @@ class TestMotionHistoryPublication:
     ) -> None:
         """
         A recorded native state change refreshes both execution views.
+
+        :param motion_execution: The plan, chart, and observing callback.
         """
         motion_execution.callback.on_start(motion_execution.motion)
         motion_execution.plan.root.status = LifeCycleValues.RUNNING
@@ -84,6 +122,8 @@ class TestMotionHistoryPublication:
     ) -> None:
         """
         A reset chart restores both plan entries to their unstarted state.
+
+        :param motion_execution: The plan, chart, and observing callback.
         """
         motion_execution.plan.node_callbacks.append(motion_execution.callback)
         MotionPlanHistory(

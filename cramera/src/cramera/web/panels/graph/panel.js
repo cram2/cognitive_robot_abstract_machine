@@ -119,7 +119,6 @@ Panels.define('graph', function (root, bus) {
   const STEP_KINDS = { ActionNode: 'action', AttachNode: 'attach', DetachNode: 'attach' };
   // conditions are internal checks that never execute — hidden from this view entirely
   const DETAIL_KINDS = { MotionNode: 'motion', MonitorNode: 'monitor' };
-  const IGNORE_KINDS = { ConditionNode: 1 };
   const STRUCT_KINDS = { SequentialNode: 1, ParallelNode: 1, UnderspecifiedNode: 1 };
   const STEP_STATUS = { SUCCEEDED: 'done', DONE: 'done', RUNNING: 'running', FAILED: 'failed', PAUSED: 'paused', PAUSE: 'paused', INTERRUPTED: 'interrupted', CREATED: 'not started', NOT_STARTED: 'not started' };
   function stepWords(x) { return String(x || '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim().toLowerCase().replace(/^./, function (c) { return c.toUpperCase(); }); }
@@ -154,34 +153,6 @@ Panels.define('graph', function (root, bus) {
     });
     return out;
   }
-  // status is reported on the leaf motion nodes, not on the action node shown as a step;
-  // conditions never execute (stay CREATED), so they are excluded. A node with real
-  // children derives purely from them (all done -> done), so a stale own "RUNNING" never
-  // keeps a step running once its motions have finished.
-  function derivedStatus(item) {
-    let anyRunning = false, anyFailed = false, seen = 0, done = 0, reported = false;
-    (function scan(it) {
-      (it.kids || []).forEach(function (c) {
-        if (IGNORE_KINDS[c.n.kind]) return;      // ignore conditions entirely
-        seen++;
-        const s = c.n.status;
-        if (s) reported = true;
-        if (s === 'RUNNING') anyRunning = true;
-        if (s === 'FAILED') anyFailed = true;
-        if (s === 'SUCCEEDED' || s === 'DONE') done++;
-        scan(c);
-      });
-    })(item);
-    if (anyFailed) return 'FAILED';
-    if (seen > 0) {                              // has real children: derive from them
-      if (!reported) return null;                // none of them reports one either
-      if (done === seen) return 'SUCCEEDED';
-      if (anyRunning || done > 0) return 'RUNNING';
-      return 'CREATED';
-    }
-    return item.n.status;                        // a leaf uses its own status
-  }
-
   const stepsCollapsed = {};   // node id -> true when the user collapsed that step (kept across live refreshes)
   let stepCollapsibleIds = [];  // ids of steps that have children, filled during render (for expand/collapse all)
   let lastStepsPayload = null;  // last plan payload rendered, so the all-buttons can re-render
@@ -220,7 +191,7 @@ Panels.define('graph', function (root, bus) {
         '<span class="st-tw">' + (hk ? (collapsed ? '▸' : '▾') : '') + '</span>' +
         '<span class="st-num">' + number + '</span>' +
         '<span class="st-name">' + stepLabel(n) + '</span>' +
-        '<span class="st-meta">' + (details.length ? '<span class="st-dc">' + details.length + ' detail' + (details.length > 1 ? 's' : '') + '</span>' : '') + stepPill(derivedStatus(item)) + '</span>' +
+        '<span class="st-meta">' + (details.length ? '<span class="st-dc">' + details.length + ' detail' + (details.length > 1 ? 's' : '') + '</span>' : '') + stepPill(n.status) + '</span>' +
         '</div>');
       if (hk) {
         html.push('<div class="st-kids"' + (collapsed ? ' style="display:none"' : '') + '>');

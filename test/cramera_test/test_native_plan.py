@@ -39,3 +39,25 @@ def test_plan_snapshot_keeps_the_native_lifecycle(status: LifeCycleValues) -> No
         json.loads(json.dumps(bridge.plan_state.recorded_trees()))[0]["status"]
         == status.name
     )
+
+
+@pytest.mark.parametrize("status", list(LifeCycleValues))
+def test_parent_lifecycle_is_independent_of_finished_children(
+    status: LifeCycleValues,
+) -> None:
+    """
+    A parent's lifecycle remains its own when children have completed.
+
+    :param status: The parent's current lifecycle, including a reset.
+    """
+    plan = Plan()
+    parent = PlanNode(status=LifeCycleValues.RUNNING)
+    plan.add_edge(parent, PlanNode(status=LifeCycleValues.SUCCEEDED))
+    bridge = Bridge()
+    bridge.begin_plan(plan)
+
+    parent.status = status
+    bridge.snapshot_plan()
+
+    assert bridge.plan_state.nodes[0].status is status
+    assert bridge.plan_state.nodes[0].derived is False

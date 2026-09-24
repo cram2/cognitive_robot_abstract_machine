@@ -650,3 +650,32 @@ for (const status of ['PAUSED', 'PAUSE', 'INTERRUPTED', 'NOT_STARTED', 'CREATED'
     }
   });
 }
+
+// %% authoritative plan status
+for (const status of ['NOT_STARTED', 'RUNNING', 'PAUSED', 'INTERRUPTED', 'FAILED', 'SUCCEEDED']) {
+  test('a parent step keeps native ' + status + ' after its motion succeeds', async function () {
+    const panel = loadPanel({
+      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+      '/api/knowledge/view?name=plan': { ok: true, nodes: [], edges: [], details: {}, live: 'plan' },
+      'http://bridge/plan': { signature: 'parent-motion', nodes: [
+        { id: 'action', kind: 'ActionNode', label: 'Transport', status: status, group: 'action' },
+        { id: 'motion', parent: 'action', kind: 'MotionNode', label: 'Move', status: 'SUCCEEDED', group: 'motion' },
+      ] },
+    });
+    const root = makeRoot();
+    const bus = makeBus();
+    const instance = panel.factory(root, bus);
+    try {
+      await flush();
+      root.buttons.find(function (button) { return button.dataset.view === 'plan'; }).click();
+      await flush();
+      bus.emit('live:changed', { on: true, url: 'http://bridge' });
+      await flush();
+      const html = root.control('#graph-steps').querySelector('.steps-tree').innerHTML;
+      const parentRow = html.split('</div>')[0];
+      assert.match(parentRow, new RegExp('class="sp sp-' + status + '"'));
+    } finally {
+      instance.destroy();
+    }
+  });
+}

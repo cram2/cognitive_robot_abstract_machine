@@ -113,26 +113,6 @@ class NamesAWorldEntity(Protocol):
     """
 
 
-@dataclass
-class MotionNodeProgress:
-    """
-    What the bridge knows about one plan node's execution.
-
-    Holds the node itself so the identity key derived from it stays unique for as long
-    as the entry lives.
-    """
-
-    node: PlanNode
-    """
-    The plan node this progress belongs to.
-    """
-
-    status: Optional[LifeCycleValues] = None
-    """
-    The node's last observed execution status, else None.
-    """
-
-
 # %% viewer payload shapes
 @dataclass(frozen=True)
 class ObjectCatalogEntry:
@@ -236,14 +216,12 @@ class PlanNodeEntry:
 
     status: LifeCycleValues
     """
-    This node's status: its own if it reports one, else a derived one.
-
+    The native lifecycle state reported by this plan node.
     """
 
     derived: bool
     """
-    Whether :attr:`status` was derived (from the statechart or children) rather than
-    the node's own reported status.
+    Whether the published status was derived; native plan states are reported directly.
     """
 
     arm: Optional[str] = None
@@ -262,12 +240,21 @@ class PlanNodeEntry:
         :return: The node fields with the lifecycle represented as text.
         """
         payload = asdict(self)
-        payload["status"] = self.status.name
+        payload[PlanTreeField.STATUS] = self.status.name
         return payload
 
 
 class PlanTreeField(StrEnum):
-    """Fields joining nodes in a recorded plan hierarchy."""
+    """Fields describing the published plan hierarchy and node lifecycle."""
+
+    STATUS = "status"
+    """The native lifecycle name of a plan node."""
+
+    SIGNATURE = "signature"
+    """The plan's node identities in traversal order."""
+
+    NODES = "nodes"
+    """The flattened plan entries with their parent references."""
 
     CHILDREN = "children"
     """Nested plan steps in execution order."""
@@ -295,8 +282,8 @@ class PlanSnapshot:
         keep its own copy of the plan-node colour table.
         """
         payload = {
-            "signature": self.signature,
-            "nodes": [node.to_payload() for node in self.nodes],
+            PlanTreeField.SIGNATURE: self.signature,
+            PlanTreeField.NODES: [node.to_payload() for node in self.nodes],
         }
         payload["legend"] = [
             {"group": group.value, "label": group.label}
@@ -585,24 +572,6 @@ class Bridge:
     Name of the action whose motion group is executing.
     """
 
-    _ever_running: set = field(default_factory=set)
-    """
-    Node identities whose callback-derived progress retains completion after becoming
-    idle.
-    """
-
-    _motion_nodes: Dict[int, MotionNodeProgress] = field(default_factory=dict)
-    """
-    Execution progress per plan node, keyed by the node's :func:`id`.
-
-    Identity, not equality: coraplex's ``DesignatorNode`` compares by field value, so
-    two structurally identical steps of one plan would otherwise share a status. The
-    :class:`MotionNodeProgress` entry pins the node itself, which keeps CPython from
-    handing its ``id`` to a later object.
-
-    Reset whenever a new plan starts performing, which bounds it to one plan's nodes.
-    """
-
     _model_revision: int = 0
     """
     Counts world attachments and model changes, reported as the status's model version.
@@ -691,40 +660,21 @@ class Bridge:
 
     def observe_motion_started(self, node: MotionNode) -> None:
         """
-        Record that a plan node's motion started running.
+        Name the executing chart from its motion's parent action.
 
         :param node: The node whose motion started.
         """
-        self._motion_nodes[id(node)] = MotionNodeProgress(
-            node=node, status=LifeCycleValues.RUNNING
-        )
         action_node = node.parent_action_node
         if action_node is not None and action_node.designator is not None:
             self._chart_title = type(action_node.designator).__name__
-
-    def observe_motion_ended(self, node: MotionNode) -> None:
-        """
-        Pin the final status of a finished motion node and republish the plan.
-
-        :param node: The node whose motion ended.
-        """
-        self._motion_nodes[id(node)] = MotionNodeProgress(
-            node=node, status=LifeCycleValues[node.status.name]
-        )
-        self.snapshot_plan()
 
     def begin_plan(self, plan: Plan) -> None:
         """
         Record the plan that started performing and publish its tree.
 
-        Drops the previous plan's per-node progress, so a long-running process does not
-        accumulate entries for nodes that no longer exist.
-
         :param plan: The plan that started performing.
         """
         self._plan = plan
-        self._motion_nodes.clear()
-        self._ever_running.clear()
         self.snapshot_plan()
 
     def observe_model_change(self) -> None:
@@ -1362,20 +1312,9 @@ class Bridge:
             return self.transform_state.to_payload(time.monotonic())
 
     # %% plan tree
-    def _live_motion_status(self, node: PlanNode) -> Optional[LifeCycleValues]:
-        """
-        Status of one plan node as its plan callbacks reported it, or None.
-
-        :param node: The plan node whose live status is looked up.
-        """
-        progress = self._motion_nodes.get(id(node))
-        if progress is None:
-            return None
-        return progress.status
-
     def snapshot_plan(self) -> None:
         """
-        Publish plan lifecycle values and derive unstarted parents from their children.
+        Publish the current native lifecycle state of every plan node.
         """
         plan = self._plan
         if plan is None:
@@ -1397,9 +1336,9 @@ class Bridge:
         parent_id: Optional[str],
         nodes: List[PlanNodeEntry],
         order: List[str],
-    ) -> LifeCycleValues:
+    ) -> None:
         """
-        Serialize one plan node and its subtree; returns the node's status.
+        Serialize one plan node and its subtree.
 
         :param node: The plan node to serialize.
         :param parent_id: Id of the node's parent entry, or None for the root.
@@ -1409,8 +1348,6 @@ class Bridge:
         """
         node_id = "plan_node_%d" % id(node)
         designator = node.designator if isinstance(node, DescribesAnAction) else None
-        native_lifecycle = isinstance(node.status, LifeCycleValues)
-        own_status = LifeCycleValues[node.status.name]
         entry = PlanNodeEntry(
             id=node_id,
             parent=parent_id,
@@ -1421,47 +1358,15 @@ class Bridge:
                 if designator is not None
                 else type(node).__name__
             ),
-            status=own_status,
+            status=node.status,
             derived=False,
         )
         self._add_designator_metadata(entry, designator)
         nodes.append(entry)
         order.append(node_id)
 
-        child_best, children, done = LifeCycleValues.NOT_STARTED, 0, 0
         for child in node.children:
-            child_status = self._serialize_plan_node(child, node_id, nodes, order)
-            if (
-                PlanNodeGroup.of_plan_node_kind(type(child).__name__)
-                is PlanNodeGroup.CONDITION
-                and child_status == LifeCycleValues.NOT_STARTED
-            ):
-                continue
-            child_best = self._max_status(child_best, child_status)
-            children += 1
-            if child_status == LifeCycleValues.SUCCEEDED:
-                done += 1
-        if own_status == LifeCycleValues.NOT_STARTED:
-            if child_best == LifeCycleValues.SUCCEEDED and done < children:
-                child_best = LifeCycleValues.RUNNING
-            motion_status = None if native_lifecycle else self._live_motion_status(node)
-            derived = motion_status or (
-                child_best if child_best != LifeCycleValues.NOT_STARTED else None
-            )
-            if derived:
-                entry.status = derived
-                entry.derived = True
-        if native_lifecycle:
-            return entry.status
-        if entry.status == LifeCycleValues.RUNNING:
-            self._ever_running.add(id(node))
-        elif (
-            id(node) in self._ever_running
-            and entry.status == LifeCycleValues.NOT_STARTED
-        ):
-            entry.status = LifeCycleValues.SUCCEEDED
-            entry.derived = True
-        return entry.status
+            self._serialize_plan_node(child, node_id, nodes, order)
 
     def _add_designator_metadata(
         self, entry: PlanNodeEntry, designator: Optional[Any]
@@ -1481,26 +1386,6 @@ class Bridge:
         target = self._designator_target(designator)
         if target:
             entry.target = target
-
-    @staticmethod
-    def _max_status(first: LifeCycleValues, second: LifeCycleValues) -> LifeCycleValues:
-        """
-        The higher-ranked of two statuses.
-
-        :param first: The first status to compare.
-        :param second: The second status to compare.
-        """
-        precedence = (
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.SUCCEEDED,
-            LifeCycleValues.PAUSED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.INTERRUPTED,
-            LifeCycleValues.FAILED,
-        )
-        if precedence.index(first) >= precedence.index(second):
-            return first
-        return second
 
     def _designator_target(self, designator: Any) -> Optional[str]:
         """

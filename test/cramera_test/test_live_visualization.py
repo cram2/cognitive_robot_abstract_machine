@@ -16,7 +16,9 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
-from coraplex.plans.plan_node import MotionNode
+from coraplex.language import SequentialNode
+from coraplex.plans.plan import Plan
+from coraplex.plans.plan_node import PlanNode
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 
 from cramera import paths
@@ -32,10 +34,7 @@ from cramera.live.visualization import (
 
 from .dataset.motion_execution import motion_execution
 from .test_live_bridge import (
-    PlanWithRoot,
-    ReportedStatus,
     make_chart,
-    make_plan_node,
     nodes_by_kind,
 )
 
@@ -183,86 +182,70 @@ class TestWorldSync:
 
 
 class TestBridgePlanCallback:
-    def test_a_motion_start_is_pinned_as_running(self):
-        bridge = Bridge()
-        motion = make_plan_node("MotionNode")
-        root = make_plan_node("SequentialNode", children=[motion])
-        bridge.begin_plan(PlanWithRoot(root=root))
-        callback = BridgePlanCallback(bridge=bridge)
+    """
+    Native node callbacks publish the lifecycle already owned by the plan.
+    """
 
-        callback.on_start(_as_motion_node(motion))
-        bridge.snapshot_plan()
+    def test_a_motion_start_publishes_native_status(self, motion_execution) -> None:
+        """
+        A start callback publishes the state assigned by native execution.
 
+        :param motion_execution: A native motion, chart, and observing callback.
+        """
+        motion_execution.motion.status = LifeCycleValues.RUNNING
+        motion_execution.callback.on_start(motion_execution.motion)
         assert (
-            nodes_by_kind(bridge)["MotionNode"]["status"]
-            == LifeCycleValues.RUNNING.name
+            nodes_by_kind(motion_execution.bridge)["MotionNode"]["status"]
+            == motion_execution.motion.status.name
         )
 
-    def test_a_motion_end_pins_the_reported_status(self):
-        bridge = Bridge()
-        motion = make_plan_node("MotionNode")
-        root = make_plan_node("SequentialNode", children=[motion])
-        bridge.begin_plan(PlanWithRoot(root=root))
-        callback = BridgePlanCallback(bridge=bridge)
-        motion.status = ReportedStatus(name=LifeCycleValues.FAILED.name)
+    @pytest.mark.parametrize("status", LifeCycleValues.terminal_states())
+    def test_a_motion_end_publishes_native_status(
+        self, motion_execution, status: LifeCycleValues
+    ) -> None:
+        """
+        An end callback publishes the motion's native terminal outcome.
 
-        callback.on_end(_as_motion_node(motion))
-        motion.status = ReportedStatus(name=LifeCycleValues.NOT_STARTED.name)
-
+        :param motion_execution: A native motion, chart, and observing callback.
+        :param status: The native terminal outcome to publish.
+        """
+        motion_execution.motion.status = status
+        motion_execution.callback.on_end(motion_execution.motion)
         assert (
-            nodes_by_kind(bridge)["MotionNode"]["status"] == LifeCycleValues.FAILED.name
+            nodes_by_kind(motion_execution.bridge)["MotionNode"]["status"]
+            == status.name
         )
 
     def test_a_native_history_change_publishes_the_statechart(self, motion_execution):
         bridge = Bridge()
         callback = BridgePlanCallback(bridge=bridge)
-
         motion_execution.record(LifeCycleValues.RUNNING)
         callback.on_state_change(motion_execution.chart.history)
-
         assert bridge.get_chart()["nodes"] != []
 
-    def test_a_non_motion_node_republishes_the_plan(self):
+    def test_a_non_motion_node_republishes_its_execution_boundaries(self) -> None:
+        """
+        A native execution scope publishes both its start and completion.
+        """
         bridge = Bridge()
-        action = make_plan_node("ActionNode", status=LifeCycleValues.RUNNING.name)
-        bridge._plan = PlanWithRoot(root=action)
-        callback = BridgePlanCallback(bridge=bridge)
-
-        callback.on_start(action)
-
-        assert (
-            nodes_by_kind(bridge)["ActionNode"]["status"]
-            == LifeCycleValues.RUNNING.name
-        )
-
-
-def _as_motion_node(mimic):
-    """
-    Give a plan-node mimic the class identity the callback routes motions by.
-
-    The subclass is deliberately named ``MotionNode`` so the serialized kind matches,
-    and it overrides the graph-reading ``parent_action_node`` property with the plain
-    attribute the mimic carries.
-
-    :param mimic: The node mimic to re-brand.
-    """
-    mimic.__class__ = type(
-        "MotionNode",
-        (MotionNode,),
-        {
-            "__init__": object.__init__,
-            # the real properties read the plan graph; the mimic stands alone
-            "parent_action_node": None,
-            "children": (),
-        },
-    )
-    return mimic
+        plan = Plan()
+        node = PlanNode()
+        plan.add_node(node)
+        bridge.begin_plan(plan)
+        plan.node_callbacks.append(BridgePlanCallback(bridge=bridge, plan=plan))
+        with node.execution_scope():
+            assert bridge.plan_state.nodes[0].status is LifeCycleValues.RUNNING
+        assert bridge.plan_state.nodes[0].status is LifeCycleValues.SUCCEEDED
 
 
 # %% the backend
 
 
 class TestLiveVisualization:
+    """
+    Viewer sessions bind native world and plan observers for their lifetime.
+    """
+
     def test_start_attaches_and_serves(self, world, monkeypatch):
         bridge = Bridge()
         server = ServerRecorder()
@@ -385,16 +368,27 @@ class TestLiveVisualization:
         assert bridge.live_server is None
         assert state_sync not in world.state.state_change_callbacks
 
-    def test_plan_callback_publishes_the_plan_tree(self, world, monkeypatch):
+    def test_plan_callback_publishes_the_plan_tree(
+        self, world: World, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """
+        Registering a native plan callback publishes its initial hierarchy.
+
+        :param world: The native world served by the viewer.
+        :param monkeypatch: Fixture replacing the HTTP server with a local recorder.
+        """
         bridge = Bridge()
         monkeypatch.setattr(
             visualization_module, "serve", lambda passed_bridge, port: ServerRecorder()
         )
         live = LiveVisualization(world=world, bridge=bridge).start()
-        plan = PlanWithRoot(root=make_plan_node("SequentialNode"))
+        plan = Plan()
+        plan.add_node(SequentialNode())
 
         callback = live.plan_callback(plan)
 
         assert isinstance(callback, BridgePlanCallback)
         assert callback.bridge is bridge
-        assert nodes_by_kind(bridge)["SequentialNode"] is not None
+        assert (
+            nodes_by_kind(bridge)["SequentialNode"]["status"] == plan.root.status.name
+        )

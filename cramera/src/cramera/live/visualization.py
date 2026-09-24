@@ -131,12 +131,9 @@ class BridgePlanCallback(PlanCallback, StateHistoryObserver):
         :param node: The plan node that completed.
         """
         plan_ended = self.plan is not None and node is self.plan.root
-        if isinstance(node, MotionNode):
-            self.bridge.observe_motion_ended(node)
-            if plan_ended:
-                self.bridge.observe_chart(node.motion_statechart)
-        else:
-            self.bridge.snapshot_plan()
+        self.bridge.snapshot_plan()
+        if isinstance(node, MotionNode) and plan_ended:
+            self.bridge.observe_chart(node.motion_statechart)
         if (
             not isinstance(node, MotionNode) or plan_ended
         ) and self.bridge.recording is not None:
