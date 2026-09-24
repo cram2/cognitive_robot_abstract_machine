@@ -1259,16 +1259,6 @@ class Bridge:
         }
 
     @staticmethod
-    def _body_shapes(body: Body) -> ShapeCollection:
-        """
-        Select native visual geometry, falling back to the collision collection.
-
-        :param body: The body whose shapes are read.
-        :return: The original collection, which is empty for a shapeless body.
-        """
-        return body.visual or body.collision
-
-    @staticmethod
     def _actuated_connections(
         connections: List[Connection],
     ) -> List[ActiveConnection1DOF]:
@@ -1301,7 +1291,7 @@ class Bridge:
         ):
             entry = ObjectCatalogEntry(
                 key=key,
-                shapes=self._body_shapes(body),
+                shapes=body.visual or body.collision,
             )
             catalog.append(entry)
             for shape_index, shape in enumerate(entry.shapes):
