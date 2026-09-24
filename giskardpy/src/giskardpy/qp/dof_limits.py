@@ -548,7 +548,7 @@ class DegreeOfFreedomLimitProfiler:
             ),
         )
 
-    def _resolve_limits(
+    def resolve_limits(
         self, degree_of_freedom: DegreeOfFreedom
     ) -> tuple[DerivativeMap[float], DerivativeMap[float]]:
         """
@@ -634,7 +634,7 @@ class DegreeOfFreedomLimitProfiler:
             cannot brake from its velocity limit to rest within the prediction horizon.
         """
         qp_controller_config = self.qp_controller_config
-        lower_limits, upper_limits = self._resolve_limits(degree_of_freedom)
+        lower_limits, upper_limits = self.resolve_limits(degree_of_freedom)
         self._raise_if_braking_exceeds_horizon(degree_of_freedom, upper_limits)
         return self.compute_horizon_bounds(
             degree_of_freedom_symbols=degree_of_freedom.variables,
@@ -799,12 +799,22 @@ class QuadraticProgramDegreeOfFreedomLimits:
         :param qp_controller_config: Controller configuration providing horizon and
             weights.
         """
+        profiler = DegreeOfFreedomLimitProfiler(qp_controller_config)
+        decision_variable_limits = {
+            degree_of_freedom.id: self._decision_variable_limits(
+                upper_limits=profiler.resolve_limits(degree_of_freedom)[1],
+                time_step=qp_controller_config.model_predictive_control_time_step,
+            )
+            for degree_of_freedom in degrees_of_freedom
+        }
         quadratic_weights = []
         for derivative, t, degree_of_freedom in self.active_slots(
             degrees_of_freedom, qp_controller_config
         ):
             normalized_weight = self.normalize_degree_of_freedom_weight(
-                variable_limit=degree_of_freedom.limits.upper[derivative],
+                variable_limit=decision_variable_limits[degree_of_freedom.id][
+                    derivative
+                ],
                 base_weight=qp_controller_config.get_degree_of_freedom_weight(
                     degree_of_freedom.name, derivative
                 ),
@@ -814,6 +824,23 @@ class QuadraticProgramDegreeOfFreedomLimits:
             )
             quadratic_weights.append(normalized_weight)
         return sm.Vector(quadratic_weights), sm.Vector.zeros(len(quadratic_weights))
+
+    def _decision_variable_limits(
+        self, upper_limits: DerivativeMap[float], time_step: float
+    ) -> DerivativeMap[float]:
+        """
+        Returns the bound of each kind of decision variable of a degree of freedom.
+
+        Jerk decision variables hold jerk times the squared time step, so their bound is
+        the jerk limit scaled the same way.
+
+        :param upper_limits: Resolved upper limits of the degree of freedom.
+        :param time_step: Duration of a single horizon step.
+        """
+        return DerivativeMap(
+            velocity=upper_limits.velocity,
+            jerk=upper_limits.jerk * time_step**2,
+        )
 
     def normalize_degree_of_freedom_weight(
         self,

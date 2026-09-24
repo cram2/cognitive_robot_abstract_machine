@@ -23,7 +23,7 @@ from giskardpy.qp.qp_controller_config import (
     NUMBER_OF_RESTING_STEPS,
     QPControllerConfig,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap, Derivatives
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -69,7 +69,7 @@ def _directional_bounds_at(
     """
     world.controlled_connections[0].position = position
     degree_of_freedom = _single_dof(world)
-    lower_limits, upper_limits = profiler._resolve_limits(degree_of_freedom)
+    lower_limits, upper_limits = profiler.resolve_limits(degree_of_freedom)
     config = profiler.qp_controller_config
     time_step = config.model_predictive_control_time_step
     position_range = upper_limits.position - lower_limits.position
@@ -116,7 +116,7 @@ def _horizon_bounds_at(
     its lower position limit.
     """
     degree_of_freedom = _single_dof(world)
-    lower_limits, upper_limits = profiler._resolve_limits(degree_of_freedom)
+    lower_limits, upper_limits = profiler.resolve_limits(degree_of_freedom)
     state = world.state[degree_of_freedom.id]
     state.position = lower_limits.position + distance_to_lower_limit
     state.velocity = velocity
@@ -143,7 +143,7 @@ def _horizon_bounds_at(
 
 
 def test_resolve_limits_with_position_limits(prismatic_bot):
-    lower_limits, upper_limits = _profiler()._resolve_limits(_single_dof(prismatic_bot))
+    lower_limits, upper_limits = _profiler().resolve_limits(_single_dof(prismatic_bot))
 
     assert upper_limits.position == POSITION_LIMIT
     assert lower_limits.position == -POSITION_LIMIT
@@ -154,7 +154,7 @@ def test_resolve_limits_with_position_limits(prismatic_bot):
 
 
 def test_resolve_limits_without_position_limits(prismatic_world_no_position_limits):
-    lower_limits, upper_limits = _profiler()._resolve_limits(
+    lower_limits, upper_limits = _profiler().resolve_limits(
         _single_dof(prismatic_world_no_position_limits)
     )
 
@@ -172,7 +172,7 @@ def test_derived_jerk_limit_follows_the_braking_time_at_every_control_frequency(
     config = QPControllerConfig(target_frequency=target_frequency)
     degree_of_freedom = _single_dof(prismatic_bot)
 
-    lower_limits, upper_limits = DegreeOfFreedomLimitProfiler(config)._resolve_limits(
+    lower_limits, upper_limits = DegreeOfFreedomLimitProfiler(config).resolve_limits(
         degree_of_freedom
     )
 
@@ -186,7 +186,7 @@ def test_derived_jerk_limit_follows_the_braking_time_at_every_control_frequency(
 def test_declared_jerk_limit_is_kept(prismatic_bot_with_jerk_limit):
     degree_of_freedom = _single_dof(prismatic_bot_with_jerk_limit)
 
-    lower_limits, upper_limits = _profiler()._resolve_limits(degree_of_freedom)
+    lower_limits, upper_limits = _profiler().resolve_limits(degree_of_freedom)
 
     assert upper_limits.jerk == degree_of_freedom.limits.upper.jerk
     assert lower_limits.jerk == degree_of_freedom.limits.lower.jerk
@@ -238,7 +238,7 @@ def test_declared_acceleration_limit_caps_the_jerk_limit(
     velocity_limit = degree_of_freedom.limits.upper.velocity
     acceleration_limit = degree_of_freedom.limits.upper.acceleration
 
-    _, upper_limits = _profiler()._resolve_limits(degree_of_freedom)
+    _, upper_limits = _profiler().resolve_limits(degree_of_freedom)
 
     assert upper_limits.jerk == pytest.approx(
         acceleration_limit**2 / (2 * velocity_limit)
@@ -395,7 +395,7 @@ def test_compute_horizon_bounds_flat_at_center(prismatic_bot):
     profiler = _profiler()
     prismatic_bot.controlled_connections[0].position = 0.0
     degree_of_freedom = _single_dof(prismatic_bot)
-    lower_limits, upper_limits = profiler._resolve_limits(degree_of_freedom)
+    lower_limits, upper_limits = profiler.resolve_limits(degree_of_freedom)
     config = profiler.qp_controller_config
 
     horizon_limits = profiler.compute_horizon_bounds(
@@ -427,7 +427,7 @@ def test_final_braking_step_uses_exactly_the_jerk_limit(prismatic_bot):
         QPControllerConfig.create_with_simulation_defaults()
     )
     time_step = profiler.qp_controller_config.model_predictive_control_time_step
-    _, upper_limits = profiler._resolve_limits(_single_dof(prismatic_bot))
+    _, upper_limits = profiler.resolve_limits(_single_dof(prismatic_bot))
     jerk_step = upper_limits.jerk * time_step**2
     approaching = _horizon_bounds_at(
         profiler, prismatic_bot, distance_to_lower_limit=0.01, velocity=-jerk_step
@@ -453,7 +453,7 @@ def test_degree_of_freedom_with_jerk_limit_has_no_jerk_cost_by_default(
 ):
     """
     A degree of freedom that states its own jerk limit keeps the default of costing
-    nothing for jerk, like one whose jerk limit is derived from the horizon.
+    nothing for jerk, like one whose jerk limit is derived from the braking time.
     """
     config = _default_config()
 
@@ -464,3 +464,66 @@ def test_degree_of_freedom_with_jerk_limit_has_no_jerk_cost_by_default(
 
     jerk_weights = limits.quadratic_weights.to_np()[config.control_horizon :]
     assert np.array_equal(jerk_weights, np.zeros(config.prediction_horizon))
+
+
+JERK_WEIGHT = 1.0
+"""
+Objective weight given to jerk in the weight normalization tests.
+"""
+
+
+def _first_jerk_weight(world: World) -> float:
+    """
+    Returns the objective weight of the first jerk decision variable of the single
+    degree of freedom of ``world``, with its jerk weighted by :data:`JERK_WEIGHT`.
+    """
+    config = _default_config()
+    degree_of_freedom = _single_dof(world)
+    config.set_dof_weight(degree_of_freedom.name, Derivatives.jerk, JERK_WEIGHT)
+    limits = QuadraticProgramDegreeOfFreedomLimits.create(
+        world.active_degrees_of_freedom, qp_controller_config=config
+    )
+    return float(limits.quadratic_weights.to_np()[config.control_horizon])
+
+
+def _normalized_first_jerk_weight(jerk_limit: float) -> float:
+    """
+    The weight of the first jerk decision variable, which holds jerk times the squared
+    time step, normalized by that variable's own bound.
+    """
+    config = _default_config()
+    jerk_decision_variable_bound = jerk_limit * config.control_dt**2
+    return (
+        config.horizon_weight_gain_scalar
+        * JERK_WEIGHT
+        / jerk_decision_variable_bound**2
+    )
+
+
+def test_jerk_weight_of_a_degree_of_freedom_without_jerk_limit_is_kept(
+    prismatic_bot,
+):
+    """
+    A jerk weight also applies to a degree of freedom whose jerk limit is derived from
+    the braking time, instead of being dropped for lack of a declared jerk limit.
+    """
+    degree_of_freedom = _single_dof(prismatic_bot)
+    derived_jerk_limit = (
+        4
+        * degree_of_freedom.limits.upper.velocity
+        / _default_config().braking_time ** 2
+    )
+
+    assert _first_jerk_weight(prismatic_bot) == pytest.approx(
+        _normalized_first_jerk_weight(derived_jerk_limit)
+    )
+
+
+def test_jerk_weight_is_normalized_by_the_bound_of_its_decision_variable(
+    prismatic_bot_with_jerk_limit,
+):
+    degree_of_freedom = _single_dof(prismatic_bot_with_jerk_limit)
+
+    assert _first_jerk_weight(prismatic_bot_with_jerk_limit) == pytest.approx(
+        _normalized_first_jerk_weight(degree_of_freedom.limits.upper.jerk)
+    )
