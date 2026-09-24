@@ -36,7 +36,6 @@ from cramera.logging_setup import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
-    from cramera.live.world_query import WorldQuerySource
     from coraplex.plans.plan import Plan
     from giskardpy.motion_statechart.motion_statechart import StateHistory
 
@@ -232,7 +231,7 @@ class LiveVisualization(PlanVisualization):
     The capture owned by this visualization session.
     """
 
-    _query_source: WorldQuerySource | None = field(init=False, default=None, repr=False)
+    _query_attachment: int | None = field(init=False, default=None, repr=False)
     """
     Automatic queries owned by this visualization's world attachment.
     """
@@ -260,7 +259,7 @@ class LiveVisualization(PlanVisualization):
         if self.bridge.recording is not None:
             finalize_recording(self.bridge, self.bridge.recording)
         try:
-            self._query_source = self.bridge.attach(self.world)
+            self._query_attachment = self.bridge.attach(self.world)
             self._recording = Recording()
             self.bridge.recording = self._recording
             self._recording.start()
@@ -327,6 +326,6 @@ class LiveVisualization(PlanVisualization):
                 self._recording = None
                 self.bridge.recording = None
         finally:
-            if self._query_source is not None:
-                self.bridge.release_world_queries(self._query_source)
-                self._query_source = None
+            if self._query_attachment is not None:
+                self.bridge.release_world_queries(self._query_attachment)
+                self._query_attachment = None

@@ -69,10 +69,11 @@ def query_bridge(bridge):
     krrood = pytest.importorskip("krrood", reason="EQL requires krrood")  # noqa: F841
     from .test_live_query import GrowingRecordSource, make_record
 
+    source = GrowingRecordSource(
+        records=[make_record("first")], stored=[make_record("last week")]
+    )
     bridge.register_query_source(
-        GrowingRecordSource(
-            records=[make_record("first")], stored=[make_record("last week")]
-        )
+        source.knowledge(), source.title(), source.presets(), source.unlisted_presets()
     )
     return bridge
 
@@ -699,10 +700,14 @@ class TestVocabularyEndpoints:
         pytest.importorskip("krrood", reason="EQL requires krrood")
         from .test_live_query import GrowingRecordSource, make_record
 
+        source = GrowingRecordSource(
+            records=[make_record("first")], stored=[make_record("last week")]
+        )
         bridge.register_query_source(
-            GrowingRecordSource(
-                records=[make_record("first")], stored=[make_record("last week")]
-            )
+            source.knowledge(),
+            source.title(),
+            source.presets(),
+            source.unlisted_presets(),
         )
         return bridge
 

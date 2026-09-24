@@ -24,7 +24,7 @@ from cramera.knowledge.queryable_knowledge import (  # noqa: E402
     UnknownQueryScope,
 )
 from cramera.live.bridge import Bridge  # noqa: E402
-from cramera.live.query import LiveQuerySource, NoQuerySourceRegistered  # noqa: E402
+from cramera.live.query import NoQuerySourceRegistered  # noqa: E402
 
 from .dataset.queryable_records import NamedRecord  # noqa: E402
 
@@ -42,7 +42,7 @@ class AnswersFromStorage(QueryEvaluation):
 
 
 @dataclass
-class GrowingRecordSource(LiveQuerySource):
+class GrowingRecordSource:
     """
     A source whose records keep arriving, the way a demo's results do while it runs,
     alongside the ones its finished runs already stored.
@@ -104,15 +104,21 @@ class GrowingRecordSource(LiveQuerySource):
 
 
 @dataclass
-class CurrentStateOnlySource(LiveQuerySource):
+class CurrentStateOnlySource:
     """
     A demo that keeps no record of its finished runs, so only its present is queryable.
     """
 
     def title(self) -> str:
+        """
+        Name the current-state-only query configuration.
+        """
         return "state-only demo"
 
     def knowledge(self) -> List[QueryableKnowledge]:
+        """
+        Provide one current-state scope with an empty native record domain.
+        """
         return [
             QueryableKnowledge(
                 scope=QueryScope.CURRENT_STATE,
@@ -121,6 +127,9 @@ class CurrentStateOnlySource(LiveQuerySource):
         ]
 
     def presets(self) -> List[Preset]:
+        """
+        Offer no predefined queries for this configuration.
+        """
         return []
 
 
@@ -143,7 +152,9 @@ def source() -> GrowingRecordSource:
 @pytest.fixture()
 def bridge(source) -> Bridge:
     live_bridge = Bridge()
-    live_bridge.register_query_source(source)
+    live_bridge.register_query_source(
+        source.knowledge(), source.title(), source.presets(), source.unlisted_presets()
+    )
     return live_bridge
 
 
@@ -248,7 +259,10 @@ class TestAskedQuestions:
 
     def test_a_source_writing_none_out_is_matched_against_its_buttons(self):
         live_bridge = Bridge()
-        live_bridge.register_query_source(CurrentStateOnlySource())
+        source = CurrentStateOnlySource()
+        live_bridge.register_query_source(
+            source.knowledge(), source.title(), source.presets()
+        )
 
         assert not live_bridge.match_question("give me all beta samples").matched
 
@@ -286,7 +300,10 @@ class TestQueryingByScope:
 
     def test_a_scope_the_source_does_not_offer_is_refused(self):
         live_bridge = Bridge()
-        live_bridge.register_query_source(CurrentStateOnlySource())
+        source = CurrentStateOnlySource()
+        live_bridge.register_query_source(
+            source.knowledge(), source.title(), source.presets()
+        )
 
         with pytest.raises(UnknownQueryScope):
             live_bridge.run_query("an(entity(record))", QueryScope.EPISODIC_MEMORY)

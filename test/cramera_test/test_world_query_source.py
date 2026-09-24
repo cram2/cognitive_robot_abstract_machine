@@ -1,28 +1,26 @@
 """
-World query domains expose native entities and follow semantic model changes.
+Native world access, collection presets and query result identity.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import pytest
 
+from krrood.entity_query_language.factories import an, entity, flat_variable, variable
 from cramera.knowledge.presets import Preset
 from cramera.knowledge.query_runner import EqlQueryRunner, RowRenderer
 from cramera.knowledge.queryable_knowledge import QueryScope
-from cramera.live.world_query import WorldQueryLabel, WorldQueryName, WorldQuerySource
+from cramera.live.bridge import Bridge
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from semantic_digital_twin.semantic_annotations.mixins import HasSupportingSurface
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Table,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
-from semantic_digital_twin.world_description.world_entity import (
-    Body,
-    SemanticAnnotation,
-)
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 # %% native world fixtures
@@ -46,205 +44,158 @@ def annotated_robot_world(pr2_world_copy: World) -> World:
     return pr2_world_copy
 
 
-# %% empty and robotless worlds
-def test_empty_world_exposes_only_native_current_state_domains(
+# %% complete native world access
+def test_world_queries_expose_the_native_world_without_copied_domains(
     world_with_two_bodies: tuple[World, Body, Body],
 ) -> None:
     """
-    An empty scene exposes each native domain without fabricated entities.
+    An attached world is exposed directly without a catalog of duplicate domains.
 
-    :param world_with_two_bodies: An empty world and two bodies not yet added to it.
+    :param world_with_two_bodies: The empty native world being queried.
     """
     world, _, _ = world_with_two_bodies
-    source = WorldQuerySource(world)
+    bridge = Bridge()
+    bridge.attach(world)
 
-    [knowledge] = source.knowledge()
+    vocabulary = bridge.query_vocabulary()
 
-    assert knowledge.scope is QueryScope.CURRENT_STATE
-    assert {domain.name: domain.entity_type for domain in knowledge.domains} == {
-        WorldQueryName.BODY: Body,
-        WorldQueryName.ANNOTATION: SemanticAnnotation,
-        WorldQueryName.HANDLE: Handle,
-        WorldQueryName.SURFACE: HasSupportingSurface,
-        WorldQueryName.ROBOT: AbstractRobot,
-        WorldQueryName.ARM: Arm,
-    }
-    assert all(domain.objects == [] for domain in knowledge.domains)
-    assert knowledge.extra_names == {}
+    assert vocabulary.domains == []
+    assert vocabulary.extra_names == {World.__name__.lower(): world}
+    assert vocabulary.extra_names[World.__name__.lower()] is world
+    assert bridge.query_scopes() == [QueryScope.CURRENT_STATE]
 
 
-@pytest.mark.parametrize("domain_name", list(WorldQueryName))
-def test_each_empty_world_preset_returns_an_empty_answer(
-    world_with_two_bodies: tuple[World, Body, Body], domain_name: WorldQueryName
-) -> None:
-    """
-    Presets over empty native domains return successful answers with no rows.
-
-    :param world_with_two_bodies: An empty world and two bodies not yet added to it.
-    :param domain_name: The domain whose preset is executed.
-    """
-    world, _, _ = world_with_two_bodies
-    source = WorldQuerySource(world)
-    [knowledge] = source.knowledge()
-    index = [domain.name for domain in knowledge.domains].index(domain_name)
-    preset = source.presets()[index]
-
-    result = EqlQueryRunner(knowledge.domains).run(preset.code)
-
-    assert result.ok
-    assert result.rows == []
-    assert result.count == 0
-
-
-def test_robotless_world_keeps_bodies_and_semantic_annotations_queryable(
-    world_with_two_bodies: tuple[World, Body, Body],
-) -> None:
-    """
-    Scene bodies and annotations remain available without robot annotations.
-
-    :param world_with_two_bodies: The world and bodies forming a table with a handle.
-    """
-    world, parent, child = world_with_two_bodies
-    handle = Handle(root=child)
-    table = Table(root=parent)
-    with world.modify_world():
-        world.add_connection(FixedConnection(parent=parent, child=child))
-        world.add_semantic_annotations([handle, table])
-
-    [knowledge] = WorldQuerySource(world).knowledge()
-    domains = {domain.name: domain.objects for domain in knowledge.domains}
-
-    assert domains[WorldQueryName.BODY] == world.bodies
-    assert domains[WorldQueryName.HANDLE] == [handle]
-    assert domains[WorldQueryName.SURFACE] == [table]
-    assert domains[WorldQueryName.ROBOT] == []
-    assert domains[WorldQueryName.ARM] == []
-
-
-# %% native identities and executable presets
-def test_domains_preserve_native_robot_and_annotation_instances(
+def test_native_connections_and_degrees_of_freedom_are_queryable(
     annotated_robot_world: World,
 ) -> None:
     """
-    Query domains retain the identities and order of the world's native entities.
+    Queries reach native connections, their relations and degrees of freedom.
 
-    :param annotated_robot_world: The scene containing entities for every query domain.
+    :param annotated_robot_world: The robot whose complete model is queried.
     """
-    [knowledge] = WorldQuerySource(annotated_robot_world).knowledge()
+    bridge = Bridge()
+    bridge.attach(annotated_robot_world)
+    world = bridge.query_vocabulary().extra_names[World.__name__.lower()]
+    world_variable = variable(World, domain=[world])
+    connection = flat_variable(world_variable.connections)
+    degree_of_freedom = flat_variable(world_variable.degrees_of_freedom)
 
-    for domain in knowledge.domains:
-        expected = (
-            annotated_robot_world.bodies
-            if domain.entity_type is Body
-            else annotated_robot_world.get_semantic_annotations_by_type(
-                domain.entity_type
-            )
-        )
-        assert len(domain.objects) == len(expected)
-        assert all(
-            actual is original for actual, original in zip(domain.objects, expected)
-        )
+    connections = bridge.run_query(an(entity(connection)))
+    parents = bridge.run_query(an(entity(connection.parent)))
+    degrees = bridge.run_query(an(entity(degree_of_freedom)))
 
-
-@pytest.mark.parametrize("domain_name", list(WorldQueryName))
-def test_each_annotated_world_preset_returns_its_native_entities(
-    annotated_robot_world: World, domain_name: WorldQueryName
-) -> None:
-    """
-    Each preset renders exactly the entities in its corresponding native domain.
-
-    :param annotated_robot_world: The scene containing entities for every query domain.
-    :param domain_name: The populated domain whose preset is executed.
-    """
-    source = WorldQuerySource(annotated_robot_world)
-    [knowledge] = source.knowledge()
-    index = [domain.name for domain in knowledge.domains].index(domain_name)
-    domain = knowledge.domains[index]
-    preset = source.presets()[index]
-
-    result = EqlQueryRunner(knowledge.domains).run(
-        preset.code, limit=len(domain.objects)
-    )
-
-    assert result.ok
-    assert domain.objects
-    assert result.count == len(domain.objects)
-    assert {row["__entity__"] for row in result.rows} == {
-        str(entity.name) for entity in domain.objects
-    }
-
-
-def test_presets_offer_each_domain_with_its_own_label(
-    world_with_two_bodies: tuple[World, Body, Body],
-) -> None:
-    """
-    Named presets cover each domain and consistently select current world state.
-
-    :param world_with_two_bodies: The empty scene used to inspect preset metadata.
-    """
-    world, _, _ = world_with_two_bodies
-    source = WorldQuerySource(world)
-
-    assert source.title() == WorldQueryLabel.TITLE
-    assert [preset.text for preset in source.presets()] == [
-        WorldQueryLabel.BODIES,
-        WorldQueryLabel.ANNOTATIONS,
-        WorldQueryLabel.HANDLES,
-        WorldQueryLabel.SURFACES,
-        WorldQueryLabel.ROBOTS,
-        WorldQueryLabel.ARMS,
+    assert [row["__entity__"] for row in connections.rows] == [
+        str(value.name) for value in world.connections
     ]
-    assert all(preset.scope is QueryScope.CURRENT_STATE for preset in source.presets())
-    assert source.unlisted_presets() == []
+    assert [row["__entity__"] for row in parents.rows] == [
+        str(value.parent.name) for value in world.connections
+    ]
+    assert [row["__entity__"] for row in degrees.rows] == [
+        str(value.name) for value in world.degrees_of_freedom
+    ]
 
 
-# %% model changes and shared locking
-def test_domains_follow_body_and_annotation_additions_and_removals(
+@dataclass(eq=False)
+class TaggedHandle(Handle):
+    """
+    A custom semantic annotation carrying domain-specific inspection information.
+    """
+
+    inspection_tag: str = ""
+    """
+    The inspection information attached to this handle.
+    """
+
+
+def test_custom_annotation_properties_remain_queryable_without_registration(
     world_with_two_bodies: tuple[World, Body, Body],
 ) -> None:
     """
-    Fresh domains reflect model edits while previously returned domains stay intact.
+    Custom semantic fields remain accessible without a predefined entity domain.
 
-    :param world_with_two_bodies: The scene and bodies added before removing a handle.
+    :param world_with_two_bodies: The world and bodies receiving a custom annotation.
     """
     world, parent, child = world_with_two_bodies
-    source = WorldQuerySource(world)
-    [initial] = source.knowledge()
+    handle = TaggedHandle(root=child, inspection_tag="inspection pending")
+    with world.modify_world():
+        world.add_connection(FixedConnection(parent=parent, child=child))
+        world.add_semantic_annotation(handle)
+    bridge = Bridge()
+    bridge.attach(world)
+    annotation = flat_variable(variable(World, domain=[world]).semantic_annotations)
+
+    answer = bridge.run_query(an(entity(annotation.inspection_tag)))
+
+    assert answer.rows == [{"value": handle.inspection_tag}]
+    assert bridge.query_vocabulary().extra_names[
+        World.__name__.lower()
+    ].semantic_annotations == [handle]
+
+
+# %% current native state
+def test_queries_follow_body_and_annotation_additions_and_removals(
+    world_with_two_bodies: tuple[World, Body, Body],
+) -> None:
+    """
+    Native world queries observe later model changes without rebuilding domains.
+
+    :param world_with_two_bodies: The world and bodies added before removing a handle.
+    """
+    world, parent, child = world_with_two_bodies
+    bridge = Bridge()
+    bridge.attach(world)
+    native_world = variable(World, domain=[world])
+    bodies = an(entity(flat_variable(native_world.bodies)))
+    annotations = an(entity(flat_variable(native_world.semantic_annotations)))
+
+    assert bridge.run_query(bodies).rows == []
+    assert bridge.run_query(annotations).rows == []
     with world.modify_world():
         world.add_connection(FixedConnection(parent=parent, child=child))
         handle = Handle(root=child)
         world.add_semantic_annotation(handle)
 
-    [added] = source.knowledge()
-    added_domains = {domain.name: domain.objects for domain in added.domains}
-
-    assert added_domains[WorldQueryName.BODY] == world.bodies
-    assert added_domains[WorldQueryName.HANDLE] == [handle]
-    assert all(domain.objects == [] for domain in initial.domains)
-
+    assert [row["__entity__"] for row in bridge.run_query(bodies).rows] == [
+        str(value.name) for value in world.bodies
+    ]
+    assert [row["__entity__"] for row in bridge.run_query(annotations).rows] == [
+        str(handle.name)
+    ]
     with world.modify_world():
         world.remove_semantic_annotation(handle)
         world.remove_kinematic_structure_entity(child)
 
-    [removed] = source.knowledge()
-    removed_domains = {domain.name: domain.objects for domain in removed.domains}
-
-    assert removed_domains[WorldQueryName.BODY] == [parent]
-    assert removed_domains[WorldQueryName.HANDLE] == []
-    assert removed_domains[WorldQueryName.ANNOTATION] == []
+    assert [row["__entity__"] for row in bridge.run_query(bodies).rows] == [
+        str(parent.name)
+    ]
+    assert bridge.run_query(annotations).rows == []
 
 
-def test_read_scope_uses_the_native_world_lock(
+# %% preset discovery
+def test_preset_discovery_does_not_evaluate_world_properties(
     world_with_two_bodies: tuple[World, Body, Body],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    Query reads share the exact lock used for native world updates.
+    Preset discovery uses collection annotations without invoking property getters.
 
-    :param world_with_two_bodies: The scene providing the native synchronization lock.
+    :param world_with_two_bodies: The world whose body property becomes unreadable.
+    :param monkeypatch: Replaces a collection getter with an explicit failure.
     """
     world, _, _ = world_with_two_bodies
 
-    assert WorldQuerySource(world).read_scope() is world.state.world_lock
+    def fail_read(world: World) -> list[Body]:
+        """
+        Reject any attempt to evaluate the body collection.
+
+        :param world: The world whose collection must remain unread.
+        :raises AssertionError: Always, when preset discovery reads the property.
+        """
+        raise AssertionError("preset discovery read a world property")
+
+    monkeypatch.setattr(World, "bodies", property(fail_read))
+
+    assert Preset.of_world(world, World.__name__.lower())
 
 
 def test_native_world_entities_keep_names_without_declared_domains(

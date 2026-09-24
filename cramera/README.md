@@ -38,12 +38,15 @@ The scene supports orbit, pan, zoom, robot following and click-to-inspect. The g
 panel displays the plan, statecharts, robot kinematics and transforms. EQL results
 can highlight entities in the scene and replay a recorded time interval.
 
-Attaching a world automatically enables **Live world** queries in the EQL panel.
-The presets list scene bodies, semantic annotations, handles, supporting surfaces,
-robots and arms. Their variables (`body`, `annotation`, `handle`, `surface`, `robot`,
-`arm`) refer to native semantic digital twin entities and reflect subsequent world
-changes. Missing annotations produce empty results; geometry alone does not imply
-semantic labels. A demo can override these defaults with `register_query_source`.
+Attaching a world automatically enables queries against the native `world` object
+in the EQL panel. All of its attributes and relationships are available, including
+bodies, connections, degrees of freedom, regions and custom semantic annotations.
+Collection presets come from the world's public list fields and properties; their
+labels use native EQL verbalization. Queries reflect subsequent world changes, and
+`world.` completion lists the available members. A demo can register existing
+`QueryableKnowledge` and `Preset` objects with `register_query_source` to supply
+its own scopes, evaluation and queries. Existing bound methods can supply knowledge
+and presets afresh for every request, including newly detected events.
 
 The EQL editor executes trusted local Python statements against the loaded world.
 The Python server listens only on loopback and rejects requests from remote

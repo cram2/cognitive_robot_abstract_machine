@@ -474,17 +474,19 @@ class EqlQueryRunner:
             return None
         return QueryVerbalization.of_expression(expression)
 
-    def run(self, code: str, limit: int = DEFAULT_ROW_LIMIT) -> RenderResult:
+    def run(
+        self, code: str | Evaluable, limit: int = DEFAULT_ROW_LIMIT
+    ) -> RenderResult:
         """
-        Execute an EQL query string and return its rendered result.
+        Evaluate an EQL expression or source string and render its result.
 
         The last expression of ``code`` is the query; preceding statements are executed
         as setup.
 
-        :param code: The EQL query source.
+        :param code: The EQL query source or an already constructed native expression.
         :param limit: Maximum number of result rows to return.
         """
-        result = self.build(code)
+        result = self.build(code) if isinstance(code, str) else code
         verbalization = None
         if isinstance(result, Evaluable):
             # worded before evaluating: building the sentence leaves the expression

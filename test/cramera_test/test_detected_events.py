@@ -3,11 +3,10 @@ Tests for asking a query what segmind detected.
 """
 
 import json
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import replace
+from datetime import datetime, timedelta
 
 import pytest
-from typing_extensions import List
 
 pytest.importorskip("krrood", reason="EQL requires krrood")
 
@@ -46,13 +45,8 @@ from cramera.live.detections import (  # noqa: E402
 )
 from cramera.knowledge.knowledge_base import EpisodeKnowledgeBase  # noqa: E402
 from cramera.knowledge.eql_session import EqlSession  # noqa: E402
-from cramera.knowledge.presets import Preset  # noqa: E402
-from cramera.knowledge.queryable_knowledge import (  # noqa: E402
-    QueryableKnowledge,
-    QueryScope,
-)
+from cramera.knowledge.queryable_knowledge import QueryScope  # noqa: E402
 from cramera.live.bridge import Bridge  # noqa: E402
-from cramera.live.query import LiveQuerySource  # noqa: E402
 
 from .conftest import reset_knowledge_base_cache  # noqa: E402
 from .test_live_bridge import world_with  # noqa: E402
@@ -223,30 +217,6 @@ class TestOfferedQuestions:
 # %% a demo offering its detections to the bridge
 
 
-@dataclass
-class DetectingDemo(LiveQuerySource):
-    """
-    A demo that ticks segmind detectors and offers what they saw alongside nothing else.
-    """
-
-    detections: DetectedEvents
-    """
-    The detections this demo offers to be questioned about.
-    """
-
-    def title(self) -> str:
-        return "detecting demo"
-
-    def knowledge(self) -> List[QueryableKnowledge]:
-        return [self.detections.knowledge()]
-
-    def presets(self) -> List[Preset]:
-        return self.detections.presets()
-
-    def unlisted_presets(self) -> List[Preset]:
-        return self.detections.unlisted_presets()
-
-
 class TestAskingTheBridge:
     @pytest.fixture()
     def bridge(self, detections):
@@ -254,13 +224,38 @@ class TestAskingTheBridge:
         A bridge a detecting demo has registered itself with.
         """
         bridge = Bridge()
+        source = DetectedEvents(detections)
         bridge.register_query_source(
-            DetectingDemo(detections=DetectedEvents(detections))
+            source.knowledge,
+            "detecting demo",
+            source.presets,
+            source.unlisted_presets,
         )
         return bridge
 
     def test_the_bridge_offers_the_detected_events_scope(self, bridge):
         assert bridge.query_scopes() == [QueryScope.DETECTED_EVENTS]
+
+    def test_new_events_are_read_after_registration(
+        self, bridge: Bridge, detections: EventLogger
+    ) -> None:
+        """
+        Registered detection queries include events arriving after registration.
+
+        :param bridge: The bridge querying the registered detection knowledge.
+        :param detections: The logger receiving another detection after the first query.
+        """
+        preset = bridge.query_presets()[0]
+        before = bridge.run_query(preset.code, preset.scope)
+        latest = detections.timeline[-1]
+        with detections.timeline_lock:
+            detections.timeline.append(
+                replace(latest, timestamp=latest.timestamp + timedelta(seconds=1))
+            )
+
+        after = bridge.run_query(preset.code, preset.scope)
+
+        assert after.count == before.count + 1
 
     def test_a_query_of_that_scope_is_answered_from_the_detections(self, bridge):
         answered = bridge.run_query(

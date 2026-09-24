@@ -1,27 +1,26 @@
-"""Live world queries preserve source selection, locking and attachment ownership."""
+"""
+Live world queries preserve source selection, locking and attachment ownership.
+"""
 
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
-from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
 import pytest
 from typing_extensions import TYPE_CHECKING
 
-from krrood.entity_query_language.factories import an, entity, variable
-from cramera.knowledge.query_runner import RowRenderer
-from cramera.knowledge.queryable_knowledge import QueryScope
+from krrood.entity_query_language.factories import an, entity, flat_variable, variable
+from cramera.knowledge.presets import Preset
+from cramera.knowledge.query_runner import EqlQueryRunner, RowRenderer
+from cramera.knowledge.queryable_knowledge import QueryScope, QueryableKnowledge
 from cramera.live import visualization as visualization_module
 from cramera.live.bridge import Bridge
 from cramera.live.query import NoQuerySourceRegistered
 from cramera.live.visualization import LiveVisualization
-from cramera.live.world_query import WorldQuerySource
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import Body
 
 from .test_live_http import bridge, get_json, post, server
 from .test_live_query import CurrentStateOnlySource, GrowingRecordSource
@@ -30,46 +29,48 @@ from .test_live_visualization import ServerRecorder, world
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing_extensions import Any
-    from cramera.knowledge.presets import Preset
 
 
 # %% source selection
 class ResponseField(StrEnum):
-    """Response fields describing live query availability and execution."""
+    """
+    Response fields describing live query availability and execution.
+    """
 
     QUERY = "query"
-    """Whether the bridge can answer live queries."""
+    """
+    Whether the bridge can answer live queries.
+    """
+
     PRESETS = "presets"
-    """Queries offered by the selected source."""
+    """
+    Queries offered by the selected source.
+    """
+
     CODE = "code"
-    """The executable expression submitted for a query."""
+    """
+    The executable expression submitted for a query.
+    """
+
     SCOPE = "scope"
-    """The body of knowledge selected for an expression."""
+    """
+    The body of knowledge selected for an expression.
+    """
+
     OK = "ok"
-    """Whether the request completed successfully."""
-
-
-@dataclass
-class CountsReads(CurrentStateOnlySource):
-    """A query source recording how many operations enter its read scope."""
-
-    reads: int = 0
     """
-    Number of operations that entered this source's read scope.
+    Whether the request completed successfully.
     """
-
-    @contextmanager
-    def read_scope(self) -> Iterator[None]:
-        """Count the operation entering the source's read boundary."""
-        self.reads += 1
-        yield
 
 
 class TestAutomaticWorldQueries:
-    """World attachments supply defaults while explicit sources retain precedence."""
+    """
+    World attachments supply defaults while explicit sources retain precedence.
+    """
 
     def test_attach_enables_current_state_queries(self, world: World) -> None:
-        """Attaching a world enables queries without registering an explicit source.
+        """
+        Attaching a world enables queries without registering an explicit source.
 
         :param world: The robotless scene attached to the bridge.
         """
@@ -78,10 +79,11 @@ class TestAutomaticWorldQueries:
 
         assert bridge.status()[ResponseField.QUERY] is True
         assert bridge.query_scopes() == [QueryScope.CURRENT_STATE]
-        assert bridge.query_source is None
+        assert bridge.query_knowledge is None
 
     def test_every_default_preset_runs_without_a_robot(self, world: World) -> None:
-        """Robotless scenes support execution and wording of every default preset.
+        """
+        Robotless scenes support execution and wording of every default preset.
 
         :param world: The scene supplying the default query domains.
         """
@@ -98,24 +100,29 @@ class TestAutomaticWorldQueries:
             assert bridge.match_question(preset.text).preset == preset
 
     def test_reattach_replaces_default_domains(self, world: World) -> None:
-        """A new attachment replaces the bodies exposed by automatic queries.
+        """
+        A new attachment replaces the bodies exposed by automatic queries.
 
         :param world: The populated scene attached before an empty replacement.
         """
         bridge = Bridge()
         bridge.attach(world)
-        first_count = len(bridge.query_vocabulary().domains[0].objects)
+        first = bridge.query_vocabulary().extra_names[World.__name__.lower()]
+        replacement = World()
 
-        bridge.attach(World())
+        bridge.attach(replacement)
 
-        assert first_count == len(world.bodies)
-        assert bridge.query_vocabulary().domains[0].objects == []
+        assert first is world
+        assert (
+            bridge.query_vocabulary().extra_names[World.__name__.lower()] is replacement
+        )
 
     @pytest.mark.parametrize("register_first", [True, False])
     def test_explicit_source_keeps_precedence(
         self, world: World, register_first: bool
     ) -> None:
-        """Explicit sources override default queries regardless of attachment order.
+        """
+        Explicit sources override default queries regardless of attachment order.
 
         :param world: The scene providing automatic queries.
         :param register_first: Whether to register the explicit source before attaching.
@@ -123,10 +130,14 @@ class TestAutomaticWorldQueries:
         source = GrowingRecordSource()
         bridge = Bridge()
         if register_first:
-            bridge.register_query_source(source)
+            bridge.register_query_source(
+                source.knowledge(), source.title(), source.presets()
+            )
         bridge.attach(world)
         if not register_first:
-            bridge.register_query_source(source)
+            bridge.register_query_source(
+                source.knowledge(), source.title(), source.presets()
+            )
 
         bridge.attach(World())
 
@@ -134,69 +145,78 @@ class TestAutomaticWorldQueries:
         assert bridge.query_scopes() == [
             knowledge.scope for knowledge in source.knowledge()
         ]
-        assert bridge.query_source is source
+        assert bridge.query_knowledge == source.knowledge()
 
-    def test_an_operation_keeps_its_source_when_registration_changes(
-        self, world: World, monkeypatch: pytest.MonkeyPatch
+    def test_an_operation_keeps_its_knowledge_when_registration_changes(
+        self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A source replacement affects subsequent operations, not an active request.
-
-        :param world: The scene providing the original query source.
-        :param monkeypatch: Replaces preset retrieval with a source-changing operation.
         """
+        A replacement registration affects subsequent queries, not an active request.
+
+        :param monkeypatch: Registers new knowledge during preset verbalization.
+        """
+        source = GrowingRecordSource()
         bridge = Bridge()
-        bridge.attach(world)
-        source = bridge._registered_query_source()
+        bridge.register_query_source(
+            source.knowledge(), source.title(), source.presets()
+        )
         expected = bridge.query_presets()
-        original_presets = source.presets
+        original_worded = Preset.worded
+        replacement = CurrentStateOnlySource()
 
-        def change_source() -> list[Preset]:
-            """Register a replacement source while returning the original presets."""
-            bridge.register_query_source(CurrentStateOnlySource())
-            return original_presets()
+        def replace_knowledge(preset: Preset, runner: EqlQueryRunner) -> Preset:
+            """
+            Replace future query knowledge while wording the current preset.
 
-        monkeypatch.setattr(source, "presets", change_source)
+            :param preset: The preset selected before registration changes.
+            :param runner: The runner retaining the original query knowledge.
+            :return: The original preset worded by its original scope.
+            """
+            bridge.register_query_source(
+                replacement.knowledge(), replacement.title(), replacement.presets()
+            )
+            return original_worded(preset, runner)
+
+        monkeypatch.setattr(Preset, "worded", replace_knowledge)
 
         assert bridge.query_presets() == expected
-        assert bridge.query_title() == CurrentStateOnlySource().title()
+        assert bridge.query_title() == replacement.title()
 
-    def test_custom_sources_participate_in_read_scopes(self) -> None:
-        """Each bridge query operation enters the explicit source's read scope."""
-        source = CountsReads()
-        bridge = Bridge(query_source=source)
-
-        bridge.query_title()
-        bridge.query_scopes()
-        bridge.query_variables()
-        bridge.query_vocabulary()
-        bridge.query_presets()
-        bridge.match_question(source.title())
-
-        assert source.reads == 6
-
-    def test_explicit_world_source_is_not_replaced(self, world: World) -> None:
-        """A manually registered world source survives a different world attachment.
-
-        :param world: The world retained by the explicit source.
+    def test_explicit_world_knowledge_is_not_replaced(self, world: World) -> None:
         """
-        source = WorldQuerySource(world)
-        bridge = Bridge(query_source=source)
+        Manually registered native world knowledge survives another attachment.
+
+        :param world: The world retained by the explicitly registered knowledge.
+        """
+        name = World.__name__.lower()
+        knowledge = [
+            QueryableKnowledge(
+                QueryScope.CURRENT_STATE, domains=[], extra_names={name: world}
+            )
+        ]
+        bridge = Bridge()
+        bridge.register_query_source(
+            knowledge, type(world).__name__, Preset.of_world(world, name)
+        )
 
         bridge.attach(World())
 
-        assert bridge.query_vocabulary().domains[0].objects == world.bodies
-        assert bridge.query_source is source
+        assert bridge.query_vocabulary().extra_names[name] is world
+        assert bridge.query_knowledge is knowledge
 
     def test_queries_read_current_poses_without_changing_world_versions(
         self, world: World
     ) -> None:
-        """Pose queries observe world changes without modifying model or state versions.
+        """
+        Pose queries observe world changes without modifying model or state versions.
 
         :param world: The scene whose connection pose changes between queries.
         """
-        body = variable(Body, domain=world.bodies)
+        bridge = Bridge()
+        bridge.attach(world)
+        body = flat_variable(variable(World, domain=[world]).bodies)
         query = an(entity(body.global_pose))
-        before = RowRenderer().rows_of(query.evaluate()).rows
+        before = bridge.run_query(query)
         connection = world.connections[0]
         connection.origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=Point3(1.0, 2.0, 3.0, reference_frame=connection.parent)
@@ -204,24 +224,30 @@ class TestAutomaticWorldQueries:
         model_version = world.get_world_model_manager().version
         state_version = world.state.version
 
-        after = RowRenderer().rows_of(query.evaluate()).rows
+        after = bridge.run_query(query)
 
-        assert after != before
+        assert before.ok and after.ok
+        assert after.rows != before.rows
         assert world.get_world_model_manager().version == model_version
         assert world.state.version == state_version
 
 
 # %% concurrent world updates
 class TestWorldQueryLocking:
-    """Query results stay consistent with the locked native world state."""
+    """
+    Query results stay consistent with the locked native world state.
+    """
 
+    @pytest.mark.parametrize("native_expression", [False, True])
     def test_native_world_stays_locked_through_result_rendering(
-        self, world: World, monkeypatch: pytest.MonkeyPatch
+        self, world: World, monkeypatch: pytest.MonkeyPatch, native_expression: bool
     ) -> None:
-        """Rendering holds the world lock against acquisition from another thread.
+        """
+        Rendering holds the world lock against acquisition from another thread.
 
         :param world: The scene whose lock protects the query results.
         :param monkeypatch: Adds a competing lock attempt during result rendering.
+        :param native_expression: Whether the query is supplied as a native expression.
         """
         bridge = Bridge()
         bridge.attach(world)
@@ -229,7 +255,9 @@ class TestWorldQueryLocking:
         competing_reads: list[bool] = []
 
         def try_read() -> bool:
-            """Return whether the world lock can be acquired without waiting."""
+            """
+            Return whether the world lock can be acquired without waiting.
+            """
             acquired = world.state.world_lock.acquire(blocking=False)
             if acquired:
                 world.state.world_lock.release()
@@ -238,7 +266,8 @@ class TestWorldQueryLocking:
         with ThreadPoolExecutor(max_workers=1) as executor:
 
             def render(renderer: RowRenderer, result: Any) -> Any:
-                """Check lock ownership before rendering the query result.
+                """
+                Check lock ownership before rendering the query result.
 
                 :param renderer: The renderer producing response rows.
                 :param result: The evaluated query result to render.
@@ -249,7 +278,12 @@ class TestWorldQueryLocking:
 
             monkeypatch.setattr(RowRenderer, "rows_of", render)
             preset = bridge.query_presets()[0]
-            answer = bridge.run_query(preset.code)
+            query = (
+                an(entity(flat_variable(variable(World, domain=[world]).bodies)))
+                if native_expression
+                else preset.code
+            )
+            answer = bridge.run_query(query)
 
         assert answer.ok
         assert competing_reads == [False]
@@ -260,7 +294,8 @@ class TestWorldQueryLocking:
 def visualization(
     world: World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> Iterator[LiveVisualization]:
-    """Provide a visualization with isolated recordings and a replaceable server.
+    """
+    Provide a visualization with isolated recordings and a replaceable server.
 
     :param world: The scene presented by the visualization.
     :param monkeypatch: Redirects storage and replaces the server with a recorder.
@@ -277,12 +312,15 @@ def visualization(
 
 
 class TestWorldQueryLifetime:
-    """Automatic queries follow the lifetime of their owning world attachment."""
+    """
+    Automatic queries follow the lifetime of their owning world attachment.
+    """
 
     def test_stop_releases_default_queries(
         self, visualization: LiveVisualization
     ) -> None:
-        """Stopping the owning visualization removes its automatic query source.
+        """
+        Stopping the owning visualization removes its automatic query source.
 
         :param visualization: The visualization acquiring the default queries.
         """
@@ -294,7 +332,8 @@ class TestWorldQueryLifetime:
             visualization.bridge.query_presets()
 
     def test_restart_restores_queries(self, visualization: LiveVisualization) -> None:
-        """Restarting a stopped visualization restores automatic query availability.
+        """
+        Restarting a stopped visualization restores automatic query availability.
 
         :param visualization: The visualization stopped and started again.
         """
@@ -307,12 +346,15 @@ class TestWorldQueryLifetime:
     def test_stop_preserves_explicit_source(
         self, visualization: LiveVisualization
     ) -> None:
-        """Stopping a visualization leaves an explicitly registered source available.
+        """
+        Stopping a visualization leaves an explicitly registered source available.
 
         :param visualization: The visualization whose bridge receives a custom source.
         """
         source = CurrentStateOnlySource()
-        visualization.bridge.register_query_source(source)
+        visualization.bridge.register_query_source(
+            source.knowledge(), source.title(), source.presets()
+        )
         visualization.start()
         visualization.stop()
 
@@ -321,9 +363,11 @@ class TestWorldQueryLifetime:
     def test_stop_preserves_a_newer_world_attachment(
         self, visualization: LiveVisualization
     ) -> None:
-        """Cleanup of an older attachment does not remove a newer attachment's queries.
+        """
+        Cleanup of an older attachment does not remove a newer attachment's queries.
 
-        :param visualization: The visualization whose bridge is reattached after startup.
+        :param visualization: The visualization whose bridge is reattached after
+            startup.
         """
         visualization.start()
         visualization.bridge.attach(visualization.world)
@@ -331,17 +375,34 @@ class TestWorldQueryLifetime:
 
         assert visualization.bridge.status()[ResponseField.QUERY] is True
 
+    def test_model_updates_do_not_change_query_ownership(
+        self, visualization: LiveVisualization
+    ) -> None:
+        """
+        Model updates leave cleanup ownership with the original attachment.
+
+        :param visualization: The session whose model revision advances before stopping.
+        """
+        visualization.start()
+        visualization.bridge.observe_model_change()
+
+        visualization.stop()
+
+        assert visualization.bridge.status()[ResponseField.QUERY] is False
+
     def test_failed_start_releases_default_queries(
         self, visualization: LiveVisualization, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Failure to start the server releases automatic queries acquired earlier.
+        """
+        Failure to start the server releases automatic queries acquired earlier.
 
         :param visualization: The visualization whose server startup fails.
         :param monkeypatch: Replaces server startup with a failing implementation.
         """
 
         def fail_start(bridge: Bridge, port: int) -> None:
-            """Reject server startup after the world has been attached.
+            """
+            Reject server startup after the world has been attached.
 
             :param bridge: The bridge offered for serving.
             :param port: The requested listening port.
@@ -359,15 +420,18 @@ class TestWorldQueryLifetime:
     def test_failed_finalization_still_releases_default_queries(
         self, visualization: LiveVisualization, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Recording finalization errors cannot retain the automatic query source.
+        """
+        Recording finalization errors cannot retain the automatic query source.
 
         :param visualization: The visualization whose recording cannot be finalized.
-        :param monkeypatch: Replaces recording finalization with a failing implementation.
+        :param monkeypatch: Replaces recording finalization with a failing
+            implementation.
         """
         visualization.start()
 
         def fail_finalize(bridge: Bridge, recording: Any) -> None:
-            """Reject finalization of an otherwise active recording.
+            """
+            Reject finalization of an otherwise active recording.
 
             :param bridge: The bridge holding the recording.
             :param recording: The capture offered for finalization.
@@ -385,12 +449,34 @@ class TestWorldQueryLifetime:
 
 # %% browser endpoint contract
 class TestWorldQueriesOverHttp:
-    """Automatic world queries use the existing preset and query endpoints."""
+    """
+    Automatic world queries use the existing preset and query endpoints.
+    """
+
+    def test_native_world_members_are_available_over_http(
+        self, world: World, bridge: Bridge, server: str
+    ) -> None:
+        """
+        The world value offers its native members through the completion endpoint.
+
+        :param world: The native world exposed to the query editor.
+        :param bridge: The bridge served by the local endpoint.
+        :param server: The base URL for query completion requests.
+        """
+        bridge.attach(world)
+
+        payload = get_json(server + "/members?name=" + World.__name__.lower())
+
+        assert payload[ResponseField.OK] is True
+        assert World.bodies.fget.__name__ in {
+            member["name"] for member in payload["members"]
+        }
 
     def test_presets_execute_over_the_existing_endpoint(
         self, world: World, bridge: Bridge, server: str
     ) -> None:
-        """Every advertised world preset executes successfully over HTTP.
+        """
+        Every advertised world preset executes successfully over HTTP.
 
         :param world: The scene supplying automatic presets.
         :param bridge: The bridge served by the local endpoint.
