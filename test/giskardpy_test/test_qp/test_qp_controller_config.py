@@ -7,14 +7,38 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.qp.exceptions import BrakingTimeExceedsHorizonError
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
-from giskardpy.qp.qp_controller_config import (
-    MINIMUM_PREDICTION_HORIZON,
-    NUMBER_OF_RESTING_STEPS,
-    QPControllerConfig,
-)
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world import World
 
 CONTROL_FREQUENCIES = [20, 50, 100]
+
+# %% step counts derived from the highest optimized derivative
+
+
+@pytest.mark.parametrize(
+    "max_derivative, number_of_resting_steps",
+    [(Derivatives.jerk, 2), (Derivatives.acceleration, 1)],
+)
+def test_resting_steps_follow_the_highest_optimized_derivative(
+    max_derivative, number_of_resting_steps
+):
+    config = QPControllerConfig(target_frequency=20, max_derivative=max_derivative)
+
+    assert config.number_of_resting_steps == number_of_resting_steps
+
+
+@pytest.mark.parametrize(
+    "max_derivative, minimum_prediction_horizon",
+    [(Derivatives.jerk, 4), (Derivatives.acceleration, 3)],
+)
+def test_minimum_prediction_horizon_follows_the_highest_optimized_derivative(
+    max_derivative, minimum_prediction_horizon
+):
+    config = QPControllerConfig(target_frequency=20, max_derivative=max_derivative)
+
+    assert config.minimum_prediction_horizon == minimum_prediction_horizon
+
 
 # %% prediction horizon
 
@@ -26,7 +50,7 @@ def test_derived_prediction_horizon_covers_braking_and_resting_steps(
     config = QPControllerConfig(target_frequency=target_frequency)
 
     assert config.prediction_horizon == (
-        config.number_of_braking_steps + NUMBER_OF_RESTING_STEPS
+        config.number_of_braking_steps + config.number_of_resting_steps
     )
 
 
@@ -51,10 +75,10 @@ def test_derived_prediction_horizon_is_at_least_the_minimum():
     )
 
     assert (
-        config.number_of_braking_steps + NUMBER_OF_RESTING_STEPS
-        < MINIMUM_PREDICTION_HORIZON
+        config.number_of_braking_steps + config.number_of_resting_steps
+        < config.minimum_prediction_horizon
     )
-    assert config.prediction_horizon == MINIMUM_PREDICTION_HORIZON
+    assert config.prediction_horizon == config.minimum_prediction_horizon
 
 
 def test_explicit_prediction_horizon_longer_than_the_braking_is_kept():
@@ -72,11 +96,14 @@ def test_explicit_prediction_horizon_longer_than_the_braking_is_kept():
 def test_explicit_prediction_horizon_too_short_for_the_braking_raises():
     target_frequency = 100
     braking_time = 0.3
+    number_of_resting_steps = QPControllerConfig(
+        target_frequency=target_frequency, braking_time=braking_time
+    ).number_of_resting_steps
     minimum_prediction_horizon = (
         JerkLimitedBraking.number_of_steps_for_braking_time(
             braking_time=braking_time, time_step=1 / target_frequency
         )
-        + NUMBER_OF_RESTING_STEPS
+        + number_of_resting_steps
     )
 
     with pytest.raises(BrakingTimeExceedsHorizonError) as error:

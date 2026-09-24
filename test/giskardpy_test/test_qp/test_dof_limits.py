@@ -20,10 +20,7 @@ from giskardpy.qp.dof_limits import (
 from giskardpy.qp.exceptions import DegreeOfFreedomBrakingExceedsHorizonError
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.pos_in_vel_limits import BrakingProfile
-from giskardpy.qp.qp_controller_config import (
-    NUMBER_OF_RESTING_STEPS,
-    QPControllerConfig,
-)
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap, Derivatives
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -150,6 +147,25 @@ def test_resolve_limits_without_position_limits(prismatic_world_no_position_limi
     assert limits.upper.position is None
 
 
+# %% jerk relaxation
+
+
+@pytest.mark.parametrize(
+    "max_derivative, number_of_jerk_relaxed_steps",
+    [(Derivatives.jerk, 3), (Derivatives.acceleration, 2)],
+)
+def test_jerk_relaxed_steps_follow_the_highest_optimized_derivative(
+    max_derivative, number_of_jerk_relaxed_steps
+):
+    profiler = DegreeOfFreedomLimitProfiler(
+        QPControllerConfig(
+            target_frequency=TARGET_FREQUENCY, max_derivative=max_derivative
+        )
+    )
+
+    assert profiler.number_of_jerk_relaxed_steps == number_of_jerk_relaxed_steps
+
+
 # %% jerk limit from the braking time
 
 
@@ -198,7 +214,7 @@ def test_braking_that_does_not_fit_the_horizon_raises(
         ).direct_limits()
 
     assert error.value.minimum_prediction_horizon == (
-        braking.number_of_steps + NUMBER_OF_RESTING_STEPS
+        braking.number_of_steps + config.number_of_resting_steps
     )
 
 
@@ -253,9 +269,12 @@ def _peak_acceleration_moving_to(
         jerk_limit=acceleration_limit**2 / (2 * velocity_limit),
         time_step=1 / TARGET_FREQUENCY,
     )
+    number_of_resting_steps = QPControllerConfig(
+        target_frequency=TARGET_FREQUENCY
+    ).number_of_resting_steps
     config = QPControllerConfig(
         target_frequency=TARGET_FREQUENCY,
-        prediction_horizon=braking.number_of_steps + NUMBER_OF_RESTING_STEPS,
+        prediction_horizon=braking.number_of_steps + number_of_resting_steps,
     )
     connection.position = 0.0
     world.state[degree_of_freedom.id].velocity = initial_velocity

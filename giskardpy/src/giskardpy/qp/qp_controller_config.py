@@ -20,18 +20,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-NUMBER_OF_RESTING_STEPS = 2
-"""
-Number of final prediction horizon steps whose velocity is fixed at zero, so that every
-plan ends at rest.
-"""
-
-MINIMUM_PREDICTION_HORIZON = 4
-"""
-Shortest prediction horizon, in time steps, that can integrate jerk into the QP
-formulation.
-"""
-
 
 @dataclass
 class QPControllerConfig:
@@ -72,9 +60,9 @@ class QPControllerConfig:
     Time, in seconds, a degree of freedom without a jerk limit of its own takes to brake
     from its velocity limit to rest.
 
-    It sets that degree of freedom's jerk limit to ``4 * velocity_limit / braking_time**2``,
-    independent of the control frequency. Increasing it makes the motion smoother and
-    less aggressive, and lengthens the derived prediction horizon.
+    It sets that degree of freedom's jerk limit to ``4 * velocity_limit /
+    braking_time**2``, independent of the control frequency. Increasing it makes the
+    motion smoother and less aggressive, and lengthens the derived prediction horizon.
     """
 
     prediction_horizon: int | None = field(default=None)
@@ -87,7 +75,7 @@ class QPControllerConfig:
 
     .. note:: Larger values increase the computational cost of the controller and slow
         down tracking of moving goals.
-    .. warning:: Minimum value is :data:`MINIMUM_PREDICTION_HORIZON`.
+    .. warning:: Minimum value is :attr:`minimum_prediction_horizon`.
     """
 
     dof_weights: Dict[PrefixedName, DerivativeMap[float]] = field(
@@ -137,21 +125,21 @@ class QPControllerConfig:
                 f"Hertz ({self.target_frequency}) is below 20Hz. This might cause instability."
             )
 
-        minimum_prediction_horizon = (
-            self.number_of_braking_steps + NUMBER_OF_RESTING_STEPS
+        braking_prediction_horizon = (
+            self.number_of_braking_steps + self.number_of_resting_steps
         )
         if self.prediction_horizon is None:
             self.prediction_horizon = max(
-                minimum_prediction_horizon, MINIMUM_PREDICTION_HORIZON
+                braking_prediction_horizon, self.minimum_prediction_horizon
             )
-        if self.prediction_horizon < MINIMUM_PREDICTION_HORIZON:
+        if self.prediction_horizon < self.minimum_prediction_horizon:
             raise ValueError(
-                f"prediction horizon must be >= {MINIMUM_PREDICTION_HORIZON}."
+                f"prediction horizon must be >= {self.minimum_prediction_horizon}."
             )
-        if self.prediction_horizon < minimum_prediction_horizon:
+        if self.prediction_horizon < braking_prediction_horizon:
             raise BrakingTimeExceedsHorizonError(
                 prediction_horizon=self.prediction_horizon,
-                minimum_prediction_horizon=minimum_prediction_horizon,
+                minimum_prediction_horizon=braking_prediction_horizon,
                 braking_time=self.braking_time,
                 time_step=self.control_dt,
             )
@@ -170,12 +158,31 @@ class QPControllerConfig:
     @property
     def number_of_braking_steps(self) -> int:
         """
-        Number of time steps a degree of freedom without a jerk limit of its own needs to
-        brake from its velocity limit to rest.
+        Number of time steps a degree of freedom without a jerk limit of its own needs
+        to brake from its velocity limit to rest.
         """
         return JerkLimitedBraking.number_of_steps_for_braking_time(
             braking_time=self.braking_time, time_step=self.control_dt
         )
+
+    @property
+    def number_of_resting_steps(self) -> int:
+        """
+        Number of final prediction horizon steps whose velocity is fixed at zero, so
+        that every plan ends at rest.
+
+        One step is needed per derivative above velocity that the QP optimizes: two when
+        :attr:`max_derivative` is jerk, one when it is acceleration.
+        """
+        return self.max_derivative - Derivatives.velocity
+
+    @property
+    def minimum_prediction_horizon(self) -> int:
+        """
+        Shortest prediction horizon, in time steps, that can integrate
+        :attr:`max_derivative` into the QP formulation: one step more than its order.
+        """
+        return self.max_derivative + 1
 
     @property
     def control_horizon(self) -> int:
@@ -183,7 +190,7 @@ class QPControllerConfig:
         Number of time steps over which commands are applied, fewer than the prediction
         horizon by the final steps that only bring the system to rest.
         """
-        return self.prediction_horizon - NUMBER_OF_RESTING_STEPS
+        return self.prediction_horizon - self.number_of_resting_steps
 
     @classmethod
     def create_with_simulation_defaults(cls):
