@@ -558,7 +558,6 @@ class DegreeOfFreedomLimitProfiler:
 
         :param degree_of_freedom: Degree of freedom whose limits are resolved.
         """
-        qp_controller_config = self.qp_controller_config
         lower_limits = DerivativeMap()
         upper_limits = DerivativeMap()
 
@@ -580,46 +579,46 @@ class DegreeOfFreedomLimitProfiler:
         else:
             upper_limits.acceleration = degree_of_freedom.limits.upper.acceleration
 
-        if degree_of_freedom.limits.upper.jerk is None:
-            upper_limits.jerk = JerkLimitedBraking.from_braking_time(
-                velocity_limit=upper_limits.velocity,
-                braking_time=qp_controller_config.braking_time,
-                time_step=qp_controller_config.model_predictive_control_time_step,
-            ).jerk_limit
-            lower_limits.jerk = -upper_limits.jerk
+        braking = self._braking(degree_of_freedom)
+        upper_limits.jerk = braking.jerk_limit
+        if degree_of_freedom.limits.lower.jerk is None:
+            lower_limits.jerk = -braking.jerk_limit
         else:
-            upper_limits.jerk = degree_of_freedom.limits.upper.jerk
-            lower_limits.jerk = degree_of_freedom.limits.lower.jerk
-
-        if degree_of_freedom.limits.upper.acceleration is not None:
-            acceleration_bounding_jerk_limit = self._acceleration_bounding_jerk_limit(
-                velocity_limit=upper_limits.velocity,
-                acceleration_limit=upper_limits.acceleration,
-            )
-            upper_limits.jerk = min(upper_limits.jerk, acceleration_bounding_jerk_limit)
             lower_limits.jerk = max(
-                lower_limits.jerk, -acceleration_bounding_jerk_limit
+                degree_of_freedom.limits.lower.jerk, -braking.jerk_limit
             )
 
         return lower_limits, upper_limits
 
-    def _acceleration_bounding_jerk_limit(
-        self, velocity_limit: float, acceleration_limit: float
-    ) -> float:
+    def _braking(self, degree_of_freedom: DegreeOfFreedom) -> JerkLimitedBraking:
         """
-        Returns the largest jerk limit that keeps the acceleration within its limit.
-
-        The QP bounds only the jerk. Starting and ending at zero acceleration, a jerk
-        limit J changes the velocity by at most 2 * velocity_limit, from one velocity
-        limit to the other, with an acceleration of at most sqrt(2 * velocity_limit * J).
+        Returns the braking of a degree of freedom from its velocity limit, with its
+        declared jerk limit or, without one, the jerk limit of the configured braking
+        time, lowered to keep a declared acceleration limit.
 
         .. warning:: Relaxing the jerk limit near a position limit can exceed the
             acceleration limit as well.
 
-        :param velocity_limit: Velocity limit of the degree of freedom.
-        :param acceleration_limit: Acceleration limit of the degree of freedom.
+        :param degree_of_freedom: Degree of freedom that brakes.
         """
-        return acceleration_limit**2 / (2 * velocity_limit)
+        velocity_limit = degree_of_freedom.limits.upper.velocity
+        time_step = self.qp_controller_config.model_predictive_control_time_step
+        if degree_of_freedom.limits.upper.jerk is None:
+            braking = JerkLimitedBraking.from_braking_time(
+                velocity_limit=velocity_limit,
+                braking_time=self.qp_controller_config.braking_time,
+                time_step=time_step,
+            )
+        else:
+            braking = JerkLimitedBraking(
+                velocity_limit=velocity_limit,
+                jerk_limit=degree_of_freedom.limits.upper.jerk,
+                time_step=time_step,
+            )
+        acceleration_limit = degree_of_freedom.limits.upper.acceleration
+        if acceleration_limit is None:
+            return braking
+        return braking.limited_to_acceleration(acceleration_limit)
 
     def compute(
         self,
@@ -635,7 +634,7 @@ class DegreeOfFreedomLimitProfiler:
         """
         qp_controller_config = self.qp_controller_config
         lower_limits, upper_limits = self.resolve_limits(degree_of_freedom)
-        self._raise_if_braking_exceeds_horizon(degree_of_freedom, upper_limits)
+        self._raise_if_braking_exceeds_horizon(degree_of_freedom)
         return self.compute_horizon_bounds(
             degree_of_freedom_symbols=degree_of_freedom.variables,
             lower_limits=lower_limits,
@@ -645,22 +644,16 @@ class DegreeOfFreedomLimitProfiler:
         )
 
     def _raise_if_braking_exceeds_horizon(
-        self, degree_of_freedom: DegreeOfFreedom, upper_limits: DerivativeMap[float]
+        self, degree_of_freedom: DegreeOfFreedom
     ) -> None:
         """
         Raises when the degree of freedom needs more steps to brake from its velocity
         limit to rest than the prediction horizon leaves before its resting steps.
 
         :param degree_of_freedom: Degree of freedom whose braking is checked.
-        :param upper_limits: Resolved upper velocity and jerk limits of the degree of
-            freedom.
         """
         qp_controller_config = self.qp_controller_config
-        braking = JerkLimitedBraking(
-            velocity_limit=upper_limits.velocity,
-            jerk_limit=upper_limits.jerk,
-            time_step=qp_controller_config.model_predictive_control_time_step,
-        )
+        braking = self._braking(degree_of_freedom)
         if braking.number_of_steps <= qp_controller_config.control_horizon:
             return
         raise DegreeOfFreedomBrakingExceedsHorizonError(
@@ -668,8 +661,8 @@ class DegreeOfFreedomLimitProfiler:
             minimum_prediction_horizon=braking.number_of_steps
             + NUMBER_OF_RESTING_STEPS,
             degree_of_freedom_name=str(degree_of_freedom.name),
-            velocity_limit=upper_limits.velocity,
-            jerk_limit=upper_limits.jerk,
+            velocity_limit=braking.velocity_limit,
+            jerk_limit=braking.jerk_limit,
         )
 
 

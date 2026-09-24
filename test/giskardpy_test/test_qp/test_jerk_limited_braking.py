@@ -139,3 +139,45 @@ def test_braking_time_of_a_whole_number_of_steps_needs_exactly_those_steps(
         )
         == number_of_steps
     )
+
+
+# %% acceleration limit
+
+
+def _peak_acceleration_of_a_reversal(braking: JerkLimitedBraking) -> float:
+    """
+    Largest acceleration of a jerk-limited change from one velocity limit to the other,
+    starting and ending with zero acceleration.
+    """
+    return math.sqrt(2 * braking.velocity_limit * braking.jerk_limit)
+
+
+@pytest.mark.parametrize(
+    "velocity_limit, time_step", list(product(VELOCITY_LIMITS, TIME_STEPS))
+)
+def test_acceleration_limit_lowers_a_jerk_limit_that_would_exceed_it(
+    velocity_limit, time_step
+):
+    braking = JerkLimitedBraking(
+        velocity_limit=velocity_limit, jerk_limit=max(JERK_LIMITS), time_step=time_step
+    )
+    acceleration_limit = _peak_acceleration_of_a_reversal(braking) / 2
+
+    limited = braking.limited_to_acceleration(acceleration_limit)
+
+    assert _peak_acceleration_of_a_reversal(limited) == pytest.approx(
+        acceleration_limit
+    )
+    assert limited.velocity_limit == braking.velocity_limit
+    assert limited.time_step == braking.time_step
+
+
+def test_acceleration_limit_keeps_a_jerk_limit_that_stays_within_it():
+    braking = JerkLimitedBraking(
+        velocity_limit=max(VELOCITY_LIMITS),
+        jerk_limit=min(JERK_LIMITS),
+        time_step=max(TIME_STEPS),
+    )
+    acceleration_limit = _peak_acceleration_of_a_reversal(braking) * 2
+
+    assert braking.limited_to_acceleration(acceleration_limit) == braking

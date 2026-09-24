@@ -6,7 +6,7 @@ steps.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 BRAKING_RELATIVE_TOLERANCE = 1e-9
 """
@@ -71,6 +71,25 @@ class JerkLimitedBraking:
         :param time_step: Duration of a single step of the grid.
         """
         return cls._smallest_number_of_steps(braking_time**2 / (4 * time_step**2))
+
+    def limited_to_acceleration(self, acceleration_limit: float) -> JerkLimitedBraking:
+        """
+        Returns this braking with its jerk limit lowered, where needed, so that its
+        acceleration stays within ``acceleration_limit``.
+
+        Starting and ending with zero acceleration, a jerk limit J changes the velocity
+        by at most 2 * velocity_limit, from one velocity limit to the other, with an
+        acceleration of at most sqrt(2 * velocity_limit * J). The acceleration of that
+        largest change, and so of every braking, stays within the limit.
+
+        :param acceleration_limit: Largest acceleration magnitude allowed.
+        """
+        return replace(
+            self,
+            jerk_limit=min(
+                self.jerk_limit, acceleration_limit**2 / (2 * self.velocity_limit)
+            ),
+        )
 
     @property
     def number_of_steps(self) -> int:
