@@ -7,6 +7,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from enum import StrEnum
 from pathlib import Path
+from threading import Event
 
 import pytest
 from typing_extensions import TYPE_CHECKING
@@ -237,6 +238,139 @@ class TestWorldQueryLocking:
     """
     Query results stay consistent with the locked native world state.
     """
+
+    def test_registration_can_change_while_waiting_for_a_world_lock(
+        self, world: World
+    ) -> None:
+        """
+        Waiting queries use one complete replacement configuration without deadlocking.
+
+        :param world: The explicitly registered world held by the competing thread.
+        """
+        name = World.__name__.lower()
+        selected = Event()
+        knowledge = [
+            QueryableKnowledge(
+                QueryScope.CURRENT_STATE, domains=[], extra_names={name: world}
+            )
+        ]
+
+        def current_knowledge() -> list[QueryableKnowledge]:
+            """
+            Signal that the operation selected the original world's knowledge.
+            """
+            selected.set()
+            return knowledge
+
+        bridge = Bridge()
+        bridge.register_query_source(
+            current_knowledge, type(world).__name__, Preset.of_world(world, name)
+        )
+        replacement = CurrentStateOnlySource()
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            with world.state.world_lock:
+                answer = executor.submit(bridge.query_presets)
+                assert selected.wait(timeout=10)
+                registration = executor.submit(
+                    bridge.register_query_source,
+                    replacement.knowledge(),
+                    replacement.title(),
+                    replacement.presets(),
+                )
+                registration.result(timeout=10)
+            presets = answer.result(timeout=10)
+
+        assert presets == bridge.query_presets()
+        assert bridge.query_title() == replacement.title()
+
+    @pytest.mark.parametrize("attach_another_world", [False, True])
+    @pytest.mark.parametrize("knowledge_factory", [False, True])
+    @pytest.mark.parametrize("native_expression", [False, True])
+    def test_explicit_world_stays_locked_through_result_rendering(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        attach_another_world: bool,
+        knowledge_factory: bool,
+        native_expression: bool,
+    ) -> None:
+        """
+        Explicit world queries prevent concurrent state changes during rendering.
+
+        :param world: The world exposed by the registered query knowledge.
+        :param monkeypatch: Attempts a competing state change during rendering.
+        :param attach_another_world: Whether the bridge visualizes an unrelated world.
+        :param knowledge_factory: Whether registered knowledge comes from a factory.
+        :param native_expression: Whether the query is supplied as a native expression.
+        """
+        name = World.__name__.lower()
+        knowledge = [
+            QueryableKnowledge(
+                QueryScope.CURRENT_STATE, domains=[], extra_names={name: world}
+            )
+        ]
+
+        def current_knowledge() -> list[QueryableKnowledge]:
+            """
+            Return the explicit native world knowledge for this operation.
+            """
+            return knowledge
+
+        bridge = Bridge()
+        bridge.register_query_source(
+            current_knowledge if knowledge_factory else knowledge,
+            type(world).__name__,
+            Preset.of_world(world, name),
+        )
+        if attach_another_world:
+            bridge.attach(World())
+        connection = world.connections[0]
+        original_pose = connection.origin.to_np().copy()
+        original_render = RowRenderer.rows_of
+        competing_updates: list[bool] = []
+
+        def try_update() -> bool:
+            """
+            Change the world pose only if its state lock is immediately available.
+            """
+            acquired = world.state.world_lock.acquire(blocking=False)
+            if acquired:
+                try:
+                    connection.origin = (
+                        HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                            point=Point3(
+                                1.0, 2.0, 3.0, reference_frame=connection.parent
+                            )
+                        )
+                    )
+                finally:
+                    world.state.world_lock.release()
+            return acquired
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+
+            def render(renderer: RowRenderer, result: Any) -> Any:
+                """
+                Attempt a competing update before rendering the evaluated result.
+
+                :param renderer: The renderer producing response rows.
+                :param result: The query result awaiting rendering.
+                :return: The rows produced by the original renderer.
+                """
+                competing_updates.append(executor.submit(try_update).result(timeout=10))
+                return original_render(renderer, result)
+
+            monkeypatch.setattr(RowRenderer, "rows_of", render)
+            query = (
+                an(entity(flat_variable(variable(World, domain=[world]).bodies)))
+                if native_expression
+                else bridge.query_presets()[0].code
+            )
+            answer = bridge.run_query(query)
+
+        assert answer.ok
+        assert competing_updates == [False]
+        assert (connection.origin.to_np() == original_pose).all()
 
     @pytest.mark.parametrize("native_expression", [False, True])
     def test_native_world_stays_locked_through_result_rendering(

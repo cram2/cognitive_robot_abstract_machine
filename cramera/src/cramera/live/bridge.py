@@ -6,7 +6,7 @@ import hashlib
 import threading
 import time
 import urllib.parse
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager, ExitStack
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from http.server import ThreadingHTTPServer
@@ -517,6 +517,11 @@ class Bridge:
     Model revision identifying the attachment that owns automatic world queries.
     """
 
+    _query_revision: int = field(default=0, init=False, repr=False)
+    """
+    Registration revision used to keep knowledge and presets from one configuration.
+    """
+
     _query_lock: threading.RLock = field(default_factory=threading.RLock)
     """
     Serializes queries: EQL evaluation is not written to run twice at once, and the
@@ -1002,34 +1007,33 @@ class Bridge:
             self._query_title = title
             self._query_presets = presets
             self._unlisted_query_presets = unlisted_presets or []
+            self._query_revision += 1
         logger.info("live queries answered by '%s'", title)
 
     @contextmanager
     def _query_scope(self) -> Iterator[list[QueryableKnowledge]]:
         """
-        Keep query work serialized and the attached world locked through rendering.
+        Serialize queries and lock their exposed native worlds through rendering.
+
+        World locks are acquired in identity order before the query lock. A changed
+        registration or attachment restarts selection before evaluation begins.
 
         :yield: The knowledge selected for this complete query operation.
         :raises NoQuerySourceRegistered: When no live query source is available.
         """
-        world = self.world if self._query_attachment is not None else None
-        with (
-            world.state.world_lock if world is not None else nullcontext(),
-            self._query_lock,
-        ):
-            if self.query_knowledge is not None:
+        while True:
+            with self._query_lock:
+                source = self.query_knowledge
+                revision = self._query_revision
+                attachment = self._query_attachment
+                world = self.world if attachment is not None else None
+            if source is not None:
+                selected = source() if callable(source) else source
                 knowledge = (
-                    self.query_knowledge()
-                    if callable(self.query_knowledge)
-                    else self.query_knowledge
-                )
-                yield (
-                    [knowledge]
-                    if isinstance(knowledge, QueryableKnowledge)
-                    else knowledge
+                    [selected] if isinstance(selected, QueryableKnowledge) else selected
                 )
             elif world is not None:
-                yield [
+                knowledge = [
                     QueryableKnowledge(
                         scope=QueryScope.CURRENT_STATE,
                         domains=[],
@@ -1038,6 +1042,30 @@ class Bridge:
                 ]
             else:
                 raise NoQuerySourceRegistered()
+            worlds = [
+                value
+                for item in knowledge
+                for value in item.extra_names.values()
+                if isinstance(value, World)
+            ]
+            if world is not None:
+                worlds.append(world)
+            locks = {
+                id(item.state.world_lock): item.state.world_lock for item in worlds
+            }
+            with ExitStack() as stack:
+                for identity in sorted(locks):
+                    stack.enter_context(locks[identity])
+                with self._query_lock:
+                    if (
+                        revision != self._query_revision
+                        or source is not self.query_knowledge
+                        or attachment != self._query_attachment
+                        or (world is not None and world is not self.world)
+                    ):
+                        continue
+                    yield knowledge
+                    return
 
     def query_title(self) -> str:
         """
