@@ -19,6 +19,7 @@ from giskardpy.qp.dof_limits import (
 )
 from giskardpy.qp.exceptions import DegreeOfFreedomBrakingExceedsHorizonError
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
+from giskardpy.qp.pos_in_vel_limits import BrakingProfile
 from giskardpy.qp.qp_controller_config import (
     NUMBER_OF_RESTING_STEPS,
     QPControllerConfig,
@@ -76,22 +77,22 @@ def _directional_bounds_at(
     velocity_limit = (
         min(upper_limits.velocity * time_step, position_range / 2) / time_step
     )
-    mpc_velocity_profile, mpc_acceleration_profile = profiler._nominal_velocity_profile(
+    braking_profile = BrakingProfile.fastest(
         initial_velocity=velocity_limit,
         acceleration_limit=upper_limits.acceleration,
         jerk_limit=upper_limits.jerk,
+        time_step=time_step,
+        prediction_horizon=profiler.prediction_horizon,
     )
     lower_bound = profiler._directional_velocity_bound(
-        velocity_profile=mpc_velocity_profile,
-        acceleration_profile=mpc_acceleration_profile,
+        braking_profile=braking_profile,
         position_error=lower_limits.position - degree_of_freedom.variables.position,
         jerk_limit=upper_limits.jerk,
         velocity_limit=velocity_limit,
         direction=BoundDirection.LOWER,
     )
     upper_bound = profiler._directional_velocity_bound(
-        velocity_profile=mpc_velocity_profile,
-        acceleration_profile=mpc_acceleration_profile,
+        braking_profile=braking_profile,
         position_error=upper_limits.position - degree_of_freedom.variables.position,
         jerk_limit=upper_limits.jerk,
         velocity_limit=velocity_limit,

@@ -12,9 +12,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 import numpy as np
-import numpy.typing as npt
 
-import giskardpy.utils.math as gm
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.exceptions import (
     DegreeOfFreedomBrakingExceedsHorizonError,
@@ -25,11 +23,7 @@ from giskardpy.qp.qp_controller_config import (
     NUMBER_OF_RESTING_STEPS,
     QPControllerConfig,
 )
-from giskardpy.qp.pos_in_vel_limits import (
-    shifted_velocity_profile,
-    compute_immediate_slowdown_profile,
-)
-from giskardpy.qp.solvers.linear_program_solver_highs import LinearProgramSolverHighs
+from giskardpy.qp.pos_in_vel_limits import BrakingProfile, SlowdownProfile
 from krrood.symbolic_math.symbolic_math import Scalar, FloatVariable
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
@@ -242,22 +236,22 @@ class DegreeOfFreedomLimitProfiler:
         jerk_limit = upper_limits.jerk
         position_range = upper_limits.position - lower_limits.position
         velocity_limit = min(velocity_limit * time_step, position_range / 2) / time_step
-        velocity_profile, acceleration_profile = self._nominal_velocity_profile(
+        braking_profile = BrakingProfile.fastest(
             initial_velocity=velocity_limit,
             acceleration_limit=upper_limits.acceleration,
             jerk_limit=jerk_limit,
+            time_step=time_step,
+            prediction_horizon=self.prediction_horizon,
         )
         velocity_lower_bound = self._directional_velocity_bound(
-            velocity_profile=velocity_profile,
-            acceleration_profile=acceleration_profile,
+            braking_profile=braking_profile,
             position_error=lower_limits.position - degree_of_freedom_symbols.position,
             jerk_limit=jerk_limit,
             velocity_limit=velocity_limit,
             direction=BoundDirection.LOWER,
         )
         velocity_upper_bound = self._directional_velocity_bound(
-            velocity_profile=velocity_profile,
-            acceleration_profile=acceleration_profile,
+            braking_profile=braking_profile,
             position_error=upper_limits.position - degree_of_freedom_symbols.position,
             jerk_limit=jerk_limit,
             velocity_limit=velocity_limit,
@@ -274,45 +268,9 @@ class DegreeOfFreedomLimitProfiler:
             skip_first=skip_first,
         )
 
-    def _nominal_velocity_profile(
-        self,
-        initial_velocity: float,
-        acceleration_limit: float,
-        jerk_limit: float,
-    ) -> tuple[npt.NDArray, npt.NDArray]:
-        """
-        Solves an MPC that drives the degree of freedom from full velocity to rest,
-        returning the nominal velocity and acceleration braking profiles.
-
-        The MPC is a linear program solved to a vertex, so the velocity levels are exact
-        rather than accurate only up to a solver tolerance.
-
-        :param initial_velocity: Velocity the profile starts braking from.
-        :param acceleration_limit: Acceleration limit applied at every horizon step.
-        :param jerk_limit: Jerk limit applied at every horizon step.
-        """
-        prediction_horizon = self.prediction_horizon
-        profile = gm.simple_model_predictive_control(
-            vel_limit=initial_velocity,
-            acc_limit=acceleration_limit,
-            jerk_limit=jerk_limit,
-            current_vel=initial_velocity,
-            current_acc=0,
-            dt=self.time_step,
-            ph=prediction_horizon,
-            q_weight=(0, 0, 0),
-            lin_weight=(-1, 0, 0),
-            solver_class=LinearProgramSolverHighs,
-        )
-        return (
-            profile[:prediction_horizon],
-            profile[prediction_horizon : prediction_horizon * 2],
-        )
-
     def _directional_velocity_bound(
         self,
-        velocity_profile: npt.NDArray,
-        acceleration_profile: npt.NDArray,
+        braking_profile: BrakingProfile,
         position_error: sm.Scalar,
         jerk_limit: float,
         velocity_limit: float,
@@ -323,8 +281,7 @@ class DegreeOfFreedomLimitProfiler:
         position limit, shifting the nominal braking profile by the remaining distance
         to that limit and capping the first step to a single jerk-limited change.
 
-        :param velocity_profile: Nominal velocity braking profile.
-        :param acceleration_profile: Nominal acceleration braking profile.
+        :param braking_profile: Fastest braking from the velocity limit to rest.
         :param position_error: Remaining distance to the position limit being braked
             against.
         :param jerk_limit: Jerk limit used to cap the first step change.
@@ -334,13 +291,7 @@ class DegreeOfFreedomLimitProfiler:
         """
         sign = direction.sign
         time_step = self.time_step
-        velocity_bound, _ = shifted_velocity_profile(
-            velocity_profile=velocity_profile,
-            acceleration_profile=acceleration_profile,
-            distance=sign * position_error,
-            delta_time=time_step,
-        )
-        velocity_bound *= sign
+        velocity_bound = braking_profile.shifted_by(sign * position_error) * sign
         one_step_change = jerk_limit * time_step**2
         one_step_change_bound = sm.limit(
             position_error / time_step,
@@ -430,24 +381,24 @@ class DegreeOfFreedomLimitProfiler:
         :param skip_first: Flag marking that the first step is already at rest against a
             limit.
         """
-        projected_velocity_profile, _, _ = compute_immediate_slowdown_profile(
-            degree_of_freedom_symbols.velocity,
-            degree_of_freedom_symbols.acceleration,
-            goal_profile,
-            Scalar(jerk_limit),
-            Scalar(self.time_step),
-            self.prediction_horizon,
-            skip_first,
-        )
-        _, _, projected_jerk_profile_violated = compute_immediate_slowdown_profile(
-            degree_of_freedom_symbols.velocity,
-            degree_of_freedom_symbols.acceleration,
-            goal_profile,
-            Scalar(np.inf),
-            Scalar(self.time_step),
-            self.prediction_horizon,
-            skip_first,
-        )
+        projected_velocity_profile = SlowdownProfile.immediate(
+            current_velocity=degree_of_freedom_symbols.velocity,
+            current_acceleration=degree_of_freedom_symbols.acceleration,
+            target_velocity_profile=goal_profile,
+            jerk_limit=Scalar(jerk_limit),
+            time_step=Scalar(self.time_step),
+            prediction_horizon=self.prediction_horizon,
+            skip_first=skip_first,
+        ).velocity
+        projected_jerk_profile_violated = SlowdownProfile.immediate(
+            current_velocity=degree_of_freedom_symbols.velocity,
+            current_acceleration=degree_of_freedom_symbols.acceleration,
+            target_velocity_profile=goal_profile,
+            jerk_limit=Scalar(np.inf),
+            time_step=Scalar(self.time_step),
+            prediction_horizon=self.prediction_horizon,
+            skip_first=skip_first,
+        ).jerk
         return projected_velocity_profile, projected_jerk_profile_violated
 
     def _relax_jerk_on_initial_steps(
