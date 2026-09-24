@@ -77,6 +77,10 @@ def _jerk_bound_derived_from_braking_time(
     The bound on a jerk decision variable, which is jerk times the squared time step,
     for a degree of freedom whose jerk limit is derived from the configured braking
     time.
+
+    :param velocity_limit: Velocity limit of the degree of freedom.
+    :param config: Controller configuration providing the braking time and time step.
+    :return: Bound on the jerk decision variable.
     """
     jerk_limit = 4 * velocity_limit / config.braking_time**2
     return jerk_limit * config.control_dt**2

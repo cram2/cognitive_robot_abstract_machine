@@ -187,6 +187,12 @@ def _symmetric_prismatic_limits(
 ) -> DegreeOfFreedomLimits:
     """
     Builds symmetric prismatic degree-of-freedom limits.
+
+    :param position: Position limit, ``None`` for a joint without position limits.
+    :param velocity: Velocity limit.
+    :param jerk: Jerk limit, ``None`` for a joint without one.
+    :param acceleration: Acceleration limit, ``None`` for a joint without one.
+    :return: Limits mirrored around zero.
     """
     return DegreeOfFreedomLimits(
         lower=DerivativeMap(

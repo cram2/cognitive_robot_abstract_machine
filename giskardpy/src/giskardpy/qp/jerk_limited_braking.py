@@ -50,6 +50,7 @@ class JerkLimitedBraking:
         :param velocity_limit: Velocity the degree of freedom brakes from.
         :param braking_time: Duration of the continuous braking, in seconds.
         :param time_step: Duration of a single step of the grid.
+        :return: Braking with the jerk limit of ``braking_time``.
         """
         return cls(
             velocity_limit=velocity_limit,
@@ -69,6 +70,7 @@ class JerkLimitedBraking:
 
         :param braking_time: Duration of the continuous braking, in seconds.
         :param time_step: Duration of a single step of the grid.
+        :return: Number of steps the braking needs.
         """
         return cls._smallest_number_of_steps(braking_time**2 / (4 * time_step**2))
 
@@ -83,6 +85,7 @@ class JerkLimitedBraking:
         largest change, and so of every braking, stays within the limit.
 
         :param acceleration_limit: Largest acceleration magnitude allowed.
+        :return: Braking whose acceleration stays within ``acceleration_limit``.
         """
         return replace(
             self,
@@ -108,6 +111,7 @@ class JerkLimitedBraking:
 
         :param velocity_in_jerk_steps: Velocity to remove, in units of
             ``jerk_limit * time_step**2``.
+        :return: Smallest number of steps that removes the velocity.
         """
         required = velocity_in_jerk_steps * (1 - BRAKING_RELATIVE_TOLERANCE)
         number_of_steps = 0
@@ -128,5 +132,6 @@ class JerkLimitedBraking:
         removes ⌈m/2⌉·⌈(m+1)/2⌉ units in m steps.
 
         :param number_of_steps: Number of steps the braking may take.
+        :return: Largest removable velocity, in units of ``jerk_limit * time_step**2``.
         """
         return math.ceil(number_of_steps / 2) * math.ceil((number_of_steps + 1) / 2)

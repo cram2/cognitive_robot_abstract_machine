@@ -14,6 +14,10 @@ def shortest_angular_distance(from_angle: float, to_angle: float) -> float:
     """
     Returns the shortest angle, in radians, that turns ``from_angle`` into an angle
     equivalent to ``to_angle``; the result lies within [-pi, pi].
+
+    :param from_angle: Angle to turn from, in radians.
+    :param to_angle: Angle to turn to, in radians.
+    :return: Shortest angle from ``from_angle`` to ``to_angle``, in radians.
     """
     return normalize_angle(to_angle - from_angle)
 
@@ -21,6 +25,9 @@ def shortest_angular_distance(from_angle: float, to_angle: float) -> float:
 def normalize_angle(angle: float) -> float:
     """
     Returns the angle equivalent to ``angle``, in radians, within [-pi, pi].
+
+    :param angle: Angle to normalize, in radians.
+    :return: Equivalent angle within [-pi, pi].
     """
     a = normalize_angle_positive(angle)
     if a > np.pi:
@@ -31,6 +38,9 @@ def normalize_angle(angle: float) -> float:
 def normalize_angle_positive(angle: float) -> float:
     """
     Returns the angle equivalent to ``angle``, in radians, within [0, 2 pi).
+
+    :param angle: Angle to normalize, in radians.
+    :return: Equivalent angle within [0, 2 pi).
     """
     return angle % (2.0 * np.pi)
 

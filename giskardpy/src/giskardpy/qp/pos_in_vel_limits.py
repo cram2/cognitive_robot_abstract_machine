@@ -64,6 +64,7 @@ class BrakingProfile:
         :param jerk_limit: Jerk limit applied at every horizon step.
         :param time_step: Duration of a single step of the prediction horizon.
         :param prediction_horizon: Number of steps in the prediction horizon.
+        :return: Fastest braking profile from ``initial_velocity`` to rest.
         """
         return cls(
             velocity=cls._solve_fastest_braking(
@@ -94,6 +95,8 @@ class BrakingProfile:
         :param jerk_limit: Jerk limit applied at every horizon step.
         :param time_step: Duration of a single step of the prediction horizon.
         :param prediction_horizon: Number of steps in the prediction horizon.
+        :return: Velocity, acceleration, and jerk at each step, one derivative after the
+            other.
         """
         limits = (initial_velocity, acceleration_limit, jerk_limit)
         number_of_derivatives = len(limits)
@@ -135,6 +138,7 @@ class BrakingProfile:
         :param time_step: Duration of a single step of the prediction horizon.
         :param prediction_horizon: Number of steps in the prediction horizon.
         :param number_of_derivatives: Number of derivatives, starting at velocity.
+        :return: Equality matrix linking each derivative to the one below it.
         """
         number_of_rows = prediction_horizon * (number_of_derivatives - 1)
         number_of_columns = prediction_horizon * number_of_derivatives
@@ -166,6 +170,8 @@ class BrakingProfile:
 
         :param distance: Remaining distance that determines how much of the profile is
             shifted out.
+        :return: Velocity at each step of the prediction horizon for the remaining
+            ``distance``.
         """
         time_step = self.time_step
         velocity_profile = self.zero_negligible_velocities(self.velocity)
@@ -214,6 +220,7 @@ class BrakingProfile:
             at rest. Sits above the absolute tolerance of every solver the controller
             can be configured with, and far below the smallest velocity a braking
             profile genuinely contains.
+        :return: Copy of ``velocity_profile`` with negligible velocities set to zero.
         """
         at_rest = copy(velocity_profile)
         at_rest[at_rest < negligible_velocity] = 0.0
@@ -263,6 +270,7 @@ class SlowdownProfile:
         :param time_step: Duration of a single time step.
         :param prediction_horizon: Number of time steps in the profile.
         :param skip_first: When truthy, the horizon cap is disabled for the first step.
+        :return: Profile slowing down towards ``target_velocity_profile``.
         """
         velocity, jerk = cls._profiles(
             current_velocity,
@@ -297,6 +305,7 @@ class SlowdownProfile:
         :param time_step: Duration of a single time step.
         :param prediction_horizon: Number of time steps in the profile.
         :param skip_first: When truthy, the horizon cap is disabled for the first step.
+        :return: Velocity and jerk at each step of the prediction horizon.
         """
         velocity_profile = []
         acceleration_profile = []

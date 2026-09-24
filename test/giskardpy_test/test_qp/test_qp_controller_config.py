@@ -98,6 +98,10 @@ def _peak_acceleration_of_a_joint_goal(
     """
     Drives the single joint of ``world`` from 0 towards a distant goal for three seconds
     and returns the largest acceleration magnitude it reaches.
+
+    :param world: World with a single prismatic joint.
+    :param config: Controller configuration the joint goal runs with.
+    :return: Largest acceleration magnitude the joint reaches.
     """
     connection = world.controlled_connections[0]
     connection.position = 0.0

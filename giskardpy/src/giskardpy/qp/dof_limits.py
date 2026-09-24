@@ -76,6 +76,7 @@ class VelocityBoundProfiles:
 
         :param velocity_limit: Velocity limit applied at every horizon step.
         :param prediction_horizon: Number of steps in the prediction horizon.
+        :return: Bounds at plus and minus the velocity limit, with a goal profile at rest.
         """
         upper_bound = sm.Vector.ones(prediction_horizon) * velocity_limit
         return cls(
@@ -92,6 +93,7 @@ class VelocityBoundProfiles:
 
         :param velocity_profile: Velocity at each step of the prediction horizon.
         :param epsilon: Tolerance below which a violation is ignored.
+        :return: Symbolic flag that is true when the velocity profile violates the bounds.
         """
         leaves_bounds = sm.logic_or(
             sm.logic_any(velocity_profile < self.lower_bound - epsilon),
@@ -224,6 +226,7 @@ class DegreeOfFreedomLimitProfiler:
         :param degree_of_freedom_symbols: Symbolic current state of the degree of
             freedom.
         :param limits: Resolved limits of the degree of freedom.
+        :return: Velocity bounds across the prediction horizon.
         """
         time_step = self.time_step
         lower_limits, upper_limits = limits.lower, limits.upper
@@ -288,6 +291,7 @@ class DegreeOfFreedomLimitProfiler:
         :param velocity_limit: Velocity limit clamping the first step change.
         :param direction: Whether the bound brakes against the lower or upper position
             limit.
+        :return: Velocity bound at each step of the prediction horizon.
         """
         sign = direction.sign
         time_step = self.time_step
@@ -324,6 +328,7 @@ class DegreeOfFreedomLimitProfiler:
             freedom.
         :param limits: Resolved limits of the degree of freedom.
         :param epsilon: Tolerance below which a velocity bound violation is ignored.
+        :return: Velocity and jerk bounds at each step of the prediction horizon.
         """
         jerk_limit = limits.upper.jerk
 
@@ -375,6 +380,8 @@ class DegreeOfFreedomLimitProfiler:
         :param jerk_limit: Jerk limit applied while projecting the velocity profile.
         :param skip_first: Flag marking that the first step is already at rest against a
             limit.
+        :return: The projected velocity profile and the jerk profile required without a
+            jerk limit.
         """
         projected_velocity_profile = SlowdownProfile.immediate(
             current_velocity=degree_of_freedom_symbols.velocity,
@@ -437,6 +444,7 @@ class DegreeOfFreedomLimitProfiler:
         :param velocity_lower_bound: Per-step lower velocity bound.
         :param velocity_upper_bound: Per-step upper velocity bound.
         :param jerk_profile: Per-step jerk magnitude.
+        :return: Velocity and jerk bounds at each step of the prediction horizon.
         """
         time_step = self.time_step
         velocity_lower_bound = sm.min(velocity_lower_bound, velocity_upper_bound)
@@ -461,6 +469,7 @@ class DegreeOfFreedomLimitProfiler:
             and jerk limits of the degree of freedom are not used.
 
         :param degree_of_freedom: Degree of freedom whose limits are resolved.
+        :return: Limits the horizon bounds of the degree of freedom are built from.
         """
         declared = degree_of_freedom.limits
         acceleration_limit = declared.upper.acceleration
@@ -490,6 +499,7 @@ class DegreeOfFreedomLimitProfiler:
             acceleration limit as well.
 
         :param degree_of_freedom: Degree of freedom that brakes.
+        :return: Braking of the degree of freedom from its velocity limit to rest.
         """
         velocity_limit = degree_of_freedom.limits.upper.velocity
         time_step = self.time_step
@@ -610,6 +620,7 @@ class DegreeOfFreedomDecisionVariables:
     def direct_limits(self) -> DirectLimits:
         """
         Returns the bounds, weights, and names of the decision variables.
+        :return: Bounds, weights, and names of every decision variable.
         """
         lower_bounds, upper_bounds = self.free_variable_bounds()
         quadratic_weights, linear_weights = self.init_weights()
@@ -627,6 +638,7 @@ class DegreeOfFreedomDecisionVariables:
         for ``derivative``.
 
         :param derivative: Derivative whose decision variables are counted.
+        :return: Number of steps with a decision variable for ``derivative``.
         """
         return self.qp_controller_config.prediction_horizon - (
             self.qp_controller_config.max_derivative - derivative
@@ -649,6 +661,7 @@ class DegreeOfFreedomDecisionVariables:
     def free_variable_bounds(self) -> tuple[sm.Vector, sm.Vector]:
         """
         Computes the lower and upper box limits of every decision variable.
+        :return: Lower and upper bound of every decision variable.
         """
         horizon_bounds: dict[UUID, DegreeOfFreedomLimits[sm.Vector]] = {
             degree_of_freedom.id: self.profiler.compute(degree_of_freedom)
@@ -668,6 +681,7 @@ class DegreeOfFreedomDecisionVariables:
 
         The weights ramp up to their full value at the last step with a velocity
         decision variable.
+        :return: Quadratic and linear objective weight of every decision variable.
         """
         qp_controller_config = self.qp_controller_config
         decision_variable_limits = {
@@ -705,6 +719,7 @@ class DegreeOfFreedomDecisionVariables:
 
         :param upper_limits: Resolved upper limits of the degree of freedom.
         :param time_step: Duration of a single horizon step.
+        :return: Bound of the velocity and of the jerk decision variables.
         """
         return DerivativeMap(
             velocity=upper_limits.velocity,
@@ -729,6 +744,8 @@ class DegreeOfFreedomDecisionVariables:
         :param horizon_index: Index of the horizon step the weight applies to.
         :param total_horizon_length: Horizon length over which the weight is ramped.
         :param growth_factor: Factor scaling the weight at the start of the horizon.
+        :return: Normalized and ramped weight, ``0`` if the free variable is not limited or
+            not weighted.
         """
 
         def linear(
@@ -737,6 +754,16 @@ class DegreeOfFreedomDecisionVariables:
             total_horizon_length: int,
             growth_factor: float,
         ) -> float:
+            """
+            Ramps a weight linearly from ``weight * growth_factor`` at the start of the horizon
+            to ``weight`` at its end.
+
+            :param horizon_index: Index of the horizon step the weight applies to.
+            :param weight: Weight at the end of the horizon.
+            :param total_horizon_length: Horizon length over which the weight is ramped.
+            :param growth_factor: Factor scaling the weight at the start of the horizon.
+            :return: Weight at ``horizon_index``.
+            """
             start = weight * growth_factor
             slope = (weight - start) / total_horizon_length
             return slope * horizon_index + start

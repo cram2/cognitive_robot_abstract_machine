@@ -148,6 +148,9 @@ def _peak_acceleration_of_a_reversal(braking: JerkLimitedBraking) -> float:
     """
     Largest acceleration of a jerk-limited change from one velocity limit to the other,
     starting and ending with zero acceleration.
+
+    :param braking: Braking whose velocity and jerk limit the reversal uses.
+    :return: Largest acceleration magnitude of the reversal.
     """
     return math.sqrt(2 * braking.velocity_limit * braking.jerk_limit)
 

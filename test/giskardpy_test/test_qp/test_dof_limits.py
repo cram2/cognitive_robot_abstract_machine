@@ -238,6 +238,11 @@ def _peak_acceleration_moving_to(
 
     The prediction horizon is the shortest one the joint's acceleration-capped braking
     fits into.
+
+    :param world: World with a single prismatic joint that has an acceleration limit.
+    :param goal: Position the joint is driven to.
+    :param initial_velocity: Velocity the joint starts moving at.
+    :return: Largest acceleration magnitude the joint reaches.
     """
     connection = world.controlled_connections[0]
     degree_of_freedom = connection.dof
@@ -439,6 +444,9 @@ def _first_jerk_weight(world: World) -> float:
     """
     Returns the objective weight of the first jerk decision variable of the single
     degree of freedom of ``world``, with its jerk weighted by :data:`JERK_WEIGHT`.
+
+    :param world: World with a single degree of freedom.
+    :return: Objective weight of the first jerk decision variable.
     """
     config = _default_config()
     degree_of_freedom = _single_dof(world)
@@ -454,6 +462,9 @@ def _normalized_first_jerk_weight(jerk_limit: float) -> float:
     """
     The weight of the first jerk decision variable, which holds jerk times the squared
     time step, normalized by that variable's own bound.
+
+    :param jerk_limit: Jerk limit of the degree of freedom.
+    :return: Normalized weight of the first jerk decision variable.
     """
     config = _default_config()
     jerk_decision_variable_bound = jerk_limit * config.control_dt**2

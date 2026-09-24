@@ -55,6 +55,10 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 def angle_between_vector(v1: np.ndarray, v2: np.ndarray) -> float:
     """
     Returns the angle, in radians, between two vectors of length 3.
+
+    :param v1: First vector.
+    :param v2: Second vector.
+    :return: Angle between ``v1`` and ``v2``, in radians.
     """
     return np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
 
