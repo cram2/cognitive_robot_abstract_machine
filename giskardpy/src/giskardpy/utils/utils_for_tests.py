@@ -6,10 +6,33 @@ from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
 
-from giskardpy.utils.math import shortest_angular_distance
-
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
+
+
+def shortest_angular_distance(from_angle: float, to_angle: float) -> float:
+    """
+    Returns the shortest angle, in radians, that turns ``from_angle`` into an angle
+    equivalent to ``to_angle``; the result lies within [-pi, pi].
+    """
+    return normalize_angle(to_angle - from_angle)
+
+
+def normalize_angle(angle: float) -> float:
+    """
+    Returns the angle equivalent to ``angle``, in radians, within [-pi, pi].
+    """
+    a = normalize_angle_positive(angle)
+    if a > np.pi:
+        a -= 2.0 * np.pi
+    return a
+
+
+def normalize_angle_positive(angle: float) -> float:
+    """
+    Returns the angle equivalent to ``angle``, in radians, within [0, 2 pi).
+    """
+    return angle % (2.0 * np.pi)
 
 
 def vector(x):
