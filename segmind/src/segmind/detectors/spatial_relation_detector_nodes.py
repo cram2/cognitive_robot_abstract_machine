@@ -20,7 +20,11 @@ from semantic_digital_twin.reasoning.predicates import is_supported_by, InsideOf
 from semantic_digital_twin.world_description.world_entity import Body
 
 from segmind.detectors.atomic_event_detectors_nodes import ContactDetector
-from segmind.detectors.base import AbstractDetector, SegmindContext
+from segmind.detectors.base import (
+    AbstractDetector,
+    EventCombiningDetector,
+    SegmindContext,
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -154,7 +158,7 @@ class ContainmentDetector(AbstractDetector):
 
 
 @dataclass(eq=False, repr=False)
-class InsertionDetector(AbstractDetector):
+class InsertionDetector(EventCombiningDetector):
     """
     Detects insertion events based on object interaction context.
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Set, List, Any, Tuple, Type
+from typing import Optional, Dict, Set, List, Any, Sequence, Tuple, Type
 
 from giskardpy.motion_statechart.context import (
     MotionStatechartContext,
@@ -174,12 +174,18 @@ class AbstractDetector(MotionStatechartNode, ABC):
         return ()
 
     @classmethod
-    def watches_a_body(cls) -> bool:
+    def create_for_run(
+        cls,
+        watched_bodies: Sequence[Body],
+        detector_types: Sequence[Type[AbstractDetector]],
+    ) -> List[AbstractDetector]:
         """
-        Whether a detector of this kind watches one body. A kind read from the events of
-        other detectors concludes over every body those watch instead.
+        The detectors of this kind a run ticks: one for each body it watches.
+
+        :param watched_bodies: The bodies the run watches.
+        :param detector_types: Every kind of detector the run ticks.
         """
-        return not cls.get_required_detector_types()
+        return [cls(tracked_object=body) for body in watched_bodies]
 
     @staticmethod
     def remember_new_relations(
@@ -314,3 +320,22 @@ class AbstractDetector(MotionStatechartNode, ABC):
                  in this cycle. Returns an empty list if no events were found.
         """
         pass
+
+
+@dataclass(repr=False, eq=False)
+class EventCombiningDetector(AbstractDetector, ABC):
+    """
+    A detector concluding from the events other detectors detected, over every body
+    those watch.
+    """
+
+    @classmethod
+    def create_for_run(
+        cls,
+        watched_bodies: Sequence[Body],
+        detector_types: Sequence[Type[AbstractDetector]],
+    ) -> List[AbstractDetector]:
+        """
+        The detectors of this kind a run ticks: one, for all the bodies it watches.
+        """
+        return [cls()]

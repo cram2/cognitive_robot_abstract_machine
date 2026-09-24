@@ -86,12 +86,13 @@ class LiveSegmenter(PropagatingThread):
             if detectors
             else DetectorSelection.of_every_kind()
         )
-        chosen: List[AbstractDetector] = []
-        for detector_type in selection.detector_types:
-            if detector_type.watches_a_body():
-                chosen.extend(detector_type(tracked_object=body) for body in bodies)
-            else:
-                chosen.append(detector_type())
+        chosen: List[AbstractDetector] = [
+            detector
+            for detector_type in selection.detector_types
+            for detector in detector_type.create_for_run(
+                bodies, selection.detector_types
+            )
+        ]
         return cls(world=world, detectors=chosen)
 
     @property

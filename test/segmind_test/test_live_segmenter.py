@@ -22,7 +22,11 @@ from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import (
     TranslationDetector,
 )
-from segmind.detectors.base import AbstractDetector, SegmindContext
+from segmind.detectors.base import (
+    AbstractDetector,
+    EventCombiningDetector,
+    SegmindContext,
+)
 from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.live_segmenter import (
     LiveSegmenter,
@@ -257,7 +261,7 @@ def test_watching_bodies_ticks_every_object_detector_for_each_body(
     object_detector_types = [
         detector_type
         for detector_type in DetectorSelection.of_every_kind().detector_types
-        if detector_type.watches_a_body()
+        if not issubclass(detector_type, EventCombiningDetector)
     ]
 
     segmenter = LiveSegmenter.create_for_bodies(world, [milk, box])
@@ -283,7 +287,7 @@ def test_watching_bodies_combines_their_events_once_for_all_of_them(
     event_combining_detector_types = [
         detector_type
         for detector_type in DetectorSelection.of_every_kind().detector_types
-        if not detector_type.watches_a_body()
+        if issubclass(detector_type, EventCombiningDetector)
     ]
 
     segmenter = LiveSegmenter.create_for_bodies(world, [milk, box])

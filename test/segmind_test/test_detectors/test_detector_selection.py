@@ -133,3 +133,43 @@ def test_everything_ticks_each_kind_after_what_it_is_read_from():
     assert order.index(PickUpDetector) > order.index(SupportDetector)
     assert order.index(InsertionDetector) > order.index(ContainmentDetector)
     assert len(order) == len(set(order))
+
+
+# %% what a detector watches
+
+
+@dataclass(eq=False, repr=False)
+class DetectorWatchingABodyBesideAnother(AbstractDetector):
+    """
+    Watches one body and is read from the events of another kind of detector.
+    """
+
+    @classmethod
+    def get_required_detector_types(cls):
+        return (ContactDetector,)
+
+    def update_context_and_events(self, context, segmind_context, tracked_objects):
+        return []
+
+
+def test_a_detector_read_from_another_kind_still_watches_a_body_of_its_own(
+    milk_in_the_apartment,
+):
+    _, milk, box = milk_in_the_apartment
+
+    detectors = DetectorWatchingABodyBesideAnother.create_for_run(
+        [milk, box], [ContactDetector]
+    )
+
+    assert [detector.tracked_object for detector in detectors] == [milk, box]
+
+
+def test_a_detector_combining_events_is_one_for_all_watched_bodies(
+    milk_in_the_apartment,
+):
+    _, milk, box = milk_in_the_apartment
+
+    detectors = PickUpDetector.create_for_run([milk, box], [PickUpDetector])
+
+    assert [type(detector) for detector in detectors] == [PickUpDetector]
+    assert detectors[0].tracked_object is None

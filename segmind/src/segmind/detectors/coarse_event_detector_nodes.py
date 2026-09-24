@@ -25,13 +25,17 @@ from segmind.datastructures.events import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from segmind.detectors.atomic_event_detectors_nodes import TranslationDetector
-from segmind.detectors.base import AbstractDetector, SegmindContext
+from segmind.detectors.base import (
+    AbstractDetector,
+    EventCombiningDetector,
+    SegmindContext,
+)
 from segmind.detectors.spatial_relation_detector_nodes import SupportDetector
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
 
 
 @dataclass
-class AbstractInteractionDetector(AbstractDetector):
+class AbstractInteractionDetector(EventCombiningDetector):
     """
     Abstract base class for interaction-based detectors.
 
