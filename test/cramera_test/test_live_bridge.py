@@ -410,6 +410,10 @@ def make_free_floating_object() -> Tuple[World, Connection6DoF, Body]:
 
 # %% what the HTTP layer reads
 class TestViewerAccessors:
+    """
+    The viewer reads the bridge's published bodies and current session state.
+    """
+
     def test_object_keys_exclude_the_robot_base(self):
         bridge = Bridge()
         bridge.publish_bodies(
@@ -421,6 +425,9 @@ class TestViewerAccessors:
         assert bridge.object_keys() == ["milk.stl"]
 
     def test_an_object_with_unscaled_shapes_falls_back_to_the_default_size(self):
+        """
+        A shapeless published body retains the shared placeholder dimensions.
+        """
         bridge = Bridge()
         bridge.publish_bodies({"blob.stl": PublishedBody(name="world/blob.stl")})
         assert bridge.object_catalog()[0]["shapes"][0]["size"] == list(
@@ -618,6 +625,9 @@ class TestShapeCatalogEntries:
     """
 
     def test_primitive_shapes_carry_dimensions_colors_and_local_poses(self):
+        """
+        Each native primitive retains its appearance and body-relative pose.
+        """
         body = Body(
             name=PrefixedName("tower", prefix="scene"),
             visual=ShapeCollection(
@@ -689,6 +699,9 @@ class TestShapeCatalogEntries:
         assert shape["size"] == list(Bridge.DEFAULT_OBJECT_SIZE)
 
     def test_collision_shapes_stand_in_when_a_body_has_no_visual_ones(self):
+        """
+        The catalog renders native collision geometry when visual geometry is absent.
+        """
         body = Body(
             name=PrefixedName("guard", prefix="scene"),
             collision=ShapeCollection(shapes=[Box(scale=Scale(0.5, 0.5, 0.5))]),

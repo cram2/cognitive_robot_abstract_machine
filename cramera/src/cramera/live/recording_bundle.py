@@ -9,7 +9,8 @@ from pathlib import Path
 
 from typing_extensions import Any, Dict, List, Optional
 
-from semantic_digital_twin.world_description.geometry import Box, Mesh
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 
 from cramera import paths
@@ -174,7 +175,8 @@ def _object_entry(
     """
     One loose object's ``scene.json`` entry: an inline box, or a copied/exported mesh.
 
-    A shapeless body reuses the catalog's native placeholder box.
+    An inline box must be centered and aligned with its body. Other local transforms are
+    retained in exported mesh geometry.
 
     :param entry: The object's publication identity, colour and native geometry.
     :param spawn: The object's pose in the recording's first frame.
@@ -188,7 +190,11 @@ def _object_entry(
     }
     shapes = entry.shapes
     payload["height"] = round(float(shapes.combined_mesh.extents[2]), POSE_PRECISION)
-    if len(shapes) == 1 and isinstance(shapes[0], Box):
+    if (
+        len(shapes) == 1
+        and isinstance(shapes[0], Box)
+        and shapes[0].origin.equivalent(HomogeneousTransformationMatrix())
+    ):
         payload["box"] = rounded_scale(shapes[0].scale, POSE_PRECISION)
         return payload
     payload["mesh"] = _write_object_mesh(entry.key, shapes, output_directory)
@@ -201,9 +207,9 @@ def _write_object_mesh(
     """
     Write a loose object's geometry into the bundle and answer the path it is served at.
 
-    A single mesh shape backed by a real file is copied verbatim, with its side assets
-    (materials, textures); anything else is flattened into one OBJ exported from the
-    collection's combined mesh.
+    A single untransformed mesh with unit scale is copied with its side assets
+    (materials, textures). Other geometry is exported from the collection's combined
+    mesh, which retains each shape's local transform and scale.
 
     :param key: The object's catalog key, used as the written file's basename.
     :param shapes: The native geometry selected for the object's catalog entry.
@@ -211,7 +217,12 @@ def _write_object_mesh(
     """
     objects_directory = output_directory / "meshes" / "objects"
     objects_directory.mkdir(parents=True, exist_ok=True)
-    if len(shapes) == 1 and isinstance(shapes[0], Mesh):
+    if (
+        len(shapes) == 1
+        and isinstance(shapes[0], Mesh)
+        and shapes[0].origin.equivalent(HomogeneousTransformationMatrix())
+        and shapes[0].scale == Scale()
+    ):
         source = shapes[0].filename
         if source and Path(source).is_file():
             destination = objects_directory / (key + Path(source).suffix)
