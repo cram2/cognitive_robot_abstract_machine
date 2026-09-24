@@ -6,6 +6,8 @@ recognize honest paraphrases, and just as importantly refuse questions nothing o
 answers, so the panel can say so instead of running the wrong query.
 """
 
+from dataclasses import replace
+
 import pytest
 
 krrood = pytest.importorskip("krrood", reason="EQL requires krrood")
@@ -89,9 +91,53 @@ class TestRecognizingAQuestion:
         assert result.matched
         assert result.preset == WORDED_PRESET
 
+    @pytest.mark.parametrize(
+        "question",
+        [WORDED_PRESET.verbalization.text, "what was detected by the camera"],
+    )
+    def test_verbalization_is_matched_when_the_label_is_absent(
+        self, question: str
+    ) -> None:
+        """
+        A preset with no label still matches its native wording and paraphrases.
+
+        :param question: An exact or paraphrased question about the verbalized query.
+        """
+        preset = replace(WORDED_PRESET, text=None)
+
+        result = QuestionMatcher([preset]).match(question)
+
+        assert result.preset is preset
+
+    def test_an_unworded_preset_does_not_prevent_matching_other_presets(self) -> None:
+        """
+        Missing wording leaves the other presets available for fuzzy matching.
+        """
+        matcher = QuestionMatcher([Preset(None, ROBOT_PRESET.code), WORDED_PRESET])
+
+        result = matcher.match("what was detected by the camera")
+
+        assert result.preset is WORDED_PRESET
+
 
 # %% refusing what nothing answers
 class TestRefusingAQuestion:
+    @pytest.mark.parametrize("minimum_similarity", [0.0, MINIMUM_SIMILARITY])
+    def test_a_preset_without_a_label_or_verbalization_matches_nothing(
+        self, minimum_similarity: float
+    ) -> None:
+        """
+        Query source is not a wording alternative for an unworded preset.
+
+        :param minimum_similarity: The threshold for recognizing a wording.
+        """
+        preset = Preset(None, ROBOT_PRESET.code)
+
+        result = QuestionMatcher([preset], minimum_similarity).match(preset.code)
+
+        assert result.preset is None
+        assert result.similarity == 0.0
+
     def test_an_unrelated_question_is_not_matched(self):
         result = make_matcher().match("what's the weather like today")
 

@@ -143,6 +143,8 @@ class QuestionMatcher:
         best: Optional[Preset] = None
         best_pair = (0.0, -1.0)
         for preset in self.presets:
+            if not self._wordings_of(preset):
+                continue
             pair = self._comparison(asked, text, preset)
             if pair > best_pair:
                 best, best_pair = preset, pair
@@ -202,9 +204,10 @@ class QuestionMatcher:
 
         :param preset: The preset to read.
         """
-        if preset.verbalization is None:
-            return [preset.text]
-        return [preset.text, preset.verbalization.text]
+        wordings = [] if preset.text is None else [preset.text]
+        if preset.verbalization is not None:
+            wordings.append(preset.verbalization.text)
+        return wordings
 
     def _comparison(
         self, asked: FrozenSet[str], text: str, preset: Preset

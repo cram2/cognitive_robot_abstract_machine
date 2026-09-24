@@ -42,9 +42,9 @@ class Preset:
     One ready-made EQL query offered by the EQL panel.
     """
 
-    text: str
+    text: str | None
     """
-    Display label, or an empty string to use the query's native verbalization.
+    Display label, or None to use the query's native verbalization.
     """
 
     code: str
@@ -82,9 +82,12 @@ class Preset:
         :param runner: The runner whose variables the preset's code ranges over.
         """
         verbalization = runner.verbalize(self.code)
+        text = self.text
+        if text is None:
+            text = verbalization.text if verbalization else self.code
         return replace(
             self,
-            text=self.text or (verbalization.text if verbalization else self.code),
+            text=text,
             verbalization=verbalization,
         )
 
@@ -117,7 +120,7 @@ class Preset:
         )
         return [
             cls(
-                text="",
+                text=None,
                 code=(
                     f"an(entity(flat_variable(variable(type({name}), [{name}])"
                     f".{attribute_name})))"
