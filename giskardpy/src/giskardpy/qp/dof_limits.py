@@ -9,6 +9,7 @@ from __future__ import annotations
 import enum
 from copy import copy
 from dataclasses import dataclass, field
+from datetime import timedelta
 from uuid import UUID
 
 import numpy as np
@@ -194,7 +195,7 @@ class DegreeOfFreedomLimitProfiler:
     """
 
     @property
-    def time_step(self) -> float:
+    def time_step(self) -> timedelta:
         """
         Duration of a single step of the prediction horizon.
         """
@@ -243,7 +244,10 @@ class DegreeOfFreedomLimitProfiler:
 
         jerk_limit = upper_limits.jerk
         position_range = upper_limits.position - lower_limits.position
-        velocity_limit = min(velocity_limit * time_step, position_range / 2) / time_step
+        velocity_limit = (
+            min(velocity_limit * time_step.total_seconds(), position_range / 2)
+            / time_step.total_seconds()
+        )
         braking_profile = BrakingProfile.fastest(
             initial_velocity=velocity_limit,
             acceleration_limit=upper_limits.acceleration,
@@ -299,7 +303,7 @@ class DegreeOfFreedomLimitProfiler:
         :return: Velocity bound at each step of the prediction horizon.
         """
         sign = direction.sign
-        time_step = self.time_step
+        time_step = self.time_step.total_seconds()
         velocity_bound = braking_profile.shifted_by(sign * position_error) * sign
         one_step_change = jerk_limit * time_step**2
         one_step_change_bound = sm.limit(
@@ -393,7 +397,7 @@ class DegreeOfFreedomLimitProfiler:
             current_acceleration=degree_of_freedom_symbols.acceleration,
             target_velocity_profile=goal_profile,
             jerk_limit=Scalar(jerk_limit),
-            time_step=Scalar(self.time_step),
+            time_step=Scalar(self.time_step.total_seconds()),
             prediction_horizon=self.prediction_horizon,
             skip_first=skip_first,
         ).velocity
@@ -402,7 +406,7 @@ class DegreeOfFreedomLimitProfiler:
             current_acceleration=degree_of_freedom_symbols.acceleration,
             target_velocity_profile=goal_profile,
             jerk_limit=Scalar(np.inf),
-            time_step=Scalar(self.time_step),
+            time_step=Scalar(self.time_step.total_seconds()),
             prediction_horizon=self.prediction_horizon,
             skip_first=skip_first,
         ).jerk
@@ -451,7 +455,7 @@ class DegreeOfFreedomLimitProfiler:
         :param jerk_profile: Per-step jerk magnitude.
         :return: Velocity and jerk bounds at each step of the prediction horizon.
         """
-        time_step = self.time_step
+        time_step = self.time_step.total_seconds()
         velocity_lower_bound = sm.min(velocity_lower_bound, velocity_upper_bound)
         velocity_upper_bound = sm.max(velocity_lower_bound, velocity_upper_bound)
         jerk_lower_bounds = sm.min(jerk_profile, -jerk_profile) * time_step**2
@@ -716,7 +720,7 @@ class DegreeOfFreedomDecisionVariables:
         return sm.Vector(quadratic_weights), sm.Vector.zeros(len(quadratic_weights))
 
     def _decision_variable_limits(
-        self, upper_limits: DerivativeMap[float], time_step: float
+        self, upper_limits: DerivativeMap[float], time_step: timedelta
     ) -> DerivativeMap[float]:
         """
         Returns the bound of each kind of decision variable of a degree of freedom.
@@ -730,7 +734,7 @@ class DegreeOfFreedomDecisionVariables:
         """
         return DerivativeMap(
             velocity=upper_limits.velocity,
-            jerk=upper_limits.jerk * time_step**2,
+            jerk=upper_limits.jerk * time_step.total_seconds() ** 2,
         )
 
     def normalize_degree_of_freedom_weight(

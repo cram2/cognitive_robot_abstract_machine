@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field, replace
+from datetime import timedelta
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,7 @@ class JerkLimitedBraking:
     Largest jerk magnitude allowed while braking.
     """
 
-    time_step: float
+    time_step: timedelta
     """
     Duration of a single step of the grid.
     """
@@ -40,28 +41,26 @@ class JerkLimitedBraking:
 
     @classmethod
     def from_braking_time(
-        cls, velocity_limit: float, braking_time: float, time_step: float
+        cls, velocity_limit: float, braking_time: timedelta, time_step: timedelta
     ) -> JerkLimitedBraking:
         """
         Creates the braking whose jerk limit brings a continuous, jerk-limited braking
         from the velocity limit to rest in exactly ``braking_time``.
 
-        The jerk limit does not depend on ``time_step``.
-
         :param velocity_limit: Velocity the degree of freedom brakes from.
-        :param braking_time: Duration of the continuous braking, in seconds.
+        :param braking_time: Duration of the continuous braking.
         :param time_step: Duration of a single step of the grid.
         :return: Braking with the jerk limit of ``braking_time``.
         """
         return cls(
             velocity_limit=velocity_limit,
-            jerk_limit=4 * velocity_limit / braking_time**2,
+            jerk_limit=4 * velocity_limit / braking_time.total_seconds() ** 2,
             time_step=time_step,
         )
 
     @classmethod
     def number_of_steps_for_braking_time(
-        cls, braking_time: float, time_step: float
+        cls, braking_time: timedelta, time_step: timedelta
     ) -> int:
         """
         Returns the number of steps a braking created by :meth:`from_braking_time`
@@ -70,11 +69,11 @@ class JerkLimitedBraking:
         The jerk limit scales with the velocity limit, so every degree of freedom needs
         the same number of steps.
 
-        :param braking_time: Duration of the continuous braking, in seconds.
+        :param braking_time: Duration of the continuous braking.
         :param time_step: Duration of a single step of the grid.
         :return: Number of steps the braking needs.
         """
-        return cls._smallest_number_of_steps(braking_time**2 / (4 * time_step**2))
+        return cls._smallest_number_of_steps((braking_time / time_step) ** 2 / 4)
 
     def limited_to_acceleration(self, acceleration_limit: float) -> JerkLimitedBraking:
         """
@@ -102,7 +101,8 @@ class JerkLimitedBraking:
         Smallest number of steps in which the braking reaches rest.
         """
         return self._smallest_number_of_steps(
-            self.velocity_limit / (self.jerk_limit * self.time_step**2)
+            self.velocity_limit
+            / (self.jerk_limit * self.time_step.total_seconds() ** 2)
         )
 
     @classmethod

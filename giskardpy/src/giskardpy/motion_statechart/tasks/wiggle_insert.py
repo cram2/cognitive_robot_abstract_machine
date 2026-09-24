@@ -182,7 +182,7 @@ class WiggleInsert(ConvergingTask):
         )
 
         control_dt = context.qp_controller_config.control_dt
-        self._control_frequency = 1 / control_dt
+        self._control_frequency = 1 / control_dt.total_seconds()
 
         self._current_angle = 0.0
         self._angular_momentum = 0.0

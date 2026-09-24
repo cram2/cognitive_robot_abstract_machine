@@ -3,6 +3,8 @@ Direct unit tests for the focused units extracted from
 :class:`giskardpy.qp.dof_limits.DegreeOfFreedomLimitProfiler`.
 """
 
+from datetime import timedelta
+
 import numpy as np
 import pytest
 
@@ -72,7 +74,8 @@ def _directional_bounds_at(
     time_step = profiler.time_step
     position_range = upper_limits.position - lower_limits.position
     velocity_limit = (
-        min(upper_limits.velocity * time_step, position_range / 2) / time_step
+        min(upper_limits.velocity * time_step.total_seconds(), position_range / 2)
+        / time_step.total_seconds()
     )
     braking_profile = BrakingProfile.fastest(
         initial_velocity=velocity_limit,
@@ -179,7 +182,9 @@ def test_derived_jerk_limit_follows_the_braking_time_at_every_control_frequency(
     limits = DegreeOfFreedomLimitProfiler(config).resolve_limits(degree_of_freedom)
 
     expected_jerk_limit = (
-        4 * degree_of_freedom.limits.upper.velocity / config.braking_time**2
+        4
+        * degree_of_freedom.limits.upper.velocity
+        / config.braking_time.total_seconds() ** 2
     )
     assert limits.upper.jerk == pytest.approx(expected_jerk_limit)
 
@@ -267,7 +272,7 @@ def _peak_acceleration_moving_to(
     braking = JerkLimitedBraking(
         velocity_limit=velocity_limit,
         jerk_limit=acceleration_limit**2 / (2 * velocity_limit),
-        time_step=1 / TARGET_FREQUENCY,
+        time_step=timedelta(seconds=1 / TARGET_FREQUENCY),
     )
     number_of_resting_steps = QPControllerConfig(
         target_frequency=TARGET_FREQUENCY
@@ -413,7 +418,7 @@ def test_final_braking_step_uses_exactly_the_jerk_limit(prismatic_bot):
     profiler = DegreeOfFreedomLimitProfiler(
         QPControllerConfig.create_with_simulation_defaults()
     )
-    time_step = profiler.time_step
+    time_step = profiler.time_step.total_seconds()
     upper_limits = profiler.resolve_limits(_single_dof(prismatic_bot)).upper
     jerk_step = upper_limits.jerk * time_step**2
     approaching = _horizon_bounds_at(
@@ -486,7 +491,7 @@ def _normalized_first_jerk_weight(jerk_limit: float) -> float:
     :return: Normalized weight of the first jerk decision variable.
     """
     config = _default_config()
-    jerk_decision_variable_bound = jerk_limit * config.control_dt**2
+    jerk_decision_variable_bound = jerk_limit * config.control_dt.total_seconds() ** 2
     return (
         config.horizon_weight_gain_scalar
         * JERK_WEIGHT
@@ -505,7 +510,7 @@ def test_jerk_weight_of_a_degree_of_freedom_without_jerk_limit_is_kept(
     derived_jerk_limit = (
         4
         * degree_of_freedom.limits.upper.velocity
-        / _default_config().braking_time ** 2
+        / _default_config().braking_time.total_seconds() ** 2
     )
 
     assert _first_jerk_weight(prismatic_bot) == pytest.approx(

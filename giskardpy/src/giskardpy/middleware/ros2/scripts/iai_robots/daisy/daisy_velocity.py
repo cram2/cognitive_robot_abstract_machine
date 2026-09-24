@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
@@ -26,7 +28,9 @@ def main():
         world_config=WorldWithDaisyConfig(urdf=robot_description),
         robot_interface_config=DAiSyVelocityInterface(),
         server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
-        qp_controller_config=QPControllerConfig(target_frequency=80, braking_time=0.36),
+        qp_controller_config=QPControllerConfig(
+            target_frequency=80, braking_time=timedelta(seconds=0.36)
+        ),
     )
     giskard.live()
 

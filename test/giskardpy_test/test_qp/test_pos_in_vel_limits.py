@@ -2,12 +2,14 @@
 Direct unit tests for :class:`giskardpy.qp.pos_in_vel_limits.BrakingProfile`.
 """
 
+from datetime import timedelta
+
 import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.pos_in_vel_limits import BrakingProfile
 
-DELTA_TIME = 0.05
+DELTA_TIME = timedelta(seconds=0.05)
 RESIDUE = 1e-10
 
 
@@ -17,7 +19,7 @@ def _shifted_velocities(velocity_profile: np.ndarray) -> np.ndarray:
     covered one time step worth of its own distance.
     """
     braking_profile = BrakingProfile(velocity=velocity_profile, time_step=DELTA_TIME)
-    return braking_profile.shifted_by(sm.Scalar(DELTA_TIME)).evaluate()
+    return braking_profile.shifted_by(sm.Scalar(DELTA_TIME.total_seconds())).evaluate()
 
 
 # %% residue in the braking profile tail

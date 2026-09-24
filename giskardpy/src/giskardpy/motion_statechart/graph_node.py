@@ -1573,7 +1573,7 @@ def velocity_convergence_expression(
         ref.append(velocity_limit)
         symbols.append(dof.variables.velocity)
 
-    dt = context.qp_controller_config.control_dt
+    dt = context.qp_controller_config.control_dt.total_seconds()
     elapsed_cycles = context.control_cycle_variable
     if reference_cycle_variable is not None:
         elapsed_cycles = elapsed_cycles - reference_cycle_variable

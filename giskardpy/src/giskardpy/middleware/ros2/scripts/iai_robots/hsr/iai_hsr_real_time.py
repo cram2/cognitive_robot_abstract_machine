@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs import (
     WorldWithHSRConfig,
     HSRVelocityInterface,
@@ -16,7 +18,9 @@ def main():
     giskard = Giskard(
         world_config=WorldWithHSRConfig(urdf=urdf),
         robot_interface_config=HSRVelocityInterface(),
-        qp_controller_config=QPControllerConfig(target_frequency=40, braking_time=0.35),
+        qp_controller_config=QPControllerConfig(
+            target_frequency=40, braking_time=timedelta(seconds=0.35)
+        ),
         server_config=GiskardServerConfig(
             execution_mode=ExecutionMode.CLOSED_LOOP, debug_mode=False
         ),

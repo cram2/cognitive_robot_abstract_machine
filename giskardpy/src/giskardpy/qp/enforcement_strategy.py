@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -228,7 +229,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.control_dt
+            * self.qp_controller_config.control_dt.total_seconds()
         )
         return sm.hstack(
             [jacobian for _ in range(self.qp_controller_config.control_horizon)]
@@ -242,7 +243,10 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         if len(self.constraints) == 0:
             return sm.Matrix()
         return sm.Matrix.diag(
-            [self.qp_controller_config.control_dt for _ in self.constraints]
+            [
+                self.qp_controller_config.control_dt.total_seconds()
+                for _ in self.constraints
+            ]
         )
 
     def create_slack_variables(self) -> DirectLimits:
@@ -279,7 +283,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
     def _apply_cap(
         self,
         value: Scalar,
-        dt: float,
+        dt: timedelta,
         normalization_number: float,
         control_horizon: int,
     ) -> Scalar:
@@ -288,14 +292,14 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         """
         return sm.limit(
             value,
-            -normalization_number * dt * control_horizon,
-            normalization_number * dt * control_horizon,
+            -normalization_number * dt.total_seconds() * control_horizon,
+            normalization_number * dt.total_seconds() * control_horizon,
         )
 
     def capped_bound(
         self,
         equality_bound: Scalar,
-        dt: float,
+        dt: timedelta,
         normalization_number: float,
         control_horizon: int,
     ) -> Scalar:
@@ -376,7 +380,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.control_dt
+            * self.qp_controller_config.control_dt.total_seconds()
         )
         missing_variables = self.qp_controller_config.max_derivative - 1
         eye = sm.Matrix.eye(self.qp_controller_config.prediction_horizon)[
@@ -403,7 +407,10 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         num_slack_variables = sum(
             self.qp_controller_config.prediction_horizon - 2 for c in self.constraints
         )
-        return sm.Matrix.eye(num_slack_variables) * self.qp_controller_config.control_dt
+        return (
+            sm.Matrix.eye(num_slack_variables)
+            * self.qp_controller_config.control_dt.total_seconds()
+        )
 
     def create_slack_variables(self) -> DirectLimits:
         """
@@ -441,7 +448,10 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         bounds = []
         for _ in range(self.qp_controller_config.control_horizon):
             for c in self.constraints:
-                bounds.append(bounds_getter(c) * self.qp_controller_config.control_dt)
+                bounds.append(
+                    bounds_getter(c)
+                    * self.qp_controller_config.control_dt.total_seconds()
+                )
         return Vector(bounds)
 
     def create_names(self) -> list[str]:
@@ -585,7 +595,8 @@ class SystemDynamicsStrategy(EnforcementStrategy):
         res = sm.Vector.zeros(self.number_of_jerk_columns)
         res[: self.number_of_free_variables] = (
             -self.velocity_variables
-            - self.acceleration_variables * self.qp_controller_config.control_dt
+            - self.acceleration_variables
+            * self.qp_controller_config.control_dt.total_seconds()
         )
         res[self.number_of_free_variables : self.number_of_free_variables * 2] = (
             self.velocity_variables

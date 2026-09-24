@@ -1,11 +1,12 @@
 import math
+from datetime import timedelta
 from itertools import product
 
 import pytest
 
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 
-TIME_STEPS = [1 / 20, 1 / 25, 1 / 50, 1 / 80, 1 / 100]
+TIME_STEPS = [timedelta(seconds=1 / frequency) for frequency in (20, 25, 50, 80, 100)]
 VELOCITY_LIMITS = [0.013, 0.2, 1.0, 2.5]
 JERK_LIMITS = [1.0, 44.4, 1111.0]
 
@@ -38,7 +39,7 @@ def test_number_of_steps_is_the_fewest_that_remove_the_velocity(
     braking = JerkLimitedBraking(
         velocity_limit=velocity_limit, jerk_limit=jerk_limit, time_step=time_step
     )
-    jerk_step = jerk_limit * time_step**2
+    jerk_step = jerk_limit * time_step.total_seconds() ** 2
 
     removable = JerkLimitedBraking._removable_velocity_in_jerk_steps(
         braking.number_of_steps
@@ -64,7 +65,7 @@ def test_braking_that_exactly_fills_its_steps_needs_no_extra_step(
     """
     velocity_limit = 1.0
     jerk_limit = velocity_limit / (
-        time_step**2
+        time_step.total_seconds() ** 2
         * JerkLimitedBraking._removable_velocity_in_jerk_steps(number_of_steps)
     )
     braking = JerkLimitedBraking(
@@ -81,7 +82,7 @@ def test_braking_that_exactly_fills_its_steps_needs_no_extra_step(
 def test_jerk_limit_from_braking_time_does_not_depend_on_the_time_step(
     velocity_limit,
 ):
-    braking_time = 0.3
+    braking_time = timedelta(seconds=0.3)
     jerk_limits = {
         JerkLimitedBraking.from_braking_time(
             velocity_limit=velocity_limit,
@@ -91,10 +92,12 @@ def test_jerk_limit_from_braking_time_does_not_depend_on_the_time_step(
         for time_step in TIME_STEPS
     }
 
-    assert jerk_limits == {4 * velocity_limit / braking_time**2}
+    assert jerk_limits == {4 * velocity_limit / braking_time.total_seconds() ** 2}
 
 
-@pytest.mark.parametrize("braking_time", [0.05, 0.3, 0.36, 1.16])
+@pytest.mark.parametrize(
+    "braking_time", [timedelta(seconds=seconds) for seconds in (0.05, 0.3, 0.36, 1.16)]
+)
 @pytest.mark.parametrize("time_step", TIME_STEPS)
 def test_every_velocity_limit_needs_the_same_steps_for_one_braking_time(
     braking_time, time_step
@@ -123,14 +126,18 @@ def test_braking_time_of_a_whole_number_of_steps_needs_exactly_those_steps(
     """
     The braking time whose jerk limit removes the velocity in exactly m steps, which is
     what a horizon of m + 2 steps used to derive, needs exactly m steps.
+
+    The braking time is rounded down to the resolution of :class:`timedelta`, so it
+    stays within that exact braking time.
     """
-    braking_time = (
+    braking_time_in_resolution_units = (
         2
-        * time_step
+        * (time_step / timedelta.resolution)
         * math.sqrt(
             JerkLimitedBraking._removable_velocity_in_jerk_steps(number_of_steps)
         )
     )
+    braking_time = timedelta.resolution * math.floor(braking_time_in_resolution_units)
 
     assert (
         JerkLimitedBraking.number_of_steps_for_braking_time(

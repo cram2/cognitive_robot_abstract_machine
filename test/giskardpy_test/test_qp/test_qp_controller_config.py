@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import numpy as np
 import pytest
 
@@ -68,7 +70,7 @@ def test_default_configuration_keeps_the_former_default_horizon():
 
 def test_derived_prediction_horizon_is_at_least_the_minimum():
     target_frequency = 50
-    braking_time_of_one_step = 2 / target_frequency
+    braking_time_of_one_step = timedelta(seconds=2 / target_frequency)
 
     config = QPControllerConfig(
         target_frequency=target_frequency, braking_time=braking_time_of_one_step
@@ -95,13 +97,14 @@ def test_explicit_prediction_horizon_longer_than_the_braking_is_kept():
 
 def test_explicit_prediction_horizon_too_short_for_the_braking_raises():
     target_frequency = 100
-    braking_time = 0.3
+    braking_time = timedelta(seconds=0.3)
     number_of_resting_steps = QPControllerConfig(
         target_frequency=target_frequency, braking_time=braking_time
     ).number_of_resting_steps
     minimum_prediction_horizon = (
         JerkLimitedBraking.number_of_steps_for_braking_time(
-            braking_time=braking_time, time_step=1 / target_frequency
+            braking_time=braking_time,
+            time_step=timedelta(seconds=1 / target_frequency),
         )
         + number_of_resting_steps
     )
@@ -173,6 +176,6 @@ def test_peak_acceleration_follows_the_braking_time_at_every_control_frequency(
     )
 
     assert peak_acceleration == pytest.approx(
-        2 * connection.dof.limits.upper.velocity / config.braking_time,
+        2 * connection.dof.limits.upper.velocity / config.braking_time.total_seconds(),
         rel=COARSEST_GRID_TOLERANCE,
     )

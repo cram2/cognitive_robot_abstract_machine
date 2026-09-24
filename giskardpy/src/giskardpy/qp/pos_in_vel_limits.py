@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from copy import copy
 from dataclasses import dataclass
+from datetime import timedelta
 
 import numpy as np
 import numpy.typing as npt
@@ -38,7 +39,7 @@ class BrakingProfile:
     Velocity at each step of the prediction horizon.
     """
 
-    time_step: float
+    time_step: timedelta
     """
     Duration of a single step of the prediction horizon.
     """
@@ -49,7 +50,7 @@ class BrakingProfile:
         initial_velocity: float,
         acceleration_limit: float,
         jerk_limit: float,
-        time_step: float,
+        time_step: timedelta,
         prediction_horizon: int,
     ) -> BrakingProfile:
         """
@@ -83,7 +84,7 @@ class BrakingProfile:
         initial_velocity: float,
         acceleration_limit: float,
         jerk_limit: float,
-        time_step: float,
+        time_step: timedelta,
         prediction_horizon: int,
     ) -> npt.NDArray:
         """
@@ -129,7 +130,7 @@ class BrakingProfile:
 
     @staticmethod
     def _derivative_link_model(
-        time_step: float, prediction_horizon: int, number_of_derivatives: int
+        time_step: timedelta, prediction_horizon: int, number_of_derivatives: int
     ) -> npt.NDArray:
         """
         Returns the equality matrix that integrates each derivative into the one below
@@ -144,7 +145,9 @@ class BrakingProfile:
         number_of_columns = prediction_horizon * number_of_derivatives
         link_model = np.zeros((number_of_rows, number_of_columns))
         link_model[:, :number_of_rows] += np.eye(number_of_rows)
-        link_model[:, prediction_horizon:] += -np.eye(number_of_rows) * time_step
+        link_model[:, prediction_horizon:] += (
+            -np.eye(number_of_rows) * time_step.total_seconds()
+        )
         previous_step_height = prediction_horizon - 1
         previous_step = -np.eye(previous_step_height)
         row_offset = 0
@@ -173,7 +176,7 @@ class BrakingProfile:
         :return: Velocity at each step of the prediction horizon for the remaining
             ``distance``.
         """
-        time_step = self.time_step
+        time_step = self.time_step.total_seconds()
         velocity_profile = self.zero_negligible_velocities(self.velocity)
         velocity_if_cases = []
         for x in range(len(velocity_profile) - 1, -1, -1):

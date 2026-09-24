@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import timedelta
 from functools import cached_property
 from typing import Dict, Type
 
@@ -55,10 +56,10 @@ class QPControllerConfig:
         Pick 20. It is high enough to be stable and low enough for quick simulations.
     """
 
-    braking_time: float = field(default=0.3)
+    braking_time: timedelta = field(default=timedelta(seconds=0.3))
     """
-    Time, in seconds, a degree of freedom without a jerk limit of its own takes to brake
-    from its velocity limit to rest.
+    Time a degree of freedom without a jerk limit of its own takes to brake from its
+    velocity limit to rest.
 
     It sets that degree of freedom's jerk limit to ``4 * velocity_limit /
     braking_time**2``, independent of the control frequency. Increasing it makes the
@@ -145,15 +146,15 @@ class QPControllerConfig:
             )
 
     @cached_property
-    def control_dt(self) -> float:
+    def control_dt(self) -> timedelta:
         """
-        Time step of the control loop in seconds, which the QP also predicts with.
+        Time step of the control loop, which the QP also predicts with.
 
         .. warning:: The robot has to execute each command for exactly this long. Longer
             makes the motion overshoot; shorter makes it outrun the prediction, and the
             QP can become infeasible.
         """
-        return 1 / self.target_frequency
+        return timedelta(seconds=1 / self.target_frequency)
 
     @property
     def number_of_braking_steps(self) -> int:

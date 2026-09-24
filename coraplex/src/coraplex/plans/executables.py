@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from typing_extensions import List, Dict, ClassVar, Optional, TYPE_CHECKING
 
@@ -253,7 +254,7 @@ class GiskardExecutable(Executable):
                 world=self.context.world,
                 qp_controller_config=QPControllerConfig(
                     target_frequency=50,
-                    braking_time=0.05,
+                    braking_time=timedelta(seconds=0.05),
                     verbose=False,
                 ),
             ),

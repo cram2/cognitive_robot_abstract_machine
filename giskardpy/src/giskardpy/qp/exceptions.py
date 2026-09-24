@@ -5,6 +5,7 @@ Exceptions raised while building and solving the quadratic program.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from typing_extensions import TYPE_CHECKING, Type
 
@@ -111,19 +112,20 @@ class BrakingTimeExceedsHorizonError(BrakingExceedsHorizonError):
     prediction horizon provides.
     """
 
-    braking_time: float
+    braking_time: timedelta
     """
-    The configured braking time, in seconds.
+    The configured braking time.
     """
 
-    time_step: float
+    time_step: timedelta
     """
     The duration of one step of the prediction horizon.
     """
 
     def error_message(self) -> str:
         return (
-            f"A braking time of {self.braking_time} s at a time step of {self.time_step} s "
+            f"A braking time of {self.braking_time.total_seconds()} s at a time step of "
+            f"{self.time_step.total_seconds()} s "
             f"needs a prediction horizon of at least {self.minimum_prediction_horizon}, "
             f"but it is {self.prediction_horizon}."
         )

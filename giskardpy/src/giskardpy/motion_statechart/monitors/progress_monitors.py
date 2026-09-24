@@ -66,9 +66,9 @@ class NotApproachingGoal(MotionStatechartNode):
     Error measured on the previous control cycle.
     """
 
-    _control_dt: float = field(default=0.0, init=False, repr=False)
+    _control_dt: timedelta = field(default=timedelta(), init=False, repr=False)
     """
-    Seconds between control cycles, used to turn a difference into a rate.
+    Time between control cycles, used to turn a difference into a rate.
     """
 
     @property
@@ -150,7 +150,7 @@ class NotApproachingGoal(MotionStatechartNode):
             # No rate is measurable from a single sample, so assume the task is moving.
             return ObservationStateValues.FALSE
         normalized_rate = (error - previous_error) / (
-            self._control_dt * self.monitored_task.threshold
+            self._control_dt.total_seconds() * self.monitored_task.threshold
         )
         if abs(normalized_rate) <= self.minimum_convergence_rate:
             return ObservationStateValues.TRUE

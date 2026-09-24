@@ -70,7 +70,7 @@ def _compile_and_tick(
     executor = Executor(context)
     executor.compile(motion_statechart=msc)
     cycles_per_alternative = ceil(
-        GIVE_UP_AFTER.total_seconds() / context.qp_controller_config.control_dt
+        GIVE_UP_AFTER / context.qp_controller_config.control_dt
     )
     for _ in range(ticks + alternatives_to_abandon * cycles_per_alternative):
         executor.tick()
@@ -239,7 +239,7 @@ def test_the_next_alternative_starts_on_the_cycle_the_previous_one_fails():
     executor.compile(motion_statechart=msc)
 
     cycles_to_abandon_an_alternative = ceil(
-        GIVE_UP_AFTER.total_seconds() / context.qp_controller_config.control_dt
+        GIVE_UP_AFTER / context.qp_controller_config.control_dt
     )
     for _ in range(cycles_to_abandon_an_alternative + SETTLE_TICKS):
         executor.tick()
