@@ -1222,7 +1222,10 @@ class Bridge:
         :raises UnknownQueryScope: When the source does not offer this scope.
         """
         with self._query_scope() as knowledge:
-            result = self._scope_runner(knowledge, scope).run(code)
+            runner = self._scope_runner(knowledge, scope)
+            result = (
+                runner.run_source(code) if isinstance(code, str) else runner.run(code)
+            )
             result.highlight = self._resolve_highlights(result.highlight)
             return result
 

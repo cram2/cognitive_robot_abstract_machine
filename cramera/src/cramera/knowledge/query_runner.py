@@ -368,7 +368,7 @@ class RowRenderer:
 @dataclass
 class EqlQueryRunner:
     """
-    Executes EQL query strings against a fixed set of domains.
+    Evaluates native EQL queries against a fixed set of domains.
     """
 
     domains: List[QueryDomain]
@@ -475,24 +475,49 @@ class EqlQueryRunner:
         return QueryVerbalization.of_expression(expression)
 
     def run(
-        self, code: str | Evaluable, limit: int = DEFAULT_ROW_LIMIT
+        self, expression: Evaluable, limit: int = DEFAULT_ROW_LIMIT
     ) -> RenderResult:
         """
-        Evaluate an EQL expression or source string and render its result.
+        Evaluate a native EQL expression and render its answer.
 
-        The last expression of ``code`` is the query; preceding statements are executed
-        as setup.
-
-        :param code: The EQL query source or an already constructed native expression.
+        :param expression: The constructed query to evaluate.
         :param limit: Maximum number of result rows to return.
+        :return: Answer rows, highlights, replay windows and available query wording.
         """
-        result = self.build(code) if isinstance(code, str) else code
-        verbalization = None
+        verbalization = QueryVerbalization.of_expression(expression)
+        return self._render(self.evaluation.evaluate(expression), limit, verbalization)
+
+    def run_source(self, code: str, limit: int = DEFAULT_ROW_LIMIT) -> RenderResult:
+        """
+        Build trusted query source and render its expression or inspected value.
+
+        The final expression supplies the answer; preceding statements establish its
+        variables. Direct values such as a world's body collection are rendered as
+        they stand.
+
+        :param code: The query source submitted by the editor.
+        :param limit: Maximum number of result rows to return.
+        :return: The evaluated query or inspected value as a rendered answer.
+        """
+        result = self.build(code)
         if isinstance(result, Evaluable):
-            # worded before evaluating: building the sentence leaves the expression
-            # evaluable, whereas the evaluated result is rows and no longer a question
-            verbalization = QueryVerbalization.of_expression(result)
-            result = self.evaluation.evaluate(result)
+            return self.run(result, limit)
+        return self._render(result, limit)
+
+    def _render(
+        self,
+        result: Any,
+        limit: int,
+        verbalization: QueryVerbalization | None = None,
+    ) -> RenderResult:
+        """
+        Render answer values with their entity highlights and optional wording.
+
+        :param result: The evaluated or directly inspected answer.
+        :param limit: Maximum number of result rows to return.
+        :param verbalization: The native query's wording, when available.
+        :return: Answer rows with their count, highlights, replay windows and wording.
+        """
         rendered = RowRenderer(
             limit=limit,
             entity_types=self.entity_types,

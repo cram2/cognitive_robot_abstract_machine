@@ -115,4 +115,4 @@ class EqlSession:
         :param code: The EQL query source.
         :param limit: Maximum number of result rows to return.
         """
-        return self.runner().run(code, limit=limit)
+        return self.runner().run_source(code, limit=limit)

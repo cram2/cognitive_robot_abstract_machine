@@ -182,7 +182,7 @@ class TestAskingForOneKindOfEvent:
         ]
         runner = EqlQueryRunner(domains=events.knowledge().domains)
 
-        answered = runner.run(pick_ups.code)
+        answered = runner.run_source(pick_ups.code)
 
         assert [row["__entity__"] for row in answered.rows] == ["milk PickUpEvent"]
         assert [row["event_type"] for row in answered.rows] == [PickUpEvent.__name__]

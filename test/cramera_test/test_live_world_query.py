@@ -69,6 +69,23 @@ class TestAutomaticWorldQueries:
     World attachments supply defaults while explicit sources retain precedence.
     """
 
+    def test_source_can_inspect_a_native_world_collection(self, world: World) -> None:
+        """
+        Source inspection returns native bodies without requiring an EQL expression.
+
+        :param world: The populated native scene inspected by the query editor.
+        """
+        bridge = Bridge()
+        bridge.attach(world)
+        code = (Path(__file__).parent / "dataset" / "world_bodies.eql").read_text()
+
+        answer = bridge.run_query(code)
+
+        assert [row["__entity__"] for row in answer.rows] == [
+            str(body.name) for body in world.bodies
+        ]
+        assert answer.verbalization is None
+
     def test_attach_enables_current_state_queries(self, world: World) -> None:
         """
         Attaching a world enables queries without registering an explicit source.

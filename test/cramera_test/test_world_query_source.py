@@ -240,4 +240,4 @@ def test_world_presets_use_native_verbalization_for_distinct_collection_labels(
     for preset in presets:
         assert preset.verbalization is not None
         assert preset.text == preset.verbalization.text
-        assert runner.run(preset.code).rows == []
+        assert runner.run_source(preset.code).rows == []
