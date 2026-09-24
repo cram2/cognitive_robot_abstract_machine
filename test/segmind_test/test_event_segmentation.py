@@ -46,7 +46,7 @@ def test_a_run_watches_the_bodies_of_every_annotation_of_a_type_it_names(
 ):
     world, milk, _ = milk_annotated_in_the_apartment
 
-    segmentation = Segmind.watching_semantic_annotations(world, [Milk])
+    segmentation = Segmind.create_for_semantic_annotation_types(world, [Milk])
 
     assert segmentation.bodies == milk.bodies
 
@@ -56,7 +56,7 @@ def test_a_body_annotated_by_two_of_the_types_named_is_watched_once(
 ):
     world, milk, _ = milk_annotated_in_the_apartment
 
-    segmentation = Segmind.watching_semantic_annotations(world, [Milk, Food])
+    segmentation = Segmind.create_for_semantic_annotation_types(world, [Milk, Food])
 
     assert segmentation.bodies == milk.bodies
 
@@ -67,7 +67,7 @@ def test_a_run_cannot_watch_a_type_the_world_holds_no_annotation_of(
     world, _, _ = milk_in_the_apartment
 
     with pytest.raises(NoSemanticAnnotationToWatch) as raised:
-        Segmind.watching_semantic_annotations(world, [Milk])
+        Segmind.create_for_semantic_annotation_types(world, [Milk])
 
     assert raised.value.semantic_annotation_type is Milk
 

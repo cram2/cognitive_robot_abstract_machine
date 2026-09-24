@@ -127,7 +127,7 @@ def test_each_kind_of_detector_is_chosen_once():
 
 
 def test_everything_holds_every_kind_of_detector_segmind_defines():
-    kinds = set(DetectorSelection.everything().detector_types)
+    kinds = set(DetectorSelection.of_every_kind().detector_types)
 
     assert {
         PickUpDetector,
@@ -143,7 +143,7 @@ def test_everything_holds_every_kind_of_detector_segmind_defines():
 
 
 def test_everything_holds_no_kind_that_is_abstract_or_defined_elsewhere():
-    kinds = set(DetectorSelection.everything().detector_types)
+    kinds = set(DetectorSelection.of_every_kind().detector_types)
 
     assert AbstractDetector not in kinds
     assert AbstractGraspDetector not in kinds
@@ -151,7 +151,7 @@ def test_everything_holds_no_kind_that_is_abstract_or_defined_elsewhere():
 
 
 def test_everything_ticks_each_kind_after_what_it_is_read_from():
-    order = DetectorSelection.everything().detector_types
+    order = DetectorSelection.of_every_kind().detector_types
 
     assert order.index(PickUpDetector) > order.index(SupportDetector)
     assert order.index(InsertionDetector) > order.index(ContainmentDetector)

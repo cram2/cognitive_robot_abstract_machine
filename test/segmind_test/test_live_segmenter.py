@@ -260,11 +260,11 @@ def test_watching_bodies_ticks_every_object_detector_for_each_body(
     world, milk, box = milk_in_the_apartment
     object_detector_types = [
         detector_type
-        for detector_type in DetectorSelection.everything().detector_types
+        for detector_type in DetectorSelection.of_every_kind().detector_types
         if detector_type.watches_a_body()
     ]
 
-    segmenter = LiveSegmenter.watching(world, [milk, box])
+    segmenter = LiveSegmenter.create_for_bodies(world, [milk, box])
 
     tracked = Counter(
         (type(detector), detector.tracked_object)
@@ -286,11 +286,11 @@ def test_watching_bodies_combines_their_events_once_for_all_of_them(
     world, milk, box = milk_in_the_apartment
     event_combining_detector_types = [
         detector_type
-        for detector_type in DetectorSelection.everything().detector_types
+        for detector_type in DetectorSelection.of_every_kind().detector_types
         if not detector_type.watches_a_body()
     ]
 
-    segmenter = LiveSegmenter.watching(world, [milk, box])
+    segmenter = LiveSegmenter.create_for_bodies(world, [milk, box])
 
     assert Counter(
         type(detector)
@@ -308,7 +308,9 @@ def test_watching_for_what_is_asked_watches_each_body_with_what_that_is_read_fro
     """
     world, milk, box = milk_in_the_apartment
 
-    segmenter = LiveSegmenter.watching(world, [milk, box], detectors=[PickUpDetector])
+    segmenter = LiveSegmenter.create_for_bodies(
+        world, [milk, box], detectors=[PickUpDetector]
+    )
 
     chosen = DetectorSelection.of(PickUpDetector).detector_types
     assert Counter(

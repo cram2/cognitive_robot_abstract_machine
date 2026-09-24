@@ -67,7 +67,7 @@ class LiveSegmenter(PropagatingThread):
         self.executor.compile(SegmindStatechart().build_statechart(self.detectors))
 
     @classmethod
-    def watching(
+    def create_for_bodies(
         cls,
         world: World,
         bodies: List[Body],
@@ -84,7 +84,7 @@ class LiveSegmenter(PropagatingThread):
         selection = (
             DetectorSelection.of(*detectors)
             if detectors
-            else DetectorSelection.everything()
+            else DetectorSelection.of_every_kind()
         )
         chosen: List[AbstractDetector] = []
         for detector_type in selection.detector_types:

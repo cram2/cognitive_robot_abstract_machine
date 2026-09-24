@@ -137,7 +137,7 @@ plan = sequential(
 ).plan
 
 segmentation = (
-    Segmind.watching_semantic_annotations(
+    Segmind.create_for_semantic_annotation_types(
         world,
         (Milk, Bowl, Spoon),
         detectors=(PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector),

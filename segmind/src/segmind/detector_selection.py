@@ -39,7 +39,7 @@ class DetectorSelection:
     """
 
     @classmethod
-    def everything(cls) -> Self:
+    def of_every_kind(cls) -> Self:
         """
         :return: Every concrete kind of detector SegMind defines, each after the kinds
             it is read from.

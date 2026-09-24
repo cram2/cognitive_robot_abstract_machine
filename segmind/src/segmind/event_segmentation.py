@@ -54,10 +54,12 @@ class Segmind:
     """
 
     def __post_init__(self) -> None:
-        self.segmenter = LiveSegmenter.watching(self.world, self.bodies, self.detectors)
+        self.segmenter = LiveSegmenter.create_for_bodies(
+            self.world, self.bodies, self.detectors
+        )
 
     @classmethod
-    def watching_semantic_annotations(
+    def create_for_semantic_annotation_types(
         cls,
         world: World,
         semantic_annotation_types: Sequence[type[SemanticAnnotation]],
