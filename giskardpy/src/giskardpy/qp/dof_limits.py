@@ -316,8 +316,8 @@ class DegreeOfFreedomLimitProfiler:
         epsilon: float = 0.00001,
     ) -> DegreeOfFreedomLimits[sm.Vector]:
         """
-        Computes the velocity, acceleration, and jerk bounds for one degree of freedom
-        across the whole prediction horizon, relaxing the jerk limit on the first steps
+        Computes the velocity and jerk bounds for one degree of freedom across the whole
+        prediction horizon, relaxing the jerk limit on the first steps
         when the position goal would otherwise be unreachable.
 
         :param degree_of_freedom_symbols: Symbolic current state of the degree of
@@ -326,7 +326,6 @@ class DegreeOfFreedomLimitProfiler:
         :param epsilon: Tolerance below which a velocity bound violation is ignored.
         """
         jerk_limit = limits.upper.jerk
-        acceleration_limit = limits.upper.acceleration
 
         velocity_bounds = self._compute_position_constrained_velocity_bounds(
             degree_of_freedom_symbols=degree_of_freedom_symbols, limits=limits
@@ -334,9 +333,6 @@ class DegreeOfFreedomLimitProfiler:
         velocity_lower_bound = velocity_bounds.lower_bound
         velocity_upper_bound = velocity_bounds.upper_bound
 
-        acceleration_profile = (
-            sm.Vector.ones(velocity_upper_bound.shape[0]) * acceleration_limit
-        )
         jerk_profile = sm.Vector.ones(velocity_upper_bound.shape[0]) * jerk_limit
 
         projected_velocity_profile, projected_jerk_profile_violated = (
@@ -359,7 +355,6 @@ class DegreeOfFreedomLimitProfiler:
         return self._assemble_degree_of_freedom_limits(
             velocity_lower_bound=velocity_lower_bound,
             velocity_upper_bound=velocity_upper_bound,
-            acceleration_profile=acceleration_profile,
             jerk_profile=jerk_profile,
         )
 
@@ -433,79 +428,57 @@ class DegreeOfFreedomLimitProfiler:
         self,
         velocity_lower_bound: sm.Vector,
         velocity_upper_bound: sm.Vector,
-        acceleration_profile: sm.Vector,
         jerk_profile: sm.Vector,
     ) -> DegreeOfFreedomLimits[sm.Vector]:
         """
-        Combines the velocity, acceleration, and jerk profiles into the horizon limits,
-        ensuring the lower bound never exceeds the upper bound.
+        Combines the velocity and jerk profiles into the horizon limits, ensuring the
+        lower bound never exceeds the upper bound.
 
         :param velocity_lower_bound: Per-step lower velocity bound.
         :param velocity_upper_bound: Per-step upper velocity bound.
-        :param acceleration_profile: Per-step acceleration magnitude.
         :param jerk_profile: Per-step jerk magnitude.
         """
         time_step = self.time_step
         velocity_lower_bound = sm.min(velocity_lower_bound, velocity_upper_bound)
         velocity_upper_bound = sm.max(velocity_lower_bound, velocity_upper_bound)
-        acceleration_lower_bounds = -acceleration_profile
-        acceleration_upper_bounds = acceleration_profile
         jerk_lower_bounds = sm.min(jerk_profile, -jerk_profile) * time_step**2
         jerk_upper_bounds = sm.max(jerk_profile, -jerk_profile) * time_step**2
         return DegreeOfFreedomLimits[sm.Vector](
-            lower=DerivativeMap(
-                velocity=velocity_lower_bound,
-                acceleration=acceleration_lower_bounds,
-                jerk=jerk_lower_bounds,
-            ),
-            upper=DerivativeMap(
-                velocity=velocity_upper_bound,
-                acceleration=acceleration_upper_bounds,
-                jerk=jerk_upper_bounds,
-            ),
+            lower=DerivativeMap(velocity=velocity_lower_bound, jerk=jerk_lower_bounds),
+            upper=DerivativeMap(velocity=velocity_upper_bound, jerk=jerk_upper_bounds),
         )
 
     def resolve_limits(
         self, degree_of_freedom: DegreeOfFreedom
     ) -> DegreeOfFreedomLimits[float]:
         """
-        Builds the lower and upper limit maps for a degree of freedom, filling in
-        unbounded acceleration limits and deriving a jerk limit from the configured
-        braking time when none is given.
+        Returns the limits the horizon bounds of a degree of freedom are built from:
+        its position limits, and the upper velocity, acceleration, and jerk limits, with
+        an unbounded acceleration limit when none is declared and the jerk limit of its
+        :meth:`_braking`.
+
+        .. note:: The horizon bounds are symmetric, so the lower velocity, acceleration,
+            and jerk limits of the degree of freedom are not used.
 
         :param degree_of_freedom: Degree of freedom whose limits are resolved.
         """
-        lower_limits = DerivativeMap()
-        upper_limits = DerivativeMap()
-
+        declared = degree_of_freedom.limits
+        acceleration_limit = declared.upper.acceleration
+        if acceleration_limit is None:
+            acceleration_limit = np.inf
+        lower_position = upper_position = None
         if degree_of_freedom.has_position_limits():
-            lower_limits.position = degree_of_freedom.limits.lower.position
-            upper_limits.position = degree_of_freedom.limits.upper.position
-        else:
-            lower_limits.position = upper_limits.position = None
-
-        lower_limits.velocity = degree_of_freedom.limits.lower.velocity
-        upper_limits.velocity = degree_of_freedom.limits.upper.velocity
-
-        if degree_of_freedom.limits.lower.acceleration is None:
-            lower_limits.acceleration = -np.inf
-        else:
-            lower_limits.acceleration = degree_of_freedom.limits.lower.acceleration
-        if degree_of_freedom.limits.upper.acceleration is None:
-            upper_limits.acceleration = np.inf
-        else:
-            upper_limits.acceleration = degree_of_freedom.limits.upper.acceleration
-
-        braking = self._braking(degree_of_freedom)
-        upper_limits.jerk = braking.jerk_limit
-        if degree_of_freedom.limits.lower.jerk is None:
-            lower_limits.jerk = -braking.jerk_limit
-        else:
-            lower_limits.jerk = max(
-                degree_of_freedom.limits.lower.jerk, -braking.jerk_limit
-            )
-
-        return DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits)
+            lower_position = declared.lower.position
+            upper_position = declared.upper.position
+        return DegreeOfFreedomLimits(
+            lower=DerivativeMap(position=lower_position),
+            upper=DerivativeMap(
+                position=upper_position,
+                velocity=declared.upper.velocity,
+                acceleration=acceleration_limit,
+                jerk=self._braking(degree_of_freedom).jerk_limit,
+            ),
+        )
 
     def _braking(self, degree_of_freedom: DegreeOfFreedom) -> JerkLimitedBraking:
         """

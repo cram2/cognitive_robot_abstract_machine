@@ -139,10 +139,8 @@ def test_resolve_limits_with_position_limits(prismatic_bot):
 
     assert limits.upper.position == POSITION_LIMIT
     assert limits.lower.position == -POSITION_LIMIT
-    assert limits.lower.acceleration == -np.inf
     assert limits.upper.acceleration == np.inf
     assert limits.upper.jerk > 0
-    assert limits.lower.jerk == pytest.approx(-limits.upper.jerk)
 
 
 def test_resolve_limits_without_position_limits(prismatic_world_no_position_limits):
@@ -168,7 +166,6 @@ def test_derived_jerk_limit_follows_the_braking_time_at_every_control_frequency(
         4 * degree_of_freedom.limits.upper.velocity / config.braking_time**2
     )
     assert limits.upper.jerk == pytest.approx(expected_jerk_limit)
-    assert limits.lower.jerk == pytest.approx(-expected_jerk_limit)
 
 
 def test_declared_jerk_limit_is_kept(prismatic_bot_with_jerk_limit):
@@ -177,7 +174,6 @@ def test_declared_jerk_limit_is_kept(prismatic_bot_with_jerk_limit):
     limits = _profiler().resolve_limits(degree_of_freedom)
 
     assert limits.upper.jerk == degree_of_freedom.limits.upper.jerk
-    assert limits.lower.jerk == degree_of_freedom.limits.lower.jerk
 
 
 def test_braking_that_does_not_fit_the_horizon_raises(

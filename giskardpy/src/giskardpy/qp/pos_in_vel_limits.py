@@ -226,19 +226,13 @@ class BrakingProfile:
 @dataclass
 class SlowdownProfile:
     """
-    Velocity, acceleration, and jerk of a degree of freedom at each step of the
-    prediction horizon while it slows down towards a target velocity profile as soon as
-    possible.
+    Velocity and jerk of a degree of freedom at each step of the prediction horizon
+    while it slows down towards a target velocity profile as soon as possible.
     """
 
     velocity: Vector
     """
     Velocity at each step of the prediction horizon.
-    """
-
-    acceleration: Vector
-    """
-    Acceleration at each step of the prediction horizon.
     """
 
     jerk: Vector
@@ -270,7 +264,7 @@ class SlowdownProfile:
         :param prediction_horizon: Number of time steps in the profile.
         :param skip_first: When truthy, the horizon cap is disabled for the first step.
         """
-        velocity, acceleration, jerk = cls._profiles(
+        velocity, jerk = cls._profiles(
             current_velocity,
             current_acceleration,
             target_velocity_profile,
@@ -279,7 +273,7 @@ class SlowdownProfile:
             prediction_horizon,
             skip_first,
         )
-        return cls(velocity=velocity, acceleration=acceleration, jerk=jerk)
+        return cls(velocity=velocity, jerk=jerk)
 
     @staticmethod
     @substitution_cache
@@ -291,9 +285,9 @@ class SlowdownProfile:
         time_step: Scalar,
         prediction_horizon: int,
         skip_first: Scalar,
-    ) -> tuple[Vector, Vector, Vector]:
+    ) -> tuple[Vector, Vector]:
         """
-        Computes the velocity, acceleration, and jerk profiles of :meth:`immediate`.
+        Computes the velocity and jerk profiles of :meth:`immediate`.
 
         :param current_velocity: Velocity at the start of the horizon.
         :param current_acceleration: Acceleration at the start of the horizon.
@@ -327,7 +321,7 @@ class SlowdownProfile:
         acceleration_profile2[0] = current_acceleration
         jerk_profile = (acceleration_profile - acceleration_profile2) / time_step
 
-        return Vector(velocity_profile), acceleration_profile, jerk_profile
+        return Vector(velocity_profile), jerk_profile
 
     @staticmethod
     @substitution_cache
