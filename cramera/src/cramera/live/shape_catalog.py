@@ -25,6 +25,7 @@ from semantic_digital_twin.world_description.geometry import (
 )
 
 from cramera.body_geometry import NumericPose
+from cramera.onboard.bundle_urdf import companion_material_library
 
 SIZE_PRECISION = 4
 """
@@ -115,12 +116,14 @@ def served_mesh_file(shape: Shape) -> Optional[str]:
     The mesh file a shape can be served from, or None when it has none.
 
     :param shape: The shape whose backing file is looked up.
+    :return: The resolved native mesh file, or None for geometry without a file.
     """
-    if not isinstance(shape, Mesh) or not shape.filename:
+    if not isinstance(shape, Mesh):
         return None
-    if not Path(shape.filename).is_file():
+    mesh_file = shape.local_file
+    if not mesh_file.is_file():
         return None
-    return shape.filename
+    return str(mesh_file)
 
 
 def companion_mtl_url(mesh_file: str, mesh_url: str) -> Optional[str]:
@@ -132,14 +135,13 @@ def companion_mtl_url(mesh_file: str, mesh_url: str) -> Optional[str]:
 
     :param mesh_file: The mesh file's path on disk.
     :param mesh_url: The URL the mesh itself is served from.
+    :return: The declared material library's URL, or None without one.
     """
     mesh_path = Path(mesh_file)
-    if mesh_path.suffix.lower() != ".obj":
+    companion = companion_material_library(mesh_path.parent, mesh_path.name)
+    if companion is None:
         return None
-    companion = mesh_path.with_suffix(".mtl")
-    if not companion.is_file():
-        return None
-    return "%s&side=%s" % (mesh_url, urllib.parse.quote(companion.name))
+    return "%s&side=%s" % (mesh_url, urllib.parse.quote(companion, safe=""))
 
 
 def shape_entry(
@@ -189,6 +191,7 @@ def shape_entry(
             radius=round(shape.radius, SIZE_PRECISION),
         )
     if isinstance(shape, Mesh) and mesh_url is not None:
+        mesh_file = shape.local_file
         return ShapeEntry(
             kind=ShapeKind.MESH,
             position=position,
@@ -196,8 +199,8 @@ def shape_entry(
             color=color,
             opacity=opacity,
             mesh=mesh_url,
-            mtl=companion_mtl_url(shape.filename, mesh_url),
-            format=Path(shape.filename).suffix.lstrip(".").lower(),
+            mtl=companion_mtl_url(str(mesh_file), mesh_url),
+            format=mesh_file.suffix.lstrip(".").lower(),
             scale=_rounded_axes(shape.scale),
         )
     if isinstance(shape, Mesh):

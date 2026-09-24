@@ -293,11 +293,15 @@ Panels.define('robot-scene', function (root, bus) {
     // any relative resource an OBJ/MTL references (the mtllib line, texture maps) is
     // fetched as a side asset of the mesh's own /mesh URL, so a live mesh keeps its
     // authored materials without the bridge serving its whole directory
-    function sideAssetModifier(meshUrl) {
+    function sideAssetModifier(meshUrl, materialUrl) {
+      const materialQuery = new URLSearchParams((materialUrl || '').split('?')[1] || '');
+      const materialPath = materialQuery.get('side') || '';
+      const directory = materialPath.slice(0, materialPath.lastIndexOf('/') + 1);
       return function (url) {
+        // MTLLoader's explicit resource path leaves texture references relative.
+        if (url.indexOf('./') === 0) url = url.slice(2);
         if (/^(\/|https?:|data:|blob:)/.test(url)) return url;
-        const resource = url.split('/').pop();
-        return meshUrl + '&side=' + encodeURIComponent(resource);
+        return meshUrl + '&side=' + encodeURIComponent(directory + url);
       };
     }
     function loadShapeMesh(shapeSpec, holder) {
@@ -313,7 +317,7 @@ Panels.define('robot-scene', function (root, bus) {
       };
       if (shapeSpec.format === 'obj' && THREE.OBJLoader) {
         const manager = new THREE.LoadingManager();
-        manager.setURLModifier(sideAssetModifier(shapeSpec.url));
+        manager.setURLModifier(sideAssetModifier(shapeSpec.url, shapeSpec.mtl));
         const loadObj = function (materials) {
           const objLoader = new THREE.OBJLoader(manager);
           if (materials) { materials.preload(); objLoader.setMaterials(materials); }
@@ -325,7 +329,7 @@ Panels.define('robot-scene', function (root, bus) {
           }, undefined, fail);
         };
         if (shapeSpec.mtl && THREE.MTLLoader) {
-          new THREE.MTLLoader(manager).load(shapeSpec.mtl, loadObj,
+          new THREE.MTLLoader(manager).setResourcePath('./').load(shapeSpec.mtl, loadObj,
             undefined, function () { loadObj(null); });
         } else {
           loadObj(null);

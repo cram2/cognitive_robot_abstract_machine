@@ -233,12 +233,12 @@ def _write_object_mesh(
         and shapes[0].origin.equivalent(HomogeneousTransformationMatrix())
         and shapes[0].scale == Scale()
     ):
-        source = shapes[0].filename
-        if source and Path(source).is_file():
-            destination = objects_directory / (key + Path(source).suffix)
+        source = shapes[0].local_file
+        if source.is_file():
+            destination = objects_directory / (key + source.suffix)
             assets = BundledAssets(bundle_root=str(output_directory))
-            if assets.copy(source, str(destination)):
-                assets.copy_side_assets(source, str(destination))
+            if assets.copy(str(source), str(destination)):
+                assets.copy_side_assets(str(source), str(destination))
                 return "meshes/objects/" + destination.name
     destination = objects_directory / key / (Path(key).name + MeshFormat.OBJ.value)
     destination.parent.mkdir(parents=True, exist_ok=True)

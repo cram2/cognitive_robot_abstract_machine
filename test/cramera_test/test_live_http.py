@@ -27,6 +27,7 @@ from cramera.live.recording import Recording
 
 from .test_live_bridge import shaped_body, world_with
 from .test_server import get, get_json, posted_answer
+from .dataset.mesh_geometry import resolved_textured_mesh
 
 
 def post(url, payload=None, timeout=10):
@@ -162,6 +163,31 @@ class TestReadOnlyEndpoints:
 
 
 class TestMesh:
+    def test_native_resolved_mesh_material_and_texture_are_served(
+        self, server: str, bridge: Bridge, resolved_textured_mesh: Mesh
+    ) -> None:
+        """
+        Serve a native export and its declared side assets through the allowlist.
+
+        :param server: Running live bridge HTTP endpoint.
+        :param bridge: Bridge whose native mesh is published.
+        :param resolved_textured_mesh: Native URI mesh with material and texture files.
+        """
+        body = Body(
+            name=PrefixedName("textured"),
+            visual=ShapeCollection(shapes=[resolved_textured_mesh]),
+        )
+        bridge.publish_bodies({str(body.name): body})
+        [shape] = bridge.object_catalog()[0]["shapes"]
+        mesh_file = resolved_textured_mesh.local_file
+        [material] = mesh_file.parent.glob("*.mtl")
+        [texture] = mesh_file.parent.glob("*.png")
+
+        assert get(server + shape["mesh"])[1] == mesh_file.read_bytes()
+        assert get(server + shape["mtl"])[1] == material.read_bytes()
+        texture_url = shape["mesh"] + "&side=" + texture.name
+        assert get(server + texture_url)[1] == texture.read_bytes()
+
     def test_a_published_meshs_bytes_are_served(self, server, bridge, tmp_path):
         publish_mesh_object(bridge, tmp_path, content=b"solid milk endsolid")
         status, body = get(server + "/mesh?key=milk.stl%230")

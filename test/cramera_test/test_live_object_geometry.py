@@ -3,6 +3,7 @@ Native shape collections remain authoritative for live object geometry.
 """
 
 from pathlib import Path
+import urllib.parse
 
 import numpy
 import pytest
@@ -24,8 +25,59 @@ from semantic_digital_twin.world_description.world_entity import Body
 from cramera.live.bridge import Bridge, ObjectCatalogEntry
 from cramera.live.recording_bundle import _object_entry
 
+from .dataset.mesh_geometry import resolved_textured_mesh
+
 
 # %% catalog geometry
+def test_catalog_resolves_the_native_mesh_and_its_declared_material(
+    resolved_textured_mesh: Mesh,
+) -> None:
+    """
+    Serve the resolved file and the material declared by its native export.
+
+    :param resolved_textured_mesh: Native mesh with material and texture side assets.
+    """
+    body = Body(
+        name=PrefixedName("textured"),
+        visual=ShapeCollection(shapes=[resolved_textured_mesh]),
+    )
+    bridge = Bridge()
+    bridge.publish_bodies({str(body.name): body})
+
+    [shape] = bridge.object_catalog()[0]["shapes"]
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(shape["mesh"]).query)
+    material_query = urllib.parse.parse_qs(urllib.parse.urlsplit(shape["mtl"]).query)
+    [material] = resolved_textured_mesh.local_file.parent.glob("*.mtl")
+
+    assert bridge.mesh_path(query["key"][0]) == str(resolved_textured_mesh.local_file)
+    assert material_query["side"] == [material.name]
+    assert material_query["key"] == query["key"]
+
+
+def test_recording_copies_the_resolved_mesh_with_its_original_materials(
+    resolved_textured_mesh: Mesh, tmp_path: Path
+) -> None:
+    """
+    Keep original file bytes and texture assets when the native pose is unchanged.
+
+    :param resolved_textured_mesh: Native exported mesh addressed through a file URI.
+    :param tmp_path: Directory receiving the copied recording assets.
+    """
+    entry = ObjectCatalogEntry(
+        key="textured", shapes=ShapeCollection(shapes=[resolved_textured_mesh])
+    )
+    destination = tmp_path / "recorded"
+
+    payload = _object_entry(entry, [0, 0, 0, 0, 0, 0, 1], destination)
+
+    recorded_file = destination / payload["mesh"]
+    assert recorded_file.read_bytes() == resolved_textured_mesh.local_file.read_bytes()
+    for source in resolved_textured_mesh.local_file.parent.iterdir():
+        if source == resolved_textured_mesh.local_file:
+            continue
+        assert (recorded_file.parent / source.name).read_bytes() == source.read_bytes()
+
+
 def test_catalog_serializes_native_meshes_without_an_external_file_map(
     tmp_path: Path,
 ) -> None:
