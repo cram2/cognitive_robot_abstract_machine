@@ -6,6 +6,7 @@ import hashlib
 import threading
 import time
 import urllib.parse
+from collections.abc import Callable
 from contextlib import contextmanager, ExitStack
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
@@ -55,11 +56,7 @@ from cramera.knowledge.queryable_knowledge import (
 )
 from cramera.knowledge.question_matching import QuestionMatcher, QuestionMatchResult
 from cramera.knowledge.views.kinematics import UrdfViewPayload
-from cramera.live.query import (
-    NoQuerySourceRegistered,
-    QueryKnowledgeSource,
-    QueryPresets,
-)
+from cramera.live.query import NoQuerySourceRegistered
 from cramera.live.markers import MarkerEntry, MarkerStore
 from cramera.live.shape_catalog import (
     color_to_hex,
@@ -492,7 +489,12 @@ class Bridge:
     The newest transform-graph snapshot (see :mod:`cramera.live.transforms`).
     """
 
-    query_knowledge: QueryKnowledgeSource | None = None
+    query_knowledge: (
+        QueryableKnowledge
+        | list[QueryableKnowledge]
+        | Callable[[], QueryableKnowledge | list[QueryableKnowledge]]
+        | None
+    ) = None
     """
     Explicit query scopes overriding the attached world's default knowledge.
     """
@@ -502,12 +504,16 @@ class Bridge:
     Display title of explicitly registered query knowledge.
     """
 
-    _query_presets: QueryPresets = field(default_factory=list, init=False)
+    _query_presets: list[Preset] | Callable[[], list[Preset]] = field(
+        default_factory=list, init=False
+    )
     """
     Visible presets for explicitly registered query knowledge.
     """
 
-    _unlisted_query_presets: QueryPresets = field(default_factory=list, init=False)
+    _unlisted_query_presets: list[Preset] | Callable[[], list[Preset]] = field(
+        default_factory=list, init=False
+    )
     """
     Additional registered presets recognized through natural-language questions.
     """
@@ -989,10 +995,14 @@ class Bridge:
     # %% viewer -> questions about the running demo
     def register_query_source(
         self,
-        knowledge: QueryKnowledgeSource,
+        knowledge: (
+            QueryableKnowledge
+            | list[QueryableKnowledge]
+            | Callable[[], QueryableKnowledge | list[QueryableKnowledge]]
+        ),
         title: str,
-        presets: QueryPresets,
-        unlisted_presets: QueryPresets | None = None,
+        presets: list[Preset] | Callable[[], list[Preset]],
+        unlisted_presets: list[Preset] | Callable[[], list[Preset]] | None = None,
     ) -> None:
         """
         Offer the running demo's state to the viewer's queries.
