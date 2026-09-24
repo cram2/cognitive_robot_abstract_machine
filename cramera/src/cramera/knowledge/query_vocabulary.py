@@ -250,6 +250,8 @@ class QueryVocabulary:
                     name=name,
                     kind=VocabularyKind.VALUE,
                     detail=self._summary_of(value) or type(value).__name__,
+                    module=type(value).__module__,
+                    type_name=type(value).__name__,
                 )
             )
             for name, value in self.extra_names.items()
@@ -312,9 +314,9 @@ class QueryVocabulary:
         for domain in self.domains:
             if name == domain.name or name == domain.entity_type.__name__:
                 return domain.entity_type
-        placed = self.extra_names.get(name)
-        if isinstance(placed, type):
-            return placed
+        if name in self.extra_names:
+            placed = self.extra_names[name]
+            return placed if isinstance(placed, type) else type(placed)
         resolved = self.class_index.resolve(name)
         return resolved if isinstance(resolved, type) else None
 
