@@ -203,7 +203,7 @@ class DegreeOfFreedomLimitProfiler:
         """
         Duration of a single step of the prediction horizon.
         """
-        return self.qp_controller_config.model_predictive_control_time_step
+        return self.qp_controller_config.control_dt
 
     @property
     def prediction_horizon(self) -> int:
@@ -673,7 +673,7 @@ class DegreeOfFreedomDecisionVariables:
         decision_variable_limits = {
             degree_of_freedom.id: self._decision_variable_limits(
                 upper_limits=self.profiler.resolve_limits(degree_of_freedom).upper,
-                time_step=qp_controller_config.model_predictive_control_time_step,
+                time_step=qp_controller_config.control_dt,
             )
             for degree_of_freedom in self.degrees_of_freedom
         }

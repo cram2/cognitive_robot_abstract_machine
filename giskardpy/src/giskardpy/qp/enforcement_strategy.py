@@ -228,7 +228,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_dt
         )
         return sm.hstack(
             [jacobian for _ in range(self.qp_controller_config.control_horizon)]
@@ -242,10 +242,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         if len(self.constraints) == 0:
             return sm.Matrix()
         return sm.Matrix.diag(
-            [
-                self.qp_controller_config.model_predictive_control_time_step
-                for _ in self.constraints
-            ]
+            [self.qp_controller_config.control_dt for _ in self.constraints]
         )
 
     def create_slack_variables(self) -> DirectLimits:
@@ -319,7 +316,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             [
                 self.capped_bound(
                     bounds_getter(c),
-                    self.qp_controller_config.model_predictive_control_time_step,
+                    self.qp_controller_config.control_dt,
                     c.normalization_factor,
                     self.qp_controller_config.control_horizon,
                 )
@@ -379,7 +376,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_dt
         )
         missing_variables = self.qp_controller_config.max_derivative - 1
         eye = sm.Matrix.eye(self.qp_controller_config.prediction_horizon)[
@@ -406,10 +403,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         num_slack_variables = sum(
             self.qp_controller_config.prediction_horizon - 2 for c in self.constraints
         )
-        return (
-            sm.Matrix.eye(num_slack_variables)
-            * self.qp_controller_config.model_predictive_control_time_step
-        )
+        return sm.Matrix.eye(num_slack_variables) * self.qp_controller_config.control_dt
 
     def create_slack_variables(self) -> DirectLimits:
         """
@@ -447,10 +441,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         bounds = []
         for _ in range(self.qp_controller_config.control_horizon):
             for c in self.constraints:
-                bounds.append(
-                    bounds_getter(c)
-                    * self.qp_controller_config.model_predictive_control_time_step
-                )
+                bounds.append(bounds_getter(c) * self.qp_controller_config.control_dt)
         return Vector(bounds)
 
     def create_names(self) -> list[str]:
@@ -594,8 +585,7 @@ class SystemDynamicsStrategy(EnforcementStrategy):
         res = sm.Vector.zeros(self.number_of_jerk_columns)
         res[: self.number_of_free_variables] = (
             -self.velocity_variables
-            - self.acceleration_variables
-            * self.qp_controller_config.model_predictive_control_time_step
+            - self.acceleration_variables * self.qp_controller_config.control_dt
         )
         res[self.number_of_free_variables : self.number_of_free_variables * 2] = (
             self.velocity_variables

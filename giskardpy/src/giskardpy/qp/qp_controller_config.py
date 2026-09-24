@@ -126,23 +126,6 @@ class QPControllerConfig:
     If True, prints config.
     """
 
-    # %% init false
-    model_predictive_control_time_step: float = field(init=False)
-    """
-    The time step of the MPC in seconds.
-
-    control_dt == mpc_dt:
-        default
-    control_dt > mpc_dt:
-        The control commands apply over longer intervals than expected, almost guaranteeing overshoot or in stability.
-    control_dt < mpc_dt:
-        The MPC formulation underestimates real kinematics based on mpc_dt. If the control loop runs faster,
-        the actual system evolves more frequently, potentially causing overshooting as velocity
-        integrals exceed the controller’s estimate. In extreme cases, QPs may become infeasible due to excessive
-        velocity/acceleration demands.
-    .. warning:: Don't change this.
-    """
-
     qp_solver_class: Type[QPSolver] = field(default=QPSolverPIQP)
     """
     Reference to the resolved QP solver class.
@@ -153,7 +136,6 @@ class QPControllerConfig:
             logging.warning(
                 f"Hertz ({self.target_frequency}) is below 20Hz. This might cause instability."
             )
-        self.model_predictive_control_time_step = self.control_dt
 
         minimum_prediction_horizon = (
             self.number_of_braking_steps + NUMBER_OF_RESTING_STEPS
@@ -177,7 +159,11 @@ class QPControllerConfig:
     @cached_property
     def control_dt(self) -> float:
         """
-        Time step of the control loop in seconds.
+        Time step of the control loop in seconds, which the QP also predicts with.
+
+        .. warning:: The robot has to execute each command for exactly this long. Longer
+            makes the motion overshoot; shorter makes it outrun the prediction, and the
+            QP can become infeasible.
         """
         return 1 / self.target_frequency
 
