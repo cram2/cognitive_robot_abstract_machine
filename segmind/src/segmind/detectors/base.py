@@ -159,9 +159,9 @@ class AbstractDetector(MotionStatechartNode, ABC):
         events = self.update_context_and_events(
             context, segmind_context_extension, objects_to_check
         )
-        for e in events:
+        for event in events:
             segmind_context_extension.logger.log_event(
-                e, segmind_context_extension.tracker_registry
+                event, segmind_context_extension.tracker_registry
             )
         return ObservationStateValues.TRUE if events else ObservationStateValues.FALSE
 

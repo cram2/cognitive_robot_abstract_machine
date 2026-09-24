@@ -35,7 +35,7 @@ class SegmindStatechart(MotionStatechart):
         :return: A statechart instance with detector nodes.
         """
 
-        sc = DetectorStateChart()
+        statechart = DetectorStateChart()
         default_detectors = [
             ContactDetector(),
             SupportDetector(),
@@ -48,7 +48,7 @@ class SegmindStatechart(MotionStatechart):
 
         detectors = detectors if detectors else default_detectors
 
-        sc.add_nodes(detectors)
+        statechart.add_nodes(detectors)
 
 
-        return sc
+        return statechart

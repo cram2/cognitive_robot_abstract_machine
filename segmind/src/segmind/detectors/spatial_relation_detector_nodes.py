@@ -200,29 +200,36 @@ class InsertionDetector(EventCombiningDetector):
         """
         events = []
         contact_events = [
-            i
-            for i in segmind_context.logger.get_events()
-            if isinstance(i, ContactEvent)
+            event
+            for event in segmind_context.logger.get_events()
+            if isinstance(event, ContactEvent)
         ]
         contact_events_with_holes = [
-            i for i in contact_events if i.with_object in segmind_context.holes
+            contact_event
+            for contact_event in contact_events
+            if contact_event.with_object in segmind_context.holes
         ]
-        containment_event = [
-            i
-            for i in segmind_context.logger.get_events()
-            if isinstance(i, ContainmentEvent)
+        containment_events = [
+            event
+            for event in segmind_context.logger.get_events()
+            if isinstance(event, ContainmentEvent)
         ]
 
-        by_object = defaultdict(list)
-        for i in contact_events_with_holes:
-            by_object[i.tracked_object].append(i)
+        contacts_by_object = defaultdict(list)
+        for contact_event in contact_events_with_holes:
+            contacts_by_object[contact_event.tracked_object].append(contact_event)
 
-        for j in containment_event:
-            for i in by_object.get(j.tracked_object, []):
-                if abs(i.timestamp - j.timestamp) >= self.shift_threshold:
+        for containment_event in containment_events:
+            for contact_event in contacts_by_object.get(
+                containment_event.tracked_object, []
+            ):
+                if (
+                    abs(contact_event.timestamp - containment_event.timestamp)
+                    >= self.shift_threshold
+                ):
                     continue
 
-                key = (i.tracked_object.id, i.with_object.id)
+                key = (contact_event.tracked_object.id, contact_event.with_object.id)
                 if key in segmind_context.insertion_pairs:
                     continue
 
@@ -230,9 +237,9 @@ class InsertionDetector(EventCombiningDetector):
 
                 events.append(
                     InsertionEvent(
-                        tracked_object=i.tracked_object,
-                        with_object=i.with_object,
-                        inserted_into_objects=[j.with_object],
+                        tracked_object=contact_event.tracked_object,
+                        with_object=contact_event.with_object,
+                        inserted_into_objects=[containment_event.with_object],
                     )
                 )
                 break
