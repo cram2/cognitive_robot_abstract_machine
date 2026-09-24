@@ -218,10 +218,17 @@ class TestOfferedQuestions:
 
 
 class TestAskingTheBridge:
+    """
+    Registered detection knowledge exposes current events and their query presets.
+    """
+
     @pytest.fixture()
     def bridge(self, detections):
         """
         A bridge a detecting demo has registered itself with.
+
+        :param detections: The logger providing the current detection records.
+        :return: A bridge configured with the logger's dynamic knowledge and presets.
         """
         bridge = Bridge()
         source = DetectedEvents(detections)

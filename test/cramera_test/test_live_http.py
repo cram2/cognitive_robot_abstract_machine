@@ -65,6 +65,9 @@ def server(bridge):
 def query_bridge(bridge):
     """
     The bridge with a demo's queryable state registered on it.
+
+    :param bridge: The bridge receiving current-state and episodic query knowledge.
+    :return: The configured bridge exposed by the HTTP fixture.
     """
     krrood = pytest.importorskip("krrood", reason="EQL requires krrood")  # noqa: F841
     from .test_live_query import GrowingRecordSource, make_record
@@ -697,6 +700,12 @@ class TestVocabularyEndpoints:
 
     @pytest.fixture()
     def query_bridge(self, bridge):
+        """
+        Register knowledge whose native domains can be inspected over HTTP.
+
+        :param bridge: The bridge receiving the query domains and their presets.
+        :return: The bridge configured for vocabulary requests.
+        """
         pytest.importorskip("krrood", reason="EQL requires krrood")
         from .test_live_query import GrowingRecordSource, make_record
 

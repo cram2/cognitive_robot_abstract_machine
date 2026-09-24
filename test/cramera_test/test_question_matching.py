@@ -43,6 +43,8 @@ def make_matcher() -> QuestionMatcher:
 
 # %% recognizing the asked question
 class TestRecognizingAQuestion:
+    """Exact wording and natural-language paraphrases resolve to their own presets."""
+
     def test_exact_collection_wording_beats_a_broader_fuzzy_match(self) -> None:
         """A collection's exact wording takes precedence over its broader base name."""
         broad = Preset("Find the degrees_of_freedom of a World", ROBOT_PRESET.code)

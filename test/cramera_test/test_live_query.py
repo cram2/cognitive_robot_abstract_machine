@@ -151,6 +151,12 @@ def source() -> GrowingRecordSource:
 
 @pytest.fixture()
 def bridge(source) -> Bridge:
+    """
+    Register current and stored records with their visible and unlisted presets.
+
+    :param source: The configuration supplying record domains and query evaluation.
+    :return: The bridge answering questions about the supplied records.
+    """
     live_bridge = Bridge()
     live_bridge.register_query_source(
         source.knowledge(), source.title(), source.presets(), source.unlisted_presets()
@@ -258,6 +264,9 @@ class TestAskedQuestions:
         assert result.preset.verbalization is None
 
     def test_a_source_writing_none_out_is_matched_against_its_buttons(self):
+        """
+        A configuration with no presets cannot match an unlisted question.
+        """
         live_bridge = Bridge()
         source = CurrentStateOnlySource()
         live_bridge.register_query_source(
@@ -278,6 +287,10 @@ class TestAskedQuestions:
 
 # %% two bodies of knowledge, asked apart
 class TestQueryingByScope:
+    """
+    Each query scope selects its own domains, vocabulary and evaluation.
+    """
+
     def test_the_current_state_is_answered_from_the_running_demo(self, bridge):
         result = bridge.run_query("an(entity(record))", QueryScope.CURRENT_STATE)
 
@@ -299,6 +312,9 @@ class TestQueryingByScope:
             bridge.run_query("an(entity(stored_record))", QueryScope.CURRENT_STATE)
 
     def test_a_scope_the_source_does_not_offer_is_refused(self):
+        """
+        A missing registered scope raises the native unknown-scope failure.
+        """
         live_bridge = Bridge()
         source = CurrentStateOnlySource()
         live_bridge.register_query_source(
