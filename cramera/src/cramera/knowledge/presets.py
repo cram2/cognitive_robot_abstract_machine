@@ -5,10 +5,14 @@ Ready-made EQL queries for the EQL panel.
 from __future__ import annotations
 
 import re
+import inspect
 from dataclasses import dataclass, replace
 from typing import Tuple
 
-from typing_extensions import TYPE_CHECKING, List, Optional
+from typing_extensions import TYPE_CHECKING, List, Optional, get_origin
+
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
+from krrood.class_diagrams.utils import get_type_hints_of_object
 
 from cramera.knowledge.eql_session import EqlSession
 from cramera.knowledge.query_verbalization import QueryVerbalization
@@ -22,6 +26,7 @@ from cramera.knowledge.detected_events import (
 
 if TYPE_CHECKING:
     from cramera.knowledge.query_runner import EqlQueryRunner
+    from semantic_digital_twin.world import World
 
 
 WORD_START = re.compile(r"(?<!^)(?=[A-Z])")
@@ -39,7 +44,7 @@ class Preset:
 
     text: str
     """
-    Human-readable label shown in the presets list.
+    Display label, or an empty string to use the query's native verbalization.
     """
 
     code: str
@@ -76,7 +81,51 @@ class Preset:
 
         :param runner: The runner whose variables the preset's code ranges over.
         """
-        return replace(self, verbalization=runner.verbalize(self.code))
+        verbalization = runner.verbalize(self.code)
+        return replace(
+            self,
+            text=self.text or (verbalization.text if verbalization else self.code),
+            verbalization=verbalization,
+        )
+
+    @classmethod
+    def of_world(cls, world: World, name: str) -> List[Preset]:
+        """
+        Offer queries for the world's public list fields and properties.
+
+        Collection discovery reads native type annotations without evaluating properties.
+        Labels are supplied by :meth:`worded` from the native query verbalization.
+
+        :param world: The world whose native collection metadata supplies the queries.
+        :param name: The name bound to this world in the query namespace.
+        :return: Collection queries ordered by their native attribute names.
+        """
+        owner = type(world)
+        annotations = get_type_hints_of_object(owner)
+        collections = {
+            attribute.public_name
+            for attribute in DataclassOnlyIntrospector().discover(owner)
+            if get_origin(annotations.get(attribute.public_name)) is list
+        }
+        collections.update(
+            attribute_name
+            for attribute_name, attribute in inspect.getmembers(owner)
+            if not attribute_name.startswith("_")
+            and isinstance(attribute, property)
+            and get_origin(get_type_hints_of_object(attribute.fget).get("return"))
+            is list
+        )
+        return [
+            cls(
+                text="",
+                code=(
+                    f"an(entity(flat_variable(variable(type({name}), [{name}])"
+                    f".{attribute_name})))"
+                ),
+                requires_live=True,
+            )
+            for attribute_name in sorted(collections)
+        ]
 
     @classmethod
     def of_scene(cls, scene: Optional[str] = None) -> List[Preset]:

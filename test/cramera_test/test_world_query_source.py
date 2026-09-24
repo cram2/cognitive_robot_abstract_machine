@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from cramera.knowledge.presets import Preset
 from cramera.knowledge.query_runner import EqlQueryRunner, RowRenderer
 from cramera.knowledge.queryable_knowledge import QueryScope
 from cramera.live.world_query import WorldQueryLabel, WorldQueryName, WorldQuerySource
@@ -267,3 +268,25 @@ def test_native_world_entities_keep_names_without_declared_domains(
         str(entity.name) for entity in entities
     ]
     assert result.highlight == [str(entity.name) for entity in entities]
+
+
+def test_world_presets_use_native_verbalization_for_distinct_collection_labels(
+    world_with_two_bodies: tuple[World, Body, Body],
+) -> None:
+    """
+    Native collection queries receive distinct labels from their EQL verbalization.
+
+    :param world_with_two_bodies: The empty scene whose collection presets are offered.
+    """
+    world, _, _ = world_with_two_bodies
+    name = World.__name__.lower()
+    runner = EqlQueryRunner(domains=[], extra_names={name: world})
+
+    presets = [preset.worded(runner) for preset in Preset.of_world(world, name)]
+
+    assert presets
+    assert len({preset.text for preset in presets}) == len(presets)
+    for preset in presets:
+        assert preset.verbalization is not None
+        assert preset.text == preset.verbalization.text
+        assert runner.run(preset.code).rows == []
