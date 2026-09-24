@@ -649,6 +649,8 @@ body.graph-full-open{overflow:hidden}
 .sp-SUCCEEDED,.sp-DONE{background:rgba(75,211,138,.14);color:#7fe0a8}
 .sp-RUNNING{background:rgba(255,182,72,.16);color:#ffcf8a}
 .sp-FAILED{background:rgba(255,107,139,.16);color:#ff9db1}
+.sp-PAUSED,.sp-PAUSE{background:rgba(91,140,255,.16);color:#a0baff}
+.sp-INTERRUPTED{background:rgba(255,157,107,.16);color:#ffbb98}
 .sp-CREATED,.sp-NOT_STARTED{background:rgba(70,85,122,.25);color:#9aa7c4}
 
 /* ---- Plan step hierarchy ---- */

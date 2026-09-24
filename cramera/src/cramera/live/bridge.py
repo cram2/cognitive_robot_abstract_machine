@@ -81,85 +81,6 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class TaskStatusName(StrEnum):
-    """
-    The status vocabulary the viewer styles plan and statechart nodes with.
-
-    Keeps the recorded plan vocabulary stable while translating native lifecycle values.
-    """
-
-    CREATED = "CREATED"
-    """
-    Execution has not started.
-    """
-    RUNNING = "RUNNING"
-    """
-    Execution is currently active.
-    """
-    SUCCEEDED = "SUCCEEDED"
-    """
-    Execution completed successfully.
-    """
-    FAILED = "FAILED"
-    """
-    Execution ended with a failure.
-    """
-    INTERRUPTED = "INTERRUPTED"
-    """
-    Execution was interrupted before completion.
-    """
-    PAUSE = "PAUSE"
-    """
-    Execution is suspended and may resume.
-    """
-
-    @classmethod
-    def of_native_name(cls, name: str) -> TaskStatusName:
-        """Translate a native lifecycle name into the recorded plan vocabulary.
-
-        :param name: A native lifecycle or recorded status name.
-        :return: Its viewer status.
-        """
-        if name == LifeCycleValues.NOT_STARTED.name:
-            return cls.CREATED
-        if name == LifeCycleValues.PAUSED.name:
-            return cls.PAUSE
-        return cls(name)
-
-    @classmethod
-    def _precedence(cls) -> Tuple[TaskStatusName, ...]:
-        """
-        The statuses from lowest to highest precedence.
-        """
-        return (
-            cls.CREATED,
-            cls.SUCCEEDED,
-            cls.PAUSE,
-            cls.RUNNING,
-            cls.INTERRUPTED,
-            cls.FAILED,
-        )
-
-    @property
-    def rank(self) -> int:
-        """
-        Precedence when a plan node's status is aggregated from its children: the higher
-        rank wins.
-        """
-        return self._precedence().index(self)
-
-    @classmethod
-    def rank_of(cls, status: str) -> int:
-        """
-        The rank of a status name, or the lowest rank for one this enum does not know.
-
-        :param status: A status name as reported by coraplex or the statechart.
-        """
-        if status not in cls._value2member_map_:
-            return 0
-        return cls(status).rank
-
-
 ROBOT_BASE_KEY = "__base__"
 """
 Key under which the robot's root body is published, instead of as a loose object.
@@ -206,7 +127,7 @@ class MotionNodeProgress:
     The plan node this progress belongs to.
     """
 
-    status: Optional[TaskStatusName] = None
+    status: Optional[LifeCycleValues] = None
     """
     The node's last observed execution status, else None.
     """
@@ -313,7 +234,7 @@ class PlanNodeEntry:
     Designator class name if this node describes an action, else :attr:`kind`.
     """
 
-    status: str
+    status: LifeCycleValues
     """
     This node's status: its own if it reports one, else a derived one.
 
@@ -334,6 +255,15 @@ class PlanNodeEntry:
     """
     Published object the node's designator refers to, if any.
     """
+
+    def to_payload(self) -> Dict[str, Any]:
+        """Serialize the node with its native lifecycle name.
+
+        :return: The node fields with the lifecycle represented as text.
+        """
+        payload = asdict(self)
+        payload["status"] = self.status.name
+        return payload
 
 
 class PlanTreeField(StrEnum):
@@ -364,7 +294,10 @@ class PlanSnapshot:
         The snapshot plus the legend its groups are drawn with, so the viewer does not
         keep its own copy of the plan-node colour table.
         """
-        payload = asdict(self)
+        payload = {
+            "signature": self.signature,
+            "nodes": [node.to_payload() for node in self.nodes],
+        }
         payload["legend"] = [
             {"group": group.value, "label": group.label}
             for group in PlanNodeGroup.legend()
@@ -377,7 +310,8 @@ class PlanSnapshot:
         :return: Plan roots containing their children and action metadata.
         """
         entries = {
-            node.id: {**asdict(node), PlanTreeField.CHILDREN: []} for node in self.nodes
+            node.id: {**node.to_payload(), PlanTreeField.CHILDREN: []}
+            for node in self.nodes
         }
         roots = []
         for node in self.nodes:
@@ -762,7 +696,7 @@ class Bridge:
         :param node: The node whose motion started.
         """
         self._motion_nodes[id(node)] = MotionNodeProgress(
-            node=node, status=TaskStatusName.RUNNING
+            node=node, status=LifeCycleValues.RUNNING
         )
         action_node = node.parent_action_node
         if action_node is not None and action_node.designator is not None:
@@ -775,7 +709,7 @@ class Bridge:
         :param node: The node whose motion ended.
         """
         self._motion_nodes[id(node)] = MotionNodeProgress(
-            node=node, status=TaskStatusName.of_native_name(node.status.name)
+            node=node, status=LifeCycleValues[node.status.name]
         )
         self.snapshot_plan()
 
@@ -1428,7 +1362,7 @@ class Bridge:
             return self.transform_state.to_payload(time.monotonic())
 
     # %% plan tree
-    def _live_motion_status(self, node: PlanNode) -> Optional[str]:
+    def _live_motion_status(self, node: PlanNode) -> Optional[LifeCycleValues]:
         """
         Status of one plan node as its plan callbacks reported it, or None.
 
@@ -1463,7 +1397,7 @@ class Bridge:
         parent_id: Optional[str],
         nodes: List[PlanNodeEntry],
         order: List[str],
-    ) -> str:
+    ) -> LifeCycleValues:
         """
         Serialize one plan node and its subtree; returns the node's status.
 
@@ -1476,7 +1410,7 @@ class Bridge:
         node_id = "plan_node_%d" % id(node)
         designator = node.designator if isinstance(node, DescribesAnAction) else None
         native_lifecycle = isinstance(node.status, LifeCycleValues)
-        own_status = TaskStatusName.of_native_name(node.status.name)
+        own_status = LifeCycleValues[node.status.name]
         entry = PlanNodeEntry(
             id=node_id,
             parent=parent_id,
@@ -1494,35 +1428,38 @@ class Bridge:
         nodes.append(entry)
         order.append(node_id)
 
-        child_best, children, done = TaskStatusName.CREATED, 0, 0
+        child_best, children, done = LifeCycleValues.NOT_STARTED, 0, 0
         for child in node.children:
             child_status = self._serialize_plan_node(child, node_id, nodes, order)
             if (
                 PlanNodeGroup.of_plan_node_kind(type(child).__name__)
                 is PlanNodeGroup.CONDITION
-                and child_status == TaskStatusName.CREATED
+                and child_status == LifeCycleValues.NOT_STARTED
             ):
                 continue
             child_best = self._max_status(child_best, child_status)
             children += 1
-            if child_status == TaskStatusName.SUCCEEDED:
+            if child_status == LifeCycleValues.SUCCEEDED:
                 done += 1
-        if own_status == TaskStatusName.CREATED:
-            if child_best == TaskStatusName.SUCCEEDED and done < children:
-                child_best = TaskStatusName.RUNNING
+        if own_status == LifeCycleValues.NOT_STARTED:
+            if child_best == LifeCycleValues.SUCCEEDED and done < children:
+                child_best = LifeCycleValues.RUNNING
             motion_status = None if native_lifecycle else self._live_motion_status(node)
             derived = motion_status or (
-                child_best if child_best != TaskStatusName.CREATED else None
+                child_best if child_best != LifeCycleValues.NOT_STARTED else None
             )
             if derived:
                 entry.status = derived
                 entry.derived = True
         if native_lifecycle:
             return entry.status
-        if entry.status == TaskStatusName.RUNNING:
+        if entry.status == LifeCycleValues.RUNNING:
             self._ever_running.add(id(node))
-        elif id(node) in self._ever_running and entry.status == TaskStatusName.CREATED:
-            entry.status = TaskStatusName.SUCCEEDED
+        elif (
+            id(node) in self._ever_running
+            and entry.status == LifeCycleValues.NOT_STARTED
+        ):
+            entry.status = LifeCycleValues.SUCCEEDED
             entry.derived = True
         return entry.status
 
@@ -1546,14 +1483,22 @@ class Bridge:
             entry.target = target
 
     @staticmethod
-    def _max_status(first: str, second: str) -> str:
+    def _max_status(first: LifeCycleValues, second: LifeCycleValues) -> LifeCycleValues:
         """
         The higher-ranked of two statuses.
 
         :param first: The first status to compare.
         :param second: The second status to compare.
         """
-        if TaskStatusName.rank_of(first) >= TaskStatusName.rank_of(second):
+        precedence = (
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.SUCCEEDED,
+            LifeCycleValues.PAUSED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.INTERRUPTED,
+            LifeCycleValues.FAILED,
+        )
+        if precedence.index(first) >= precedence.index(second):
             return first
         return second
 
@@ -1587,7 +1532,7 @@ class Bridge:
             running = [
                 entry
                 for entry in self.plan_state.nodes
-                if entry.status == TaskStatusName.RUNNING
+                if entry.status == LifeCycleValues.RUNNING
                 and entry.group is PlanNodeGroup.ACTION
             ]
         return running[-1].label if running else None

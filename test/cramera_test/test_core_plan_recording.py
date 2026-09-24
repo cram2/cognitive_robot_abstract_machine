@@ -11,7 +11,7 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
 )
 
-from cramera.live.bridge import Bridge, TaskStatusName
+from cramera.live.bridge import Bridge
 from cramera.live.chart_structure import ObservationName
 from cramera.live.recording_bundle import write_recording_bundle
 from cramera.live.recording_storage import trim_recording_bundle
@@ -49,7 +49,8 @@ class TestNativePlanStatus:
         bridge.begin_plan(PlanWithRoot(root=root))
 
         assert (
-            nodes_by_kind(bridge)["SequentialNode"]["status"] == TaskStatusName.RUNNING
+            nodes_by_kind(bridge)["SequentialNode"]["status"]
+            == LifeCycleValues.RUNNING.name
         )
 
     def test_a_paused_motion_publishes_a_paused_status(self):
@@ -60,7 +61,9 @@ class TestNativePlanStatus:
 
         bridge.observe_motion_ended(motion)
 
-        assert nodes_by_kind(bridge)["MotionNode"]["status"] == TaskStatusName.PAUSE
+        assert (
+            nodes_by_kind(bridge)["MotionNode"]["status"] == LifeCycleValues.PAUSED.name
+        )
 
     def test_unexecuted_conditions_do_not_keep_a_completed_action_running(self):
         bridge = Bridge()
@@ -73,9 +76,13 @@ class TestNativePlanStatus:
 
         bridge.begin_plan(PlanWithRoot(root=action))
 
-        assert nodes_by_kind(bridge)["ActionNode"]["status"] == TaskStatusName.SUCCEEDED
         assert (
-            nodes_by_kind(bridge)["ConditionNode"]["status"] == TaskStatusName.CREATED
+            nodes_by_kind(bridge)["ActionNode"]["status"]
+            == LifeCycleValues.SUCCEEDED.name
+        )
+        assert (
+            nodes_by_kind(bridge)["ConditionNode"]["status"]
+            == LifeCycleValues.NOT_STARTED.name
         )
 
 
@@ -145,9 +152,9 @@ class TestRecordedPlan:
 
     def test_recording_contains_the_published_plan(self, tmp_path):
         bridge = attached_bridge()
-        child = make_plan_node("ActionNode", status=TaskStatusName.SUCCEEDED)
+        child = make_plan_node("ActionNode", status=LifeCycleValues.SUCCEEDED.name)
         root = make_plan_node(
-            "SequentialNode", status=TaskStatusName.SUCCEEDED, children=[child]
+            "SequentialNode", status=LifeCycleValues.SUCCEEDED.name, children=[child]
         )
         bridge.begin_plan(PlanWithRoot(root=root))
 
@@ -157,7 +164,7 @@ class TestRecordedPlan:
 
         [recorded_root] = scene["planTrees"]
         assert recorded_root["label"] == type(root).__name__
-        assert recorded_root["status"] == TaskStatusName.SUCCEEDED
+        assert recorded_root["status"] == LifeCycleValues.SUCCEEDED.name
         [recorded_child] = recorded_root["children"]
         assert recorded_child["label"] == type(child).__name__
         assert recorded_child["children"] == []

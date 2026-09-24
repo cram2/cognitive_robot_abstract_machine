@@ -121,7 +121,7 @@ Panels.define('graph', function (root, bus) {
   const DETAIL_KINDS = { MotionNode: 'motion', MonitorNode: 'monitor' };
   const IGNORE_KINDS = { ConditionNode: 1 };
   const STRUCT_KINDS = { SequentialNode: 1, ParallelNode: 1, UnderspecifiedNode: 1 };
-  const STEP_STATUS = { SUCCEEDED: 'done', DONE: 'done', RUNNING: 'running', FAILED: 'failed', CREATED: 'not started', NOT_STARTED: 'not started' };
+  const STEP_STATUS = { SUCCEEDED: 'done', DONE: 'done', RUNNING: 'running', FAILED: 'failed', PAUSED: 'paused', PAUSE: 'paused', INTERRUPTED: 'interrupted', CREATED: 'not started', NOT_STARTED: 'not started' };
   function stepWords(x) { return String(x || '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim().toLowerCase().replace(/^./, function (c) { return c.toUpperCase(); }); }
   function stepLabel(n) {
     if (n.kind === 'ConditionNode') return 'condition check';
@@ -142,8 +142,7 @@ Panels.define('graph', function (root, bus) {
   // with nothing to report shows no pill rather than an invented "not started"
   function stepPill(status) {
     if (!status) return '';
-    const key = status === 'NOT_STARTED' ? 'CREATED' : status;
-    return '<span class="sp sp-' + key + '">' + (STEP_STATUS[status] || String(status).toLowerCase()) + '</span>';
+    return '<span class="sp sp-' + status + '">' + (STEP_STATUS[status] || String(status).toLowerCase()) + '</span>';
   }
   // flatten structural containers; keep action/attach as numbered steps, details collapsed
   function stepItems(node) {

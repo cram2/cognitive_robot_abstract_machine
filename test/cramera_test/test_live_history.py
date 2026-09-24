@@ -12,7 +12,6 @@ from coraplex.plans.plan_node import MotionNode
 from coraplex.robot_plans.motions.base import BaseMotion
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 
-from cramera.live.bridge import TaskStatusName
 from cramera.live.recording import Recording
 from cramera.live.visualization import (
     LiveVisualization,
@@ -62,7 +61,7 @@ class TestMotionHistoryPublication:
             LifeCycleValues.RUNNING.name
         )
         assert motion_execution.bridge.plan_state.nodes[0].status == (
-            TaskStatusName.RUNNING
+            LifeCycleValues.RUNNING
         )
 
     def test_merged_motions_subscribe_to_their_shared_history_once(
@@ -97,8 +96,8 @@ class TestMotionHistoryPublication:
         motion_execution.record(LifeCycleValues.NOT_STARTED)
 
         assert [node.status for node in motion_execution.bridge.plan_state.nodes] == [
-            TaskStatusName.CREATED,
-            TaskStatusName.CREATED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
         ]
 
     def test_root_completion_removes_history_subscriptions(

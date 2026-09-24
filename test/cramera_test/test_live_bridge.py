@@ -48,7 +48,6 @@ from cramera.live.chart_structure import ChartEdgeEntry
 from cramera.live.bridge import (
     Bridge,
     ROBOT_BASE_KEY,
-    TaskStatusName,
 )
 
 from .test_robot_parts import ArmPart, EndEffectorPart, NamedBody, OneArmedRobot
@@ -111,7 +110,7 @@ class PublishedBody:
 
 def make_plan_node(
     kind: str,
-    status: str = TaskStatusName.CREATED,
+    status: str = LifeCycleValues.NOT_STARTED.name,
     designator: Optional[ActionDescription] = None,
     children: tuple = (),
 ) -> Any:
@@ -143,7 +142,7 @@ def plan_bridge():
         children=[condition, motion],
     )
     root = make_plan_node(
-        "SequentialNode", status=TaskStatusName.SUCCEEDED, children=[action]
+        "SequentialNode", status=LifeCycleValues.SUCCEEDED.name, children=[action]
     )
     bridge.publish_bodies(
         {
@@ -171,7 +170,7 @@ def nodes_by_kind(bridge: Bridge) -> Dict[str, Dict[str, Any]]:
     return {node["kind"]: node for node in bridge.get_plan()["nodes"]}
 
 
-def end_motion(bridge: Bridge, node: Any, status: TaskStatusName) -> None:
+def end_motion(bridge: Bridge, node: Any, status: str) -> None:
     """
     Report a motion node's end with the given final status.
 
@@ -184,7 +183,7 @@ def end_motion(bridge: Bridge, node: Any, status: TaskStatusName) -> None:
     """
     node.status = ReportedStatus(name=status)
     bridge.observe_motion_ended(node)
-    node.status = ReportedStatus(name=TaskStatusName.CREATED)
+    node.status = ReportedStatus(name=LifeCycleValues.NOT_STARTED.name)
 
 
 # %% plan tree
@@ -194,9 +193,9 @@ class TestPlanSnapshot:
         bridge.observe_motion_started(motion)
         bridge.snapshot_plan()
         nodes = nodes_by_kind(bridge)
-        assert nodes["MotionNode"]["status"] == TaskStatusName.RUNNING
+        assert nodes["MotionNode"]["status"] == LifeCycleValues.RUNNING.name
         assert nodes["MotionNode"]["derived"] is True
-        assert nodes["ActionNode"]["status"] == TaskStatusName.RUNNING
+        assert nodes["ActionNode"]["status"] == LifeCycleValues.RUNNING.name
 
     def test_each_node_carries_the_colour_group_of_its_kind(self, plan_bridge):
         """
@@ -227,34 +226,42 @@ class TestPlanSnapshot:
     def test_real_status_wins_over_derivation(self, plan_bridge):
         bridge, *_ = plan_bridge
         assert nodes_by_kind(bridge)["SequentialNode"]["status"] == (
-            TaskStatusName.SUCCEEDED
+            LifeCycleValues.SUCCEEDED.name
         )
         assert nodes_by_kind(bridge)["SequentialNode"]["derived"] is False
 
     def test_partially_done_parent_is_running_not_succeeded(self, plan_bridge):
         bridge, root, action, condition, motion = plan_bridge
         action.children.append(make_plan_node("MotionNode"))
-        end_motion(bridge, motion, TaskStatusName.SUCCEEDED)
-        assert nodes_by_kind(bridge)["ActionNode"]["status"] == TaskStatusName.RUNNING
+        end_motion(bridge, motion, LifeCycleValues.SUCCEEDED.name)
+        assert (
+            nodes_by_kind(bridge)["ActionNode"]["status"]
+            == LifeCycleValues.RUNNING.name
+        )
 
     def test_fully_done_parent_is_succeeded(self, plan_bridge):
         bridge, root, action, condition, motion = plan_bridge
-        end_motion(bridge, motion, TaskStatusName.SUCCEEDED)
-        end_motion(bridge, condition, TaskStatusName.SUCCEEDED)
-        assert nodes_by_kind(bridge)["ActionNode"]["status"] == TaskStatusName.SUCCEEDED
+        end_motion(bridge, motion, LifeCycleValues.SUCCEEDED.name)
+        end_motion(bridge, condition, LifeCycleValues.SUCCEEDED.name)
+        assert (
+            nodes_by_kind(bridge)["ActionNode"]["status"]
+            == LifeCycleValues.SUCCEEDED.name
+        )
 
     def test_failure_outranks_done_sibling(self, plan_bridge):
         bridge, root, action, condition, motion = plan_bridge
-        end_motion(bridge, motion, TaskStatusName.SUCCEEDED)
-        end_motion(bridge, condition, TaskStatusName.FAILED)
-        assert nodes_by_kind(bridge)["ActionNode"]["status"] == TaskStatusName.FAILED
+        end_motion(bridge, motion, LifeCycleValues.SUCCEEDED.name)
+        end_motion(bridge, condition, LifeCycleValues.FAILED.name)
+        assert (
+            nodes_by_kind(bridge)["ActionNode"]["status"] == LifeCycleValues.FAILED.name
+        )
 
     def test_signature_is_stable_across_status_changes(self, plan_bridge):
         bridge, root, action, condition, motion = plan_bridge
         bridge.observe_motion_started(motion)
         bridge.snapshot_plan()
         while_running = bridge.get_plan()["signature"]
-        end_motion(bridge, motion, TaskStatusName.SUCCEEDED)
+        end_motion(bridge, motion, LifeCycleValues.SUCCEEDED.name)
         assert bridge.get_plan()["signature"] == while_running
 
     def test_structurally_identical_nodes_keep_separate_statuses(self):
@@ -269,22 +276,28 @@ class TestPlanSnapshot:
         second = make_plan_node("MotionNode")
         root = make_plan_node("SequentialNode", children=[first, second])
         bridge.begin_plan(PlanWithRoot(root=root))
-        end_motion(bridge, first, TaskStatusName.FAILED)
+        end_motion(bridge, first, LifeCycleValues.FAILED.name)
         statuses = [
             node["status"]
             for node in bridge.get_plan()["nodes"]
             if node["kind"] == "MotionNode"
         ]
-        assert statuses == [TaskStatusName.FAILED, TaskStatusName.CREATED]
+        assert statuses == [
+            LifeCycleValues.FAILED.name,
+            LifeCycleValues.NOT_STARTED.name,
+        ]
 
     def test_a_new_plan_drops_the_previous_progress(self, plan_bridge):
         """
         A node's pinned status must not survive into the next plan.
         """
         bridge, root, action, condition, motion = plan_bridge
-        end_motion(bridge, motion, TaskStatusName.SUCCEEDED)
+        end_motion(bridge, motion, LifeCycleValues.SUCCEEDED.name)
         bridge.begin_plan(PlanWithRoot(root=motion))
-        assert nodes_by_kind(bridge)["MotionNode"]["status"] == TaskStatusName.CREATED
+        assert (
+            nodes_by_kind(bridge)["MotionNode"]["status"]
+            == LifeCycleValues.NOT_STARTED.name
+        )
 
 
 # %% viewer -> world
@@ -314,7 +327,7 @@ class TestRunningStep:
         bridge.begin_plan(PlanWithRoot(root=action))
         bridge.observe_motion_started(motion)
         bridge.snapshot_plan()
-        end_motion(bridge, motion, TaskStatusName.SUCCEEDED)
+        end_motion(bridge, motion, LifeCycleValues.SUCCEEDED.name)
         bridge.snapshot_plan()
 
         assert bridge.running_step() is None

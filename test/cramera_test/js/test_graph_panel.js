@@ -58,6 +58,9 @@ function makeButton(view) {
 }
 
 function makeRoot() {
+  const stepsTree = makeElement();
+  const steps = makeElement();
+  steps.querySelector = function (selector) { return selector === '.steps-tree' ? stepsTree : undefined; };
   const byId = {
     '#graph-empty': makeElement(),
     '#graph-nav': makeElement(),
@@ -66,7 +69,7 @@ function makeRoot() {
     '#gnav-path': makeElement(),
     '#gt-live': makeElement(),
     '.graph-canvas': makeElement(),
-    '#graph-steps': makeElement(),
+    '#graph-steps': steps,
     '#legend': makeElement(),
     '#graph-zoom-in': makeButton(),
     '#graph-zoom-out': makeButton(),
@@ -620,3 +623,30 @@ test('a view that arrives after the reader moved on is not drawn', async functio
     instance.destroy();
   }
 });
+
+// %% lifecycle labels
+for (const status of ['PAUSED', 'PAUSE', 'INTERRUPTED', 'NOT_STARTED', 'CREATED']) {
+  test('the step list labels lifecycle ' + status, async function () {
+    const panel = loadPanel({
+      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+      '/api/knowledge/view?name=plan': { ok: true, nodes: [], edges: [], details: {}, live: 'plan' },
+      'http://bridge/plan': { signature: 'step', nodes: [
+        { id: 'action', kind: 'ActionNode', label: 'Transport', status: status, group: 'action' },
+      ] },
+    });
+    const root = makeRoot();
+    const bus = makeBus();
+    const instance = panel.factory(root, bus);
+    try {
+      await flush();
+      root.buttons.find(function (button) { return button.dataset.view === 'plan'; }).click();
+      await flush();
+      bus.emit('live:changed', { on: true, url: 'http://bridge' });
+      await flush();
+      const label = { PAUSED: 'paused', PAUSE: 'paused', INTERRUPTED: 'interrupted', NOT_STARTED: 'not started', CREATED: 'not started' }[status];
+      assert.match(root.control('#graph-steps').querySelector('.steps-tree').innerHTML, new RegExp('>' + label + '</span>'));
+    } finally {
+      instance.destroy();
+    }
+  });
+}

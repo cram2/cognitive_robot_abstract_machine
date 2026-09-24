@@ -21,7 +21,7 @@ from giskardpy.motion_statechart.data_types import LifeCycleValues
 
 from cramera import paths
 from cramera.live import visualization as visualization_module
-from cramera.live.bridge import Bridge, TaskStatusName
+from cramera.live.bridge import Bridge
 from cramera.live.recording import Recording, RecordingState
 from cramera.live.visualization import (
     BridgePlanCallback,
@@ -193,7 +193,10 @@ class TestBridgePlanCallback:
         callback.on_start(_as_motion_node(motion))
         bridge.snapshot_plan()
 
-        assert nodes_by_kind(bridge)["MotionNode"]["status"] == TaskStatusName.RUNNING
+        assert (
+            nodes_by_kind(bridge)["MotionNode"]["status"]
+            == LifeCycleValues.RUNNING.name
+        )
 
     def test_a_motion_end_pins_the_reported_status(self):
         bridge = Bridge()
@@ -201,12 +204,14 @@ class TestBridgePlanCallback:
         root = make_plan_node("SequentialNode", children=[motion])
         bridge.begin_plan(PlanWithRoot(root=root))
         callback = BridgePlanCallback(bridge=bridge)
-        motion.status = ReportedStatus(name=TaskStatusName.FAILED)
+        motion.status = ReportedStatus(name=LifeCycleValues.FAILED.name)
 
         callback.on_end(_as_motion_node(motion))
-        motion.status = ReportedStatus(name=TaskStatusName.CREATED)
+        motion.status = ReportedStatus(name=LifeCycleValues.NOT_STARTED.name)
 
-        assert nodes_by_kind(bridge)["MotionNode"]["status"] == TaskStatusName.FAILED
+        assert (
+            nodes_by_kind(bridge)["MotionNode"]["status"] == LifeCycleValues.FAILED.name
+        )
 
     def test_a_native_history_change_publishes_the_statechart(self, motion_execution):
         bridge = Bridge()
@@ -219,13 +224,16 @@ class TestBridgePlanCallback:
 
     def test_a_non_motion_node_republishes_the_plan(self):
         bridge = Bridge()
-        action = make_plan_node("ActionNode", status=TaskStatusName.RUNNING)
+        action = make_plan_node("ActionNode", status=LifeCycleValues.RUNNING.name)
         bridge._plan = PlanWithRoot(root=action)
         callback = BridgePlanCallback(bridge=bridge)
 
         callback.on_start(action)
 
-        assert nodes_by_kind(bridge)["ActionNode"]["status"] == TaskStatusName.RUNNING
+        assert (
+            nodes_by_kind(bridge)["ActionNode"]["status"]
+            == LifeCycleValues.RUNNING.name
+        )
 
 
 def _as_motion_node(mimic):

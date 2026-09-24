@@ -59,9 +59,8 @@
   };
 
   // %% execution status → node ring
-  // One palette for both status vocabularies: coraplex TaskStatus on plan nodes
-  // (CREATED/RUNNING/SUCCEEDED/FAILED/INTERRUPTED/PAUSE) and giskardpy
-  // LifeCycleValues on statechart nodes (NOT_STARTED/RUNNING/PAUSED/DONE/FAILED).
+  // Plans and statecharts share native lifecycle names. Older recordings also
+  // use CREATED, PAUSE and DONE, whose styles remain available during replay.
   const STATUS_STYLE = {
     RUNNING:     { c: '#ffb648', w: 16, text: 'running', legend: 'running' },
     SUCCEEDED:   { c: '#4bd38a', w: 12, text: 'succeeded', legend: 'succeeded / done' },
@@ -78,7 +77,7 @@
     STALE:       { c: '#7f8db0', w: 10, d: [4, 5], legend: 'not written for a while' },
     STATIC:      { c: '#46557a', w: 7, legend: 'cannot move (fixed)' },
   };
-  const STATUS_LEGEND_ORDER = ['RUNNING', 'SUCCEEDED', 'FAILED', 'PAUSE', 'INTERRUPTED', 'CREATED'];
+  const STATUS_LEGEND_ORDER = ['RUNNING', 'SUCCEEDED', 'FAILED', 'PAUSED', 'INTERRUPTED', 'NOT_STARTED'];
 
   // vis node patch that draws `status` as the node's border. The colour object is
   // written in full (background included): a per-node colour replaces the group's,
