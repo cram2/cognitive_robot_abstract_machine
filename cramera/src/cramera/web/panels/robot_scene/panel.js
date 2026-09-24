@@ -369,13 +369,16 @@ Panels.define('robot-scene', function (root, bus) {
     if (spec.box) { box(spec.box, true); return; }
     const fmt = (spec.format || (spec.meshUrl || '').split('?')[0].split('.').pop() || '').toLowerCase();
     if (fmt === 'obj' && THREE.OBJLoader) {
-      // an OBJ may bring its own materials and textures -- a printed cardboard box, say;
-      // only without them is the mesh painted in the object's flat colour
+      // keep authored textures and vertex colours; use the object's tint for plain geometry
       const loadObj = function (materials) {
         const objLoader = new THREE.OBJLoader();
         if (materials) { materials.preload(); objLoader.setMaterials(materials); spec.tame = true; }
         objLoader.load(spec.meshUrl, function (o) {
-          if (!materials) o.traverse(function (c) { if (c.isMesh) c.material = mat; });
+          if (!materials) {
+            o.traverse(function (c) {
+              if (c.isMesh && !c.geometry.hasAttribute('color')) c.material = mat;
+            });
+          }
           place(o);
         }, undefined, function () { box(); });
       };
