@@ -591,7 +591,35 @@ class DegreeOfFreedomLimitProfiler:
             upper_limits.jerk = degree_of_freedom.limits.upper.jerk
             lower_limits.jerk = degree_of_freedom.limits.lower.jerk
 
+        if degree_of_freedom.limits.upper.acceleration is not None:
+            acceleration_bounding_jerk_limit = self._acceleration_bounding_jerk_limit(
+                velocity_limit=upper_limits.velocity,
+                acceleration_limit=upper_limits.acceleration,
+            )
+            upper_limits.jerk = min(upper_limits.jerk, acceleration_bounding_jerk_limit)
+            lower_limits.jerk = max(
+                lower_limits.jerk, -acceleration_bounding_jerk_limit
+            )
+
         return lower_limits, upper_limits
+
+    def _acceleration_bounding_jerk_limit(
+        self, velocity_limit: float, acceleration_limit: float
+    ) -> float:
+        """
+        Returns the largest jerk limit that keeps the acceleration within its limit.
+
+        The QP bounds only the jerk. Starting and ending at zero acceleration, a jerk
+        limit J changes the velocity by at most 2 * velocity_limit, from one velocity
+        limit to the other, with an acceleration of at most sqrt(2 * velocity_limit * J).
+
+        .. warning:: Relaxing the jerk limit near a position limit can exceed the
+            acceleration limit as well.
+
+        :param velocity_limit: Velocity limit of the degree of freedom.
+        :param acceleration_limit: Acceleration limit of the degree of freedom.
+        """
+        return acceleration_limit**2 / (2 * velocity_limit)
 
     def compute(
         self,

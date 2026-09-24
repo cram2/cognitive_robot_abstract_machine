@@ -180,20 +180,26 @@ def apartment_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
 
 
 def _symmetric_prismatic_limits(
-    position: float | None, velocity: float, jerk: float | None = None
+    position: float | None,
+    velocity: float,
+    jerk: float | None = None,
+    acceleration: float | None = None,
 ) -> DegreeOfFreedomLimits:
     """
-    Builds symmetric prismatic degree-of-freedom limits with no acceleration bound.
+    Builds symmetric prismatic degree-of-freedom limits.
     """
     return DegreeOfFreedomLimits(
         lower=DerivativeMap(
             position=None if position is None else -position,
             velocity=-velocity,
-            acceleration=None,
+            acceleration=None if acceleration is None else -acceleration,
             jerk=None if jerk is None else -jerk,
         ),
         upper=DerivativeMap(
-            position=position, velocity=velocity, acceleration=None, jerk=jerk
+            position=position,
+            velocity=velocity,
+            acceleration=acceleration,
+            jerk=jerk,
         ),
     )
 
@@ -248,6 +254,25 @@ JERK_LIMIT_TOO_LOW_FOR_SHORT_HORIZONS = 1.0
 A jerk limit with which a joint needs dozens of time steps at 20 Hz to brake from a
 velocity of 1 to rest.
 """
+
+ACCELERATION_LIMIT = 2.0
+"""
+An acceleration limit well below what the default braking time implies for a velocity
+limit of 1.
+"""
+
+
+@pytest.fixture(
+    params=[2, None], ids=["with_position_limits", "without_position_limits"]
+)
+def prismatic_world_with_acceleration_limit(request):
+    """
+    A prismatic joint with an acceleration limit of its own, with and without position
+    limits.
+    """
+    return _make_prismatic_world(
+        [_symmetric_prismatic_limits(request.param, 1, acceleration=ACCELERATION_LIMIT)]
+    )
 
 
 @pytest.fixture(

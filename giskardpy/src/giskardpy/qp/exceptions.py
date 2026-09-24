@@ -159,6 +159,12 @@ class DegreeOfFreedomBrakingExceedsHorizonError(BrakingExceedsHorizonError):
             f"least {self.minimum_prediction_horizon}."
         )
 
+    def suggest_correction(self) -> str:
+        return (
+            f"Set prediction_horizon to at least {self.minimum_prediction_horizon}, or "
+            f"raise the jerk or acceleration limit of the degree of freedom."
+        )
+
 
 @dataclass
 class OutOfJointLimitsException(InfeasibleException):

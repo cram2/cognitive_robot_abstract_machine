@@ -7,6 +7,10 @@ import numpy as np
 import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
+from giskardpy.executor import Executor
+from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.qp.dof_limits import (
     BoundDirection,
     DegreeOfFreedomLimitProfiler,
@@ -212,6 +216,96 @@ def test_braking_that_does_not_fit_the_horizon_raises(
     assert error.value.minimum_prediction_horizon == (
         braking.number_of_steps + NUMBER_OF_RESTING_STEPS
     )
+
+
+# %% acceleration limits
+
+ACCELERATION_LIMIT_TOLERANCE = 1e-3
+"""
+Relative amount by which a solved acceleration may exceed its limit, covering the
+tolerance of the QP solver.
+"""
+
+
+def test_declared_acceleration_limit_caps_the_jerk_limit(
+    prismatic_world_with_acceleration_limit,
+):
+    """
+    With only a jerk limit J in the QP, a velocity swing of at most 2 v reaches an
+    acceleration of at most sqrt(2 v J), so J = A² / (2 v) keeps it within A.
+    """
+    degree_of_freedom = _single_dof(prismatic_world_with_acceleration_limit)
+    velocity_limit = degree_of_freedom.limits.upper.velocity
+    acceleration_limit = degree_of_freedom.limits.upper.acceleration
+
+    _, upper_limits = _profiler()._resolve_limits(degree_of_freedom)
+
+    assert upper_limits.jerk == pytest.approx(
+        acceleration_limit**2 / (2 * velocity_limit)
+    )
+
+
+def _peak_acceleration_moving_to(
+    world: World, goal: float, initial_velocity: float
+) -> float:
+    """
+    Drives the single joint of ``world`` from 0, moving at ``initial_velocity``, to
+    ``goal`` and returns the largest acceleration magnitude it reaches.
+
+    The prediction horizon is the shortest one the joint's acceleration-capped braking
+    fits into.
+    """
+    connection = world.controlled_connections[0]
+    degree_of_freedom = connection.dof
+    velocity_limit = degree_of_freedom.limits.upper.velocity
+    acceleration_limit = degree_of_freedom.limits.upper.acceleration
+    braking = JerkLimitedBraking(
+        velocity_limit=velocity_limit,
+        jerk_limit=acceleration_limit**2 / (2 * velocity_limit),
+        time_step=1 / TARGET_FREQUENCY,
+    )
+    config = QPControllerConfig(
+        target_frequency=TARGET_FREQUENCY,
+        prediction_horizon=braking.number_of_steps + NUMBER_OF_RESTING_STEPS,
+    )
+    connection.position = 0.0
+    world.state[degree_of_freedom.id].velocity = initial_velocity
+    statechart = MotionStatechart()
+    statechart.add_node(
+        JointPositionList(goal_state=JointState.from_mapping({connection: goal}))
+    )
+    executor = Executor(
+        MotionStatechartContext(world=world, qp_controller_config=config)
+    )
+    executor.compile(motion_statechart=statechart)
+    accelerations = []
+    for _ in range(6 * TARGET_FREQUENCY):
+        executor.tick()
+        accelerations.append(world.state[degree_of_freedom.id].acceleration)
+    return float(np.max(np.abs(accelerations)))
+
+
+@pytest.mark.parametrize(
+    "initial_velocity_factor", [0.0, -1.0], ids=["from_rest", "reversing"]
+)
+def test_joint_goal_respects_the_declared_acceleration_limit(
+    prismatic_world_with_acceleration_limit, initial_velocity_factor
+):
+    """
+    Reversing at full speed is the largest velocity swing, and the case the jerk cap is
+    sized for.
+    """
+    degree_of_freedom = _single_dof(prismatic_world_with_acceleration_limit)
+    acceleration_limit = degree_of_freedom.limits.upper.acceleration
+
+    peak_acceleration = _peak_acceleration_moving_to(
+        prismatic_world_with_acceleration_limit,
+        goal=1.5,
+        initial_velocity=initial_velocity_factor
+        * degree_of_freedom.limits.upper.velocity,
+    )
+
+    assert peak_acceleration <= acceleration_limit * (1 + ACCELERATION_LIMIT_TOLERANCE)
 
 
 def test_unconstrained_velocity_bounds_are_flat():
