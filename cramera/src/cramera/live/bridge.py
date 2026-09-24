@@ -19,11 +19,11 @@ from typing_extensions import (
     FrozenSet,
     List,
     Optional,
-    Protocol,
-    runtime_checkable,
     Tuple,
     TYPE_CHECKING,
 )
+from coraplex.datastructures.enums import Arms
+from coraplex.plans.plan_node import DesignatorNode
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -37,6 +37,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import WorldEntity
 from cramera.knowledge.enums import PlanNodeGroup
 from cramera.live.chart_observer import ChartObserver
 from cramera.live.chart_structure import (
@@ -69,6 +70,7 @@ from cramera.recording_fields import SceneField
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from coraplex.plans.designator import Designator
     from coraplex.plans.plan import Plan
     from coraplex.plans.plan_node import MotionNode, PlanNode
     from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -87,30 +89,14 @@ Key under which the robot's root body is published, instead of as a loose object
 """
 
 
-@runtime_checkable
-class DescribesAnAction(Protocol):
-    """
-    A plan node carrying the designator that describes what it does.
+class DesignatorParameter(StrEnum):
+    """Native designator parameters naming the selected arms."""
 
-    Structural, because only some coraplex node types have a designator at all.
-    """
+    ARM = "arm"
+    """A single arm selection."""
 
-    designator: Any
-    """
-    The action description carried by the plan node.
-    """
-
-
-@runtime_checkable
-class NamesAWorldEntity(Protocol):
-    """
-    Anything carrying a world-entity name, such as a body a designator refers to.
-    """
-
-    name: Any
-    """
-    The world-entity name identifying the referenced body or annotation.
-    """
+    ARMS = "arms"
+    """Multiple arm selections."""
 
 
 # %% viewer payload shapes
@@ -186,12 +172,12 @@ class ObjectCatalogEntry:
 @dataclass
 class PlanNodeEntry:
     """
-    One plan node's serialized state, mutated in place as its status resolves.
+    One plan node's native lifecycle state and display metadata.
     """
 
     id: str
     """
-    Identity-based id of this node (``p`` + ``id(node)``).
+    Identity-based id of this node (``plan_node_`` + ``id(node)``).
     """
 
     parent: Optional[str]
@@ -665,8 +651,8 @@ class Bridge:
         :param node: The node whose motion started.
         """
         action_node = node.parent_action_node
-        if action_node is not None and action_node.designator is not None:
-            self._chart_title = type(action_node.designator).__name__
+        if action_node is not None:
+            self._chart_title = type(action_node.action).__name__
 
     def begin_plan(self, plan: Plan) -> None:
         """
@@ -1347,7 +1333,7 @@ class Bridge:
             traversal order, to build the tree's signature.
         """
         node_id = "plan_node_%d" % id(node)
-        designator = node.designator if isinstance(node, DescribesAnAction) else None
+        designator = node.designator if isinstance(node, DesignatorNode) else None
         entry = PlanNodeEntry(
             id=node_id,
             parent=parent_id,
@@ -1369,7 +1355,7 @@ class Bridge:
             self._serialize_plan_node(child, node_id, nodes, order)
 
     def _add_designator_metadata(
-        self, entry: PlanNodeEntry, designator: Optional[Any]
+        self, entry: PlanNodeEntry, designator: Designator | None
     ) -> None:
         """
         Add arm and target-object info from a node's designator, if any.
@@ -1379,15 +1365,17 @@ class Bridge:
         """
         if designator is None:
             return
-        fields = vars(designator)
-        arm = fields.get("arm") or fields.get("arms")
+        parameters = designator.designator_parameter
+        arm = parameters.get(DesignatorParameter.ARM)
+        if arm is None:
+            arm = parameters.get(DesignatorParameter.ARMS)
         if arm is not None:
-            entry.arm = str(arm)
+            entry.arm = arm.name if isinstance(arm, Arms) else str(arm)
         target = self._designator_target(designator)
         if target:
             entry.target = target
 
-    def _designator_target(self, designator: Any) -> Optional[str]:
+    def _designator_target(self, designator: Designator) -> Optional[str]:
         """
         Published key of the object a designator refers to, if any.
 
@@ -1397,10 +1385,10 @@ class Bridge:
         :param designator: The designator to search for a world-entity reference.
         """
         keys_by_basename = {key.split("/")[-1]: key for key in self._bodies}
-        for value in vars(designator).values():
-            if not isinstance(value, NamesAWorldEntity):
+        for value in designator.designator_parameter.values():
+            if not isinstance(value, WorldEntity):
                 continue
-            basename = str(value.name).split("/")[-1]
+            basename = value.name.name
             if basename in keys_by_basename:
                 return keys_by_basename[basename]
         return None

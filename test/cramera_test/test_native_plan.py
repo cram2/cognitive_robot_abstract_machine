@@ -8,11 +8,21 @@ import json
 
 import pytest
 
+from coraplex.datastructures.enums import Arms
 from coraplex.plans.plan import Plan
-from coraplex.plans.plan_node import PlanNode
+from coraplex.plans.plan_node import ActionNode, MotionNode, PlanNode
 from giskardpy.motion_statechart.data_types import LifeCycleValues
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+from semantic_digital_twin.world_description.world_entity import Body
 
 from cramera.live.bridge import Bridge
+
+from .dataset.plan_metadata import (
+    AnnotationTargetMotion,
+    ArmSelectionAction,
+    MultipleArmAction,
+)
 
 # %% lifecycle publication
 
@@ -61,3 +71,70 @@ def test_parent_lifecycle_is_independent_of_finished_children(
 
     assert bridge.plan_state.nodes[0].status is status
     assert bridge.plan_state.nodes[0].derived is False
+
+
+# %% native designator metadata
+
+
+@pytest.mark.parametrize("arm", list(Arms))
+def test_native_arm_selection_keeps_its_name(arm: Arms) -> None:
+    """
+    Publish every selected arm, including the zero-valued left arm.
+
+    :param arm: The native arm selection to publish.
+    """
+    plan = Plan()
+    plan.add_node(ActionNode(designator=ArmSelectionAction(arm=arm)))
+    bridge = Bridge()
+
+    bridge.begin_plan(plan)
+
+    assert bridge.plan_state.nodes[0].arm == arm.name
+
+
+def test_multiple_arm_selection_keeps_the_native_arm_labels() -> None:
+    """
+    Publish a designator's plural arm parameter without losing its selections.
+    """
+    action = MultipleArmAction(arms=[Arms.LEFT, Arms.RIGHT])
+    plan = Plan()
+    plan.add_node(ActionNode(designator=action))
+    bridge = Bridge()
+
+    bridge.begin_plan(plan)
+
+    assert bridge.plan_state.nodes[0].arm == str(action.arms)
+
+
+def test_arm_enum_is_not_mistaken_for_a_target_body() -> None:
+    """
+    An enum's name does not create an object reference with the same name.
+    """
+    arm = Arms.RIGHT
+    body = Body(name=PrefixedName(arm.name))
+    plan = Plan()
+    plan.add_node(ActionNode(designator=ArmSelectionAction(arm=arm)))
+    bridge = Bridge()
+    bridge.publish_bodies({str(body.name): body})
+
+    bridge.begin_plan(plan)
+
+    assert bridge.plan_state.nodes[0].target is None
+
+
+def test_native_annotation_resolves_its_published_body_name() -> None:
+    """
+    A semantic annotation retains the target match through its native name.
+    """
+    body = Body(name=PrefixedName("handle", prefix="world"))
+    annotation = Handle(root=body, name=body.name)
+    plan = Plan()
+    plan.add_node(
+        MotionNode(designator=AnnotationTargetMotion(target_annotation=annotation))
+    )
+    bridge = Bridge()
+    bridge.publish_bodies({body.name.name: body})
+
+    bridge.begin_plan(plan)
+
+    assert bridge.plan_state.nodes[0].target == body.name.name
