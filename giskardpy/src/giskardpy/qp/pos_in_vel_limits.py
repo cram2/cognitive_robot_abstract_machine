@@ -363,15 +363,15 @@ class SlowdownProfile:
         :param no_cap: When truthy, skips the horizon-based acceleration capping.
         :return: The velocity and acceleration of the next time step.
         """
-        acceleration_cap1 = SlowdownProfile._acceleration_cap(
+        acceleration_limit_from_velocity = SlowdownProfile._acceleration_cap(
             current_velocity, jerk_limit, delta_time
-        )  # if we start at arbitrary horizon and jerk as strongly as possible, which acc do we have when we reach the vel limit
-        acceleration_cap2 = (
+        )
+        acceleration_limit_from_horizon = (
             remaining_prediction_horizon * jerk_limit * delta_time
-        )  # max acc reachable given horizon depending only on vel
+        )
         acceleration_prediction_horizon_max = sm.min(
-            acceleration_cap1, acceleration_cap2
-        )  # in reality we have a limited horizon, so we have to use the min of the two.
+            acceleration_limit_from_velocity, acceleration_limit_from_horizon
+        )
         acceleration_prediction_horizon_min = -acceleration_prediction_horizon_max
 
         next_acceleration_min = (
@@ -383,18 +383,18 @@ class SlowdownProfile:
             velocity_limit - current_velocity
         ) / delta_time  # the total acc needed to reach vel target vel
 
-        target_acceleratino = sm.max(next_acceleration_min, acceleration_to_velocity)
-        target_acceleratino = sm.if_else(
+        target_acceleration = sm.max(next_acceleration_min, acceleration_to_velocity)
+        target_acceleration = sm.if_else(
             no_cap,
-            target_acceleratino,
+            target_acceleration,
             sm.limit(
-                target_acceleratino,
+                target_acceleration,
                 acceleration_prediction_horizon_min,
                 acceleration_prediction_horizon_max,
             ),
         )  # skip when vel_limit is negative
         next_acceleration = sm.limit(
-            target_acceleratino, next_acceleration_min, next_acceleration_max
+            target_acceleration, next_acceleration_min, next_acceleration_max
         )
 
         next_velocity = current_velocity + next_acceleration * delta_time
@@ -419,11 +419,13 @@ class SlowdownProfile:
         """
         acceleration_integral = sm.abs(current_velocity) / delta_time
         jerk_step = jerk_limit * delta_time
-        n = sm.floor(
+        number_of_ramp_steps = sm.floor(
             SlowdownProfile._reverse_gauss(sm.abs(acceleration_integral / jerk_step))
         )
-        x = (-sm.gauss(n) * jerk_limit * delta_time + acceleration_integral) / (n + 1)
-        return sm.abs(n * jerk_limit * delta_time + x)
+        leftover_acceleration_per_step = (
+            -sm.gauss(number_of_ramp_steps) * jerk_step + acceleration_integral
+        ) / (number_of_ramp_steps + 1)
+        return sm.abs(number_of_ramp_steps * jerk_step + leftover_acceleration_per_step)
 
     @staticmethod
     def _reverse_gauss(integral: Scalar) -> Scalar:

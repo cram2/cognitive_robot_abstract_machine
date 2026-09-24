@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import timedelta
 
 from typing_extensions import List, Dict, ClassVar, Optional, TYPE_CHECKING
 
@@ -252,11 +251,7 @@ class GiskardExecutable(Executable):
         executor = Ros2Executor(
             context=MotionStatechartContext(
                 world=self.context.world,
-                qp_controller_config=QPControllerConfig(
-                    target_frequency=50,
-                    braking_time=timedelta(seconds=0.05),
-                    verbose=False,
-                ),
+                qp_controller_config=QPControllerConfig.create_with_fast_simulation_defaults(),
             ),
             ros_node=self.context.ros_node,
         )

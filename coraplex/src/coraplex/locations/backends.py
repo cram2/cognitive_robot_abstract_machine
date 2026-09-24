@@ -1,6 +1,5 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import timedelta
 
 from typing_extensions import List, Union, Iterable
 
@@ -166,11 +165,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
         executor = Executor(
             MotionStatechartContext(
                 world=world,
-                qp_controller_config=QPControllerConfig(
-                    target_frequency=50,
-                    braking_time=timedelta(seconds=0.05),
-                    verbose=False,
-                ),
+                qp_controller_config=QPControllerConfig.create_with_fast_simulation_defaults(),
             ),
         )
         executor.compile(msc)

@@ -200,6 +200,16 @@ class QPControllerConfig:
         """
         return cls(target_frequency=20)
 
+    @classmethod
+    def create_with_fast_simulation_defaults(cls) -> QPControllerConfig:
+        """
+        Creates a silent configuration for kinematic simulation that brakes and
+        accelerates in much less time than :meth:`create_with_simulation_defaults`.
+        """
+        return cls(
+            target_frequency=20, braking_time=timedelta(seconds=0.1), verbose=False
+        )
+
     def set_dof_weight(
         self, dof_name: PrefixedName, derivative: Derivatives, weight: float
     ):
