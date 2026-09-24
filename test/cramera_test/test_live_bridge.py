@@ -616,17 +616,17 @@ class TestShapeCatalogEntries:
         entry = bridge.object_catalog()[0]
 
         assert isinstance(bridge.object_metadata[0].shapes, ShapeCollection)
-        assert entry["color"] == "#cc3333"
+        assert entry["color"] == body.visual[0].color.to_hex()
         box, cylinder, sphere = entry["shapes"]
         assert box["kind"] == "box"
         assert box["size"] == [0.2, 0.3, 0.4]
-        assert box["color"] == "#cc3333"
+        assert box["color"] == body.visual[0].color.to_hex()
         assert box["position"] == [0.1, 0.0, 0.05]
         assert box["quaternion"] == [0.0, 0.0, 0.0, 1.0]
         assert cylinder["kind"] == "cylinder"
         assert cylinder["radius"] == 0.05
         assert cylinder["height"] == 0.3
-        assert cylinder["color"] == "#0080ff"
+        assert cylinder["color"] == body.visual[1].color.to_hex()
         assert sphere["kind"] == "sphere"
         assert sphere["radius"] == 0.05
 

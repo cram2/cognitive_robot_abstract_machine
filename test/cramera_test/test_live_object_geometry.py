@@ -9,7 +9,13 @@ import pytest
 import trimesh
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale, Sphere
+from semantic_digital_twin.world_description.geometry import (
+    Box,
+    Color,
+    Mesh,
+    Scale,
+    Sphere,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -18,6 +24,28 @@ from cramera.live.recording_bundle import _object_entry
 
 
 # %% catalog geometry
+@pytest.mark.parametrize("color", [Color(0.8, 0.2, 0.7), Color(0.1, 0.6, 0.9, 0.4)])
+def test_catalog_uses_native_color_conversion(color: Color) -> None:
+    """
+    Publish native RGB conversion while retaining opacity separately.
+
+    :param color: The native appearance of the published shape.
+    """
+    body = Body(
+        name=PrefixedName("colored"),
+        visual=ShapeCollection(shapes=[Sphere(radius=0.2, color=color)]),
+    )
+    bridge = Bridge()
+    bridge.publish_bodies({str(body.name): body})
+
+    [entry] = bridge.object_catalog()
+    [shape] = entry["shapes"]
+
+    assert entry["color"] == color.to_hex()
+    assert shape["color"] == color.to_hex()
+    assert shape["opacity"] == color.A
+
+
 def test_catalog_reuses_the_visual_shape_collection() -> None:
     """
     Publish the body's existing visual geometry without a second classification.

@@ -111,19 +111,6 @@ class ShapeEntry:
     """
 
 
-def color_to_hex(color: Color) -> str:
-    """
-    A colour as the ``#rrggbb`` hex string the viewer applies.
-
-    :param color: The colour to convert, with channels between 0 and 1.
-    """
-    return "#%02x%02x%02x" % (
-        round(color.R * 255),
-        round(color.G * 255),
-        round(color.B * 255),
-    )
-
-
 def is_default_white(color: Color) -> bool:
     """
     Whether a colour is the untouched default, meaning no colour was chosen at all.
@@ -185,9 +172,7 @@ def shape_entry(
     """
     local_pose = NumericPose.of_matrix(shape.origin.to_np()).rounded()
     position, quaternion = local_pose[:3], local_pose[3:]
-    color = (
-        fallback_color if is_default_white(shape.color) else color_to_hex(shape.color)
-    )
+    color = fallback_color if is_default_white(shape.color) else shape.color.to_hex()
     opacity = float(shape.color.A)
     if isinstance(shape, Box):
         return ShapeEntry(

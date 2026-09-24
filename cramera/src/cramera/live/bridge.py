@@ -58,7 +58,6 @@ from cramera.knowledge.views.kinematics import UrdfViewPayload
 from cramera.live.query import NoQuerySourceRegistered
 from cramera.live.markers import MarkerEntry, MarkerStore
 from cramera.live.shape_catalog import (
-    color_to_hex,
     is_default_white,
     served_mesh_file,
     shape_entry,
@@ -123,7 +122,7 @@ class ObjectCatalogEntry:
         """Return the first shape's colour, or its assigned palette colour."""
         if not self.shapes or is_default_white(self.shapes[0].color):
             return self.fallback_color
-        return color_to_hex(self.shapes[0].color)
+        return self.shapes[0].color.to_hex()
 
     def mesh_key(self, shape_index: int) -> str:
         """Identify one shape's served mesh within this object.
