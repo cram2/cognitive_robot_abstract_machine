@@ -1,4 +1,5 @@
 import os
+from contextlib import nullcontext
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
@@ -11,6 +12,13 @@ from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTor
 
 from coraplex.testing import setup_world
 from krrood.entity_query_language.factories import an, entity, variable, the
+from segmind.detectors.coarse_event_detector_nodes import (
+    PickUpDetector,
+    PlacingDetector,
+)
+from segmind.detectors.agent_event_detector_nodes import GraspDetector
+from segmind.detectors.spatial_relation_detector_nodes import ContainmentDetector
+from segmind.event_segmentation import Segmind
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
@@ -45,14 +53,14 @@ with world.modify_world():
     world.merge_world_at_pose(
         bowl,
         HomogeneousTransformationMatrix.from_xyz_quaternion(
-            2.4, 2.2, 1, reference_frame=world.root
+            2.4, 2.2, 0.98, reference_frame=world.root
         ),
     )
     connection = FixedConnection(
         parent=world.get_body_by_name("cabinet10_drawer_top"),
         child=spoon.root,
         parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-            -0.05, -0.05, 0
+            -0.05, -0.05, -0.01
         ),
     )
     world.merge_world(spoon, connection)
@@ -97,18 +105,26 @@ plan = sequential(
         ParkArmsAction(Arms.BOTH),
         MoveTorsoAction(TorsoState.HIGH),
         TransportAction(
-            next(an(entity(variable(Milk, domain=world.semantic_annotations))).evaluate()),
-            Pose.from_xyz_rpy(4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root),
+            next(
+                an(entity(variable(Milk, domain=world.semantic_annotations))).evaluate()
+            ),
+            Pose.from_xyz_rpy(4.9, 3.3, 0.81, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            next(an(entity(variable(Bowl, domain=world.semantic_annotations))).evaluate()),
-            Pose.from_xyz_rpy(5, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
+            next(
+                an(entity(variable(Bowl, domain=world.semantic_annotations))).evaluate()
+            ),
+            Pose.from_xyz_rpy(5, 3.3, 0.76, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            next(an(entity(variable(Spoon, domain=world.semantic_annotations))).evaluate()),
-            Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
+            next(
+                an(
+                    entity(variable(Spoon, domain=world.semantic_annotations))
+                ).evaluate()
+            ),
+            Pose.from_xyz_rpy(5.1, 3.3, 0.73, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
             GraspDescription(
                 ApproachDirection.FRONT,
@@ -120,5 +136,15 @@ plan = sequential(
     context=context,
 ).plan
 
-with simulated_robot:
+segmentation = (
+    Segmind.create_for_semantic_annotation_types(
+        world,
+        (Milk, Bowl, Spoon),
+        detectors=(PickUpDetector, PlacingDetector, ContainmentDetector, GraspDetector),
+    )
+    if context.segment_events
+    else nullcontext()
+)
+
+with simulated_robot, segmentation:
     plan.perform()

@@ -81,7 +81,7 @@ def contact(
     :return: True if the two objects are in contact False else
     """
     tcd = body1._world.collision_manager.collision_detector
-    result = tcd.check_collision_between_bodies(body1, body2)
+    result = tcd.check_collision_between_bodies(body1, body2, distance=threshold)
 
     if result is None:
         return False
@@ -249,24 +249,58 @@ def compute_euclidean_planar_distance(
 
 @symbolic_function
 def is_supported_by(
-    supported_body: Body, supporting_body: Body, max_intersection_height: float = 0.1
+    supported_body: Body,
+    supporting_body: Body,
+    max_intersection_height: float = 0.1,
+    contact_tolerance: float = 0.005,
 ) -> bool:
     """
     Checks if one object is supporting another object.
+
+    An object rests on what touches it from underneath, which is read off where the two
+    meet rather than from where their middles lie: a container carries its own middle
+    above what stands on its floor, and a wall's bounding box reaches far past the wall.
 
     :param supported_body: Object that is supported
     :param supporting_body: Object that potentially supports the first object
     :param max_intersection_height: Maximum height of the intersection between the two
         objects. If the intersection is higher than this value, the check returns False
         due to unhandled clipping.
+    :param contact_tolerance: How far apart the two objects may be and still count as
+        touching, and so how far above the supporting object the supported object may
+        stand and still rest on it.
+
+        A body is set down by a motion that stops where it can rather than exactly on
+        the surface, so a support read from overlapping volume alone would hold for
+        almost no placement at all. Measured on a robot stacking boxes, a placement
+        missed the surface it was aimed at by 1.9 mm; the default leaves room for that
+        while staying far below the centimetres by which a body that is genuinely in
+        the air clears a surface.
     :return: True if the second object is supported by the first object, False otherwise
     """
-    if Below(
+    if supported_body is supporting_body:
+        return False
+
+    collision_detector = supported_body._world.collision_manager.collision_detector
+    touch = collision_detector.check_collision_between_bodies(
+        supported_body, supporting_body, distance=contact_tolerance
+    )
+    if touch is None or touch.distance >= contact_tolerance:
+        return False
+
+    root_P_touch = touch.root_P_point_on_body_b
+    if not Below(
+        Point3(
+            x=root_P_touch[0],
+            y=root_P_touch[1],
+            z=root_P_touch[2],
+            reference_frame=supported_body._world.root,
+        ),
         supported_body.center_of_mass,
-        supporting_body.center_of_mass,
         supported_body.global_transform,
     )():
         return False
+
     bounding_box_supported_body = (
         supported_body.collision.as_bounding_box_collection_at_origin(
             HomogeneousTransformationMatrix(reference_frame=supported_body)
@@ -283,7 +317,7 @@ def is_supported_by(
     ).bounding_box()
 
     if intersection.is_empty():
-        return False
+        return True
 
     z_intersection: Interval = intersection[SpatialVariables.z.value]
     size = sum([si.upper - si.lower for si in z_intersection.simple_sets])

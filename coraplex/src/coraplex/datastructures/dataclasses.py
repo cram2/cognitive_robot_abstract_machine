@@ -84,6 +84,12 @@ class Context(PlanEntity):
     Should pre -and postconditions of actions be evaluated in this plan.
     """
 
+    segment_events: bool = field(default=True)
+    """
+    Whether this plan asks for the changes in the world during its execution to be
+    detected as events by SegMind, such as an object being picked up or placed.
+    """
+
     query_backend: QueryBackend = field(
         default_factory=EntityQueryLanguageGenerativeBackend
     )
