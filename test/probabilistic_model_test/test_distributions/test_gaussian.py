@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from scipy.stats import truncnorm
 
 from krrood.adapters.json_serializer import from_json, to_json
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
@@ -135,17 +136,6 @@ class TruncatedGaussianDistributionTestCase(unittest.TestCase):
     def test_init(self):
         self.assertEqual(self.distribution.location, 2.0)
 
-    def test_normalization_constant(self):
-        normal_distribution = GaussianDistribution(
-            location=self.distribution.location,
-            scale=self.distribution.scale,
-            variable=self.x,
-        )
-        self.assertAlmostEqual(
-            normal_distribution.probability(self.distribution.support),
-            self.distribution.normalizing_constant,
-        )
-
     def test_cdf(self):
         cdf = self.distribution.cumulative_distribution_function(
             np.array([0, 3, -3]).reshape(-1, 1)
@@ -172,6 +162,14 @@ class TruncatedGaussianDistributionTestCase(unittest.TestCase):
         gauss_distribution: GaussianDistribution = GaussianDistribution(
             variable=self.x, location=0, scale=1
         )
+        untruncated_distribution = GaussianDistribution(
+            variable=self.x,
+            location=self.distribution.location,
+            scale=self.distribution.scale,
+        )
+        normalizing_constant = untruncated_distribution.probability(
+            self.distribution.support
+        )
         beta = (
             self.distribution.upper - self.distribution.location
         ) / self.distribution.scale
@@ -186,7 +184,7 @@ class TruncatedGaussianDistributionTestCase(unittest.TestCase):
         offset_term = (
             -self.distribution.scale
             * (likelihood_beta - likelihood_alpha)
-            / self.distribution.normalizing_constant
+            / normalizing_constant
         )
         self.assertAlmostEqual(
             expectation[self.distribution.variable], 0 + offset_term, places=7
@@ -258,7 +256,7 @@ class TruncatedGaussianDistributionTestCase(unittest.TestCase):
         self.assertNotEqual(self.distribution, copy)
 
     def test_sample(self):
-        samples = self.distribution.rejection_sample(100)
+        samples = self.distribution.sample(100)
         self.assertEqual(samples.shape, (100, 1))
         likelihoods = self.distribution.likelihood(samples)
         self.assertTrue(all(likelihoods > 0))
@@ -337,71 +335,36 @@ class TruncatedGaussianDistributionJapaneseManTestCase(unittest.TestCase):
         self.assertAlmostEqual(raw_moment, 0, delta=0.01)
 
 
+class TruncatedGaussianFarTailMomentTestCase(unittest.TestCase):
+    x = Continuous("x")
+    distribution = TruncatedGaussianDistribution(
+        variable=x,
+        interval=SimpleInterval.from_data(5, 6),
+        location=0,
+        scale=1,
+    )
+
+    def test_variance_is_precise_far_in_the_tail(self):
+        # a standard normal, so the interval already is in scipy's standardized units
+        lower, upper = self.distribution.lower, self.distribution.upper
+        mean = truncnorm.mean(lower, upper)
+        variance = self.distribution.moment(
+            VariableMap({self.x: 2}), VariableMap({self.x: mean})
+        )[self.x]
+        expected_variance = truncnorm.var(lower, upper)
+        # far in the tail the variance is small compared to the squared mean, so
+        # this tolerance fails any computation that cancels large raw moments
+        self.assertAlmostEqual(
+            variance, expected_variance, delta=1e-10 * expected_variance
+        )
+
+
 class TruncatedGaussianSamplingTestCase(unittest.TestCase):
     x = Continuous("x")
 
     @classmethod
     def setUpClass(cls):
         np.random.seed(69)
-
-    def test_with_center_in_truncation(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(-3, 5),
-            location=1,
-            scale=2,
-        )
-        samples = model.robert_rejection_sample(1000).reshape(-1, 1)
-        self.assertEqual(len(samples), 1000)
-        likelihoods = model.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
-        self.assertAlmostEqual(
-            model.expectation(model.variables)[self.x], samples.mean(), delta=0.1
-        )
-
-    def test_with_center_higher_truncation(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(3, 10),
-            location=1,
-            scale=2,
-        )
-        samples = model.robert_rejection_sample(1000).reshape(-1, 1)
-        self.assertEqual(len(samples), 1000)
-        likelihoods = model.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
-        self.assertAlmostEqual(
-            model.expectation(model.variables)[model.variable],
-            samples.mean(),
-            delta=0.1,
-        )
-
-    def test_with_center_lower_truncation(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(-6, -2),
-            location=1,
-            scale=2,
-        )
-        samples = model.robert_rejection_sample(1000).reshape(-1, 1)
-        self.assertEqual(len(samples), 1000)
-        likelihoods = model.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
-        self.assertAlmostEqual(
-            model.expectation(model.variables)[model.variable],
-            samples.mean(),
-            delta=0.1,
-        )
-
-    def test_compare_rejection_sampling_with_robert_sampling(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(9, 11),
-            location=0,
-            scale=1,
-        )
-        with self.assertRaises(RecursionError):
-            model.rejection_sample(50)
 
     def test_sampling_with_infinite_bounds_smaller_0(self):
         model = TruncatedGaussianDistribution(
@@ -450,23 +413,6 @@ class TruncatedGaussianSamplingTestCase(unittest.TestCase):
         self.assertAlmostEqual(
             model.expectation(model.variables)[model.variable],
             np.array(samples).mean(),
-            delta=0.1,
-        )
-
-    def test_non_standard_sampling(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(-np.inf, -0.1),
-            location=0.5,
-            scale=2,
-        )
-        samples = model.robert_rejection_sample(1000).reshape(-1, 1)
-        self.assertAlmostEqual(max(samples), -0.1, delta=0.1)
-        likelihoods = model.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
-        self.assertAlmostEqual(
-            model.expectation(model.variables)[model.variable],
-            samples.mean(),
             delta=0.1,
         )
 

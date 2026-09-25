@@ -1,0 +1,18 @@
+{
+  "framesPerSecond": 30,
+  "frames": [
+    {"pr2/torso_lift_joint": 0.0, "pr2/l_wrist_flex_joint": -0.1},
+    {"pr2/torso_lift_joint": 0.1, "pr2/l_wrist_flex_joint": -0.5},
+    {"pr2/torso_lift_joint": 0.3, "pr2/l_wrist_flex_joint": -0.2}
+  ],
+  "base": [
+    [0, 0, 0, 0, 0, 0, 1],
+    [0, 0, 0, 0, 0, 0, 1],
+    [0, 0, 0, 0, 0, 0, 1]
+  ],
+  "objects": [
+    {"milk.stl": [2.37, 2.0, 1.05, 0, 0, 0, 1]},
+    {"milk.stl": [2.37, 2.0, 1.05, 0, 0, 0, 1]},
+    {"milk.stl": [2.37, 2.0, 1.05, 0, 0, 0, 1]}
+  ]
+}

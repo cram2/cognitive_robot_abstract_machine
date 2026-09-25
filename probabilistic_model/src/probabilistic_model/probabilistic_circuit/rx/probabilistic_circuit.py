@@ -345,7 +345,7 @@ class LeafUnit(Unit):
             return
         rows = np.concatenate(self.result_of_current_query)
         column_indices = [
-            variable_to_index_map[variable] for variable in self.variables
+            variable_to_index_map[variable] for variable in self.distribution.variables
         ]
         samples[rows[:, None], column_indices] = self.distribution.sample(len(rows))
 
@@ -381,6 +381,46 @@ class LeafUnit(Unit):
 
     def copy_without_graph(self):
         return self.__class__(distribution=self.distribution.__deepcopy__())
+
+    def replace_by_mixture(
+        self, truncations: Iterable[Tuple[Optional[ProbabilisticModel], float]]
+    ) -> Optional[SumUnit]:
+        """
+        Replace this leaf by the mixture of the given truncations of its distribution,
+        each weighted by its probability.
+
+        :param truncations: Each truncated distribution with its log-probability.
+        :return: The sum unit that replaced this leaf, or nothing if every truncation is
+            impossible, in which case this leaf is left without a distribution.
+        """
+        result = SumUnit(probabilistic_circuit=self.probabilistic_circuit)
+        total_probability = 0.0
+
+        for truncated, log_probability in truncations:
+            probability = np.exp(log_probability)
+            if probability == 0:
+                continue
+            result.add_subcircuit(
+                self.__class__(
+                    distribution=truncated,
+                    probabilistic_circuit=self.probabilistic_circuit,
+                ),
+                log_probability,
+            )
+            total_probability += probability
+
+        if total_probability == 0:
+            self.result_of_current_query = -np.inf
+            self.distribution = None
+            self.probabilistic_circuit.remove_node(result)
+            return None
+
+        self.connect_incoming_edges_to(result)
+        self.probabilistic_circuit.remove_node(self)
+
+        result.normalize()
+        result.result_of_current_query = np.log(total_probability)
+        return result
 
 
 @dataclass(eq=False)
@@ -1179,7 +1219,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                             :,
                             [
                                 variable_to_index_map[variable]
-                                for variable in unit.variables
+                                for variable in unit.distribution.variables
                             ],
                         ]
                     )
@@ -1199,7 +1239,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                             :,
                             [
                                 variable_to_index_map[variable]
-                                for variable in unit.variables
+                                for variable in unit.distribution.variables
                             ],
                         ]
                     )
@@ -2147,46 +2187,12 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
             )
             return self
 
-        total_probability = 0.0
-
-        # calculate the truncated distribution as sum unit
-        result = SumUnit(probabilistic_circuit=self.probabilistic_circuit)
-
-        for simple_interval in event.simple_sets:
-            current_conditional, current_log_probability = (
-                self.distribution.log_conditional_from_simple_interval(
-                    simple_interval, singleton_allowed
-                )
+        return self.replace_by_mixture(
+            self.distribution.log_conditional_from_simple_interval(
+                simple_interval, singleton_allowed
             )
-            current_probability = np.exp(current_log_probability)
-
-            if current_probability == 0:
-                continue
-
-            current_conditional = self.__class__(
-                distribution=current_conditional,
-                probabilistic_circuit=self.probabilistic_circuit,
-            )
-            result.add_subcircuit(current_conditional, np.log(current_probability))
-            total_probability += current_probability
-
-        # if the event is impossible
-        if total_probability == 0:
-            self.result_of_current_query = -np.inf
-            self.distribution = None
-            self.probabilistic_circuit.remove_node(result)
-            return None
-
-        # reroute the parent to the new sum unit
-        self.connect_incoming_edges_to(result)
-
-        # remove this node
-        self.probabilistic_circuit.remove_node(self)
-
-        # update result
-        result.normalize()
-        result.result_of_current_query = np.log(total_probability)
-        return result
+            for simple_interval in event.simple_sets
+        )
 
 
 @dataclass
@@ -2253,15 +2259,94 @@ class UnivariateDiscreteLeaf(UnivariateLeaf):
         return cls(distribution)
 
 
+@dataclass(eq=False)
+class MultivariateLeaf(LeafUnit):
+    """
+    A leaf whose distribution is over several variables at once.
+
+    Whatever the distribution cannot represent itself, the circuit represents around
+    it: conditioning on all of its variables leaves a product of Dirac leaves, and an
+    event of several boxes becomes a mixture of one truncation per box.
+    """
+
+    def log_conditional_in_place(self, point: Dict[Variable, Any]):
+        own_point = self.filter_variable_map_by_self(point)
+        if not own_point:
+            self.result_of_current_query = 0.0
+            return
+        if len(own_point) == len(self.distribution.variables):
+            self.replace_by_dirac_product(own_point)
+            return
+        self.distribution, self.result_of_current_query = (
+            self.distribution.log_conditional(own_point)
+        )
+
+    def replace_by_dirac_product(self, point: Dict[Variable, Any]) -> ProductUnit:
+        """
+        Replace this leaf by the product of one Dirac leaf per variable.
+
+        :param point: The value of every variable of this leaf.
+        :return: The product unit that replaced this leaf, carrying the log-density of
+            the point under the distribution.
+        """
+        result = ProductUnit(probabilistic_circuit=self.probabilistic_circuit)
+        for variable in self.distribution.variables:
+            result.add_subcircuit(
+                leaf(make_dirac(variable, point[variable]), self.probabilistic_circuit)
+            )
+        result.result_of_current_query = self.distribution.log_likelihood(
+            np.array([[point[variable] for variable in self.distribution.variables]])
+        )[0]
+
+        self.connect_incoming_edges_to(result)
+        self.probabilistic_circuit.remove_node(self)
+        return result
+
+    def log_truncated_of_simple_event_in_place(
+        self, event: SimpleEvent, singleton_allowed: bool = False
+    ):
+        """
+        Truncate the distribution to every box the event makes of this leaf's variables,
+        and mix the truncations when there is more than one.
+
+        :param event: The simple event to truncate to.
+        :param singleton_allowed: Whether singletons are allowed in the event.
+        """
+        variables = self.distribution.variables
+        boxes = [
+            SimpleEvent.from_data(
+                {
+                    variable: simple_interval.as_composite_set()
+                    for variable, simple_interval in zip(variables, simple_intervals)
+                }
+            ).as_composite_set()
+            for simple_intervals in itertools.product(
+                *(event[variable].simple_sets for variable in variables)
+            )
+        ]
+        if len(boxes) == 1:
+            self.distribution, self.result_of_current_query = (
+                self.distribution.log_truncated(boxes[0], singleton_allowed)
+            )
+            return self
+        return self.replace_by_mixture(
+            self.distribution.log_truncated(box, singleton_allowed) for box in boxes
+        )
+
+
 def leaf(
-    distribution: UnivariateDistribution,
+    distribution: ProbabilisticModel,
     probabilistic_circuit: Optional[ProbabilisticCircuit] = None,
-) -> UnivariateLeaf:
+) -> LeafUnit:
     """
     Factory that creates the correct leaf from a distribution.
 
     :return: The leaf.
     """
+    if not isinstance(distribution, UnivariateDistribution):
+        return MultivariateLeaf(
+            distribution, probabilistic_circuit=probabilistic_circuit
+        )
     if isinstance(distribution.variable, Continuous):
         return UnivariateContinuousLeaf(
             distribution, probabilistic_circuit=probabilistic_circuit

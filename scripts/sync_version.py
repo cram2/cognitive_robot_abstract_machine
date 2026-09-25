@@ -12,6 +12,7 @@ PACKAGES = [
     "random_events",
     "krrood",
     "coraplex",
+    "cramera",
     "giskardpy",
     "probabilistic_model",
     "robokudo",

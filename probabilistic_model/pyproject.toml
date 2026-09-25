@@ -27,7 +27,7 @@ dependencies = [
     "random-events>=4.1.2",
     "networkx",
     "plotly",
-    "scipy",
+    "scipy>=1.10",
     "typing_extensions",
     "numpy",
     "sortedcontainers",

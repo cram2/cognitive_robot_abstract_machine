@@ -257,6 +257,7 @@ def get_python_type_from_sqlalchemy_column(column: Column):
 
     :param column: The sqlalchemy column.
     :return: The python type of the column.
+    :raises UnsupportedColumnType: If the column type names no specific python type.
     """
     type_mappings = _get_default_type_mappings()
 
@@ -268,6 +269,9 @@ def get_python_type_from_sqlalchemy_column(column: Column):
         try:
             python_type = [column.type.python_type]
         except NotImplementedError:
+            raise UnsupportedColumnType(column.type)
+        # SQLAlchemy >= 2.1 reports ``object`` instead of raising for custom types.
+        if python_type == [object]:
             raise UnsupportedColumnType(column.type)
 
     if len(python_type) > 1:

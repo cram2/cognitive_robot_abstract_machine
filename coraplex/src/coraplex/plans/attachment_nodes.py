@@ -38,5 +38,8 @@ class ReAttachNode(ExecutionBoundaryNode):
 
     def parse(self) -> MoveBranchExecutable:
         return MoveBranchExecutable(
-            context=self.context, body=self.body, new_parent=self.new_parent
+            context=self.context,
+            body=self.body,
+            new_parent=self.new_parent,
+            execution_scope=self.execution_scope,
         )

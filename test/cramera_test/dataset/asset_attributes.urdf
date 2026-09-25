@@ -1,0 +1,7 @@
+<robot name='asset_bundle'>
+  <link name='base'/>
+  <link name='mesh'>
+    <visual><geometry><mesh filename='source.stl'/></geometry></visual>
+  </link>
+  <joint type='fixed' name='mount'><parent link='base'/><child link='mesh'/></joint>
+</robot>

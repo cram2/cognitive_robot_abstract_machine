@@ -1,0 +1,2 @@
+# Preserve verified upstream browser assets byte-for-byte.
+cramera/src/cramera/web/vendor/** -whitespace

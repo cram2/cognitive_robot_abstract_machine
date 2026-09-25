@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
 
@@ -464,6 +465,7 @@ class NextLifeCycle:
         return self.of(node)
 
 
+# %% state history
 @dataclass(repr=False, eq=False)
 class StateHistoryItem:
     """
@@ -520,6 +522,21 @@ class StateHistoryItem:
 
 
 @dataclass
+class StateHistoryObserver(ABC):
+    """
+    Observe newly recorded motion statechart states.
+    """
+
+    @abstractmethod
+    def on_state_change(self, history: StateHistory) -> None:
+        """
+        Observe the newest snapshot after it has been appended.
+
+        :param history: The history containing the changed state.
+        """
+
+
+@dataclass
 class StateHistory:
     """
     The recorded sequence of :class:`StateHistoryItem` snapshots of a
@@ -532,6 +549,33 @@ class StateHistory:
     duplicates.
     """
 
+    observers: list[StateHistoryObserver] = field(
+        default_factory=list, init=False, repr=False, compare=False
+    )
+    """
+    The observers subscribed to newly recorded states.
+    """
+
+    def add_observer(self, observer: StateHistoryObserver) -> None:
+        """
+        Subscribe an observer once by identity.
+
+        :param observer: The observer to notify when a changed state is recorded.
+        """
+        if any(registered is observer for registered in self.observers):
+            return
+        self.observers.append(observer)
+
+    def remove_observer(self, observer: StateHistoryObserver) -> None:
+        """
+        Remove an observer's subscription if it is present.
+
+        :param observer: The observer whose subscription should end.
+        """
+        self.observers[:] = [
+            registered for registered in self.observers if registered is not observer
+        ]
+
     def append(self, next_item: StateHistoryItem):
         """
         Appends `next_item`, unless it is equal to the last recorded item, in which case
@@ -543,6 +587,8 @@ class StateHistory:
             if next_item == self.history[-1]:
                 return
         self.history.append(next_item)
+        for observer in tuple(self.observers):
+            observer.on_state_change(self)
 
     def get_life_cycle_history_of_node(
         self, node: MotionStatechartNode
@@ -566,6 +612,7 @@ class StateHistory:
         return len(self.history)
 
 
+# %% motion statechart
 @dataclass
 class MotionStatechart(SubclassJSONSerializer):
     """
@@ -1104,20 +1151,23 @@ class MotionStatechart(SubclassJSONSerializer):
         """
         Executes a single tick of the motion statechart.
 
-        First the observation state is updated, then the life cycle state.
+        Record completed observation and life cycle updates before reporting a native
+        cancellation. Failed updates do not publish a partial control cycle.
 
         :param context: The context required to execute the tick.
         """
         self._update_observation_state(context)
         self._update_life_cycle_state(context)
-        self._raise_if_cancel_motion()
-        self.history.append(
-            next_item=StateHistoryItem(
-                control_cycle=len(self.history),
-                life_cycle_state=self.life_cycle_state,
-                observation_state=self.observation_state,
+        try:
+            self.history.append(
+                next_item=StateHistoryItem(
+                    control_cycle=len(self.history),
+                    life_cycle_state=self.life_cycle_state,
+                    observation_state=self.observation_state,
+                )
             )
-        )
+        finally:
+            self._raise_if_cancel_motion()
 
     def get_nodes_by_type(
         self, node_type: Type[GenericMotionStatechartNode]

@@ -31,8 +31,9 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
-from coraplex.datastructures.enums import Arms
+from coraplex.datastructures.enums import Arms, VisualizationBackend
 from coraplex.view_manager import ViewManager
+from coraplex.visualization import WorldVisualization
 
 logger = logging.getLogger(__name__)
 
@@ -49,17 +50,19 @@ except ImportError:
     )
 
 
-def start_visualization(world: World) -> None:
+def start_visualization(world: World) -> WorldVisualization:
     """
-    Publish the world to RViz.
+    Start the selected renderer, defaulting to native RViz when available.
 
-    Does nothing if ROS is not available.
+    :param world: The world to visualize.
+    :return: The renderer owner, accepting optional plan observers.
     """
-    if VizMarkerPublisher is None:
-        return
-    rclpy.init()
-    node = rclpy.create_node("viz_marker")
-    VizMarkerPublisher(_world=world, node=node)
+    default_backend = (
+        VisualizationBackend.RVIZ
+        if VizMarkerPublisher is not None
+        else VisualizationBackend.NONE
+    )
+    return WorldVisualization.from_environment(world, default_backend).start()
 
 
 def attach_tool(
@@ -130,7 +133,9 @@ def setup_world() -> World:
             parent=apartment_root, child=pr2_root, world=apartment_world
         )
         apartment_world.merge_world(pr2_sem_world, c_root_bf)
-        c_root_bf.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2.5, 0, reference_frame=apartment_root)
+        c_root_bf.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            1.5, 2.5, 0, reference_frame=apartment_root
+        )
 
     apartment_world.get_body_by_name("milk.stl").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(

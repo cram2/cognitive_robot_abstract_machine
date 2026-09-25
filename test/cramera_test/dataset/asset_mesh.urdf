@@ -1,0 +1,5 @@
+<robot name="asset_bundle">
+  <link name="mesh">
+    <visual><geometry><mesh filename="package://demo/cup.stl"/></geometry></visual>
+  </link>
+</robot>

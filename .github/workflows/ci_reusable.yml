@@ -92,7 +92,11 @@ jobs:
           if [[ "${{ inputs.lib }}" == "semantic_digital_twin" ]]; then
             export MUJOCO_GL=egl
           fi
-          python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+          if [[ "${{ inputs.lib }}" == "cramera" ]]; then
+            python -m pytest -n auto --cov=cramera --cov-fail-under=85 cognitive_robot_abstract_machine/test/cramera_test
+          else
+            python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+          fi
 
       - name: Save cache
         uses: actions/cache/save@v4
