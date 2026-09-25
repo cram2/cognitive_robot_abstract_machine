@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -272,6 +273,72 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayerWithDensity, ABC):
             right = np.where(right_closed, column <= self.upper, column < self.upper)
 
         return left & right
+
+    def with_supports(
+        self, interval: NodeIntervals, bounds: NodeIntervalBounds
+    ) -> Self:
+        """
+        :param interval: The new lower and upper bound of every node.
+        :param bounds: The new kind of every bound.
+        :return: A layer whose nodes have these supports and the other parameters of
+            the nodes of this layer.
+        """
+        return dataclasses.replace(self, interval=interval, bounds=bounds)
+
+    def log_truncated_of_non_singleton_interval(
+        self, interval: SimpleInterval
+    ) -> LayerWithLogProbabilities:
+        """
+        Truncate every node to a simple interval. A node keeps its shape on the
+        intersection of its support and the interval.
+
+        :param interval: The simple interval, which is not a singleton.
+        :return: The layer over the intersections and the log-probability of the
+            interval under every node.
+        """
+        lower, upper = float(interval.lower), float(interval.upper)
+        left_bound, right_bound = int(interval.left), int(interval.right)
+
+        cumulative = self.cumulative_distribution_of_nodes_from_column(
+            np.array([lower, upper])
+        )
+        probability = cumulative[1] - cumulative[0]
+        alive = probability > 0
+
+        # the bounds of the intersection: the tighter side wins, and where the two
+        # bounds coincide the interval is open if either of them is open. Bound.OPEN is
+        # the larger value, so that is a maximum.
+        own_left, own_right = self.bounds[:, 0], self.bounds[:, 1]
+        new_left = np.where(
+            self.lower > lower,
+            own_left,
+            np.where(self.lower < lower, left_bound, np.maximum(own_left, left_bound)),
+        )
+        new_right = np.where(
+            self.upper < upper,
+            own_right,
+            np.where(
+                self.upper > upper, right_bound, np.maximum(own_right, right_bound)
+            ),
+        )
+
+        # impossible nodes keep their parameters and are dropped by the prune pass
+        interval_of_nodes = np.where(
+            alive[:, None],
+            np.stack([np.maximum(self.lower, lower), np.minimum(self.upper, upper)], 1),
+            self.interval,
+        )
+        bounds_of_nodes = np.where(
+            alive[:, None], np.stack([new_left, new_right], axis=1), self.bounds
+        )
+        log_probabilities = np.where(
+            alive, np.log(np.where(alive, probability, 1.0)), -np.inf
+        )
+
+        return LayerWithLogProbabilities(
+            self.with_supports(interval_of_nodes, bounds_of_nodes),
+            log_probabilities,
+        )
 
     def select_nodes(self, mask: NodeMask) -> Self:
         return self.__class__(self.variable, self.interval[mask], self.bounds[mask])

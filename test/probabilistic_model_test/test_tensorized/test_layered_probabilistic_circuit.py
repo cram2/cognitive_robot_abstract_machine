@@ -25,13 +25,15 @@ numerically integrating the joint density.
 from __future__ import annotations
 
 import unittest
+from enum import IntEnum
 from unittest import mock
 
 import numpy as np
 from krrood.adapters.json_serializer import from_json, to_json
 from random_events.interval import closed
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
-from random_events.variable import Continuous
+from random_events.set import Set
+from random_events.variable import Continuous, Integer, Symbolic
 
 from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
     CannotConvertError,
@@ -43,9 +45,16 @@ from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized i
 from probabilistic_model.adapters.rustworkx_tensorized.tensorized_to_rustworkx import (
     LayeredCircuitToRustworkxCircuitConverter,
 )
+from probabilistic_model.distributions.distributions import (
+    IntegerDistribution,
+    SymbolicDistribution,
+)
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.exceptions import IntractableError, ShapeMismatchError
+from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
+    UndefinedCumulativeDistributionError,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer import (
     ProductLayer,
 )
@@ -54,6 +63,14 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer 
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    IntegerLayer,
+    SymbolicLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
+    GaussianLayer,
+    TruncatedGaussianLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.uniform_layer import (
     UniformLayer,
@@ -67,9 +84,27 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
+from probabilistic_model.utils import MissingDict
 
 x = Continuous("x")
 y = Continuous("y")
+n = Integer("n")
+
+
+class SymbolEnum(IntEnum):
+    A = 0
+    B = 1
+    C = 2
+
+
+s = Symbolic(name="s", domain=Set.from_iterable(SymbolEnum))
+
+
+class UnconvertibleUniformDistribution(UniformDistribution):
+    """
+    A distribution type that no converter handles: converters dispatch on the exact type
+    of a distribution.
+    """
 
 
 def uniform(variable, lower, upper):
@@ -151,13 +186,82 @@ def shared_children_circuit() -> RxCircuit:
     return circuit
 
 
+def mixed_circuit() -> RxCircuit:
+    """
+    A circuit over a continuous, an integer and a symbolic variable.
+    """
+    circuit = RxCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+
+    for weight, (lower, upper), integer_probabilities, symbolic_probabilities in (
+        (0.4, (0, 2), {0: 0.2, 1: 0.8}, {0: 0.5, 1: 0.25, 2: 0.25}),
+        (0.6, (1, 4), {0: 0.7, 2: 0.3}, {0: 0.1, 1: 0.6, 2: 0.3}),
+    ):
+        product = ProductUnit(probabilistic_circuit=circuit)
+        root.add_subcircuit(product, np.log(weight))
+        product.add_subcircuit(leaf(uniform(x, lower, upper), circuit))
+        product.add_subcircuit(
+            leaf(
+                IntegerDistribution(
+                    variable=n,
+                    probabilities=MissingDict(float, integer_probabilities),
+                ),
+                circuit,
+            )
+        )
+        product.add_subcircuit(
+            leaf(
+                SymbolicDistribution(
+                    variable=s,
+                    probabilities=MissingDict(
+                        float,
+                        {
+                            hash(element): probability
+                            for element, probability in zip(
+                                s.domain.simple_sets, symbolic_probabilities.values()
+                            )
+                        },
+                    ),
+                ),
+                circuit,
+            )
+        )
+    return circuit
+
+
+def gaussian_circuit() -> RxCircuit:
+    """
+    A mixture of products of Gaussians.
+    """
+    circuit = RxCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    for weight, location, scale in ((0.35, -1.0, 0.5), (0.65, 2.0, 1.5)):
+        product = ProductUnit(probabilistic_circuit=circuit)
+        root.add_subcircuit(product, np.log(weight))
+        product.add_subcircuit(
+            leaf(
+                GaussianDistribution(variable=x, location=location, scale=scale),
+                circuit,
+            )
+        )
+        product.add_subcircuit(
+            leaf(
+                GaussianDistribution(variable=y, location=-location, scale=scale),
+                circuit,
+            )
+        )
+    return circuit
+
+
 ALL_CIRCUITS = {
     "overlapping": overlapping_mixture,
     "deterministic": deterministic_mixture,
     "shared": shared_children_circuit,
+    "mixed": mixed_circuit,
+    "gaussian": gaussian_circuit,
 }
 
-CONTINUOUS_CIRCUITS = ("overlapping", "deterministic", "shared")
+CONTINUOUS_CIRCUITS = ("overlapping", "deterministic", "shared", "gaussian")
 
 
 class ConversionTestCase(unittest.TestCase):
@@ -172,7 +276,12 @@ class ConversionTestCase(unittest.TestCase):
 
     def test_a_leaf_without_a_converter_is_reported(self):
         circuit = RxCircuit()
-        leaf(GaussianDistribution(variable=x, location=0.0, scale=1.0), circuit)
+        leaf(
+            UnconvertibleUniformDistribution(
+                variable=x, interval=closed(0, 1).simple_sets[0]
+            ),
+            circuit,
+        )
         with self.assertRaises(CannotConvertError):
             RustworkxCircuitToLayeredCircuitConverter.convert(circuit)
 
@@ -211,6 +320,21 @@ class ConversionTestCase(unittest.TestCase):
         # one layer per variable, each holding the two shared leaves
         self.assertEqual(len(uniform_layers), 2)
         self.assertEqual({layer.number_of_nodes for layer in uniform_layers}, {2})
+
+    def test_gaussian_leaves_become_a_gaussian_layer(self):
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(gaussian_circuit())
+        self.assertTrue(
+            any(isinstance(layer, GaussianLayer) for layer in layered.layers)
+        )
+
+    def test_discrete_leaves_become_discrete_layers(self):
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(mixed_circuit())
+        self.assertTrue(
+            any(isinstance(layer, SymbolicLayer) for layer in layered.layers)
+        )
+        self.assertTrue(
+            any(isinstance(layer, IntegerLayer) for layer in layered.layers)
+        )
 
     def test_round_trip_through_rustworkx_keeps_the_likelihood(self):
         for name in CONTINUOUS_CIRCUITS:
@@ -327,6 +451,21 @@ class QueryTestCase(unittest.TestCase):
             rx_circuit.probability(event.__deepcopy__()),
         )
 
+    def test_probability_of_a_mixed_event(self):
+        rx_circuit = mixed_circuit()
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
+        event = SimpleEvent.from_data(
+            {
+                x: closed(0.5, 2.5),
+                n: closed(0, 0),
+                s: Set.from_iterable([SymbolEnum.A, SymbolEnum.C]),
+            }
+        )
+        self.assertAlmostEqual(
+            layered.probability_of_simple_event(event),
+            rx_circuit.probability_of_simple_event(event),
+        )
+
     def test_support(self):
         for name, factory in ALL_CIRCUITS.items():
             with self.subTest(name):
@@ -347,6 +486,13 @@ class QueryTestCase(unittest.TestCase):
                     self.assertAlmostEqual(
                         layered.variance()[variable], rx_circuit.variance()[variable]
                     )
+
+    def test_expectation_of_an_integer_variable(self):
+        rx_circuit = mixed_circuit()
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
+        self.assertAlmostEqual(
+            layered.expectation([n])[n], rx_circuit.expectation([n])[n]
+        )
 
     def test_expectation_of_a_subset_of_the_variables(self):
         rx_circuit = overlapping_mixture()
@@ -472,6 +618,39 @@ class TruncationTestCase(unittest.TestCase):
             with self.subTest(name):
                 self.assert_same_truncation(ALL_CIRCUITS[name](), event, grid)
 
+    def test_truncation_of_a_gaussian_circuit_produces_truncated_gaussian_layers(self):
+        grid = np.stack(
+            np.meshgrid(np.linspace(-4, 6, 25), np.linspace(-4, 6, 25)), axis=-1
+        ).reshape(-1, 2)
+        event = SimpleEvent.from_data(
+            {x: closed(-2.0, 1.0), y: closed(-1.0, 3.0)}
+        ).as_composite_set()
+        truncated = self.assert_same_truncation(gaussian_circuit(), event, grid)
+        self.assertTrue(
+            any(isinstance(layer, TruncatedGaussianLayer) for layer in truncated.layers)
+        )
+
+    def test_truncation_of_a_mixed_circuit(self):
+        rx_circuit = mixed_circuit()
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
+        event = SimpleEvent.from_data(
+            {
+                x: closed(0.5, 3.0),
+                n: closed(0, 0),
+                s: Set.from_iterable([SymbolEnum.A, SymbolEnum.B]),
+            }
+        ).as_composite_set()
+
+        rx_truncated, rx_probability = rx_circuit.truncated(event.__deepcopy__())
+        truncated, probability = layered.truncated(event.__deepcopy__())
+        self.assertAlmostEqual(probability, rx_probability)
+
+        samples = truncated.sample(200)
+        np.testing.assert_allclose(
+            truncated.log_likelihood(samples),
+            rx_truncated.log_likelihood(samples),
+        )
+
     def boxes(self, number_of_boxes: int, lower: float, upper: float) -> Event:
         """
         A staircase of disjoint boxes with gaps between them.
@@ -574,6 +753,42 @@ class TruncationTestCase(unittest.TestCase):
         self.assertGreaterEqual(
             truncated.number_of_nodes, separate.number_of_nodes - len(separate.layers)
         )
+
+    def test_a_gaussian_circuit_batches_truncation_to_several_simple_sets(self):
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(gaussian_circuit())
+        self.assertTrue(
+            layered.can_truncate_in_one_batch(
+                list(self.boxes(4, -1.0, 3.0).simple_sets)
+            )
+        )
+
+        grid = np.stack(
+            np.meshgrid(np.linspace(-4, 6, 25), np.linspace(-4, 6, 25)), axis=-1
+        ).reshape(-1, 2)
+        self.assert_same_truncation(gaussian_circuit(), self.boxes(4, -1.0, 3.0), grid)
+
+    def test_a_batch_whose_simple_sets_disagree_on_the_layer_type_reports_it(self):
+        """
+        A batch a layer cannot be truncated in has to be reported, so that the circuit
+        falls back to truncating once per simple set. Here one simple set bounds x and
+        turns the Gaussian leaves over it into truncated Gaussians, while the other
+        leaves x unbounded and keeps them Gaussian.
+        """
+        event = (
+            SimpleEvent.from_data(
+                {x: closed(0.0, 1.0), y: closed(0.0, 1.0)}
+            ).as_composite_set()
+            | SimpleEvent.from_data({y: closed(2.0, 3.0)}).as_composite_set()
+        )
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(gaussian_circuit())
+        event.fill_missing_variables(set(layered.variables))
+
+        self.assertFalse(layered.can_truncate_in_one_batch(list(event.simple_sets)))
+
+        grid = np.stack(
+            np.meshgrid(np.linspace(-4, 6, 25), np.linspace(-4, 6, 25)), axis=-1
+        ).reshape(-1, 2)
+        self.assert_same_truncation(gaussian_circuit(), event, grid)
 
     def test_truncation_puts_all_mass_inside_the_event(self):
         layered = RustworkxCircuitToLayeredCircuitConverter.convert(
@@ -685,6 +900,21 @@ class ConditionalTestCase(unittest.TestCase):
         self.assertIsNone(conditional)
         self.assertEqual(probability, 0.0)
 
+    def test_conditioning_on_a_symbolic_variable(self):
+        rx_circuit = mixed_circuit()
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
+
+        point = {s: SymbolEnum.B}
+        rx_conditional, rx_probability = rx_circuit.log_conditional(point)
+        conditional, probability = layered.log_conditional(point)
+
+        self.assertAlmostEqual(probability, rx_probability)
+        samples = conditional.sample(200)
+        np.testing.assert_allclose(
+            conditional.log_likelihood(samples),
+            rx_conditional.log_likelihood(samples),
+        )
+
     def test_conditioning_on_every_variable(self):
         layered = RustworkxCircuitToLayeredCircuitConverter.convert(
             deterministic_mixture()
@@ -741,6 +971,17 @@ class MarginalTestCase(unittest.TestCase):
             )
             self.assertAlmostEqual(float(np.trapezoid(joint, grid)), expected, places=3)
 
+    def test_marginal_of_a_discrete_variable(self):
+        rx_circuit = mixed_circuit()
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
+        marginal = layered.marginal([n])
+        rx_marginal = rx_circuit.marginal([n])
+        self.assertEqual(list(marginal.variables), [n])
+        grid = np.array([[0], [1], [2], [3]])
+        np.testing.assert_allclose(
+            marginal.log_likelihood(grid), rx_marginal.log_likelihood(grid)
+        )
+
     def test_marginal_of_a_variable_that_is_not_modeled(self):
         layered = RustworkxCircuitToLayeredCircuitConverter.convert(
             deterministic_mixture()
@@ -774,6 +1015,19 @@ class SerializationTestCase(unittest.TestCase):
                 np.testing.assert_allclose(
                     restored.log_likelihood(samples), layered.log_likelihood(samples)
                 )
+
+    def test_json_round_trip_of_a_truncated_gaussian_layer(self):
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(gaussian_circuit())
+        event = SimpleEvent.from_data(
+            {x: closed(-2.0, 1.0), y: closed(-1.0, 3.0)}
+        ).as_composite_set()
+        truncated, _ = layered.truncated(event)
+
+        restored = from_json(to_json(truncated))
+        samples = truncated.sample(200)
+        np.testing.assert_allclose(
+            restored.log_likelihood(samples), truncated.log_likelihood(samples)
+        )
 
     def test_json_round_trip_of_a_conditioned_circuit(self):
         # conditional() attaches a DiracDeltaLayer per conditioned variable under a new
@@ -937,6 +1191,70 @@ class LayerTestCase(unittest.TestCase):
         layer = DiracDeltaLayer(0, np.array([0.0, 1.0]), np.array([1.0]))
         with self.assertRaises(ShapeMismatchError):
             layer.validate()
+
+    def test_gaussian_layer_likelihood(self):
+        layer = GaussianLayer(0, np.array([0.0, 2.0]), np.array([1.0, 0.5]))
+        points = np.array([[0.0], [2.0]])
+        result = layer.log_likelihood_of_nodes(points)
+        for node in range(2):
+            distribution = layer.node_distribution(node, x)
+            np.testing.assert_allclose(
+                result[:, node], distribution.log_likelihood(points)
+            )
+
+    def test_symbolic_layer_likelihood(self):
+        distributions = [
+            SymbolicDistribution(
+                variable=s,
+                probabilities=MissingDict(
+                    float,
+                    {
+                        hash(element): probability
+                        for element, probability in zip(
+                            s.domain.simple_sets, (0.5, 0.25, 0.25)
+                        )
+                    },
+                ),
+            ),
+            SymbolicDistribution(
+                variable=s,
+                probabilities=MissingDict(
+                    float,
+                    {
+                        hash(element): probability
+                        for element, probability in zip(
+                            s.domain.simple_sets, (0.1, 0.6, 0.3)
+                        )
+                    },
+                ),
+            ),
+        ]
+        layer = SymbolicLayer.from_distributions(0, distributions)
+        events = np.array([[hash(element)] for element in s.domain.simple_sets])
+        result = layer.log_likelihood_of_nodes(events)
+        for node, distribution in enumerate(distributions):
+            np.testing.assert_allclose(
+                result[:, node], distribution.log_likelihood(events)
+            )
+
+    def test_a_symbolic_layer_has_no_cumulative_distribution(self):
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(mixed_circuit())
+        [symbolic_layer] = [
+            layer for layer in layered.layers if isinstance(layer, SymbolicLayer)
+        ]
+        with self.assertRaises(UndefinedCumulativeDistributionError):
+            symbolic_layer.cumulative_distribution_of_nodes(np.zeros((1, 3)))
+
+    def test_integer_layer_cumulative_distribution(self):
+        distribution = IntegerDistribution(
+            variable=n, probabilities=MissingDict(float, {0: 0.2, 1: 0.3, 2: 0.5})
+        )
+        layer = IntegerLayer.from_distributions(0, [distribution])
+        points = np.array([[-1], [0], [1], [2], [3]])
+        np.testing.assert_allclose(
+            layer.cumulative_distribution_of_nodes(points)[:, 0],
+            distribution.cumulative_distribution_function(points),
+        )
 
 
 if __name__ == "__main__":

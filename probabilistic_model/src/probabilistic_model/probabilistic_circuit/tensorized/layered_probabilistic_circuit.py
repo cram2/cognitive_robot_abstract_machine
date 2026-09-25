@@ -8,6 +8,11 @@ from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Dict, Iterable, List, Optional, Self, Tuple
 
+from probabilistic_model.distributions.distributions import (
+    IntegerDistribution,
+    SymbolicDistribution,
+    UnivariateDistribution,
+)
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.exceptions import IntractableError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
@@ -24,8 +29,15 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_la
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base import (
+    InputLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    IntegerLayer,
+    SymbolicLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
@@ -404,14 +416,30 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
         for variable, value in point.items():
             children.append(
-                DiracDeltaLayer.from_distributions(
-                    original_variables.index(variable), [make_dirac(variable, value)]
+                self.point_mass_layer(
+                    original_variables.index(variable), make_dirac(variable, value)
                 )
             )
 
         self.root = ProductLayer.product_of(children).simplify()
         self.root.normalize()
         return self, log_probability
+
+    @staticmethod
+    def point_mass_layer(
+        variable_index: int, distribution: UnivariateDistribution
+    ) -> InputLayer:
+        """
+        :param variable_index: The index of the variable of the distribution.
+        :param distribution: A distribution that puts all of its mass on one value, as
+            :func:`~probabilistic_model.distributions.helper.make_dirac` creates it.
+        :return: The input layer with one node that holds the distribution.
+        """
+        if isinstance(distribution, SymbolicDistribution):
+            return SymbolicLayer.from_distributions(variable_index, [distribution])
+        if isinstance(distribution, IntegerDistribution):
+            return IntegerLayer.from_distributions(variable_index, [distribution])
+        return DiracDeltaLayer.from_distributions(variable_index, [distribution])
 
     def restore_variables(self, variables: SortedSet):
         """

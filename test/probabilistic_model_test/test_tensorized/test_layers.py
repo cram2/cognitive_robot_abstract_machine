@@ -10,9 +10,9 @@ import unittest
 import numpy as np
 import pandas as pd
 from krrood.adapters.json_serializer import from_json, to_json
-from random_events.interval import Bound, SimpleInterval, closed, open, singleton
+from random_events.interval import Bound, SimpleInterval, closed, open, reals, singleton
 from random_events.product_algebra import SimpleEvent
-from random_events.variable import Continuous
+from random_events.variable import Continuous, Integer
 from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 
@@ -22,10 +22,16 @@ from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized i
 from probabilistic_model.adapters.rustworkx_tensorized.tensorized_to_rustworkx import (
     LayeredCircuitToRustworkxCircuitConverter,
 )
+from probabilistic_model.distributions.distributions import IntegerDistribution
+from probabilistic_model.distributions.gaussian import (
+    GaussianDistribution,
+    TruncatedGaussianDistribution,
+)
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
 from probabilistic_model.probabilistic_circuit.rx.helper import (
+    fully_factorized,
     uniform_measure_of_event,
     uniform_measure_of_simple_event,
 )
@@ -62,6 +68,13 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer 
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    IntegerLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
+    GaussianLayer,
+    TruncatedGaussianLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.uniform_layer import (
     UniformLayer,
 )
@@ -71,11 +84,13 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
 from probabilistic_model.probabilistic_circuit.tensorized.utils import (
     embedded_logsumexp,
 )
+from probabilistic_model.utils import MissingDict
 from .test_layered_probabilistic_circuit import shared_children_circuit
 
 
 x = Continuous("x")
 y = Continuous("y")
+n = Integer("n")
 
 
 def uniform_layer_of(variable_index: int, intervals) -> UniformLayer:
@@ -367,6 +382,205 @@ class VectorizedTruncationTestCase(unittest.TestCase):
         )
         np.testing.assert_array_equal(layered.log_likelihood(points), likelihood_before)
 
+    def test_discrete_layer_agrees_with_the_scalar_truncation(self):
+        distributions = [
+            IntegerDistribution(
+                variable=n, probabilities=MissingDict(float, {0: 0.2, 1: 0.3, 2: 0.5})
+            ),
+            IntegerDistribution(variable=n, probabilities=MissingDict(float, {0: 1.0})),
+        ]
+        layer = IntegerLayer.from_distributions(0, distributions)
+
+        for assignment in (closed(0, 1), closed(2, 2), closed(5, 6)):
+            with self.subTest(str(assignment)):
+                truncated = layer.log_truncated_of_assignment(assignment, False)
+                truncated_layer = truncated.layer
+                log_probabilities = truncated.log_probabilities
+                for node, distribution in enumerate(distributions):
+                    expected, expected_log_probability = distribution.log_truncated(
+                        SimpleEvent.from_data({n: assignment}).as_composite_set()
+                    )
+                    if expected is None:
+                        self.assertEqual(log_probabilities[node], -np.inf)
+                        continue
+                    self.assertAlmostEqual(
+                        float(log_probabilities[node]),
+                        float(expected_log_probability),
+                    )
+                    self.assertEqual(
+                        truncated_layer.probabilities_of_node(node),
+                        expected.probabilities,
+                    )
+
+    def test_gaussian_layer_agrees_with_the_scalar_truncation(self):
+        bound_pairs = [
+            (Bound.CLOSED, Bound.CLOSED),
+            (Bound.CLOSED, Bound.OPEN),
+            (Bound.OPEN, Bound.CLOSED),
+            (Bound.OPEN, Bound.OPEN),
+        ]
+        node_parameters = [(0.0, 1.0), (2.0, 0.5), (-3.0, 2.0), (100.0, 0.01)]
+        event_ranges = [(-1.0, 1.0), (-10.0, 10.0), (5.0, 6.0)]
+
+        distributions = [
+            GaussianDistribution(variable=x, location=location, scale=scale)
+            for location, scale in node_parameters
+        ]
+        layer = GaussianLayer.from_distributions(0, distributions)
+
+        for event_bounds in bound_pairs:
+            for lower, upper in event_ranges:
+                event_interval = SimpleInterval.from_data(lower, upper, *event_bounds)
+                with self.subTest(event_bounds=event_bounds, event=(lower, upper)):
+                    truncated = layer.log_truncated_of_assignment(
+                        event_interval.as_composite_set(), False
+                    )
+                    truncated_layer = truncated.layer
+                    log_probabilities = truncated.log_probabilities
+
+                    for node, distribution in enumerate(distributions):
+                        expected, expected_log_probability = (
+                            distribution.log_conditional_from_simple_interval(
+                                event_interval, False
+                            )
+                        )
+                        if expected is None:
+                            self.assertEqual(log_probabilities[node], -np.inf)
+                            continue
+
+                        self.assertAlmostEqual(
+                            float(log_probabilities[node]),
+                            float(expected_log_probability),
+                        )
+                        self.assertIsInstance(expected, TruncatedGaussianDistribution)
+                        self.assertEqual(
+                            truncated_layer.simple_interval_of(node),
+                            expected.interval,
+                        )
+
+    def test_gaussian_layer_truncated_to_the_real_line_stays_gaussian(self):
+        distributions = [
+            GaussianDistribution(variable=x, location=0.0, scale=1.0),
+            GaussianDistribution(variable=x, location=5.0, scale=2.0),
+        ]
+        layer = GaussianLayer.from_distributions(0, distributions)
+
+        truncated = layer.log_truncated_of_assignment(reals(), False)
+        truncated_layer = truncated.layer
+        log_probabilities = truncated.log_probabilities
+
+        self.assertIsInstance(truncated_layer, GaussianLayer)
+        self.assertNotIsInstance(truncated_layer, TruncatedGaussianLayer)
+        np.testing.assert_allclose(log_probabilities, 0.0, atol=1e-9)
+        np.testing.assert_array_equal(truncated_layer.location, layer.location)
+        np.testing.assert_array_equal(truncated_layer.scale, layer.scale)
+
+    def test_gaussian_layer_marks_a_node_with_no_probability_left_as_impossible(self):
+        layer = GaussianLayer.from_distributions(
+            0,
+            [
+                GaussianDistribution(variable=x, location=0.0, scale=0.001),
+                GaussianDistribution(variable=x, location=100.0, scale=1.0),
+            ],
+        )
+        log_probabilities = layer.log_truncated_of_assignment(
+            closed(99.0, 101.0), False
+        ).log_probabilities
+        self.assertEqual(log_probabilities[0], -np.inf)
+        self.assertGreater(log_probabilities[1], -np.inf)
+
+    def test_a_singleton_turns_every_gaussian_node_into_a_dirac_delta(self):
+        layer = GaussianLayer.from_distributions(
+            0, [GaussianDistribution(variable=x, location=0.0, scale=1.0)]
+        )
+        truncated = layer.log_truncated_of_assignment(singleton(1.0), True)
+        self.assertIsInstance(truncated.layer, DiracDeltaLayer)
+        self.assertAlmostEqual(
+            float(truncated.log_probabilities[0]),
+            float(layer.log_likelihood_of_nodes_from_column(np.array([1.0]))[0, 0]),
+        )
+
+    def test_a_composite_assignment_mixes_the_truncated_gaussians(self):
+        distribution = GaussianDistribution(variable=x, location=0.0, scale=1.0)
+        layer = GaussianLayer.from_distributions(0, [distribution])
+        assignment = closed(-1, 0) | closed(1, 2)
+        truncated = layer.log_truncated_of_assignment(assignment, False)
+        self.assertIsInstance(truncated.layer, SumLayer)
+        self.assertIsInstance(truncated.layer.child_layers[0], TruncatedGaussianLayer)
+        self.assertAlmostEqual(
+            float(np.exp(truncated.log_probabilities[0])),
+            distribution.probability(
+                SimpleEvent.from_data({x: assignment}).as_composite_set()
+            ),
+        )
+
+    def test_truncated_gaussian_layer_agrees_with_the_scalar_truncation(self):
+        """
+        The expected distribution is built on the intersection of the support and the
+        assignment directly: ``TruncatedGaussianDistribution.log_truncated`` keeps the
+        interval of the event instead of that intersection.
+        """
+        support = closed(-1.0, 3.0)
+        distributions = [
+            TruncatedGaussianDistribution(
+                variable=x,
+                interval=support.simple_sets[0],
+                location=location,
+                scale=scale,
+            )
+            for location, scale in ((0.0, 1.0), (2.5, 0.5))
+        ]
+        layer = TruncatedGaussianLayer.from_distributions(0, distributions)
+        points = np.linspace(-1.5, 3.5, 11).reshape(-1, 1)
+        for assignment in (closed(0.0, 1.0), open(-5.0, 0.5), closed(2.0, 10.0)):
+            with self.subTest(str(assignment)):
+                truncated = layer.log_truncated_of_assignment(assignment, False)
+                self.assertIsInstance(truncated.layer, TruncatedGaussianLayer)
+                [intersection] = (support & assignment).simple_sets
+                for node, distribution in enumerate(distributions):
+                    event = SimpleEvent.from_data({x: assignment}).as_composite_set()
+                    self.assertAlmostEqual(
+                        float(np.exp(truncated.log_probabilities[node])),
+                        distribution.probability(event),
+                    )
+                    expected = TruncatedGaussianDistribution(
+                        variable=x,
+                        interval=intersection,
+                        location=distribution.location,
+                        scale=distribution.scale,
+                    )
+                    self.assertEqual(
+                        truncated.layer.simple_interval_of(node), intersection
+                    )
+                    np.testing.assert_allclose(
+                        np.exp(
+                            truncated.layer.log_likelihood_of_nodes(points)[:, node]
+                        ),
+                        expected.likelihood(points),
+                        atol=1e-9,
+                    )
+
+    def test_conditioning_a_discrete_layer_on_a_value(self):
+        layer = IntegerLayer.from_distributions(
+            0,
+            [
+                IntegerDistribution(
+                    variable=n, probabilities=MissingDict(float, {0: 0.2, 2: 0.8})
+                ),
+                IntegerDistribution(
+                    variable=n, probabilities=MissingDict(float, {0: 1.0})
+                ),
+            ],
+        )
+        conditioned = layer.log_conditional_of_value(2)
+        np.testing.assert_allclose(conditioned.log_probabilities, np.log([0.8, 0.0]))
+        self.assertEqual(
+            conditioned.layer.probabilities_of_node(0), MissingDict(float, {2: 1.0})
+        )
+        np.testing.assert_array_equal(
+            layer.log_conditional_of_value(7).log_probabilities, [-np.inf, -np.inf]
+        )
+
 
 class LayerGraphTraversalTestCase(unittest.TestCase):
     """
@@ -436,6 +650,14 @@ class HelperTestCase(unittest.TestCase):
             circuit.likelihood(np.array([[1.0, 2.0]])), np.array([1 / 8])
         )
         self.assertAlmostEqual(circuit.probability_of_simple_event(event), 1.0)
+
+    def test_fully_factorized(self):
+        circuit = RustworkxCircuitToLayeredCircuitConverter.convert(
+            fully_factorized([x, y], means={x: 1.0}, variances={y: 2.0})
+        )
+        self.assertEqual(list(circuit.variables), [x, y])
+        self.assertAlmostEqual(circuit.expectation()[x], 1.0)
+        self.assertAlmostEqual(circuit.expectation()[y], 0.0)
 
     def test_uniform_measure_of_a_composite_event(self):
         event = (

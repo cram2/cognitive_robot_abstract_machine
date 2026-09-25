@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from random_events.interval import SimpleInterval
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import List, Self
@@ -16,9 +15,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.continuous_layer_with_density import (
     ContinuousLayerWithFiniteSupport,
-)
-from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
-    LayerWithLogProbabilities,
 )
 
 
@@ -104,58 +100,3 @@ class UniformLayer(ContinuousLayerWithFiniteSupport):
         self, node: int, amount: int, variables: SortedSet
     ) -> SampleColumn:
         return np.random.uniform(self.lower[node], self.upper[node], amount)
-
-    def log_truncated_of_non_singleton_interval(
-        self, interval: SimpleInterval
-    ) -> LayerWithLogProbabilities:
-        """
-        Truncate every node to a simple interval. A uniform truncated to an interval is
-        the uniform over the intersection of the two.
-
-        :param interval: The simple interval, which is not a singleton.
-        :return: The uniform layer over the intersections and the log-probability of the
-            interval under every node.
-        """
-        lower, upper = float(interval.lower), float(interval.upper)
-        left_bound, right_bound = int(interval.left), int(interval.right)
-
-        cumulative = self.cumulative_distribution_of_nodes_from_column(
-            np.array([lower, upper])
-        )
-        probability = cumulative[1] - cumulative[0]
-        alive = probability > 0
-
-        # the bounds of the intersection: the tighter side wins, and where the two
-        # bounds coincide the interval is open if either of them is open. Bound.OPEN is
-        # the larger value, so that is a maximum.
-        own_left, own_right = self.bounds[:, 0], self.bounds[:, 1]
-        new_left = np.where(
-            self.lower > lower,
-            own_left,
-            np.where(self.lower < lower, left_bound, np.maximum(own_left, left_bound)),
-        )
-        new_right = np.where(
-            self.upper < upper,
-            own_right,
-            np.where(
-                self.upper > upper, right_bound, np.maximum(own_right, right_bound)
-            ),
-        )
-
-        # impossible nodes keep their parameters and are dropped by the prune pass
-        interval_of_nodes = np.where(
-            alive[:, None],
-            np.stack([np.maximum(self.lower, lower), np.minimum(self.upper, upper)], 1),
-            self.interval,
-        )
-        bounds_of_nodes = np.where(
-            alive[:, None], np.stack([new_left, new_right], axis=1), self.bounds
-        )
-        log_probabilities = np.where(
-            alive, np.log(np.where(alive, probability, 1.0)), -np.inf
-        )
-
-        return LayerWithLogProbabilities(
-            self.__class__(self.variable, interval_of_nodes, bounds_of_nodes),
-            log_probabilities,
-        )

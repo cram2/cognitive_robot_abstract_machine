@@ -97,3 +97,24 @@ EdgeMask: TypeAlias = npt.NDArray[np.bool_]
 """
 One flag per edge of an inner layer, in the order the layer stores its edges.
 """
+
+States: TypeAlias = npt.NDArray[np.int64]
+"""
+The states of a discrete variable, sorted ascending: the hash of the domain element for
+a symbolic variable and the value itself for an integer variable.
+"""
+
+StateIndices: TypeAlias = npt.NDArray[np.int64]
+"""
+Indices into the states of a discrete variable.
+"""
+
+StateMask: TypeAlias = npt.NDArray[np.bool_]
+"""
+One flag per state of a discrete variable.
+"""
+
+NodeStateValues: TypeAlias = npt.NDArray[np.float64]
+"""
+One value per node of a layer and state of a discrete variable, shape (#nodes, #states).
+"""
