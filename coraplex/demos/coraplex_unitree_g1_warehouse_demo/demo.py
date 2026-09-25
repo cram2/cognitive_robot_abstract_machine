@@ -11,8 +11,6 @@ from __future__ import annotations
 import numpy as np
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan import Plan
@@ -22,7 +20,6 @@ from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.testing import start_visualization
-from coraplex.view_manager import ViewManager
 from krrood.entity_query_language.factories import an, entity, variable
 from semantic_digital_twin.api import (
     BodySpecification,
@@ -30,7 +27,8 @@ from semantic_digital_twin.api import (
     WorldSpecification,
 )
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspPoses
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Parcel
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Scale
@@ -109,9 +107,7 @@ def build_world() -> World:
     # The parcel stands in for any graspable object; the plan only needs an annotation
     # to name it by, not a particular kind of object.
     with world.modify_world():
-        world.add_semantic_annotation(
-            HasRootBody(root=world.get_body_by_name("parcel"))
-        )
+        world.add_semantic_annotation(Parcel(root=world.get_body_by_name("parcel")))
     return world
 
 
@@ -140,16 +136,10 @@ def build_plan(world: World, robot: UnitreeG1) -> Plan:
     parcel = world.get_body_by_name("parcel")
     parcel_annotation = an(
         entity(
-            semantic_annotation := variable(
-                HasRootBody, domain=world.semantic_annotations
-            )
+            semantic_annotation := variable(Parcel, domain=world.semantic_annotations)
         ).where(semantic_annotation.root == parcel)
     ).first()
-    grasp = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        ViewManager.get_end_effector_view(Arms.LEFT, robot),
-    )
+    grasp = Pose(reference_frame=parcel)
     context = Context(world=world, robot=robot, evaluate_conditions=False)
     place_pose = Pose(
         PLACE_POSE.to_position(), PLACE_POSE.to_quaternion(), reference_frame=world.root
@@ -161,10 +151,10 @@ def build_plan(world: World, robot: UnitreeG1) -> Plan:
     return sequential(
         [
             # %% bring to place pose
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(robot.get_arms()),
             NavigateAction(standing_pose_in_front_of(PICK_POSE, world)),
-            PickUpAction(parcel_annotation, Arms.LEFT, grasp),
-            ParkArmsAction(Arms.BOTH),
+            PickUpAction(grasp, robot.torso.left_arm),
+            ParkArmsAction(robot.get_arms()),
             MoveJointsMotion(
                 names=[
                     connection.name for connection in robot.torso.active_connections
@@ -173,8 +163,8 @@ def build_plan(world: World, robot: UnitreeG1) -> Plan:
             ),
             NavigateAction(Pose.from_xyz_rpy(yaw=-1.57, reference_frame=robot.root)),
             NavigateAction(standing_pose_in_front_of(PLACE_POSE, world)),
-            PlaceAction(parcel, place_pose, Arms.LEFT),
-            ParkArmsAction(Arms.BOTH),
+            PlaceAction(parcel_annotation, place_pose),
+            ParkArmsAction(robot.get_arms()),
             MoveJointsMotion(
                 names=[
                     connection.name for connection in robot.torso.active_connections
@@ -195,16 +185,10 @@ def build_plan2(world: World, robot: UnitreeG1) -> Plan:
     parcel = world.get_body_by_name("parcel")
     parcel_annotation = an(
         entity(
-            semantic_annotation := variable(
-                HasRootBody, domain=world.semantic_annotations
-            )
+            semantic_annotation := variable(Parcel, domain=world.semantic_annotations)
         ).where(semantic_annotation.root == parcel)
     ).first()
-    grasp = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        ViewManager.get_end_effector_view(Arms.LEFT, robot),
-    )
+    grasp = Pose(reference_frame=parcel)
     context = Context(world=world, robot=robot, evaluate_conditions=False)
     place_pose = Pose(
         PLACE_POSE.to_position(), PLACE_POSE.to_quaternion(), reference_frame=world.root
@@ -216,10 +200,10 @@ def build_plan2(world: World, robot: UnitreeG1) -> Plan:
     return sequential(
         [
             # %% bring to place pose
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(robot.get_arms()),
             NavigateAction(standing_pose_in_front_of(PLACE_POSE, world)),
-            PickUpAction(parcel_annotation, Arms.LEFT, grasp),
-            ParkArmsAction(Arms.BOTH),
+            PickUpAction(grasp, robot.torso.left_arm),
+            ParkArmsAction(robot.get_arms()),
             MoveJointsMotion(
                 names=[
                     connection.name for connection in robot.torso.active_connections
@@ -228,8 +212,8 @@ def build_plan2(world: World, robot: UnitreeG1) -> Plan:
             ),
             NavigateAction(Pose.from_xyz_rpy(yaw=1.57, reference_frame=robot.root)),
             NavigateAction(standing_pose_in_front_of(PICK_POSE, world)),
-            PlaceAction(parcel, pick_pose, Arms.LEFT),
-            ParkArmsAction(Arms.BOTH),
+            PlaceAction(parcel_annotation, pick_pose),
+            ParkArmsAction(robot.get_arms()),
             MoveJointsMotion(
                 names=[
                     connection.name for connection in robot.torso.active_connections

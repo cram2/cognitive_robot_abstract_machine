@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Any, Dict, List, Optional
 
-from coraplex.datastructures.enums import Arms
+from cramera.robot_parts import ArmSide
 from semantic_digital_twin.spatial_types import Point3
 
 from cramera.knowledge.architecture_entities import Package, PythonClass, SubPackage
@@ -88,7 +88,7 @@ class EqlSession:
                 "Point3": Point3,
                 "Gripper": Gripper,
                 "Arm": RecordedArm,
-                "Arms": Arms,
+                "ArmSide": ArmSide,
                 "objects": self.knowledge_base.objects,
                 "episodes": self.knowledge_base.episodes,
                 "arms": self.knowledge_base.arms,

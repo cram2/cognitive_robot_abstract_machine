@@ -14,14 +14,15 @@ adapt to objects that moved, a torso that was already raised, or an object alrea
 
 ## Location designators
 
-Location designators are resolved into 6D poses by the pose-generator backends in {mod}`coraplex.locations`. The
-backends in {mod}`coraplex.locations.backends` build and combine costmaps (see {doc}`costmap`) for criteria such as
-reachability, visibility and occupancy, and the factories in {mod}`coraplex.locations.factories` assemble the location
-for a given task. Sampling a costmap yields candidate poses, which are then validated by the validators in
-{mod}`coraplex.locations.pose_validator` (for example {class}`~coraplex.locations.pose_validator.IsObjectReachableBy`).
+Location designators are resolved into 6D poses by the locations in {mod}`coraplex.locations`. A
+{class}`~coraplex.locations.base.Location` is drawn from a costmap (see {doc}`costmap`) for criteria such as reach
+distance, visibility and occupancy. The locations in {mod}`coraplex.locations.locations`, such as
+{class}`~coraplex.locations.locations.ReachabilityLocation`, build that costmap from the world as it is when they are
+drawn from, and a target given relative to a body follows that body. Iterating a location draws candidate poses from
+it; whether the robot can do its task from one of them is found out by trying the action that uses it.
 
 ## Customising resolution
 
-To change how a particular kind of location is generated, provide or extend a pose-generator backend in
-{mod}`coraplex.locations` rather than adding a separate resolver module. Custom resolution logic should keep the same
+To change how a particular kind of location is generated, provide or extend a
+{class}`~coraplex.locations.base.Location` in {mod}`coraplex.locations` rather than adding a separate resolver module. Custom resolution logic should keep the same
 interface as the designator it grounds so it stays a drop-in replacement.

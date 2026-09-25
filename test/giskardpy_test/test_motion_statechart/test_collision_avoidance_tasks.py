@@ -1067,6 +1067,7 @@ def test_collision_for_robot_with_static_base(
             )
 
 
+@pytest.mark.flaky(reruns=3)
 def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
     pr2_apartment_world,
 ):

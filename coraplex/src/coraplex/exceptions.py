@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, Type, List
+from typing_extensions import TYPE_CHECKING, Type
 
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
 from coraplex.datastructures.enums import (
-    Arms,
     ExecutionType,
     VisualizationBackend,
     VisualizationOption,
@@ -18,9 +16,9 @@ from coraplex.plans.failures import PlanFailure
 if TYPE_CHECKING:
     from coraplex.plans.designator import Designator
     from coraplex.robot_plans.actions.base import ActionDescription
-    from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
+    from semantic_digital_twin.semantic_annotations.mixins import HasGraspPoses
     from semantic_digital_twin.world_description.world_entity import (
-        KinematicStructureEntity,
         SemanticAnnotation,
     )
 
@@ -105,30 +103,6 @@ class ContextIsUnavailable(DataclassException):
 
 
 @dataclass
-class TipLinkDoesNotMatchAnyArm(DataclassException):
-    """
-    Raised when a reachability validator's tip link is not the tool frame of any arm of
-    the robot, so no arm can be selected to reach the requested pose.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    The tip link that did not match any arm.
-    """
-
-    robot: AbstractRobot
-    """
-    The robot whose arms were searched.
-    """
-
-    def error_message(self) -> str:
-        return f"tip_link {self.tip_link} does not match any arm of {self.robot}"
-
-    def suggest_correction(self) -> str:
-        return "ensure the tip_link is the tool frame of one of the robot's arms."
-
-
-@dataclass
 class MissingWaypoints(DataclassException):
     """
     Raised when a waypoint motion or tool action produced no waypoints to follow.
@@ -165,30 +139,12 @@ class WipingTargetMissing(DataclassException):
 
 
 @dataclass
-class PerceptionTargetMissing(DataclassException):
-    """
-    Raised when an action is asked to perceive before grasping but names no object.
-    """
-
-    instance: Designator
-    """
-    The action that has no object to detect.
-    """
-
-    def error_message(self) -> str:
-        return f"{self.instance} perceives before grasping but names no object."
-
-    def suggest_correction(self) -> str:
-        return "provide an object_designator or leave perceive_before_grasp off."
-
-
-@dataclass
 class MissingToolFrame(DataclassException):
     """
     Raised when no tool frame is available for the requested arm.
     """
 
-    arm: Arms
+    arm: Arm
     """
     The arm whose tool frame was requested.
     """
@@ -224,23 +180,22 @@ class ConditionNotSatisfied(PlanFailure):
 
 
 @dataclass
-class MotionDidNotFinish(PlanFailure):
-
-    unfinished_motions: List[MotionStatechartNode]
+class ObjectIsNotHeld(DataclassException):
     """
-    The nodes that did not succeed, whether they failed, were interrupted or never
-    ended.
+    Raised when a place is asked for an object that no arm holds and no pick-up before
+    it is going to take.
+    """
+
+    object_designator: HasGraspPoses
+    """
+    The object that was to be placed.
     """
 
     def error_message(self) -> str:
-        reports = ", ".join(
-            f"{motion.unique_name} ({motion.life_cycle_state.name})"
-            for motion in self.unfinished_motions
-        )
-        return f"Motion did not finish, following motions did not succeed: {reports}"
+        return f"no arm holds {self.object_designator.name} to place it."
 
     def suggest_correction(self) -> str:
-        return ""
+        return "place the object after a pick-up of it."
 
 
 @dataclass
@@ -423,26 +378,22 @@ class NotOnASingleLevelException(DataclassException):
 
 
 @dataclass
-class BodyIsNotHeld(DataclassException):
+class NonPositiveNumberOfSamples(DataclassException):
     """
-    Raised when a grasp should be read off a body that no end effector is holding.
-    """
-
-    body: KinematicStructureEntity
-    """
-    The body that was expected to be held.
+    Raised when a costmap is asked for fewer than one candidate, which no draw can
+    satisfy.
     """
 
-    end_effector: EndEffector
+    number_of_samples: int
     """
-    The end effector that was expected to hold it.
+    The number of candidates that was asked for.
     """
 
     def error_message(self) -> str:
-        return (
-            f"'{self.body.name}' is not held by '{self.end_effector.name}', so there is "
-            f"no grasp to read from the world."
-        )
+        return f"A costmap cannot be asked for {self.number_of_samples} candidates."
 
     def suggest_correction(self) -> str:
-        return "pick the body up before reading its grasp."
+        return (
+            "ask for at least one; a map offers everything it holds when asked for "
+            "more than that."
+        )

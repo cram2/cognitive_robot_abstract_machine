@@ -7,104 +7,52 @@ import pytest
 from typing_extensions import Iterator, List
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.locations.backends import GiskardLocationBackend
-from coraplex.locations.base import Location, PoseGeneratorBackend, PoseValidator
-from coraplex.locations.factories import (
-    reachability_location,
-)
-from coraplex.view_manager import ViewManager
+from coraplex.locations.base import Location
+from coraplex.locations.costmaps import RingCostmap
+from coraplex.locations.sampling import CandidateDraw
+from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
 from semantic_digital_twin.api import RobotSpecification, WorldSpecification
-from semantic_digital_twin.collision_checking.collision_rules import (
-    AllowSelfCollisions,
-    CollisionRule,
-)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 
 # %% test doubles
 
 
 @dataclass
-class FixedPoseGenerator(PoseGeneratorBackend):
+class RecordsHowItWasDrawn(Location):
     """
-    Yields predetermined candidates, so a location's placement can be asserted exactly.
-    """
-
-    poses: List[Pose]
-    """
-    The candidates to yield, in order.
+    Yields one candidate and records the terms the draw was asked for on.
     """
 
-    def __iter__(self) -> Iterator[Pose]:
-        return iter(self.poses)
-
-
-@dataclass
-class RecordsEvaluatedRobot(PoseValidator):
+    pose: Pose
     """
-    Accepts every candidate and records the robot it was evaluated against.
+    The single candidate to yield.
     """
 
-    evaluated_robots: List[AbstractRobot] = field(default_factory=list)
+    asked_for: List[CandidateDraw] = field(default_factory=list)
     """
-    The robot annotation each candidate was evaluated against, in evaluation order.
-    """
-
-    evaluated_root_poses: List[Pose] = field(default_factory=list)
-    """
-    Where the evaluated robot's root stood in the world frame, in evaluation order.
+    One entry per draw: the terms it was asked on.
     """
 
-    def __call__(self, *args, **kwargs) -> bool:
-        self.evaluated_robots.append(self.robot)
-        self.evaluated_root_poses.append(self.robot.root.global_pose)
-        return True
+    def candidates(self, draw: CandidateDraw) -> Iterator[Pose]:
+        self.asked_for.append(draw)
+        return iter([self.pose])
 
 
-@dataclass
-class RecordsCollisionRules(PoseValidator):
-    """
-    Accepts every candidate and records the temporary collision rules in force while it
-    was evaluated.
-    """
+# %% a specification-built world whose odom is displaced
 
-    temporary_rules_seen: List[List[CollisionRule]] = field(default_factory=list)
-    """
-    The world's temporary collision rules at each evaluation, in evaluation order.
-    """
-
-    def __call__(self, *args, **kwargs) -> bool:
-        self.temporary_rules_seen.append(
-            list(self.world.collision_manager.temporary_rules)
-        )
-        return True
-
-
-@dataclass
-class MotionlessExecutor:
-    """
-    Stands in for a Giskard executor and leaves the world exactly as it found it.
-    """
-
-    def tick_until_end(self, *args, **kwargs) -> None:
-        pass
-
-
-# %% specification-built worlds whose odom is displaced
-
-# The drive is an OmniDrive, which represents x, y and yaw only, so the odom offsets stay
-# in that plane. The environment holds nothing but the robots, so a candidate is never
-# rejected for collision and each test fails only for the behaviour it names.
-_FIRST_ODOM = HomogeneousTransformationMatrix.from_xyz_rpy(0.5, 0.5, 0, yaw=np.pi / 2)
-_SECOND_ODOM = HomogeneousTransformationMatrix.from_xyz_rpy(
-    -2.0, 1.0, 0, yaw=-np.pi / 4
-)
+# The drive is an OmniDrive, which represents x, y and yaw only, so the odom offset stays
+# in that plane.
+_ODOM = HomogeneousTransformationMatrix.from_xyz_rpy(0.5, 0.5, 0, yaw=np.pi / 2)
 
 
 def _world_with_robots_behind_displaced_odoms(
@@ -128,7 +76,7 @@ def _world_with_robots_behind_displaced_odoms(
 
 @pytest.fixture(scope="session")
 def _single_robot_world_setup() -> World:
-    return _world_with_robots_behind_displaced_odoms(_FIRST_ODOM)
+    return _world_with_robots_behind_displaced_odoms(_ODOM)
 
 
 @pytest.fixture
@@ -138,67 +86,57 @@ def single_robot_world(_single_robot_world_setup):
     return world, robot, Context(world, robot)
 
 
-@pytest.fixture(scope="session")
-def _two_robot_world_setup() -> World:
-    return _world_with_robots_behind_displaced_odoms(_FIRST_ODOM, _SECOND_ODOM)
-
-
-@pytest.fixture
-def two_robot_world(_two_robot_world_setup):
-    return deepcopy(_two_robot_world_setup)
-
-
 def _candidate(world: World) -> Pose:
     return Pose.from_xyz_rpy(1.3, 2.0, 0.0, yaw=0.25, reference_frame=world.root)
 
 
-# %% a location evaluates candidates where the world frame says they are
+# %% a location draws its candidates on its own terms
 
 
-def test_location_places_the_robot_at_the_candidate_in_the_world_frame(
-    single_robot_world,
-):
+def test_a_location_draws_on_the_terms_it_was_given(single_robot_world):
     world, robot, context = single_robot_world
-    candidate = _candidate(world)
-    recorder = RecordsEvaluatedRobot()
+    draw = CandidateDraw(number_of_samples=17, seed=3)
+    location = RecordsHowItWasDrawn(pose=_candidate(world), draw=draw)
 
-    list(Location(context, candidate, FixedPoseGenerator([candidate]), [recorder]))
+    list(islice(iter(location), 1))
 
-    np.testing.assert_allclose(
-        recorder.evaluated_root_poses[0].to_np(), candidate.to_np(), atol=1e-9
-    )
+    assert location.asked_for == [draw]
 
 
-def test_location_yields_the_pose_it_evaluated(single_robot_world):
+def test_a_location_draws_nothing_before_it_is_consumed(single_robot_world):
+    """
+    A location handed to a plan as a domain is only drawn from once the plan asks for a
+    pose, so it reflects the world at that moment.
+    """
     world, robot, context = single_robot_world
-    candidate = _candidate(world)
-    recorder = RecordsEvaluatedRobot()
+    location = RecordsHowItWasDrawn(pose=_candidate(world))
 
-    yielded_poses = list(
-        Location(context, candidate, FixedPoseGenerator([candidate]), [recorder])
-    )
+    candidates = iter(location)
+    assert location.asked_for == []
 
-    assert len(yielded_poses) == 1
-    np.testing.assert_allclose(
-        yielded_poses[0].to_np(),
-        recorder.evaluated_root_poses[0].to_np(),
-        atol=1e-9,
-    )
+    next(candidates)
+    assert location.asked_for == [location.draw]
 
 
-# %% a location evaluates the robot of its context
+def test_a_location_grounds_to_its_first_candidate(single_robot_world):
+    world, robot, context = single_robot_world
+    location = RecordsHowItWasDrawn(pose=_candidate(world))
+
+    assert location.ground() is location.pose
 
 
-def test_location_evaluates_the_robot_of_its_context(two_robot_world):
-    world = two_robot_world
-    second_robot = world.get_semantic_annotations_by_type(PR2)[1]
-    context = Context(world, second_robot)
-    recorder = RecordsEvaluatedRobot()
-    candidate = _candidate(world)
+def test_a_location_that_does_not_say_how_it_draws_cannot_be_built():
+    """
+    A location inherits no draw of its own, so one that leaves the terms unanswered is
+    refused where it is defined rather than silently offering nothing at runtime.
+    """
 
-    list(Location(context, candidate, FixedPoseGenerator([candidate]), [recorder]))
+    @dataclass
+    class SaysNothingAboutTheTerms(Location):
+        pass
 
-    assert recorder.evaluated_robots[0].id == second_robot.id
+    with pytest.raises(TypeError):
+        SaysNothingAboutTheTerms()
 
 
 # %% how far a reachability location stands from its target
@@ -209,127 +147,175 @@ REACHABILITY_TARGET_POSITION = (2.0, 2.0, 0.9)
 Position of the target a reachability location is built around, clear of the robot.
 """
 
-STANDING_DISTANCE_TOLERANCE = 0.05
+REACH_FRACTION = 0.5
 """
-Tolerance of a sampled standing distance, in meter.
-
-Candidates land on the cell centres of a 0.02 m costmap grid, so a sample sits a
-fraction of a cell off the ring it was drawn from.
-"""
-
-CANDIDATES_TO_SAMPLE = 20
-"""
-Number of candidates whose distance to the target is asserted.
+The fraction of the arm's length the sampled ring is asked to stand off by, chosen away
+from the default so the parameter is what the sampling follows.
 """
 
 
-def test_reachability_location_stands_at_the_arm_length_fraction_from_its_target(
+def test_a_ring_from_the_arm_reach_distance_stands_off_by_the_reach_fraction(
     single_robot_world,
 ):
     """
-    The standing distance follows the constant, so tuning it moves the robot.
-
-    Standing too close puts the arms inside whatever the target rests on, which the
-    collision check on candidate poses then rejects.
+    The standing distance follows the reach fraction, so tuning it moves the robot.
     """
     world, robot, context = single_robot_world
     target = Pose.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
-    # approximate_length returns a symbolic scalar, which compares as unequal to a float
-    # under pytest.approx no matter the tolerance.
-    expected_distance = (
-        float(ViewManager.get_arm_view(Arms.RIGHT, robot).approximate_length()) * 0.66
-    )
-    target_position = target.to_position().to_np()[:2]
+    # approximate_length returns a symbolic scalar, and so does the distance derived
+    # from it, which compares as unequal to a float under pytest.approx no matter the
+    # tolerance.
+    arm = context.robot.right_arm
+    expected_distance = float(arm.approximate_length()) * REACH_FRACTION
 
-    candidates = list(
-        islice(
-            reachability_location(target, context, Arms.RIGHT).generator,
-            CANDIDATES_TO_SAMPLE,
+    ring = RingCostmap.from_arm_reach_distance(
+        context, arm, target, reach_fraction=REACH_FRACTION
+    )
+
+    assert float(ring.distance) == pytest.approx(expected_distance)
+
+
+# %% a reachability location stands around the target it is given
+
+
+def _box_in(world: World) -> Milk:
+    """
+    A graspable box with collision geometry, standing away from the robot.
+    """
+    body = Body(
+        name=PrefixedName("box"),
+        collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.2))]),
+    )
+    graspable = Milk(root=body)
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection(
+                parent=world.root,
+                child=body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-1.0, y=-1.0, z=0.9
+                ),
+            )
         )
+        world.add_semantic_annotation(graspable)
+    return graspable
+
+
+def test_a_reachability_location_is_drawn_around_its_target(single_robot_world):
+    world, robot, context = single_robot_world
+    target = Pose.from_xyz_rpy(
+        *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
 
-    assert len(candidates) == CANDIDATES_TO_SAMPLE
-    distances = [
-        np.linalg.norm(candidate.to_position().to_np()[:2] - target_position)
-        for candidate in candidates
-    ]
-    assert distances == pytest.approx(
-        [expected_distance] * len(distances), abs=STANDING_DISTANCE_TOLERANCE
+    location = ReachabilityLocation(
+        target, context.robot.right_arm, context=context
+    )
+
+    np.testing.assert_allclose(
+        location.costmap().origin.to_position().to_np()[:2],
+        target.to_position().to_np()[:2],
     )
 
 
-# %% the giskard backend reports the pose it placed the robot at
+def test_a_reachability_location_takes_its_seed_from_the_context(single_robot_world):
+    """
+    A demonstration is only worth running as a regression test if it runs the same way
+    twice, so a plan can fix the draws made anywhere inside it.
+    """
+    world, robot, context = single_robot_world
+    context.sampling_seed = 5
+
+    location = ReachabilityLocation(
+        _box_in(world).root.global_pose,
+        context.robot.right_arm,
+        context=context,
+    )
+
+    assert location.draw.seed == context.sampling_seed
 
 
-def test_giskard_backend_yields_the_candidate_it_placed_the_robot_at(
+def test_a_reachability_location_draws_afresh_without_one(single_robot_world):
+    """
+    Left unseeded a plan explores the region differently each run, which is what makes
+    drawing from the map worth more than ranking it.
+    """
+    world, robot, context = single_robot_world
+
+    location = ReachabilityLocation(
+        _box_in(world).root.global_pose,
+        context.robot.right_arm,
+        context=context,
+    )
+
+    assert location.draw.seed is None
+
+
+# %% a location reflects the world when it is drawn from
+
+
+def test_a_costmap_location_builds_its_costmap_only_when_drawn_from(
     single_robot_world, monkeypatch
 ):
+    """
+    Handing a location to a plan must not build its costmap, so the map describes the
+    world as the plan finds it when it gets there.
+    """
     world, robot, context = single_robot_world
-    candidate = _candidate(world)
-    end_effector = ViewManager.get_end_effector_view(Arms.RIGHT, robot)
-    backend = GiskardLocationBackend(
-        target=candidate,
-        arm=Arms.RIGHT,
-        grasp_description=GraspDescription(
-            ApproachDirection.FRONT, VerticalAlignment.NoAlignment, end_effector
-        ),
-        robot=robot,
-        world=world,
+    location = ReachabilityLocation(
+        _box_in(world).root.global_pose,
+        context.robot.right_arm,
+        context=context,
     )
+    built = []
+    build_costmap = ReachabilityLocation.costmap
     monkeypatch.setattr(
-        GiskardLocationBackend, "setup_costmap", lambda self, pose: [candidate]
-    )
-    monkeypatch.setattr(
-        GiskardLocationBackend,
-        "setup_giskard_executor",
-        lambda self, *args, **kwargs: MotionlessExecutor(),
+        ReachabilityLocation,
+        "costmap",
+        lambda self: built.append(True) or build_costmap(self),
     )
 
-    yielded_poses = list(backend)
+    candidates = iter(location)
+    assert built == []
 
-    assert len(yielded_poses) == 1
-    np.testing.assert_allclose(yielded_poses[0].to_np(), candidate.to_np(), atol=1e-9)
+    next(candidates)
+    assert built == [True]
 
 
-def test_location_validates_against_the_rules_the_plan_runs_with(single_robot_world):
+def test_a_target_given_in_a_body_frame_follows_the_body(single_robot_world):
     """
-    Deciding whether a standing pose is already in collision needs collision rules of
-    its own, but they are the wrong ones for the reachability simulation that follows:
-
-    left in place they override the distances the robot actually has to keep, and a pose
-    validates against clearances the executed motion is never given.
+    A target named relative to a body is where that body is when the location is drawn
+    from, not where it was when the location was made.
     """
     world, robot, context = single_robot_world
-    candidate = _candidate(world)
-    recorder = RecordsCollisionRules()
+    box = _box_in(world).root
+    location = ReachabilityLocation(
+        Pose(reference_frame=box),
+        context.robot.right_arm,
+        context=context,
+    )
+    with world.modify_world():
+        box.parent_connection.parent_T_connection_expression = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(*REACHABILITY_TARGET_POSITION)
+        )
 
-    list(Location(context, candidate, FixedPoseGenerator([candidate]), [recorder]))
-
-    assert recorder.temporary_rules_seen
-    assert not any(
-        isinstance(rule, AllowSelfCollisions)
-        for rule in recorder.temporary_rules_seen[0]
+    np.testing.assert_allclose(
+        location.costmap().origin.to_position().to_np()[:2],
+        box.global_pose.to_position().to_np()[:2],
     )
 
 
-def test_location_validates_with_the_motion_policy_of_its_own_context(
-    single_robot_world,
-):
-    """
-    Validators run against a copy of the world and so are handed a context of their own.
+# %% seeing a target
 
-    That context has to carry the tolerances and the tick budget of the run, or a
-    candidate is judged by defaults the plan itself is never held to.
-    """
+
+def test_a_visibility_location_takes_its_seed_from_the_context(single_robot_world):
     world, robot, context = single_robot_world
-    context.ticks_per_motion = 11
-    context.motion_tolerances.default_tcp_position_threshold = 0.123
-    candidate = _candidate(world)
-    recorder = RecordsEvaluatedRobot()
+    context.sampling_seed = 5
 
-    list(Location(context, candidate, FixedPoseGenerator([candidate]), [recorder]))
+    location = VisibilityLocation(
+        Pose.from_xyz_rpy(*REACHABILITY_TARGET_POSITION, reference_frame=world.root),
+        context=context,
+    )
 
-    assert recorder.context.ticks_per_motion == context.ticks_per_motion
-    assert recorder.context.motion_tolerances is context.motion_tolerances
+    assert location.draw.seed == context.sampling_seed

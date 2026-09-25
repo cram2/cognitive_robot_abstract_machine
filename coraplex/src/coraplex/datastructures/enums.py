@@ -7,6 +7,25 @@ from __future__ import annotations
 from enum import Enum, auto, IntEnum, StrEnum
 
 
+class ReachFraction(float, Enum):
+    """
+    How far the robot stands off what it reaches for, as a fraction of the arm's length.
+    """
+
+    GRASPING = 0.5
+    """
+    Reaching something that stays where it is.
+    """
+
+    ACCESSING = 0.66
+    """
+    Working a container's handle.
+
+    A container is pulled open towards the robot, so it stands further back than it does
+    to reach something that stays where it is.
+    """
+
+
 class VisualizationLayout(Enum):
     BFS = "bfs"
     """
@@ -99,6 +118,23 @@ class VisualizationBackend(StrEnum):
     """Use an installed browser visualization provider."""
 
 
+class ActionTrialVisualization(StrEnum):
+    """
+    Where the world copy an action trial runs in is published while debugging, apart
+    from the world it copies.
+    """
+
+    FRAME_PREFIX = "action_trial/"
+    """
+    Put in front of every tf frame of the copy.
+    """
+
+    MARKER_TOPIC = "/semworld/action_trial/viz_marker"
+    """
+    The topic the markers of the copy are published on.
+    """
+
+
 class VisualizationOption(StrEnum):
     """
     Configuration names for optional visualization providers.
@@ -125,23 +161,13 @@ class VisualizationOption(StrEnum):
     """
 
 
-class Arms(IntEnum):
+class PouringSide(StrEnum):
     """
-    Enum for Arms.
+    The side of a target container, as the robot sees it, that is poured from.
     """
 
-    # LEFT = "left"
-    # RIGHT = "right"
-    # BOTH = "both"
-    LEFT = 0
-    RIGHT = 1
-    BOTH = 2
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return self.name
+    LEFT = "left"
+    RIGHT = "right"
 
 
 class JointType(Enum):
@@ -172,56 +198,6 @@ class AxisIdentifier(Enum):
     @classmethod
     def from_tuple(cls, axis_tuple):
         return next((axis for axis in cls if axis.value == axis_tuple), None)
-
-
-class Grasp(Enum):
-    """
-    Base class for grasp enums.
-    """
-
-    def __hash__(self):
-        return [index for index, value in enumerate(self.__class__) if self == value][0]
-
-    @classmethod
-    def from_axis_direction(cls, axis: AxisIdentifier, direction: int):
-        """
-        Get the Grasp face from an axis-index tuple.
-        """
-        return next((grasp for grasp in cls if grasp.value == (axis, direction)), None)
-
-
-class ApproachDirection(Grasp):
-    """
-    Enum for the approach direction of a gripper.
-
-    The AxisIdentifier is used to identify the axis of the gripper, and the int is used
-    to identify the direction along  that axis.
-    """
-
-    FRONT = (AxisIdentifier.X, -1)
-    BACK = (AxisIdentifier.X, 1)
-    RIGHT = (AxisIdentifier.Y, -1)
-    LEFT = (AxisIdentifier.Y, 1)
-
-    @property
-    def axis(self) -> AxisIdentifier:
-        """
-        Returns the axis of the approach direction.
-        """
-        return self.value[0]
-
-
-class VerticalAlignment(Grasp):
-    """
-    Enum for the vertical alignment of a gripper.
-
-    The AxisIdentifier is used to identify the axis of the gripper, and the int is used
-    to identify the direction along  that axis.
-    """
-
-    NoAlignment = (AxisIdentifier.Undefined, 0)
-    TOP = (AxisIdentifier.Z, -1)
-    BOTTOM = (AxisIdentifier.Z, 1)
 
 
 class GripperType(Enum):

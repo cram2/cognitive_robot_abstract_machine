@@ -237,10 +237,13 @@ class PlanNode(PlanEntity):
         :return: The previous nodes as a list of nodes
         """
         previous_nodes = []
-        for search_node in self.plan.nodes:
+        to_visit = [self.plan.root]
+        while to_visit:
+            search_node = to_visit.pop()
             if search_node is self:
                 break
             previous_nodes.append(search_node)
+            to_visit.extend(reversed(search_node.children))
         return previous_nodes
 
     def get_previous_node_by_designator_type(

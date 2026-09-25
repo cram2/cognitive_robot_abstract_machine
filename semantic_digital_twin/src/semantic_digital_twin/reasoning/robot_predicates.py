@@ -202,12 +202,7 @@ def is_gripper_holding_something(gripper: EndEffector) -> bool:
     :param gripper: The gripper for which the check should be done.
     :return: True if there is a body mounted beneath the gripper in the kinematic chain.
     """
-    bodies_under_tcp = gripper._world.get_kinematic_structure_entities_of_branch(
-        gripper.tool_frame
-    )
-    # the branch always contains the tool frame itself, so only additional
-    # entities below it count as something being held
-    return len(bodies_under_tcp) > 1
+    return bool(gripper.tool_frame.child_kinematic_structure_entities)
 
 
 @symbolic_function

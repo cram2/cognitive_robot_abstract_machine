@@ -9,7 +9,6 @@ import pytest
 
 krrood = pytest.importorskip("krrood", reason="EQL requires krrood")
 
-from coraplex.datastructures.enums import Arms  # noqa: E402
 
 from semantic_digital_twin.datastructures.prefixed_name import (
     PrefixedName,
@@ -106,7 +105,7 @@ class TestEpisodeKnowledgeBase:
     def test_scene_entities(self, fresh_knowledge_base):
         assert [o.name for o in fresh_knowledge_base.objects] == ["milk", "place_area"]
         assert fresh_knowledge_base.robot.name == "pr2"
-        assert [a.side for a in fresh_knowledge_base.arms] == [Arms.LEFT]
+        assert [a.side for a in fresh_knowledge_base.arms] == [ArmSide.LEFT]
         assert fresh_knowledge_base.arms[0].gripper.name == "left_gripper"
 
     def test_episodes_link_objects(self, fresh_knowledge_base):
@@ -115,7 +114,7 @@ class TestEpisodeKnowledgeBase:
         )
         assert transport.picks is fresh_knowledge_base.objects[0]
         assert transport.places_at.name == "place_area"
-        assert transport.performed_by.side == Arms.LEFT
+        assert transport.performed_by.side == ArmSide.LEFT
 
     def test_joint_motion_ranges(self, fresh_knowledge_base):
         torso = next(
@@ -214,9 +213,9 @@ class TestArmsFromRecordedAnnotations:
 
         [arm] = knowledge_base_instance.arms
         assert arm.name == "ManipulatorOne"
-        assert arm.side == Arms.RIGHT
+        assert arm.side == ArmSide.RIGHT
         assert arm.gripper.name == "HandOne"
-        assert arm.gripper.side == Arms.RIGHT
+        assert arm.gripper.side == ArmSide.RIGHT
         assert knowledge_base_instance.grippers == [arm.gripper]
 
 

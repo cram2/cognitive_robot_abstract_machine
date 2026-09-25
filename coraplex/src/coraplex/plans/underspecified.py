@@ -4,7 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from typing import Optional, Tuple, Type, TYPE_CHECKING, Iterator
 
-from coraplex.datastructures.enums import ExecutionType
+from coraplex.datastructures.enums import ActionTrialVisualization, ExecutionType
 from coraplex.execution_environment import ExecutionEnvironment
 from coraplex.plans.executables import (
     Executable,
@@ -14,6 +14,7 @@ from coraplex.plans.executables import (
 from coraplex.plans.failures import PlanFailure
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import ActionNode, ExecutionBoundaryNode
+from coraplex.visualization import RvizVisualization
 from krrood.entity_query_language.query.match import Match
 
 if TYPE_CHECKING:
@@ -42,6 +43,10 @@ class ActionTrial:
     of the execution type the real attempt will use. Conditions are always evaluated
     too: whether a candidate is worth attempting for real is exactly what its pre- and
     postconditions decide, so a plan that skips them elsewhere does not skip them here.
+
+    While the context is debugging, the copy is published to RViz under its own frame
+    prefix and marker topic, so the candidates being tried can be watched next to the
+    world they were grounded in.
     """
 
     context: Context
@@ -67,6 +72,19 @@ class ActionTrial:
     notice that it has moved on and the copy has to be replaced.
     """
 
+    copy_marker_alpha: float = field(default=0.9, kw_only=True)
+    """
+    The opacity the copy is drawn with while debugging, so it can be told apart from the
+    world it copies where the two overlap.
+    """
+
+    _visualization: Optional[RvizVisualization] = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The RViz publishing of the current copy, while the context is debugging.
+    """
+
     def succeeds(self, action: ActionDescription) -> bool:
         """
         Run `action` against the copy and restore the copy afterwards.
@@ -82,7 +100,7 @@ class ActionTrial:
         and longer run of blocks, most of them already-undone ones.
 
         :param action: The grounded action to try out.
-        :return: True if `action` runs to completion without raising a `PlanFailure`.
+        :return: True if `action` runs to completion without failing.
         """
         context = self._copy()
         world = context.world
@@ -115,6 +133,7 @@ class ActionTrial:
             self.context.world.state.version,
         )
         if self._copied_context is None or self._source_versions != versions:
+            self._stop_visualization()
             world = deepcopy(self.context.world)
             self._copied_context = replace(
                 self.context,
@@ -123,14 +142,33 @@ class ActionTrial:
                 evaluate_conditions=True,
             )
             self._source_versions = versions
+            if self.context.debug:
+                self._visualization = RvizVisualization(
+                    world,
+                    ros_node=self.context.ros_node,
+                    collision_visualization=True,
+                    frame_prefix=ActionTrialVisualization.FRAME_PREFIX,
+                    marker_topic=ActionTrialVisualization.MARKER_TOPIC,
+                    marker_alpha=self.copy_marker_alpha,
+                ).start()
         return self._copied_context
 
     def discard(self) -> None:
         """
         Release the copy, so the next trial takes a fresh one.
         """
+        self._stop_visualization()
         self._copied_context = None
         self._source_versions = None
+
+    def _stop_visualization(self) -> None:
+        """
+        Stop publishing the current copy, if it is being published.
+        """
+        if self._visualization is None:
+            return
+        self._visualization.stop()
+        self._visualization = None
 
 
 # %% resolving an underspecified action to a candidate that works

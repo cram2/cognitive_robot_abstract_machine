@@ -38,7 +38,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Neck,
     Torso,
 )
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     OmniDrive,
@@ -65,6 +65,10 @@ class GarmiCamera(Camera):
         """
         return []
 
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.root)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -74,7 +78,6 @@ class GarmiCamera(Camera):
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
-            forward_facing_axis=Vector3(1, 0, 0),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=0.75049,
             maximal_height=0.99483,
@@ -285,6 +288,14 @@ class GarmiLeftGripper(
         )
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -299,7 +310,6 @@ class GarmiLeftGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "arm_0_gripper_fr3_hand_tcp"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
@@ -339,6 +349,14 @@ class GarmiRightGripper(
         )
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -353,7 +371,6 @@ class GarmiRightGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "arm_1_gripper_fr3_hand_tcp"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 

@@ -21,6 +21,8 @@ from typing import (
 )
 from uuid import UUID
 
+import numpy as np
+
 from typing_extensions import get_origin, get_args, Generic, TypeVar, Unpack
 
 from krrood.adapters.json_serializer import list_like_classes
@@ -35,7 +37,10 @@ from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
+    GripperAxesNotPerpendicular,
+    MoreThanOneBodyHeld,
     NoJointStateWithType,
+    NothingHeld,
     UselessConceptError,
     DuplicateRobotAssignmentsError,
     MissingDefaultCameraError,
@@ -49,13 +54,14 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     TGenericSensors,
     RobotPartMixin,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasRootBody,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Agent,
     Table,
 )
 from semantic_digital_twin.spatial_types import (
-    Quaternion,
     Vector3,
     RotationMatrix,
     HomogeneousTransformationMatrix,
@@ -517,11 +523,6 @@ class Camera(Sensor, ABC):
     A camera is a sensor that captures images of the environment.
     """
 
-    forward_facing_axis: Vector3 = field(kw_only=True)
-    """
-    The axis of the camera that is facing forward, expressed in the camera's root frame.
-    """
-
     field_of_view: FieldOfView = field(kw_only=True)
     """
     The field of view of the camera, defined by the vertical and horizontal angles of
@@ -545,9 +546,12 @@ class Camera(Sensor, ABC):
     The maximal height of the camera above the ground, in meters.
     """
 
-    def __post_init__(self):
-        super().__post_init__()
-        self.forward_facing_axis.reference_frame = self.root
+    @property
+    @abstractmethod
+    def forward_facing_axis(self) -> Vector3:
+        """
+        The direction the camera looks, expressed in :attr:`root`'s frame.
+        """
 
     @property
     def root_T_forward_view(self) -> HomogeneousTransformationMatrix:
@@ -595,21 +599,114 @@ class EndEffector(AbstractRobotPart, ABC):
     Usually the point the robot tries to align with the object.
     """
 
-    front_facing_orientation: Quaternion = field(kw_only=True)
-    """
-    The orientation of the end_effector's tool frame, which is usually the front-facing
-    orientation.
-    """
-
-    front_facing_axis: Vector3 = field(init=False)
-    """
-The axis of the end_effector's tool frame that is facing forward.
-    """
-
     def __post_init__(self):
         super().__post_init__()
-        rotation_matrix = RotationMatrix.from_quaternion(self.front_facing_orientation)
-        self.front_facing_axis = Vector3.from_iterable(rotation_matrix[:3, 0])
+        if not np.isclose(float(self.approach_axis.dot(self.closing_axis)), 0.0):
+            raise GripperAxesNotPerpendicular(self)
+
+    @property
+    @abstractmethod
+    def approach_axis(self) -> Vector3:
+        """
+        The direction the gripper travels toward an object, expressed in
+        :attr:`tool_frame`.
+
+        It is the x-axis of the grasp frame
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspPoses.grasp_poses`
+        describes.
+        """
+
+    @property
+    @abstractmethod
+    def closing_axis(self) -> Vector3:
+        """
+        The axis the fingers close along, expressed in :attr:`tool_frame`.
+
+        It is the y-axis of the grasp frame
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspPoses.grasp_poses`
+        describes, and has to be perpendicular to :attr:`approach_axis`.
+        """
+
+    @property
+    def tool_R_grasp(self) -> RotationMatrix:
+        """
+        The grasp frame's orientation in :attr:`tool_frame`, spanned by
+        :attr:`approach_axis` and :attr:`closing_axis`.
+        """
+        return RotationMatrix.from_vectors(
+            x=self.approach_axis,
+            y=self.closing_axis,
+            reference_frame=self.tool_frame,
+        )
+
+    def tool_frame_goal(self, grasp_pose: Pose) -> Pose:
+        """
+        Express a grasp frame as a goal for this end effector's tool frame.
+
+        Grippers differ in which way their tool frame points, so a grasp frame only
+        becomes a tool frame goal once the end effector's own orientation is applied.
+
+        :param grasp_pose: The grasp frame to reach.
+        :return: The pose the tool frame has to reach, in ``grasp_pose``'s frame.
+        """
+        grasp_R_tool = self.tool_R_grasp.inverse()
+        return Pose(
+            position=grasp_pose.to_position(),
+            orientation=(
+                grasp_pose.to_rotation_matrix() @ grasp_R_tool
+            ).to_quaternion(),
+            reference_frame=grasp_pose.reference_frame,
+        )
+
+    @property
+    def held_body(self) -> Optional[Body]:
+        """
+        The body hanging off the tool frame. If in the future we need this to return
+        the semantic annotation of the body, we should update it.
+
+        :raises MoreThanOneBodyHeld: If the tool frame has more than one child, since
+            there is then no single body the gripper holds.
+        :return: The held body, or ``None`` when the gripper holds nothing.
+        """
+        children = self.tool_frame.child_kinematic_structure_entities
+        if not children:
+            return None
+        if len(children) > 1:
+            raise MoreThanOneBodyHeld(self, children)
+        return children[0]
+
+    @property
+    def held_body_T_grasp(self) -> Pose:
+        """
+        The grasp this gripper has on the body it is holding.
+
+        The body hangs off the tool frame, so the transform between the two *is* the
+        grasp that was achieved, whatever it was and wherever on the body it sits.
+
+        :return: The grasp frame, in :attr:`held_body`'s frame.
+        """
+        body = self.held_body
+        if body is None:
+            raise NothingHeld(self)
+        body_T_tool = self._world.transform(self.tool_frame.global_transform, body)
+        body_R_grasp = body_T_tool.to_rotation_matrix() @ self.tool_R_grasp
+        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            point=body_T_tool.to_position(),
+            rotation_matrix=body_R_grasp,
+            reference_frame=body,
+        ).to_pose()
+
+    def grasp_on(self, body: Body) -> Optional[Pose]:
+        """
+        The grasp this gripper has on ``body``.
+
+        :param body: The body asked about.
+        :return: :attr:`held_body_T_grasp`, or ``None`` when ``body`` is not the body
+            this gripper holds.
+        """
+        if self.held_body is not body:
+            return None
+        return self.held_body_T_grasp
 
     @property
     def held_bodies(self) -> list[Body]:
@@ -701,6 +798,16 @@ class MobileBase(AbstractRobotPart, Generic[TGenericDrive], ABC):
         The axis of this base that points where the robot faces.
         """
 
+    @property
+    def base_R_front(self) -> RotationMatrix:
+        """
+        The rotation from this base's own axes to the frame whose x-axis is its front.
+
+        A heading says where the front should point as its x-axis, so this is what turns
+        one into a base pose and, inverted the other way, reads one back off a base pose.
+        """
+        return RotationMatrix.from_vectors(x=self.forward_axis, z=Vector3.Z())
+
     def pose_facing(self, heading: Pose) -> Pose:
         """
         The base pose whose :attr:`forward_axis` points along ``heading``.
@@ -709,10 +816,9 @@ class MobileBase(AbstractRobotPart, Generic[TGenericDrive], ABC):
         its x-axis, so the same heading serves bases modelled with different axes. Its
         position is kept as it is.
         """
-        base_R_forward = RotationMatrix.from_vectors(x=self.forward_axis, z=Vector3.Z())
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
             heading.to_position(),
-            heading.to_rotation_matrix() @ base_R_forward.inverse(),
+            heading.to_rotation_matrix() @ self.base_R_front.inverse(),
             reference_frame=heading.reference_frame,
         ).to_pose()
 
@@ -811,16 +917,22 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     @property
     def is_in_collision(self) -> bool:
         """
-        :return: Whether any body of this robot touches something under the collision
-            rules currently in force.
+        :return: Whether any body of this robot has come closer to something than the
+            collision rules currently in force allow.
 
-        The rules the question is asked under are the caller's to set, so that the same
-        robot can be asked about the clearances of a plan or of a standing pose.
+        A pair is watched from further away than it may approach, so a contact being
+        reported at all says only that the two are being watched; what makes it a
+        collision is its distance falling to the rules' violated distance. The rules the
+        question is asked under are the caller's to set, so that the same robot can be
+        asked about the clearances of a plan or of a standing pose.
         """
         own_bodies = set(self.bodies_with_collision)
+        collision_manager = self._world.collision_manager
         return any(
-            contact.body_a in own_bodies or contact.body_b in own_bodies
-            for contact in self._world.collision_manager.compute_collisions().contacts
+            contact.distance
+            <= collision_manager.get_violated_distance(contact.body_a, contact.body_b)
+            for contact in collision_manager.compute_collisions().contacts
+            if contact.body_a in own_bodies or contact.body_b in own_bodies
         )
 
     @classmethod

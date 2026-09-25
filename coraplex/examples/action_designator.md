@@ -62,7 +62,9 @@ from coraplex.testing import setup_world
 world = setup_world()
 pr2 = PR2.from_world(world)
 
-context = Context(world=world, robot=pr2)
+# A location draws its candidates from a costmap, so a seed is what makes this
+# example run the same way twice.
+context = Context(world=world, robot=pr2, sampling_seed=0)
 
 
 ```
@@ -135,10 +137,9 @@ The procedure is similar to the last time, but this time we will shorten it a bi
 ```python
 from coraplex.execution_environment import simulated_robot
 from coraplex.robot_plans.actions.core.robot_body import SetGripperAction
-from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.datastructures.definitions import GripperState
 
-gripper = Arms.RIGHT
+gripper = pr2.right_arm.end_effector
 motion = GripperState.OPEN
 
 with simulated_robot:
@@ -152,10 +153,9 @@ Park arms is used to move one or both arms into the default parking position.
 ```python
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.execution_environment import simulated_robot
-from coraplex.datastructures.enums import Arms
 
 with simulated_robot:
-    execute_single(ParkArmsAction(Arms.BOTH), context=context).perform()
+    execute_single(ParkArmsAction(pr2.get_arms()), context=context).perform()
 ```
 
 ## Pick Up and Place
@@ -170,38 +170,32 @@ To start we need an environment in which we can pick up and place things as well
 
 ```python
 from coraplex.execution_environment import simulated_robot
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
-from coraplex.robot_plans.actions.composite.transporting import NavigateAction, PickUpAction, PlaceAction
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from coraplex.robot_plans.actions.core.pick_up import PickUpAction
+from coraplex.robot_plans.actions.core.placing import PlaceAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 import rclpy
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 
-arm = Arms.RIGHT
+arm = pr2.right_arm
 
 with simulated_robot:
     sequential(
-        [ParkArmsAction(Arms.BOTH),
+        [ParkArmsAction(pr2.get_arms()),
          MoveTorsoAction(TorsoState.HIGH),
          NavigateAction(
              Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root)
          ),
          PickUpAction(
-             object_designator=world.get_semantic_annotations_by_type(Milk)[0],
+             grasp=(milk := world.get_semantic_annotations_by_type(Milk)[0]).grasp_poses()[0],
              arm=arm,
-             grasp_description=GraspDescription(
-                 ApproachDirection.FRONT,
-                 VerticalAlignment.NoAlignment,
-                 context.robot.right_arm.end_effector,
-             ),
          ),
          PlaceAction(
-             object_designator=world.get_body_by_name("milk.stl"),
+             object_designator=milk,
              target_location=Pose.from_xyz_rpy(2.4, 2.2, 1, reference_frame=world.root),
-             arm=arm,
          )],
         context=context,
     ).perform()
@@ -230,7 +224,6 @@ designator will return a resolved instance of an ObjectDesignatorDescription.
 ```python
 # from coraplex.robot_plans import DetectActionDescription, LookAtActionDescription, ParkArmsActionDescription, NavigateActionDescription
 # from coraplex.designators.object_designator import BelieveObject
-# from coraplex.datastructures.enums import Arms
 # from coraplex.process_module import simulated_robot
 # from coraplex.datastructures.pose import PoseStamped
 # from coraplex.datastructures.enums import DetectionTechnique
@@ -238,7 +231,7 @@ designator will return a resolved instance of an ObjectDesignatorDescription.
 # milk_desig = BelieveObject(names=["milk"])
 # 
 # with simulated_robot:
-#     ParkArmsActionDescription([Arms.BOTH]).resolve().perform()
+#     ParkArmsActionDescription(pr2.get_arms()).resolve().perform()
 # 
 #     NavigateActionDescription([PoseStamped.from_list([1.7, 2, 0], [0, 0, 0, 1])]).resolve().perform()
 # 
@@ -260,14 +253,15 @@ don't need to do this if you already have spawned it in a previous example.
 from coraplex.robot_plans import *
 from coraplex.execution_environment import simulated_robot
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
-from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
-description = TransportAction(world.get_semantic_annotations_by_type(Milk)[0],
-                              Pose.from_xyz_quaternion(2.9, 2.2, 0.99,
-                                                       0.0, 0.0, 1.0, 0.0, reference_frame=world.root),
-                              Arms.LEFT)
+description = TransportAction.from_grasp(
+    world.get_semantic_annotations_by_type(Milk)[0].grasp_poses()[0],
+    Pose.from_xyz_quaternion(3.0, 2.2, 1.04, 0.0, 0.0, 1.0, 0.0, reference_frame=world.root),
+    pr2.left_arm,
+    context,
+)
 with simulated_robot:
     sequential([MoveTorsoAction(TorsoState.HIGH),
                 description], context=context).perform()
@@ -283,19 +277,26 @@ apartment.
 
 ```python
 from coraplex.robot_plans import *
-from coraplex.datastructures.enums import Arms
 from coraplex.execution_environment import simulated_robot
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from coraplex.robot_plans.actions.core.container import OpenAction
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+
+# Opening reaches for a handle, so it is named by the handle's annotation rather than by
+# its body. The apartment carries none, so we register one for the drawer we want.
+with world.modify_world():
+    world.add_semantic_annotation_recursively(
+        handle := Handle(root=world.get_body_by_name("handle_cab10_t"))
+    )
 
 with simulated_robot:
     sequential([
         MoveTorsoAction(TorsoState.HIGH),
-        ParkArmsAction(Arms.BOTH),
+        ParkArmsAction(pr2.get_arms()),
         NavigateAction(Pose.from_xyz_quaternion(1.7074915981292725, 2.6873629093170166, 0.0,
                                                 -0.0, 0.0, 0.5253598267689507, -0.850880163370435,
                                                 reference_frame=world.root)),
-        OpenAction(world.get_body_by_name("handle_cab10_t"), Arms.RIGHT)], context=context).perform()
+        OpenAction(handle, pr2.right_arm)], context=context).perform()
 ```
 
 ## Closing
@@ -308,15 +309,14 @@ the apartment. Additionally, we open the drawer such that we can close it with t
 
 ```python
 from coraplex.robot_plans.actions.core.container import CloseAction
-from coraplex.datastructures.enums import Arms
 from coraplex.execution_environment import simulated_robot
 
 with simulated_robot:
     sequential([
         MoveTorsoAction(TorsoState.HIGH),
-        ParkArmsAction(Arms.BOTH),
+        ParkArmsAction(pr2.get_arms()),
         NavigateAction(Pose.from_xyz_quaternion(1.72, 2.65, 0.0,
                                                 -0.0, 0.0, 0.5253598267689507, -0.850880163370435,
                                                 reference_frame=world.root)),
-        CloseAction(world.get_body_by_name("handle_cab10_t"), Arms.RIGHT)], context=context).perform()
+        CloseAction(handle, pr2.right_arm)], context=context).perform()
 ```

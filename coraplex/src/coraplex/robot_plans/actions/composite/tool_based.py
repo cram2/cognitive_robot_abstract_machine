@@ -11,6 +11,8 @@ from typing_extensions import Any, List, Optional, Tuple, Union
 
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
+from semantic_digital_twin.robots.robot_parts import Arm
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspPoses
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -20,24 +22,23 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 from coraplex.datastructures.enums import (
-    Arms,
     CuttingTechnique,
     MixingPattern,
     MovementType,
+    PouringSide,
     SlicingPriority,
     ToolPathSegmentKind,
     WipingTechnique,
 )
 from coraplex.exceptions import (
     MissingWaypoints,
-    MotionDidNotFinish,
     WipingTargetMissing,
 )
+from coraplex.plans.failures import MotionMadeNoProgress
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.mixins import HasTcpGoalThresholds
-from coraplex.view_manager import ViewManager
 from coraplex.robot_plans.actions.composite.tool_paths import (
     ToolPath,
     ToolPathSegment,
@@ -105,7 +106,7 @@ class ToolMotionAction(FullBodyControlledAction, ABC, HasTcpGoalThresholds):
     with its target.
     """
 
-    arm: Arms
+    arm: Arm
     """
     The arm holding the tool.
     """
@@ -192,7 +193,7 @@ class MixingAction(ToolMotionAction):
     Mix the contents of a container with a tool.
     """
 
-    container: Body
+    container: HasGraspPoses
     """
     The container (e.g., a bowl) whose contents are mixed.
     """
@@ -207,18 +208,18 @@ class MixingAction(ToolMotionAction):
     def _build_tool_path(self) -> ToolPath:
         if self.mix_duration > 0.0:
             return build_container_path(
-                self.container,
+                self.container.root,
                 pattern=MixingPattern.STIR,
                 mix_duration=self.mix_duration,
             )
-        return build_container_path(self.container, pattern=MixingPattern.SPIRAL)
+        return build_container_path(self.container.root, pattern=MixingPattern.SPIRAL)
 
     def _path_frame(self) -> HomogeneousTransformationMatrix:
-        return self.container.global_pose.to_homogeneous_matrix()
+        return self.container.root.global_pose.to_homogeneous_matrix()
 
     @property
     def _alignment_target(self) -> Optional[Union[Body, Pose]]:
-        return self.container
+        return self.container.root
 
 
 @dataclass(kw_only=True)
@@ -227,7 +228,7 @@ class CuttingAction(ToolMotionAction):
     Cut a food object with a tool.
     """
 
-    object_to_cut: Body
+    object_to_cut: HasGraspPoses
     """
     The object to cut.
     """
@@ -259,7 +260,7 @@ class CuttingAction(ToolMotionAction):
 
     def _build_tool_path(self) -> ToolPath:
         return build_cutting_path(
-            self.object_to_cut,
+            self.object_to_cut.root,
             technique=self.technique,
             slice_thickness=self.slice_thickness,
             number_of_cuts_on_local_x_axis=self.number_of_cuts_on_local_x_axis,
@@ -267,11 +268,11 @@ class CuttingAction(ToolMotionAction):
         )
 
     def _path_frame(self) -> HomogeneousTransformationMatrix:
-        return self.object_to_cut.global_pose.to_homogeneous_matrix()
+        return self.object_to_cut.root.global_pose.to_homogeneous_matrix()
 
     @property
     def _alignment_target(self) -> Optional[Union[Body, Pose]]:
-        return self.object_to_cut
+        return self.object_to_cut.root
 
 
 @dataclass(kw_only=True)
@@ -280,9 +281,9 @@ class WipingAction(ToolMotionAction):
     Wipe a surface or a patch around a target pose with a tool.
     """
 
-    surface: Optional[Body] = None
+    surface: Optional[HasGraspPoses] = None
     """
-    The surface body to wipe.
+    The surface to wipe.
 
     If None, ``target_pose`` is used instead.
     """
@@ -324,7 +325,7 @@ class WipingAction(ToolMotionAction):
 
     def _build_tool_path(self) -> ToolPath:
         if self.surface is not None:
-            return build_surface_path(self.surface, technique=self.technique)
+            return build_surface_path(self.surface.root, technique=self.technique)
         if self.technique is WipingTechnique.SPREAD:
             return ToolPath(
                 [
@@ -353,7 +354,7 @@ class WipingAction(ToolMotionAction):
 
     def _path_frame(self) -> HomogeneousTransformationMatrix:
         if self.surface is not None:
-            return self.surface.global_pose.to_homogeneous_matrix()
+            return self.surface.root.global_pose.to_homogeneous_matrix()
         if self.target_pose.reference_frame is None:
             self.target_pose.reference_frame = self.world.root
         return self.target_pose.to_homogeneous_matrix()
@@ -361,18 +362,18 @@ class WipingAction(ToolMotionAction):
     @property
     def _alignment_target(self) -> Optional[Union[Body, Pose]]:
         if self.surface is not None:
-            return self.surface
+            return self.surface.root
         return self.target_pose
 
     def _perform_plan(self) -> None:
         """
-        Perform the wiping plan, accepting an unfinished motion if the tool still
+        Perform the wiping plan, accepting a motion that gave up if the tool still
         reached the final waypoint.
         """
         subplan = self.add_subplan(self.action_plan)
         try:
             subplan.perform()
-        except MotionDidNotFinish:
+        except MotionMadeNoProgress:
             if not self._tool_reached_final_waypoint():
                 raise
 
@@ -398,7 +399,7 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
     to the target's rim.
     """
 
-    target_container: Body
+    target_container: HasGraspPoses
     """
     The container that is poured into.
     """
@@ -408,7 +409,7 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
     The held container that is poured from.
     """
 
-    arm: Arms
+    arm: Arm
     """
     The arm holding the source container.
     """
@@ -418,11 +419,12 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
     Tilt angle in radians applied to the source container while pouring.
     """
 
-    pour_side: Optional[Arms] = None
+    pour_side: Optional[PouringSide] = None
     """
     Robot-relative side of the target container to pour from.
 
-    Defaults to the arm, so one-arm robots can still use either side's pouring geometry.
+    Defaults to the side of the pouring arm, so one-arm robots can still use either
+    side's pouring geometry.
     """
 
     pour_side_offset: float = 0.0
@@ -440,20 +442,23 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
     TCP height in meters above the target container for the pre-pour pose.
     """
 
-    def _effective_pour_side(self) -> Arms:
+    def _effective_pour_side(self) -> PouringSide:
         """
-        :return: The requested pour side, or the pouring arm if none was requested.
+        :return: The requested pour side, or the side of the pouring arm if none was
+            requested.
         """
-        if self.pour_side is None:
-            return self.arm
-        return self.pour_side
+        if self.pour_side is not None:
+            return self.pour_side
+        if self.arm is self.robot.get_right_arm_if_specified():
+            return PouringSide.RIGHT
+        return PouringSide.LEFT
 
     def _mouth_height_above_tool_frame(self) -> float:
         """
         :return: Height in meters of the source container's opening above the arm's
             tool frame, measured along the tool frame's z axis.
         """
-        tool_frame = ViewManager.get_end_effector_view(self.arm, self.robot).tool_frame
+        tool_frame = self.arm.end_effector.tool_frame
         tool_frame_T_source = self.world.compute_forward_kinematics_np(
             tool_frame, self.source_container.root
         )
@@ -511,13 +516,13 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
             pouring pose.
         """
         pour_side = self._effective_pour_side()
-        target_pose = self.target_container.global_pose
+        target_pose = self.target_container.root.global_pose
         robot_pose = self.robot.root.global_pose
 
         approach_x, approach_y = self._approach_direction(target_pose, robot_pose)
         robot_right_x = approach_y
         robot_right_y = -approach_x
-        side_sign = 1.0 if pour_side == Arms.RIGHT else -1.0
+        side_sign = 1.0 if pour_side == PouringSide.RIGHT else -1.0
 
         side_offset = float(self.pour_side_offset) + math.sin(self.tilt_angle) * max(
             self._mouth_height_above_tool_frame(), 0.0
@@ -540,11 +545,11 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
             float(target_pose.y) - pour_y, float(target_pose.x) - pour_x
         )
         base_rotation = Rotation.from_euler("z", yaw_to_target)
-        if pour_side == Arms.LEFT:
+        if pour_side == PouringSide.LEFT:
             base_rotation = Rotation.from_euler("z", math.pi) * base_rotation
 
         signed_tilt_angle = (
-            self.tilt_angle if pour_side == Arms.RIGHT else -self.tilt_angle
+            self.tilt_angle if pour_side == PouringSide.RIGHT else -self.tilt_angle
         )
         tilted_rotation = base_rotation * Rotation.from_euler("y", signed_tilt_angle)
 

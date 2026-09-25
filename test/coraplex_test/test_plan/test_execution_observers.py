@@ -1,6 +1,7 @@
 """Execution callbacks preserve the native plan and motion lifecycle."""
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import StrEnum
 from unittest.mock import Mock
 
@@ -25,6 +26,8 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
+from giskardpy.motion_statechart.exceptions import NoProgressError
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
     StateHistoryItem,
@@ -494,24 +497,29 @@ def test_compilation_failure_preserves_error_without_starting_motion(
     executor.tick.assert_not_called()
 
 
-def test_exhausted_execution_ends_started_motion_observation(
+def test_stalled_execution_ends_started_motion_observation(
     monkeypatch, tracked_motion, cylinder_bot_world
 ) -> None:
-    """A motion that exhausts its native tick budget reports a failed observation."""
+    """A motion that stops approaching its goal reports a failed observation."""
     node = tracked_motion
     recorder = ExecutionRecorder(plan=node.plan)
     node.plan.node_callbacks.append(recorder)
     motion = RecordedMotion()
-    executor = AbortedExecution(motion, failure=None)
+    stall = NoProgressError(
+        progress_monitor=StillProgressing(
+            monitored_node=EndMotion(), timeout=timedelta(seconds=3)
+        )
+    )
+    executor = AbortedExecution(motion, failure=stall)
     monkeypatch.setattr(executables, "Ros2Executor", Mock(return_value=executor))
     robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
     executable = executables.GiskardExecutable(
-        context=Context(cylinder_bot_world, robot, ticks_per_motion=1),
+        context=Context(cylinder_bot_world, robot),
         root_node=Goal(),
         motion_state_chart=motion.chart,
         motion_mappings={node: motion.task},
     )
-    with pytest.raises(executables.MotionDidNotFinish):
+    with pytest.raises(NoProgressError):
         executable._execute_simulation()
     assert recorder.events == [
         NodeEvent(ExecutionEvent.START, node, LifeCycleValues.RUNNING),

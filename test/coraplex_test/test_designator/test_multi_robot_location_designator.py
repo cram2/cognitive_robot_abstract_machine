@@ -1,9 +1,8 @@
 from copy import deepcopy
 
-import numpy as np
 import pytest
 import rclpy
-from typing_extensions import Generator, List, Tuple
+from typing_extensions import Generator, Tuple
 
 from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
@@ -15,26 +14,17 @@ from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
 from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
 from coraplex.datastructures.dataclasses import Context
 
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.locations.base import DeferredLocation
-from coraplex.locations.factories import (
-    reachability_location,
-    visibility_location,
-    accessing_location,
-    giskard_reachability_location,
-)
-from krrood.entity_query_language.factories import variable
+from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
-from coraplex.view_manager import ViewManager
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from ..conftest import right_or_only_arm
 
 try:
     from semantic_digital_twin.robots.garmi import Garmi
@@ -44,14 +34,12 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Drawer,
-    Handle,
-)
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
+
+from ...conftest import SAMPLING_SEED
 
 # The alternative motion mappings that should be available to the plans in this test module.
 # Resolution filters by robot type and execution type, so passing the full set is always safe.
@@ -159,7 +147,10 @@ def immutable_multiple_robot_simple_apartment(
     world, view = setup_multi_robot_simple_apartment
     state = deepcopy(world.state._data)
     yield world, view, Context(
-        world, view, alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS
+        world,
+        view,
+        alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS,
+        sampling_seed=SAMPLING_SEED,
     )
     world.state._data[:] = state
     world.notify_state_change()
@@ -177,76 +168,9 @@ def mutable_multiple_robot_simple_apartment(setup_multi_robot_simple_apartment):
             copy_world,
             copy_view,
             alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS,
+            sampling_seed=SAMPLING_SEED,
         ),
     )
-
-
-def test_deferred_location_factory_runs_at_execution_not_construction():
-    """A :class:`DeferredLocation` must not build its :class:`Location` until the EQL
-    variable domain is actually consumed.
-
-    ``variable`` wraps the domain in :func:`filter`, whose builtin implementation calls
-    :func:`iter` on its argument at construction time. An eagerly-iterating
-    ``DeferredLocation`` would therefore run the factory while the plan is being parsed,
-    reintroducing the stale-pose bug.
-    """
-    factory_calls = []
-
-    def build_poses() -> List[Pose]:
-        factory_calls.append(True)
-        return [Pose.from_xyz_rpy(0.0, 0.0, 0.0)]
-
-    domain_variable = variable(Pose, domain=DeferredLocation(build_poses))
-
-    assert factory_calls == []
-
-    next(iter(domain_variable._re_enterable_domain_generator_), None)
-
-    assert factory_calls == [True]
-
-
-def test_deferred_location_reflects_state_changed_after_construction():
-    """
-    The deferred factory observes the world state as it is when the location is
-    consumed, not as it was when the underspecified action was constructed.
-    """
-    observed_positions = []
-    moving_pose = {"value": Pose.from_xyz_rpy(0.0, 0.0, 0.0)}
-
-    def build_poses() -> List[Pose]:
-        observed_positions.append(moving_pose["value"].to_position().to_list())
-        return [moving_pose["value"]]
-
-    domain_variable = variable(Pose, domain=DeferredLocation(build_poses))
-
-    moving_pose["value"] = Pose.from_xyz_rpy(3.1, 2.2, 0.95)
-
-    next(iter(domain_variable._re_enterable_domain_generator_), None)
-
-    assert observed_positions == [[3.1, 2.2, 0.95, 1.0]]
-
-
-def test_new_reachability_location_pose(
-    immutable_multiple_robot_simple_apartment, rclpy_node
-):
-    world, robot, context = immutable_multiple_robot_simple_apartment
-
-    plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
-        context,
-    )
-    with simulated_robot:
-        plan.perform()
-
-        world.notify_state_change()
-
-        location = reachability_location(
-            world.get_body_by_name("milk.stl").global_pose, context, Arms.RIGHT
-        )
-
-        pose = next(iter(location))
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
 
 
 def test_new_reachability_location_body(
@@ -255,7 +179,7 @@ def test_new_reachability_location_body(
     world, robot, context = immutable_multiple_robot_simple_apartment
 
     plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
+        [ParkArmsAction(context.robot.get_arms()), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
     with simulated_robot:
@@ -263,38 +187,13 @@ def test_new_reachability_location_body(
 
         world.notify_state_change()
 
-        location = reachability_location(
-            world.get_body_by_name("milk.stl"), context, Arms.RIGHT
+        location = ReachabilityLocation(
+            world.get_body_by_name("milk.stl").global_pose,
+            right_or_only_arm(context.robot),
+            context=context,
         )
 
         pose = next(iter(location))
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
-
-
-def test_merge_reachability_location(immutable_multiple_robot_simple_apartment):
-    world, robot, context = immutable_multiple_robot_simple_apartment
-
-    plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
-        context,
-    )
-    with simulated_robot:
-        plan.perform()
-
-        world.notify_state_change()
-
-        location_body = reachability_location(
-            world.get_body_by_name("milk.stl"), context, Arms.RIGHT
-        )
-
-        location_pose = reachability_location(
-            world.get_body_by_name("milk.stl").global_pose, context, Arms.RIGHT
-        )
-
-        merged_location = location_body & location_pose
-        pose = next(iter(merged_location))
-
     assert len(pose.to_position().to_list()) == 4
     assert len(pose.to_quaternion().to_list()) == 4
 
@@ -303,7 +202,7 @@ def test_visibility_location_pose(immutable_multiple_robot_simple_apartment):
     world, robot, context = immutable_multiple_robot_simple_apartment
 
     plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
+        [ParkArmsAction(context.robot.get_arms()), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
     with simulated_robot:
@@ -311,8 +210,8 @@ def test_visibility_location_pose(immutable_multiple_robot_simple_apartment):
 
         world.notify_state_change()
 
-        location = visibility_location(
-            world.get_body_by_name("milk.stl").global_pose, context
+        location = VisibilityLocation(
+            world.get_body_by_name("milk.stl").global_pose, context=context
         )
 
         pose = next(iter(location))
@@ -325,7 +224,7 @@ def test_visibility_location_body(immutable_multiple_robot_simple_apartment):
     world, robot, context = immutable_multiple_robot_simple_apartment
 
     plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
+        [ParkArmsAction(context.robot.get_arms()), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
     with simulated_robot:
@@ -333,143 +232,11 @@ def test_visibility_location_body(immutable_multiple_robot_simple_apartment):
 
         world.notify_state_change()
 
-        location = visibility_location(world.get_body_by_name("milk.stl"), context)
-
-        pose = next(iter(location))
-
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
-
-
-def test_visibility_reachability_merge(immutable_multiple_robot_simple_apartment):
-    world, robot, context = immutable_multiple_robot_simple_apartment
-
-    plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
-        context,
-    )
-
-    with simulated_robot:
-        plan.perform()
-
-        world.notify_state_change()
-
-        location_vis = visibility_location(world.get_body_by_name("milk.stl"), context)
-
-        next(iter(location_vis))
-
-        location_reach = reachability_location(
-            world.get_body_by_name("milk.stl"), context, Arms.RIGHT
-        )
-
-        location = location_vis & location_reach
-
-        pose = next(iter(location))
-
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
-
-
-def test_accessing_location_pose(immutable_model_world):
-    world, robot, context = immutable_model_world
-    plan = sequential(
-        [
-            ParkArmsAction(Arms.BOTH),
-            MoveTorsoAction(TorsoState.HIGH),
-        ],
-        context,
-    )
-    with simulated_robot:
-        plan.perform()
-
-    with world.modify_world():
-        world.add_semantic_annotation_recursively(
-            drawer := Drawer(
-                root=world.get_body_by_name("cabinet10_drawer_middle"),
-                handle=Handle(root=world.get_body_by_name("handle_cab10_m")),
-            )
-        )
-
-    location_desig = accessing_location(drawer, context=context, arm=Arms.RIGHT)
-    with simulated_robot:
-        pose = next(iter(location_desig))
-
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
-
-
-def test_giskard_location_pose(immutable_multiple_robot_simple_apartment):
-    world, robot, context = immutable_multiple_robot_simple_apartment
-    plan = sequential(
-        [
-            ParkArmsAction(Arms.BOTH),
-            MoveTorsoAction(TorsoState.HIGH),
-        ],
-        context,
-    )
-
-    with simulated_robot:
-        plan.perform()
-
-        world.notify_state_change()
-
-        location = giskard_reachability_location(
-            world.get_body_by_name("milk.stl"),
-            context,
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                ViewManager.get_end_effector_view(Arms.RIGHT, robot),
-            ),
+        location = VisibilityLocation(
+            Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
         )
 
         pose = next(iter(location))
 
     assert len(pose.to_position().to_list()) == 4
     assert len(pose.to_quaternion().to_list()) == 4
-
-
-def test_accessing_location_validates_the_poses_the_grasp_will_reach(
-    immutable_model_world,
-):
-    """
-    Opening a container reaches a pre-pose set off the handle's own geometry.
-
-    Handing the location the handle's pose rather than the handle drops that geometry,
-    which collapses the pre-pose onto the grasp pose, so every candidate is validated
-    for a reach the plan never performs.
-    """
-    world, robot, context = immutable_model_world
-
-    with world.modify_world():
-        world.add_semantic_annotation_recursively(
-            drawer := Drawer(
-                root=world.get_body_by_name("cabinet10_drawer_middle"),
-                handle=Handle(root=world.get_body_by_name("handle_cab10_m")),
-            )
-        )
-
-    [validator] = accessing_location(drawer, context=context, arm=Arms.RIGHT).validators
-    reached = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        ViewManager.get_end_effector_view(Arms.BOTH, robot),
-    ).grasp_pose_sequence(drawer.handle.root)
-
-    def in_world(pose):
-        """
-        :return: ``pose`` expressed in the world frame, since the two sequences are
-            given relative to different frames.
-        """
-        if pose.reference_frame is world.root:
-            return pose
-        return world.compute_forward_kinematics(world.root, pose.reference_frame) @ pose
-
-    assert len(validator.pose_sequence) == len(reached)
-    for validated_pose, reached_pose in zip(validator.pose_sequence, reached):
-        np.testing.assert_allclose(
-            in_world(validated_pose).to_position().to_np(),
-            in_world(reached_pose).to_position().to_np(),
-            atol=1e-6,
-        )

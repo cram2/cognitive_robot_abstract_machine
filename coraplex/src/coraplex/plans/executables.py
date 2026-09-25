@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from contextlib import AbstractContextManager, ExitStack, nullcontext
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -9,18 +8,28 @@ from typing_extensions import Callable, List, Dict, ClassVar, Optional, TYPE_CHE
 
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.exceptions import (
-    MotionDidNotFinish,
     ConditionNotSatisfied,
     UnknownExecutionType,
 )
+from coraplex.plans.failures import (
+    EmptyUnderspecified,
+    MotionMadeNoProgress,
+    MotionViolatedCollisionAvoidance,
+    PlanFailure,
+)
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues
+from giskardpy.motion_statechart.exceptions import (
+    CollisionViolatedError,
+    NoProgressError,
+)
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
 from giskardpy.motion_statechart.graph_node import CancelMotion
 from giskardpy.motion_statechart.graph_node import EndMotion, Goal, Task
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
     StateHistoryObserver,
@@ -39,8 +48,6 @@ if TYPE_CHECKING:
     from coraplex.plans.plan_node import MotionNode
     from coraplex.plans.underspecified import UnderspecifiedNode
     from coraplex.datastructures.dataclasses import Context
-
-logger = logging.getLogger(__name__)
 
 
 # %% native motion history
@@ -249,7 +256,9 @@ class GiskardExecutable(Executable):
 
     def prepare_for_execution(self) -> None:
         """
-        Extend the motion state chart with the nodes that terminate it.
+        Extend the motion state chart with the nodes that terminate it: one that cancels
+        the motion once it reaches its goal, and one that gives up on it once it stops
+        approaching one.
 
         This runs just before compilation rather than during parsing, because the
         execution type is only known once an
@@ -263,6 +272,11 @@ class GiskardExecutable(Executable):
         end_motion = EndMotion()
         end_motion.start_condition = end_trigger
         self.motion_state_chart.add_node(end_motion)
+
+        self.motion_state_chart.add_node(
+            still_progressing := StillProgressing(monitored_node=self.root_node)
+        )
+        self.motion_state_chart.add_node(still_progressing.cancel_motion())
 
     def _add_condition_monitors(self, end_trigger: Scalar) -> Scalar:
         """
@@ -333,6 +347,10 @@ class GiskardExecutable(Executable):
         """
         Completes the motion state chart and executes it according to the execution
         type.
+
+        :raises MotionMadeNoProgress: When the motion stops approaching its goal.
+        :raises MotionViolatedCollisionAvoidance: When the motion brings bodies closer
+            to each other than collision avoidance allows.
         """
         if len(self.motion_mappings) == 0:
             return
@@ -340,17 +358,33 @@ class GiskardExecutable(Executable):
             return
         self.prepare_for_execution()
 
-        match GiskardExecutable.execution_type:
-            case ExecutionType.SIMULATED:
-                self._execute_simulation()
-            case ExecutionType.REAL:
-                self._execute_real()
-            case _:
-                raise UnknownExecutionType(GiskardExecutable.execution_type)
+        try:
+            match GiskardExecutable.execution_type:
+                case ExecutionType.SIMULATED:
+                    self._execute_simulation()
+                case ExecutionType.REAL:
+                    self._execute_real()
+                case _:
+                    raise UnknownExecutionType(GiskardExecutable.execution_type)
+        except NoProgressError as stalled:
+            raise MotionMadeNoProgress(stalled) from stalled
+        except CollisionViolatedError as violation:
+            raise MotionViolatedCollisionAvoidance(violation) from violation
 
     def _execute_simulation(self) -> None:
         """
-        Execute the native chart while projecting its recorded motion states.
+        Compiles the motion state chart and ticks it in the world of the context until
+        it is done or gives up.
+
+        The chart's own stall monitor decides when a motion is hopeless, so a motion
+        that keeps converging is never cut off for taking many ticks.
+
+        :raises NoProgressError: When the motion stops approaching its goal. The error
+            names the tasks that stalled, and :meth:`execute` turns it into a
+            :class:`~coraplex.plans.failures.MotionMadeNoProgress`.
+
+        The recorded motion states are projected onto the motion nodes of the plan
+        while the chart runs.
         """
         executor = Ros2Executor(
             context=MotionStatechartContext(
@@ -361,6 +395,8 @@ class GiskardExecutable(Executable):
             ),
             ros_node=self.context.ros_node,
         )
+        # A chart that gives up cancels itself, which raises out of the tick doing it.
+        # The robot is stopped and the chart torn down either way.
         with ExitStack() as cleanup:
             history = MotionPlanHistory(self.motion_state_chart, self.motion_mappings)
             cleanup.callback(history.stop)
@@ -371,20 +407,9 @@ class GiskardExecutable(Executable):
             cleanup.callback(executor.set_velocity_acceleration_jerk_to_zero)
             try:
                 executor.compile(self.motion_state_chart)
-                for _ in range(
-                    len(self.motion_mappings) * self.context.ticks_per_motion
-                ):
+                while not executor.motion_statechart.is_end_motion():
                     executor.tick()
-                    if executor.motion_statechart.is_end_motion():
-                        history.end_active_motions()
-                        return
-                unfinished_nodes = [
-                    node
-                    for node in self.motion_state_chart.nodes
-                    if node.life_cycle_state
-                    not in [LifeCycleValues.SUCCEEDED, LifeCycleValues.NOT_STARTED]
-                ]
-                raise MotionDidNotFinish(unfinished_nodes)
+                history.end_active_motions()
             except BaseException as error:
                 history.end_active_motions(
                     LifeCycleValues.FAILED
@@ -475,8 +500,6 @@ class UnderspecifiedExecutable(Executable):
     """
 
     def execute(self) -> None:
-        from coraplex.plans.failures import PlanFailure, EmptyUnderspecified
-
         while self.node.advance():
             try:
                 self.node.current_candidate.parse().execute()

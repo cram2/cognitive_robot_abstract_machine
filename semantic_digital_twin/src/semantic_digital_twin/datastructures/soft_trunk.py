@@ -26,7 +26,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.geometry import Cylinder, Color
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
-    Quaternion,
+    Vector3,
 )
 
 if TYPE_CHECKING:
@@ -106,6 +106,14 @@ class SoftEndEffector(EndEffector):
     """
     Concrete implementation of EndEffector for soft robots.
     """
+
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(cls, robot_root):
@@ -277,7 +285,6 @@ class SoftTrunk(SemanticAnnotation):
                 name=PrefixedName("effector", prefix),
                 root=prev_body,
                 tool_frame=prev_body,
-                front_facing_orientation=Quaternion(w=1.0),
                 _world=world,
             )
             arm = SoftArm(
@@ -406,7 +413,6 @@ class SoftTrunk(SemanticAnnotation):
                 name=PrefixedName("effector", prefix),
                 root=prev_body,
                 tool_frame=prev_body,
-                front_facing_orientation=Quaternion(w=1.0),
                 _world=world,
             )
             arm = SoftArm(

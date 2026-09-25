@@ -122,8 +122,8 @@ class ProbabilisticCostmap:
         elif costmap_type == VisibilityCostmap:
             camera = robot.get_default_camera()
             self.costmap = VisibilityCostmap(
-                min_height=camera.minimal_height,
-                max_height=camera.maximal_height,
+                minimum_height=camera.minimal_height,
+                maximum_height=camera.maximal_height,
                 size=number_of_cells,
                 resolution=resolution.magnitude,
                 origin=self.origin,

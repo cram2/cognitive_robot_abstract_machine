@@ -1,8 +1,11 @@
 import logging
+from copy import deepcopy
 
 import pytest
 
 from coraplex.datastructures.dataclasses import Context
+
+from ...conftest import SAMPLING_SEED
 
 # %% debug validation
 
@@ -48,3 +51,43 @@ def test_default_context_logs_at_info(immutable_model_world):
         assert coraplex_logger.level == logging.INFO
     finally:
         coraplex_logger.setLevel(previous_level)
+
+
+# %% repeatable location draws
+
+WORLD_FIXTURES_WITH_A_CONTEXT = [
+    "mutable_model_world",
+    "immutable_model_world",
+    "mutable_simple_pr2_world",
+    "immutable_simple_pr2_world",
+    "apartment_world_pr2_copy_with_context",
+]
+"""
+The shared fixtures that hand a test a plan context to run its actions in.
+"""
+
+
+@pytest.mark.parametrize("world_fixture", WORLD_FIXTURES_WITH_A_CONTEXT)
+def test_a_shared_fixture_fixes_the_draws_its_context_makes(world_fixture, request):
+    """
+    A location draws its candidates from a costmap rather than ranking it, so a test
+    handed an unseeded context would stand somewhere else every run.
+    """
+    _, _, context = request.getfixturevalue(world_fixture)
+
+    assert context.sampling_seed == SAMPLING_SEED
+
+
+# %% copying something that belongs to a run
+
+
+def test_a_copied_context_is_the_same_context(immutable_model_world, rclpy_node):
+    """
+    A context is the run an object belongs to, holding the world it acts on and the ROS
+    node it talks through, so copying an object that refers to it keeps referring to
+    that run rather than trying to copy the run itself.
+    """
+    world, robot, context = immutable_model_world
+    context.ros_node = rclpy_node
+
+    assert deepcopy(context) is context

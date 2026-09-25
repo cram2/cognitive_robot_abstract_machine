@@ -6,12 +6,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
-from coraplex.datastructures.enums import Arms, JointType
+from coraplex.datastructures.enums import JointType
 from typing_extensions import Any, ClassVar, Dict, List, Optional, TYPE_CHECKING
 
 from cramera.knowledge.enums import EdgeKind, KinematicChainGroup
 from cramera.knowledge.scene_bundle import ParsedUrdf
-from cramera.robot_parts import RobotPartAnnotation, RobotPartRole
+from cramera.robot_parts import ArmSide, RobotPartAnnotation, RobotPartRole
 from cramera.knowledge.subgraph import (
     DetailEntry,
     GraphEdge,
@@ -138,6 +138,6 @@ class UrdfViewPayload(GraphPanelPayload):
         if part.role is RobotPartRole.SENSOR:
             return KinematicChainGroup.SENSOR
         return {
-            Arms.LEFT: KinematicChainGroup.LEFT_ARM,
-            Arms.RIGHT: KinematicChainGroup.RIGHT_ARM,
+            ArmSide.LEFT: KinematicChainGroup.LEFT_ARM,
+            ArmSide.RIGHT: KinematicChainGroup.RIGHT_ARM,
         }.get(part.side, KinematicChainGroup.BASE)

@@ -22,7 +22,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, CuttingTechnique
+from coraplex.datastructures.enums import CuttingTechnique
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.composite.tool_based import CuttingAction
@@ -57,27 +57,27 @@ def main() -> None:
     context = Context(world=world, robot=pr2, _debug=False, ros_node=None)
 
     knife_body = attach_tool(
-        world, pr2, Arms.RIGHT, parse_object("big-knife.stl"), CUT_MOUNT
+        world, pr2.right_arm, parse_object("big-knife.stl"), CUT_MOUNT
     )
-    bread_body = world.get_body_by_name("bread.stl")
+    bread = Bread(root=world.get_body_by_name("bread.stl"))
 
     knife = CuttingKnife(root=knife_body)
     with world.modify_world():
-        world.add_semantic_annotations([Bread(root=bread_body), knife])
+        world.add_semantic_annotations([bread, knife])
 
     context.evaluate_conditions = False
 
     plan = sequential(
         [
-            SetGripperAction(Arms.RIGHT, GripperState.CLOSE),
-            ParkArmsAction(Arms.BOTH),
+            SetGripperAction(pr2.right_arm.end_effector, GripperState.CLOSE),
+            ParkArmsAction(pr2.get_arms()),
             MoveTorsoAction(TorsoState.HIGH),
             NavigateAction(
                 Pose.from_xyz_rpy(*BASE_POSITION_XYZ, reference_frame=world.root)
             ),
             CuttingAction(
-                object_to_cut=bread_body,
-                arm=Arms.RIGHT,
+                object_to_cut=bread,
+                arm=pr2.right_arm,
                 tool=knife,
                 technique=CuttingTechnique.SLICE,
                 number_of_cuts_on_local_x_axis=3,

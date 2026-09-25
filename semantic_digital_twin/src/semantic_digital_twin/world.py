@@ -540,6 +540,104 @@ _LRU_CACHE_SIZE: int = 2048
 
 
 @dataclass
+class WorldEntityRebinding:
+    """
+    One rebinding of objects onto the world entities of :attr:`world`.
+
+    Remembers what each object it reached was rebound into, so every object is rebound
+    once however often, and through however many cycles, it is reached.
+    """
+
+    world: World
+    """
+    The world whose own entities the rebound objects refer to.
+    """
+
+    rebound: Dict[int, Any] = field(default_factory=dict)
+    """
+    What each object already reached was rebound into, by the id of that object.
+
+    Doubles as the memo of the deep copies made on the way, so an object first reached
+    by one of them is not copied a second time either.
+    """
+
+    def rebind(self, obj: RelocatableType) -> RelocatableType:
+        """
+        :param obj: The object to rebind, or a value containing world entities.
+        :return: The equivalent of `obj` referring to :attr:`world`, as described in
+            :meth:`World.rebind_world_entities`.
+        """
+        if isinstance(obj, WorldEntityWithID):
+            return self._rebound_entity(obj)
+        if id(obj) in self.rebound:
+            return self.rebound[id(obj)]
+        if self._is_walked_dataclass(obj):
+            return self._rebound_dataclass(obj)
+        if isinstance(obj, list_like_classes):
+            rebound = type(obj)(self.rebind(item) for item in obj)
+        elif isinstance(obj, dict):
+            rebound = {key: self.rebind(value) for key, value in obj.items()}
+        else:
+            return deepcopy(obj, self.rebound)
+        self.rebound[id(obj)] = rebound
+        return rebound
+
+    def _rebound_entity(self, entity: WorldEntityWithID) -> WorldEntityWithID:
+        """
+        :param entity: The entity to look up.
+        :return: :attr:`world`'s own instance of `entity`, or `entity` itself if
+            :attr:`world` does not contain it.
+        :raises WorldEntityWithIDBelongsToAnotherWorld: If :attr:`world`'s lookup
+            answers with an entity that reports belonging elsewhere.
+        """
+        try:
+            found = self.world.get_world_entity_with_id_by_id(entity.id)
+        except WorldEntityWithIDNotFoundError:
+            return entity
+        if found._world is not self.world:
+            raise WorldEntityWithIDBelongsToAnotherWorld(
+                world=self.world, world_entity=found
+            )
+        return found
+
+    @staticmethod
+    def _is_walked_dataclass(obj: Any) -> bool:
+        """
+        :param obj: The object to rebind.
+        :return: Whether `obj` is a dataclass instance whose fields are rebound one by
+            one, rather than one whose type says itself how it is deep-copied.
+        """
+        return (
+            is_dataclass(obj)
+            and not isinstance(obj, type)
+            and not hasattr(type(obj), "__deepcopy__")
+        )
+
+    def _rebound_dataclass(self, obj: Any) -> Any:
+        """
+        :param obj: The dataclass instance to rebind.
+        :return: A copy of `obj` with every field rebound, registered before its fields
+            are rebound so a field referring back to it finds it. Attributes that are
+            not fields are deep-copied.
+        """
+        result = copy(obj)
+        self.rebound[id(obj)] = result
+        field_names = set()
+        for dataclass_field in fields(obj):
+            field_names.add(dataclass_field.name)
+            setattr(
+                result,
+                dataclass_field.name,
+                self.rebind(getattr(obj, dataclass_field.name)),
+            )
+        if hasattr(obj, "__dict__"):
+            for name, value in vars(obj).items():
+                if name not in field_names:
+                    setattr(result, name, deepcopy(value, self.rebound))
+        return result
+
+
+@dataclass
 class World(HasSimulatorProperties):
     """
     A class representing the world.
@@ -1653,7 +1751,10 @@ class World(HasSimulatorProperties):
         Walks `obj` recursively through dataclass fields, list like classes and dict values.
         A :class:`~semantic_digital_twin.world_description.world_entity.WorldEntityWithID`
         is looked up here by its id. Anything else is deep-copied, so `obj` and the
-        result never share mutable state.
+        result never share mutable state. Each object is rebound once, so objects that
+        refer to each other, or one object reached from several places, keep that shape
+        in the result. A type that defines how it is deep-copied is copied its own way
+        rather than walked.
 
         An entity this world does not contain is left as it is: it is not this world's
         state to rebind, and leaving it behaves exactly as not rebinding at all.
@@ -1668,30 +1769,7 @@ class World(HasSimulatorProperties):
             entity that reports belonging elsewhere, rather than letting it fail later
             wherever it ends up being used.
         """
-        if isinstance(obj, WorldEntityWithID):
-            try:
-                found = self.get_world_entity_with_id_by_id(obj.id)
-            except WorldEntityWithIDNotFoundError:
-                return obj
-            if found._world is not self:
-                raise WorldEntityWithIDBelongsToAnotherWorld(
-                    world=self, world_entity=found
-                )
-            return found
-        if isinstance(obj, list_like_classes):
-            return type(obj)(self.rebind_world_entities(item) for item in obj)
-        if isinstance(obj, dict):
-            return {
-                key: self.rebind_world_entities(value) for key, value in obj.items()
-            }
-        if is_dataclass(obj) and not isinstance(obj, type):
-            result = deepcopy(obj)
-            for f in fields(obj):
-                setattr(
-                    result, f.name, self.rebind_world_entities(getattr(obj, f.name))
-                )
-            return result
-        return deepcopy(obj)
+        return WorldEntityRebinding(world=self).rebind(obj)
 
     def get_kinematic_structure_entity_by_id(
         self, id: UUID

@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-from coraplex.datastructures.enums import Arms
 from cramera.generated_json import write_json_atomically
 from cramera.knowledge.enums import KinematicChainGroup
 from cramera.knowledge.eql_session import EqlSession
@@ -22,7 +21,7 @@ def test_recorded_part_side_uses_the_native_arms_enum() -> None:
 
     restored = RobotPartAnnotation.from_payload(annotation.to_payload())
 
-    assert restored.side is Arms.LEFT
+    assert restored.side is ArmSide.LEFT
 
 
 @pytest.mark.parametrize(
@@ -119,14 +118,14 @@ def test_gripper_membership_takes_precedence_over_its_arm(fixture_scene: Path) -
         RobotPartAnnotation(
             "Tool",
             RobotPartRole.END_EFFECTOR,
-            Arms.LEFT,
+            ArmSide.LEFT,
             ["l_gripper_link"],
             "Manipulator",
         ).to_payload(),
         RobotPartAnnotation(
             "Manipulator",
             RobotPartRole.ARM,
-            Arms.LEFT,
+            ArmSide.LEFT,
             ["l_shoulder_link", "l_gripper_link"],
         ).to_payload(),
     ]

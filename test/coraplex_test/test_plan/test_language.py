@@ -110,8 +110,9 @@ def test_combination_construction():
     assert len(root.children[0].children) == 2
 
 
-def test_repeat_construction():
-    act = ParkArmsAction(Arms.BOTH)
+def test_repeat_construction(immutable_model_world):
+    world, robot_view, context = immutable_model_world
+    act = ParkArmsAction(context.robot.get_arms())
     act2 = MoveTorsoAction(TorsoState.HIGH)
 
     root = repeat([act, act2], maximum_repetitions=10)
@@ -123,7 +124,7 @@ def test_perform_execute_single(immutable_model_world):
     world, robot_view, context = immutable_model_world
     act = NavigateAction(Pose.from_xyz_rpy(0.3, -1.3, 0, reference_frame=world.root))
     act2 = MoveTorsoAction(TorsoState.HIGH)
-    act3 = ParkArmsAction(Arms.BOTH)
+    act3 = ParkArmsAction(context.robot.get_arms())
 
     plan = sequential([act, act2, act3], context).plan
     with simulated_robot:
@@ -278,8 +279,9 @@ def test_exception_try_all(immutable_model_world):
 # %% monitored subtrees
 
 
-def test_cancel_monitor_construction():
-    act = ParkArmsAction(Arms.BOTH)
+def test_cancel_monitor_construction(immutable_model_world):
+    world, robot_view, context = immutable_model_world
+    act = ParkArmsAction(context.robot.get_arms())
     act2 = MoveTorsoAction(TorsoState.HIGH)
 
     root = cancel_when([act, act2], monitor=ConstFalseNode(name="never"))
@@ -365,7 +367,7 @@ def test_repeat_raises_when_it_runs_out_of_attempts(immutable_model_world):
     unreachable = Pose.from_xyz_rpy(5, 0, 0, reference_frame=world.root)
 
     plan = repeat(
-        [MoveToolCenterPointMotion(target=unreachable, arm=Arms.RIGHT)],
+        [MoveToolCenterPointMotion(target=unreachable, arm=context.robot.right_arm)],
         maximum_repetitions=2,
         context=context,
         repeat_template=partial(RepeatOnStall, timeout=timedelta(seconds=1)),

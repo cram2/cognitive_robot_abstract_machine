@@ -45,7 +45,9 @@ from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
-context = Context(world, pr2_view)
+# A location draws its candidates from a costmap, so a seed is what makes this
+# example run the same way twice.
+context = Context(world, pr2_view, sampling_seed=0)
 
 origin_pose = pr2_view.root.global_pose
 ```
@@ -86,11 +88,10 @@ PR2 will be set to 0.2 since otherwise the arms of the robot will be too low to 
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import *
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
-from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.datastructures.definitions import TorsoState
 
 with simulated_robot:
-    sequential([ParkArmsAction(Arms.BOTH),
+    sequential([ParkArmsAction(pr2_view.get_arms()),
                 MoveTorsoAction(TorsoState.HIGH)], context=context).perform()
 
 ```
@@ -98,9 +99,14 @@ with simulated_robot:
 ```python
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.execution_environment import simulated_robot
-from coraplex.locations.factories import reachability_location
+from coraplex.locations.locations import ReachabilityLocation
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
-location = reachability_location(world.get_body_by_name("milk.stl"), context=context, arm=Arms.LEFT)
+location = ReachabilityLocation(
+    Pose(reference_frame=world.get_body_by_name("milk.stl")),
+    pr2_view.left_arm,
+    context=context,
+)
 
 plan = execute_single(NavigateAction(next(iter(location))), context=context)
 
@@ -110,8 +116,9 @@ with simulated_robot:
 pr2_view.root.parent_connection.origin = origin_pose.to_homogeneous_matrix()
 ```
 
-As you can see we get a pose near the countertop where the robot can be placed without colliding with it. Furthermore,
-we get a list of arms with which the robot can reach the given object.
+As you can see we get a pose near the countertop where the robot can be placed without colliding with it, at the
+distance from which the arm can reach the given object. The target is given relative to the milk, so the location
+follows the milk wherever it is when the location is drawn from.
 
 ## Visible
 
@@ -124,9 +131,11 @@ designator you can spawn them with the following cell.
 
 ```python
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
-from coraplex.locations.factories import visibility_location
+from coraplex.locations.locations import VisibilityLocation
 
-location = visibility_location(world.get_body_by_name("milk.stl"), context=context)
+location = VisibilityLocation(
+    Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
+)
 
 plan = execute_single(NavigateAction(next(iter(location))), context=context)
 
@@ -146,7 +155,7 @@ already have a milk spawned in you world you can ignore the following cell.
 
 ```python
 
-location = visibility_location(Pose(Point3.from_iterable([-1, 0, 1.2]), reference_frame=world.root), context=context)
+location = VisibilityLocation(Pose(Point3.from_iterable([-1, 0, 1.2]), reference_frame=world.root), context=context)
 
 for i, pose in enumerate(location):
     print(pose)
@@ -157,14 +166,14 @@ for i, pose in enumerate(location):
 
 ## Accessing Locations
 
-Accessing describes a location from which the robot can open a drawer. The drawer is specified by the handle that is 
-used to open it.
+Opening a drawer needs the robot to stand closer to the handle than grasping an object does, so the reachability
+location is asked for the handle with the closer stand-off distance.
 
 At the moment this location designator only works in the apartment environment, so please remove the kitchen if you
 spawned it in a previous example. Furthermore, we need a robot, so we also spawn the PR2 if it isn't spawned already.
 
 ```python
-from coraplex.locations.factories import accessing_location
+from coraplex.datastructures.enums import ReachFraction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle
 
 with world.modify_world():
@@ -175,7 +184,12 @@ with world.modify_world():
         )
     )
 
-location = accessing_location(world.get_semantic_annotations_by_type(Drawer)[0], context=context, arm=Arms.LEFT)
+location = ReachabilityLocation(
+    Pose(reference_frame=drawer.handle.root),
+    pr2_view.left_arm,
+    ReachFraction.ACCESSING,
+    context=context,
+)
 
 print(next(iter(location)))
 ```
