@@ -253,6 +253,23 @@ class TruncatedGaussianDistribution(
         )
         return VariableMap({self.variable: moment})
 
+    def log_conditional_from_simple_interval_if_not_singleton(
+        self, interval: SimpleInterval
+    ) -> Tuple[Optional[ContinuousDistribution], float]:
+        """
+        Truncate this distribution to the intersection of its interval and the given
+        one.
+
+        :param interval: The simple interval, which is not a singleton.
+        :return: The truncated distribution and the log-probability of the interval.
+        """
+        intersection = self.interval.intersection_with(interval)
+        if intersection.is_empty():
+            return None, -np.inf
+        return super().log_conditional_from_simple_interval_if_not_singleton(
+            intersection
+        )
+
     def __eq__(self, other):
         return super().__eq__(other) and self.interval == other.interval
 
