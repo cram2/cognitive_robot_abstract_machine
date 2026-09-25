@@ -165,9 +165,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
         executor = Executor(
             MotionStatechartContext(
                 world=world,
-                qp_controller_config=QPControllerConfig(
-                    target_frequency=50, prediction_horizon=4, verbose=False
-                ),
+                qp_controller_config=QPControllerConfig.create_with_fast_simulation_defaults(),
             ),
         )
         executor.compile(msc)

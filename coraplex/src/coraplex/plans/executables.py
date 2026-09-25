@@ -355,9 +355,7 @@ class GiskardExecutable(Executable):
         executor = Ros2Executor(
             context=MotionStatechartContext(
                 world=self.context.world,
-                qp_controller_config=QPControllerConfig(
-                    target_frequency=50, prediction_horizon=4, verbose=False
-                ),
+                qp_controller_config=QPControllerConfig.create_with_fast_simulation_defaults(),
             ),
             ros_node=self.context.ros_node,
         )

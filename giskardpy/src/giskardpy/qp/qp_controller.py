@@ -30,7 +30,7 @@ class QPController:
 
     config: QPControllerConfig
     degrees_of_freedom: InitVar[List[DegreeOfFreedom]]
-    active_dofs: List[DegreeOfFreedom] = field(init=False)
+    active_degrees_of_freedom: List[DegreeOfFreedom] = field(init=False)
     constraint_collection: ConstraintCollection
     world_state_symbols: List[sm.FloatVariable]
     life_cycle_variables: List[sm.FloatVariable]
@@ -46,14 +46,14 @@ class QPController:
         if self.config.verbose:
             logger.info(
                 f"Initialized QP Controller:\n"
-                f'sample period: "{self.config.model_predictive_control_time_step}"s\n'
+                f'sample period: "{self.config.control_time_step.total_seconds()}"s\n'
                 f'max derivative: "{self.config.max_derivative.name}"\n'
                 f'prediction horizon: "{self.config.prediction_horizon}"\n'
                 f'QP solver: "{self.config.qp_solver_class.__name__}"'
             )
         self._set_active_dofs(degrees_of_freedom)
         generic_qp_data_symbolic = QPDataSymbolic(
-            degrees_of_freedom=self.active_dofs,
+            degrees_of_freedom=self.active_degrees_of_freedom,
             constraint_collection=self.constraint_collection,
             qp_controller_config=self.config,
         )
@@ -102,10 +102,10 @@ class QPController:
                 if v.name in active_float_variables
             ]
         )
-        self.active_dofs = [dof for dof in degrees_of_freedom if dof_used(dof)]
+        self.active_degrees_of_freedom = [dof for dof in degrees_of_freedom if dof_used(dof)]
 
     def has_not_free_variables(self) -> bool:
-        return len(self.active_dofs) == 0
+        return len(self.active_degrees_of_freedom) == 0
 
     def compute_command(
         self,
@@ -121,15 +121,23 @@ class QPController:
         )
         qp_data_filtered = qp_data_raw.apply_filters()
         solution = self.qp_solver.solver_call(qp_data_filtered)
-        return self.xdot_to_control_commands(solution)
+        return self.extract_control_commands(solution)
 
-    def xdot_to_control_commands(self, xdot: np.ndarray) -> np.ndarray:
-        offset = len(self.active_dofs) * (self.config.prediction_horizon - 2)
-        offset_end = offset + len(self.active_dofs)
-        control_cmds = (
-            xdot[offset:offset_end] / self.config.model_predictive_control_time_step**2
+    def extract_control_commands(self, solution: np.ndarray) -> np.ndarray:
+        """
+        Reads the control command of every degree of freedom out of the QP solution.
+
+        :param solution: The QP decision vector returned by the solver.
+        :return: One control command per degree of freedom of the world state, zero for
+            degrees of freedom that are not active in this QP.
+        """
+        offset = len(self.active_degrees_of_freedom) * (self.config.prediction_horizon - 2)
+        offset_end = offset + len(self.active_degrees_of_freedom)
+        control_commands = (
+            solution[offset:offset_end]
+            / self.config.control_time_step.total_seconds() ** 2
         )
         # divide by 4 because the world state has pos/vel/acc/jerk variables
-        full_control_cmds = np.zeros(len(self.world_state_symbols) // 4)
-        full_control_cmds[self.dof_filter] = control_cmds
-        return full_control_cmds
+        full_control_commands = np.zeros(len(self.world_state_symbols) // 4)
+        full_control_commands[self.dof_filter] = control_commands
+        return full_control_commands
