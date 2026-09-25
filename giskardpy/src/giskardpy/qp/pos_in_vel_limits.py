@@ -263,13 +263,13 @@ class SlowdownProfile:
         :return: Profile slowing down towards ``target_velocity_profile``.
         """
         velocity, jerk = cls._profiles(
-            current_velocity,
-            current_acceleration,
-            target_velocity_profile,
-            jerk_limit,
-            time_step,
-            prediction_horizon,
-            skip_first,
+            current_velocity=current_velocity,
+            current_acceleration=current_acceleration,
+            target_velocity_profile=target_velocity_profile,
+            jerk_limit=jerk_limit,
+            time_step=time_step,
+            prediction_horizon=prediction_horizon,
+            skip_first=skip_first,
         )
         return cls(velocity=velocity, jerk=jerk)
 
@@ -303,13 +303,13 @@ class SlowdownProfile:
         for i in range(prediction_horizon):
             next_velocity, next_acceleration = (
                 SlowdownProfile._next_velocity_and_acceleration(
-                    next_velocity,
-                    next_acceleration,
-                    target_velocity_profile[i],
-                    jerk_limit,
-                    time_step,
-                    prediction_horizon - i - 1,
-                    sm.logic_and(skip_first, sm.Scalar(i == 0)),
+                    current_velocity=next_velocity,
+                    current_acceleration=next_acceleration,
+                    velocity_limit=target_velocity_profile[i],
+                    jerk_limit=jerk_limit,
+                    delta_time=time_step,
+                    remaining_prediction_horizon=prediction_horizon - i - 1,
+                    no_cap=sm.logic_and(skip_first, sm.Scalar(i == 0)),
                 )
             )
             velocity_profile.append(next_velocity)

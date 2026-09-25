@@ -49,7 +49,7 @@ def test_number_of_steps_is_the_fewest_that_remove_the_velocity(
     )
 
     assert removable * jerk_step >= velocity_limit * (
-        1 - JerkLimitedBraking.RELATIVE_TOLERANCE
+        1 - JerkLimitedBraking.relative_tolerance
     )
     assert removable_with_one_step_less * jerk_step < velocity_limit
 

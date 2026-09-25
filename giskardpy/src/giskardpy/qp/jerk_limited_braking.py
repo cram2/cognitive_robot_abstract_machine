@@ -32,7 +32,7 @@ class JerkLimitedBraking:
     Duration of a single step of the grid.
     """
 
-    RELATIVE_TOLERANCE: float = field(init=False, default=1e-9)
+    relative_tolerance: float = field(init=False, default=1e-9)
     """
     Relative tolerance with which a braking counts as removing a velocity, so that a
     jerk limit derived from a number of steps is not pushed to the next step by
@@ -115,7 +115,7 @@ class JerkLimitedBraking:
             time_step**2``.
         :return: Smallest number of steps that removes the velocity.
         """
-        required = velocity_in_jerk_steps * (1 - cls.RELATIVE_TOLERANCE)
+        required = velocity_in_jerk_steps * (1 - cls.relative_tolerance)
         number_of_steps = 0
         while cls._removable_velocity_in_jerk_steps(number_of_steps) < required:
             number_of_steps += 1
