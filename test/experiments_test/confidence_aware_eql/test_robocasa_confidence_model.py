@@ -4,11 +4,11 @@ import pytest
 
 import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from semantic_digital_twin.adapters.robocasa_dataset.loader import RoboCasaDatasetLoader
-from semantic_digital_twin.adapters.robocasa_dataset.semantics import RoboCasaObjectCategory
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Cup, Pot
+from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
+    RoboCasaObjectCategory,
+)
 
 from experiments.confidence_aware_eql.confidence_model import ConfidenceModel
-from experiments.confidence_aware_eql.robocasa_data import downloaded_instance_count
 
 pytest.importorskip("robocasa", reason="robocasa is not installed")
 pytest.importorskip("robosuite", reason="robosuite is not installed")
@@ -30,37 +30,31 @@ def robocasa_loader() -> RoboCasaDatasetLoader:
     return loader
 
 
-def _load_class(loader, category, annotation_class, count):
+def _load_instances(loader, category, count):
     """Load ``count`` real instances of one robocasa object category as their semantic annotation."""
-    instances = []
-    for index in range(count):
-        world = loader.load_object(category, instance_index=index)
-        [annotation] = [
-            annotation
-            for annotation in world.semantic_annotations
-            if isinstance(annotation, annotation_class)
-        ]
-        instances.append(annotation)
-    return instances
+    return [
+        loader.load_object_annotation(category, instance_index=index)
+        for index in range(count)
+    ]
 
 
 @pytest.fixture(scope="session")
 def real_cups_and_pots(robocasa_loader):
     """Real downloaded cup and pot instances, or a skip if either has none downloaded."""
     cup_count = min(
-        downloaded_instance_count(robocasa_loader, RoboCasaObjectCategory.CUP),
+        robocasa_loader.downloaded_instance_count(RoboCasaObjectCategory.CUP),
         MAX_INSTANCES_PER_CLASS,
     )
     pot_count = min(
-        downloaded_instance_count(robocasa_loader, RoboCasaObjectCategory.POT),
+        robocasa_loader.downloaded_instance_count(RoboCasaObjectCategory.POT),
         MAX_INSTANCES_PER_CLASS,
     )
     if cup_count == 0 or pot_count == 0:
         pytest.skip(
             "No downloaded cup or pot instances found under the robocasa assets directory."
         )
-    cups = _load_class(robocasa_loader, RoboCasaObjectCategory.CUP, Cup, cup_count)
-    pots = _load_class(robocasa_loader, RoboCasaObjectCategory.POT, Pot, pot_count)
+    cups = _load_instances(robocasa_loader, RoboCasaObjectCategory.CUP, cup_count)
+    pots = _load_instances(robocasa_loader, RoboCasaObjectCategory.POT, pot_count)
     return cups, pots
 
 
