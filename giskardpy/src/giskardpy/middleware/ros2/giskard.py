@@ -14,6 +14,7 @@ from giskardpy.data_types.exceptions import NoControlledJointsError
 from giskardpy.executor import Executor
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
+from giskardpy.middleware.ros2.client_presence import ClientWatchdog, HeartbeatPresence
 from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from giskardpy.middleware.ros2.graceful_shutdown import GracefulShutdownSignals
@@ -122,6 +123,9 @@ class Giskard:
         action_server = ActionServerHandler(
             action_name=f"{rospy.get_node().get_name()}/command", action_type=JsonAction
         )
+        client_watchdog = ClientWatchdog(
+            presence=HeartbeatPresence(node=rospy.get_node()),
+        )
         feedback_publisher = ActionFeedbackPublisher(
             executor=self.executor, action_server=action_server
         )
@@ -133,6 +137,7 @@ class Giskard:
         control_loop = ControlLoop(
             executor=self.executor,
             action_server=action_server,
+            client_watchdog=client_watchdog,
             feedback_publisher=feedback_publisher,
             inputs=WorldStateInputs(world=world),
             cycle_counter=cycle_counter,
@@ -142,6 +147,7 @@ class Giskard:
             executor=self.executor,
             action_server=action_server,
             control_loop=control_loop,
+            client_watchdog=client_watchdog,
             world_updates=world_updates,
             world_synchronizer=self.world_synchronizer,
             feedback_publisher=feedback_publisher,
