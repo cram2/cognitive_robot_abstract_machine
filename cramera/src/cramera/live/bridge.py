@@ -25,6 +25,8 @@ from typing_extensions import (
 from coraplex.plans.plan_node import DesignatorNode
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from krrood.entity_query_language.evaluable import Evaluable
+from krrood.entity_query_language.factories import inference
+from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
@@ -67,7 +69,6 @@ from cramera.recording_fields import SceneField
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from coraplex.datastructures.enums import Arms
     from coraplex.plans.designator import Designator
     from coraplex.plans.plan import Plan
     from coraplex.plans.plan_node import MotionNode, PlanNode
@@ -78,13 +79,6 @@ if TYPE_CHECKING:
     from cramera.live.ros_markers import RosMarkerListener
 
 logger = get_logger(__name__)
-
-
-class DesignatorParameter(StrEnum):
-    """Native designator parameters naming the selected arms."""
-
-    ARM = "arm"
-    """The native arm selection, including both arms."""
 
 
 # %% viewer payload shapes
@@ -176,9 +170,9 @@ class PlanNodeEntry:
     Whether the published status was derived; native plan states are reported directly.
     """
 
-    arm: Optional[str] = None
+    description: Optional[str] = None
     """
-    Arm the node's designator names, if any.
+    Native verbalization of the designator and its parameters, if present.
     """
 
     target: Optional[str] = None
@@ -1409,16 +1403,16 @@ class Bridge:
         self, entry: PlanNodeEntry, designator: Designator | None
     ) -> None:
         """
-        Add arm and target-object info from a node's designator, if any.
+        Describe the designator's parameters and retain its published target identity.
 
         :param entry: The serialized entry to fill in, mutated in place.
         :param designator: The node's designator, or None.
         """
         if designator is None:
             return
-        arm: Arms | None = designator.designator_parameter.get(DesignatorParameter.ARM)
-        if arm is not None:
-            entry.arm = arm.name
+        entry.description = verbalize_expression(
+            inference(type(designator))(**designator.designator_parameter)
+        )
         target = self._designator_target(designator)
         if target:
             entry.target = target

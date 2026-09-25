@@ -128,8 +128,8 @@ class PlanViewPayload(GraphPanelPayload):
         node_id = "plan_tree_node_%d" % next(node_ids)
         kind = tree.get("kind", "PlanNode")
         lines = ["a " + kind]
-        if tree.get("arm"):
-            lines.append("arm: " + tree["arm"])
+        if tree.get(SceneField.DESCRIPTION):
+            lines.append(tree[SceneField.DESCRIPTION])
         if tree.get("target"):
             lines.append("target: " + tree["target"])
         view.add(

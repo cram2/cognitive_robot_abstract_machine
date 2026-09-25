@@ -57,6 +57,11 @@ class SceneField(StrEnum):
     Nested execution trees captured by the plan observer.
     """
 
+    DESCRIPTION = "description"
+    """
+    Native verbalization of a plan node's designator and parameters.
+    """
+
     DETECTED_EVENTS = "detectedEvents"
     """
     Events observed during the recorded execution.

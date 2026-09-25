@@ -11,13 +11,20 @@ import pytest
 from coraplex.datastructures.enums import Arms
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import ActionNode, MotionNode, PlanNode
-from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+from coraplex.robot_plans.actions.core.robot_body import (
+    ParkArmsAction,
+    SetGripperAction,
+)
 from giskardpy.motion_statechart.data_types import LifeCycleValues
+from krrood.entity_query_language.factories import inference
+from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.world_description.world_entity import Body
 
 from cramera.live.bridge import Bridge
+from cramera.recording_fields import SceneField
 
 from .dataset.plan_metadata import AnnotationTargetMotion
 
@@ -73,20 +80,46 @@ def test_parent_lifecycle_is_independent_of_finished_children(
 # %% native designator metadata
 
 
-@pytest.mark.parametrize("arm", list(Arms))
-def test_native_arm_selection_keeps_its_name(arm: Arms) -> None:
+@pytest.mark.parametrize("gripper", list(Arms))
+def test_designator_description_uses_native_parameter_verbalization(
+    gripper: Arms,
+) -> None:
     """
-    Publish every native arm selection, including the left arm and both arms.
+    Publish native wording for the selected grippers and their requested state.
 
-    :param arm: The native arm selection to publish.
+    :param gripper: The native gripper selection to describe.
     """
+    action = SetGripperAction(gripper=gripper, motion=GripperState.CLOSE)
     plan = Plan()
-    plan.add_node(ActionNode(designator=ParkArmsAction(arm=arm)))
+    plan.add_node(ActionNode(designator=action))
     bridge = Bridge()
 
     bridge.begin_plan(plan)
 
-    assert bridge.plan_state.nodes[0].arm == arm.name
+    [entry] = bridge.get_plan()["nodes"]
+    assert entry[SceneField.DESCRIPTION] == verbalize_expression(
+        inference(type(action))(**action.designator_parameter)
+    )
+    assert "arm" not in entry
+
+
+@pytest.mark.parametrize("arm", list(Arms))
+def test_native_arm_selection_is_verbalized(arm: Arms) -> None:
+    """
+    Describe every native arm selection, including the left arm and both arms.
+
+    :param arm: The native arm selection to publish.
+    """
+    plan = Plan()
+    action = ParkArmsAction(arm=arm)
+    plan.add_node(ActionNode(designator=action))
+    bridge = Bridge()
+
+    bridge.begin_plan(plan)
+
+    assert bridge.plan_state.nodes[0].description == verbalize_expression(
+        inference(type(action))(**action.designator_parameter)
+    )
 
 
 def test_arm_enum_is_not_mistaken_for_a_target_body() -> None:

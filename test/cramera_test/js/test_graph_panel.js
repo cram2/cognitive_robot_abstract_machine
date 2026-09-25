@@ -118,6 +118,7 @@ function errorPage(status) {
 function loadPanel(responses, search) {
   let factory = null;
   let lastBuild = null;
+  let selectNode = null;
   const requested = [];
   const Panels = { define(id, f) { factory = f; } };
   const zooms = [];
@@ -125,7 +126,7 @@ function loadPanel(responses, search) {
   const statuses = [];
   const Graph = {
     attach() {}, build(payload) { lastBuild = payload; },
-    onSelect() {}, onDoubleSelect() {}, highlight() {}, reset() {},
+    onSelect(callback) { selectNode = callback; }, onDoubleSelect() {}, highlight() {}, reset() {},
     setStatuses(map) { statuses.push(map); return true; },
     zoomBy(factor) { zooms.push(factor); }, fit() { zooms.push('fit'); },
     resize() { resizes.push(1); },
@@ -143,6 +144,7 @@ function loadPanel(responses, search) {
   return {
     factory: factory,
     lastBuild: function () { return lastBuild; },
+    select: function (id) { selectNode(id); },
     requested: requested,
     zooms: zooms,
     resizes: resizes,
@@ -188,6 +190,88 @@ test('a live plan is drawn with the groups and legend the bridge sent', async fu
     ]);
   } finally {
     instance.destroy();       // clears the live-poll setInterval even if an assertion above throws
+  }
+});
+
+
+// %% native plan descriptions
+test('a live plan shows its native description while keeping the label and target', async function () {
+  const action = {
+    id: 'transport', kind: 'ActionNode', label: 'TransportAction',
+    status: 'RUNNING', group: 'action', target: 'kitchen/milk.stl',
+    description: 'A transport action whose arm is left and whose object is the milk.',
+  };
+  const panel = loadPanel({
+    '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+    '/api/knowledge/view?name=plan': { ok: true, nodes: [], edges: [], details: {}, live: 'plan' },
+    'http://bridge/plan': { signature: 'description', nodes: [action] },
+  });
+  const root = makeRoot();
+  const bus = makeBus();
+  let selected = null;
+  bus.on('entity:select', function (selection) { selected = selection; });
+  const instance = panel.factory(root, bus);
+  try {
+    await flush();
+    root.buttons.find(function (button) { return button.dataset.view === 'plan'; }).click();
+    await flush();
+    bus.emit('live:changed', { on: true, url: 'http://bridge' });
+    await flush();
+
+    const payload = panel.lastBuild();
+    const node = payload.nodes.find(function (entry) { return entry.id === action.id; });
+    panel.select(action.id);
+    assert.ok(node.title.split('\n').includes(action.description));
+    assert.ok(selected.detail.lines.includes(action.description));
+    assert.strictEqual(node.label, action.label);
+    assert.strictEqual(node.target, action.target);
+    assert.strictEqual(Object.hasOwn(node, 'arm'), false);
+  } finally {
+    instance.destroy();
+  }
+});
+
+
+test('step rows and motion details expose descriptions as plain tooltip text', async function () {
+  const descriptions = {
+    action: ['A transport action whose target is <milk> & cereal.'],
+    motion: ['A move motion whose arm is "left".'],
+  };
+  const panel = loadPanel({
+    '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+    '/api/knowledge/view?name=plan': {
+      ok: true, edges: [],
+      nodes: [
+        { id: 'action', kind: 'ActionNode', label: 'Transport', group: 'action' },
+        { id: 'motion', parent: 'action', kind: 'MotionNode', label: 'Move', group: 'motion' },
+      ],
+      details: {
+        action: { label: 'Transport', lines: descriptions.action },
+        motion: { label: 'Move', lines: descriptions.motion },
+      },
+    },
+  });
+  const root = makeRoot();
+  const stepTree = root.control('#graph-steps').querySelector('.steps-tree');
+  const rows = Object.keys(descriptions).map(function (id) {
+    return { dataset: { id: id }, title: '' };
+  });
+  stepTree.querySelectorAll = function (selector) {
+    return selector === '.st-row, .st-leaf' ? rows : [];
+  };
+  const instance = panel.factory(root, makeBus());
+  try {
+    await flush();
+    root.buttons.find(function (button) { return button.dataset.view === 'plan'; }).click();
+    await flush();
+
+    rows.forEach(function (row) {
+      assert.strictEqual(row.title, descriptions[row.dataset.id].join('\n'));
+      assert.ok(stepTree.innerHTML.includes('data-id="' + row.dataset.id + '"'));
+      assert.strictEqual(stepTree.innerHTML.includes(row.title), false);
+    });
+  } finally {
+    instance.destroy();
   }
 });
 

@@ -201,13 +201,17 @@ Panels.define('graph', function (root, bus) {
         '</div>');
       if (hk) {
         html.push('<div class="st-kids"' + (collapsed ? ' style="display:none"' : '') + '>');
-        details.forEach(function (d) { html.push('<div class="st-leaf"><span class="st-name detail">' + stepLabel(d.n) + '</span><span class="st-meta">' + stepPill(d.n.status) + '</span></div>'); });
+        details.forEach(function (d) { html.push('<div class="st-leaf" data-id="' + d.n.id + '"><span class="st-name detail">' + stepLabel(d.n) + '</span><span class="st-meta">' + stepPill(d.n.status) + '</span></div>'); });
         var i = 1; sub.forEach(function (c) { walk(c, number + '.' + (i++), depth + 1); });
         html.push('</div>');
       }
     }
     var i = 1; top.forEach(function (c) { walk(c, String(i++), 0); });
     treeEl.innerHTML = html.join('');
+    treeEl.querySelectorAll('.st-row, .st-leaf').forEach(function (row) {
+      const detail = payload.details && payload.details[row.dataset.id];
+      row.title = detail ? detail.lines.join('\n') : '';
+    });
     // collapse/expand (persist the state so the 700ms live refresh keeps it)
     treeEl.querySelectorAll('.st-row.hk').forEach(function (r) {
       r.addEventListener('click', function () {
@@ -433,10 +437,10 @@ Panels.define('graph', function (root, bus) {
       const label = shortenActionLabel(n.label || '?');
       const lines = ['a ' + n.kind,
                      'status: ' + n.status + (n.derived ? ' (derived from the motion statechart)' : '')];
-      if (n.arm) lines.push('arm: ' + n.arm);
+      if (n.description) lines.push(n.description);
       if (n.target) lines.push('target: ' + n.target);
       nodes.push({ id: n.id, label: n.label, group: n.group,
-                   kind: n.kind, parent: n.parent, target: n.target, arm: n.arm,
+                   kind: n.kind, parent: n.parent, target: n.target,
                    title: [label].concat(lines).join('\n'), status: n.status });
       details[n.id] = { label: label, group: n.group, lines: lines };
       if (n.parent) edges.push({ from: n.parent, to: n.id, kind: 'property', label: 'has step' });

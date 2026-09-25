@@ -16,6 +16,8 @@ from coraplex.plans.plan_node import ActionNode, MotionNode
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.robot_plans.motions.base import BaseMotion
 from giskardpy.motion_statechart.data_types import LifeCycleValues
+from krrood.entity_query_language.factories import inference
+from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -47,6 +49,7 @@ from typing_extensions import Any, Dict, List, Optional, Tuple
 from cramera.knowledge.enums import PlanNodeGroup
 from cramera.live.chart_structure import ChartEdgeEntry
 from cramera.live.bridge import Bridge
+from cramera.recording_fields import SceneField
 
 from .dataset.plan_metadata import BodyTargetMotion
 from .test_robot_parts import ArmPart, EndEffectorPart, NamedBody, OneArmedRobot
@@ -126,14 +129,16 @@ class TestPlanSnapshot:
 
     def test_designator_metadata_is_serialized(self, plan_bridge) -> None:
         """
-        Publish the target body and arm selected by native designators.
+        Publish the target identity and native description of designator parameters.
 
         :param plan_bridge: The bridge and its native plan nodes.
         """
         bridge, _, action, _, motion = plan_bridge
         nodes = nodes_by_kind(bridge)
         assert nodes["MotionNode"]["target"] == motion.designator.target_body.name.name
-        assert nodes["ActionNode"]["arm"] == str(action.designator.arm)
+        assert nodes["ActionNode"][SceneField.DESCRIPTION] == verbalize_expression(
+            inference(type(action.designator))(**action.designator.designator_parameter)
+        )
 
     def test_completed_parent_keeps_its_status_with_unstarted_children(
         self, plan_bridge
