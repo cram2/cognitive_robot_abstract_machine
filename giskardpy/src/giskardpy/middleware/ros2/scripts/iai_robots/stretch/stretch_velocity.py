@@ -22,7 +22,9 @@ def main():
         robot_interface_config=StretchVelocityInterface(),
         server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
         qp_controller_config=QPControllerConfig(
-            target_frequency=25, braking_time=timedelta(seconds=1.15)
+            # reproduces the braking of the former prediction_horizon=30
+            target_frequency=25,
+            braking_time=timedelta(seconds=1.15),
         ),
     )
     giskard.live()

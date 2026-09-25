@@ -199,7 +199,7 @@ class DegreeOfFreedomLimitProfiler:
         """
         Duration of a single step of the prediction horizon.
         """
-        return self.qp_controller_config.control_dt
+        return self.qp_controller_config.control_time_step
 
     @property
     def prediction_horizon(self) -> int:
@@ -249,10 +249,11 @@ class DegreeOfFreedomLimitProfiler:
             / time_step.total_seconds()
         )
         braking_profile = BrakingProfile.fastest(
-            initial_velocity=velocity_limit,
-            acceleration_limit=upper_limits.acceleration,
-            jerk_limit=jerk_limit,
-            time_step=time_step,
+            braking=JerkLimitedBraking(
+                velocity_limit=velocity_limit,
+                jerk_limit=jerk_limit,
+                time_step=time_step,
+            ),
             prediction_horizon=self.prediction_horizon,
         )
         velocity_lower_bound = self._directional_velocity_bound(
@@ -592,10 +593,9 @@ class DecisionVariableSlot:
     Degree of freedom the decision variable belongs to.
     """
 
-    @property
-    def debug_name(self) -> str:
+    def __str__(self) -> str:
         """
-        Human readable name of the decision variable, used for debugging.
+        Name of the decision variable in the QP.
         """
         short_label = {Derivatives.velocity: "vel", Derivatives.jerk: "jerk"}
         return f"{self.degree_of_freedom.name}_{short_label[self.derivative]}_k_{self.step}"
@@ -639,7 +639,7 @@ class DegreeOfFreedomDecisionVariables:
             upper_bounds=upper_bounds,
             quadratic_weights=quadratic_weights,
             linear_weights=linear_weights,
-            names=[slot.debug_name for slot in self.slots],
+            names=[str(slot) for slot in self.slots],
         )
 
     def number_of_steps(self, derivative: Derivatives) -> int:
@@ -698,7 +698,7 @@ class DegreeOfFreedomDecisionVariables:
         decision_variable_limits = {
             degree_of_freedom.id: self._decision_variable_limits(
                 upper_limits=self.profiler.resolve_limits(degree_of_freedom).upper,
-                time_step=qp_controller_config.control_dt,
+                time_step=qp_controller_config.control_time_step,
             )
             for degree_of_freedom in self.degrees_of_freedom
         }

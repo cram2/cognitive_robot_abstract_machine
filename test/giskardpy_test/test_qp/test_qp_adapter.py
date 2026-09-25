@@ -83,7 +83,7 @@ def _jerk_bound_derived_from_braking_time(
     :return: Bound on the jerk decision variable.
     """
     jerk_limit = 4 * velocity_limit / config.braking_time.total_seconds() ** 2
-    return jerk_limit * config.control_dt.total_seconds() ** 2
+    return jerk_limit * config.control_time_step.total_seconds() ** 2
 
 
 def test_DofLimits(prismatic_bot):

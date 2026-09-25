@@ -1573,11 +1573,11 @@ def velocity_convergence_expression(
         ref.append(velocity_limit)
         symbols.append(dof.variables.velocity)
 
-    dt = context.qp_controller_config.control_dt.total_seconds()
+    time_step = context.qp_controller_config.control_time_step.total_seconds()
     elapsed_cycles = context.control_cycle_variable
     if reference_cycle_variable is not None:
         elapsed_cycles = elapsed_cycles - reference_cycle_variable
-    trajectory_longer_than_minimum_time = elapsed_cycles * dt > minimum_time
+    trajectory_longer_than_minimum_time = elapsed_cycles * time_step > minimum_time
     return sm.trinary_logic_and(
         trajectory_longer_than_minimum_time,
         sm.logic_all(sm.abs(sm.Vector(symbols)) < sm.Vector(ref)),

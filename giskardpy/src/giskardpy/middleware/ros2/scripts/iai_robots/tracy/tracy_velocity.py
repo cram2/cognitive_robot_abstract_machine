@@ -29,7 +29,9 @@ def main():
         robot_interface_config=TracyVelocityInterface(),
         server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
         qp_controller_config=QPControllerConfig(
-            target_frequency=80, braking_time=timedelta(seconds=0.36)
+            # reproduces the braking of the former prediction_horizon=30
+            target_frequency=80,
+            braking_time=timedelta(seconds=0.36),
         ),
     )
     giskard.live()

@@ -1616,7 +1616,7 @@ def test_count_simulation_time_seconds_reaches_target_on_exact_tick():
     context = MotionStatechartContext(world=World())
     ticks_until_true = 4
     seconds = (
-        context.qp_controller_config.control_dt * ticks_until_true
+        context.qp_controller_config.control_time_step * ticks_until_true
     ).total_seconds()
     node = CountSimulationTimeSeconds(seconds=seconds)
     node.on_start(context)
@@ -1627,7 +1627,7 @@ def test_count_simulation_time_seconds_reaches_target_on_exact_tick():
 
 def test_count_simulation_time_seconds_on_start_resets_counter():
     context = MotionStatechartContext(world=World())
-    seconds = (context.qp_controller_config.control_dt * 2).total_seconds()
+    seconds = (context.qp_controller_config.control_time_step * 2).total_seconds()
     node = CountSimulationTimeSeconds(seconds=seconds)
     node.on_start(context)
     node.on_tick(context)
@@ -1640,7 +1640,7 @@ def test_count_simulation_time_seconds_with_executor():
     context = MotionStatechartContext(world=World())
     ticks_until_true = 20
     seconds = (
-        context.qp_controller_config.control_dt * ticks_until_true
+        context.qp_controller_config.control_time_step * ticks_until_true
     ).total_seconds()
     msc = MotionStatechart()
     msc.add_node(counter := CountSimulationTimeSeconds(seconds=seconds))

@@ -196,7 +196,7 @@ class Executor:
         """
         Simulated time of the control cycles executed since the last compile.
         """
-        return self.control_cycles * self.context.qp_controller_config.control_dt
+        return self.control_cycles * self.context.qp_controller_config.control_time_step
 
     def __post_init__(self):
         self.pacer.target_frequency = self.context.qp_controller_config.target_frequency
@@ -262,7 +262,7 @@ class Executor:
         )
         self.context.world.apply_control_commands(
             next_cmd,
-            self.qp_controller.config.control_dt.total_seconds(),
+            self.qp_controller.config.control_time_step.total_seconds(),
             self.qp_controller.config.max_derivative,
         )
         if self.trajectory_plotter is not None:

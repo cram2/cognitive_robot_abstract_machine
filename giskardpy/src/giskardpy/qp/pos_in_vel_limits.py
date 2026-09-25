@@ -14,6 +14,7 @@ import numpy.typing as npt
 import scipy.sparse as sp
 
 import krrood.symbolic_math.symbolic_math as sm
+from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.qp_data import QPDataExplicit
 from giskardpy.qp.solvers.linear_program_solver_highs import LinearProgramSolverHighs
 from giskardpy.utils.decorators import memoize
@@ -46,60 +47,46 @@ class BrakingProfile:
 
     @classmethod
     def fastest(
-        cls,
-        initial_velocity: float,
-        acceleration_limit: float,
-        jerk_limit: float,
-        time_step: timedelta,
-        prediction_horizon: int,
+        cls, braking: JerkLimitedBraking, prediction_horizon: int
     ) -> BrakingProfile:
         """
-        Creates the profile that brakes from ``initial_velocity`` to rest as fast as the
-        limits allow, starting with zero acceleration.
+        Creates the profile that brakes from the velocity limit of ``braking`` to rest
+        as fast as its jerk limit allows, starting with zero acceleration.
 
         The profile solves a linear program to a vertex, so its velocity levels are
         exact rather than accurate only up to a solver tolerance.
 
-        :param initial_velocity: Velocity the profile starts braking from.
-        :param acceleration_limit: Acceleration limit applied at every horizon step.
-        :param jerk_limit: Jerk limit applied at every horizon step.
-        :param time_step: Duration of a single step of the prediction horizon.
+        .. note:: The acceleration is not bounded separately; a braking limited by
+            :meth:`JerkLimitedBraking.limited_to_acceleration` already keeps it.
+
+        :param braking: Braking whose velocity limit, jerk limit, and time step the
+            profile follows.
         :param prediction_horizon: Number of steps in the prediction horizon.
-        :return: Fastest braking profile from ``initial_velocity`` to rest.
+        :return: Fastest braking profile from the velocity limit of ``braking`` to rest.
         """
         return cls(
-            velocity=cls._solve_fastest_braking(
-                initial_velocity,
-                acceleration_limit,
-                jerk_limit,
-                time_step,
-                prediction_horizon,
-            )[:prediction_horizon],
-            time_step=time_step,
+            velocity=cls._solve_fastest_braking(braking, prediction_horizon)[
+                :prediction_horizon
+            ],
+            time_step=braking.time_step,
         )
 
     @staticmethod
     @memoize
     def _solve_fastest_braking(
-        initial_velocity: float,
-        acceleration_limit: float,
-        jerk_limit: float,
-        time_step: timedelta,
-        prediction_horizon: int,
+        braking: JerkLimitedBraking, prediction_horizon: int
     ) -> npt.NDArray:
         """
         Solves the linear program behind :meth:`fastest` and returns its solution: the
         velocity, acceleration, and jerk at each step, one derivative after the other.
 
-        :param initial_velocity: Velocity the profile starts braking from.
-        :param acceleration_limit: Acceleration limit applied at every horizon step.
-        :param jerk_limit: Jerk limit applied at every horizon step.
-        :param time_step: Duration of a single step of the prediction horizon.
+        :param braking: Braking whose velocity limit, jerk limit, and time step the
+            profile follows.
         :param prediction_horizon: Number of steps in the prediction horizon.
         :return: Velocity, acceleration, and jerk at each step, one derivative after the
             other.
         """
-        limits = (initial_velocity, acceleration_limit, jerk_limit)
+        limits = (braking.velocity_limit, np.inf, braking.jerk_limit)
         number_of_derivatives = len(limits)
         upper_bounds = np.repeat(np.array(limits, dtype=float), prediction_horizon)
         lower_bounds = -upper_bounds
@@ -107,10 +94,10 @@ class BrakingProfile:
             last_step = (derivative + 1) * prediction_horizon - 1
             lower_bounds[last_step] = upper_bounds[last_step] = 0
         link_model = BrakingProfile._derivative_link_model(
-            time_step, prediction_horizon, number_of_derivatives
+            braking.time_step, prediction_horizon, number_of_derivatives
         )
         link_bounds = np.zeros(link_model.shape[0])
-        link_bounds[0] = initial_velocity
+        link_bounds[0] = braking.velocity_limit
         linear_weights = np.zeros(upper_bounds.shape[0])
         linear_weights[:prediction_horizon] = -1
         qp_data = QPDataExplicit(

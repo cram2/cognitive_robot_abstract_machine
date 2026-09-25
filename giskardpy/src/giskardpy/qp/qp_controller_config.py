@@ -142,11 +142,11 @@ class QPControllerConfig:
                 prediction_horizon=self.prediction_horizon,
                 minimum_prediction_horizon=braking_prediction_horizon,
                 braking_time=self.braking_time,
-                time_step=self.control_dt,
+                time_step=self.control_time_step,
             )
 
     @cached_property
-    def control_dt(self) -> timedelta:
+    def control_time_step(self) -> timedelta:
         """
         Time step of the control loop, which the QP also predicts with.
 
@@ -163,7 +163,7 @@ class QPControllerConfig:
         to brake from its velocity limit to rest.
         """
         return JerkLimitedBraking.number_of_steps_for_braking_time(
-            braking_time=self.braking_time, time_step=self.control_dt
+            braking_time=self.braking_time, time_step=self.control_time_step
         )
 
     @property

@@ -229,7 +229,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.control_dt.total_seconds()
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
         return sm.hstack(
             [jacobian for _ in range(self.qp_controller_config.control_horizon)]
@@ -244,7 +244,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             return sm.Matrix()
         return sm.Matrix.diag(
             [
-                self.qp_controller_config.control_dt.total_seconds()
+                self.qp_controller_config.control_time_step.total_seconds()
                 for _ in self.constraints
             ]
         )
@@ -283,7 +283,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
     def _apply_cap(
         self,
         value: Scalar,
-        dt: timedelta,
+        time_step: timedelta,
         normalization_number: float,
         control_horizon: int,
     ) -> Scalar:
@@ -292,14 +292,14 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         """
         return sm.limit(
             value,
-            -normalization_number * dt.total_seconds() * control_horizon,
-            normalization_number * dt.total_seconds() * control_horizon,
+            -normalization_number * time_step.total_seconds() * control_horizon,
+            normalization_number * time_step.total_seconds() * control_horizon,
         )
 
     def capped_bound(
         self,
         equality_bound: Scalar,
-        dt: timedelta,
+        time_step: timedelta,
         normalization_number: float,
         control_horizon: int,
     ) -> Scalar:
@@ -307,7 +307,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         Returns the bound capped to what is reachable within the control horizon.
         """
         return self._apply_cap(
-            equality_bound, dt, normalization_number, control_horizon
+            equality_bound, time_step, normalization_number, control_horizon
         )
 
     def create_bounds(
@@ -320,7 +320,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             [
                 self.capped_bound(
                     bounds_getter(c),
-                    self.qp_controller_config.control_dt,
+                    self.qp_controller_config.control_time_step,
                     c.normalization_factor,
                     self.qp_controller_config.control_horizon,
                 )
@@ -380,7 +380,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.control_dt.total_seconds()
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
         missing_variables = self.qp_controller_config.max_derivative - 1
         eye = sm.Matrix.eye(self.qp_controller_config.prediction_horizon)[
@@ -409,7 +409,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         )
         return (
             sm.Matrix.eye(num_slack_variables)
-            * self.qp_controller_config.control_dt.total_seconds()
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
 
     def create_slack_variables(self) -> DirectLimits:
@@ -450,7 +450,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             for c in self.constraints:
                 bounds.append(
                     bounds_getter(c)
-                    * self.qp_controller_config.control_dt.total_seconds()
+                    * self.qp_controller_config.control_time_step.total_seconds()
                 )
         return Vector(bounds)
 
@@ -596,7 +596,7 @@ class SystemDynamicsStrategy(EnforcementStrategy):
         res[: self.number_of_free_variables] = (
             -self.velocity_variables
             - self.acceleration_variables
-            * self.qp_controller_config.control_dt.total_seconds()
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
         res[self.number_of_free_variables : self.number_of_free_variables * 2] = (
             self.velocity_variables

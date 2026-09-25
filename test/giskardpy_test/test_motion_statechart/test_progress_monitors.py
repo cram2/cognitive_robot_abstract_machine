@@ -523,7 +523,9 @@ class TestNothingToConverge:
         executor.tick()
         assert progressing.observation_state == ObservationStateValues.TRUE
 
-        for _ in range(ceil(STALL_TIMEOUT / context.qp_controller_config.control_dt)):
+        for _ in range(
+            ceil(STALL_TIMEOUT / context.qp_controller_config.control_time_step)
+        ):
             executor.tick()
         assert progressing.observation_state == ObservationStateValues.FALSE
 

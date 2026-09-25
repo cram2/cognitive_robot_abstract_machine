@@ -118,7 +118,7 @@ class CountSimulationTimeSeconds(TickCounter):
     """
 
     def _reached_target(self, context: MotionStatechartContext) -> bool:
-        elapsed = context.qp_controller_config.control_dt * self._counter
+        elapsed = context.qp_controller_config.control_time_step * self._counter
         return elapsed.total_seconds() >= self.seconds
 
 

@@ -69,7 +69,7 @@ class HistoryGanttChartPlotter:
     def x_width_per_control_cycle(self) -> float:
         if self.context is None:
             return 1
-        return self.context.qp_controller_config.control_dt.total_seconds()
+        return self.context.qp_controller_config.control_time_step.total_seconds()
 
     @property
     def total_control_cycles(self) -> int:

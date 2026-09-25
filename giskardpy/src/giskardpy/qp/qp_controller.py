@@ -46,7 +46,7 @@ class QPController:
         if self.config.verbose:
             logger.info(
                 f"Initialized QP Controller:\n"
-                f'sample period: "{self.config.control_dt.total_seconds()}"s\n'
+                f'sample period: "{self.config.control_time_step.total_seconds()}"s\n'
                 f'max derivative: "{self.config.max_derivative.name}"\n'
                 f'prediction horizon: "{self.config.prediction_horizon}"\n'
                 f'QP solver: "{self.config.qp_solver_class.__name__}"'
@@ -127,7 +127,7 @@ class QPController:
         offset = len(self.active_dofs) * (self.config.prediction_horizon - 2)
         offset_end = offset + len(self.active_dofs)
         control_cmds = (
-            xdot[offset:offset_end] / self.config.control_dt.total_seconds() ** 2
+            xdot[offset:offset_end] / self.config.control_time_step.total_seconds() ** 2
         )
         # divide by 4 because the world state has pos/vel/acc/jerk variables
         full_control_cmds = np.zeros(len(self.world_state_symbols) // 4)

@@ -78,10 +78,11 @@ def _directional_bounds_at(
         / time_step.total_seconds()
     )
     braking_profile = BrakingProfile.fastest(
-        initial_velocity=velocity_limit,
-        acceleration_limit=upper_limits.acceleration,
-        jerk_limit=upper_limits.jerk,
-        time_step=time_step,
+        braking=JerkLimitedBraking(
+            velocity_limit=velocity_limit,
+            jerk_limit=upper_limits.jerk,
+            time_step=time_step,
+        ),
         prediction_horizon=profiler.prediction_horizon,
     )
     lower_bound = profiler._directional_velocity_bound(
@@ -209,7 +210,7 @@ def test_braking_that_does_not_fit_the_horizon_raises(
     braking = JerkLimitedBraking(
         velocity_limit=degree_of_freedom.limits.upper.velocity,
         jerk_limit=degree_of_freedom.limits.upper.jerk,
-        time_step=config.control_dt,
+        time_step=config.control_time_step,
     )
 
     with pytest.raises(DegreeOfFreedomBrakingExceedsHorizonError) as error:
@@ -491,7 +492,9 @@ def _normalized_first_jerk_weight(jerk_limit: float) -> float:
     :return: Normalized weight of the first jerk decision variable.
     """
     config = _default_config()
-    jerk_decision_variable_bound = jerk_limit * config.control_dt.total_seconds() ** 2
+    jerk_decision_variable_bound = (
+        jerk_limit * config.control_time_step.total_seconds() ** 2
+    )
     return (
         config.horizon_weight_gain_scalar
         * JERK_WEIGHT
