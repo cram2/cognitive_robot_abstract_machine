@@ -24,7 +24,7 @@ def _resolve_domain(
 ) -> Optional[DomainType]:
     """
     Resolve a variable's domain: what :func:`variable` and
-    :meth:`~krrood.entity_query_language.query.match.Match.create_or_update_variable`
+    :meth:`~krrood.entity_query_language.query.match.Match._create_or_update_variable_`
     both range a variable's values over.
 
     :param type_: The type of the variable the domain is for.

@@ -117,7 +117,7 @@ class QueryBackend(ABC):
 
         :param expression: The expression about to be evaluated.
         """
-        if not (isinstance(expression, Match) and expression.has_cause_attributes):
+        if not (isinstance(expression, Match) and expression._has_cause_attributes_):
             return
         if self.raise_on_unresolvable_cause:
             raise BackendCannotEvaluateCause(expression, backend_type=type(self))
@@ -138,7 +138,7 @@ class SelectiveBackend(QueryBackend, ABC):
     """
 
     def evaluate(self, expression: Evaluable) -> Iterable[T]:
-        if isinstance(expression, Match) and expression.has_ellipsis_attributes:
+        if isinstance(expression, Match) and expression._has_ellipsis_attributes_:
             raise SelectiveBackendCannotResolveEllipsisMatch(expression)
         self._warn_or_raise_on_unresolved_cause_(expression)
         yield from self._evaluate(expression)
@@ -212,17 +212,17 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
         self._warn_or_raise_on_unresolved_cause_(expression)
         variables: Dict[str, Variable] = {}
-        for attribute_match in expression.matches_with_variables:
+        for attribute_match in expression._matches_with_variables_:
             self._check_attribute_match_is_suitable_for_generation(attribute_match)
             variables[attribute_match.name_from_variable_access_path] = (
                 self._convert_attribute_match_to_variable(attribute_match)
             )
 
-        expression.variable._update_domain_(
+        expression._variable_._update_domain_(
             self._generate_raw_results(expression, variables)
         )
 
-        filtered_results = entity(expression.variable)._quantify_(
+        filtered_results = entity(expression._variable_)._quantify_(
             expression._quantifier_type_
         )
         if expression._where_conditions_:
@@ -410,9 +410,11 @@ class ProbabilisticBackend(GenerativeBackend):
             truncated = parameters.resolve_conditioned_and_truncated_model(model)
 
         if truncated is None:
-            raise NoSolutionFound(expression.expression)
+            raise NoSolutionFound(expression._get_expression_())
 
-        number_of_samples = expression.expression._limit_ or self.number_of_samples
+        number_of_samples = (
+            expression._get_expression_()._limit_ or self.number_of_samples
+        )
 
         # sample and sort by log likelihood
         samples = truncated.sample(number_of_samples)
@@ -448,7 +450,7 @@ class ProbabilisticBackend(GenerativeBackend):
         :return: The resolved cause candidates and effect variable.
         """
         if not parameters.effect_variables_from_causes_effect:
-            raise NoCausesEffectConditionForCause(expression.expression)
+            raise NoCausesEffectConditionForCause(expression._get_expression_())
         if len(parameters.effect_variables_from_causes_effect) > 1:
             raise MultipleEffectVariablesNotSupported(
                 parameters.effect_variables_from_causes_effect
@@ -502,7 +504,7 @@ class ProbabilisticBackend(GenerativeBackend):
             confounder_variables,
         )
         if not scored_interventions:
-            raise NoSolutionFound(expression.expression)
+            raise NoSolutionFound(expression._get_expression_())
         return scored_interventions[0]
 
     @classmethod
@@ -586,7 +588,7 @@ class ProbabilisticBackend(GenerativeBackend):
         """
         parameters = UnderspecifiedParameters(expression)
         if not parameters.search_cause_variables:
-            raise NoCauseVariablesForRanking(expression.expression)
+            raise NoCauseVariablesForRanking(expression._get_expression_())
         model = self.model_registry.get_model(parameters)
         if not isinstance(model, CausalCircuit):
             raise DoRequiresCausalCircuitModel(model)

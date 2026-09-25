@@ -42,6 +42,7 @@ from krrood.parametrization.parameterizer import (
 from krrood.parametrization.random_events_translator import (
     WhereExpressionToRandomEventTranslator,
 )
+
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import Attribute
     from krrood.entity_query_language.query.match import Match
@@ -111,9 +112,7 @@ class Probability(ProbabilisticQuery):
         ).variables.keys()
         roots = {attribute._chain_root_ for attribute in referenced_attributes}
         if len(roots) != 1:
-            raise JointQueryAcrossClassesNotSupported(
-                {root._type_ for root in roots}
-            )
+            raise JointQueryAcrossClassesNotSupported({root._type_ for root in roots})
         [root_variable] = roots
 
         matching_count = entity(count(root_variable)).where(self.condition).first()
@@ -150,7 +149,7 @@ class Distribution(ProbabilisticQuery):
 
     Optional keyword-only ``marginalize_for`` narrows the result to a subset of the
     match's free variables (further marginalization), e.g.
-    ``distribution_of(match, marginalize_for=(match.variable.outcome,))``. Without it,
+    ``distribution_of(match, marginalize_for=(match.outcome,))``. Without it,
     every one of the match's free variables is kept.
     """
 
@@ -161,9 +160,21 @@ class Distribution(ProbabilisticQuery):
 
     marginalize_for: Tuple[Attribute, ...] = field(default_factory=tuple)
     """
-    The match's variables to narrow the result to. Empty keeps every one of the
-    match's free variables.
+    The match's variables to narrow the result to.
+
+    Empty keeps every one of the match's free variables.
     """
+
+    def __post_init__(self):
+        query = self.match._get_expression_()
+        self.marginalize_for = tuple(
+            (
+                query._rerooted_on_selection_(attribute)
+                if query._is_attribute_of_self_(attribute)
+                else attribute
+            )
+            for attribute in self.marginalize_for
+        )
 
     def _resolve_(self, model_registry: ModelRegistry) -> Any:
         parameters = UnderspecifiedParameters(self.match)
@@ -173,9 +184,7 @@ class Distribution(ProbabilisticQuery):
             raise NoSolutionFound(self)
 
         if self.marginalize_for:
-            selected = [
-                parameters.variables[v._name_] for v in self.marginalize_for
-            ]
+            selected = [parameters.variables[v._name_] for v in self.marginalize_for]
             result = result.marginal(selected)
             if result is None:
                 raise NoSolutionFound(self)

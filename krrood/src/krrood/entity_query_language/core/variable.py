@@ -247,11 +247,7 @@ class InstantiatedVariable(
         Set the child variables from the kwargs dictionary.
         """
         for k, v in self._kwargs_.items():
-            self._child_vars_[k] = (
-                v
-                if isinstance(v, SymbolicExpression)
-                else Literal(_value_=v, _name__=k)
-            )
+            self._child_vars_[k] = SymbolicExpression._as_operand_(v, k)
             self._child_var_id_name_map_[self._child_vars_[k]._id_] = k
 
     def _evaluate__(

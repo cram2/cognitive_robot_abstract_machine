@@ -31,6 +31,34 @@ from krrood.entity_query_language.factories import an
 robot_pattern = an(ExampleRobot)(name="R2D2")
 ```
 
+## A match reads like an instance
+
+A match stands for the instance it describes, so the operations you would write on that
+instance are available on the match itself and build symbolic expressions: reading an
+attribute, indexing, comparing and arithmetic.
+
+```python
+robot = an(ExampleRobot)(name="R2D2").from_(world.robots)
+
+robot.where(robot.battery >= 50)   # an attribute of the matched instance
+robot.where(robot == known_robot)  # the instance itself
+```
+
+The **first** parentheses after `an(Type)` always state the pattern, so a matched class
+whose instances are callable is called through a **second** pair - and an empty pattern
+still takes its own:
+
+```python
+adder = an(ExampleAdder)(offset=1)   # the pattern
+adder.where(adder(10) == 11)         # calling the matched instance
+
+an(ExampleAdder)()(10)               # no pattern, still called through the second pair
+```
+
+A second pattern is a mistake the language still catches: a matched class whose instances
+are not callable raises `CalledMatchMultipleTimes`, or `CalledMatchAfterResolution` once
+the match has been lowered.
+
 ## Binding to a domain with `.from_()`
 
 Chaining `.from_(domain)` after the call binds the match to a specific set of candidate objects.

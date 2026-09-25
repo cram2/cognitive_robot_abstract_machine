@@ -155,14 +155,14 @@ class MatchPlanner(Planner[Match, MatchPlan]):
         # Aggregate single-hop equalities by their object via the shared owner-grouping primitive;
         # conditions that are not such an equality (``_as_assignment`` → ``None``) are the remainder.
         owner_groups, other = group_by_owner(
-            list(match.conditions), self._as_assignment
+            list(match._conditions_), self._as_assignment
         )
         groups = [
             AttributeGroup(object=group.owner, assignments=group.items)
             for group in owner_groups
         ]
         return MatchPlan(
-            selection=match.variable,
+            selection=match._variable_,
             groups=groups,
             other_conditions=other,
             where_conditions=list(match._where_conditions_),

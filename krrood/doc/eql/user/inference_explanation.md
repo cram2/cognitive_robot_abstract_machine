@@ -106,9 +106,10 @@ prismatic_conn = variable(ExamplePrismaticConnection, prismatic_conns)
 fixed_conn = an(ExampleFixedConnection)(
     parent=prismatic_conn.child, child=handle_var
 ).from_(fixed_conns)
-# .expression lowers the Match to its selection Entity for symbolic attribute access
+# The match reads like an instance, so .parent / .child are symbolic attributes of
+# the query it stands for and carry its pattern
 drawers = inference(ExampleDrawer)(
-    container=fixed_conn.expression.parent, handle=fixed_conn.expression.child
+    container=fixed_conn.parent, handle=fixed_conn.child
 ).tolist()
 
 print(f"Inferred {len(drawers)} drawer(s): {drawers}")

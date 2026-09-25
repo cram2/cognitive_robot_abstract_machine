@@ -105,7 +105,7 @@ def _random_navigate_action(world: World):
         ),
         keep_joint_states=True,
     )
-    action.expression.limit(10)
+    action.limit(10)
     return action
 
 
