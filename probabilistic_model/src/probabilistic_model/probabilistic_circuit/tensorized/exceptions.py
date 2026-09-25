@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from typing_extensions import Type
+
 from krrood.exceptions import DataclassException
 
 
@@ -29,3 +31,25 @@ class NumberOfWeightsMismatchError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Pass exactly one weight per component."
+
+
+@dataclass
+class UndefinedCumulativeDistributionError(DataclassException, TypeError):
+    """
+    Exception raised when the cumulative distribution function of a layer over an
+    unordered variable is queried.
+    """
+
+    layer_type: Type
+    """
+    The type of the layer.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.layer_type.__name__} has no cumulative distribution function, "
+            f"since the states of its variable are not ordered."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Query the cumulative distribution only over ordered variables."
