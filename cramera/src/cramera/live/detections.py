@@ -105,22 +105,26 @@ class DetectedEvents:
     The event logger the demo's detectors write their events to.
     """
 
-    def knowledge(self) -> QueryableKnowledge:
+    def knowledge(self) -> list[QueryableKnowledge]:
         """
-        What a question about the detections may range over.
+        The query scopes supplied by the current detections.
 
         Read fresh on every call, so an answer names every moment detected up to now.
+
+        :return: The detected-events scope with its current record collection.
         """
-        return QueryableKnowledge(
-            scope=QueryScope.DETECTED_EVENTS,
-            domains=[
-                QueryDomain(
-                    EVENT_VARIABLE,
-                    DetectedEventRecord,
-                    self.records(),
-                )
-            ],
-        )
+        return [
+            QueryableKnowledge(
+                scope=QueryScope.DETECTED_EVENTS,
+                domains=[
+                    QueryDomain(
+                        EVENT_VARIABLE,
+                        DetectedEventRecord,
+                        self.records(),
+                    )
+                ],
+            )
+        ]
 
     def records(self) -> List[DetectedEventRecord]:
         """

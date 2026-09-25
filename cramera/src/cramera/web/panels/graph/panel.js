@@ -103,6 +103,7 @@ Panels.define('graph', function (root, bus) {
   const LIVE_ENDPOINT = { plan: '/plan', chart: '/chart', transforms: '/transforms' };
   let tab = DEFAULT_TAB;
   let view = null;            // the currently rendered payload
+  let statusStyles = {}, statusOrder = []; // retained for live and replay-generated views
   const base = {};            // tab -> payload as loaded from the server
   const shown = {};           // tab -> payload currently rendered (drill-downs)
   const stacks = {};          // tab -> parent payloads for the back button
@@ -119,9 +120,7 @@ Panels.define('graph', function (root, bus) {
   const STEP_KINDS = { ActionNode: 'action', AttachNode: 'attach', DetachNode: 'attach' };
   // conditions are internal checks that never execute — hidden from this view entirely
   const DETAIL_KINDS = { MotionNode: 'motion', MonitorNode: 'monitor' };
-  const IGNORE_KINDS = { ConditionNode: 1 };
   const STRUCT_KINDS = { SequentialNode: 1, ParallelNode: 1, UnderspecifiedNode: 1 };
-  const STEP_STATUS = { SUCCEEDED: 'done', DONE: 'done', RUNNING: 'running', FAILED: 'failed', CREATED: 'not started', NOT_STARTED: 'not started' };
   function stepWords(x) { return String(x || '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim().toLowerCase().replace(/^./, function (c) { return c.toUpperCase(); }); }
   function stepLabel(n) {
     if (n.kind === 'ConditionNode') return 'condition check';
@@ -142,8 +141,13 @@ Panels.define('graph', function (root, bus) {
   // with nothing to report shows no pill rather than an invented "not started"
   function stepPill(status) {
     if (!status) return '';
-    const key = status === 'NOT_STARTED' ? 'CREATED' : status;
-    return '<span class="sp sp-' + key + '">' + (STEP_STATUS[status] || String(status).toLowerCase()) + '</span>';
+    const style = statusStyles[status];
+    const label = String(style ? style.label : status).replace(/[&<>]/g, function (character) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[character];
+    });
+    return '<span class="sp"' +
+      (style ? ' style="--status-color:' + style.color + '"' : '') + '>' +
+      label + '</span>';
   }
   // flatten structural containers; keep action/attach as numbered steps, details collapsed
   function stepItems(node) {
@@ -155,34 +159,6 @@ Panels.define('graph', function (root, bus) {
     });
     return out;
   }
-  // status is reported on the leaf motion nodes, not on the action node shown as a step;
-  // conditions never execute (stay CREATED), so they are excluded. A node with real
-  // children derives purely from them (all done -> done), so a stale own "RUNNING" never
-  // keeps a step running once its motions have finished.
-  function derivedStatus(item) {
-    let anyRunning = false, anyFailed = false, seen = 0, done = 0, reported = false;
-    (function scan(it) {
-      (it.kids || []).forEach(function (c) {
-        if (IGNORE_KINDS[c.n.kind]) return;      // ignore conditions entirely
-        seen++;
-        const s = c.n.status;
-        if (s) reported = true;
-        if (s === 'RUNNING') anyRunning = true;
-        if (s === 'FAILED') anyFailed = true;
-        if (s === 'SUCCEEDED' || s === 'DONE') done++;
-        scan(c);
-      });
-    })(item);
-    if (anyFailed) return 'FAILED';
-    if (seen > 0) {                              // has real children: derive from them
-      if (!reported) return null;                // none of them reports one either
-      if (done === seen) return 'SUCCEEDED';
-      if (anyRunning || done > 0) return 'RUNNING';
-      return 'CREATED';
-    }
-    return item.n.status;                        // a leaf uses its own status
-  }
-
   const stepsCollapsed = {};   // node id -> true when the user collapsed that step (kept across live refreshes)
   let stepCollapsibleIds = [];  // ids of steps that have children, filled during render (for expand/collapse all)
   let lastStepsPayload = null;  // last plan payload rendered, so the all-buttons can re-render
@@ -221,17 +197,21 @@ Panels.define('graph', function (root, bus) {
         '<span class="st-tw">' + (hk ? (collapsed ? '▸' : '▾') : '') + '</span>' +
         '<span class="st-num">' + number + '</span>' +
         '<span class="st-name">' + stepLabel(n) + '</span>' +
-        '<span class="st-meta">' + (details.length ? '<span class="st-dc">' + details.length + ' detail' + (details.length > 1 ? 's' : '') + '</span>' : '') + stepPill(derivedStatus(item)) + '</span>' +
+        '<span class="st-meta">' + (details.length ? '<span class="st-dc">' + details.length + ' detail' + (details.length > 1 ? 's' : '') + '</span>' : '') + stepPill(n.status) + '</span>' +
         '</div>');
       if (hk) {
         html.push('<div class="st-kids"' + (collapsed ? ' style="display:none"' : '') + '>');
-        details.forEach(function (d) { html.push('<div class="st-leaf"><span class="st-name detail">' + stepLabel(d.n) + '</span><span class="st-meta">' + stepPill(d.n.status) + '</span></div>'); });
+        details.forEach(function (d) { html.push('<div class="st-leaf" data-id="' + d.n.id + '"><span class="st-name detail">' + stepLabel(d.n) + '</span><span class="st-meta">' + stepPill(d.n.status) + '</span></div>'); });
         var i = 1; sub.forEach(function (c) { walk(c, number + '.' + (i++), depth + 1); });
         html.push('</div>');
       }
     }
     var i = 1; top.forEach(function (c) { walk(c, String(i++), 0); });
     treeEl.innerHTML = html.join('');
+    treeEl.querySelectorAll('.st-row, .st-leaf').forEach(function (row) {
+      const detail = payload.details && payload.details[row.dataset.id];
+      row.title = detail ? detail.lines.join('\n') : '';
+    });
     // collapse/expand (persist the state so the 700ms live refresh keeps it)
     treeEl.querySelectorAll('.st-row.hk').forEach(function (r) {
       r.addEventListener('click', function () {
@@ -274,6 +254,8 @@ Panels.define('graph', function (root, bus) {
 
   function setView(payload) {
     view = payload;
+    if (payload.statusStyles) statusStyles = payload.statusStyles;
+    if (payload.statusOrder) statusOrder = payload.statusOrder;
     shown[tab] = payload;
     inGraphSet = {};
     payload.nodes.forEach(function (n) { inGraphSet[n.id] = 1; });
@@ -290,6 +272,7 @@ Panels.define('graph', function (root, bus) {
       layout: payload.layout, arrows: !!payload.arrows,
       // a view may name the statuses its legend lists, instead of taking the default
       statusLegend: payload.statusLegend || false,
+      statusStyles: statusStyles, statusOrder: statusOrder,
       key: (payload.key || tab) + '#' + stacks[tab].length,
     });
     updateNav();
@@ -454,10 +437,10 @@ Panels.define('graph', function (root, bus) {
       const label = shortenActionLabel(n.label || '?');
       const lines = ['a ' + n.kind,
                      'status: ' + n.status + (n.derived ? ' (derived from the motion statechart)' : '')];
-      if (n.arm) lines.push('arm: ' + n.arm);
+      if (n.description) lines.push(n.description);
       if (n.target) lines.push('target: ' + n.target);
       nodes.push({ id: n.id, label: n.label, group: n.group,
-                   kind: n.kind, parent: n.parent, target: n.target, arm: n.arm,
+                   kind: n.kind, parent: n.parent, target: n.target,
                    title: [label].concat(lines).join('\n'), status: n.status });
       details[n.id] = { label: label, group: n.group, lines: lines };
       if (n.parent) edges.push({ from: n.parent, to: n.id, kind: 'property', label: 'has step' });

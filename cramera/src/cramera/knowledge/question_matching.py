@@ -119,7 +119,7 @@ class QuestionMatcher:
 
     def match(self, text: str) -> QuestionMatchResult:
         """
-        The preset most similar to the asked question, or the no-match outcome.
+        Prefer an exact wording, then match by similarity or return no match.
 
         A wording is scored by how much of it the question covers, and each of its words
         counts for as much as it tells the wordings apart: the framing that every
@@ -129,9 +129,22 @@ class QuestionMatcher:
         :param text: The question as asked, in natural language.
         """
         asked = spellings_of(text)
+        asked_words = words_of(text)
+        for preset in self.presets:
+            if asked_words and any(
+                asked_words == words_of(wording)
+                for wording in self._wordings_of(preset)
+            ):
+                similarity = self._comparison(asked, text, preset)[0]
+                return QuestionMatchResult(
+                    preset=preset if similarity >= self.minimum_similarity else None,
+                    similarity=similarity,
+                )
         best: Optional[Preset] = None
         best_pair = (0.0, -1.0)
         for preset in self.presets:
+            if not self._wordings_of(preset):
+                continue
             pair = self._comparison(asked, text, preset)
             if pair > best_pair:
                 best, best_pair = preset, pair
@@ -191,9 +204,10 @@ class QuestionMatcher:
 
         :param preset: The preset to read.
         """
-        if preset.verbalization is None:
-            return [preset.text]
-        return [preset.text, preset.verbalization.text]
+        wordings = [] if preset.text is None else [preset.text]
+        if preset.verbalization is not None:
+            wordings.append(preset.verbalization.text)
+        return wordings
 
     def _comparison(
         self, asked: FrozenSet[str], text: str, preset: Preset

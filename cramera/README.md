@@ -34,9 +34,26 @@ observes execution; it offers no robot or plan editing controls.
 Use one live session per `CRAMERA_DATA` directory. Separate simultaneous sessions
 need separate data directories and ports.
 
+`cramera.config.CrameraConfig` holds the live session's robot-root publication key,
+world-discovery interval and placeholder object dimensions. Pass it as
+`Bridge(configuration=...)` when constructing a custom bridge for `LiveVisualization`.
+Each bridge gets its own configuration by default.
+
 The scene supports orbit, pan, zoom, robot following and click-to-inspect. The graph
 panel displays the plan, statecharts, robot kinematics and transforms. EQL results
 can highlight entities in the scene and replay a recorded time interval.
+
+Attaching a world automatically enables queries against the native `world` object
+in the EQL panel. All of its attributes and relationships are available, including
+bodies, connections, degrees of freedom, regions and custom semantic annotations.
+Collection presets come from the world's public list fields and properties; their
+labels use native EQL verbalization. Queries reflect subsequent world changes, and
+`world.` completion lists the available members. A demo can register existing
+providers with `register_query_source` to supply its own scopes, evaluation and
+queries. Each provider returns a list: `knowledge()` returns `QueryableKnowledge`
+objects, while `presets()` and optional `unlisted_presets()` return `Preset` objects.
+These callbacks run for each request, so bound methods can expose newly detected
+events and current preset definitions.
 
 The EQL editor executes trusted local Python statements against the loaded world.
 The Python server listens only on loopback and rejects requests from remote

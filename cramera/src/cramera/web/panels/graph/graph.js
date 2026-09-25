@@ -3,7 +3,7 @@
  *
  * A thin wrapper around vis-network used by panel.js: force layout for entity
  * graphs, hierarchical layout for trees (plan / statechart), execution status
- * drawn as node rings (see STATUS_STYLE), and in-place status re-colouring so
+ * drawn as node rings from the server's palette, and in-place status re-colouring so
  * live updates never re-run the layout. Exposed as window.Graph.
  * ==========================================================================*/
 (function () {
@@ -59,33 +59,24 @@
   };
 
   // %% execution status → node ring
-  // One palette for both status vocabularies: coraplex TaskStatus on plan nodes
-  // (CREATED/RUNNING/SUCCEEDED/FAILED/INTERRUPTED/PAUSE) and giskardpy
-  // LifeCycleValues on statechart nodes (NOT_STARTED/RUNNING/PAUSED/DONE/FAILED).
-  const STATUS_STYLE = {
-    RUNNING:     { c: '#ffb648', w: 16, text: 'running', legend: 'running' },
-    SUCCEEDED:   { c: '#4bd38a', w: 12, text: 'succeeded', legend: 'succeeded / done' },
-    DONE:        { c: '#4bd38a', w: 12, text: 'done', legend: 'succeeded / done' },
-    FAILED:      { c: '#ff6b8b', w: 16, text: 'failed', legend: 'failed' },
-    INTERRUPTED: { c: '#ff9d6b', w: 12, d: [9, 7], text: 'interrupted', legend: 'interrupted' },
-    PAUSE:       { c: '#5b8cff', w: 12, d: [9, 7], text: 'paused', legend: 'paused' },
-    PAUSED:      { c: '#5b8cff', w: 12, d: [9, 7], text: 'paused', legend: 'paused' },
-    CREATED:     { c: '#46557a', w: 7, d: [4, 5], legend: 'not started' },
-    NOT_STARTED: { c: '#46557a', w: 7, d: [4, 5], legend: 'not started' },
-    // transform freshness (cramera.live.transforms), on the frame a connection carries
-    MOVING:      { c: '#ffb648', w: 20, text: 'moving', legend: 'moving now' },
-    SETTLED:     { c: '#4bd38a', w: 16, text: 'settled', legend: 'moved just now' },
-    STALE:       { c: '#7f8db0', w: 10, d: [4, 5], legend: 'not written for a while' },
-    STATIC:      { c: '#46557a', w: 7, legend: 'cannot move (fixed)' },
+  // The graph payload derives lifecycle names and colors from Python.
+  let statusStyles = {}, statusOrder = [];
+  // Transform freshness (cramera.live.transforms), on the frame a connection carries.
+  const FRESHNESS_STYLE = {
+    MOVING:  { color: '#ffb648', width: 20, label: 'moving', show_label: true, legend: 'moving now' },
+    SETTLED: { color: '#4bd38a', width: 16, label: 'settled', show_label: true, legend: 'moved just now' },
+    STALE:   { color: '#7f8db0', width: 10, dashes: [4, 5], legend: 'not written for a while' },
+    STATIC:  { color: '#46557a', width: 7, legend: 'cannot move (fixed)' },
   };
-  const STATUS_LEGEND_ORDER = ['RUNNING', 'SUCCEEDED', 'FAILED', 'PAUSE', 'INTERRUPTED', 'CREATED'];
+
+  function statusStyle(status) { return statusStyles[status] || FRESHNESS_STYLE[status]; }
 
   // vis node patch that draws `status` as the node's border. The colour object is
   // written in full (background included): a per-node colour replaces the group's,
   // so a partial one would drop the group's fill.
   function statusPatch(id, baseLabel, status, group) {
     const gs = GROUP_STYLE[group] || GROUP_STYLE.ind;
-    const st = STATUS_STYLE[status];
+    const st = statusStyle(status);
     const patch = { id: id };
     if (!st) {
       patch.label = baseLabel;
@@ -96,12 +87,12 @@
       patch.shapeProperties = { borderDashes: false };
       return patch;
     }
-    patch.label = st.text ? baseLabel + '\n' + st.text : baseLabel;
-    patch.borderWidth = st.w;
-    patch.borderWidthSelected = st.w;   // vis would otherwise thin the ring to 2 on click
-    patch.color = { background: gs.color, border: st.c,
+    patch.label = st.show_label ? baseLabel + '\n' + st.label : baseLabel;
+    patch.borderWidth = st.width;
+    patch.borderWidthSelected = st.width;   // vis would otherwise thin the ring to 2 on click
+    patch.color = { background: gs.color, border: st.color,
                     highlight: { background: gs.ring, border: '#ffffff' } };
-    patch.shapeProperties = { borderDashes: st.d || false };
+    patch.shapeProperties = { borderDashes: st.dashes || false };
     return patch;
   }
 
@@ -149,6 +140,8 @@
 
   function build(data) {
     if (!el) throw new Error('Graph.attach(container, legend) must run before build()');
+    statusStyles = data.statusStyles || {};
+    statusOrder = data.statusOrder || [];
     const hier = data.layout === 'hier' || data.layout === 'hier-lr';
     viewKey = data.key || null;
     const cached = viewKey && !hier ? POS[viewKey] : null;
@@ -279,12 +272,14 @@
   // status vocabulary (transform freshness) passes it, the rest take the plan/chart one
   function statusLegend(order) {
     // rings, not filled dots — that is exactly how a status reads on a node
-    (Array.isArray(order) ? order : STATUS_LEGEND_ORDER).forEach(function (key) {
-      const st = STATUS_STYLE[key];
+    (Array.isArray(order) ? order : statusOrder).forEach(function (key) {
+      const st = statusStyle(key);
+      if (!st) return;
       const d = document.createElement('div');
       d.className = 'li';
-      d.innerHTML = '<span class="ring" style="border-color:' + st.c +
-        (st.d ? ';border-style:dashed' : '') + '"></span>' + st.legend;
+      d.innerHTML = '<span class="ring" style="border-color:' + st.color +
+        (st.dashes ? ';border-style:dashed' : '') + '"></span>';
+      d.appendChild(document.createTextNode(st.legend || st.label));
       legendEl.appendChild(d);
     });
   }

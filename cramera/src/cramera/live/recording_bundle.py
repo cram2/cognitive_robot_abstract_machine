@@ -9,23 +9,24 @@ from pathlib import Path
 
 from typing_extensions import Any, Dict, List, Optional
 
-from semantic_digital_twin.world_description.geometry import Box, Mesh
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 
 from cramera import paths
 from cramera.recording_fields import SceneField
-from cramera.body_geometry import measure_body, POSE_PRECISION, rounded_scale
+from cramera.body_geometry import POSE_PRECISION, rounded_scale
 from cramera.generated_json import write_json_atomically
 from cramera.knowledge.recorded_statecharts import (
     RecordedStatecharts,
     STATECHART_FILE,
 )
-from cramera.live.bridge import Bridge, ObjectCatalogEntry, ObjectKind
+from cramera.live.bridge import Bridge, ObjectCatalogEntry
 from cramera.live.live_bundle import bundle_world_models
 from cramera.live.recording import Recording, RecordedFrame, RecordingState
 from cramera.live.recording_segments import derive_segments
 from cramera.mesh_format import MeshFormat
-from cramera.onboard.bundle_urdf import BundledAssets
+from cramera.onboard.bundle_urdf import BundledAssets, companion_material_library
 
 MESH_SUBDIRECTORY = "recording"
 """
@@ -164,24 +165,21 @@ def _loose_object_entries(
         body = bridge.object_body(entry.key)
         if spawn is None or body is None:
             continue
-        entries.append(_object_entry(entry, body, spawn, output_directory))
+        entries.append(_object_entry(entry, spawn, output_directory))
     return entries
 
 
 def _object_entry(
-    entry: ObjectCatalogEntry, body: Body, spawn: List[float], output_directory: Path
+    entry: ObjectCatalogEntry, spawn: List[float], output_directory: Path
 ) -> Dict[str, Any]:
     """
-    One loose object's ``scene.json`` entry: an inline box, or a copied/exported mesh.
+    One loose object's ``scene.json`` entry, including its geometry and material
+    library.
 
-    A body with no shapes at all (:attr:`ObjectCatalogEntry.kind` is
-    :attr:`~cramera.live.bridge.ObjectKind.BOX`) reuses the catalog's own placeholder
-    size rather than touching the body's geometry, which does not exist to measure or
-    export.
+    An inline box must be centered and aligned with its body. Other local transforms are
+    retained in exported mesh geometry.
 
-    :param entry: The object's geometry-catalog entry, for its id, colour and — for a
-        shapeless body — its placeholder size.
-    :param body: The world body the object is published from.
+    :param entry: The object's publication identity, colour and native geometry.
     :param spawn: The object's pose in the recording's first frame.
     :param output_directory: Directory a mesh file is written into.
     """
@@ -189,60 +187,60 @@ def _object_entry(
         "id": entry.id,
         "key": entry.key,
         "spawn": spawn,
-        "color": entry.color,
+        "color": entry.color.to_hex(),
     }
-    if entry.kind is ObjectKind.BOX:
-        payload["box"] = list(entry.size)
-        payload["height"] = entry.size[2]
+    shapes = entry.shapes
+    if not shapes:
+        payload[SceneField.SHAPES] = []
+        payload["height"] = 0.0
         return payload
-    extent = measure_body(body)
-    if extent is not None:
-        payload["height"] = round(extent.z, POSE_PRECISION)
-    shapes = _body_shapes(body)
-    if len(shapes) == 1 and isinstance(shapes[0], Box):
+    payload["height"] = round(float(shapes.combined_mesh.extents[2]), POSE_PRECISION)
+    if (
+        len(shapes) == 1
+        and isinstance(shapes[0], Box)
+        and shapes[0].origin.equivalent(HomogeneousTransformationMatrix())
+    ):
         payload["box"] = rounded_scale(shapes[0].scale, POSE_PRECISION)
         return payload
-    payload["mesh"] = _write_object_mesh(body, entry.key, shapes, output_directory)
+    mesh_path = _write_object_mesh(entry.key, shapes, output_directory)
+    payload[SceneField.MESH] = mesh_path
+    material_library = companion_material_library(output_directory, mesh_path)
+    if material_library is not None:
+        payload[SceneField.MATERIAL_LIBRARY] = material_library
     return payload
 
 
-def _body_shapes(body: Body) -> List[Any]:
-    """
-    The body's shapes to render from: its visual ones, else its collision ones.
-
-    :param body: The body whose shapes are read.
-    """
-    for collection in (body.visual, body.collision):
-        if collection.shapes:
-            return list(collection.shapes)
-    return []
-
-
 def _write_object_mesh(
-    body: Body, key: str, shapes: List[Any], output_directory: Path
+    key: str, shapes: ShapeCollection, output_directory: Path
 ) -> str:
     """
     Write a loose object's geometry into the bundle and answer the path it is served at.
 
-    A single mesh shape backed by a real file is copied verbatim, with its side assets
-    (materials, textures); anything else is flattened into one OBJ exported from the
-    body's combined mesh.
+    A single untransformed mesh with unit scale is copied with its side assets
+    (materials, textures). Other geometry is exported from the collection's combined
+    mesh, which retains each shape's local transform and scale. Each export has its own
+    directory for generated materials and textures.
 
-    :param body: The body whose geometry is written.
     :param key: The object's catalog key, used as the written file's basename.
-    :param shapes: The body's shapes, as :func:`_body_shapes` selected them.
+    :param shapes: The native geometry selected for the object's catalog entry.
     :param output_directory: Directory the mesh is written into.
     """
     objects_directory = output_directory / "meshes" / "objects"
     objects_directory.mkdir(parents=True, exist_ok=True)
-    if len(shapes) == 1 and isinstance(shapes[0], Mesh):
-        source = shapes[0].filename
-        if source and Path(source).is_file():
-            destination = objects_directory / (key + Path(source).suffix)
+    if (
+        len(shapes) == 1
+        and isinstance(shapes[0], Mesh)
+        and shapes[0].origin.equivalent(HomogeneousTransformationMatrix())
+        and shapes[0].scale == Scale()
+    ):
+        source = shapes[0].local_file
+        if source.is_file():
+            destination = objects_directory / (key + source.suffix)
             assets = BundledAssets(bundle_root=str(output_directory))
-            if assets.copy(source, str(destination)):
-                assets.copy_side_assets(source, str(destination))
+            if assets.copy(str(source), str(destination)):
+                assets.copy_side_assets(str(source), str(destination))
                 return "meshes/objects/" + destination.name
-    destination = objects_directory / (key + MeshFormat.OBJ.value)
-    body.combined_mesh.export(str(destination))
-    return "meshes/objects/" + destination.name
+    destination = objects_directory / key / (Path(key).name + MeshFormat.OBJ.value)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shapes.combined_mesh.export(str(destination))
+    return destination.relative_to(output_directory).as_posix()

@@ -4,6 +4,8 @@ Native state history publication and recording boundaries.
 
 from __future__ import annotations
 
+import pytest
+
 from typing_extensions import TYPE_CHECKING
 
 from coraplex.plans.executables import MotionPlanHistory
@@ -12,7 +14,6 @@ from coraplex.plans.plan_node import MotionNode
 from coraplex.robot_plans.motions.base import BaseMotion
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 
-from cramera.live.bridge import TaskStatusName
 from cramera.live.recording import Recording
 from cramera.live.visualization import (
     LiveVisualization,
@@ -35,6 +36,40 @@ class TestMotionHistoryPublication:
     History subscriptions publish motion changes for the plan's lifetime.
     """
 
+    @pytest.mark.parametrize(
+        "outcome",
+        [
+            LifeCycleValues.SUCCEEDED,
+            LifeCycleValues.FAILED,
+            LifeCycleValues.INTERRUPTED,
+        ],
+    )
+    def test_native_history_owns_pause_completion_and_reset(
+        self, motion_execution: MotionExecution, outcome: LifeCycleValues
+    ) -> None:
+        """
+        Publish the native motion lifecycle throughout a complete attempt.
+
+        :param motion_execution: The plan, chart, and subscriber to exercise.
+        :param outcome: The terminal outcome recorded before resetting the motion.
+        """
+        motion_execution.plan.node_callbacks.append(motion_execution.callback)
+        MotionPlanHistory(
+            statechart=motion_execution.chart,
+            motion_mappings={motion_execution.motion: motion_execution.chart.nodes[0]},
+        )
+        for state in (
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.PAUSED,
+            outcome,
+            LifeCycleValues.NOT_STARTED,
+        ):
+            motion_execution.record(state)
+            assert motion_execution.motion.status is state
+            assert [
+                node.status for node in motion_execution.bridge.plan_state.nodes
+            ] == [motion_execution.plan.root.status, state]
+
     def test_motion_start_publishes_the_bound_chart(
         self, motion_execution: MotionExecution
     ) -> None:
@@ -52,6 +87,8 @@ class TestMotionHistoryPublication:
     ) -> None:
         """
         A recorded native state change refreshes both execution views.
+
+        :param motion_execution: The plan, chart, and observing callback.
         """
         motion_execution.callback.on_start(motion_execution.motion)
         motion_execution.plan.root.status = LifeCycleValues.RUNNING
@@ -62,7 +99,7 @@ class TestMotionHistoryPublication:
             LifeCycleValues.RUNNING.name
         )
         assert motion_execution.bridge.plan_state.nodes[0].status == (
-            TaskStatusName.RUNNING
+            LifeCycleValues.RUNNING
         )
 
     def test_merged_motions_subscribe_to_their_shared_history_once(
@@ -85,6 +122,8 @@ class TestMotionHistoryPublication:
     ) -> None:
         """
         A reset chart restores both plan entries to their unstarted state.
+
+        :param motion_execution: The plan, chart, and observing callback.
         """
         motion_execution.plan.node_callbacks.append(motion_execution.callback)
         MotionPlanHistory(
@@ -97,8 +136,8 @@ class TestMotionHistoryPublication:
         motion_execution.record(LifeCycleValues.NOT_STARTED)
 
         assert [node.status for node in motion_execution.bridge.plan_state.nodes] == [
-            TaskStatusName.CREATED,
-            TaskStatusName.CREATED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
         ]
 
     def test_root_completion_removes_history_subscriptions(

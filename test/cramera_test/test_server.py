@@ -10,8 +10,11 @@ import urllib.request
 
 import pytest
 
+from giskardpy.motion_statechart.data_types import LifeCycleValues
+
 from cramera import paths
 from cramera.knowledge.detected_events import SceneField
+from cramera.knowledge.life_cycle_style import StatusPresentationField
 from cramera.paths import RECORDING_SCENE_NAME
 from cramera.live.recording_storage import SceneDestination
 
@@ -348,6 +351,33 @@ class TestRecordingApi:
 
 
 class TestApi:
+    @pytest.mark.parametrize(
+        "route",
+        [
+            "/api/knowledge",
+            "/api/knowledge/view?name=plan",
+            "/api/knowledge/view?name=chart",
+        ],
+    )
+    def test_graph_views_publish_the_native_lifecycle_palette(
+        self, server: str, route: str
+    ) -> None:
+        """
+        The overview and replay tabs supply styles without a live bridge.
+
+        :param server: The running fixture server.
+        :param route: The graph view to request.
+        """
+        payload = get_json(server + route)
+
+        assert payload[StatusPresentationField.ORDER] == [
+            state.name for state in LifeCycleValues
+        ]
+        for state in LifeCycleValues:
+            style = payload[StatusPresentationField.STYLES][state.name]
+            assert style["color"] == state.color.to_hex()
+            assert style["label"] == state.name.lower().replace("_", " ")
+
     def test_knowledge_overview(self, server):
         pytest.importorskip("krrood")
         payload = get_json(server + "/api/knowledge")

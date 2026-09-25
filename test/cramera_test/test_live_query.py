@@ -24,7 +24,7 @@ from cramera.knowledge.queryable_knowledge import (  # noqa: E402
     UnknownQueryScope,
 )
 from cramera.live.bridge import Bridge  # noqa: E402
-from cramera.live.query import LiveQuerySource, NoQuerySourceRegistered  # noqa: E402
+from cramera.live.query import NoQuerySourceRegistered  # noqa: E402
 
 from .dataset.queryable_records import NamedRecord  # noqa: E402
 
@@ -42,7 +42,7 @@ class AnswersFromStorage(QueryEvaluation):
 
 
 @dataclass
-class GrowingRecordSource(LiveQuerySource):
+class GrowingRecordSource:
     """
     A source whose records keep arriving, the way a demo's results do while it runs,
     alongside the ones its finished runs already stored.
@@ -104,15 +104,21 @@ class GrowingRecordSource(LiveQuerySource):
 
 
 @dataclass
-class CurrentStateOnlySource(LiveQuerySource):
+class CurrentStateOnlySource:
     """
     A demo that keeps no record of its finished runs, so only its present is queryable.
     """
 
     def title(self) -> str:
+        """
+        Name the current-state-only query configuration.
+        """
         return "state-only demo"
 
     def knowledge(self) -> List[QueryableKnowledge]:
+        """
+        Provide one current-state scope with an empty native record domain.
+        """
         return [
             QueryableKnowledge(
                 scope=QueryScope.CURRENT_STATE,
@@ -121,6 +127,9 @@ class CurrentStateOnlySource(LiveQuerySource):
         ]
 
     def presets(self) -> List[Preset]:
+        """
+        Offer no predefined queries for this configuration.
+        """
         return []
 
 
@@ -142,8 +151,16 @@ def source() -> GrowingRecordSource:
 
 @pytest.fixture()
 def bridge(source) -> Bridge:
+    """
+    Register current and stored records with their visible and unlisted presets.
+
+    :param source: The configuration supplying record domains and query evaluation.
+    :return: The bridge answering questions about the supplied records.
+    """
     live_bridge = Bridge()
-    live_bridge.register_query_source(source)
+    live_bridge.register_query_source(
+        source.knowledge, source.title(), source.presets, source.unlisted_presets
+    )
     return live_bridge
 
 
@@ -165,6 +182,46 @@ class TestQueryingARegisteredSource:
         result = bridge.run_query("an(entity(record))")
 
         assert [row["__entity__"] for row in result.rows] == ["first", "second"]
+
+    def test_queries_refresh_replaced_domain_collections(
+        self, bridge: Bridge, source: GrowingRecordSource
+    ) -> None:
+        """
+        A provider exposes a replacement collection on the next query.
+
+        :param bridge: The bridge holding the source's knowledge provider.
+        :param source: The source replacing its current records.
+        """
+        [preset, _] = source.presets()
+        bridge.run_query(preset.code)
+        source.records = [make_record("replacement")]
+
+        answer = bridge.run_query(preset.code)
+
+        assert [row["__entity__"] for row in answer.rows] == [source.records[0].name]
+
+    def test_preset_providers_refresh_visible_and_unlisted_queries(
+        self, source: GrowingRecordSource
+    ) -> None:
+        """
+        Mutable preset collections remain current through their list providers.
+
+        :param source: The source supplying query scopes and valid query definitions.
+        """
+        listed: list[Preset] = []
+        unlisted: list[Preset] = []
+        bridge = Bridge()
+        bridge.register_query_source(
+            source.knowledge, source.title(), listed.copy, unlisted.copy
+        )
+        assert bridge.query_presets() == []
+        listed.extend(source.presets())
+        unlisted.extend(source.unlisted_presets())
+
+        assert [preset.text for preset in bridge.query_presets()] == [
+            preset.text for preset in listed
+        ]
+        assert bridge.match_question(unlisted[0].text).preset is unlisted[0]
 
     def test_the_presets_are_the_sources_own(self, bridge):
         assert [preset.text for preset in bridge.query_presets()] == [
@@ -247,8 +304,14 @@ class TestAskedQuestions:
         assert result.preset.verbalization is None
 
     def test_a_source_writing_none_out_is_matched_against_its_buttons(self):
+        """
+        A configuration with no presets cannot match an unlisted question.
+        """
         live_bridge = Bridge()
-        live_bridge.register_query_source(CurrentStateOnlySource())
+        source = CurrentStateOnlySource()
+        live_bridge.register_query_source(
+            source.knowledge, source.title(), source.presets
+        )
 
         assert not live_bridge.match_question("give me all beta samples").matched
 
@@ -264,6 +327,10 @@ class TestAskedQuestions:
 
 # %% two bodies of knowledge, asked apart
 class TestQueryingByScope:
+    """
+    Each query scope selects its own domains, vocabulary and evaluation.
+    """
+
     def test_the_current_state_is_answered_from_the_running_demo(self, bridge):
         result = bridge.run_query("an(entity(record))", QueryScope.CURRENT_STATE)
 
@@ -285,8 +352,14 @@ class TestQueryingByScope:
             bridge.run_query("an(entity(stored_record))", QueryScope.CURRENT_STATE)
 
     def test_a_scope_the_source_does_not_offer_is_refused(self):
+        """
+        A missing registered scope raises the native unknown-scope failure.
+        """
         live_bridge = Bridge()
-        live_bridge.register_query_source(CurrentStateOnlySource())
+        source = CurrentStateOnlySource()
+        live_bridge.register_query_source(
+            source.knowledge, source.title(), source.presets
+        )
 
         with pytest.raises(UnknownQueryScope):
             live_bridge.run_query("an(entity(record))", QueryScope.EPISODIC_MEMORY)

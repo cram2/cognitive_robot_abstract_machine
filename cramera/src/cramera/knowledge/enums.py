@@ -9,6 +9,18 @@ from enum import StrEnum
 from typing_extensions import Optional, Tuple, Union
 
 
+# %% viewer entity identifiers
+class SceneEntityPrefix(StrEnum):
+    """
+    Prefixes distinguishing viewer entity identifiers from plain object names.
+    """
+
+    URDF_LINK = "urdf:"
+    """
+    A robot-model link addressed by the name stored in its URDF.
+    """
+
+
 class JointRegion(StrEnum):
     """
     Which region of the robot/scene a joint belongs to, as inferred from its name.

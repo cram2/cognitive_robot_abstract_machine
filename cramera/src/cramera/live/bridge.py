@@ -6,6 +6,8 @@ import hashlib
 import threading
 import time
 import urllib.parse
+from collections.abc import Callable
+from contextlib import contextmanager, ExitStack
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from http.server import ThreadingHTTPServer
@@ -18,23 +20,29 @@ from typing_extensions import (
     FrozenSet,
     List,
     Optional,
-    Protocol,
-    runtime_checkable,
-    Tuple,
     TYPE_CHECKING,
 )
+from coraplex.plans.plan_node import DesignatorNode
 from giskardpy.motion_statechart.data_types import LifeCycleValues
+from krrood.entity_query_language.evaluable import Evaluable
+from krrood.entity_query_language.factories import inference
+from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.world import World
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from cramera.logging_setup import get_logger
+from cramera.config import CrameraConfig
 from cramera.body_geometry import NumericPose, POSE_PRECISION, rounded_pose
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
-from cramera.knowledge.enums import PlanNodeGroup
+from semantic_digital_twin.world_description.geometry import Color, Mesh
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import WorldEntity
+from cramera.knowledge.enums import PlanNodeGroup, SceneEntityPrefix
 from cramera.live.chart_observer import ChartObserver
 from cramera.live.chart_structure import (
     ChartSnapshot,
@@ -48,20 +56,23 @@ from cramera.knowledge.queryable_knowledge import (
     UnknownQueryScope,
 )
 from cramera.knowledge.question_matching import QuestionMatcher, QuestionMatchResult
-from cramera.knowledge.workspace_classes import WorkspaceClassIndex
-from cramera.live.query import LiveQuerySource, NoQuerySourceRegistered
+from cramera.live.query import NoQuerySourceRegistered
 from cramera.live.markers import MarkerEntry, MarkerStore
-from cramera.live.shape_catalog import ShapeEntry, served_mesh_file, shape_entry
+from cramera.live.shape_catalog import (
+    served_mesh_file,
+    shape_entry,
+)
 from cramera.live.transforms import TransformGraph, TransformSnapshot
 from cramera.world_objects import WorldObjects
-from cramera.palette import ObjectPalette
 from cramera.robot_parts import RobotPartAnnotation
+from cramera.recording_fields import SceneField
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from coraplex.plans.designator import Designator
     from coraplex.plans.plan import Plan
     from coraplex.plans.plan_node import MotionNode, PlanNode
     from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-    from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.world_entity import Body, Connection
 
     from cramera.live.recording import Recording
@@ -70,191 +81,63 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class TaskStatusName(StrEnum):
-    """
-    The status vocabulary the viewer styles plan and statechart nodes with.
-
-    Keeps the recorded plan vocabulary stable while translating native lifecycle values.
-    """
-
-    CREATED = "CREATED"
-    RUNNING = "RUNNING"
-    SUCCEEDED = "SUCCEEDED"
-    FAILED = "FAILED"
-    INTERRUPTED = "INTERRUPTED"
-    PAUSE = "PAUSE"
-
-    @classmethod
-    def of_native_name(cls, name: str) -> TaskStatusName:
-        """Translate a native lifecycle name into the recorded plan vocabulary.
-
-        :param name: A native lifecycle or recorded status name.
-        :return: Its viewer status.
-        """
-        if name == LifeCycleValues.NOT_STARTED.name:
-            return cls.CREATED
-        if name == LifeCycleValues.PAUSED.name:
-            return cls.PAUSE
-        return cls(name)
-
-    @classmethod
-    def _precedence(cls) -> Tuple[TaskStatusName, ...]:
-        """
-        The statuses from lowest to highest precedence.
-        """
-        return (
-            cls.CREATED,
-            cls.SUCCEEDED,
-            cls.PAUSE,
-            cls.RUNNING,
-            cls.INTERRUPTED,
-            cls.FAILED,
-        )
-
-    @property
-    def rank(self) -> int:
-        """
-        Precedence when a plan node's status is aggregated from its children: the higher
-        rank wins.
-        """
-        return self._precedence().index(self)
-
-    @classmethod
-    def rank_of(cls, status: str) -> int:
-        """
-        The rank of a status name, or the lowest rank for one this enum does not know.
-
-        :param status: A status name as reported by coraplex or the statechart.
-        """
-        if status not in cls._value2member_map_:
-            return 0
-        return cls(status).rank
-
-
-ROBOT_BASE_KEY = "__base__"
-"""
-Key under which the robot's root body is published, instead of as a loose object.
-"""
-
-
-@runtime_checkable
-class DescribesAnAction(Protocol):
-    """
-    A plan node carrying the designator that describes what it does.
-
-    Structural, because only some coraplex node types have a designator at all.
-    """
-
-    designator: Any
-
-
-@runtime_checkable
-class NamesAWorldEntity(Protocol):
-    """
-    Anything carrying a world-entity name, such as a body a designator refers to.
-    """
-
-    name: Any
-
-
-ALLOWED_CONSTRAINT_GOALS = (
-    "VectorsAligned",
-    "PointingAt",
-    "JointPositionReached",
-    "HeightMonitor",
-    "DistanceMonitor",
-)
-"""giskardpy goal/monitor class names the plan view may request (verified in
-``giskardpy/motion_statechart/monitors``)."""
-
-
-@dataclass
-class MotionNodeProgress:
-    """
-    What the bridge knows about one plan node's execution.
-
-    Holds the node itself so the identity key derived from it stays unique for as long
-    as the entry lives.
-    """
-
-    node: PlanNode
-    """
-    The plan node this progress belongs to.
-    """
-
-    status: Optional[TaskStatusName] = None
-    """
-    The node's last observed execution status, else None.
-    """
-
-
 # %% viewer payload shapes
-class ObjectKind(StrEnum):
-    """
-    How a loose object's geometry is served to the viewer.
-    """
-
-    MESH = "mesh"
-    BOX = "box"
-    SHAPES = "shapes"
-
-
 @dataclass(frozen=True)
 class ObjectCatalogEntry:
     """
-    One loose object's geometry-catalog entry, as the viewer spawns it.
+    One loose object's native geometry and publication identity.
     """
 
     key: str
     """
-    Mesh basename this object is published under.
+    Published key shared by this object's geometry and pose snapshots.
     """
 
-    id: str
+    shapes: ShapeCollection
     """
-    Stem of :attr:`key`, used as the object's display id.
-    """
-
-    kind: ObjectKind
-    """
-    Whether the viewer renders a served mesh or a placeholder box.
+    The body's native visual geometry, or collision geometry when visuals are absent.
     """
 
-    color: str
-    """
-    Colour assigned to this object from the shared palette.
-    """
+    @property
+    def id(self) -> str:
+        """Return the display identifier derived from the published key."""
+        return Path(self.key).stem
 
-    mesh: Optional[str] = None
-    """
-    URL the mesh is served from, set only when :attr:`kind` is ``MESH``.
-    """
+    @property
+    def color(self) -> Color:
+        """Return the first shape's native color, or native white without geometry."""
+        return self.shapes[0].color if self.shapes else Color()
 
-    format: Optional[str] = None
-    """
-    Mesh file extension, set only when :attr:`kind` is ``MESH``.
-    """
+    def to_payload(self) -> dict[str, Any]:
+        """Describe native shapes with the browser's primitive and asset fields.
 
-    size: Optional[List[float]] = None
-    """
-    Box extent in metres, set only when :attr:`kind` is ``BOX``.
-    """
-
-    shapes: Optional[List[ShapeEntry]] = None
-    """
-    The body's shapes, set only when :attr:`kind` is ``SHAPES``.
-    """
+        :return: The object's geometry payload.
+        """
+        entries = []
+        for shape in self.shapes:
+            mesh_url = (
+                "/mesh?key=" + urllib.parse.quote(shape.filename, safe="")
+                if isinstance(shape, Mesh) and served_mesh_file(shape) is not None
+                else None
+            )
+            entries.append(asdict(shape_entry(shape, mesh_url)))
+        return {
+            SceneField.KEY: self.key,
+            SceneField.ID: self.id,
+            SceneField.COLOR: self.color.to_hex(),
+            SceneField.SHAPES: entries,
+        }
 
 
 @dataclass
 class PlanNodeEntry:
     """
-    One plan node's serialized state, mutated in place as its status resolves.
+    One plan node's native lifecycle state and display metadata.
     """
 
     id: str
     """
-    Identity-based id of this node (``p`` + ``id(node)``).
+    Identity-based id of this node (``plan_node_`` + ``id(node)``).
     """
 
     parent: Optional[str]
@@ -277,21 +160,19 @@ class PlanNodeEntry:
     Designator class name if this node describes an action, else :attr:`kind`.
     """
 
-    status: str
+    status: LifeCycleValues
     """
-    This node's status: its own if it reports one, else a derived one.
-
+    The native lifecycle state reported by this plan node.
     """
 
     derived: bool
     """
-    Whether :attr:`status` was derived (from the statechart or children) rather than
-    the node's own reported status.
+    Whether the published status was derived; native plan states are reported directly.
     """
 
-    arm: Optional[str] = None
+    description: Optional[str] = None
     """
-    Arm the node's designator names, if any.
+    Native verbalization of the designator and its parameters, if present.
     """
 
     target: Optional[str] = None
@@ -299,9 +180,27 @@ class PlanNodeEntry:
     Published object the node's designator refers to, if any.
     """
 
+    def to_payload(self) -> Dict[str, Any]:
+        """Serialize the node with its native lifecycle name.
+
+        :return: The node fields with the lifecycle represented as text.
+        """
+        payload = asdict(self)
+        payload[PlanTreeField.STATUS] = self.status.name
+        return payload
+
 
 class PlanTreeField(StrEnum):
-    """Fields joining nodes in a recorded plan hierarchy."""
+    """Fields describing the published plan hierarchy and node lifecycle."""
+
+    STATUS = "status"
+    """The native lifecycle name of a plan node."""
+
+    SIGNATURE = "signature"
+    """The plan's node identities in traversal order."""
+
+    NODES = "nodes"
+    """The flattened plan entries with their parent references."""
 
     CHILDREN = "children"
     """Nested plan steps in execution order."""
@@ -328,7 +227,10 @@ class PlanSnapshot:
         The snapshot plus the legend its groups are drawn with, so the viewer does not
         keep its own copy of the plan-node colour table.
         """
-        payload = asdict(self)
+        payload = {
+            PlanTreeField.SIGNATURE: self.signature,
+            PlanTreeField.NODES: [node.to_payload() for node in self.nodes],
+        }
         payload["legend"] = [
             {"group": group.value, "label": group.label}
             for group in PlanNodeGroup.legend()
@@ -341,7 +243,8 @@ class PlanSnapshot:
         :return: Plan roots containing their children and action metadata.
         """
         entries = {
-            node.id: {**asdict(node), PlanTreeField.CHILDREN: []} for node in self.nodes
+            node.id: {**node.to_payload(), PlanTreeField.CHILDREN: []}
+            for node in self.nodes
         }
         roots = []
         for node in self.nodes:
@@ -443,8 +346,7 @@ class BridgeStatus:
 
     query: bool
     """
-    Whether a running demo offered its state to be questioned (see
-    :meth:`Bridge.register_query_source`).
+    Whether an attached world or an explicit source can answer live queries.
     """
 
     sequence_number: int
@@ -491,15 +393,8 @@ class Bridge:
     snapshots without changing the world.
     """
 
-    REBIND_INTERVAL_SECONDS: ClassVar[float] = 3.0
-    """
-    How long a world binding stays fresh before bodies are re-discovered.
-    """
-
-    DEFAULT_OBJECT_SIZE: ClassVar[Tuple[float, float, float]] = (0.06, 0.06, 0.12)
-    """
-    Fallback size for an object whose shapes carry no scale, in metres.
-    """
+    configuration: CrameraConfig = field(default_factory=CrameraConfig, kw_only=True)
+    """Publication keys, discovery timing and fallback geometry for this session."""
 
     world: Optional[World] = None
     """
@@ -546,12 +441,39 @@ class Bridge:
     The newest transform-graph snapshot (see :mod:`cramera.live.transforms`).
     """
 
-    query_source: Optional[LiveQuerySource] = None
+    query_knowledge: Callable[[], list[QueryableKnowledge]] | None = None
     """
-    What the running demo offers to be queried about, once it registers itself.
+    Provider of current query scopes overriding the attached world's default knowledge.
     """
 
-    _query_lock: threading.Lock = field(default_factory=threading.Lock)
+    _query_title: str = field(default="", init=False)
+    """
+    Display title of explicitly registered query knowledge.
+    """
+
+    _query_presets: Callable[[], list[Preset]] = field(default=list, init=False)
+    """
+    Provider of visible presets for explicitly registered query knowledge.
+    """
+
+    _unlisted_query_presets: Callable[[], list[Preset]] = field(
+        default=list, init=False
+    )
+    """
+    Provider of additional registered presets recognized through spoken questions.
+    """
+
+    _query_attachment: int | None = field(default=None, init=False, repr=False)
+    """
+    Model revision identifying the attachment that owns automatic world queries.
+    """
+
+    _query_revision: int = field(default=0, init=False, repr=False)
+    """
+    Registration revision used to keep knowledge and presets from one configuration.
+    """
+
+    _query_lock: threading.RLock = field(default_factory=threading.RLock)
     """
     Serializes queries: EQL evaluation is not written to run twice at once, and the
     bridge answers several viewers from its own thread pool.
@@ -573,12 +495,12 @@ class Bridge:
 
     _bodies: Dict[str, Body] = field(default_factory=dict)
     """
-    Published bodies by mesh key; :data:`ROBOT_BASE_KEY` is the robot root.
+    Published bodies by mesh key, including the configured robot root key.
     """
 
     _last_bind_time: float = 0.0
     """
-    Timestamp of the last world discovery (see :attr:`REBIND_INTERVAL_SECONDS`).
+    Timestamp of the last world discovery.
     """
 
     _lock: threading.Lock = field(default_factory=threading.Lock)
@@ -589,9 +511,9 @@ class Bridge:
     bundle_lock: threading.RLock = field(default_factory=threading.RLock)
     """Serializes this session's geometry and recording exports."""
 
-    _mesh_serve: Dict[str, str] = field(default_factory=dict)
+    _mesh_serve: Dict[str, Mesh] = field(default_factory=dict)
     """
-    Object key → absolute mesh path served via the ``/mesh`` endpoint.
+    Native mesh sources allowed through the ``/mesh`` endpoint, keyed by filename.
     """
 
     _plan: Optional[Plan] = None
@@ -607,24 +529,6 @@ class Bridge:
     _chart_title: str = ""
     """
     Name of the action whose motion group is executing.
-    """
-
-    _ever_running: set = field(default_factory=set)
-    """
-    Node identities whose callback-derived progress retains completion after becoming
-    idle.
-    """
-
-    _motion_nodes: Dict[int, MotionNodeProgress] = field(default_factory=dict)
-    """
-    Execution progress per plan node, keyed by the node's :func:`id`.
-
-    Identity, not equality: coraplex's ``DesignatorNode`` compares by field value, so
-    two structurally identical steps of one plan would otherwise share a status. The
-    :class:`MotionNodeProgress` entry pins the node itself, which keeps CPython from
-    handing its ``id`` to a later object.
-
-    Reset whenever a new plan starts performing, which bounds it to one plan's nodes.
     """
 
     _model_revision: int = 0
@@ -683,58 +587,53 @@ class Bridge:
     """
 
     # %% what the visualization drives
-    def attach(self, world: World) -> None:
+    def attach(self, world: World) -> int:
         """
-        Bind to the world a demo is executing and publish its geometry catalog.
+        Publish a world's geometry and provide its default live query source.
 
-        :param world: The world the demo is executing in.
+        :param world: The world to visualize and query.
+        :return: The revision identifying this attachment's query ownership.
         """
         self.world = world
         self._model_revision += 1
         self.bind()
         self._refresh_bundle_signature()
+        self._query_attachment = self._model_revision
         logger.info(
             "attached to world (robot=%s, %d joints)",
             type(self.robot).__name__ if self.robot else "?",
             len(self._connections),
         )
+        return self._query_attachment
+
+    def release_world_queries(self, attachment: int) -> None:
+        """
+        Release the automatic source if it still belongs to the given attachment.
+
+        Explicit sources and sources from newer attachments remain registered.
+
+        :param attachment: The revision returned when the world was attached.
+        """
+        if self._query_attachment == attachment:
+            self._query_attachment = None
 
     def observe_motion_started(self, node: MotionNode) -> None:
         """
-        Record that a plan node's motion started running.
+        Name the executing chart from its motion's parent action.
 
         :param node: The node whose motion started.
         """
-        self._motion_nodes[id(node)] = MotionNodeProgress(
-            node=node, status=TaskStatusName.RUNNING
-        )
         action_node = node.parent_action_node
-        if action_node is not None and action_node.designator is not None:
-            self._chart_title = type(action_node.designator).__name__
-
-    def observe_motion_ended(self, node: MotionNode) -> None:
-        """
-        Pin the final status of a finished motion node and republish the plan.
-
-        :param node: The node whose motion ended.
-        """
-        self._motion_nodes[id(node)] = MotionNodeProgress(
-            node=node, status=TaskStatusName.of_native_name(node.status.name)
-        )
-        self.snapshot_plan()
+        if action_node is not None:
+            self._chart_title = type(action_node.action).__name__
 
     def begin_plan(self, plan: Plan) -> None:
         """
         Record the plan that started performing and publish its tree.
 
-        Drops the previous plan's per-node progress, so a long-running process does not
-        accumulate entries for nodes that no longer exist.
-
         :param plan: The plan that started performing.
         """
         self._plan = plan
-        self._motion_nodes.clear()
-        self._ever_running.clear()
         self.snapshot_plan()
 
     def observe_model_change(self) -> None:
@@ -916,23 +815,51 @@ class Bridge:
         The geometry catalog the viewer spawns live objects from.
         """
         with self._lock:
-            return [asdict(entry) for entry in self.object_metadata]
+            return [entry.to_payload() for entry in self.object_metadata]
 
     def object_keys(self) -> List[str]:
         """
         Mesh keys of the published loose objects, excluding the robot root.
         """
         with self._lock:
-            return [key for key in self._bodies if key != ROBOT_BASE_KEY]
+            return [
+                key for key in self._bodies if key != self.configuration.robot_base_key
+            ]
+
+    def _resolve_highlights(self, names: list[str]) -> list[str]:
+        """Map native body names to their existing object or robot-link identifiers.
+
+        :param names: Canonical entity names and existing viewer identifiers.
+        :return: Sorted unique highlight identifiers, preserving unknown names.
+        """
+        identifiers = (
+            {
+                name: SceneEntityPrefix.URDF_LINK + name
+                for name in WorldObjects(self.world, self.robot).robot_body_names()
+            }
+            if self.world is not None
+            else {}
+        )
+        with self._lock:
+            identifiers.update(
+                {
+                    str(body.name): key
+                    for key, body in self._bodies.items()
+                    if key != self.configuration.robot_base_key
+                }
+            )
+        return sorted({identifiers.get(name, name) for name in names})
 
     def mesh_path(self, key: str) -> Optional[str]:
         """
-        Absolute path of an object's mesh file, or None if it is not served.
+        Resolved local file of a registered mesh source, or None if it is not served.
 
-        :param key: Mesh key of the object, as published in the geometry catalog.
+        :param key: Native mesh filename published in the geometry catalog.
+        :return: The allowed mesh's existing local file, or None when unavailable.
         """
         with self._lock:
-            return self._mesh_serve.get(key)
+            mesh = self._mesh_serve.get(key)
+        return served_mesh_file(mesh) if mesh is not None else None
 
     def object_body(self, key: str) -> Optional[Body]:
         """
@@ -995,11 +922,16 @@ class Bridge:
             return BridgeStatus(
                 running=self.world is not None,
                 robot=type(self.robot).__name__ if self.robot else None,
-                objects=[key for key in self._bodies if key != ROBOT_BASE_KEY],
+                objects=[
+                    key
+                    for key in self._bodies
+                    if key != self.configuration.robot_base_key
+                ],
                 movable=True,
                 plan=bool(self.plan_state.nodes),
                 chart=bool(self.chart_state.nodes),
-                query=self.query_source is not None,
+                query=self.query_knowledge is not None
+                or self._query_attachment is not None,
                 sequence_number=self.sequence_number,
                 model_version=self._model_revision,
                 bundle_signature=bundle_signature,
@@ -1011,112 +943,201 @@ class Bridge:
             ).to_payload()
 
     # %% viewer -> questions about the running demo
-    def register_query_source(self, source: LiveQuerySource) -> None:
+    def register_query_source(
+        self,
+        knowledge: Callable[[], list[QueryableKnowledge]],
+        title: str,
+        presets: Callable[[], list[Preset]],
+        unlisted_presets: Callable[[], list[Preset]] = list,
+    ) -> None:
         """
         Offer the running demo's state to the viewer's queries.
 
-        :param source: What the demo declares as queryable.
+        :param knowledge: Provider returning the current native query scopes as a list.
+        :param title: The name shown for this query source.
+        :param presets: Provider returning the current visible query definitions.
+        :param unlisted_presets: Provider returning additional queries for matching.
         """
-        self.query_source = source
-        logger.info("live queries answered by '%s'", source.title())
+        with self._query_lock:
+            self.query_knowledge = knowledge
+            self._query_title = title
+            self._query_presets = presets
+            self._unlisted_query_presets = unlisted_presets
+            self._query_revision += 1
+        logger.info("live queries answered by '%s'", title)
 
-    def _registered_query_source(self) -> LiveQuerySource:
+    @contextmanager
+    def _query_scope(self) -> Iterator[list[QueryableKnowledge]]:
         """
-        The registered query source.
+        Serialize queries and lock their exposed native worlds through rendering.
 
-        :raises NoQuerySourceRegistered: When no demo offered one.
+        World locks are acquired in identity order before the query lock. A changed
+        registration or attachment restarts selection before evaluation begins.
+
+        :yield: The knowledge selected for this complete query operation.
+        :raises NoQuerySourceRegistered: When no live query source is available.
         """
-        if self.query_source is None:
-            raise NoQuerySourceRegistered()
-        return self.query_source
+        while True:
+            with self._query_lock:
+                source = self.query_knowledge
+                revision = self._query_revision
+                attachment = self._query_attachment
+                world = self.world if attachment is not None else None
+            if source is not None:
+                knowledge = source()
+            elif world is not None:
+                knowledge = [
+                    QueryableKnowledge(
+                        scope=QueryScope.CURRENT_STATE,
+                        domains=[],
+                        extra_names={World.__name__.lower(): world},
+                    )
+                ]
+            else:
+                raise NoQuerySourceRegistered()
+            worlds = [
+                value
+                for item in knowledge
+                for value in item.extra_names.values()
+                if isinstance(value, World)
+            ]
+            if world is not None:
+                worlds.append(world)
+            locks = {
+                id(item.state.world_lock): item.state.world_lock for item in worlds
+            }
+            with ExitStack() as stack:
+                for identity in sorted(locks):
+                    stack.enter_context(locks[identity])
+                with self._query_lock:
+                    if (
+                        revision != self._query_revision
+                        or source is not self.query_knowledge
+                        or attachment != self._query_attachment
+                        or (world is not None and world is not self.world)
+                    ):
+                        continue
+                    yield knowledge
+                    return
 
     def query_title(self) -> str:
         """
-        Short name of what queries are answered from.
+        Name the live source supplying query answers.
 
-        :raises NoQuerySourceRegistered: When no demo offered one.
+        :return: The selected source's display title.
+        :raises NoQuerySourceRegistered: When no live query source is available.
         """
-        return self._registered_query_source().title()
+        with self._query_scope() as knowledge:
+            if self.query_knowledge is not None:
+                return self._query_title
+            world = knowledge[0].extra_names[World.__name__.lower()]
+            return world.name or type(world).__name__
 
     def query_presets(self) -> List[Preset]:
         """
-        The ready-made queries the panel offers as buttons, each with its question read
-        back as English by the scope it declares.
+        List the selected source's visible presets with their English wording.
 
-        :raises NoQuerySourceRegistered: When no demo offered one.
+        :return: Presets in the source's display order.
+        :raises NoQuerySourceRegistered: When no live query source is available.
+        :raises UnknownQueryScope: When a preset requests unavailable knowledge.
         """
-        presets = self._registered_query_source().presets()
-        with self._query_lock:
-            return [
-                preset.worded(self._scope_runner(preset.scope)) for preset in presets
-            ]
+        with self._query_scope() as knowledge:
+            return self._worded_presets(knowledge)
+
+    def _worded_presets(self, knowledge: list[QueryableKnowledge]) -> list[Preset]:
+        """
+        Add English wording to each visible preset in its declared query scope.
+
+        Hold :meth:`_query_scope` while preparing the presets.
+
+        :param knowledge: The knowledge selected for this operation.
+        :return: Worded presets in the source's display order.
+        :raises UnknownQueryScope: When a preset requests unavailable knowledge.
+        """
+        if self.query_knowledge is not None:
+            presets = self._query_presets()
+        else:
+            name = World.__name__.lower()
+            presets = Preset.of_world(knowledge[0].extra_names[name], name)
+        return [
+            preset.worded(self._scope_runner(knowledge, preset.scope))
+            for preset in presets
+        ]
 
     def match_question(self, text: str) -> QuestionMatchResult:
         """
-        Recognize which of the running demo's ready-made queries a natural-language
-        question is asking, if any.
+        Match a natural-language question to the selected source's presets.
 
-        The questions the panel shows are matched against their English wording as well
-        as their label; the ones it does not show are matched against their label alone,
-        which is already the words they are asked in, and wording each of them would
-        mean building that many queries per asked question.
+        Visible presets match their labels and English wording; unlisted presets
+        match their labels.
 
         :param text: The question as asked, in natural language.
-        :raises NoQuerySourceRegistered: When no demo offered one.
+        :return: The matching preset, if any, and the closest wording's similarity.
+        :raises NoQuerySourceRegistered: When no live query source is available.
+        :raises UnknownQueryScope: When a preset requests unavailable knowledge.
         """
-        unlisted = self._registered_query_source().unlisted_presets()
-        return QuestionMatcher(self.query_presets() + unlisted).match(text)
+        with self._query_scope() as knowledge:
+            unlisted = self._unlisted_query_presets()
+            presets = self._worded_presets(knowledge) + unlisted
+            return QuestionMatcher(presets).match(text)
 
     def query_scopes(self) -> List[QueryScope]:
         """
-        The bodies of knowledge the running demo offers, in the order it offers them.
+        List the bodies of knowledge available from the selected source.
 
-        :raises NoQuerySourceRegistered: When no demo offered one.
+        :return: Query scopes in the order declared by the source.
+        :raises NoQuerySourceRegistered: When no live query source is available.
         """
-        return [
-            knowledge.scope for knowledge in self._registered_query_source().knowledge()
-        ]
+        with self._query_scope() as knowledge:
+            return [item.scope for item in knowledge]
 
     def query_variables(
         self, scope: QueryScope = QueryScope.CURRENT_STATE
     ) -> List[str]:
         """
-        Names a query of one scope may range over, for the panel to advertise.
+        List ready-made query variables or the scope's directly exposed values.
 
         :param scope: The body of knowledge the names belong to.
-        :raises NoQuerySourceRegistered: When no demo offered one.
-        :raises UnknownQueryScope: When the demo offers no such body of knowledge.
+        :return: Domain names, or exposed value names when no domains are declared.
+        :raises NoQuerySourceRegistered: When no live query source is available.
+        :raises UnknownQueryScope: When the source does not offer this scope.
         """
-        return [domain.name for domain in self._queryable_knowledge(scope).domains]
+        with self._query_scope() as knowledge:
+            selected = self._queryable_knowledge(knowledge, scope)
+            return (
+                [domain.name for domain in selected.domains]
+                if selected.domains
+                else list(selected.extra_names)
+            )
 
     def query_vocabulary(
         self, scope: QueryScope = QueryScope.CURRENT_STATE
     ) -> QueryVocabulary:
         """
-        Everything a query of one scope may name, for the query box to offer.
+        Describe the names available to queries within one scope.
 
         :param scope: The body of knowledge the names belong to.
-        :raises NoQuerySourceRegistered: When no demo offered one.
-        :raises UnknownQueryScope: When the demo offers no such body of knowledge.
+        :return: Vocabulary for the scope's domains, extra names and workspace classes.
+        :raises NoQuerySourceRegistered: When no live query source is available.
+        :raises UnknownQueryScope: When the source does not offer this scope.
         """
-        knowledge = self._queryable_knowledge(scope)
-        return QueryVocabulary(
-            domains=knowledge.domains,
-            extra_names=knowledge.extra_names,
-            class_index=WorkspaceClassIndex.of_repository(),
-        )
+        with self._query_scope() as knowledge:
+            return self._scope_runner(knowledge, scope).vocabulary()
 
-    def _queryable_knowledge(self, scope: QueryScope) -> QueryableKnowledge:
+    def _queryable_knowledge(
+        self, knowledge: list[QueryableKnowledge], scope: QueryScope
+    ) -> QueryableKnowledge:
         """
-        What answers questions of one scope.
+        Select the knowledge offered by a source for one query scope.
 
+        :param knowledge: The knowledge selected for this operation.
         :param scope: The body of knowledge being asked.
-        :raises NoQuerySourceRegistered: When no demo offered one.
-        :raises UnknownQueryScope: When the demo offers no such body of knowledge.
+        :return: Knowledge containing the scope's domains and evaluation context.
+        :raises UnknownQueryScope: When the source does not offer this scope.
         """
-        for knowledge in self._registered_query_source().knowledge():
-            if knowledge.scope is scope:
-                return knowledge
+        for item in knowledge:
+            if item.scope is scope:
+                return item
         raise UnknownQueryScope(name=scope.value)
 
     def highlightable_ids(self) -> FrozenSet[str]:
@@ -1130,35 +1151,43 @@ class Bridge:
         return frozenset(keys) | frozenset(Path(key).stem for key in keys)
 
     def run_query(
-        self, code: str, scope: QueryScope = QueryScope.CURRENT_STATE
+        self, code: str | Evaluable, scope: QueryScope = QueryScope.CURRENT_STATE
     ) -> RenderResult:
         """
-        Answer one EQL query about the running demo.
+        Evaluate and render an EQL query within the selected source's read scope.
 
-        :param code: The EQL query source.
-        :param scope: Which of the demo's bodies of knowledge to ask.
-        :raises NoQuerySourceRegistered: When no demo offered one.
-        :raises UnknownQueryScope: When the demo offers no such body of knowledge.
+        :param code: The EQL query source or an already constructed native expression.
+        :param scope: The body of knowledge to query.
+        :return: The rendered query answer.
+        :raises NoQuerySourceRegistered: When no live query source is available.
+        :raises UnknownQueryScope: When the source does not offer this scope.
         """
-        with self._query_lock:
-            return self._scope_runner(scope).run(code)
+        with self._query_scope() as knowledge:
+            runner = self._scope_runner(knowledge, scope)
+            result = (
+                runner.run_source(code) if isinstance(code, str) else runner.run(code)
+            )
+            result.highlight = self._resolve_highlights(result.highlight)
+            return result
 
-    def _scope_runner(self, scope: QueryScope) -> EqlQueryRunner:
+    def _scope_runner(
+        self, knowledge: list[QueryableKnowledge], scope: QueryScope
+    ) -> EqlQueryRunner:
         """
-        The runner answering questions of one scope, over the demo's current state.
+        Create a query runner over the selected source's knowledge of one scope.
 
-        Krrood's SymbolGraph singleton is not threadsafe, so callers hold
-        :attr:`_query_lock` around whatever they do with the runner.
+        Hold :meth:`_query_scope` until the answer has been rendered.
 
+        :param knowledge: The knowledge selected for this operation.
         :param scope: The body of knowledge being asked.
-        :raises NoQuerySourceRegistered: When no demo offered one.
-        :raises UnknownQueryScope: When the demo offers no such body of knowledge.
+        :return: A runner configured with the scope's knowledge and scene highlights.
+        :raises UnknownQueryScope: When the source does not offer this scope.
         """
-        knowledge = self._queryable_knowledge(scope)
+        selected = self._queryable_knowledge(knowledge, scope)
         return EqlQueryRunner(
-            domains=knowledge.domains,
-            extra_names=knowledge.extra_names,
-            evaluation=knowledge.evaluation,
+            domains=selected.domains,
+            extra_names=selected.extra_names,
+            evaluation=selected.evaluation,
             highlightable_ids=self.highlightable_ids(),
         )
 
@@ -1182,7 +1211,7 @@ class Bridge:
         self._connections = self._actuated_connections(self._kinematic_connections)
         bodies: Dict[str, Body] = {}
         if self.robot is not None:
-            bodies[ROBOT_BASE_KEY] = self.robot.root
+            bodies[self.configuration.robot_base_key] = self.robot.root
         try:
             bodies.update(self._discover_overlay_bodies())
         except Exception as error:
@@ -1198,7 +1227,11 @@ class Bridge:
     def overlay_bodies(self) -> List[Body]:
         """Return the independent objects currently published by this session."""
         with self._lock:
-            return [body for key, body in self._bodies.items() if key != ROBOT_BASE_KEY]
+            return [
+                body
+                for key, body in self._bodies.items()
+                if key != self.configuration.robot_base_key
+            ]
 
     def _discover_overlay_bodies(self) -> Dict[str, Body]:
         """Discover movable objects and retain their identity through attachments."""
@@ -1208,18 +1241,6 @@ class Bridge:
                 self.overlay_bodies()
             )
         }
-
-    @staticmethod
-    def _body_shapes(body: Body) -> List[Any]:
-        """
-        The shapes a body is rendered from: its visual ones, else its collision ones.
-
-        :param body: The body whose shapes are read.
-        """
-        for shape_collection in (body.visual, body.collision):
-            if shape_collection.shapes:
-                return list(shape_collection.shapes)
-        return []
 
     @staticmethod
     def _actuated_connections(
@@ -1240,77 +1261,29 @@ class Bridge:
         """
         Rebuild the geometry catalog the viewer spawns live objects from.
 
-        Each object gets a mesh URL (served by the bridge), its real shapes, or a
-        fallback box size, so objects the viewer does not know yet can appear mid-run.
+        Retain native geometry and register its mesh files so new objects can appear
+        mid-run.
 
-        :param bodies: The current published bodies, keyed by mesh key.
+        :param bodies: The current published bodies, keyed by their publication keys.
         """
         catalog: List[ObjectCatalogEntry] = []
-        serve: Dict[str, str] = {}
-        palette = ObjectPalette()
-        for index, (key, body) in enumerate(
-            item for item in bodies.items() if item[0] != ROBOT_BASE_KEY
+        serve: Dict[str, Mesh] = {}
+        for key, body in (
+            item
+            for item in bodies.items()
+            if item[0] != self.configuration.robot_base_key
         ):
-            color = palette.color_for(index)
-            object_id = Path(key).stem
-            shapes = self._body_shapes(body)
-            if shapes:
-                catalog.append(self._shape_catalog_entry(key, shapes, color, serve))
-                continue
-            catalog.append(
-                ObjectCatalogEntry(
-                    key=key,
-                    id=object_id,
-                    kind=ObjectKind.BOX,
-                    color=color,
-                    size=list(self.DEFAULT_OBJECT_SIZE),
-                )
+            entry = ObjectCatalogEntry(
+                key=key,
+                shapes=body.visual or body.collision,
             )
-        self._mesh_serve = serve
+            catalog.append(entry)
+            for shape in entry.shapes:
+                if isinstance(shape, Mesh):
+                    serve[shape.filename] = shape
         with self._lock:
+            self._mesh_serve = serve
             self.object_metadata = catalog
-
-    def _shape_catalog_entry(
-        self,
-        key: str,
-        shapes: List[Any],
-        fallback_color: str,
-        serve: Dict[str, str],
-    ) -> ObjectCatalogEntry:
-        """
-        The catalog entry of a body published shape by shape.
-
-        Mesh shapes are registered in the serve map under a composite key, so each of
-        a body's meshes is downloadable on its own.
-
-        :param key: The body's published key.
-        :param shapes: The body's shapes, as :meth:`_body_shapes` selects them.
-        :param fallback_color: Palette colour used for shapes without one of their own.
-        :param serve: The serve map being built, extended with this body's mesh files.
-        """
-        entries: List[ShapeEntry] = []
-        for shape_index, shape in enumerate(shapes):
-            mesh_url = None
-            mesh_file = served_mesh_file(shape)
-            if mesh_file is not None:
-                serve_key = "%s#%d" % (key, shape_index)
-                serve[serve_key] = mesh_file
-                mesh_url = "/mesh?key=" + urllib.parse.quote(serve_key, safe="")
-            entries.append(
-                shape_entry(
-                    shape,
-                    mesh_url,
-                    fallback_size=list(self.DEFAULT_OBJECT_SIZE),
-                    fallback_color=fallback_color,
-                )
-            )
-        return ObjectCatalogEntry(
-            key=key,
-            id=Path(key).stem,
-            kind=ObjectKind.SHAPES,
-            color=entries[0].color,
-            shapes=entries,
-        )
 
     # %% world snapshot
     def snapshot(self) -> None:
@@ -1322,7 +1295,10 @@ class Bridge:
         """
         if self.world is None:
             return
-        if time.time() - self._last_bind_time > self.REBIND_INTERVAL_SECONDS:
+        if (
+            time.time() - self._last_bind_time
+            > self.configuration.rebind_interval_seconds
+        ):
             self.bind()
         frames = {
             str(connection.name): round(float(connection.position), POSE_PRECISION)
@@ -1331,7 +1307,7 @@ class Bridge:
         base_pose: Optional[List[float]] = None
         object_poses: Dict[str, List[float]] = {}
         for name, body in self._bodies.items():
-            if name == ROBOT_BASE_KEY:
+            if name == self.configuration.robot_base_key:
                 base_pose = rounded_pose(body)
             else:
                 object_poses[name] = rounded_pose(body)
@@ -1367,20 +1343,9 @@ class Bridge:
             return self.transform_state.to_payload(time.monotonic())
 
     # %% plan tree
-    def _live_motion_status(self, node: PlanNode) -> Optional[str]:
-        """
-        Status of one plan node as its plan callbacks reported it, or None.
-
-        :param node: The plan node whose live status is looked up.
-        """
-        progress = self._motion_nodes.get(id(node))
-        if progress is None:
-            return None
-        return progress.status
-
     def snapshot_plan(self) -> None:
         """
-        Publish plan lifecycle values and derive unstarted parents from their children.
+        Publish the current native lifecycle state of every plan node.
         """
         plan = self._plan
         if plan is None:
@@ -1402,9 +1367,9 @@ class Bridge:
         parent_id: Optional[str],
         nodes: List[PlanNodeEntry],
         order: List[str],
-    ) -> str:
+    ) -> None:
         """
-        Serialize one plan node and its subtree; returns the node's status.
+        Serialize one plan node and its subtree.
 
         :param node: The plan node to serialize.
         :param parent_id: Id of the node's parent entry, or None for the root.
@@ -1413,9 +1378,7 @@ class Bridge:
             traversal order, to build the tree's signature.
         """
         node_id = "plan_node_%d" % id(node)
-        designator = node.designator if isinstance(node, DescribesAnAction) else None
-        native_lifecycle = isinstance(node.status, LifeCycleValues)
-        own_status = TaskStatusName.of_native_name(node.status.name)
+        designator = node.designator if isinstance(node, DesignatorNode) else None
         entry = PlanNodeEntry(
             id=node_id,
             parent=parent_id,
@@ -1426,77 +1389,35 @@ class Bridge:
                 if designator is not None
                 else type(node).__name__
             ),
-            status=own_status,
+            status=node.status,
             derived=False,
         )
         self._add_designator_metadata(entry, designator)
         nodes.append(entry)
         order.append(node_id)
 
-        child_best, children, done = TaskStatusName.CREATED, 0, 0
         for child in node.children:
-            child_status = self._serialize_plan_node(child, node_id, nodes, order)
-            if (
-                PlanNodeGroup.of_plan_node_kind(type(child).__name__)
-                is PlanNodeGroup.CONDITION
-                and child_status == TaskStatusName.CREATED
-            ):
-                continue
-            child_best = self._max_status(child_best, child_status)
-            children += 1
-            if child_status == TaskStatusName.SUCCEEDED:
-                done += 1
-        if own_status == TaskStatusName.CREATED:
-            if child_best == TaskStatusName.SUCCEEDED and done < children:
-                child_best = TaskStatusName.RUNNING
-            motion_status = None if native_lifecycle else self._live_motion_status(node)
-            derived = motion_status or (
-                child_best if child_best != TaskStatusName.CREATED else None
-            )
-            if derived:
-                entry.status = derived
-                entry.derived = True
-        if native_lifecycle:
-            return entry.status
-        if entry.status == TaskStatusName.RUNNING:
-            self._ever_running.add(id(node))
-        elif id(node) in self._ever_running and entry.status == TaskStatusName.CREATED:
-            entry.status = TaskStatusName.SUCCEEDED
-            entry.derived = True
-        return entry.status
+            self._serialize_plan_node(child, node_id, nodes, order)
 
     def _add_designator_metadata(
-        self, entry: PlanNodeEntry, designator: Optional[Any]
+        self, entry: PlanNodeEntry, designator: Designator | None
     ) -> None:
         """
-        Add arm and target-object info from a node's designator, if any.
+        Describe the designator's parameters and retain its published target identity.
 
         :param entry: The serialized entry to fill in, mutated in place.
         :param designator: The node's designator, or None.
         """
         if designator is None:
             return
-        fields = vars(designator)
-        arm = fields.get("arm") or fields.get("arms")
-        if arm is not None:
-            entry.arm = str(arm)
+        entry.description = verbalize_expression(
+            inference(type(designator))(**designator.designator_parameter)
+        )
         target = self._designator_target(designator)
         if target:
             entry.target = target
 
-    @staticmethod
-    def _max_status(first: str, second: str) -> str:
-        """
-        The higher-ranked of two statuses.
-
-        :param first: The first status to compare.
-        :param second: The second status to compare.
-        """
-        if TaskStatusName.rank_of(first) >= TaskStatusName.rank_of(second):
-            return first
-        return second
-
-    def _designator_target(self, designator: Any) -> Optional[str]:
+    def _designator_target(self, designator: Designator) -> Optional[str]:
         """
         Published key of the object a designator refers to, if any.
 
@@ -1506,10 +1427,10 @@ class Bridge:
         :param designator: The designator to search for a world-entity reference.
         """
         keys_by_basename = {key.split("/")[-1]: key for key in self._bodies}
-        for value in vars(designator).values():
-            if not isinstance(value, NamesAWorldEntity):
+        for value in designator.designator_parameter.values():
+            if not isinstance(value, WorldEntity):
                 continue
-            basename = str(value.name).split("/")[-1]
+            basename = value.name.name
             if basename in keys_by_basename:
                 return keys_by_basename[basename]
         return None
@@ -1526,7 +1447,7 @@ class Bridge:
             running = [
                 entry
                 for entry in self.plan_state.nodes
-                if entry.status == TaskStatusName.RUNNING
+                if entry.status == LifeCycleValues.RUNNING
                 and entry.group is PlanNodeGroup.ACTION
             ]
         return running[-1].label if running else None

@@ -3,11 +3,10 @@ Tests for asking a query what segmind detected.
 """
 
 import json
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import replace
+from datetime import datetime, timedelta
 
 import pytest
-from typing_extensions import List
 
 pytest.importorskip("krrood", reason="EQL requires krrood")
 
@@ -46,13 +45,8 @@ from cramera.live.detections import (  # noqa: E402
 )
 from cramera.knowledge.knowledge_base import EpisodeKnowledgeBase  # noqa: E402
 from cramera.knowledge.eql_session import EqlSession  # noqa: E402
-from cramera.knowledge.presets import Preset  # noqa: E402
-from cramera.knowledge.queryable_knowledge import (  # noqa: E402
-    QueryableKnowledge,
-    QueryScope,
-)
+from cramera.knowledge.queryable_knowledge import QueryScope  # noqa: E402
 from cramera.live.bridge import Bridge  # noqa: E402
-from cramera.live.query import LiveQuerySource  # noqa: E402
 
 from .conftest import reset_knowledge_base_cache  # noqa: E402
 from .test_live_bridge import world_with  # noqa: E402
@@ -149,18 +143,18 @@ class TestRecordableEventTypes:
 
 class TestDetectedEventsKnowledge:
     def test_the_knowledge_is_of_the_detected_events_scope(self, detections):
-        knowledge = DetectedEvents(logger=detections).knowledge()
+        [knowledge] = DetectedEvents(logger=detections).knowledge()
 
         assert knowledge.scope is QueryScope.DETECTED_EVENTS
 
     def test_the_domain_is_the_event_variable_a_question_names(self, detections):
-        [domain] = DetectedEvents(logger=detections).knowledge().domains
+        [domain] = DetectedEvents(logger=detections).knowledge()[0].domains
 
         assert domain.name == "event"
         assert domain.entity_type is DetectedEventRecord
 
     def test_the_domain_holds_a_record_per_detection(self, detections):
-        [domain] = DetectedEvents(logger=detections).knowledge().domains
+        [domain] = DetectedEvents(logger=detections).knowledge()[0].domains
 
         assert [record.event_type for record in domain.objects] == [
             PickUpEvent.__name__,
@@ -169,11 +163,11 @@ class TestDetectedEventsKnowledge:
 
     def test_a_detection_made_after_the_last_question_is_answered_too(self, detections):
         events = DetectedEvents(logger=detections)
-        before = len(events.knowledge().domains[0].objects)
+        before = len(events.knowledge()[0].domains[0].objects)
 
         detections.timeline.append(PickUpEvent(tracked_object=collidable_body("cup")))
 
-        assert len(events.knowledge().domains[0].objects) == before + 1
+        assert len(events.knowledge()[0].domains[0].objects) == before + 1
 
 
 class TestAskingForOneKindOfEvent:
@@ -186,9 +180,9 @@ class TestAskingForOneKindOfEvent:
             for preset in events.unlisted_presets()
             if PickUpEvent.__name__ in preset.code
         ]
-        runner = EqlQueryRunner(domains=events.knowledge().domains)
+        runner = EqlQueryRunner(domains=events.knowledge()[0].domains)
 
-        answered = runner.run(pick_ups.code)
+        answered = runner.run_source(pick_ups.code)
 
         assert [row["__entity__"] for row in answered.rows] == ["milk PickUpEvent"]
         assert [row["event_type"] for row in answered.rows] == [PickUpEvent.__name__]
@@ -223,44 +217,52 @@ class TestOfferedQuestions:
 # %% a demo offering its detections to the bridge
 
 
-@dataclass
-class DetectingDemo(LiveQuerySource):
-    """
-    A demo that ticks segmind detectors and offers what they saw alongside nothing else.
-    """
-
-    detections: DetectedEvents
-    """
-    The detections this demo offers to be questioned about.
-    """
-
-    def title(self) -> str:
-        return "detecting demo"
-
-    def knowledge(self) -> List[QueryableKnowledge]:
-        return [self.detections.knowledge()]
-
-    def presets(self) -> List[Preset]:
-        return self.detections.presets()
-
-    def unlisted_presets(self) -> List[Preset]:
-        return self.detections.unlisted_presets()
-
-
 class TestAskingTheBridge:
+    """
+    Registered detection knowledge exposes current events and their query presets.
+    """
+
     @pytest.fixture()
     def bridge(self, detections):
         """
         A bridge a detecting demo has registered itself with.
+
+        :param detections: The logger providing the current detection records.
+        :return: A bridge configured with the logger's dynamic knowledge and presets.
         """
         bridge = Bridge()
+        source = DetectedEvents(detections)
         bridge.register_query_source(
-            DetectingDemo(detections=DetectedEvents(detections))
+            source.knowledge,
+            "detecting demo",
+            source.presets,
+            source.unlisted_presets,
         )
         return bridge
 
     def test_the_bridge_offers_the_detected_events_scope(self, bridge):
         assert bridge.query_scopes() == [QueryScope.DETECTED_EVENTS]
+
+    def test_new_events_are_read_after_registration(
+        self, bridge: Bridge, detections: EventLogger
+    ) -> None:
+        """
+        Registered detection queries include events arriving after registration.
+
+        :param bridge: The bridge querying the registered detection knowledge.
+        :param detections: The logger receiving another detection after the first query.
+        """
+        preset = bridge.query_presets()[0]
+        before = bridge.run_query(preset.code, preset.scope)
+        latest = detections.timeline[-1]
+        with detections.timeline_lock:
+            detections.timeline.append(
+                replace(latest, timestamp=latest.timestamp + timedelta(seconds=1))
+            )
+
+        after = bridge.run_query(preset.code, preset.scope)
+
+        assert after.count == before.count + 1
 
     def test_a_query_of_that_scope_is_answered_from_the_detections(self, bridge):
         answered = bridge.run_query(
