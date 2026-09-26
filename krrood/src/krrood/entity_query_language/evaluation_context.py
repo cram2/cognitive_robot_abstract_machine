@@ -359,6 +359,33 @@ class EvaluationContext:
         """
         return expression._id_ in self.truth_value_operator_children
 
+    def iterate_as_current(
+        self, results: Iterator[OperationResult]
+    ) -> Iterator[OperationResult]:
+        """
+        Iterate the given results with this context as the current evaluation context
+        while each of them is produced.
+
+        The context is current only while the results advance, never while the caller
+        holds a result, so a caller that stops iterating part way does not leave it set.
+
+        :param results: The results of an evaluation this context belongs to.
+        :return: The same results.
+        """
+        results_exhausted = object()
+        try:
+            while True:
+                context_token = set_evaluation_context(self)
+                try:
+                    result = next(results, results_exhausted)
+                finally:
+                    _evaluation_context_var.reset(context_token)
+                if result is results_exhausted:
+                    return
+                yield result
+        finally:
+            results.close()
+
     def on_evaluate_enter(
         self,
         *,

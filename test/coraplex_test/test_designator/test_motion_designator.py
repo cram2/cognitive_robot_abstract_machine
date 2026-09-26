@@ -101,7 +101,6 @@ def test_pick_up_motion(immutable_model_world):
                         Quaternion.from_iterable([0, 0, 0, 1]),
                         test_world.root,
                     ),
-                    True,
                 )
             ),
             MoveTorsoAction(TorsoState.HIGH),

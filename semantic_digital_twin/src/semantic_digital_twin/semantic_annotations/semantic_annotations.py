@@ -662,6 +662,17 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint):
     def _hole_direction_axis(cls) -> Vector3:
         return Vector3.Z()
 
+    @property
+    def opening_ratio(self) -> float:
+        """
+        :return: How far this drawer stands pulled out, as a fraction of its travel.
+        """
+        connection = self.root.parent_connection
+        limits = connection.dof.limits
+        return (connection.position - limits.lower.position) / (
+            limits.upper.position - limits.lower.position
+        )
+
 
 @dataclass(eq=False)
 class Elevator(HasCaseAsRootBody, HasDoors, HasMechanicalJoint):

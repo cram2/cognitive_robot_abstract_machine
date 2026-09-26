@@ -52,6 +52,48 @@ def test_evaluation_releases_its_context_when_it_finishes():
     assert get_evaluation_context() is None
 
 
+def test_suspended_evaluation_does_not_leave_its_context_set():
+    """
+    An evaluation whose caller keeps its iterator suspended between results must not
+    leave its :class:`EvaluationContext` set for the caller.
+
+    The context holds the query it evaluates, so leaving it set pins that query, and
+    every object its variables reach, for as long as the thread lives; it would also be
+    picked up by the next, unrelated evaluation.
+    """
+    subject = variable(int, [1, 2, 3])
+    results = an(entity(subject)).evaluate()
+
+    next(results)
+
+    assert get_evaluation_context() is None
+    results.close()
+
+
+def test_resumed_evaluation_sees_its_own_context_on_every_result():
+    """
+    An evaluation resumed after being suspended evaluates each result within the context
+    it started with.
+    """
+    captured_contexts = []
+
+    @symbolic_function
+    def capture_context(value):
+        captured_contexts.append(get_evaluation_context())
+        return True
+
+    subject = variable(int, [1, 2, 3])
+    results = an(entity(subject).where(capture_context(subject))).evaluate()
+
+    next(results)
+    next(results)
+    results.close()
+
+    first_context, second_context = captured_contexts
+    assert first_context is not None
+    assert second_context is first_context
+
+
 def test_evaluation_root_query_falls_back_to_the_structural_root_outside_an_evaluation():
     """
     With no evaluation active there is no outermost query to resolve from, so

@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from typing_extensions import Dict, List, Optional
+import pytest
+from typing_extensions import Dict, Iterator, List, Optional
 
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
@@ -82,6 +83,18 @@ def register_probe() -> UUID:
     key = uuid4()
     _registered_probes[key] = TrialProbe()
     return key
+
+
+@pytest.fixture(autouse=True)
+def release_registered_probes() -> Iterator[None]:
+    """
+    Drop every probe a test registered once it has finished.
+
+    A probe keeps the worlds its calls ran against, so a probe left registered would
+    keep them in memory for the rest of the session.
+    """
+    yield
+    _registered_probes.clear()
 
 
 @dataclass(eq=False, repr=False)
@@ -184,7 +197,6 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
                 Pose.from_xyz_quaternion(2, -1, 0, reference_frame=world.root),
             ]
         ),
-        keep_joint_states=True,
     )
 
     plan = execute_single(action_like=action, context=context).plan
@@ -192,8 +204,7 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
         plan.perform()
 
     assert plan.root.status == LifeCycleValues.SUCCEEDED
-    candidate = plan.root.children[0]
-    assert isinstance(candidate.designator, NavigateAction)
+    assert isinstance(plan.root.current_candidate.designator, NavigateAction)
     assert plan.root.parse() is not None
     assert plan.root._action_iterator is None, (
         "the action iterator must be released once grounding succeeds, so any resources a "
@@ -222,7 +233,6 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
             yaw=0.0,
             reference_frame=context.robot.root,
         ),
-        keep_joint_states=...,
     )
 
     plan = execute_single(action_like=action, context=context).plan
@@ -230,8 +240,7 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
         plan.perform()
 
     assert plan.root.status == LifeCycleValues.SUCCEEDED
-    candidate = plan.root.children[-1]
-    assert isinstance(candidate.designator, NavigateAction)
+    assert isinstance(plan.root.current_candidate.designator, NavigateAction)
     assert plan.root.parse() is not None
 
 
@@ -260,7 +269,6 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
                         ]
                     )
                 ),
-                keep_joint_states=True,
             ),
             a(PickUpAction)(
                 arm=...,
@@ -300,7 +308,7 @@ def test_isolation_rejected_candidate_never_touches_real_world(
 
     assert plan.root.status == LifeCycleValues.SUCCEEDED
     assert len(plan.root.children) == 1
-    assert plan.root.children[0].designator.fail_on_attempt_number is None
+    assert plan.root.children[0].children[0].designator.fail_on_attempt_number is None
 
     probe = _registered_probes[probe_key]
     assert len(probe.calls) == 3
@@ -375,7 +383,8 @@ def test_real_failure_keeps_state_and_next_trial_reflects_it(
     # Both the failed and the accepted candidate are attached to the tree - a real
     # failure is not undone, only worked around by trying the next candidate.
     assert [
-        child.designator.fail_on_attempt_number for child in plan.root.children
+        child.children[0].designator.fail_on_attempt_number
+        for child in plan.root.children
     ] == [
         2,
         None,

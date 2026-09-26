@@ -153,29 +153,3 @@ for i, pose in enumerate(location):
     if i > 3:
         break
 ```
-
-
-## Accessing Locations
-
-Accessing describes a location from which the robot can open a drawer. The drawer is specified by the handle that is 
-used to open it.
-
-At the moment this location designator only works in the apartment environment, so please remove the kitchen if you
-spawned it in a previous example. Furthermore, we need a robot, so we also spawn the PR2 if it isn't spawned already.
-
-```python
-from coraplex.locations.factories import accessing_location
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle
-
-with world.modify_world():
-    world.add_semantic_annotation_recursively(
-        drawer := Drawer(
-            root=world.get_body_by_name("cabinet10_drawer_middle"),
-            handle=Handle(root=world.get_body_by_name("handle_cab10_m")),
-        )
-    )
-
-location = accessing_location(world.get_semantic_annotations_by_type(Drawer)[0], context=context, arm=Arms.LEFT)
-
-print(next(iter(location)))
-```

@@ -17,6 +17,7 @@ from coraplex.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
     from coraplex.plans.designator import Designator
+    from coraplex.plans.plan_node import PlanNode
     from coraplex.robot_plans.actions.base import ActionDescription
     from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
     from semantic_digital_twin.world_description.world_entity import (
@@ -105,6 +106,54 @@ class ContextIsUnavailable(DataclassException):
 
 
 @dataclass
+class CannotMatchOnType(DataclassException):
+    """
+    Raised when a plan transformation is bound to a type that is neither a plan node nor
+    a designator, leaving no rule by which it could select the nodes it rewrites.
+    """
+
+    transformation: Type
+    """
+    The transformation class that carries the binding.
+    """
+
+    matched_type: Type
+    """
+    The type it is bound to.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.transformation.__name__} is bound to {self.matched_type}, which is "
+            f"neither a plan node nor a designator."
+        )
+
+    def suggest_correction(self) -> str:
+        return "bind the transformation to a plan node type or a designator type"
+
+
+@dataclass
+class CannotInsertBesideRoot(DataclassException):
+    """
+    Raised when a node is to be inserted before or after the root node, which has no
+    parent that could hold the new sibling.
+    """
+
+    root: PlanNode
+    """
+    The root node that was given as the reference node.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.root} is the root of the plan and has no parent to hold a sibling."
+        )
+
+    def suggest_correction(self) -> str:
+        return "insert the node as the last child of the root instead"
+
+
+@dataclass
 class TipLinkDoesNotMatchAnyArm(DataclassException):
     """
     Raised when a reachability validator's tip link is not the tool frame of any arm of
@@ -167,7 +216,7 @@ class WipingTargetMissing(DataclassException):
 @dataclass
 class PerceptionTargetMissing(DataclassException):
     """
-    Raised when an action is asked to perceive before grasping but names no object.
+    Raised when a rule is to perceive before grasping but the action names no object.
     """
 
     instance: Designator
@@ -176,10 +225,13 @@ class PerceptionTargetMissing(DataclassException):
     """
 
     def error_message(self) -> str:
-        return f"{self.instance} perceives before grasping but names no object."
+        return f"{self.instance} is to perceive before grasping but names no object."
 
     def suggest_correction(self) -> str:
-        return "provide an object_designator or leave perceive_before_grasp off."
+        return (
+            "provide an object_designator or drop the detect-before-grasp rule from the"
+            " context."
+        )
 
 
 @dataclass

@@ -46,6 +46,10 @@ from coraplex.robot_plans.actions.core.pick_up import (
     PickUpAction,
 )
 from coraplex.robot_plans.actions.core.placing import PlaceAction
+from coraplex.robot_plans.plan_transformations import (
+    OpenDrawerBeforePickUp,
+    OpenDrawerBeforeTransport,
+)
 from coraplex.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
     SetGripperAction,
@@ -733,7 +737,7 @@ def test_facing(immutable_multiple_robot_apartment):
 
     with simulated_robot:
         milk_pose = world.get_body_by_name("milk.stl").global_pose
-        plan = execute_single(FaceAtAction(milk_pose, True), context)
+        plan = execute_single(FaceAtAction(milk_pose), context)
         plan.perform()
         milk_in_base_frame = world.transform(
             world.get_body_by_name("milk.stl").global_transform,
@@ -803,6 +807,7 @@ def test_transport_open_container(mutable_multiple_robot_apartment, rclpy_node):
 
     if isinstance(robot, HSRB):
         return
+    context.plan_transformations.append(OpenDrawerBeforeTransport())
     description = TransportAction(
         object_designator=world.get_semantic_annotations_by_type(Spoon)[0],
         target_location=Pose.from_xyz_rpy(

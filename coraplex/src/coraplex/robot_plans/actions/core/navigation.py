@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Optional, Any, Dict
 
-from coraplex.config.action_conf import ActionConfig
 from coraplex.datastructures.dataclasses import Context
 from coraplex.exceptions import NoFloorBelowRobot, NotOnASingleLevelException
 from coraplex.plans.attachment_nodes import ReAttachNode
@@ -50,17 +49,11 @@ class NavigateAction(ActionDescription):
     x-axis.
     """
 
-    keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
-    """
-    Keep the joint states of the robot the same during the navigation.
-    """
-
     @property
     def _action_plan(self) -> PlanNode:
         return execute_single(
             MoveMotion(
                 self.robot.mobile_base.pose_facing(self.target_location),
-                self.keep_joint_states,
             )
         )
 
