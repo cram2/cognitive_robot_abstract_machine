@@ -68,9 +68,14 @@ GARMI_LIFT_JOINTS = ["lift_0_lower_joint", "lift_0_upper_joint"]
 Names of the two prismatic torso lift joints.
 """
 
-GARMI_INTERACTIVE_MARKER_ROOT_LINKS = ["arm_mount_left_link", "map"]
+GARMI_INTERACTIVE_MARKER_ROOT_LINKS = ["map", "map"]
 """
 Root links of the kinematic chains controllable via interactive markers.
+
+Both arms are rooted at "map", so a drag expresses a whole-body goal and may
+recruit the base and lift alongside the arm. Root an arm at its mount
+("arm_mount_left_link" / "arm_mount_right_link") instead for arm-only goals --
+that also renders in RViz when no map frame is on tf.
 """
 
 GARMI_INTERACTIVE_MARKER_TIP_LINKS = ["left_fr3_hand_tcp", "right_fr3_hand_tcp"]
@@ -117,31 +122,37 @@ class GarmiStandaloneInterface(RobotInterfaceConfig):
 @dataclass
 class GarmiVelocityInterface(RobotInterfaceConfig):
     """
-    Closed-loop velocity interface for the real GARMI robot.
+    Closed-loop velocity interface for the GARMI robot.
 
-    Synchronizes the world state from joint-state and odometry topics and sends joint
-    velocities to per-subsystem group controllers as well as base twists to the drive.
-
-    .. warning::
-        The ROS topic and TF frame names below are placeholders for the online
-        integration meeting and must be replaced with the names published by the
-        GARMI hardware bring-up.
+    Synchronizes the world state from the merged whole-robot joint state topic and
+    sends arm joint velocities to the per-arm group controllers, as documented in
+    garmi_description's docs/real_robot.md (the public interface contract).
     """
 
     def setup(self) -> None:
-        # self.sync_6dof_joint_with_tf_frame(
-        #    joint=self.world.get_connections_by_type(Connection6DoF)[0],
-        #    tf_parent_frame="placeholder_map_frame",
-        #    tf_child_frame="placeholder_odom_frame",
-        # )
+        # Base localization and drive, per real_robot.md. Both producers run on
+        # the current robot deployment: map->odom is on the global /tf (static
+        # identity while localization is "none") and the legs EKF publishes the
+        # filtered platform odometry at 50 Hz.
+        # NOTE the base listens on /r100_0603/cmd_vel as geometry_msgs/TwistStamped,
+        # while add_base_cmd_velocity publishes a plain Twist -- so the twist goes
+        # out on the unstamped topic and garmi_giskard's twist_stamping_relay
+        # (started by giskard_real.launch.py) stamps it onto /r100_0603/cmd_vel.
+        self.sync_6dof_joint_with_tf_frame(
+            joint=self.world.get_connections_by_type(Connection6DoF)[0],
+            tf_parent_frame="map",
+            tf_child_frame="odom",
+        )
+        omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
+        self.sync_odometry_topic("/r100_0603/platform/odom/filtered", omni_drive)
+        self.add_base_cmd_velocity(
+            cmd_vel_topic="/r100_0603/cmd_vel_unstamped", joint=omni_drive
+        )
 
-        # omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
-        # self.sync_odometry_topic("/placeholder/base/odom", omni_drive)
-        # self.add_base_cmd_velocity(
-        #    cmd_vel_topic="/placeholder/base/cmd_vel", joint=omni_drive
-        # )
-
-        self.sync_joint_state_topic("/garmi/arms/joint_states")
+        # The merged whole-robot joint state (~50 Hz): arms + lift, the platform's
+        # wheels, and the head. The per-subsystem topics documented in
+        # real_robot.md stay available if a joint group needs faster sync.
+        self.sync_joint_state_topic("/garmi/joint_states")
 
         self.add_joint_velocity_group_controller(
             cmd_topic="/garmi/arms/left_arm_joint_velocity_controller/reference",
@@ -154,11 +165,11 @@ class GarmiVelocityInterface(RobotInterfaceConfig):
             command_format=MultiDOFCommandFormat(),
         )
 
-        # self.add_joint_velocity_group_controller(
-        #    cmd_topic="/placeholder/head/velocity_controller/commands",
-        #    connections=GARMI_HEAD_JOINTS,
-        # )
-        # self.add_joint_velocity_group_controller(
-        #    cmd_topic="/placeholder/lift/velocity_controller/commands",
-        #    connections=GARMI_LIFT_JOINTS,
-        # )
+        # The head and the lift take POSITION streams, not velocities -- there is
+        # no velocity controller to publish to on either path (see real_robot.md):
+        #   head: sensor_msgs/JointState (position only) on
+        #         /olive/olixO1/id004/head_goal;
+        #   lift: std_msgs/Float64MultiArray on
+        #         /garmi/arms/lift_0_position_controller/commands.
+        # Wiring them into Giskard means a position-command publisher, not
+        # add_joint_velocity_group_controller.
