@@ -21,6 +21,7 @@ from typing_extensions import (
 
 from probabilistic_model.distributions.distributions import UnivariateDistribution
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    NodeIndices,
     NodeMask,
     NodeValues,
     NodeVariableValues,
@@ -224,13 +225,37 @@ class InputLayer(Layer, ABC):
         samples: SampleArray,
         variables: SortedSet,
     ):
+        rows, nodes = [], []
         for node, rows_of_node in enumerate(assignment.rows_of(self)):
             if rows_of_node.is_empty:
                 continue
-            rows = rows_of_node.rows
-            samples[rows, self.variable] = self.sample_of_node(
-                node, len(rows), variables
+            rows.append(rows_of_node.rows)
+            nodes.append(np.full(len(rows_of_node.rows), node))
+        if not rows:
+            return
+        samples[np.concatenate(rows), self.variable] = self.sample_of_nodes(
+            np.concatenate(nodes), variables
+        )
+
+    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+        """
+        Draw one sample from the node of every entry of ``nodes``.
+
+        The fallback draws from the nodes one by one through :meth:`sample_of_node`.
+        Layers whose distributions numpy or scipy can sample for all nodes at once
+        override this.
+
+        :param nodes: The node to draw each sample from.
+        :param variables: The variables of the circuit.
+        :return: The samples with shape (#entries of ``nodes``,).
+        """
+        result = np.empty(len(nodes))
+        for node in np.unique(nodes):
+            of_node = nodes == node
+            result[of_node] = self.sample_of_node(
+                int(node), int(of_node.sum()), variables
             )
+        return result
 
     def sample_of_node(
         self, node: int, amount: int, variables: SortedSet

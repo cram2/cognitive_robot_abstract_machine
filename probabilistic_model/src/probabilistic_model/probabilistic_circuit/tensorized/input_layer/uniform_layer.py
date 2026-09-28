@@ -9,6 +9,7 @@ from typing_extensions import List, Self
 
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    NodeIndices,
     NodeValues,
     SampleColumn,
     SampleNodeValues,
@@ -96,7 +97,5 @@ class UniformLayer(ContinuousLayerWithFiniteSupport):
         )
         return cls(variable_index, interval, bounds)
 
-    def sample_of_node(
-        self, node: int, amount: int, variables: SortedSet
-    ) -> SampleColumn:
-        return np.random.uniform(self.lower[node], self.upper[node], amount)
+    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+        return np.random.uniform(self.lower[nodes], self.upper[nodes])

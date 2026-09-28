@@ -107,6 +107,13 @@ class UnconvertibleUniformDistribution(UniformDistribution):
     """
 
 
+class UnconvertibleUniformDistribution(UniformDistribution):
+    """
+    A distribution type that no converter handles: converters dispatch on the exact type
+    of a distribution.
+    """
+
+
 def uniform(variable, lower, upper):
     return UniformDistribution(
         variable=variable, interval=closed(lower, upper).simple_sets[0]

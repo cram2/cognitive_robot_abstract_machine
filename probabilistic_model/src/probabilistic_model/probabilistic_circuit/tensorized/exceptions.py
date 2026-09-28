@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 from typing_extensions import Type
 
 from krrood.exceptions import DataclassException
@@ -53,3 +54,21 @@ class UndefinedCumulativeDistributionError(DataclassException, TypeError):
 
     def suggest_correction(self) -> str:
         return "Query the cumulative distribution only over ordered variables."
+
+
+@dataclass
+class NonPositiveScaleError(DataclassException, ValueError):
+    """
+    Exception raised when a layer has a scale that is not positive.
+    """
+
+    scale: np.ndarray
+    """
+    The scales that are not positive.
+    """
+
+    def error_message(self) -> str:
+        return f"The scales {self.scale.tolist()} are not positive."
+
+    def suggest_correction(self) -> str:
+        return "Give every node a positive scale."

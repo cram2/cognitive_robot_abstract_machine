@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 from random_events.interval import SimpleInterval, reals
 from random_events.variable import Variable
-from scipy.stats import norm
+from scipy.stats import norm, truncnorm
 from sortedcontainers import SortedSet
 from typing_extensions import List, Self, Type
 
@@ -16,11 +16,15 @@ from probabilistic_model.distributions.gaussian import (
 )
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    NodeIndices,
     NodeMask,
     NodeValues,
     SampleColumn,
     SampleNodeValues,
     VariableValues,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
+    NonPositiveScaleError,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.continuous_layer_with_density import (
@@ -33,19 +37,39 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 
 
 @dataclass(eq=False, repr=False)
-class GaussianLayer(ContinuousLayerWithDensity):
+class HasLocationAndScale:
     """
-    A layer of Gaussian distributions over one continuous variable.
+    Base class for the layers whose nodes are described by a Gaussian with a location
+    and a scale.
     """
 
     location: NodeValues
     """
-    The mean of every node.
+    The mean of the Gaussian of every node.
     """
 
     scale: NodeValues
     """
-    The standard deviation of every node.
+    The standard deviation of the Gaussian of every node.
+    """
+
+    def validate_own(self):
+        """
+        :raises ShapeMismatchError: If there is not one scale per location.
+        :raises NonPositiveScaleError: If a scale is not positive.
+        """
+        if self.location.shape != self.scale.shape:
+            raise ShapeMismatchError(self.location.shape, self.scale.shape)
+        # the negated comparison also catches a scale that is nan
+        non_positive = ~(self.scale > 0)
+        if non_positive.any():
+            raise NonPositiveScaleError(self.scale[non_positive])
+
+
+@dataclass(eq=False, repr=False)
+class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
+    """
+    A layer of Gaussian distributions over one continuous variable.
     """
 
     @property
@@ -55,10 +79,6 @@ class GaussianLayer(ContinuousLayerWithDensity):
     @property
     def number_of_own_parameters(self) -> int:
         return 2 * self.number_of_nodes
-
-    def validate_own(self):
-        if self.location.shape != self.scale.shape:
-            raise ShapeMismatchError(self.location.shape, self.scale.shape)
 
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
@@ -139,10 +159,8 @@ class GaussianLayer(ContinuousLayerWithDensity):
             np.concatenate([layer.scale for layer in layers]),
         )
 
-    def sample_of_node(
-        self, node: int, amount: int, variables: SortedSet
-    ) -> SampleColumn:
-        return norm.rvs(loc=self.location[node], scale=self.scale[node], size=amount)
+    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+        return norm.rvs(loc=self.location[nodes], scale=self.scale[nodes])
 
     def apply_translation_own(self, translation: VariableValues):
         self.location = self.location + translation[self.variable]
@@ -211,23 +229,19 @@ class GaussianLayer(ContinuousLayerWithDensity):
 
 
 @dataclass(eq=False, repr=False)
-class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
+class TruncatedGaussianLayer(HasLocationAndScale, ContinuousLayerWithFiniteSupport):
     """
     A layer of truncated Gaussian distributions over one continuous variable.
+
+    The location and scale are those of the untruncated Gaussian of every node.
 
     This is the layer that truncating a :class:`GaussianLayer` to a bounded interval
     produces.
     """
 
-    location: NodeValues
-    """
-    The mean of the untruncated Gaussian of every node.
-    """
-
-    scale: NodeValues
-    """
-    The standard deviation of the untruncated Gaussian of every node.
-    """
+    def validate_own(self):
+        HasLocationAndScale.validate_own(self)
+        ContinuousLayerWithFiniteSupport.validate_own(self)
 
     @property
     def number_of_own_parameters(self) -> int:
@@ -274,6 +288,15 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
             untruncated - self.cumulative_distribution_to_lower
         ) / self.normalizing_constant
         return np.minimum(1.0, np.where(left_included, result, 0.0))
+
+    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+        location, scale = self.location[nodes], self.scale[nodes]
+        return truncnorm.rvs(
+            a=(self.lower[nodes] - location) / scale,
+            b=(self.upper[nodes] - location) / scale,
+            loc=location,
+            scale=scale,
+        )
 
     def node_distribution(
         self, index: int, variable: Variable

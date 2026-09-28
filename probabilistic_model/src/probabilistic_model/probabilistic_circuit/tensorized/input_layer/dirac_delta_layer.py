@@ -11,6 +11,7 @@ from typing_extensions import List, Self, Type
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    NodeIndices,
     NodeMask,
     NodeValues,
     SampleColumn,
@@ -117,10 +118,8 @@ class DiracDeltaLayer(AbstractContinuousLayer):
             return self.location - center
         return np.zeros(self.number_of_nodes)
 
-    def sample_of_node(
-        self, node: int, amount: int, variables: SortedSet
-    ) -> SampleColumn:
-        return np.full(amount, self.location[node])
+    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+        return self.location[nodes].astype(float)
 
     def type_of_truncated_layer(
         self, assignment: Interval, singleton_allowed: bool

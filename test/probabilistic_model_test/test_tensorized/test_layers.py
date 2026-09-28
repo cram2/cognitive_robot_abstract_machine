@@ -35,10 +35,13 @@ from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_event,
     uniform_measure_of_simple_event,
 )
+from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
+    NonPositiveScaleError,
     NumberOfWeightsMismatchError,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
+    ForwardSampleAssignment,
     SampleRowsOfNode,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
@@ -763,10 +766,121 @@ class QueryDatastructureTestCase(unittest.TestCase):
         )
 
 
+class InputLayerSamplingTestCase(unittest.TestCase):
+    """
+    An input layer draws the samples of all of its nodes together, each sample from the
+    node it was routed to.
+    """
+
+    @staticmethod
+    def layers():
+        closed_bounds = np.full((3, 2), int(Bound.CLOSED), dtype=np.int64)
+        return {
+            "gaussian": GaussianLayer(0, np.array([-1.0, 2.0]), np.array([0.5, 1.5])),
+            "truncated gaussian": TruncatedGaussianLayer(
+                0,
+                np.array([[-1.0, 0.5], [0.0, 3.0], [2.0, 10.0]]),
+                closed_bounds,
+                np.array([0.0, 2.5, 0.0]),
+                np.array([1.0, 0.5, 2.0]),
+            ),
+            "uniform": uniform_layer_of(0, [(0, 2), (1, 5)]),
+            "dirac delta": DiracDeltaLayer(0, np.array([0.5, 3.0]), np.ones(2)),
+        }
+
+    def setUp(self):
+        np.random.seed(69)
+
+    def test_samples_of_every_node_have_the_mean_of_the_node(self):
+        for name, layer in self.layers().items():
+            with self.subTest(name):
+                nodes = np.repeat(np.arange(layer.number_of_nodes), 20000)
+                samples = layer.sample_of_nodes(nodes, SortedSet([x]))
+                means = layer.moment_of_nodes_own(1, 0.0, x)
+                for node in range(layer.number_of_nodes):
+                    of_node = samples[nodes == node]
+                    self.assertAlmostEqual(of_node.mean(), means[node], delta=0.05)
+                    self.assertTrue(
+                        np.all(
+                            np.isfinite(
+                                layer.log_likelihood_of_nodes_from_column(of_node)[
+                                    :, node
+                                ]
+                            )
+                        )
+                    )
+
+    def test_sampling_forward_fills_every_row_from_its_node(self):
+        for name, layer in self.layers().items():
+            with self.subTest(name):
+                assignment = ForwardSampleAssignment.for_layers([layer])
+                last = layer.number_of_nodes - 1
+                assignment.assign(layer, last, np.array([0, 2]))
+                assignment.assign(layer, 0, np.array([1]))
+                assignment.assign(layer, last, np.array([3]))
+                samples = np.full((4, 1), np.nan)
+                layer.sample_forward(assignment, samples, SortedSet([x]))
+
+                log_likelihoods = layer.log_likelihood_of_nodes_from_column(
+                    samples[:, 0]
+                )
+                node_of_row = np.array([last, 0, last, last])
+                self.assertTrue(
+                    np.all(np.isfinite(log_likelihoods[np.arange(4), node_of_row]))
+                )
+
+
+class LocationAndScaleValidationTestCase(unittest.TestCase):
+    """
+    A Gaussian layer, truncated or not, needs one positive scale per location.
+    """
+
+    @staticmethod
+    def truncated_gaussian_layer(
+        location: np.ndarray, scale: np.ndarray, number_of_intervals: int = 2
+    ) -> TruncatedGaussianLayer:
+        return TruncatedGaussianLayer(
+            0,
+            np.tile([[-1.0, 1.0]], (number_of_intervals, 1)),
+            np.full((number_of_intervals, 2), int(Bound.CLOSED), dtype=np.int64),
+            location,
+            scale,
+        )
+
+    def test_layers_with_positive_scales_are_valid(self):
+        GaussianLayer(0, np.zeros(2), np.array([0.5, 2.0])).validate()
+        self.truncated_gaussian_layer(np.zeros(2), np.array([0.5, 2.0])).validate()
+
+    def test_non_positive_scale_is_invalid(self):
+        for scale in (
+            np.array([1.0, 0.0]),
+            np.array([-1.0, 1.0]),
+            np.array([np.nan, 1.0]),
+        ):
+            for layer in (
+                GaussianLayer(0, np.zeros(2), scale),
+                self.truncated_gaussian_layer(np.zeros(2), scale),
+            ):
+                with self.subTest(layer=type(layer).__name__, scale=scale):
+                    with self.assertRaises(NonPositiveScaleError):
+                        layer.validate()
+
+    def test_truncated_gaussian_layer_with_one_scale_per_location_is_required(self):
+        layer = self.truncated_gaussian_layer(np.zeros(2), np.ones(3))
+        with self.assertRaises(ShapeMismatchError):
+            layer.validate()
+
+    def test_truncated_gaussian_layer_still_needs_one_bound_per_interval_end(self):
+        layer = self.truncated_gaussian_layer(np.zeros(2), np.ones(2))
+        layer.bounds = layer.bounds[:1]
+        with self.assertRaises(ShapeMismatchError):
+            layer.validate()
+
+
 class SupportWithoutCopiesTestCase(unittest.TestCase):
     """
-    The support and mode queries combine the events of the children with operations
-    that return new events, so they must not alter the events of the children.
+    The support and mode queries combine the events of the children with operations that
+    return new events, so they must not alter the events of the children.
     """
 
     def test_the_support_of_a_sum_does_not_alter_the_support_of_its_children(self):
