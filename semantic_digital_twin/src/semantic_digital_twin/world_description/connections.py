@@ -300,6 +300,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             multiplier=self.multiplier,
             offset=self.offset,
             raw_dof=world.get_degree_of_freedom_by_id(self.raw_dof.id),
+            dynamics=self.dynamics,
         )
 
     def copy_with_new_parent(
@@ -471,6 +472,7 @@ class ScrewConnection(ActiveConnection1DOF):
             offset=self.offset,
             raw_dof=world.get_degree_of_freedom_by_id(self.raw_dof.id),
             screw_pitch=self.screw_pitch,
+            dynamics=self.dynamics,
         )
 
     def copy_with_new_parent(

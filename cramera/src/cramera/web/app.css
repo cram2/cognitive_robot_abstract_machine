@@ -1,0 +1,711 @@
+:root{
+  --bg:#050608; --bg2:#0c0e12; --panel:#0b0d11; --panel2:#070809;
+  --ink:#e8eef6; --muted:#8b93a3; --faint:#5a6270;
+  --line:#20242c; --line2:#2c313b;
+  --accent:#39d5c8; --accent2:#5b8cff; --warn:#ffb648; --danger:#ff6b8b;
+  --obj:#5b8cff; --step:#39d5c8; --action:#b98cff; --reg:#ffb648; --robot:#ff7a9c;
+  --radius:4px; --shadow:0 8px 30px rgba(0,0,0,.6);
+  --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;font-family:var(--font);color:var(--ink);
+  background:
+    radial-gradient(1200px 700px at 15% -10%, #0b0d12 0%, transparent 55%),
+    radial-gradient(1000px 600px at 100% 0%, #0a0c11 0%, transparent 50%),
+    var(--bg);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+
+/* %% top bar */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 22px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(14,16,20,.9),rgba(6,7,9,.6));
+  backdrop-filter:blur(6px);
+  /* the backdrop-filter flattens this into one stacking context, so the whole bar
+     (dropdowns included) must sit above every panel's positioned internals */
+  position:relative;z-index:100;
+}
+.brand{display:flex;align-items:center;gap:14px}
+
+/* %% split */
+.split{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;min-height:0}
+/* a slot the layout mounts nothing into takes no room: the ?replay= popup shows the
+   scene alone and it gets the whole width */
+.split:has(>.slot:empty){grid-template-columns:1fr}
+.split>.slot:empty{display:none}
+/* panel slots: config.js mounts panels into these; several ids stack vertically */
+.slot{display:flex;flex-direction:column;gap:16px;min-height:0;min-width:0}
+.slot>.panel{flex:1;min-height:0}
+.slot>.panel-eql{flex:0 1 auto;min-height:150px}
+/* the tab group holding the graph takes the share the graph used to take on its own */
+.slot>.panel-tabs{flex:1 1 0}
+.panel-error{margin:auto;color:var(--danger);font-size:13px;padding:20px;text-align:center}
+.panel{
+  background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:1px solid var(--line);border-radius:var(--radius);
+  display:flex;flex-direction:column;min-height:0;box-shadow:var(--shadow);overflow:hidden;
+}
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--line);
+}
+.panel-head h2{margin:0;font-size:15px;font-weight:700}
+.pop-out{
+  position:absolute;right:12px;bottom:12px;z-index:5;
+  background:rgba(12,14,19,.72);border:1px solid var(--line);color:var(--muted);
+  border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;white-space:nowrap;
+}
+.pop-out:hover,.pop-out:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+
+/* %% 3d stage */
+.stage{position:relative;flex:1;min-height:0;overflow:hidden;background:
+  radial-gradient(700px 500px at 50% 25%, #0a0c11 0%, #050608 70%);}
+/* Procedural backdrop behind the 3D canvas. */
+.stage-bg{position:absolute;inset:0;z-index:0;
+  background:linear-gradient(155deg,#232833,#0c0e13);
+  filter:blur(9px) brightness(.62) saturate(1.05);
+  transform:scale(1.12);            /* overscan so blurred edges stay off-screen */
+}
+.stage-bg:after{content:"";position:absolute;inset:0;
+  background:radial-gradient(60% 60% at 50% 45%, rgba(5,10,20,0) 0%, rgba(5,10,20,.45) 100%)}
+#viewer{position:absolute;inset:0;z-index:1}
+#viewer canvas{display:block;width:100%;height:100%}
+.hidden{display:none!important}
+.viewer-status{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  color:var(--muted);font-size:13px;letter-spacing:.3px;
+  padding:10px 16px;border:1px solid var(--line2);border-radius:4px;background:rgba(10,17,32,.6)
+}
+.stage-hint{position:absolute;left:14px;bottom:12px;z-index:4;font-size:11px;color:var(--faint);letter-spacing:.4px}
+.layers-panel{
+  position:absolute;left:14px;top:14px;z-index:3;min-width:180px;
+  background:rgba(12,20,34,.72);border:1px solid var(--line2);border-radius:4px;
+  padding:12px 13px;backdrop-filter:blur(7px);box-shadow:0 8px 26px rgba(0,0,0,.4)
+}
+.lp-title{
+  font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);
+  margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:10px
+}
+.lp-fold{font-size:12px;line-height:1}
+/* folded: the overlay is its title and the fold button, nothing more */
+.layers-panel.folded{min-width:0;padding:8px 10px}
+.layers-panel.folded .lp-title{margin-bottom:0}
+.layers-panel.folded .lp-row,
+.layers-panel.folded .lp-legend,
+.layers-panel.folded .marker-settings,
+.layers-panel.folded .frame-settings{display:none}
+.lp-row{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);padding:4px 0;cursor:pointer}
+.lp-row input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+.lp-legend{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
+.lp-legend .li{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+.lp-legend .dot{width:10px;height:10px;border-radius:50%}
+
+/* red LIVE indicator, top right of the 3D view — on while the bridge is attached */
+.live-indicator{
+  position:absolute;right:16px;top:16px;z-index:6;display:none;align-items:center;gap:9px;
+  font:800 19px/1 Inter,sans-serif;letter-spacing:2.4px;color:#fff;
+  padding:12px 18px;border-radius:5px;background:rgba(214,40,57,.94);
+  border:2px solid #ff6b7a;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 10px 26px rgba(214,40,57,.45);
+  animation:live-pulse 1.6s ease-in-out infinite
+}
+.live-indicator.on{display:inline-flex}
+@keyframes live-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.live-indicator{animation:none}}
+
+/* blue REPLAY badge — the popup playing a recorded clip instead of the live stream */
+.live-indicator.replay{
+  background:rgba(53,167,255,.94);border-color:#8fdcff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.35),0 10px 26px rgba(53,167,255,.45);
+  animation:none;font-size:15px;letter-spacing:1.2px
+}
+
+.step-caption{
+  position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:4;
+  max-width:82%;text-align:center;font-size:13px;line-height:1.4;color:var(--ink);
+  padding:9px 16px;border-radius:4px;border:1px solid var(--line2);
+  background:rgba(10,17,32,.78);backdrop-filter:blur(6px);
+  box-shadow:0 8px 24px rgba(0,0,0,.4)
+}
+.step-caption b{color:var(--accent)}
+
+.play-btn{
+  background:rgba(57,213,200,.14);border:1px solid var(--accent);color:var(--accent);
+  font:inherit;font-size:14px;font-weight:700;padding:11px 26px;border-radius:4px;cursor:pointer;transition:.15s
+}
+.play-btn:hover{background:rgba(57,213,200,.24)}
+.play-btn:disabled{opacity:.4;cursor:default}
+.play-btn.playing{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04121a;border-color:transparent}
+.wf-btns{display:flex;gap:10px;width:100%;justify-content:center}
+.play-btn.cram{color:#c9b3ff;border-color:var(--action);background:rgba(185,140,255,.16)}
+.play-btn.cram:hover{background:rgba(185,140,255,.26)}
+.play-btn.cram.playing{background:linear-gradient(135deg,var(--action),#8f6bff);color:#0b0518;border-color:transparent}
+.play-btn.record{color:#ffcf8a;border-color:#e0a94a;background:rgba(224,169,74,.14);padding:11px 18px}
+.play-btn.record:hover{background:rgba(224,169,74,.24)}
+.play-btn.record:disabled{opacity:.45;cursor:default;background:rgba(224,169,74,.14)}
+
+/* %% naming and trimming a captured episode before it is saved */
+.record-save-panel{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;
+  padding:10px 12px;border:1px solid #e0a94a;border-radius:6px;
+  background:rgba(224,169,74,.08)
+}
+.record-save-field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink)}
+.record-name{
+  width:150px;padding:5px 7px;border:1px solid var(--line2);border-radius:4px;
+  background:var(--panel);color:var(--ink);font-size:12px
+}
+.record-trim{width:130px;accent-color:#e0a94a;cursor:pointer}
+.record-trim-summary{font-size:12px;color:var(--muted);min-width:120px}
+
+/* %% workflow */
+.workflow{border-top:1px solid var(--line);padding:12px 14px;background:var(--panel2)}
+.workflow-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
+.workflow-head span{font-size:13px;font-weight:600;color:var(--ink)}
+
+.playback-scrub-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.playback-scrubber{
+  flex:1;height:4px;border-radius:2px;background:var(--line2);appearance:none;cursor:pointer
+}
+.playback-scrubber::-webkit-slider-thumb{
+  appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 3px rgba(57,213,200,.2);cursor:pointer
+}
+.playback-scrubber::-moz-range-thumb{
+  width:14px;height:14px;border:none;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 3px rgba(57,213,200,.2);cursor:pointer
+}
+.playback-scrubber:disabled{opacity:.4;cursor:default}
+.playback-track{position:relative;flex:1;display:flex;align-items:center}
+.playback-track .playback-scrubber{width:100%}
+.timeline-events{position:absolute;left:0;right:0;top:50%;height:0;pointer-events:none}
+.timeline-mark{
+  position:absolute;transform:translate(-50%,-50%);width:9px;height:9px;border-radius:2px;
+  border:1px solid rgba(10,17,32,.85);cursor:pointer;pointer-events:auto;
+}
+.timeline-mark:hover{transform:translate(-50%,-50%) scale(1.35)}
+.timeline-preview{
+  position:absolute;bottom:18px;transform:translateX(-50%);z-index:6;width:184px;
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;
+  box-shadow:0 10px 26px rgba(0,0,0,.5);pointer-events:none;
+}
+.timeline-preview img{display:block;width:100%;border-radius:5px;background:#0c0e13}
+.timeline-preview .tp-loading{
+  height:104px;border-radius:5px;background:#0c0e13;display:flex;align-items:center;
+  justify-content:center;font-size:11px;color:var(--faint)
+}
+.timeline-preview .tp-label{font-size:11.5px;color:var(--ink);margin-top:5px}
+.timeline-preview .tp-time{font-size:10.5px;color:var(--faint)}
+.playback-time{font-size:12px;color:var(--muted);white-space:nowrap;min-width:72px;text-align:right}
+
+/* %% query box */
+.knowledge-status{font-size:12px;color:var(--faint)}
+.knowledge-status.ready{color:var(--accent)}
+/* position:relative so the suggestion menu hangs below the box it belongs to */
+.query-box{
+  padding:14px 16px;border-bottom:1px solid var(--line);background:var(--panel2);
+  position:relative
+}
+/* the text bar: the query input with its buttons sitting inside it, on the right */
+.query-bar{
+  display:flex;align-items:stretch;gap:6px;background:var(--bg);
+  border:1px solid var(--line2);border-radius:4px;padding:4px
+}
+.query-bar:focus-within{border-color:var(--accent)}
+#query-input{
+  flex:1;background:transparent;border:0;color:var(--ink);font-family:var(--mono);
+  font-size:13px;padding:7px 9px;outline:none;resize:vertical;min-height:36px;line-height:1.45
+}
+#query-run{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;color:#04121a;
+  font-weight:700;font-size:13px;padding:0 20px;border-radius:4px;cursor:pointer
+}
+#query-run:active{transform:translateY(1px)}
+/* one press records one spoken question; sits inside the bar beside Run */
+.voice-ask{
+  background:var(--bg2);border:1px solid var(--line2);border-radius:4px;color:var(--ink);
+  font-size:15px;padding:0 13px;cursor:pointer;transition:.15s
+}
+.voice-ask:hover{border-color:var(--accent)}
+.voice-ask:disabled{opacity:.4;cursor:not-allowed}
+.voice-ask.listening{border-color:#ff5470;animation:voice-listening 1.1s ease-in-out infinite}
+@keyframes voice-listening{
+  0%,100%{box-shadow:0 0 0 0 rgba(255,84,112,.55)}
+  50%{box-shadow:0 0 0 6px rgba(255,84,112,0)}
+}
+/* the asked question, big under the bar, in English; the role colours are krrood's
+   own inline spans, and its words link to their documentation or source */
+.question{
+  background:var(--bg);border:1px solid var(--line2);
+  border-left:3px solid var(--accent);border-radius:4px;color:var(--ink);
+  font-size:17px;line-height:1.55;padding:13px 15px;min-height:24px
+}
+.question .question-hint{color:var(--faint);font-size:14px;font-style:italic}
+.question a{color:inherit;text-decoration:underline dotted;text-underline-offset:3px}
+.question a:hover{color:var(--accent);text-decoration:underline solid}
+
+/* %% suggestion menu */
+/* hangs under the query box like an editor's completion popup: one row per name, the
+   kind it is, what it is, and the module a class comes from. Fixed rather than absolute,
+   and placed from the box's own rectangle, because every panel clips its overflow and a
+   menu longer than the panel would be cut off inside it. */
+.completion-menu{
+  position:fixed;z-index:60;
+  background:var(--panel);border:1px solid var(--line2);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:auto
+}
+.completion-item{
+  display:grid;grid-template-columns:74px minmax(120px,auto) 1fr auto;gap:10px;
+  align-items:baseline;padding:5px 10px;cursor:pointer;font-size:12px
+}
+.completion-item.active{background:var(--bg2)}
+.completion-kind{
+  font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--faint)
+}
+.completion-name{font-family:var(--mono);color:var(--ink)}
+.completion-item.active .completion-name{color:var(--accent)}
+.completion-detail{
+  color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.completion-origin{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+
+/* everything the bar produces, in one scrolling region: the question read back, the
+   questions on offer and the answer. A long verbalization would otherwise push the
+   answer past the bottom of a panel that clips whatever does not fit. */
+.console-body{flex:1;min-height:0;overflow-y:auto;padding:14px 16px}
+
+.presets{margin-top:11px}
+/* the heading a body of knowledge's questions are offered under; a scene that only asks
+   about one thing gets no heading at all, so the row stands alone as it always did */
+.preset-group{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;
+  font-size:10.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--accent);margin:12px 0 6px
+}
+.preset-group .lp-fold{color:var(--accent)}
+.preset-group:hover{color:var(--ink)}
+.preset-group:hover .lp-fold{color:var(--ink)}
+.preset-group:first-child{margin-top:0}
+.preset-row{display:flex;flex-wrap:wrap;gap:7px}
+.preset-row.folded{display:none}
+.preset{
+  font-size:12px;color:var(--muted);background:var(--bg2);border:1px solid var(--line2);
+  padding:6px 11px;border-radius:4px;cursor:pointer;transition:.15s
+}
+.preset:hover{border-color:var(--accent);color:var(--ink)}
+/* a question about a demo that is not attached: shown, so the set of questions the
+   scene answers stays visible, but not clickable */
+.preset.unavailable{opacity:.45;cursor:not-allowed;border-style:dashed}
+.preset.unavailable:hover{border-color:var(--line2);color:var(--muted)}
+
+/* %% answer */
+.answer{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.answer-empty{color:var(--faint);font-size:13px;font-style:italic}
+.answer .goal{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:8px;word-break:break-all}
+.answer .headline{font-size:13.5px;color:var(--ink);margin:0 0 10px;line-height:1.5}
+.answer .headline b{color:var(--accent)}
+.ansrow{
+  display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:3px;
+  background:var(--bg2);border:1px solid var(--line);margin-bottom:6px
+}
+.ansrow .tag{
+  flex:0 0 auto;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  padding:3px 8px;border-radius:3px;color:#04121a
+}
+.ansrow .body{font-size:12.5px;line-height:1.45}
+.ansrow .body .name{font-weight:600;color:var(--ink)}
+.ansrow .body .sub{color:var(--muted);display:block;margin-top:2px}
+.ansrow .body code{font-family:var(--mono);font-size:11.5px;color:var(--accent2);background:rgba(91,140,255,.1);padding:1px 5px;border-radius:5px}
+
+/* %% answer table — a query's rows share their columns, so they are read as a table.
+   Each cell is coloured by what its value is; colouring them all alike turns an answer
+   into a wall of one colour that has to be read word by word. */
+.anstable-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2)}
+.anstable{border-collapse:collapse;width:100%;font-size:12.5px}
+.anstable th{
+  position:sticky;top:0;z-index:1;background:var(--panel);
+  font-size:10.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--faint);text-align:left;padding:7px 12px;white-space:nowrap;
+  border-bottom:1px solid var(--line2)
+}
+.anstable td{padding:7px 12px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.45}
+.anstable tbody tr:last-child td{border-bottom:0}
+.anstable tbody tr:nth-child(even){background:rgba(255,255,255,.018)}
+.anstable tbody tr:hover{background:rgba(57,213,200,.06)}
+.anstable .ans-type{width:1%;white-space:nowrap;padding-right:4px}
+.anstable .ans-type .tag{display:inline-block}
+.anstable .ans-name{color:var(--ink);font-weight:600}
+.anstable .ans-number{color:var(--warn);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.anstable .ans-true{color:var(--accent);font-weight:600}
+.anstable .ans-false{color:var(--danger);font-weight:600}
+.anstable .ans-empty{color:var(--faint)}
+.anstable .ans-text{color:var(--muted)}
+.anstable .ans-replay{width:1%;white-space:nowrap;text-align:right}
+.replay-btn{
+  background:rgba(53,167,255,.14);border:1px solid #35a7ff;color:#8fdcff;
+  font:inherit;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:4px;
+  cursor:pointer;transition:.15s;white-space:nowrap
+}
+.replay-btn:hover{background:rgba(53,167,255,.28)}
+.nores{color:var(--warn);font-size:13px}
+.qerr{color:var(--danger);font-family:var(--mono);font-size:12px;white-space:pre-wrap}
+.ansub{font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:#93a4c4;margin:12px 0 6px}
+.answer .rel{font-family:var(--mono);font-size:11px;color:var(--accent2);padding:0 3px}
+.hint-txt{font-size:12px;color:var(--muted);line-height:1.5;margin:10px 0 0}
+
+/* %% panel tabs — several panels sharing one frame, one shown at a time */
+.panel-tabs{display:flex;flex-direction:column;min-height:0;min-width:0}
+.tab-bar{
+  display:flex;align-items:center;gap:2px;padding:0 4px;flex:0 0 auto;
+}
+.tab-bar button{
+  appearance:none;background:none;border:0;border-bottom:2px solid transparent;
+  color:var(--muted);font:700 11.5px/1 Inter,sans-serif;letter-spacing:.4px;
+  text-transform:uppercase;padding:8px 12px 6px;cursor:pointer;transition:.15s
+}
+.tab-bar button:hover{color:var(--ink)}
+.tab-bar button.active{color:var(--accent);border-bottom-color:var(--accent)}
+/* a tab body is the frame the panel inside it fills, so the panel keeps its own chrome */
+.tab-body{flex:1 1 0;min-height:0;display:flex}
+.tab-body>.panel{flex:1;min-height:0;min-width:0}
+
+/* %% event timeline */
+.timeline-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.timeline-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:8px 14px;border-bottom:1px solid var(--line2);flex:0 0 auto;
+  font:600 11.5px/1 Inter,sans-serif;letter-spacing:.3px;color:var(--muted)
+}
+.timeline-title{color:var(--ink)}
+.timeline-body{position:relative;flex:1;min-height:0}
+.timeline-plot{position:absolute;inset:0;overflow:hidden}
+/* one lane per kind of event, labelled at the left edge over its own rule */
+.timeline-lane{
+  position:absolute;z-index:1;left:0;right:0;transform:translateY(-50%);
+  padding-left:10px;border-top:1px dashed var(--line2);
+  font:600 10.5px/18px Inter,sans-serif;letter-spacing:.3px;color:var(--muted);
+  white-space:nowrap;pointer-events:none
+}
+.timeline-mark{
+  position:absolute;z-index:2;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;
+  border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg2);
+  cursor:default
+}
+.timeline-mark:hover{background:var(--warn);box-shadow:0 0 0 3px var(--bg2)}
+/* what a pointed-at mark says: the kind of event, what it happened to, and when */
+.timeline-summary{
+  position:absolute;z-index:9;pointer-events:none;max-width:60%;
+  --summary-across:-50%;--summary-down:-100%;
+  transform:translate(var(--summary-across),var(--summary-down));
+  padding:6px 9px;border:1px solid var(--line2);border-radius:6px;
+  background:var(--bg2);box-shadow:0 6px 18px rgba(0,0,0,.35);
+  font:500 11px/1.45 Inter,sans-serif;white-space:normal
+}
+.timeline-summary.from-left{--summary-across:0}
+.timeline-summary.from-right{--summary-across:-100%}
+.timeline-summary.above{margin-top:-11px}
+.timeline-summary.below{--summary-down:0;margin-top:11px}
+.timeline-summary-kind{font-weight:700;color:var(--ink)}
+.timeline-summary-objects{color:var(--ink);opacity:.85}
+.timeline-summary-time{color:var(--muted);font-size:10.5px;letter-spacing:.2px}
+.timeline-now{
+  position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;
+  background:var(--warn);opacity:.85;pointer-events:none
+}
+.timeline-empty{
+  position:absolute;inset:0;display:grid;place-items:center;padding:0 16%;
+  text-align:center;color:var(--muted);font-size:12.5px;pointer-events:none
+}
+
+/* %% graph */
+.graph-wrap{position:relative;flex:1;min-height:0}
+/* a class rather than an id: every panel drawing a graph has a canvas of its own */
+.graph-canvas{position:absolute;inset:34px 0 0}
+
+/* view tabs: knowledge graph / kinematics / motion statechart */
+.graph-tabs{
+  position:absolute;left:0;right:0;top:0;height:34px;z-index:7;display:flex;align-items:center;gap:2px;
+  padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--line2)
+}
+.graph-tabs button{
+  appearance:none;background:none;border:0;border-bottom:2px solid transparent;
+  color:var(--muted);font:600 11.5px/1 Inter,sans-serif;letter-spacing:.3px;
+  padding:10px 10px 8px;cursor:pointer;transition:.15s
+}
+.graph-tabs button:hover{color:var(--ink)}
+.graph-tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.graph-tabs .gt-live{
+  margin-left:auto;display:none;font:600 10.5px/1 Inter,sans-serif;letter-spacing:.4px;
+  color:#0b1220;background:var(--warn);border-radius:3px;padding:4px 7px
+}
+.graph-tabs .gt-live.on{display:inline-block}
+
+.graph-empty{
+  position:absolute;inset:34px 0 0;display:grid;place-items:center;padding:0 16%;
+  text-align:center;font-size:12.5px;line-height:1.65;color:var(--muted);z-index:5;pointer-events:none
+}
+.legend{
+  position:absolute;right:12px;top:46px;display:flex;flex-direction:column;gap:5px;
+  background:rgba(10,17,32,.72);border:1px solid var(--line2);border-radius:4px;padding:9px 11px;
+  backdrop-filter:blur(4px)
+}
+.legend .li{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+.legend .dot{width:11px;height:11px;border-radius:50%}
+/* execution status shows up as a node ring, so the legend uses rings too */
+.legend .ring{width:18px;height:18px;border-radius:50%;border:6px solid;border-style:solid;box-sizing:border-box}
+
+/* %% plan graph — the head line above the tree names the step being executed */
+.plan-head{
+  position:absolute;left:0;right:0;top:0;height:34px;z-index:7;display:flex;align-items:center;gap:10px;
+  padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--line2)
+}
+.plan-executing{
+  font:600 11.5px/1 Inter,sans-serif;letter-spacing:.3px;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.plan-follow{
+  margin-left:auto;display:flex;align-items:center;gap:5px;flex:none;
+  font:600 10.5px/1 Inter,sans-serif;letter-spacing:.3px;color:var(--muted);cursor:pointer
+}
+.plan-head .gt-live{
+  display:none;font:600 10.5px/1 Inter,sans-serif;letter-spacing:.4px;
+  color:#0b1220;background:var(--warn);border-radius:3px;padding:4px 7px
+}
+.plan-head .gt-live.on{display:inline-block}
+
+/* %% resizable split — core/split-resize.js inserts these between two panes */
+.pane-divider{position:relative;z-index:6;border-radius:4px;transition:background .15s}
+.pane-divider:hover,.pane-divider.dragging{background:rgba(94,197,255,.28)}
+.pane-divider.dragging{user-select:none}
+/* the grip line down (or across) the middle of the divider */
+.pane-divider:after{content:"";position:absolute;background:var(--line2);border-radius:2px}
+.pane-divider:hover:after,.pane-divider.dragging:after{background:var(--accent)}
+/* between the scene and the knowledge column */
+.split-divider{width:8px;cursor:col-resize;align-self:stretch}
+.split-divider:after{left:3px;top:50%;width:2px;height:44px;transform:translateY(-50%)}
+/* between the panels a slot stacks */
+.slot-divider{height:8px;cursor:row-resize;justify-self:stretch}
+.slot-divider:after{top:3px;left:50%;height:2px;width:44px;transform:translateX(-50%)}
+
+.kg-max-btn{
+  background:#141821;border:1px solid #37404f;border-radius:4px;color:#c8d1e0;
+  font:inherit;font-size:14px;line-height:1;padding:6px 9px;cursor:pointer;
+  margin-left:10px;transition:.15s;
+}
+.kg-max-btn:hover{background:#1c222d;color:#fff;border-color:var(--accent)}
+.split.kg-maximized{grid-template-columns:1fr}
+.split.kg-maximized [data-slot="left"],
+.split.kg-maximized .split-divider{display:none}
+
+/* %% drill-down breadcrumb, shown once you double-click into a node */
+.graph-nav{
+  position:absolute;left:52px;top:46px;z-index:6;display:flex;align-items:center;gap:6px;
+  background:rgba(20,24,33,.82);border:1px solid #37404f;border-radius:4px;
+  padding:4px 8px;backdrop-filter:blur(4px);
+}
+.graph-nav button{
+  background:none;border:1px solid #37404f;border-radius:3px;color:#c8d1e0;
+  font:inherit;font-size:11.5px;line-height:1;padding:4px 8px;cursor:pointer;transition:.15s;
+}
+.graph-nav button:hover{color:#fff;border-color:var(--accent)}
+.graph-nav #gnav-path{font-size:11.5px;color:var(--warn);font-weight:600;max-width:320px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* %% overlay controls inside .graph-wrap: fullscreen and zoom */
+.graph-max-btn,.graph-zoom button{
+  background:rgba(20,24,33,.82);border:1px solid #37404f;border-radius:4px;color:#c8d1e0;
+  font:inherit;font-size:14px;line-height:1;padding:6px 9px;cursor:pointer;
+  backdrop-filter:blur(4px);transition:.15s;
+}
+.graph-max-btn:hover,.graph-zoom button:hover{background:#1c222d;color:#fff;border-color:var(--accent)}
+.graph-max-btn{position:absolute;left:12px;top:46px;z-index:6}
+/* zoom in / out / fit — the touchpad-free way to get the same result as a pinch */
+.graph-zoom{position:absolute;left:12px;top:82px;z-index:6;display:flex;flex-direction:column;gap:4px}
+.graph-zoom button{width:31px;text-align:center;padding:6px 0}
+.graph-wrap.graph-fullscreen{
+  position:fixed;inset:0;z-index:1000;background:var(--bg);
+  border:none;border-radius:0;padding:0;margin:0;
+}
+.graph-wrap.graph-fullscreen .graph-canvas{inset:34px 0 0}
+/* keep the page from scrolling behind the overlay */
+body.graph-full-open{overflow:hidden}
+
+/* %% responsive */
+@media (max-width:900px){
+  body{overflow:auto}
+  .split{grid-template-columns:1fr !important}
+  /* the slot goes back to stacking, so the divider it made a grid track for goes */
+  .slot{display:flex !important}
+  .pane-divider,.kg-max-btn{display:none}
+  .stage{min-height:340px}
+  .graph-wrap{min-height:360px}
+  .cards{grid-template-columns:1fr}
+}
+
+/* %% scene switcher in the top bar */
+.scene-pickers{display:flex;align-items:center;gap:14px}
+.scene-picker{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted)}
+.scene-picker:has(select:disabled){opacity:.6}
+.scene-select{
+  background:#141821;border:1px solid #37404f;border-radius:4px;color:#c8d1e0;
+  font:inherit;font-size:12.5px;padding:6px 9px;cursor:pointer;margin-right:10px;
+}
+.scene-select:hover,.scene-select:focus{border-color:var(--accent);outline:none}
+
+/* live mode button */
+/* driving the running demo: pause / restart / loop, beside the Live button */
+.run-controls{display:inline-flex;gap:6px}
+.play-btn.run{color:#ffd18a;border-color:#ffb648;background:rgba(255,182,72,.12)}
+.play-btn.run:hover{background:rgba(255,182,72,.24)}
+.play-btn.run.on{background:linear-gradient(135deg,#ffb648,#ff8f48);color:#1a1005;border-color:transparent}
+.play-btn.run.pending{opacity:.6;font-style:italic}
+.run-status{font-family:var(--mono);font-size:11px;color:var(--muted);align-self:center}
+.play-btn.live{color:#ff8091;border-color:#ff6b8b;background:rgba(255,107,139,.12)}
+.play-btn.live:hover{background:rgba(255,107,139,.22)}
+.play-btn.live.on{background:linear-gradient(135deg,#ff6b8b,#ff9d6b);color:#1a0509;border-color:transparent;animation:livePulse 1.6s ease-in-out infinite}
+@keyframes livePulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.25)}}
+
+/* %% page tabs (Scene / Models) */
+.page-tabs{display:flex;gap:4px;margin-left:28px;margin-right:auto}
+.page-tabs a{
+  padding:7px 16px;border-radius:var(--radius);font-size:13px;font-weight:600;
+  color:var(--muted);text-decoration:none;border:1px solid transparent;
+}
+.page-tabs a:hover{color:var(--ink);background:rgba(255,255,255,.04)}
+.page-tabs a.active{color:var(--accent);border-color:var(--line2);background:rgba(57,213,200,.08)}
+
+/* %% topbar view menu: which panels are shown */
+.view-menu{position:relative}
+.view-menu-toggle{
+  padding:7px 16px;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;
+  color:var(--muted);background:transparent;border:1px solid var(--line2);
+}
+.view-menu-toggle:hover{color:var(--ink);background:rgba(255,255,255,.04)}
+.view-menu-list{
+  position:absolute;right:0;top:calc(100% + 8px);z-index:50;min-width:280px;
+  background:var(--panel);border:1px solid var(--line2);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:10px 14px;display:flex;flex-direction:column;gap:2px;
+}
+
+/* %% view menu rows: panel name + region choice */
+.view-menu-row{
+  display:flex;align-items:center;gap:10px;
+  font-size:12.5px;color:var(--ink);padding:5px 0;
+}
+.view-menu-row span{flex:1}
+.view-menu-row input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+.view-menu-reload{
+  margin-top:10px;padding:7px 12px;width:100%;cursor:pointer;
+  border:1px solid var(--line2);border-radius:var(--radius);
+  background:rgba(57,213,200,.08);color:var(--accent);font-size:12.5px;font-weight:600;
+}
+.view-menu-reload:hover{background:rgba(57,213,200,.16)}
+.view-menu-row select{
+  background:var(--bg2);color:var(--ink);border:1px solid var(--line2);
+  border-radius:var(--radius);padding:4px 8px;font-size:12px;font-family:var(--font);
+}
+
+/* %% marker settings (inside the layers panel) */
+.marker-gear,.layer-gear{
+  margin-left:auto;background:transparent;border:none;color:var(--faint);
+  cursor:pointer;font-size:13px;padding:0 2px;
+}
+.marker-gear:hover,.layer-gear:hover{color:var(--accent)}
+.marker-settings,.frame-settings{
+  margin:4px 0 6px 22px;padding-left:9px;border-left:1px solid var(--line);
+  display:flex;flex-direction:column;gap:1px;max-height:220px;overflow:auto;
+}
+.ms-title{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin:6px 0 2px}
+.ms-row{font-size:11.5px;overflow-wrap:anywhere}
+.ms-note{font-size:11.5px;color:var(--faint);padding:4px 0}
+.ms-nested{margin-left:16px;padding-left:8px;border-left:1px solid var(--line)}
+.ms-disclosure{background:transparent;border:none;color:var(--faint);cursor:pointer;
+  font-size:9px;padding:0 3px 0 0;line-height:1}
+.ms-disclosure:hover{color:var(--accent)}
+.ms-slider{display:flex;align-items:center;gap:6px;font-size:11.5px;padding:2px 0}
+.ms-slider input[type=range]{flex:1;min-width:0}
+
+/* Plan tab: readable step-list view (toggled via the Steps button) */
+.graph-steps{position:absolute;inset:0;overflow:auto;padding:16px 20px;background:var(--panel,#0f1729)}
+.graph-steps-toggle{position:absolute;top:52px;right:14px;z-index:6;background:var(--bg2,#0c1526);border:1px solid var(--line2,#2b3a57);color:var(--muted,#8b9bc0);font:inherit;font-size:12px;font-weight:600;padding:5px 11px;border-radius:6px;cursor:pointer}
+.graph-steps-toggle:hover{color:var(--ink,#dfe8fb);border-color:var(--accent,#39d5c8)}
+.graph-steps-toggle.on{color:#04121a;background:var(--accent,#39d5c8);border-color:transparent}
+.steps-tree{max-width:900px;margin:0 auto}
+.st-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;border:1px solid transparent}
+.st-row.hk{cursor:pointer}
+.st-row.hk:hover{background:var(--bg2,#0c1526);border-color:var(--line,#26324d)}
+.st-tw{width:14px;flex:none;color:var(--faint,#5f7196);font-size:11px;text-align:center}
+.st-num{min-width:40px;flex:none;color:var(--faint,#5f7196);font-variant-numeric:tabular-nums;font-size:12px}
+.st-name{font-size:13.5px;font-weight:600;color:var(--ink,#dfe8fb)}
+.st-name.detail{font-weight:400;color:var(--muted,#8b9bc0);font-size:12.5px}
+.st-meta{margin-left:auto;display:flex;gap:9px;align-items:center}
+.st-dc{font-size:10.5px;color:var(--faint,#5f7196)}
+.st-kids{margin-left:20px;border-left:1px solid var(--line,#26324d);padding-left:8px}
+.st-leaf{display:flex;align-items:center;gap:8px;padding:4px 10px}
+.sp{display:inline-flex;align-items:center;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.sp-SUCCEEDED,.sp-DONE{background:rgba(75,211,138,.14);color:#7fe0a8}
+.sp-RUNNING{background:rgba(255,182,72,.16);color:#ffcf8a}
+.sp-FAILED{background:rgba(255,107,139,.16);color:#ff9db1}
+.sp-CREATED,.sp-NOT_STARTED{background:rgba(70,85,122,.25);color:#9aa7c4}
+
+/* ---- Plan step hierarchy ---- */
+.graph-steps{position:absolute;inset:34px 0 0;display:flex;overflow:hidden;padding:0}
+.graph-steps .steps-pane{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.graph-steps .steps-tree{flex:1;max-width:none;margin:0;overflow:auto;padding:14px 18px}
+
+/* hierarchy: top-level "phases" stand out; deeper steps recede */
+.st-row.lvl0{margin-top:6px;padding-top:9px;border-top:1px solid var(--line,#26324d)}
+.steps-tree > .step:first-child > .st-row.lvl0{border-top:0;margin-top:0}
+.st-row.lvl0 .st-name{font-size:14.5px;font-weight:700;color:var(--ink,#dfe8fb)}
+.st-row.lvl0 .st-num{font-weight:700;color:var(--muted,#8b9bc0)}
+.st-row.lvl1 .st-name{font-size:13px;font-weight:600}
+.st-row.lvl2 .st-name,.st-row.lvl3 .st-name{font-size:12.5px;font-weight:400;color:var(--muted,#8b9bc0)}
+.st-kids{margin-left:16px;border-left:2px solid var(--line2,#2b3a57);padding-left:10px}
+.st-row.lvl0 .st-name::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent,#39d5c8);margin-right:8px;vertical-align:middle;opacity:.7}
+
+/* ===== Plan Steps: strong tree hierarchy (overrides the earlier weaker rules) ===== */
+.st-row{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;position:relative}
+.st-row:hover{background:rgba(255,255,255,.03)}
+.st-row .st-name{font-size:13px;font-weight:600;color:var(--ink,#e8eef6)}
+/* top-level phases: card-like header with an accent bar */
+.st-row.lvl0{margin-top:10px;padding:10px 12px 10px 14px;background:var(--bg2,#0c0e12);
+  border:1px solid var(--line,#20242c);border-left:4px solid var(--accent,#39d5c8);border-radius:8px}
+.steps-tree > .st-row.lvl0:first-child{margin-top:0}
+.st-row.lvl0 .st-name{font-size:15px;font-weight:800;color:var(--ink,#e8eef6)}
+.st-row.lvl0 .st-num{font-weight:800;color:var(--muted,#8b93a3)}
+.st-row.lvl0 .st-name::before{content:none}
+/* nested groups: indent + a clear vertical guide line + connector ticks */
+.st-kids{position:relative;margin-left:18px;padding-left:20px;border-left:2px solid var(--line2,#2c313b)}
+.st-kids > .st-row::before,
+.st-kids > .st-leaf::before{content:"";position:absolute;left:-20px;top:50%;width:16px;height:2px;background:var(--line2,#2c313b)}
+/* depth de-emphasis */
+.st-row.lvl2 .st-name{font-weight:500;color:#c7cede;font-size:12.5px}
+.st-row.lvl3 .st-name{font-weight:400;color:var(--muted,#8b93a3);font-size:12.5px}
+/* details (motions) recede clearly */
+.st-leaf{display:flex;align-items:center;gap:8px;padding:4px 10px;position:relative}
+.st-leaf .st-name{font-weight:400;color:var(--muted,#8b93a3);font-size:12px;font-style:italic}
+.st-leaf .st-name.detail::before{content:"↳ ";color:var(--faint,#5a6270);font-style:normal}
+
+/* expand/collapse-all controls at the top of the step list */
+.steps-toolbar{flex:none;display:flex;gap:6px;padding:8px 18px;border-bottom:1px solid var(--line,#20242c);background:var(--panel2,#070809)}
+.steps-tool-btn{font:inherit;font-size:11px;color:var(--muted,#8b93a3);background:var(--panel,#0b0d11);border:1px solid var(--line,#20242c);border-radius:6px;padding:5px 10px;cursor:pointer}
+.steps-tool-btn:hover{color:var(--ink,#e8eef6);border-color:var(--accent,#39d5c8)}
+
+/* scene-only mode: an embedded 3D view (index.html?scene in an iframe)
+   and the popped-out scene window (index.html?layout=scene) */
+:root.scene-only .topbar{display:none}
+:root.scene-only .split{position:absolute;inset:0}
+/* the window the scene was popped out into has nothing left to pop out; embeds keep it */
+:root.popped-out .pop-out{display:none}
+
+/* shared busy indicator: a spinner + elapsed time, used while a live scene comes up */
+@keyframes cr-spin { to { transform: rotate(360deg); } }
+.cr-busy { display: inline-flex; align-items: center; gap: 7px; }
+.cr-spinner {
+  display: inline-block; width: 13px; height: 13px; flex: 0 0 auto;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: cr-spin 0.7s linear infinite; opacity: 0.85;
+}

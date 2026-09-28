@@ -13,6 +13,8 @@ import trimesh
 from numpy.typing import NDArray
 from typing_extensions import Dict, List, Optional, Sequence, Tuple, Type
 
+from krrood.class_diagrams.mocking import MockedClass, MockedModule
+
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
     PathResolver,
@@ -65,6 +67,56 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
 
+# %% pxr fallbacks
+#
+# Usd.Prim, Usd.Stage, and Gf.Matrix4d are used below as dataclass field types.
+# Leaving Usd/Gf unbound when usd-core is missing crashes any code that resolves
+# this module's type hints (e.g. ORM/class-diagram generation), not just code that
+# actually parses a USD stage. Binding them to these mocks keeps every annotation
+# resolvable; actually parsing a stage still fails loudly, via
+# krrood.class_diagrams.mocking.MockedClass.
+
+
+@dataclass
+class _MockedUsdPrim(MockedClass):
+    """
+    Mocked class for Usd.Prim in pxr.
+    """
+
+
+@dataclass
+class _MockedUsdStage(MockedClass):
+    """
+    Mocked class for Usd.Stage in pxr.
+    """
+
+
+@dataclass
+class _MockedUsdModule(MockedModule):
+    """
+    Mocked module for pxr.Usd.
+    """
+
+    Prim: Type[_MockedUsdPrim] = _MockedUsdPrim
+    Stage: Type[_MockedUsdStage] = _MockedUsdStage
+
+
+@dataclass
+class _MockedGfMatrix4d(MockedClass):
+    """
+    Mocked class for Gf.Matrix4d in pxr.
+    """
+
+
+@dataclass
+class _MockedGfModule(MockedModule):
+    """
+    Mocked module for pxr.Gf.
+    """
+
+    Matrix4d: Type[_MockedGfMatrix4d] = _MockedGfMatrix4d
+
+
 try:
     from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
 except ImportError:
@@ -72,6 +124,8 @@ except ImportError:
         "usd-core is required for USD parsing. Please install it using "
         "'pip install usd-core'"
     )
+    Usd = _MockedUsdModule()
+    Gf = _MockedGfModule()
 
 try:
     from pxr import UsdSemantics

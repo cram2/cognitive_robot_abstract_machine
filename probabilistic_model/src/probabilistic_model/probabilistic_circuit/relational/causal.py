@@ -16,11 +16,7 @@ import math
 from dataclasses import dataclass
 from typing_extensions import TYPE_CHECKING, List, Optional
 
-import pandas as pd
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
-from krrood.ormatic.data_access_objects.dao import DataAccessObject
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import AnnotatedVariable
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
     MarginalDeterminismTreeNode,
@@ -35,7 +31,6 @@ from probabilistic_model.probabilistic_circuit.relational.rspn import (
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
-    SumUnit,
 )
 from random_events.variable import Variable
 
@@ -43,7 +38,6 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import Match
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class RelationalCausalCircuit:
@@ -96,80 +90,6 @@ class RelationalCausalCircuit:
         if not matches:
             raise VariableNotFoundError(path, list(circuit.variables))
         raise AmbiguousVariablePathError(path, matches)
-
-    def fit(
-        self,
-        relational_probabilistic_circuit: RelationalProbabilisticCircuit,
-        instances: List[DataAccessObject],
-        stratify_by: str,
-        dataframe_from_parent: Optional[pd.DataFrame] = None,
-    ) -> RelationalProbabilisticCircuit:
-        """
-        Fit ``relational_probabilistic_circuit`` support-deterministically over
-        ``stratify_by``, the precondition ``CausalCircuit.verify_support_determinism``
-        checks.
-
-        Partitions the training dataframe by ``stratify_by``'s exact value and fits one
-        sub-circuit per partition (see :meth:`_fit_stratified_class_circuit`), rather
-        than the plain, unconstrained fit ``RelationalProbabilisticCircuit.fit``
-        otherwise runs: every row sharing a value then ends up under one circuit branch
-        by construction, instead of possibly split across sibling leaves.
-
-        :param relational_probabilistic_circuit: The circuit to fit, in place.
-        :param instances: Training instances; all must share the same DAO class.
-        :param stratify_by: Name of the class-level dataframe column to partition the
-            training data by -- an EQL attribute-access expression's own ``._name_``, or
-            the equivalent dotted access-path string.
-        :param dataframe_from_parent: Forwarded to
-            ``RelationalProbabilisticCircuit.fit``.
-        :return:``relational_probabilistic_circuit``, fitted, to allow chaining.
-        """
-        relational_probabilistic_circuit.class_circuit_builder = (
-            lambda class_dataframe, variables: self._fit_stratified_class_circuit(
-                class_dataframe, variables, stratify_by
-            )
-        )
-        return relational_probabilistic_circuit.fit(
-            instances, dataframe_from_parent=dataframe_from_parent
-        )
-
-    @staticmethod
-    def _fit_stratified_class_circuit(
-        class_dataframe: pd.DataFrame,
-        variables: List[AnnotatedVariable],
-        stratify_by: str,
-    ) -> ProbabilisticCircuit:
-        """
-        Fit one class circuit per distinct value of ``stratify_by``, combined under a
-        root ``SumUnit`` weighted by each value's relative frequency.
-
-        Every row of one partition shares the same ``stratify_by`` value, so that
-        variable's fitted distribution within each partition's sub-circuit is a single
-        point by construction, regardless of how the sub-circuit's own induction
-        subsequently splits on the remaining variables -- unlike fitting one
-        unconstrained tree over the whole dataframe, where two rows sharing a value can
-        still end up under different sibling leaves.
-
-        :param class_dataframe: The full class-level training dataframe.
-        :param variables: The variables inferred over the full dataframe, reused as the
-            annotation (mean, standard deviation, split thresholds) for every
-            partition's own fit.
-        :param stratify_by: Name of the column to partition the dataframe by.
-        :return: The combined circuit.
-        """
-        result = ProbabilisticCircuit()
-        root = SumUnit(probabilistic_circuit=result)
-        total_row_count = len(class_dataframe)
-        for _, partition in class_dataframe.groupby(stratify_by):
-            partition_circuit = JointProbabilityTree(annotated_variables=variables).fit(
-                partition.reset_index(drop=True)
-            )
-            node_index_map = result.mount(partition_circuit.root)
-            root.add_subcircuit(
-                node_index_map[partition_circuit.root.index],
-                math.log(len(partition) / total_row_count),
-            )
-        return result
 
     def ground(
         self,

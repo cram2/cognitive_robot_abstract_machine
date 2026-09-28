@@ -954,7 +954,7 @@ class Wall(HasApertures):
         origin: HomogeneousTransformationMatrix,
         bloat_amount: float,
         obstacle_height_clearance: float = 0.01,
-    ) -> BoundingBoxCollection[VolumetricBoundingBox]:
+    ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3]:
         """
         Bloat this wall's bounding boxes along their thinner dimension only -- the
         side that faces the room -- rather than symmetrically in x and y.
@@ -1517,7 +1517,7 @@ class SemanticEnvironmentAnnotation(HasRootBody):
     """
 
     def obstacle_entities(
-        self, search_space: BoundingBoxCollection[VolumetricBoundingBox]
+        self, search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3]
     ) -> List[Body]:
         """
         Collect the obstacle bodies to consider within ``search_space``.
@@ -1538,12 +1538,12 @@ class SemanticEnvironmentAnnotation(HasRootBody):
 
     def build_bloated_obstacle_collection(
         self,
-        search_space: BoundingBoxCollection[VolumetricBoundingBox],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         semantic_wall_annotation: Optional[Wall] = None,
         bloat_obstacles: float = 0.0,
         bloat_walls: float = 0.0,
         obstacle_height_clearance: float = 0.01,
-    ) -> BoundingBoxCollection[VolumetricBoundingBox]:
+    ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3]:
         """
         Collect and bloat this annotation's obstacle bounding boxes.
 

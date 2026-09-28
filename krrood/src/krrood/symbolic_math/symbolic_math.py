@@ -34,6 +34,7 @@ from dataclasses import field, dataclass
 from enum import IntEnum, StrEnum
 from functools import partial, wraps
 from inspect import BoundArguments
+from uuid import UUID, uuid4
 
 import casadi as ca
 import numpy as np
@@ -53,7 +54,8 @@ from typing_extensions import (
     Any,
 )
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
+from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.exceptions import (
     HasFreeVariablesError,
@@ -66,7 +68,6 @@ from krrood.symbolic_math.exceptions import (
     UnsupportedOperationError,
     WrongDimensionsError,
     CannotConvertToStringError,
-    SymbolicMathNotJsonSerializableError,
 )
 
 EPS: float = sys.float_info.epsilon * 4.0
@@ -926,35 +927,141 @@ class SymbolicMathType(ABC):
 
 class SymbolicMathJSONKey(StrEnum):
     """
-    The keys of the JSON a constant symbolic math value is serialized to.
+    The keys of the JSON a symbolic math value is serialized to.
     """
 
     VALUES = "values"
     """
-    The entries of the value, as a list of rows.
+    The entries of a constant value, as a list of rows.
+    """
+
+    EXPRESSION = "expression"
+    """
+    The :class:`ExpressionGraph` of a value that depends on variables.
+    """
+
+    FREE_VARIABLES = "free_variables"
+    """
+    The variables an expression graph is computed from.
+    """
+
+    CASADI_FUNCTION = "casadi_function"
+    """
+    The serialized CasADi function an expression graph computes its value with.
+    """
+
+    ID = "id"
+    """
+    The id of a float variable.
+    """
+
+    NAME = "name"
+    """
+    The name of a float variable.
     """
 
 
 @dataclass(eq=False, repr=False)
 class SerializableSymbolicMathType(SymbolicMathType, SubclassJSONSerializer):
     """
-    A symbolic math value that can be serialized to JSON while it is constant.
+    A symbolic math value that can be serialized to JSON.
+
+    A constant is serialized as its entries, a value that depends on variables as the
+    :class:`ExpressionGraph` computing it.
     """
 
     def to_json(self, **kwargs) -> Dict[str, Any]:
-        """
-        :raises SymbolicMathNotJsonSerializableError: If the value depends on variables,
-            since an expression means nothing to whoever reads the JSON.
-        """
-        if not self.is_constant():
-            raise SymbolicMathNotJsonSerializableError(expression=self)
         result = super().to_json(**kwargs)
-        result[SymbolicMathJSONKey.VALUES] = ca.DM(self.casadi_sx).full().tolist()
+        result.update(self._value_to_json(**kwargs))
+        return result
+
+    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+        """
+        :param kwargs: Keyword arguments to hand on to nested ``to_json`` calls.
+        :return: The JSON entries describing the value itself.
+        """
+        if self.is_constant():
+            return {SymbolicMathJSONKey.VALUES: ca.DM(self.casadi_sx).full().tolist()}
+        return {
+            SymbolicMathJSONKey.EXPRESSION: ExpressionGraph.from_expression(
+                self
+            ).to_json(**kwargs)
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        if SymbolicMathJSONKey.EXPRESSION in data:
+            return ExpressionGraph.from_json(
+                data[SymbolicMathJSONKey.EXPRESSION], **kwargs
+            ).to_expression(cls)
+        return cls(data[SymbolicMathJSONKey.VALUES])
+
+
+@dataclass
+class ExpressionGraph(SubclassJSONSerializer):
+    """
+    The computation of a symbolic math value from the variables it depends on.
+    """
+
+    free_variables: List[FloatVariable]
+    """
+    The variables the value depends on, in the order :attr:`casadi_function` takes them.
+    """
+
+    casadi_function: ca.Function
+    """
+    Computes the value from the stacked :attr:`free_variables`.
+    """
+
+    @classmethod
+    def from_expression(cls, expression: SymbolicMathType) -> Self:
+        """
+        :param expression: The value to capture the computation of.
+        :return: The computation of `expression` from its free variables.
+        """
+        free_variables = expression.free_variables()
+        casadi_function = ca.Function(
+            cls.__name__,
+            [ca.vertcat(*[variable.casadi_sx for variable in free_variables])],
+            [expression.casadi_sx],
+        )
+        return cls(free_variables=free_variables, casadi_function=casadi_function)
+
+    def to_expression(
+        self, expression_type: Type[GenericSymbolicType]
+    ) -> GenericSymbolicType:
+        """
+        :param expression_type: The type of the value this graph computes.
+        :return: The value this graph computes, depending on :attr:`free_variables`.
+        """
+        arguments = ca.vertcat(
+            *[variable.casadi_sx for variable in self.free_variables]
+        )
+        result = expression_type.from_casadi_sx(self.casadi_function(arguments))
+        result.pinned_free_variables = list(self.free_variables)
+        return result
+
+    def to_json(self, **kwargs) -> Dict[str, Any]:
+        result = super().to_json(**kwargs)
+        result[SymbolicMathJSONKey.FREE_VARIABLES] = [
+            variable.to_json(**kwargs) for variable in self.free_variables
+        ]
+        result[SymbolicMathJSONKey.CASADI_FUNCTION] = self.casadi_function.serialize()
         return result
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(data[SymbolicMathJSONKey.VALUES])
+        # registers the tracker in kwargs, so every variable below shares it
+        FloatVariableTracker.from_kwargs(kwargs)
+        return cls(
+            free_variables=[
+                FloatVariable.from_json(variable_data, **kwargs)
+                for variable_data in data[SymbolicMathJSONKey.FREE_VARIABLES]
+            ],
+            casadi_function=ca.Function.deserialize(
+                data[SymbolicMathJSONKey.CASADI_FUNCTION]
+            ),
+        )
 
 
 # %% scalars, vectors and matrices
@@ -1240,6 +1347,12 @@ class FloatVariable(Scalar):
 
     name: str = field(kw_only=True)
 
+    id: UUID = field(kw_only=True, default_factory=uuid4)
+    """
+    Identifies this variable in serialized expressions, unlike :attr:`name`, which
+    several variables may share.
+    """
+
     _registry: ClassVar[weakref.WeakValueDictionary[ca.SX, FloatVariable]] = (
         weakref.WeakValueDictionary()
     )
@@ -1251,6 +1364,13 @@ class FloatVariable(Scalar):
     .. warning:: Does not ensure that two FloatVariable instances are identical.
     """
 
+    _registry_by_id: ClassVar[weakref.WeakValueDictionary[UUID, FloatVariable]] = (
+        weakref.WeakValueDictionary()
+    )
+    """
+    The living FloatVariable instances, by their :attr:`id`.
+    """
+
     resolve: Callable[[], float] | None = field(default=None, init=False)
     """
     This is called by SymbolicType.evaluate().
@@ -1258,11 +1378,37 @@ class FloatVariable(Scalar):
     Subclasses should set it to return the current float value for this variable.
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, id: Optional[UUID] = None):
+        """
+        :param name: The name of the variable.
+        :param id: The id of the variable, a new one if None.
+        """
         self.name = name
+        self.id = uuid4() if id is None else id
         casadi_sx = ca.SX.sym(self.name)
         self._registry[casadi_sx] = self
+        self._registry_by_id[self.id] = self
         super().__init__(casadi_sx)
+
+    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+        return {
+            SymbolicMathJSONKey.ID: to_json(self.id),
+            SymbolicMathJSONKey.NAME: self.name,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        """
+        :return: The variable with the serialized id, if one was already deserialized
+            from this document or is alive in this process, else a new one.
+        """
+        tracker = FloatVariableTracker.from_kwargs(kwargs)
+        variable_id = from_json(data[SymbolicMathJSONKey.ID])
+        if tracker.has(variable_id):
+            return tracker.get(variable_id)
+        variable = cls(name=data[SymbolicMathJSONKey.NAME], id=variable_id)
+        tracker.add(variable_id, variable)
+        return variable
 
     def __copy__(self) -> Scalar:
         """
@@ -1296,6 +1442,22 @@ class FloatVariable(Scalar):
 
     def __hash__(self):
         return hash(self.casadi_sx)
+
+
+@dataclass
+class FloatVariableTracker(DeserializedObjectTracker[UUID, FloatVariable]):
+    """
+    The float variables deserialized from one JSON document, by their id.
+
+    A variable the document did not create is looked up among the variables alive in
+    this process.
+    """
+
+    def _has_untracked(self, key: UUID) -> bool:
+        return key in FloatVariable._registry_by_id
+
+    def _get_untracked(self, key: UUID) -> FloatVariable:
+        return FloatVariable._registry_by_id[key]
 
 
 @dataclass(eq=False, repr=False)

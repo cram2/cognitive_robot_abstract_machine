@@ -303,6 +303,45 @@ class TestCartesianPositionTrajectory:
             cartesian_trajectory.tip_link,
         )
 
+    def test_trajectory_follows_a_goal_frame_that_moved_before_it_started(
+        self, cylinder_bot_world: World
+    ):
+        """
+        A trajectory bound on start must track its goal frame where that frame is when the
+        trajectory starts, even if a task built after the trajectory moved the frame
+        first.
+        """
+        root = cylinder_bot_world.root
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        points = [Point3(0, y, 0, reference_frame=tip) for y in np.linspace(0, 0.2, 21)]
+
+        motion_statechart = MotionStatechart()
+        cartesian_trajectory = CartesianPositionTrajectory(
+            root_link=root, tip_link=tip, goal_points=points
+        )
+        motion_statechart.add_node(cartesian_trajectory)
+        move_away = CartesianPosition(
+            root_link=root,
+            tip_link=tip,
+            goal_point=Point3(-0.5, 0, 0, reference_frame=root),
+        )
+        motion_statechart.add_node(move_away)
+        move_away.end_condition = move_away.observation_variable
+        cartesian_trajectory.start_condition = move_away.is_succeeded
+        motion_statechart.add_node(EndMotion.when_true(cartesian_trajectory))
+
+        executor = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        executor.compile(motion_statechart=motion_statechart)
+        executor.tick_until_end()
+
+        root_P_tip_start = move_away.goal_point.to_np()[:3]
+        tip_start_P_last_point = points[-1].to_np()[:3]
+        assert np.allclose(
+            cylinder_bot_world.compute_forward_kinematics_np(root, tip)[:3, 3],
+            root_P_tip_start + tip_start_P_last_point,
+            atol=move_away.threshold + cartesian_trajectory.threshold,
+        )
+
     def test_cartesian_position_trajectory_spiral_pr2(
         self, pr2_world_state_reset: World, better_pr2_pose
     ):
@@ -1311,6 +1350,48 @@ class TestDiffDriveBaseGoal:
         for step in goal.nodes[1:]:
             assert step.translation_threshold == 0.3
             assert step.orientation_threshold == 0.3
+
+    def test_second_goal_drives_from_where_the_first_one_ended(
+        self, cylinder_bot_diff_world
+    ):
+        """
+        Every goal in a statechart is expanded before any of them runs, so a goal that
+        reads the base pose while expanding reads where the base started rather than
+        where its own leg begins.
+
+        The two legs turn a corner, so the direction the second leg has to drive in
+        differs from the direction it would have had from the start pose -- a heading
+        taken at expansion time asks a differential drive to translate sideways, which
+        it cannot do.
+        """
+        first_goal_pose = Pose.from_xyz_rpy(
+            x=1, y=0, reference_frame=cylinder_bot_diff_world.root
+        )
+        second_goal_pose = Pose.from_xyz_rpy(
+            x=1, y=1, reference_frame=cylinder_bot_diff_world.root
+        )
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_node(
+            first_leg := DifferentialDriveBaseGoal(goal_pose=first_goal_pose)
+        )
+        motion_statechart.add_node(
+            second_leg := DifferentialDriveBaseGoal(goal_pose=second_goal_pose)
+        )
+        second_leg.start_condition = first_leg.observation_variable
+        motion_statechart.add_node(EndMotion.when_true(second_leg))
+
+        executor = Executor(MotionStatechartContext(world=cylinder_bot_diff_world))
+        executor.compile(motion_statechart=motion_statechart)
+        executor.tick_until_end()
+
+        assert np.allclose(
+            cylinder_bot_diff_world.compute_forward_kinematics(
+                cylinder_bot_diff_world.root,
+                cylinder_bot_diff_world.get_body_by_name("bot"),
+            ),
+            second_goal_pose,
+            atol=1e-2,
+        )
 
 
 class TestVelocityTasks:

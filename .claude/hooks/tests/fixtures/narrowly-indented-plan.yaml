@@ -1,0 +1,13 @@
+schema_version: 1
+id: narrow-plan
+title: "A plan whose items are not indented the way /plan-create writes them"
+default_repository: an-owner/a-repository
+tracking_issue: 1
+items:
+- id: an-item
+  title: "An item indented two spaces, not four"
+  branch: null
+  pull_request_number: null
+  track: a-track
+  depends_on: []
+  status: not_started

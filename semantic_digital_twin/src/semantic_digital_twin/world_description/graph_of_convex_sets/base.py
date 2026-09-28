@@ -14,24 +14,18 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
-    Point,
     Point3,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
-from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
+from semantic_digital_twin.world_description.geometry import (
+    PointT,
+    VolumetricBoundingBox,
+)
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
-
-PointT = TypeVar("PointT", bound=Point)
-"""
-The point type a :class:`GraphOfConvexSets` subclass queries and returns paths in --
-:class:`~semantic_digital_twin.spatial_types.Point3` for a graph that plans in three
-dimensions, :class:`~semantic_digital_twin.spatial_types.Point2` for one that plans on
-a single plane.
-"""
 
 SearchSpaceT = TypeVar("SearchSpaceT")
 """

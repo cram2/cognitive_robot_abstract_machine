@@ -2,13 +2,15 @@
 :meth:`MappedVariable.apply_mapping_on_external_root` follows a chain from a value
 outside query evaluation, which is how features are read off an instance.
 
-These tests pin what it does when a step along the way maps one value to several.
+These tests pin what it does when a step along the way maps one value to several, and
+when a step maps it to none.
 """
 
 import pytest
 
 from krrood.entity_query_language.exceptions import (
     MultipleValuesAlongAccessPath,
+    NoValueAlongAccessPath,
     ReadOnlyMapping,
 )
 from krrood.entity_query_language.factories import flat_variable, variable
@@ -102,6 +104,47 @@ def test_chain_through_a_flattened_attribute_is_rejected_whatever_the_collection
         chain.apply_mapping_on_external_root(cabinet)
 
 
+# %% a step that maps one value to none
+
+
+def test_chain_through_an_index_nothing_is_stored_under_reaches_no_value(
+    handles_and_containers_world,
+):
+    """
+    An index reaches the element stored under it, so a chain through one that holds
+    nothing says so rather than ending in an exhausted walk.
+    """
+    cabinets = [
+        view for view in handles_and_containers_world.views if isinstance(view, Cabinet)
+    ]
+    cabinet = next(cabinet for cabinet in cabinets if len(cabinet.drawers) == 1)
+    chain = variable(Cabinet, domain=cabinets).drawers[1].handle.name
+
+    with pytest.raises(NoValueAlongAccessPath):
+        chain.apply_mapping_on_external_root(cabinet)
+
+
+def test_a_step_that_reaches_no_value_is_reported_the_same_from_inside_a_generator(
+    handles_and_containers_world,
+):
+    """
+    Reading a chain off an instance is done from generators -- the backends evaluating a
+    query are ones -- where an exhausted walk would be read as that generator's own end
+    and surface as an unrelated failure instead.
+    """
+    cabinets = [
+        view for view in handles_and_containers_world.views if isinstance(view, Cabinet)
+    ]
+    cabinet = next(cabinet for cabinet in cabinets if len(cabinet.drawers) == 1)
+    chain = variable(Cabinet, domain=cabinets).drawers[1].handle.name
+
+    def following_it():
+        yield chain.apply_mapping_on_external_root(cabinet)
+
+    with pytest.raises(NoValueAlongAccessPath):
+        list(following_it())
+
+
 # %% writing through a chain
 
 
@@ -157,3 +200,20 @@ def test_setting_through_a_flattened_attribute_has_no_single_value(
 
     with pytest.raises(MultipleValuesAlongAccessPath):
         chain._set_external_root_instance_value_(cabinet, "Handle9")
+
+
+def test_setting_through_a_step_that_reaches_no_value_is_reported(
+    handles_and_containers_world,
+):
+    """
+    Writing follows the chain to the value it sets, so a step that reaches nothing
+    leaves it with nothing to write to, just as reading has nothing to read.
+    """
+    cabinets = [
+        view for view in handles_and_containers_world.views if isinstance(view, Cabinet)
+    ]
+    cabinet = next(cabinet for cabinet in cabinets if len(cabinet.drawers) == 1)
+    chain = variable(Cabinet, domain=cabinets).drawers[1].handle
+
+    with pytest.raises(NoValueAlongAccessPath):
+        chain._set_external_root_instance_value_(cabinet, cabinet.drawers[0].handle)

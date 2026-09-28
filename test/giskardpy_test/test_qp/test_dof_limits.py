@@ -13,8 +13,12 @@ from giskardpy.qp.dof_limits import (
     VelocityBoundProfiles,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 
 TARGET_FREQUENCY = 20
 PREDICTION_HORIZON = 10
@@ -68,7 +72,6 @@ def _directional_bounds_at(
         jerk_limit=upper_limits.jerk,
         time_step=time_step,
         prediction_horizon=config.prediction_horizon,
-        solver_class=config.qp_solver_class,
     )
     lower_bound = profiler._directional_velocity_bound(
         velocity_profile=mpc_velocity_profile,
@@ -89,6 +92,44 @@ def _directional_bounds_at(
         direction=BoundDirection.UPPER,
     )
     return lower_bound.evaluate(), upper_bound.evaluate()
+
+
+def _horizon_bounds_at(
+    profiler: DegreeOfFreedomLimitProfiler,
+    world: World,
+    distance_to_lower_limit: float,
+    velocity: float,
+) -> DegreeOfFreedomLimits:
+    """
+    Evaluates the horizon bounds of the single degree of freedom of ``world`` while it
+    moves with ``velocity`` and zero acceleration at ``distance_to_lower_limit`` above
+    its lower position limit.
+    """
+    degree_of_freedom = _single_dof(world)
+    lower_limits, upper_limits = profiler._resolve_limits(degree_of_freedom)
+    state = world.state[degree_of_freedom.id]
+    state.position = lower_limits.position + distance_to_lower_limit
+    state.velocity = velocity
+    state.acceleration = 0.0
+    world.notify_state_change()
+    config = profiler.qp_controller_config
+    horizon_limits = profiler.compute_horizon_bounds(
+        degree_of_freedom_symbols=degree_of_freedom.variables,
+        lower_limits=lower_limits,
+        upper_limits=upper_limits,
+        time_step=config.model_predictive_control_time_step,
+        prediction_horizon=config.prediction_horizon,
+    )
+    return DegreeOfFreedomLimits(
+        lower=DerivativeMap(
+            velocity=horizon_limits.lower.velocity.evaluate(),
+            jerk=horizon_limits.lower.jerk.evaluate(),
+        ),
+        upper=DerivativeMap(
+            velocity=horizon_limits.upper.velocity.evaluate(),
+            jerk=horizon_limits.upper.jerk.evaluate(),
+        ),
+    )
 
 
 def test_resolve_limits_with_position_limits(prismatic_bot):
@@ -205,7 +246,6 @@ def test_compute_horizon_bounds_flat_at_center(prismatic_bot):
         degree_of_freedom_symbols=degree_of_freedom.variables,
         lower_limits=lower_limits,
         upper_limits=upper_limits,
-        solver_class=config.qp_solver_class,
         time_step=config.model_predictive_control_time_step,
         prediction_horizon=config.prediction_horizon,
     )
@@ -216,3 +256,35 @@ def test_compute_horizon_bounds_flat_at_center(prismatic_bot):
     assert np.allclose(
         horizon_limits.lower.velocity.evaluate(), -VELOCITY_LIMIT, atol=1e-3
     )
+
+
+# %% braking margin
+
+
+def test_final_braking_step_uses_exactly_the_jerk_limit(prismatic_bot):
+    """
+    A degree of freedom that rides the last braking level into a position limit stops
+    with exactly the full jerk limit, so the first step's velocity is not confined to a
+    window as narrow as a solver's tolerance.
+    """
+    profiler = DegreeOfFreedomLimitProfiler(
+        QPControllerConfig.create_with_simulation_defaults()
+    )
+    time_step = profiler.qp_controller_config.model_predictive_control_time_step
+    _, upper_limits = profiler._resolve_limits(_single_dof(prismatic_bot))
+    jerk_step = upper_limits.jerk * time_step**2
+    approaching = _horizon_bounds_at(
+        profiler, prismatic_bot, distance_to_lower_limit=0.01, velocity=-jerk_step
+    )
+    final_braking_velocity = approaching.lower.velocity[0]
+    stopping = _horizon_bounds_at(
+        profiler,
+        prismatic_bot,
+        distance_to_lower_limit=time_step * -final_braking_velocity / 2,
+        velocity=final_braking_velocity,
+    )
+
+    reachable_velocity = final_braking_velocity + stopping.upper.jerk[0]
+
+    assert stopping.lower.velocity[0] == 0.0
+    assert reachable_velocity == stopping.lower.velocity[0]

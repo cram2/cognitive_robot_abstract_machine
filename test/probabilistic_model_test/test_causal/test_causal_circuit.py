@@ -14,7 +14,10 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
-from probabilistic_model.distributions.distributions import SymbolicDistribution
+from probabilistic_model.distributions.distributions import (
+    DiracDeltaDistribution,
+    SymbolicDistribution,
+)
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.utils import MissingDict
 
@@ -199,6 +202,48 @@ def _build_correlated_circuit() -> tuple:
         root.add_subcircuit(component, math.log(0.5))
 
     return circuit, x, w, y
+
+
+def _build_nested_overlap_circuit() -> tuple:
+    """
+    SumUnit-rooted mixture whose components all overlap on x without being identical:
+    the kind of circuit Monte-Carlo grounding builds when it mixes one copy of a part
+    template per sampled aggregation value.
+
+    Three equal-weight components:
+        Wide:   x∈[0,3], y∈[0,1]
+        Narrow: x∈[0,1], y∈[1,2]
+        Middle: x∈[1,3], y∈[0,2]
+
+    Wide overlaps both others, so no pair of components is disjoint, yet the
+    components do not share one support either: x∈[0,1] lies in Wide and Narrow but
+    not Middle, so the mixture is not support-deterministic over x.
+    """
+    x, y = Continuous("x"), Continuous("y")
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+
+    for x_range, y_range in [((0, 3), (0, 1)), ((0, 1), (1, 2)), ((1, 3), (0, 2))]:
+        component = ProductUnit(probabilistic_circuit=circuit)
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=x, interval=closed(*x_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=y, interval=closed(*y_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
+        root.add_subcircuit(component, math.log(1 / 3))
+
+    return circuit, x, y
 
 
 def _build_confounded_circuit() -> tuple:
@@ -678,6 +723,30 @@ class VerifySupportDeterminismDisjointnessTestCase(unittest.TestCase):
         cc = CausalCircuit.from_probabilistic_circuit(circuit, tree, [x], [y])
         result = cc.verify_support_determinism()
         self.assertTrue(result.passed, msg=f"Violations: {result.violations}")
+
+    def test_components_overlapping_without_a_disjoint_pair_fail(self):
+        """
+        A sum unit splits on a variable as soon as its children's supports on it differ,
+        not only once two of them are disjoint; overlapping children that differ still
+        leave no disjoint regions to intervene on.
+        """
+        circuit, x, y = _build_nested_overlap_circuit()
+        tree = MarginalDeterminismTreeNode.from_causal_graph([x], [y])
+        cc = CausalCircuit.from_probabilistic_circuit(circuit, tree, [x], [y])
+        with self.assertRaises(SupportDeterminismVerificationResult) as ctx:
+            cc.verify_support_determinism()
+        self.assertEqual(
+            [violation.query_variable for violation in ctx.exception.violations], [x]
+        )
+
+    def test_fewer_than_two_children_do_not_split(self):
+        """
+        A sum unit with no children, or one, has nothing to split on.
+        """
+        x = Continuous("x")
+        one_child = [SimpleEvent.from_data({x: closed(0, 1)}).as_composite_set()]
+        self.assertFalse(CausalCircuit._child_marginals_split_on_variable([]))
+        self.assertFalse(CausalCircuit._child_marginals_split_on_variable(one_child))
 
 
 class VerifySupportDeterminismSharedSubcircuitTestCase(unittest.TestCase):
@@ -1644,3 +1713,63 @@ class EndToEndIntegrationTestCase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _build_circuit_with_an_untruncatable_cause_region() -> tuple:
+    """
+    Two equal-weight strata whose cause ``x`` is a Dirac point each, one of them at a
+    value single precision cannot represent exactly.
+
+    A support region is read off the circuit in single precision, so truncating the
+    circuit back to the region misses the Dirac at ``0.2`` and yields nothing, while the
+    region at ``1.0`` truncates fine. Adjusting for ``z`` has to skip the former region
+    without leaving anything behind.
+    """
+    x, y, z = Continuous("x"), Continuous("y"), Continuous("z")
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    for x_location, y_range in [(0.2, (0, 1)), (1.0, (1, 2))]:
+        component = ProductUnit(probabilistic_circuit=circuit)
+        component.add_subcircuit(
+            leaf(DiracDeltaDistribution(variable=x, location=x_location), circuit)
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=y, interval=closed(*y_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(variable=z, interval=closed(0, 1).simple_sets[0]),
+                circuit,
+            )
+        )
+        root.add_subcircuit(component, math.log(0.5))
+    return circuit, x, y, z
+
+
+class BackdoorAdjustmentSkippedRegionTestCase(unittest.TestCase):
+    """
+    A cause region that cannot be truncated to must be skipped without leaving a
+    dangling unit in the interventional circuit, which would give it several roots.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.circuit, cls.x, cls.y, cls.z = (
+            _build_circuit_with_an_untruncatable_cause_region()
+        )
+        cls.cc = CausalCircuit.from_probabilistic_circuit(
+            cls.circuit,
+            MarginalDeterminismTreeNode.from_causal_graph([cls.x], [cls.y]),
+            [cls.x],
+            [cls.y],
+        )
+
+    def test_adjusted_circuit_has_one_root(self):
+        adjusted = self.cc.backdoor_adjustment(self.x, self.y, [self.z])
+        self.assertTrue(isinstance(adjusted.root, SumUnit))
+        self.assertEqual(len(adjusted.root.subcircuits), 1)

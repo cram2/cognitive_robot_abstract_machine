@@ -221,6 +221,7 @@ def main():
         "ros-jazzy-py-trees-ros",
         "python3-vcstool",
         "git",
+        "nodejs",
         "ros-dev-tools",
         "default-jre",
         "graphviz",

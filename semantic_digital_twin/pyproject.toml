@@ -55,7 +55,6 @@ dependencies = [
     "psycopg",
     "plyfile",
     "huggingface-hub",
-    "usd-core>=24.11",
     "vhacdx",
     "rerun-sdk[datafusion]",
     "imageio",
@@ -90,6 +89,13 @@ workspace = [
 [project.optional-dependencies]
 gui = [
     "ripple_down_rules[gui]",
+]
+iris = [
+    "drake",
+]
+datasets = [
+    "py7zr",
+    "usd-core>=24.11",
 ]
 dev = [
     "pytest>=7.0.0,<8.0.0",

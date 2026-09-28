@@ -10,7 +10,7 @@ from rclpy_message_converter.message_converter import (
 )
 from typing_extensions import Dict, Type, Any
 
-from krrood.adapters.exceptions import JSON_TYPE_NAME
+from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import (
     ExternalClassJSONSerializer,
     to_json,
@@ -48,7 +48,7 @@ class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
         Serialize a ROS 2 message into a JSON-compatible dictionary.
         """
         return {
-            JSON_TYPE_NAME: get_full_class_name(obj.__class__),
+            JSONField.TYPE: get_full_class_name(obj.__class__),
             "data": convert_ros_message_to_dictionary(obj),
         }
 
@@ -90,7 +90,7 @@ class QoSProfileJSONSerializer(ExternalClassJSONSerializer[QoSProfile]):
         Serialize a QoSProfile into a JSON-compatible dictionary.
         """
         return {
-            JSON_TYPE_NAME: get_full_class_name(obj.__class__),
+            JSONField.TYPE: get_full_class_name(obj.__class__),
             **{
                 field_name: to_json(getattr(obj, field_name), **kwargs)
                 for field_name in obj.__slots__
@@ -125,7 +125,7 @@ class DurationJSONSerializer(ExternalClassJSONSerializer[Duration]):
         Serialize a Duration into a JSON-compatible dictionary.
         """
         return {
-            JSON_TYPE_NAME: get_full_class_name(obj.__class__),
+            JSONField.TYPE: get_full_class_name(obj.__class__),
             "nanoseconds": obj.nanoseconds,
         }
 

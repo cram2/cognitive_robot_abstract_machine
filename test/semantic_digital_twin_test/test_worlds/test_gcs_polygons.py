@@ -1,6 +1,10 @@
 import numpy as np
 import pytest
 import trimesh
+
+pytest.importorskip(
+    "pydrake", reason="drake is not installed - install the semantic_digital_twin 'iris' extra"
+)
 from pydrake.geometry.optimization import HPolyhedron, VPolytope
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

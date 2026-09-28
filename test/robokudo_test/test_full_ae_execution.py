@@ -252,6 +252,7 @@ class TestFullAEExecution(object):
 
         plane_desc = PlaneAnnotator.Descriptor()
         plane_desc.parameters.distance_threshold = 0.01
+        plane_desc.parameters.random_seed = 0
 
         cluster_desc = PointCloudClusterExtractor.Descriptor()
         cluster_desc.parameters.dbscan_min_cluster_count = 8
@@ -329,6 +330,7 @@ class TestFullAEExecution(object):
 
         plane_desc = PlaneAnnotator.Descriptor()
         plane_desc.parameters.distance_threshold = 0.01
+        plane_desc.parameters.random_seed = 0
 
         cluster_desc = PointCloudClusterExtractor.Descriptor()
         cluster_desc.parameters.dbscan_min_cluster_count = 8

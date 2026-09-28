@@ -9,7 +9,8 @@ This module provides an annotator for:
 
 The plane detection uses:
 
-* RANSAC for robust model fitting
+* RANSAC for robust model fitting, seeded on request so that the same cloud gives the
+  same plane every time
 * Distance threshold for inlier selection
 * Plane equation in ax + by + cz + d = 0 form
 
@@ -19,7 +20,10 @@ The plane detection uses:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
 from timeit import default_timer
+from typing import Optional
 
 import numpy as np
 import open3d as o3d
@@ -29,6 +33,30 @@ from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Plane
 from robokudo.utils.transform import get_transform_from_plane_equation
+
+
+@contextmanager
+def _deterministic_ransac(seed: int) -> Iterator[None]:
+    """
+    Make Open3D's RANSAC-based geometry fitting reproducible for one call.
+
+    Seeding Open3D's random generator is not enough on its own: Open3D
+    distributes RANSAC's iterations across threads, and the reduction that
+    picks the best-scoring candidate among several near-tied ones depends on
+    the order in which those threads finish, which OS scheduling makes
+    unpredictable. Restricting Open3D to a single thread for the call removes
+    that source of nondeterminism; the previous thread limit is restored
+    afterwards.
+
+    :param seed: Seed for the random samples RANSAC draws.
+    """
+    o3d.utility.random.seed(seed)
+    previous_max_threads = o3d.utility.get_max_threads()
+    o3d.utility.set_max_threads(1)
+    try:
+        yield
+    finally:
+        o3d.utility.set_max_threads(previous_max_threads)
 
 
 class PlaneAnnotator(ThreadedAnnotator):
@@ -60,6 +88,12 @@ class PlaneAnnotator(ThreadedAnnotator):
 
                 self.num_iterations: int = 50
                 """"""
+
+                self.random_seed: Optional[int] = None
+                """
+                Seed for the random samples RANSAC draws, so that the same cloud gives
+                the same plane every time; ``None`` leaves the samples unseeded.
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -107,11 +141,18 @@ class PlaneAnnotator(ThreadedAnnotator):
         camera_intrinsics = self.get_cas().get(CASViews.CAMERA_INTRINSIC)
         # print(f"Loaded cloud with {len(cloud.points)} points")
 
-        plane_model, inliers = cloud.segment_plane(
-            distance_threshold=self.descriptor.parameters.distance_threshold,
-            ransac_n=3,
-            num_iterations=self.descriptor.parameters.num_iterations,
+        random_seed = self.descriptor.parameters.random_seed
+        segmentation_context = (
+            _deterministic_ransac(random_seed)
+            if random_seed is not None
+            else nullcontext()
         )
+        with segmentation_context:
+            plane_model, inliers = cloud.segment_plane(
+                distance_threshold=self.descriptor.parameters.distance_threshold,
+                ransac_n=3,
+                num_iterations=self.descriptor.parameters.num_iterations,
+            )
 
         [a, b, c, d] = plane_model
         # print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")

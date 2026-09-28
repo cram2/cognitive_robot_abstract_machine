@@ -14,7 +14,10 @@ from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.exceptions import PointOccupiedError
+from semantic_digital_twin.exceptions import (
+    NoSupportingSurfaceError,
+    PointOccupiedError,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_types import Point2, Point3, Pose
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -37,6 +40,7 @@ from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
 )
 from semantic_digital_twin.world_description.graph_of_convex_sets.exceptions import (
     AmbiguousSelectedVariableError,
+    PointOutsideSearchSpaceError,
 )
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -170,10 +174,10 @@ def test_from_world(table_world: World):
     assert path is not None
     assert len(path) > 1
 
-    with pytest.raises(PointOccupiedError):
-        start_occupied = Point3(-10, -10, -10, reference_frame=table_world.root)
-        target_occupied = Point3(10, 10, 10, reference_frame=table_world.root)
-        graph_of_convex_sets.path_from_to(start_occupied, target_occupied)
+    with pytest.raises(PointOutsideSearchSpaceError):
+        start_unsearched = Point3(-10, -10, -10, reference_frame=table_world.root)
+        target_unsearched = Point3(10, 10, 10, reference_frame=table_world.root)
+        graph_of_convex_sets.path_from_to(start_unsearched, target_unsearched)
 
 
 def test_constrain_to_free_space_requires_floatlike_fields(table_world: World):
@@ -550,26 +554,23 @@ def test_path_from_to_scales_to_a_real_apartment_scene():
     assert len(path) > 1
 
 
-def test_planar_free_space_uses_the_supporting_surface_as_search_space():
+# %% the free space above a supporting surface
+
+
+def _floor_with_an_obstacle_standing_on_it() -> Floor:
     """
-    HasSupportingSurface.planar_free_space must derive its search space from the
-    supporting surface's own area, rather than requiring the caller to build one.
+    A four by four metre floor with a single box standing in the middle of it.
+
+    The floor is left without a supporting surface, so a test can decide whether to
+    attach one itself.
+
+    :return: The floor annotation.
     """
     world = World.create_with_root_body("root")
     with world.modify_world():
         floor = Floor.create_with_new_body_in_world(
             name="floor", world=world, scale=Scale(4, 4, 0.01)
         )
-        surface = Region.from_shape_collection(
-            PrefixedName("floor_surface"),
-            ShapeCollection(
-                [Box(scale=Scale(4, 4, 0.001))], reference_frame=floor.root
-            ),
-        )
-        world.add_region(surface)
-        world.add_connection(FixedConnection(parent=floor.root, child=surface))
-        floor.supporting_surface = surface
-
         obstacle = Body(name=PrefixedName("obstacle"))
         world.add_connection(
             FixedConnection.create_with_dofs(
@@ -582,6 +583,26 @@ def test_planar_free_space_uses_the_supporting_surface_as_search_space():
             )
         )
         obstacle.collision.append(Box(scale=Scale(0.4, 0.4, 1.0)))
+    return floor
+
+
+def test_planar_free_space_uses_the_supporting_surface_as_search_space():
+    """
+    HasSupportingSurface.planar_free_space must derive its search space from the
+    supporting surface's own area, rather than requiring the caller to build one.
+    """
+    floor = _floor_with_an_obstacle_standing_on_it()
+    world = floor._world
+    with world.modify_world():
+        surface = Region.from_shape_collection(
+            PrefixedName("floor_surface"),
+            ShapeCollection(
+                [Box(scale=Scale(4, 4, 0.001))], reference_frame=floor.root
+            ),
+        )
+        world.add_region(surface)
+        world.add_connection(FixedConnection(parent=floor.root, child=surface))
+        floor.supporting_surface = surface
 
     graph = floor.planar_free_space(max_height=2.0)
 
@@ -592,3 +613,236 @@ def test_planar_free_space_uses_the_supporting_surface_as_search_space():
     assert search_box.min_y == pytest.approx(-2.0)
     assert search_box.max_y == pytest.approx(2.0)
     assert len(graph.graph.nodes()) > 0
+
+
+def test_planar_free_space_computes_a_missing_supporting_surface():
+    """
+    An annotation that never had a supporting surface attached still gets a free space
+    built over the surface its own geometry offers.
+    """
+    floor = _floor_with_an_obstacle_standing_on_it()
+    assert floor.supporting_surface is None
+
+    graph = floor.planar_free_space(max_height=2.0)
+
+    surface_box = floor.supporting_surface.area.as_bounding_box_collection_at_origin(
+        HomogeneousTransformationMatrix(reference_frame=floor.root)
+    ).bounding_box()
+    search_box = graph.search_space.bounding_box()
+    assert search_box.min_x == pytest.approx(surface_box.min_x)
+    assert search_box.max_x == pytest.approx(surface_box.max_x)
+    assert search_box.min_y == pytest.approx(surface_box.min_y)
+    assert search_box.max_y == pytest.approx(surface_box.max_y)
+    assert len(graph.graph.nodes()) > 0
+
+
+def test_planar_free_space_rejects_an_annotation_without_any_surface():
+    """
+    An annotation whose geometry offers nothing to stand on cannot have a free space
+    built over it.
+    """
+    world = World.create_with_root_body("root")
+    with world.modify_world():
+        body = Body(name=PrefixedName("floor"))
+        world.add_connection(FixedConnection(parent=world.root, child=body))
+        floor = Floor(root=body)
+        world.add_semantic_annotation(floor)
+
+    with pytest.raises(NoSupportingSurfaceError) as raised:
+        floor.planar_free_space()
+
+    assert raised.value.annotation is floor
+
+
+# %% what path_from_to rejects, and which frame it answers in
+
+
+def test_path_from_to_answers_every_waypoint_in_the_search_spaces_frame():
+    """
+    A graph decomposed in a frame of its own has to answer in that frame throughout: a
+    waypoint carrying the search space's numbers under the world root's name puts the
+    path somewhere else entirely.
+    """
+    world = World.create_with_root_body("root")
+    with world.modify_world():
+        floor = Floor.create_with_new_body_in_world(
+            name="floor",
+            world=world,
+            scale=Scale(6, 6, 0.01),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                10.0, 0.0, 0.0, reference_frame=world.root
+            ),
+        )
+        wall = Body(name=PrefixedName("wall"))
+        world.add_connection(
+            FixedConnection.create_with_dofs(
+                world,
+                world.root,
+                wall,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    10.0, 0.0, 0.5, reference_frame=world.root
+                ),
+            )
+        )
+        wall.collision.append(Box(scale=Scale(0.4, 4.0, 1.0)))
+
+    graph = floor.planar_free_space(max_height=1.0)
+
+    world_P_start = Point2(8.0, 0.0, reference_frame=world.root)
+    path = graph.path_from_to(
+        world_P_start, Point2(12.0, 0.0, reference_frame=world.root)
+    )
+
+    # The wall forces a detour, so the path carries waypoints beyond its two endpoints.
+    assert len(path) > 2
+    assert all(
+        waypoint.reference_frame == graph.search_space.reference_frame
+        for waypoint in path
+    )
+    world_P_first = world.transform(path[0], world.root)
+    assert float(world_P_first.x) == pytest.approx(float(world_P_start.x))
+    assert float(world_P_first.y) == pytest.approx(float(world_P_start.y))
+
+
+def _navigation_map_around_the_table(
+    table_world: World,
+) -> PlanarGraphOfBoundingBoxes:
+    """
+    The floor plan of the region the table stands in.
+
+    :param table_world: The world holding the table.
+    :return: The navigation map.
+    """
+    search_space = BoundingBoxCollection(
+        [
+            VolumetricBoundingBox(
+                min_x=-5,
+                max_x=-2,
+                min_y=-1,
+                max_y=2,
+                min_z=0,
+                max_z=2,
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=table_world.root
+                ),
+            )
+        ],
+        table_world.root,
+    )
+    return PlanarGraphOfBoundingBoxes.navigation_map_from_world(
+        table_world, search_space=search_space
+    )
+
+
+def test_path_from_to_rejects_a_point_outside_the_search_space(table_world: World):
+    """
+    A point the decomposition never covered is reported as outside the search space, not
+    as occupied: nothing is known about what stands there.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    free = Point2(-4.5, -0.5, reference_frame=table_world.root)
+    unsearched = Point2(10, 10, reference_frame=table_world.root)
+
+    with pytest.raises(PointOutsideSearchSpaceError) as raised:
+        navigation_map.path_from_to(free, unsearched)
+
+    assert raised.value.point is unsearched
+    assert raised.value.search_space == navigation_map.search_space.bounding_box()
+
+
+def test_path_from_to_rejects_a_point_inside_an_obstacle(table_world: World):
+    """
+    A point the decomposition covered but left out of its free space is occupied.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    free = Point2(-4.5, -0.5, reference_frame=table_world.root)
+    under_the_table = Point2(-3.5, 0.5, reference_frame=table_world.root)
+
+    with pytest.raises(PointOccupiedError):
+        navigation_map.path_from_to(free, under_the_table)
+
+
+def test_path_from_to_accepts_points_in_another_reference_frame(table_world: World):
+    """
+    Start and goal may be given in any frame, and the waypoints come back in the search
+    space's own frame rather than in a mix of the two.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+    table_top = table_world.get_body_by_name("top")
+
+    world_P_start = Point2(-4.5, -0.5, reference_frame=table_world.root)
+    world_P_goal = Point2(-2.5, 1.5, reference_frame=table_world.root)
+
+    path = navigation_map.path_from_to(
+        table_world.transform(world_P_start, table_top),
+        table_world.transform(world_P_goal, table_top),
+    )
+
+    assert all(
+        waypoint.reference_frame == navigation_map.search_space.reference_frame
+        for waypoint in path
+    )
+    np.testing.assert_allclose(
+        path[0].to_np().flatten(), world_P_start.to_np().flatten(), atol=1e-9
+    )
+    np.testing.assert_allclose(
+        path[-1].to_np().flatten(), world_P_goal.to_np().flatten(), atol=1e-9
+    )
+
+
+# %% locating the node a point falls into
+
+
+def test_node_of_point_answers_with_the_free_box_a_point_falls_into(
+    table_world: World,
+):
+    """
+    Asking where a point sits is answered with the free-space box around it.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    free = Point2(-4.5, -0.5, reference_frame=table_world.root)
+
+    assert navigation_map.node_of_point(free).contains(free)
+
+
+def test_node_of_point_rejects_a_point_no_free_box_covers(table_world: World):
+    """
+    A point the decomposition covered but left out of its free space has no node, which
+    is a rejected query rather than an empty answer.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    under_the_table = Point2(-3.5, 0.5, reference_frame=table_world.root)
+
+    with pytest.raises(PointOccupiedError):
+        navigation_map.node_of_point(under_the_table)
+
+
+def test_node_of_point_rejects_a_point_outside_the_search_space(table_world: World):
+    """
+    A point the decomposition never covered is reported as outside the search space, so
+    it is not confused with one that was checked and found occupied.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    unsearched = Point2(10, 10, reference_frame=table_world.root)
+
+    with pytest.raises(PointOutsideSearchSpaceError):
+        navigation_map.node_of_point(unsearched)
+
+
+def test_the_unchecked_lookup_answers_with_nothing_for_an_occupied_point(
+    table_world: World,
+):
+    """
+    The protected lookup the checked one builds on reports a missing node rather than
+    raising, which is what lets the checked one tell the two rejections apart.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    under_the_table = Point2(-3.5, 0.5, reference_frame=table_world.root)
+
+    assert navigation_map._node_of_point(under_the_table) is None

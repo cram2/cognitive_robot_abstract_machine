@@ -39,14 +39,43 @@ class GoalOutcome(Enum):
     def report_to(self, goal_handle: ServerGoalHandle) -> None:
         """
         Transition the goal handle into the state matching this outcome.
+
+        rclpy allows the canceled transition only for a goal whose client asked to
+        cancel it. A goal that was superseded by a newer one is therefore aborted in
+        rclpy's terms; its result still reports the cancellation.
         """
         match self:
             case GoalOutcome.SUCCEEDED:
                 goal_handle.succeed()
             case GoalOutcome.ABORTED:
                 goal_handle.abort()
-            case GoalOutcome.CANCELED:
+            case GoalOutcome.CANCELED if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
+            case GoalOutcome.CANCELED:
+                goal_handle.abort()
+
+
+@dataclass
+class GoalAnswer:
+    """
+    The motion server's answer to one goal, handed back to the rclpy thread that waits
+    for it.
+    """
+
+    goal_id: int
+    """
+    Identifier of the answered goal in logs and feedback.
+    """
+
+    result_message: Any
+    """
+    Result of the answered goal.
+    """
+
+    outcome: GoalOutcome
+    """
+    How the answered goal ended.
+    """
 
 
 @dataclass
@@ -55,9 +84,12 @@ class ActionServerHandler:
     Hands goals from rclpy's executor threads over to the thread that runs the motion
     server.
 
-    ``execute_cb`` runs on an rclpy executor thread and blocks on a queue, while the
-    motion server polls :meth:`has_goal` and answers with :meth:`send_result`. Goal
-    execution therefore stays on the motion server's own thread.
+    :meth:`execute_callback` runs on an rclpy executor thread and blocks on a queue,
+    while the motion server polls :meth:`has_goal` and answers with :meth:`send_result`.
+    Goal execution therefore stays on the motion server's own thread, and so does every
+    change to the current goal: the motion server resets the handler before it releases
+    an answer, so the rclpy thread never writes to a goal the motion server may already
+    have moved on from.
     """
 
     action_name: str
@@ -125,12 +157,15 @@ class ActionServerHandler:
             cancel_callback=self.cancel_callback,
         )
 
-    def loginfo(self, message: str) -> None:
+    def loginfo(self, message: str, goal_id: int | None = None) -> None:
         """
-        Log a message tagged with the action name and the current goal id.
+        Log a message tagged with the action name and a goal id, the current goal's
+        unless another is given.
         """
+        if goal_id is None:
+            goal_id = self.goal_id
         rospy.get_node().get_logger().info(
-            f"{self.action_name}(Goal #{self.goal_id}): {message}"
+            f"{self.action_name}(Goal #{goal_id}): {message}"
         )
 
     def default_goal_callback(self, goal_request: Any) -> GoalResponse:
@@ -154,38 +189,16 @@ class ActionServerHandler:
 
     async def execute_callback(self, goal_handle: ServerGoalHandle) -> Any:
         """
-        Queue the goal for the motion server thread and wait for its result.
+        Queue the goal for the motion server thread, wait for its answer and tell rclpy
+        how it ended.
         """
         while self.goal_handle is not None:
             sleep(0.1)
         self.goal_queue.put(goal_handle)
-        result_msg = self.result_queue.get()
-        self.loginfo("Sending response.")
-        outcome = self.outcome
-        self.goal_msg = None
-        self.goal_handle = None
-        self.result_message = None
-        self.cancel_requested = False
-        self.outcome = None
-        self.report_outcome(goal_handle, outcome)
-        return result_msg
-
-    def report_outcome(
-        self, goal_handle: ServerGoalHandle, outcome: GoalOutcome | None
-    ) -> None:
-        """
-        Tell rclpy how the goal ended.
-
-        The handler releases the goal before this runs, so that the next goal waiting in
-        :meth:`execute_cb` is not blocked while rclpy transitions this one.
-
-        :raises MissingGoalOutcomeError: If the goal is answered without an outcome.
-        """
-        if outcome is None:
-            raise MissingGoalOutcomeError(
-                action_server_name=self.action_name, goal_id=self.goal_id
-            )
-        outcome.report_to(goal_handle)
+        answer: GoalAnswer = self.result_queue.get()
+        self.loginfo("Sending response.", goal_id=answer.goal_id)
+        answer.outcome.report_to(goal_handle)
+        return answer.result_message
 
     def accept_goal(self) -> None:
         """
@@ -239,9 +252,29 @@ class ActionServerHandler:
 
     def send_result(self) -> None:
         """
-        Hand the result back to the waiting rclpy executor thread.
+        Hand the result back to the waiting rclpy executor thread and forget the goal.
+
+        The handler is reset before the answer is released, so that the next goal can be
+        accepted the moment this one is answered.
+
+        :raises MissingGoalOutcomeError: If the goal is answered without an outcome.
+        :raises MissingActionResultError: If the goal is answered without a result.
         """
-        self.result_queue.put(self.result_message)
+        if self.outcome is None:
+            raise MissingGoalOutcomeError(
+                action_server_name=self.action_name, goal_id=self.goal_id
+            )
+        answer = GoalAnswer(
+            goal_id=self.goal_id,
+            result_message=self.result_message,
+            outcome=self.outcome,
+        )
+        self.goal_msg = None
+        self.goal_handle = None
+        self.result_message = None
+        self.cancel_requested = False
+        self.outcome = None
+        self.result_queue.put(answer)
 
     def is_cancel_requested(self) -> bool:
         """

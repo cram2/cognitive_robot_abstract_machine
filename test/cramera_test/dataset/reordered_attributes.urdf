@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<robot name="inspection_fixture">
+  <link name="base"/>
+  <link name="tool"/>
+  <joint type="fixed" name="tool_mount">
+    <child link="tool"/>
+    <parent link="base"/>
+  </joint>
+</robot>

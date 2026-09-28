@@ -81,7 +81,12 @@ class ConclusionSelector(TruthValueOperator, ABC):
 
         Any condition already in a tree (has a ``_parent_``) is replaced with the node from
         :meth:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression._node_for_new_position_`
-        so splicing it in cannot corrupt the original's ``_parent_``.
+        so splicing it in cannot corrupt the original's ``_parent_``. The anchor is
+        cleaned the same way, by
+        :meth:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression._parent_outside_`:
+        a node can be one rule's whole condition and part of what another rule's
+        condition is written over, and the parent it has inside the incoming branch is
+        not an edge this splice may re-point.
 
         :param anchor: The existing condition node the new branch connects to.
         :param conditions: Conditions to chain with AND into the new branch.
@@ -107,10 +112,14 @@ class ConclusionSelector(TruthValueOperator, ABC):
         # Splice above the parent the asking branch reaches the anchor by. A shared anchor
         # keeps whichever parent was attached first as its structural one, which may belong to
         # an unrelated branch entirely, so the enclosing ``with`` context decides instead and
-        # the structural parent only stands in when no enclosing context anchors on it.
+        # the structural parent only stands in when no enclosing context anchors on it -- and
+        # then only one from outside the branch being added, since a parent inside it is part
+        # of what is being spliced in rather than an edge the surrounding graph holds.
         anchor_context = SymbolicExpression._rule_tree_context_anchored_on_(anchor)
         previous_parent = (
-            anchor._parent_ if anchor_context is None else anchor_context.owning_parent
+            anchor._parent_outside_(new_condition)
+            if anchor_context is None
+            else anchor_context.owning_parent
         )
 
         # Only raise when the anchor is already established in a rule tree (has parents).

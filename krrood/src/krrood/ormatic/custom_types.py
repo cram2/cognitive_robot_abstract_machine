@@ -8,7 +8,7 @@ from sqlalchemy import Dialect, TypeDecorator, types
 from typing_extensions import Optional, Type
 
 from krrood.adapters.json_serializer import JSONData
-from krrood.utils import module_and_class_name
+from krrood.utils import module_and_class_name, resolve_class_from_full_name
 
 
 class TypeType(TypeDecorator):
@@ -30,10 +30,7 @@ class TypeType(TypeDecorator):
     def process_result_value(self, value: impl, dialect: Dialect) -> Optional[Type]:
         if value is None:
             return None
-
-        module_name, class_name = str(value).rsplit(".", 1)
-        module = importlib.import_module(module_name)
-        return getattr(module, class_name)
+        return resolve_class_from_full_name(str(value))
 
 
 class PolymorphicEnumType(TypeDecorator):

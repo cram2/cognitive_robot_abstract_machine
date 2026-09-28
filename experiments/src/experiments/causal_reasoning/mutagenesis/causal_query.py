@@ -22,6 +22,8 @@ from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisMolecule,
     MutagenesisMoleculeAggregations,
 )
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.relational.causal import (
     RelationalCausalCircuit,
 )
@@ -161,7 +163,7 @@ class BranchingAtomCountCausalQuery:
         adjustment for the structural indicator ``ind1``.
 
         Fits the class circuit stratified by branching-atom count, via
-        :meth:`~probabilistic_model.probabilistic_circuit.relational.causal.RelationalCausalCircuit.fit`:
+        :class:`~probabilistic_model.learning.learning_method.StratifiedLearning`:
         a plain, unconstrained fit gives no guarantee that training rows sharing a
         branching-atom-count value end up under one circuit branch, and
         `CausalCircuit.verify_support_determinism` rejects the registration when they
@@ -194,16 +196,18 @@ class BranchingAtomCountCausalQuery:
         :return: The fitted result, including one causal-effect row per branching-
             atom-count value the grounded circuit's support covers.
         """
-        model = RelationalProbabilisticCircuit(MutagenesisMolecule)
-        model.monte_carlo_sample_count = monte_carlo_sample_count
         branching_atom_count_variable_expression = variable(
             MutagenesisMoleculeAggregations
         ).branching_atom_count()
-        RelationalCausalCircuit().fit(
-            model,
-            [to_dao(molecule) for molecule in training_molecules],
-            stratify_by=branching_atom_count_variable_expression._name_,
+        model = RelationalProbabilisticCircuit(
+            MutagenesisMolecule,
+            monte_carlo_sample_count=monte_carlo_sample_count,
+            learning_method=StratifiedLearning(
+                variables=[branching_atom_count_variable_expression._name_],
+                method=JointProbabilityTree(),
+            ),
         )
+        model.fit([to_dao(molecule) for molecule in training_molecules])
 
         query = self._build_query(atom_count, bond_count)
         registry = RelationalCircuitRegistry(relational_probabilistic_circuit=model)

@@ -172,9 +172,29 @@ class FeatureExtractor:
                 continue
 
             symbolic_attribute = getattr(symbolic_root, column.name)
-            symbolic_attribute._type_ = get_python_type_from_sqlalchemy_column(column)
+            symbolic_attribute._type_ = FeatureExtractor._type_of_column_value(
+                column, value
+            )
             result.append(symbolic_attribute)
         return result
+
+    @staticmethod
+    def _type_of_column_value(column: sqlalchemy.Column, value: Any) -> type:
+        """
+        The python type of what a column holds.
+
+        A column storing enum members of any enum says only :class:`enum.Enum`, which
+        has no members of its own to build a domain from, so the value standing in it
+        says which enum it is.
+
+        :param column: The column the value was read from.
+        :param value: The value read from it.
+        :return: The type a variable over this column ranges over.
+        """
+        column_type = get_python_type_from_sqlalchemy_column(column)
+        if column_type is enum.Enum:
+            return type(value)
+        return column_type
 
     @staticmethod
     def _process_many_to_one(
@@ -275,24 +295,26 @@ class FeatureExtractor:
 
     def preprocess_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Preprocess the dataframe for JointProbabilityTrees by converting enum columns to
-        hashes.
+        Check the dataframe's columns are of types a JointProbabilityTree can be fitted
+        on.
 
-        Boolean columns are left as ``bool``, not converted to ``int``:
-        ``infer_variables_from_dataframe`` types a ``bool`` column as a two-valued
-        ``Symbolic`` variable, which is what JPT needs to split on it by category rather
-        than by a numeric threshold over an otherwise-unbounded domain a plain ``int``
-        column would infer as.
+        Enum and boolean columns are left as they are: ``infer_variables_from_dataframe``
+        types either as a ``Symbolic`` variable over the values present, which is what
+        JPT needs to split on it by category rather than by a numeric threshold. An enum
+        member itself is also what a query later conditions on, so its leaf keeps the
+        member's own hash; storing the hash as a number instead would round it through
+        a float and never match the member again.
 
         :param df: The dataframe to preprocess.
         :return: The dataframe in a JPT compatible format.
+        :raises UnsupportedFeatureTypeError: If a column's type cannot be fitted on.
         """
         feature_map = dict(zip(df.columns, self.features))
         for column in df.columns:
             feature = feature_map[column]
             if isinstance(feature._type_, enum.EnumType):
-                df[column] = df[column].apply(lambda x: hash(x))
-            elif feature._type_ not in compatible_types and feature._type_ is not None:
+                continue
+            if feature._type_ not in compatible_types and feature._type_ is not None:
                 raise UnsupportedFeatureTypeError(
                     feature_type=feature._type_, column_name=column
                 )

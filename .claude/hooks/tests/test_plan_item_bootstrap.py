@@ -40,6 +40,7 @@ from plan_item_bootstrap import (
     UnknownPlanError,
     ValueStyle,
     WorkOpenRequest,
+    apply_item_fields,
     open_work,
     record_item,
 )
@@ -554,6 +555,37 @@ def test_a_rendered_field_line_matches_how_a_real_manifest_writes_it():
         manifest_line(ManifestKey.STATUS, ItemStatus.NOT_STARTED.value) in PLAN_MANIFEST
     )
     assert manifest_line(ManifestKey.TRACK, "a-track") in PLAN_MANIFEST
+
+
+NARROWLY_INDENTED_MANIFEST = (
+    FIXTURES_DIRECTORY / "narrowly-indented-plan.yaml"
+).read_text()
+"""
+A manifest predating this module's own formatting convention: its items list has no
+indent before the ``-`` and its fields sit two spaces in, not the four
+``ITEM_FIELD_INDENT`` assumes.
+
+``icra-mechanism/plan.yaml`` on the personal-notes branch is written exactly this way.
+"""
+
+
+def test_patching_a_field_matches_the_items_own_indentation_rather_than_a_fixed_one():
+    """
+    A fixed indentation nests a patched field under whichever key happens to precede it.
+
+    instead of beside it, the moment a manifest's own indentation differs from the
+    module's assumed one - which stops the result parsing as YAML at all.
+    """
+    patched = apply_item_fields(
+        NARROWLY_INDENTED_MANIFEST,
+        "narrow-plan",
+        "an-item",
+        {ManifestKey.STATUS: ItemStatus.IN_PROGRESS.value},
+    )
+
+    item = yaml.safe_load(patched)[ManifestKey.ITEMS.key][0]
+    assert item[ManifestKey.STATUS.key] == ItemStatus.IN_PROGRESS.value
+    assert item[ManifestKey.TITLE.key] == "An item indented two spaces, not four"
 
 
 def test_a_key_quotes_its_own_value_when_its_style_says_to():

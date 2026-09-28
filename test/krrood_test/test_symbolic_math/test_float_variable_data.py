@@ -7,7 +7,11 @@ from krrood.symbolic_math.exceptions import (
     FloatVariableAlreadyHasResolveError,
 )
 from krrood.symbolic_math.float_variable_data import FloatVariableData
-from krrood.symbolic_math.symbolic_math import FloatVariable, Vector
+from krrood.symbolic_math.symbolic_math import (
+    FloatVariable,
+    Vector,
+    VariableParameters,
+)
 import numpy as np
 
 
@@ -98,3 +102,27 @@ def test_read_value_of_unregistered_variable():
 
     with pytest.raises(SymbolicMathExpressionNotRegisteredError):
         data.get_value(FloatVariable("v2"))
+
+
+# %% growing the data array
+
+
+def test_registering_an_expression_keeps_earlier_bound_functions_readable():
+    """
+    A compiled function reading `data` must still see the managed values after a later
+    expression is registered.
+
+    Consumers bind to the array once and then evaluate every control cycle, so a
+    registration that leaves them pointing at an outdated array makes them read stale
+    values without raising.
+    """
+    data = FloatVariableData()
+    first = Vector([FloatVariable("v1")])
+    data.register_expression(first)
+    compiled = first.compile(parameters=VariableParameters.from_lists(data.variables))
+    data.bind_argument(compiled, 0)
+
+    data.register_expression(Vector([FloatVariable("v2")]))
+    data.set_value(first, [1.0])
+
+    assert np.allclose(compiled.evaluate(), [1.0])

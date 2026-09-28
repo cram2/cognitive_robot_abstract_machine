@@ -8,7 +8,6 @@ import trimesh.boolean
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood.symbolic_math.exceptions import SymbolicMathNotJsonSerializableError
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -16,7 +15,6 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
-    SpatialTypeNotJsonSerializable,
     WorldEntityWithIDNotInKwargs,
     MissingWorldError,
 )
@@ -26,7 +24,7 @@ from semantic_digital_twin.spatial_types import (
     Quaternion,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap, Derivatives
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,
@@ -130,23 +128,6 @@ def test_point3_json_serialization():
     assert point.reference_frame == point_copy.reference_frame
     assert id(point.reference_frame) == id(point_copy.reference_frame)
     assert np.allclose(point.to_np(), point_copy.to_np())
-
-
-def test_point3_json_serialization_with_expression():
-    body = Body(name=PrefixedName("body"))
-    point = Point3(f := FloatVariable(name="muh"), reference_frame=body)
-    with pytest.raises(SpatialTypeNotJsonSerializable):
-        point.to_json()
-
-
-def test_spatial_type_refuses_an_expression_like_any_symbolic_math_value():
-    body = Body(name=PrefixedName("body"))
-    point = Point3(FloatVariable(name="muh"), reference_frame=body)
-
-    with pytest.raises(SymbolicMathNotJsonSerializableError) as error:
-        point.to_json()
-
-    assert error.value.expression is point
 
 
 def test_KinematicStructureEntityNotInKwargs():
@@ -284,37 +265,6 @@ def test_world_entity_missing_from_the_world_is_an_untracked_object():
     tracker = WorldEntityWithIDKwargsTracker.from_world(World())
     with pytest.raises(UntrackedObjectError):
         Point3.from_json(json_data, **tracker.create_kwargs())
-
-
-def test_vector3_json_serialization_with_expression():
-    body = Body(name=PrefixedName("body"))
-    vector = Vector3(f := FloatVariable(name="muh"), reference_frame=body)
-    with pytest.raises(SpatialTypeNotJsonSerializable):
-        vector.to_json()
-
-
-def test_quaternion_json_serialization_with_expression():
-    body = Body(name=PrefixedName("body"))
-    quaternion = Quaternion(f := FloatVariable(name="muh"), reference_frame=body)
-    with pytest.raises(SpatialTypeNotJsonSerializable):
-        quaternion.to_json()
-
-
-def test_rotation_matrix_json_serialization_with_expression():
-    body = Body(name=PrefixedName("body"))
-    f = FloatVariable(name="muh")
-    rotation = RotationMatrix.from_rpy(roll=f, reference_frame=body)
-    with pytest.raises(SpatialTypeNotJsonSerializable):
-        rotation.to_json()
-
-
-def test_transformation_matrix_json_serialization_with_expression():
-    body = Body(name=PrefixedName("body"))
-    transform = HomogeneousTransformationMatrix.from_xyz_rpy(
-        f := FloatVariable(name="muh"), reference_frame=body
-    )
-    with pytest.raises(SpatialTypeNotJsonSerializable):
-        transform.to_json()
 
 
 def test_vector3_json_serialization():
@@ -622,3 +572,143 @@ def test_a_degree_of_freedom_survives_a_json_round_trip():
     assert restored.limits.lower.position == limits.lower.position
     assert restored.limits.upper.position == limits.upper.position
     assert restored.to_json() == payload
+
+
+# %% expressions over variables
+
+
+def symbolic_point3(variable: FloatVariable, frame: Body) -> Point3:
+    return Point3(variable, 2.0, 3.0, reference_frame=frame)
+
+
+def symbolic_point2(variable: FloatVariable, frame: Body) -> Point2:
+    return Point2(variable, 2.0, reference_frame=frame)
+
+
+def symbolic_vector3(variable: FloatVariable, frame: Body) -> Vector3:
+    return Vector3(variable, 2.0, 3.0, reference_frame=frame)
+
+
+def symbolic_quaternion(variable: FloatVariable, frame: Body) -> Quaternion:
+    return Quaternion.from_rpy(variable, 0.2, 0.3, reference_frame=frame)
+
+
+def symbolic_rotation_matrix(variable: FloatVariable, frame: Body) -> RotationMatrix:
+    return RotationMatrix.from_rpy(variable, 0.2, 0.3, reference_frame=frame)
+
+
+def symbolic_transformation_matrix(
+    variable: FloatVariable, frame: Body
+) -> HomogeneousTransformationMatrix:
+    return HomogeneousTransformationMatrix.from_xyz_rpy(
+        variable, 2.0, 3.0, 0.1, variable, 0.3, reference_frame=frame
+    )
+
+
+def symbolic_pose(variable: FloatVariable, frame: Body) -> Pose:
+    return Pose.from_xyz_rpy(
+        variable, 2.0, 3.0, 0.1, variable, 0.3, reference_frame=frame
+    )
+
+
+def symbolic_pose2d(variable: FloatVariable, frame: Body) -> Pose2D:
+    return Pose2D(variable, 2.0, variable, reference_frame=frame)
+
+
+@pytest.mark.parametrize(
+    "build_spatial_type",
+    [
+        symbolic_point3,
+        symbolic_point2,
+        symbolic_vector3,
+        symbolic_quaternion,
+        symbolic_rotation_matrix,
+        symbolic_transformation_matrix,
+        symbolic_pose,
+        symbolic_pose2d,
+    ],
+)
+def test_a_spatial_type_over_a_variable_survives_a_json_round_trip(
+    build_spatial_type,
+):
+    frame = Body(name=PrefixedName("reference"))
+    variable = FloatVariable(name="muh")
+    spatial_type = build_spatial_type(variable, frame)
+    tracker = WorldEntityWithIDKwargsTracker()
+    tracker.add(frame.id, frame)
+
+    restored = from_json(to_json(spatial_type), **tracker.create_kwargs())
+
+    assert type(restored) is type(spatial_type)
+    assert restored.reference_frame is frame
+    (restored_variable,) = restored.free_variables()
+    assert restored_variable is variable
+    np.testing.assert_allclose(
+        restored.substitute([variable], [0.4]).to_np(),
+        spatial_type.substitute([variable], [0.4]).to_np(),
+    )
+
+
+def test_a_transformation_over_a_variable_keeps_its_child_frame():
+    reference_frame = Body(name=PrefixedName("reference"))
+    child_frame = Body(name=PrefixedName("child"))
+    transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
+        FloatVariable(name="muh"),
+        reference_frame=reference_frame,
+        child_frame=child_frame,
+    )
+    tracker = WorldEntityWithIDKwargsTracker()
+    tracker.add(reference_frame.id, reference_frame)
+    tracker.add(child_frame.id, child_frame)
+
+    restored = from_json(to_json(transformation), **tracker.create_kwargs())
+
+    assert restored.child_frame is child_frame
+
+
+@pytest.mark.parametrize("derivative", list(Derivatives))
+def test_a_degree_of_freedom_variable_is_read_as_the_variable_of_the_reading_world(
+    cylinder_bot_world, derivative
+):
+    degree_of_freedom = cylinder_bot_world.active_degrees_of_freedom[0]
+    payload = to_json(degree_of_freedom.variables[derivative])
+    world_copy = deepcopy(cylinder_bot_world)
+    degree_of_freedom_copy = world_copy.get_degree_of_freedom_by_id(
+        degree_of_freedom.id
+    )
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world_copy)
+
+    restored = from_json(payload, **tracker.create_kwargs())
+
+    assert restored is degree_of_freedom_copy.variables[derivative]
+
+
+def test_a_forward_kinematics_expression_is_read_over_the_reading_world(
+    cylinder_bot_world,
+):
+    root = cylinder_bot_world.root
+    tip = cylinder_bot_world.get_body_by_name("bot")
+    for position, degree_of_freedom in enumerate(
+        cylinder_bot_world.active_degrees_of_freedom, start=1
+    ):
+        cylinder_bot_world.state[degree_of_freedom.id].position = position / 10
+    cylinder_bot_world.notify_state_change()
+    payload = to_json(
+        cylinder_bot_world.compose_forward_kinematics_expression(root, tip)
+    )
+    world_copy = deepcopy(cylinder_bot_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world_copy)
+
+    restored = from_json(payload, **tracker.create_kwargs())
+
+    assert {id(variable) for variable in restored.free_variables()} <= {
+        id(degree_of_freedom.variables[derivative])
+        for degree_of_freedom in world_copy.degrees_of_freedom
+        for derivative in Derivatives
+    }
+    np.testing.assert_allclose(
+        restored.evaluate(),
+        world_copy.compute_forward_kinematics_np(
+            world_copy.root, world_copy.get_body_by_name("bot")
+        ),
+    )

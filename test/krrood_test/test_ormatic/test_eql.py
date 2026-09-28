@@ -314,7 +314,7 @@ def test_complicated_equal(session, database):
     assert str(translator.sql_query) == str(expected)
 
     # SQL result matches EQL result
-    sql_result = translator.evaluate()
+    [sql_result] = translator.evaluate()
     assert sql_result.name == eql_result[0].name
 
 

@@ -31,6 +31,7 @@ from .dataset import (
     semantic_world_like_classes,
     alternative_mappings_construction_order,
     clashing_field_names,
+    classes_with_generic,
 )
 from .dataset.example_classes import (
     KRROODPhysicalObject,
@@ -38,11 +39,14 @@ from .dataset.example_classes import (
     ChildNotMapped,
     ConceptType,
     JSONSerializableClass,
+    GenericJSONSerializableClass,
+    TextJSONSerializableClass,
 )
 from .dataset.role_and_ontology import (
     university_ontology_like_classes_without_descriptors,
     role_takers_in_another_module,
     classes_for_testing_role_recursion_error,
+    roles_over_a_value_stored_as_json,
 )
 from .dataset.semantic_world_like_classes import *
 from .test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld
@@ -77,13 +81,16 @@ def generate_sqlalchemy_interface():
     )
     all_classes |= set(classes_of_module(role_takers_in_another_module))
     all_classes |= set(classes_of_module(classes_for_testing_role_recursion_error))
+    all_classes |= set(classes_of_module(roles_over_a_value_stored_as_json))
     all_classes |= set(classes_of_module(alternative_mappings_construction_order))
     all_classes |= set(classes_of_module(clashing_field_names))
+    all_classes |= set(classes_of_module(classes_with_generic))
     all_classes |= {Symbol, Role}
 
     # remove classes that don't need persistence
     all_classes -= {HasType, HasTypes, ContainsType}
     all_classes -= {NotMappedParent, ChildNotMapped, JSONSerializableClass}
+    all_classes -= {GenericJSONSerializableClass, TextJSONSerializableClass}
 
     # only keep dataclasses
     all_classes = {

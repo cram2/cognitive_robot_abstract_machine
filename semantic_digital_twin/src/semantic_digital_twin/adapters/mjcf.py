@@ -1,6 +1,7 @@
 import logging
 import os
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 import mujoco
 import numpy
@@ -10,6 +11,7 @@ from typing_extensions import Optional, Dict, Self
 from xml.etree import ElementTree as ET
 
 from semantic_digital_twin.adapters.multi_sim import (
+    ContactCategories,
     MujocoActuator,
     GeomVisibilityAndCollisionType,
     MujocoCamera,
@@ -42,6 +44,12 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
 )
+from semantic_digital_twin.world_description.contact import (
+    ContactFriction,
+    ContactImpedance,
+    ContactParameters,
+    ContactStiffness,
+)
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Sphere,
@@ -59,7 +67,10 @@ from semantic_digital_twin.world_description.inertial_properties import (
     PrincipalAxes,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Actuator
+from semantic_digital_twin.world_description.world_entity import (
+    Actuator,
+    GravityCompensation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -163,10 +174,20 @@ class MJCFParser(WorldModelParser):
         for mujoco_geom in mujoco_body.geoms:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
             shape.origin.reference_frame = body
-            shape.simulator_additional_properties.append(
+            shape.add_simulator_property(
+                ContactParameters(
+                    friction=ContactFriction(*mujoco_geom.friction.tolist()),
+                    stiffness=ContactStiffness(
+                        time_constant=timedelta(seconds=mujoco_geom.solref[0]),
+                        damping_ratio=mujoco_geom.solref[1],
+                    ),
+                    impedance=ContactImpedance(*mujoco_geom.solimp.tolist()),
+                )
+            )
+            shape.add_simulator_property(
                 MujocoGeom(
-                    solver_impedance=mujoco_geom.solimp.tolist(),
-                    solver_reference=mujoco_geom.solref.tolist(),
+                    contact_type=ContactCategories(mujoco_geom.contype),
+                    contact_affinity=ContactCategories(mujoco_geom.conaffinity),
                 )
             )
             if mujoco_geom.contype != 0 or mujoco_geom.conaffinity != 0:
@@ -180,12 +201,11 @@ class MJCFParser(WorldModelParser):
         body.inertial = self.parse_inertial(mujoco_body=mujoco_body)
         body.visual = ShapeCollection(shapes=visuals, reference_frame=body)
         body.collision = ShapeCollection(shapes=collisions, reference_frame=body)
-        body.simulator_additional_properties.append(
-            MujocoBody(
-                gravitation_compensation_factor=mujoco_body.gravcomp,
-                motion_capture=mujoco_body.mocap,
+        if mujoco_body.gravcomp != 0.0:
+            body.add_simulator_property(
+                GravityCompensation(fraction=float(mujoco_body.gravcomp))
             )
-        )
+        body.add_simulator_property(MujocoBody(motion_capture=mujoco_body.mocap))
         self.world.add_kinematic_structure_entity(body)
         for mujoco_child_body in mujoco_body.bodies:
             self.parse_body(mujoco_body=mujoco_child_body)
@@ -518,7 +538,7 @@ class MJCFParser(WorldModelParser):
                     raise NotImplementedError(
                         f"Joint type {mujoco_joint.type} not implemented yet."
                     )
-                connection.simulator_additional_properties.append(
+                connection.add_simulator_property(
                     MujocoJoint(
                         stiffness=(
                             [mujoco_joint.stiffness]
@@ -593,7 +613,7 @@ class MJCFParser(WorldModelParser):
             actuator.add_dof(
                 self.world.get_degree_of_freedom_by_name(mujoco_actuator.target)
             )
-        actuator.simulator_additional_properties.append(
+        actuator.add_simulator_property(
             MujocoActuator(
                 activation_limited=mujoco_actuator.actlimited,
                 activation_range=[*mujoco_actuator.actrange],
@@ -656,7 +676,7 @@ class MJCFParser(WorldModelParser):
 
         body_name = mujoco_camera.parent.name
         body = self.world.get_body_by_name(body_name)
-        body.simulator_additional_properties.append(
+        body.add_simulator_property(
             MujocoCamera(
                 body=body,
                 name=camera_name,
@@ -687,7 +707,7 @@ class MJCFParser(WorldModelParser):
         """
         body_name = mujoco_light.parent.name
         body = self.world.get_body_by_name(body_name)
-        body.simulator_additional_properties.append(
+        body.add_simulator_property(
             MujocoLight(
                 body=body,
                 name=mujoco_light.name,
@@ -716,7 +736,7 @@ class MJCFParser(WorldModelParser):
                 case mujoco.mjtEq.mjEQ_JOINT:
                     self.mimic_joints[equality.name2] = equality.name1
                 case mujoco.mjtEq.mjEQ_WELD:
-                    self.world.simulator_additional_properties.append(
+                    self.world.add_simulator_property(
                         MujocoEquality(
                             type=mujoco.mjtEq.mjEQ_WELD,
                             object_type=mujoco.mjtObj.mjOBJ_BODY,
@@ -726,7 +746,7 @@ class MJCFParser(WorldModelParser):
                         )
                     )
                 case mujoco.mjtEq.mjEQ_CONNECT:
-                    self.world.simulator_additional_properties.append(
+                    self.world.add_simulator_property(
                         MujocoEquality(
                             type=mujoco.mjtEq.mjEQ_CONNECT,
                             object_type=mujoco.mjtObj.mjOBJ_BODY,
@@ -755,7 +775,7 @@ class MJCFParser(WorldModelParser):
                 name=PrefixedName(tendon.name),
             )
             self.world.add_degree_of_freedom(dof)
-            self.world.simulator_additional_properties.append(
+            self.world.add_simulator_property(
                 MujocoTendon(
                     name=tendon.name,
                     actuator_force_limited=tendon.actfrclimited,

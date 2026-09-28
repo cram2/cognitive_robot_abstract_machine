@@ -16,7 +16,6 @@ from copy import deepcopy, copy
 from dataclasses import is_dataclass, fields
 from enum import Enum
 from krrood.patterns.caching import memoize
-from os.path import dirname
 from pathlib import Path
 from subprocess import check_call
 from tempfile import NamedTemporaryFile
@@ -32,6 +31,7 @@ from krrood.code_generation.imports import get_imports_from_types
 from krrood.utils import (
     is_builtin_type,
     get_import_path_from_path,
+    make_path_importable,
     get_method_name,
     get_method_class_name_if_exists,
     get_method_file_name,
@@ -156,7 +156,8 @@ def get_and_import_python_modules_in_a_package(
     :param parent_package_name: The name of the parent package to use for relative imports.
     :return: The imported modules.
     """
-    package_path = dirname(file_paths[0])
+    package_path = Path(file_paths[0]).parent
+    make_path_importable(package_path)
     package_import_path = get_import_path_from_path(package_path)
     file_names = [Path(file_path).name.replace(".py", "") for file_path in file_paths]
     module_import_paths = [
@@ -189,7 +190,8 @@ def get_and_import_python_module(
     :return: The imported module.
     """
     if package_import_path is None:
-        package_path = dirname(python_file_path)
+        package_path = Path(python_file_path).parent
+        make_path_importable(package_path)
         package_import_path = get_import_path_from_path(package_path)
     file_name = Path(python_file_path).name.replace(".py", "")
     module_import_path = (

@@ -2,54 +2,39 @@
 Giskardpy is an open source library for implementing motion control frameworks.
 It uses constraint and optimization based task space control to control the whole body of mobile manipulators.
 
-This is a pure python library with the core functionality.
-To use it with ROS you need the following repos, which use giskardpy to create an action server and implement ROS interfaces:
- - **ROS1**: https://github.com/SemRoCo/giskardpy_ros/tree/ros1-noetic-main
- - **ROS2**: https://github.com/SemRoCo/giskardpy_ros/tree/ros2-jazzy-main
+Giskardpy is part of the [CRAM monorepo](https://github.com/cram2/cognitive_robot_abstract_machine) and builds on
+`krrood` and `semantic_digital_twin`, which provide the world model it controls.
 
-## Installation instructions for Ubuntu (tested on 20.04 and 24.04)
+## Key Features
 
-### (Optional) create a virtual environment using virtualenvwrapper
-```
-sudo apt install virtualenvwrapper
-echo "export WORKON_HOME=~/venvs" >> ~/.bashrc
-echo "source /usr/share/virtualenvwrapper/virtualenvwrapper.sh" >> ~/.bashrc
-source ~/.bashrc
-mkdir -p $WORKON_HOME
+- **Constraint-based control**: define motion goals as constraints and let a QP solver compute the joint commands.
+- **Motion statecharts**: compose complex behaviors from reusable nodes with start, pause, end and reset conditions.
+- **Simulation and execution**: run the same motion statechart in simulation or on a robot through different executors and pacers.
+- **Semantic digital twin integration**: operate on `semantic_digital_twin` worlds, bodies and connections.
+- **ROS 2 support**: optional executor and tooling to connect to a ROS 2 system.
 
-# --system-site-packages is only required if you are using ROS
-mkvirtualenv giskardpy --system-site-packages
-```
-To use it do:
-```
-workon giskardpy
-```
+## Installation
 
-### Build Giskardpy
-Switch to your venv, if you use one.
-```
-workon giskardpy
-```
-Choose a place where you want to build giskardpy and clone it. This should NOT be in a ROS workspace.
-```
-mkdir -p ~/libs && cd ~/libs
-git clone -b giskard_library https://github.com/SemRoCo/giskardpy.git
-cd giskardpy
-```
-Install Giskardpy, `-e` is optional but prevents you from having to rebuild every time the code changes.
-```
-pip3 install -e .                           
-```
+Giskardpy depends on other packages of the monorepo, so it is not installed on its own.
+Follow the [installation instructions of the monorepo](../README.md#installation) to set up
+the whole repository, including the virtual environment and the system dependencies.
 
-### Tutorials
-https://github.com/SemRoCo/giskardpy/wiki
+ROS 2 is only required for the ROS 2 executor and for visualization.
+The [monorepo README](../README.md#optional-setup-your-ros-workspace) explains how to set up a ROS workspace.
 
-### How to cite
+## ROS Interface
+
+This is a pure Python library with the core functionality. The ROS 2 action server and interfaces that use
+giskardpy live in `giskardpy_ros`, which is part of
+[cram_ros2_packages](https://github.com/cram2/cram_ros2_packages). ROS 1 is not supported.
+
+
+## How to cite
 ```
 @phdthesis{stelter25giskard,
 	author = {Simon Stelter},
 	title = {A Robot-Agnostic Kinematic Control Framework: Task Composition via Motion Statecharts and Linear Model Predictive Control},
 	year = {2025},
-	doi = {10.26092/elib/3743},	
+	doi = {10.26092/elib/3743},
 }
 ```

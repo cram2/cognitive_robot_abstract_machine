@@ -360,8 +360,8 @@ class CartesianPositionTrajectory(CartesianTask):
         self._compiled_goal_reference_frame_P_tip.bind_args_to_memory_view(
             0, context.world.state.positions
         )
-        self._compiled_goal_reference_frame_P_tip.bind_args_to_memory_view(
-            1, context.float_variable_data.data
+        context.float_variable_data.bind_argument(
+            self._compiled_goal_reference_frame_P_tip, 1
         )
 
     def _update_trajectory_index(self, goal_reference_frame_P_tip_np: np.ndarray):

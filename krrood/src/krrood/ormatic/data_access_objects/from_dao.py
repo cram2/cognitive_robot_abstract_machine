@@ -29,6 +29,10 @@ from krrood.ormatic.data_access_objects.base import (
 )
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
+from krrood.ormatic.data_access_objects.conversion_order import (
+    ConversionOrder,
+    DeclaredOrder,
+)
 from krrood.ormatic.data_access_objects.helper import get_dao_class
 
 if TYPE_CHECKING:
@@ -343,7 +347,7 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
                 self._class_dependencies.add_edge(
                     types_to_index[concrete_alternative_mapping],
                     types_to_index[alternative_mapping],
-                    None,
+                    DeclaredOrder(concrete_alternative_mapping, alternative_mapping),
                 )
 
     def convert_alternative_mappings_to_domain_objects(self):
@@ -359,12 +363,11 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         for instance in self._alternative_mappings_being_referenced:
             instances_by_type[type(instance)].append(instance)
 
-        # types in dependency order first, then any referenced types not in the graph
+        # types in conversion order first, then any referenced types not in the graph
         # (e.g. instances that were already converted in a previous conversion)
-        ordered_types = [
-            self._class_dependencies[type_index]
-            for type_index in rustworkx.topological_sort(self._class_dependencies)
-        ]
+        ordered_types = ConversionOrder(
+            self._class_dependencies, self._alternative_mappings_being_referenced
+        ).sort_types()
         ordered_types += [
             type_ for type_ in instances_by_type if type_ not in set(ordered_types)
         ]

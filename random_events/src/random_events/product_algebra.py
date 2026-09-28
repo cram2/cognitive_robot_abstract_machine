@@ -460,6 +460,18 @@ class Event(AbstractCompositeSet):
         instance._variables = SortedSet(self.get_variable(v.name) for v in variables)
         return instance
 
+    def is_box(self) -> bool:
+        """
+        :return: Whether this event is a single simple event that assigns exactly one
+            simple set to each of its variables.
+        """
+        if len(self.simple_sets) != 1:
+            return False
+        [simple_event] = self.simple_sets
+        return all(
+            len(assignment.simple_sets) == 1 for assignment in simple_event.values()
+        )
+
     def bounding_box(self) -> SimpleEvent:
         """
         Compute the bounding box of the event.

@@ -10,13 +10,25 @@ from giskardpy.executor import (
     NoPacing,
     RealTimePacer,
     SimulationPacer,
+    SteppedSimulationPacer,
 )
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode, EndMotion
+from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import CountSeconds
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.adapters.multi_sim import MujocoSim
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
+
+from ...pytest_environment import runs_in_continuous_integration
 
 
 def test_simulation_pacer_timing_real_time(monkeypatch):
@@ -87,3 +99,47 @@ def test_with_executor():
     # we tick 20 (hz) * 2 (real_time_factor) per second and sleep for 1s.
     # +2 because the endmotion needs to extra ticks
     assert kin_sim.control_cycles == 42
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_stepped_simulation_pacer_advances_the_physics_one_cycle_per_sleep():
+    """
+    A box dropped from a metre falls under the simulation's gravity exactly as far as
+    the paced cycles add up to, so the physics and the loop stay in lockstep.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        box = Body(name=PrefixedName("box"))
+        box.collision = ShapeCollection(
+            [Box(origin=HomogeneousTransformationMatrix(), scale=Scale(0.1, 0.1, 0.1))],
+            reference_frame=box,
+        )
+        world.add_connection(
+            Connection6DoF.create_with_dofs(
+                world=world,
+                parent=root,
+                child=box,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    z=1.0, reference_frame=root
+                ),
+            )
+        )
+    cycles, frequency = 25, 50
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        pacer = SteppedSimulationPacer(simulation)
+        pacer.target_frequency = frequency
+        for _ in range(cycles):
+            pacer.sleep()
+        height = simulation.simulator.get_body_position(body_name="box").result[2]
+    finally:
+        simulation.stop_simulation()
+
+    fallen = 0.5 * 9.81 * (cycles / frequency) ** 2
+    assert height == pytest.approx(1.0 - fallen, abs=0.01)

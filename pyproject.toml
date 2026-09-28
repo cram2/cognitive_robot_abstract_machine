@@ -24,6 +24,7 @@ dependencies = [
   "physics_simulators",
   "experiments",
   "segmind",
+  "cramera",
   "ipykernel>=7.2.0",
   "lark-parser>=0.12.0",
   "tqdm"
@@ -35,6 +36,9 @@ dev = [
     "pytest-asyncio>=0.23.0,<0.24.0",
     "pytest-xdist",
     "pytest-rerunfailures",
+    "pytest-cov",
+    "setuptools>=68",
+    "wheel",
     "objgraph",
     "treon",
     "bokeh",
@@ -88,7 +92,8 @@ members = [
   "physics_simulators",
   "robokudo",
   "experiments",
-  "segmind"
+  "segmind",
+  "cramera"
 ]
 
 [tool.uv.sources]
@@ -102,6 +107,7 @@ robokudo              = { workspace = true }
 physics_simulators    = { workspace = true }
 segmind               = { workspace = true }
 experiments           = { workspace = true }
+cramera                = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -117,6 +123,7 @@ robokudo = { path = "robokudo", develop = true }
 physics_simulators = { path = "physics_simulators", develop = true }
 experiments = { path = "experiments", develop = true }
 segmind = { path = "segmind", develop = true }
+cramera = { path = "cramera", develop = true }
 
 [tool.setuptools]
 packages = ["cognitive_robot_abstract_machine"]

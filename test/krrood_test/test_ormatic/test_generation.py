@@ -1,5 +1,10 @@
 import os
 
+from krrood.ormatic.custom_types import PolymorphicEnumType
+from ..dataset.ormatic_interface import SceneObjectDAO
+
+# %% the generated file
+
 
 def test_generation_process():
     """
@@ -31,3 +36,16 @@ def test_generation_process():
     assert hasattr(ormatic_interface, "KRROODTransformationMappedDAO")
     assert hasattr(ormatic_interface, "KRROODPositionDAO")
     assert hasattr(ormatic_interface, "AtomDAO")
+
+
+# %% default type mappings
+
+
+def test_an_enum_field_maps_to_a_polymorphic_enum_column_by_default():
+    """
+    Enums map polymorphically without the generating side registering anything, so an
+    interface that asks for no type mapping of its own still stores any enum member.
+    """
+    assert isinstance(
+        SceneObjectDAO.__table__.columns["type"].type, PolymorphicEnumType
+    )
