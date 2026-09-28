@@ -142,6 +142,29 @@ def test_object_wearing_another_class_geometry_is_rejected(model, cups, pots):
     assert not model.is_familiar(disguised)
 
 
+# %% recognising objects it was not trained on
+
+
+@pytest.fixture(scope="module")
+def model_without_the_first_cup(cups, pots) -> ConfidenceModel:
+    """A model fitted on every familiar instance except the first cup."""
+    return ConfidenceModel.fit_from_instances(cups[1:] + pots)
+
+
+def test_unseen_object_inside_the_learnt_range_is_accepted(
+    model_without_the_first_cup, cups
+):
+    """An object the model never saw is familiar when its features fall in range.
+
+    The first cup's volume and aspect ratio both lie between the other cups', so it
+    belongs to the region they describe. A class circuit whose leaves each cover a
+    single instance instead collapses onto those instances' exact values, which
+    judges every unseen object unfamiliar and leaves the model unable to recognise
+    anything it was not trained on.
+    """
+    assert model_without_the_first_cup.is_familiar(cups[0])
+
+
 # %% thresholds
 
 
