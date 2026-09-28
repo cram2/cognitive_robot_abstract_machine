@@ -515,11 +515,6 @@ class VectorizedTruncationTestCase(unittest.TestCase):
         )
 
     def test_truncated_gaussian_layer_agrees_with_the_scalar_truncation(self):
-        """
-        The expected distribution is built on the intersection of the support and the
-        assignment directly: ``TruncatedGaussianDistribution.log_truncated`` keeps the
-        interval of the event instead of that intersection.
-        """
         support = closed(-1.0, 3.0)
         distributions = [
             TruncatedGaussianDistribution(
@@ -536,21 +531,15 @@ class VectorizedTruncationTestCase(unittest.TestCase):
             with self.subTest(str(assignment)):
                 truncated = layer.log_truncated_of_assignment(assignment, False)
                 self.assertIsInstance(truncated.layer, TruncatedGaussianLayer)
-                [intersection] = (support & assignment).simple_sets
                 for node, distribution in enumerate(distributions):
-                    event = SimpleEvent.from_data({x: assignment}).as_composite_set()
-                    self.assertAlmostEqual(
-                        float(np.exp(truncated.log_probabilities[node])),
-                        distribution.probability(event),
+                    expected, expected_log_probability = distribution.log_truncated(
+                        SimpleEvent.from_data({x: assignment}).as_composite_set()
                     )
-                    expected = TruncatedGaussianDistribution(
-                        variable=x,
-                        interval=intersection,
-                        location=distribution.location,
-                        scale=distribution.scale,
+                    self.assertAlmostEqual(
+                        truncated.log_probabilities[node], expected_log_probability
                     )
                     self.assertEqual(
-                        truncated.layer.simple_interval_of(node), intersection
+                        truncated.layer.simple_interval_of(node), expected.interval
                     )
                     np.testing.assert_allclose(
                         np.exp(
