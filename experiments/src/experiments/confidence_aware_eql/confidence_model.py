@@ -17,6 +17,7 @@ from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
 from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.dao import get_dao_schema, to_dao
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
@@ -80,7 +81,8 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
     """
     schema = get_dao_schema(type(to_dao(instance)))
     collection_relationships = {
-        relationship.key: relationship for relationship in schema.collection_relationships
+        relationship.key: relationship
+        for relationship in schema.collection_relationships
     }
     kwargs = {}
     for field in dataclasses.fields(domain_class):
@@ -90,7 +92,10 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
                 _build_grounding_query(child_domain_type, child)
                 for child in getattr(instance, field.name)
             ]
-        elif field.default is dataclasses.MISSING and field.default_factory is dataclasses.MISSING:
+        elif (
+            field.default is dataclasses.MISSING
+            and field.default_factory is dataclasses.MISSING
+        ):
             kwargs[field.name] = ...
     query = a(domain_class)(**kwargs)
     query.resolve()
@@ -98,6 +103,17 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
 
 
 # %% per-class model
+
+
+MINIMUM_INSTANCES_PER_LEAF = 2
+"""Fewest training instances a leaf of the class circuit may describe.
+
+A leaf fitted to a single instance collapses onto that instance's exact feature
+values, leaving the circuit a point mass per training instance: every object the
+model was not trained on then scores an infinitely low log-likelihood, however
+ordinary it is, and no threshold can tell such an object from a genuinely odd one.
+Two is the fewest that leaves a leaf spanning a range of feature values.
+"""
 
 
 @dataclass
@@ -126,7 +142,12 @@ class PerClassConfidenceModel:
         :param instances: The familiar instances of ``domain_class`` to learn from.
         :return: A fitted per-class confidence model.
         """
-        circuit = RelationalProbabilisticCircuit(domain_class)
+        circuit = RelationalProbabilisticCircuit(
+            domain_class,
+            learning_method=JointProbabilityTree(
+                min_samples_per_leaf=MINIMUM_INSTANCES_PER_LEAF
+            ),
+        )
         daos = [to_dao(instance) for instance in instances]
         circuit.fit(daos, dataframe_from_parent=extract_feature_dataframe(instances))
         model = cls(circuit, threshold=-np.inf)
@@ -147,7 +168,9 @@ class PerClassConfidenceModel:
         :param instance: The instance to score; must belong to this model's class.
         :return: The instance's log-likelihood under the fitted circuit.
         """
-        grounded = self.circuit.ground(_build_grounding_query(self.circuit.class_, instance))
+        grounded = self.circuit.ground(
+            _build_grounding_query(self.circuit.class_, instance)
+        )
         feature_row = extract_feature_dataframe([instance])
         variable_names = [variable.name for variable in grounded.variables]
         event = np.full((1, len(variable_names)), np.nan, dtype=object)
