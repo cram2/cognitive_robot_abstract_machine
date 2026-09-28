@@ -233,6 +233,16 @@ class TruncatedGaussianDistributionTestCase(unittest.TestCase):
         self.assertEqual(conditional.lower, 1)
         self.assertEqual(conditional.upper, 2)
 
+    def test_conditional_on_an_interval_reaching_beyond_the_support(self):
+        event = SimpleEvent.from_data({self.x: closed(-5, 1)}).as_composite_set()
+        conditional, probability = self.distribution.truncated(event)
+        self.assertEqual(conditional.interval, closed(-2, 1).simple_sets[0])
+        points = np.linspace(-2, 1, 7).reshape(-1, 1)
+        np.testing.assert_allclose(
+            conditional.likelihood(points),
+            self.distribution.likelihood(points) / probability,
+        )
+
     def test_conditional_on_mode(self):
         mode, _ = self.distribution.mode()
         conditional, probability = self.distribution.truncated(mode)
