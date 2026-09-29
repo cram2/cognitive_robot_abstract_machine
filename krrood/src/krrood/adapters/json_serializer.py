@@ -11,7 +11,7 @@ from types import NoneType
 from typing import List, Optional, TypeAlias, TYPE_CHECKING
 
 import numpy as np
-from scipy.sparse import coo_array
+from scipy.sparse import coo_array, csr_array
 from sortedcontainers import SortedSet
 from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
 
@@ -762,6 +762,30 @@ class CoordinateSparseArrayJSONSerializer(ExternalClassJSONSerializer[coo_array]
                 ),
             ),
             shape=tuple(data[CoordinateSparseArrayJSONKey.SHAPE]),
+        )
+
+
+class CompressedSparseRowArrayJSONSerializer(ExternalClassJSONSerializer[csr_array]):
+    """
+    External JSON serializer for scipy sparse arrays in compressed sparse row format.
+
+    The array is written like a sparse array in coordinate format, through its stored
+    entries.
+    """
+
+    @classmethod
+    def to_json(cls, obj: csr_array, **kwargs) -> Dict[str, Any]:
+        return {
+            **CoordinateSparseArrayJSONSerializer.to_json(obj.tocoo(), **kwargs),
+            JSONField.TYPE: get_full_class_name(type(obj)),
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[csr_array], **kwargs
+    ) -> csr_array:
+        return csr_array(
+            CoordinateSparseArrayJSONSerializer.from_json(data, coo_array, **kwargs)
         )
 
 

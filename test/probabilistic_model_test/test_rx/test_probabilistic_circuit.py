@@ -336,6 +336,17 @@ class ConditioningTestCase(unittest.TestCase):
 
         model.conditional({s: SymbolEnum.A})
 
+    def test_probability_of_a_point_that_only_one_component_supports(self):
+        # only the second component has density at x = 1.5, so conditioning removes
+        # the root sum unit; its weight must still be part of the probability
+        point = {self.x: 1.5}
+        _, log_probability = self.model.log_conditional(point)
+        self.assertAlmostEqual(log_probability, np.log(0.5 * 0.5))
+        self.assertAlmostEqual(
+            log_probability,
+            self.model.marginal([self.x]).log_likelihood(np.array([[1.5]]))[0],
+        )
+
 
 def test_subset_of_continuous_variables_expectation():
     circuit = ProbabilisticCircuit()

@@ -65,8 +65,12 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delt
     DiracDeltaLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    DiscreteLayer,
     IntegerLayer,
     SymbolicLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
+    SparseProbabilityTable,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
@@ -84,6 +88,9 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding import (
+    SymbolicEncoding,
+)
 from probabilistic_model.utils import MissingDict
 
 x = Continuous("x")
@@ -100,11 +107,17 @@ class SymbolEnum(IntEnum):
 s = Symbolic(name="s", domain=Set.from_iterable(SymbolEnum))
 
 
-class UnconvertibleUniformDistribution(UniformDistribution):
+class SparseSymbolEnum(IntEnum):
     """
-    A distribution type that no converter handles: converters dispatch on the exact type
-    of a distribution.
+    Domain elements whose hashes are not their positions in the domain.
     """
+
+    LOW = 3
+    MIDDLE = 7
+    HIGH = 11
+
+
+sparse = Symbolic(name="sparse", domain=Set.from_iterable(SparseSymbolEnum))
 
 
 class UnconvertibleUniformDistribution(UniformDistribution):
@@ -777,9 +790,10 @@ class TruncationTestCase(unittest.TestCase):
     def test_a_batch_whose_simple_sets_disagree_on_the_layer_type_reports_it(self):
         """
         A batch a layer cannot be truncated in has to be reported, so that the circuit
-        falls back to truncating once per simple set. Here one simple set bounds x and
-        turns the Gaussian leaves over it into truncated Gaussians, while the other
-        leaves x unbounded and keeps them Gaussian.
+        falls back to truncating once per simple set.
+
+        Here one simple set bounds x and turns the Gaussian leaves over it into
+        truncated Gaussians, while the other leaves x unbounded and keeps them Gaussian.
         """
         event = (
             SimpleEvent.from_data(
@@ -920,6 +934,33 @@ class ConditionalTestCase(unittest.TestCase):
         np.testing.assert_allclose(
             conditional.log_likelihood(samples),
             rx_conditional.log_likelihood(samples),
+        )
+
+    def test_conditioning_on_an_integer_variable(self):
+        rx_circuit = mixed_circuit()
+        layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
+
+        point = {n: 2}
+        rx_conditional, rx_probability = rx_circuit.log_conditional(point)
+        conditional, probability = layered.log_conditional(point)
+
+        # only the second component has n = 2
+        self.assertAlmostEqual(probability, np.log(0.6 * 0.3))
+        self.assertAlmostEqual(probability, rx_probability)
+        # the point mass is an integer layer, so it answers interval events of n
+        self.assertTrue(
+            any(isinstance(layer, IntegerLayer) for layer in conditional.layers)
+        )
+        event = SimpleEvent.from_data(
+            {
+                x: closed(1.5, 3.0),
+                n: closed(1, 3),
+                s: Set.from_iterable([SymbolEnum.A]),
+            }
+        )
+        self.assertAlmostEqual(
+            conditional.probability_of_simple_event(event),
+            rx_conditional.probability_of_simple_event(event),
         )
 
     def test_conditioning_on_every_variable(self):
@@ -1158,6 +1199,183 @@ class SimplificationTestCase(unittest.TestCase):
         np.testing.assert_allclose(layered.log_likelihood(samples), before)
 
 
+def sparse_symbolic_circuit() -> RxCircuit:
+    """
+    A mixture over a continuous variable and a symbolic variable whose domain elements
+    hash to numbers that are not their positions in the domain.
+    """
+    circuit = RxCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    for weight, (lower, upper), symbol_probabilities in (
+        (0.3, (0, 2), {SparseSymbolEnum.LOW: 0.6, SparseSymbolEnum.HIGH: 0.4}),
+        (0.7, (1, 3), {SparseSymbolEnum.MIDDLE: 0.5, SparseSymbolEnum.HIGH: 0.5}),
+    ):
+        product = ProductUnit(probabilistic_circuit=circuit)
+        root.add_subcircuit(product, np.log(weight))
+        product.add_subcircuit(leaf(uniform(x, lower, upper), circuit))
+        product.add_subcircuit(
+            leaf(
+                SymbolicDistribution(
+                    variable=sparse,
+                    probabilities=MissingDict(
+                        float,
+                        {
+                            hash(element): probability
+                            for element, probability in symbol_probabilities.items()
+                        },
+                    ),
+                ),
+                circuit,
+            )
+        )
+    return circuit
+
+
+class SymbolicEncodingTestCase(unittest.TestCase):
+    """
+    A symbolic value is the hash of a domain element outside of the circuit and its
+    position in the domain inside of it: the circuit translates between the two, so
+    that the layers look states up by position.
+    """
+
+    def setUp(self):
+        self.rx_circuit = sparse_symbolic_circuit()
+        self.layered = RustworkxCircuitToLayeredCircuitConverter.convert(
+            self.rx_circuit
+        )
+
+    def test_encoding_maps_hashes_to_positions_and_back(self):
+        encoding = SymbolicEncoding(sparse)
+        hashes = np.array([hash(element) for element in SparseSymbolEnum])
+        positions = encoding.indices_of_hashes(hashes)
+        np.testing.assert_array_equal(positions, np.arange(len(SparseSymbolEnum)))
+        np.testing.assert_array_equal(encoding.hashes_of_indices(positions), hashes)
+
+    def test_a_value_outside_of_the_domain_has_no_position(self):
+        encoding = SymbolicEncoding(sparse)
+        np.testing.assert_array_equal(
+            encoding.indices_of_hashes(np.array([5.0, np.nan])), [-1, -1]
+        )
+
+    def test_symbolic_layer_stores_positions_in_the_domain(self):
+        [symbolic_layer] = [
+            layer for layer in self.layered.layers if isinstance(layer, SymbolicLayer)
+        ]
+        self.assertTrue(
+            set(symbolic_layer.states.tolist()) <= set(range(len(SparseSymbolEnum)))
+        )
+
+    def test_log_likelihood_agrees_with_rustworkx(self):
+        events = np.array(
+            [
+                [1.5, hash(SparseSymbolEnum.LOW)],
+                [1.5, hash(SparseSymbolEnum.MIDDLE)],
+                [2.5, hash(SparseSymbolEnum.HIGH)],
+                [1.5, 5.0],
+            ]
+        )
+        np.testing.assert_allclose(
+            self.layered.log_likelihood(events), self.rx_circuit.log_likelihood(events)
+        )
+
+    def test_samples_are_hashes_of_domain_elements(self):
+        samples = self.layered.sample(500)
+        column = self.layered.variables.index(sparse)
+        self.assertTrue(
+            set(samples[:, column].tolist())
+            <= {float(hash(element)) for element in SparseSymbolEnum}
+        )
+        self.assertTrue(np.isfinite(self.rx_circuit.log_likelihood(samples)).all())
+
+    def test_probability_of_an_event_agrees_with_rustworkx(self):
+        event = SimpleEvent.from_data(
+            {
+                x: closed(0.5, 2.5),
+                sparse: Set.from_iterable(
+                    [SparseSymbolEnum.LOW, SparseSymbolEnum.MIDDLE]
+                ),
+            }
+        )
+        self.assertAlmostEqual(
+            self.layered.probability_of_simple_event(event),
+            self.rx_circuit.probability_of_simple_event(event),
+        )
+
+    def test_conditioning_agrees_with_rustworkx(self):
+        point = {sparse: SparseSymbolEnum.HIGH}
+        rx_conditional, rx_probability = self.rx_circuit.log_conditional(point)
+        conditional, probability = self.layered.log_conditional(point)
+        self.assertAlmostEqual(probability, rx_probability)
+        samples = conditional.sample(200)
+        np.testing.assert_allclose(
+            conditional.log_likelihood(samples),
+            rx_conditional.log_likelihood(samples),
+        )
+
+
+class ProbabilityTableChoiceTestCase(unittest.TestCase):
+    """
+    A circuit whose discrete layers store their probabilities sparsely answers every
+    query like the same circuit with dense tables.
+    """
+
+    circuits = {"mixed": mixed_circuit, "sparse symbolic": sparse_symbolic_circuit}
+
+    def setUp(self):
+        np.random.seed(69)
+
+    def dense_and_sparse(self, circuit):
+        dense = RustworkxCircuitToLayeredCircuitConverter.convert(circuit())
+        sparse = RustworkxCircuitToLayeredCircuitConverter.convert(
+            circuit()
+        ).store_discrete_probabilities_as(SparseProbabilityTable)
+        return dense, sparse
+
+    def test_every_discrete_layer_is_stored_sparsely(self):
+        for name, circuit in self.circuits.items():
+            with self.subTest(name):
+                _, sparse = self.dense_and_sparse(circuit)
+                discrete_layers = [
+                    layer for layer in sparse.layers if isinstance(layer, DiscreteLayer)
+                ]
+                self.assertTrue(discrete_layers)
+                for layer in discrete_layers:
+                    self.assertIsInstance(layer.table, SparseProbabilityTable)
+
+    def test_queries_agree(self):
+        for name, circuit in self.circuits.items():
+            with self.subTest(name):
+                dense, sparse = self.dense_and_sparse(circuit)
+                samples = dense.sample(300)
+                np.testing.assert_allclose(
+                    sparse.log_likelihood(samples), dense.log_likelihood(samples)
+                )
+                event = SimpleEvent.from_data({x: closed(0.5, 2.5)})
+                event.fill_missing_variables(dense.variables)
+                self.assertAlmostEqual(
+                    sparse.probability_of_simple_event(event),
+                    dense.probability_of_simple_event(event),
+                )
+                dense_truncated, dense_probability = dense.truncated(
+                    event.as_composite_set()
+                )
+                sparse_truncated, sparse_probability = sparse.truncated(
+                    event.as_composite_set()
+                )
+                self.assertAlmostEqual(sparse_probability, dense_probability)
+                np.testing.assert_allclose(
+                    sparse_truncated.log_likelihood(samples),
+                    dense_truncated.log_likelihood(samples),
+                )
+
+    def test_samples_of_a_sparse_circuit_are_likely_under_the_dense_one(self):
+        for name, circuit in self.circuits.items():
+            with self.subTest(name):
+                dense, sparse = self.dense_and_sparse(circuit)
+                samples = sparse.sample(300)
+                self.assertTrue(np.isfinite(dense.log_likelihood(samples)).all())
+
+
 class LayerTestCase(unittest.TestCase):
     """
     Direct checks of the layer classes, independent of a circuit.
@@ -1237,11 +1455,13 @@ class LayerTestCase(unittest.TestCase):
             ),
         ]
         layer = SymbolicLayer.from_distributions(0, distributions)
-        events = np.array([[hash(element)] for element in s.domain.simple_sets])
-        result = layer.log_likelihood_of_nodes(events)
+        hashes = np.array([[hash(element)] for element in s.domain.simple_sets])
+        # a layer reads the positions of the domain elements, which the circuit encodes
+        positions = SymbolicEncoding(s).indices_of_hashes(hashes[:, 0]).reshape(-1, 1)
+        result = layer.log_likelihood_of_nodes(positions)
         for node, distribution in enumerate(distributions):
             np.testing.assert_allclose(
-                result[:, node], distribution.log_likelihood(events)
+                result[:, node], distribution.log_likelihood(hashes)
             )
 
     def test_a_symbolic_layer_has_no_cumulative_distribution(self):

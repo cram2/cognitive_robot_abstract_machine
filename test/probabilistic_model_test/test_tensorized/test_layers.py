@@ -74,6 +74,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delt
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
     IntegerLayer,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
+    DenseProbabilityTable,
+    SparseProbabilityTable,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
     TruncatedGaussianLayer,
@@ -875,6 +879,52 @@ class LocationAndScaleValidationTestCase(unittest.TestCase):
         layer.bounds = layer.bounds[:1]
         with self.assertRaises(ShapeMismatchError):
             layer.validate()
+
+
+class DiscreteLayerSamplingTestCase(unittest.TestCase):
+    """
+    A discrete layer draws the samples of all of its nodes together, whichever way its
+    probabilities are stored.
+    """
+
+    distributions = [
+        IntegerDistribution(
+            variable=n, probabilities=MissingDict(float, {2: 0.2, 5: 0.3, 9: 0.5})
+        ),
+        IntegerDistribution(variable=n, probabilities=MissingDict(float, {5: 1.0})),
+    ]
+
+    def setUp(self):
+        np.random.seed(69)
+
+    def layers(self):
+        return {
+            table_type.__name__: IntegerLayer.from_distributions(
+                0, self.distributions, table_type
+            )
+            for table_type in (DenseProbabilityTable, SparseProbabilityTable)
+        }
+
+    def test_samples_of_every_node_follow_its_distribution(self):
+        amount = 20000
+        for name, layer in self.layers().items():
+            with self.subTest(name):
+                nodes = np.repeat(np.arange(layer.number_of_nodes), amount)
+                samples = layer.sample_of_nodes(nodes, SortedSet([n]))
+                for node, distribution in enumerate(self.distributions):
+                    of_node = samples[nodes == node]
+                    for state, probability in distribution.probabilities.items():
+                        self.assertAlmostEqual(
+                            float(np.mean(of_node == state)), probability, delta=0.015
+                        )
+
+    def test_a_node_without_mass_samples_nothing(self):
+        for name, layer in self.layers().items():
+            with self.subTest(name):
+                truncated = layer.log_truncated_of_assignment(closed(2, 2), False).layer
+                samples = truncated.sample_of_nodes(np.array([0, 1, 1]), SortedSet([n]))
+                self.assertEqual(samples[0], 2.0)
+                self.assertTrue(np.isnan(samples[1:]).all())
 
 
 class SupportWithoutCopiesTestCase(unittest.TestCase):

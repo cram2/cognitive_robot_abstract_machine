@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Dict, Any, Self
 
 import numpy as np
-from scipy.sparse import coo_array
+from scipy.sparse import coo_array, csr_array
 import pytest
 from sortedcontainers import SortedSet
 
@@ -412,6 +412,19 @@ def test_coordinate_sparse_array_keeps_its_stored_entries():
     np.testing.assert_array_equal(result.data, obj.data)
     np.testing.assert_array_equal(result.row, obj.row)
     np.testing.assert_array_equal(result.col, obj.col)
+
+
+def test_compressed_sparse_row_array_keeps_its_stored_entries():
+    # the first entry stores a zero, which is a value and not a missing entry
+    obj = csr_array(
+        (np.array([0, 3]), (np.array([0, 1]), np.array([1, 0]))), shape=(2, 3)
+    )
+    result = from_json(to_json(obj))
+    assert isinstance(result, csr_array)
+    assert result.shape == obj.shape
+    np.testing.assert_array_equal(result.data, obj.data)
+    np.testing.assert_array_equal(result.indices, obj.indices)
+    np.testing.assert_array_equal(result.indptr, obj.indptr)
 
 
 @dataclass
