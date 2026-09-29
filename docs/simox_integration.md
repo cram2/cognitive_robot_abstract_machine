@@ -1,7 +1,7 @@
 # Simox Grasp Planner — Integration, Architecture & Demo Guide
 
 > **Branch:** `feature/robot-centric-grasp`  
-
+> **Related Documentation:** [Grasp Refactoring Summary](grasp_refactoring_summary.md)
 
 ---
 
@@ -20,6 +20,7 @@
 11. [Running the Demo](#11-running-the-demo)
 12. [The Grasp Planner GUI](#12-the-grasp-planner-gui)
 13. [Installation & Prerequisites](#13-installation--prerequisites)
+14. [Grasp Refactoring Architecture Summary](grasp_refactoring_summary.md)
 
 ---
 
@@ -90,54 +91,98 @@ Simox is **not** embedded as a Python library. It runs as a **standalone ROS 2 s
 
 ---
 
-## 3. File & Directory Overview
+## 3. Architecture & Multi-Repository Overview (3 Repositories)
 
+Running the complete autonomous grasp planning and execution pipeline on the PR2 (in simulation or on physical hardware) coordinates **three separate repositories**:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ 1. cognitive_robot_abstract_machine (Monorepo, branch: feature/robot-centric-grasp)    │
+│    - High-level reasoning, CoraPlex plans, SimoxPickUpAction, semantic_digital_twin    │
+│    - simox_grasp_planner.py (ROS 2 service client & frame transformations)             │
+│    - PR2 Pick & Place Demo (coraplex/demos/pr2_simox_demo/demo.py)                     │
+│    - PR2 ROS bridge motion mapping (translates joint trajectories for bridge)          │
+└────────────────────────────────────────┬───────────────────────────────────────────────┘
+                                         │
+                 ┌───────────────────────┴───────────────────────┐
+                 │                                               │
+                 ▼                                               ▼
+┌───────────────────────────────────────┐       ┌────────────────────────────────────────┐
+│ 2. grasp_planner (Simox Service Repo) │       │ 3. ros1_2_bridge (Docker Bridge Repo)  │
+│    - KIT Simox C++ library & models   │       │    - Bridges ROS 2 Jazzy ↔ ROS 1       │
+│    - grasp_planner_msgs               │       │      Noetic without DDS clashes        │
+│    - grasp_planner_service C++ node   │       │    - Forwards joint trajectory actions │
+│      (/plan_grasp service)            │       │      directly to PR2 hardware          │
+│    - scripts/install_simox.sh         │       │    - start_bridge_to_robot.sh          │
+└───────────────────────────────────────┘       └────────────────────────────────────────┘
+```
+
+### Repository Structure & Responsibilities
+
+#### Repository 1: `cognitive_robot_abstract_machine` (Monorepo)
 ```
 cognitive_robot_abstract_machine/
 │
 ├── coraplex/
 │   ├── src/coraplex/external_interfaces/
-│   │   └── simox_grasp_planner.py          ← Main Simox↔CoraPlex bridge (NEW)
+│   │   └── simox_grasp_planner.py          ← Main Simox↔CoraPlex bridge
 │   │
 │   ├── src/coraplex/datastructures/
 │   │   └── grasp.py                        ← GraspPose, translate_pose_along_local_axis
 │   │
 │   ├── src/coraplex/robot_plans/actions/core/
-│   │   └── pick_up.py                      ← SimoxPickUpAction (higher-level planner)
+│   │   └── pick_up.py                      ← SimoxPickUpAction (high-level action plan)
+│   │
+│   ├── alternative_motion_mappings/
+│   │   └── pr2_motion_mapping.py           ← PR2 trajectory mapping for ROS bridge
 │   │
 │   ├── resources/objects/
 │   │   ├── breakfast_cereal.stl            ← Mesh in meters (used directly by Simox)
 │   │   ├── milk.stl
 │   │   ├── bowl.stl
-│   │   ├── apartment_bowl.stl 
-│   │   
+│   │   └── apartment_bowl.stl
 │   │
-│   └── demos/pr2_simox_demo/
-│       ├── demo.py                         ← End-to-end pick-and-place demo (NEW)
-│       └── README.md                       ← Quick-start guide (NEW)
+│   └── demos/
+│       ├── pr2_simox_demo/
+│       │   ├── demo.py                     ← End-to-end pick-and-place demo
+│       │   └── README.md                   ← Quick-start guide
+│       └── pr2_ros_bridge_demo/            ← Low-level bridge validation demo
 │
 └── docs/
-    └── simox_integration.md                ← This document
+    ├── simox_integration.md                ← This document
+    └── grasp_refactoring_summary.md        ← GraspDescription refactoring summary
 ```
 
-**Simox service workspace** (separate, built with colcon — not in this mono-repo):
-
+#### Repository 2: `grasp_planner` (Simox ROS 2 Workspace)
 ```
-<simox_ws>/
+grasp_planner/ (<simox_ws>)
 ├── grasp_test_files/
 │   └── resources/
 │       ├── robots/
 │       │   ├── pr2.xml                     ← Simox robot XML entry point
 │       │   └── pr2_for_simox.urdf          ← PR2 URDF with Simox EEF definitions
 │       └── objects/                        ← Auto-generated cache (not version-controlled)
-│           ├── breakfast_cereal.stl        ← Copied/scaled STL
+│           ├── breakfast_cereal.stl        ← Copied/scaled STL in meters
 │           ├── breakfast_cereal.xml        ← Auto-generated ManipulationObject XML
 │           └── ...
-└── scripts/
-    └── launch_simox_service.sh             ← Launches grasp_planner_service_node
+├── grasp_planner_gui/                      ← Diagnostic GUI client
+├── scripts/
+│   └── install_simox.sh                    ← Automated Simox C++ build/install script
+└── src/
+    ├── grasp_planner_msgs/                 ← ROS 2 service definition (PlanGrasp.srv)
+    └── grasp_planner_service/              ← C++ node (runs /plan_grasp)
 ```
+> **Note:** `grasp_test_files/resources/objects/` is a **runtime cache**. STL files and XML wrappers are auto-generated by `simox_grasp_planner.py` on first use and do not need to be manually maintained.
 
-> **Note:** `grasp_test_files/resources/objects/` is a **runtime cache**. STL files and XML wrappers are auto-generated by `simox_grasp_planner.py` on first use and do not need to be manually maintained .
+#### Repository 3: `ros1_2_bridge` (ROS 1 ↔ ROS 2 Docker Bridge)
+```
+ros1_2_bridge/
+├── Dockerfile                              ← Dual ROS 1 Noetic + ROS 2 Jazzy container
+├── docker-compose.yml                      ← Network and container configuration
+├── bridge_rules.yaml                       ← Topic/Action forwarding rules
+└── start_bridge_to_robot.sh                ← Entrypoint to launch bridge against real PR2 / Gazebo
+```
+> **Purpose:** PR2 hardware controllers run exclusively on ROS 1 Noetic. The bridge forwards ROS 2 action goals (`FollowJointTrajectory`, `Pr2GripperCommand`) to ROS 1 action servers without DDS transport clashes. Required for Mode 2 (Real PR2) and Gazebo.
 
 ---
 
@@ -486,7 +531,9 @@ The following uses placeholder paths. Replace:
 
 ```bash
 cd <simox_ws>
-bash scripts/launch_simox_service.sh
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 run grasp_planner_service grasp_planner_service_node
 ```
 
 Expected: `[INFO] [grasp_planner_service_node]: Simox service ready on /plan_grasp`
@@ -567,9 +614,48 @@ The GUI sends the same `PlanGrasp.Request` as the demo and displays each grasp c
 | OS | Ubuntu 24.04 (Noble) |
 | ROS 2 | Jazzy |
 | Python | 3.12 |
-| Docker | Required for Modes 2 and 3 only |
+| Docker | Required for Mode 2 (Real robot bridge) only |
 
-### 1. Clone and Configure the Mono-Repo
+### 1. Install Simox C++ Library
+
+Simox (Simulation of Motion and Grasping for Robots) must be compiled with `VirtualRobot` and `GraspStudio` components.
+
+You can use the one-shot automated installation script provided in the **`grasp_planner`** repository (`<simox_ws>/scripts/install_simox.sh` or `<simox_ws>/install_simox.sh`):
+
+```bash
+# Automated install (installs apt dependencies, clones cram2/Simox, compiles and installs):
+cd <simox_ws>
+bash scripts/install_simox.sh
+```
+
+Or manually:
+
+```bash
+# 1. Install build dependencies
+sudo apt-get update && sudo apt-get install -y \
+    build-essential cmake git \
+    libboost-all-dev libeigen3-dev \
+    qtbase5-dev libqt5opengl5-dev \
+    libcoin-dev libsoqt-dev-common \
+    libnlopt-dev liburdfdom-dev
+
+# 2. Clone cram2 Simox repository
+git clone https://github.com/cram2/Simox.git /tmp/Simox
+cd /tmp/Simox
+
+# 3. Build & install
+cmake -B build -S . \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr/local \
+    -DSimox_BUILD_EXAMPLES=OFF \
+    -DSimox_BUILD_VirtualRobot=ON \
+    -DSimox_BUILD_GraspStudio=ON \
+    -DBUILD_TESTING=OFF
+cmake --build build -j$(nproc)
+sudo cmake --install build
+```
+
+### 2. Clone and Configure the Mono-Repo
 
 ```bash
 git clone <mono_repo_url> cognitive_robot_abstract_machine
@@ -577,9 +663,9 @@ cd cognitive_robot_abstract_machine
 git checkout feature/robot-centric-grasp
 ```
 
-### 2. Build the Simox ROS 2 Workspace
+### 3. Build the Simox ROS 2 Workspace
 
-The Simox service is built as a separate ROS 2 workspace (not part of this mono-repo):
+The Simox service packages (`grasp_planner_msgs` and `grasp_planner_service`) are built in your ROS 2 workspace:
 
 ```bash
 cd <simox_ws>
@@ -596,7 +682,7 @@ ros2 pkg list | grep grasp_planner
 #   grasp_planner_service
 ```
 
-### 3. Install Python Dependencies
+### 4. Install Python Dependencies
 
 ```bash
 python3 -m venv <venv>
@@ -609,11 +695,13 @@ pip install -e <mono_repo>/giskardpy
 pip install -e <mono_repo>/krrood
 ```
 
-### 4. Verify the Integration End-to-End
+### 5. Verify the Integration End-to-End
 
 ```bash
 # Terminal 1: Start the Simox service
-bash <simox_ws>/scripts/launch_simox_service.sh
+source /opt/ros/jazzy/setup.bash
+source <simox_ws>/install/setup.bash
+ros2 run grasp_planner_service grasp_planner_service_node
 
 # Terminal 2: Run demo in simulation mode
 source /opt/ros/jazzy/setup.bash && source <simox_ws>/install/setup.bash

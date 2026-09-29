@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 pr2_simox_demo/demo.py
-══════════════════════════════════════════════════════════════════════════════
-PR2 Simox Grasp Planner + CoraPlex + Giskard + ROS 1/2 Bridge Pick-and-Place Demo
+══════════════════════════════════════════════════════════════════════════════ PR2 Simox
+Grasp Planner + CoraPlex + Giskard + ROS 1/2 Bridge Pick-and-Place Demo.
 
 Complete sequence:
   1. Park both arms + Torso up + Open right gripper
@@ -15,12 +15,11 @@ Complete sequence:
 
 Execution modes:
   [1] Simulation  -- watch in RViz2 (no robot/docker needed)
-  [2] Gazebo sim  -- via docker sim_bridge container (ros1_2_bridge)
-  [3] Real robot  -- via docker bridge container (ros1_2_bridge)
+  [2] Real robot  -- via docker bridge container (ros1_2_bridge)
 
 HOW TO RUN:
   Terminal 1 (Simox service):
-    bash /home/zakaria/grasp_planner/scripts/launch_simox_service.sh
+    ros2 run grasp_planner_service grasp_planner_service_node
 
   Terminal 2 (RViz2):
     source /opt/ros/jazzy/setup.bash && rviz2
@@ -28,7 +27,6 @@ HOW TO RUN:
 
   Terminal 3 (Demo):
     source /opt/ros/jazzy/setup.bash
-    source /home/zakaria/grasp_planner/install/setup.bash
     python3 /home/zakaria/workspace/ros/src/cognitive_robot_abstract_machine/coraplex/demos/pr2_simox_demo/demo.py
 """
 
@@ -49,32 +47,7 @@ from typing import List, Optional
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-logger = logging.getLogger("pr2_simox_demo")
-
-# --- Hardware Calibration ---
-# The physical PR2 has a 90-degree offset on its wrist roll compared to the URDF.
-HARDWARE_WRIST_ROLL_OFFSET = 0.0#1.57
-
-# --- Bowl Tuning Parameters (Easy Control) ---
-BOWL_TILT_DEG = 25.0            # Slight angle in degrees matching apartment_bowl.stl's conical wall (e.g. 25.0°)
-BOWL_EXTRA_FORWARD_M = 0.065     # Move robot base closer to kitchen counter (increase to move more forward)
-BOWL_PICK_Z_OFFSET = 0.05       # Height of gripper above bowl center when picking (0.05m = top rim of apartment_bowl.stl)
-BOWL_PREGRASP_HEIGHT_M = 0.10   # How far back along the tilted wall angle the gripper starts before moving onto the rim
-BOWL_LIFT_HEIGHT_M = 0.14       # How much the arm lifts the bowl up after grasping (14 cm)
-BOWL_PLACE_DESCENT_M = 0.15     # How much the arm goes down when placing (decrease so arm stays higher)
-
-# ─── Paths ────────────────────────────────────────────────────────────────────
-
-REPO_ROOT = Path("/home/zakaria/grasp_planner")
-OBJECTS_DIR = REPO_ROOT / "grasp_test_files" / "resources" / "objects"
-ROBOT_XML = str(REPO_ROOT / "grasp_test_files" / "resources" / "robots" / "pr2.xml")
-
-# ─── CoraPlex + Simox + Giskard Imports ──────────────────────────────────────
-
+import coraplex.alternative_motion_mappings.pr2_motion_mapping  # noqa: F401 — registers PR2 bridge handlers
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import Arms, MovementType
 from coraplex.datastructures.grasp import translate_pose_along_local_axis
@@ -87,7 +60,6 @@ from coraplex.robot_plans.actions.core.robot_body import (
     MoveManipulatorAction,
     MoveTorsoAction,
     ParkArmsAction,
-    SetGripperAction,
 )
 from coraplex.robot_plans.motions.gripper import (
     MoveGripperMotion,
@@ -106,12 +78,37 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
 )
-import coraplex.alternative_motion_mappings.pr2_motion_mapping  # noqa: F401 — registers PR2 bridge handlers
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("pr2_simox_demo")
+
+# %% Bowl Tuning Parameters (Easy Control)
+BOWL_TILT_DEG = 25.0  # Slight angle in degrees matching apartment_bowl.stl's conical wall (e.g. 25.0°)
+BOWL_EXTRA_FORWARD_M = (
+    0.065  # Move robot base closer to kitchen counter (increase to move more forward)
+)
+BOWL_PICK_Z_OFFSET = 0.05  # Height of gripper above bowl center when picking (0.05m = top rim of apartment_bowl.stl)
+BOWL_PREGRASP_HEIGHT_M = 0.10  # How far back along the tilted wall angle the gripper starts before moving onto the rim
+BOWL_LIFT_HEIGHT_M = 0.14  # How much the arm lifts the bowl up after grasping (14 cm)
+BOWL_PLACE_DESCENT_M = (
+    0.15  # How much the arm goes down when placing (decrease so arm stays higher)
+)
+
+# %% Paths
+SIMOX_WORKSPACE = os.environ.get("SIMOX_WORKSPACE_DIR", "/home/zakaria/grasp_planner")
+REPO_ROOT = Path(SIMOX_WORKSPACE)
+OBJECTS_DIR = REPO_ROOT / "grasp_test_files" / "resources" / "objects"
+ROBOT_XML = str(REPO_ROOT / "grasp_test_files" / "resources" / "robots" / "pr2.xml")
 
 
 @dataclass
 class MoveJointsAction(ActionDescription):
-    """Wrapper so MoveJointsMotion runs through the plan tree."""
+    """
+    Wrapper so MoveJointsMotion runs through the plan tree.
+    """
 
     names: List[str]
     positions: List[float]
@@ -119,7 +116,6 @@ class MoveJointsAction(ActionDescription):
     @property
     def _action_plan(self):
         return execute_single(MoveJointsMotion(self.names, self.positions))
-
 
 
 def main():
@@ -130,8 +126,8 @@ def main():
         "--mode",
         type=str,
         default=None,
-        choices=["1", "2", "3"],
-        help="Execution mode: 1=RViz2 Simulation, 2=Gazebo via sim_bridge, 3=Real PR2 via bridge",
+        choices=["1", "2"],
+        help="Execution mode: 1=RViz2 Simulation, 2=Real PR2 via bridge",
     )
     parser.add_argument(
         "--object",
@@ -188,7 +184,9 @@ def main():
     executor.add_node(node)
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
-    print(f'[demo] ROS 2 node ready (ROS_DOMAIN_ID={os.environ.get("ROS_DOMAIN_ID", "0")})')
+    print(
+        f'[demo] ROS 2 node ready (ROS_DOMAIN_ID={os.environ.get("ROS_DOMAIN_ID", "0")})'
+    )
 
     # 2. World Setup
     print("[demo] Loading apartment world...")
@@ -202,6 +200,7 @@ def main():
     elif is_bowl:
         target_name = "apartment_bowl.stl"
         from semantic_digital_twin.adapters.mesh import STLParser
+
         coraplex_objects_dir = (
             Path(__file__).resolve().parents[2] / "resources" / "objects"
         )
@@ -214,7 +213,6 @@ def main():
     target_obj = world.get_body_by_name(target_name)
     all_objs = ["breakfast_cereal.stl", "milk.stl"] + ([target_name] if is_bowl else [])
     other_objs = [world.get_body_by_name(n) for n in all_objs if n != target_name]
-
 
     arm_enum = Arms.RIGHT if args.arm == "right" else Arms.LEFT
     eef_name = "r_gripper" if args.arm == "right" else "l_gripper"
@@ -255,21 +253,22 @@ def main():
         if not is_milk and not is_bowl:
             world.add_semantic_annotation(Cereal(root=target_obj))
 
-
     context = Context(world=world, robot=pr2, ros_node=node)
 
     # 3. RViz2 Visualization
-    viz = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
+    _viz = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
     root_frame = str(world.root.name) if world.root else "world"
-    print(f'\n[demo] ================================================')
+    print("\n[demo] ================================================")
     print(f'[demo]  RViz2 Fixed Frame  ->  "{root_frame}" (or "world")')
-    print(f'[demo]  MarkerArray topic  ->  /semworld/viz_marker')
-    print(f'[demo]  Durability         ->  TRANSIENT_LOCAL')
-    print(f'[demo] ================================================')
-    print(f'[demo]  Pick  location: [{pick_x:.2f}, {pick_y:.2f}, {pick_z:.2f}]')
-    print(f'[demo]  Place location: [{pick_x:.2f}, {pick_y + left_offset_y:.2f}, {pick_z:.2f}] (+{left_offset_y:.2f}m left)')
-    print(f'[demo]  PR2 start base: [1.50, 2.50, 0.00]')
-    print(f'[demo] ================================================\n')
+    print("[demo]  MarkerArray topic  ->  /semworld/viz_marker")
+    print("[demo]  Durability         ->  TRANSIENT_LOCAL")
+    print("[demo] ================================================")
+    print(f"[demo]  Pick  location: [{pick_x:.2f}, {pick_y:.2f}, {pick_z:.2f}]")
+    print(
+        f"[demo]  Place location: [{pick_x:.2f}, {pick_y + left_offset_y:.2f}, {pick_z:.2f}] (+{left_offset_y:.2f}m left)"
+    )
+    print("[demo]  PR2 start base: [1.50, 2.50, 0.00]")
+    print("[demo] ================================================\n")
 
     # 4. Mode Selection
     mode = args.mode
@@ -277,12 +276,11 @@ def main():
         print("[demo] ================================================")
         print("[demo]  Choose execution mode:")
         print("[demo]  [1] Simulation  -- watch in RViz2 (no robot needed)")
-        print("[demo]  [2] Gazebo sim  -- via docker sim_bridge container")
-        print("[demo]  [3] Real robot  -- via docker bridge container")
+        print("[demo]  [2] Real robot  -- via docker bridge container")
         print("[demo] ================================================")
-        mode = input("[demo] Enter 1, 2 or 3 [default=1]: ").strip() or "1"
+        mode = input("[demo] Enter 1 or 2 [default=1]: ").strip() or "1"
 
-    use_bridge = mode in ("2", "3")
+    use_bridge = mode == "2"
     container = None
     if use_bridge:
         from coraplex.alternative_motion_mappings.pr2_motion_mapping import (
@@ -293,12 +291,14 @@ def main():
         container = _find_bridge_container()
         if not container:
             print("[demo] ERROR: No bridge container found!")
-            print("[demo] Run in /home/zakaria/Desktop/ros1_2_bridge: bash start_bridge_to_robot.sh")
+            print(
+                "[demo] Run in /home/zakaria/Desktop/ros1_2_bridge: bash start_bridge_to_robot.sh"
+            )
             rclpy.shutdown()
             return
         print(f"[demo] Using bridge container: {container}\n")
 
-    # ─── Helpers (Simulation + Bridge Sync) ──────────────────────────────────
+    # %% Helpers (Simulation + Bridge Sync)
 
     R_ARM = [
         "r_shoulder_pan_joint",
@@ -324,20 +324,25 @@ def main():
     WAIT_SEC = 2.0 if use_bridge else 0.5
 
     def extract_joints(joints: List[str]) -> List[float]:
-        positions = []
-        for n in joints:
-            pos = float(world.state[world.get_connection_by_name(n).dof.id].position)
-            if n in ("r_wrist_roll_joint", "l_wrist_roll_joint"):
-                pos += HARDWARE_WRIST_ROLL_OFFSET
-            positions.append(pos)
-        return positions
+        return [
+            float(world.state[world.get_connection_by_name(n).dof.id].position)
+            for n in joints
+        ]
 
-    def bridge_send(joints: List[str], positions: List[float], dur: float, label: str = "", blocking: bool = True):
+    def bridge_send(
+        joints: List[str],
+        positions: List[float],
+        dur: float,
+        label: str = "",
+        blocking: bool = True,
+    ):
         if not use_bridge:
             return None
 
         def _send():
-            print(f"[bridge] -> {label}: {[round(p, 3) for p in positions]}", flush=True)
+            print(
+                f"[bridge] -> {label}: {[round(p, 3) for p in positions]}", flush=True
+            )
             t = PR2ROS1TrajectoryTask(
                 joint_names=joints,
                 positions=positions,
@@ -354,7 +359,9 @@ def main():
         th.start()
         return th
 
-    def bridge_arms_parallel(r_pos: List[float], l_pos: List[float], dur: float, label: str = ""):
+    def bridge_arms_parallel(
+        r_pos: List[float], l_pos: List[float], dur: float, label: str = ""
+    ):
         if not use_bridge:
             return
         th_r = bridge_send(R_ARM, r_pos, dur, f"r_arm {label}", blocking=False)
@@ -364,7 +371,9 @@ def main():
         if th_l:
             th_l.join()
 
-    def bridge_gripper(side: str, open_gripper: bool, label: str = "", gap: Optional[float] = None):
+    def bridge_gripper(
+        side: str, open_gripper: bool, label: str = "", gap: Optional[float] = None
+    ):
         if not use_bridge:
             return
         state = "OPEN" if open_gripper else "CLOSE"
@@ -399,7 +408,9 @@ def main():
         )
         timeout = ((dx**2 + dy**2) ** 0.5) / speed + 5.0
         try:
-            subprocess.run(["docker", "exec", container, "bash", "-c", cmd], timeout=timeout)
+            subprocess.run(
+                ["docker", "exec", container, "bash", "-c", cmd], timeout=timeout
+            )
         except Exception as exc:
             print(f"[bridge] Base movement warning: {exc}", flush=True)
 
@@ -407,7 +418,9 @@ def main():
         with simulated_robot:
             execute_single(description, context=context).plan.perform()
 
-    def sim_gripper(gripper_state: GripperState, arm: Arms, gap: Optional[float] = None):
+    def sim_gripper(
+        gripper_state: GripperState, arm: Arms, gap: Optional[float] = None
+    ):
         with simulated_robot:
             if gap is not None:
                 prefix = arm.name.lower()[0]
@@ -421,13 +434,15 @@ def main():
                     )
                 )
             else:
-                execute_single(MoveGripperMotion(gripper_state, arm), context=context).plan.perform()
+                execute_single(
+                    MoveGripperMotion(gripper_state, arm), context=context
+                ).plan.perform()
 
     def move_robot_base_by(dx: float, dy: float, label: str):
         """
         Move the PR2 base by (dx, dy) in world frame using the ros1_2_bridge
-        base_cmd_vel controller when in bridge mode, and update the digital twin
-        world state (falling back to Giskard NavigateAction if needed).
+        base_cmd_vel controller when in bridge mode, and update the digital twin world
+        state (falling back to Giskard NavigateAction if needed).
         """
         if use_bridge:
             bridge_base(dx, dy, speed=0.15, label=label)
@@ -435,11 +450,15 @@ def main():
         b_pos = pr2.root.global_pose.to_position()
         nx = float(b_pos[0]) + dx
         ny = float(b_pos[1]) + dy
-        target_nav_pose = Pose.from_xyz_rpy(nx, ny, 0.0, 0.0, 0.0, 0.0, reference_frame=world.root)
+        target_nav_pose = Pose.from_xyz_rpy(
+            nx, ny, 0.0, 0.0, 0.0, 0.0, reference_frame=world.root
+        )
         try:
             with world.modify_world():
-                pr2.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-                    nx, ny, 0.0, reference_frame=world.root
+                pr2.root.parent_connection.origin = (
+                    HomogeneousTransformationMatrix.from_xyz_rpy(
+                        nx, ny, 0.0, reference_frame=world.root
+                    )
                 )
         except Exception:
             sim_action(NavigateAction(target_location=target_nav_pose))
@@ -456,7 +475,12 @@ def main():
     sim_gripper(GripperState.OPEN, arm_enum)
 
     bridge_arms_parallel(extract_joints(R_ARM), extract_joints(L_ARM), ARM_DUR, "park")
-    bridge_send(["torso_lift_joint"], extract_joints(["torso_lift_joint"]), TORSO_DUR, "torso high")
+    bridge_send(
+        ["torso_lift_joint"],
+        extract_joints(["torso_lift_joint"]),
+        TORSO_DUR,
+        "torso high",
+    )
     bridge_gripper(gripper_side, True, "open gripper")
     time.sleep(WAIT_SEC)
 
@@ -468,8 +492,14 @@ def main():
     b_pos = pr2.root.global_pose.to_position()
     extra_fwd = BOWL_EXTRA_FORWARD_M if is_bowl else 0.0
     nav_dx = (pick_x - 0.65 + extra_fwd) - float(b_pos[0])
-    nav_dy = (pick_y + 0.11) - float(b_pos[1]) if arm_enum == Arms.RIGHT else (pick_y - 0.11) - float(b_pos[1])
-    print(f"[demo] Navigating base closer to counter by dx={nav_dx:.3f}m, dy={nav_dy:.3f}m")
+    nav_dy = (
+        (pick_y + 0.11) - float(b_pos[1])
+        if arm_enum == Arms.RIGHT
+        else (pick_y - 0.11) - float(b_pos[1])
+    )
+    print(
+        f"[demo] Navigating base closer to counter by dx={nav_dx:.3f}m, dy={nav_dy:.3f}m"
+    )
     move_robot_base_by(nav_dx, nav_dy, label="move closer to kitchen counter")
     time.sleep(WAIT_SEC)
 
@@ -524,7 +554,7 @@ def main():
 
     end_effector = ViewManager.get_end_effector_view(arm_enum, pr2)
     selected_grasp_pose = None
-    pre_grasp_pose = None
+    _pre_grasp_pose = None
 
     with simulated_robot:
         for direction in directions:
@@ -540,12 +570,16 @@ def main():
 
                     rim_radius = 0.0815
                     rim_sign = -1.0 if arm_enum == Arms.RIGHT else 1.0
-                    tilt = math.radians(BOWL_TILT_DEG) * (-rim_sign)  # +25° for right arm, -25° for left arm
+                    tilt = math.radians(BOWL_TILT_DEG) * (
+                        -rim_sign
+                    )  # +25° for right arm, -25° for left arm
 
                     # Position along the slanted rim wall at height pick_z + BOWL_PICK_Z_OFFSET
                     depth_from_top = max(0.0, 0.050 - BOWL_PICK_Z_OFFSET)
                     rim_x = pick_x
-                    rim_y = pick_y + rim_sign * (rim_radius - depth_from_top * math.tan(abs(tilt)))
+                    rim_y = pick_y + rim_sign * (
+                        rim_radius - depth_from_top * math.tan(abs(tilt))
+                    )
                     rim_z = pick_z + BOWL_PICK_Z_OFFSET
 
                     T_vert = np.eye(4)
@@ -630,14 +664,16 @@ def main():
                     )
 
                     selected_grasp_pose = candidate
-                    pre_grasp_pose = candidate_pre
+                    _pre_grasp_pose = candidate_pre
                     print(
                         f"[demo] ✔ Reached Simox grasp [{direction}] #{idx} "
                         f"(quality={candidate.quality:.4f})"
                     )
                     break
                 except Exception as exc:
-                    logger.warning("Candidate [%s] #%d unreachable: %s", direction, idx, exc)
+                    logger.warning(
+                        "Candidate [%s] #%d unreachable: %s", direction, idx, exc
+                    )
                     continue
             if selected_grasp_pose is not None:
                 break
@@ -651,7 +687,9 @@ def main():
     #  STEP 4: Close Gripper & Attach Object
     # ══════════════════════════════════════════════════════════════════════════
     grasp_gap = 0.0 if is_bowl else 0.04
-    print(f"\n[demo] ══ Step 4: Close Gripper (gap={grasp_gap:.3f}m, full close={is_bowl}) & Attach {target_obj.name} ══")
+    print(
+        f"\n[demo] ══ Step 4: Close Gripper (gap={grasp_gap:.3f}m, full close={is_bowl}) & Attach {target_obj.name} ══"
+    )
     sim_gripper(GripperState.CLOSE, arm_enum, gap=grasp_gap)
     bridge_gripper(gripper_side, False, "close gripper (grasp)", gap=grasp_gap)
 
@@ -688,10 +726,14 @@ def main():
             ),
             context=context,
         ).plan.perform()
-    bridge_send(ACTIVE_ARM_JOINTS, extract_joints(ACTIVE_ARM_JOINTS), ARM_DUR, "lift object")
+    bridge_send(
+        ACTIVE_ARM_JOINTS, extract_joints(ACTIVE_ARM_JOINTS), ARM_DUR, "lift object"
+    )
     time.sleep(WAIT_SEC)
 
-    print(f"\n[demo] ══ Step 5b: Move PR2 Base Left (+{left_offset_y:.2f}m along counter) ══")
+    print(
+        f"\n[demo] ══ Step 5b: Move PR2 Base Left (+{left_offset_y:.2f}m along counter) ══"
+    )
     move_robot_base_by(0.0, left_offset_y, label="move left to place location")
     time.sleep(WAIT_SEC)
 
@@ -721,7 +763,12 @@ def main():
             ),
             context=context,
         ).plan.perform()
-    bridge_send(ACTIVE_ARM_JOINTS, extract_joints(ACTIVE_ARM_JOINTS), ARM_DUR, "lower to place pose")
+    bridge_send(
+        ACTIVE_ARM_JOINTS,
+        extract_joints(ACTIVE_ARM_JOINTS),
+        ARM_DUR,
+        "lower to place pose",
+    )
     time.sleep(WAIT_SEC)
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -756,7 +803,9 @@ def main():
             ),
             context=context,
         ).plan.perform()
-    bridge_send(ACTIVE_ARM_JOINTS, extract_joints(ACTIVE_ARM_JOINTS), ARM_DUR, "retract arm up")
+    bridge_send(
+        ACTIVE_ARM_JOINTS, extract_joints(ACTIVE_ARM_JOINTS), ARM_DUR, "retract arm up"
+    )
     time.sleep(WAIT_SEC)
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -772,7 +821,9 @@ def main():
     bridge_arms_parallel(extract_joints(R_ARM), extract_joints(L_ARM), ARM_DUR, "park")
 
     print("\n══════════════════════════════════════════════════════════════════════")
-    print(f" ✔ Demo Complete! {target_obj.name} picked via Simox and placed on the left!")
+    print(
+        f" ✔ Demo Complete! {target_obj.name} picked via Simox and placed on the left!"
+    )
     print(
         f" Final {target_obj.name} world pose: "
         f"x={float(target_obj.global_pose.x):.3f}, "

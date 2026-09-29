@@ -4,7 +4,7 @@ Module holding all enums of CoraPlex.
 
 from __future__ import annotations
 
-from enum import Enum, auto, IntEnum
+from enum import Enum, auto, IntEnum, StrEnum
 
 
 class VisualizationLayout(Enum):
@@ -86,9 +86,9 @@ class ExecutionType(Enum):
     NO_EXECUTION = auto()
     BRIDGE = auto()
     """
-    Used by PR2 AlternativeMotion handlers that route commands to the real
-    robot via docker exec into the ROS 1/2 bridge container, instead of
-    sending them through Giskard's motion planning pipeline.
+    Used by PR2 AlternativeMotion handlers that route commands to the real robot via
+    docker exec into the ROS 1/2 bridge container, instead of sending them through
+    Giskard's motion planning pipeline.
     """
 
 
@@ -189,6 +189,20 @@ class VerticalAlignment(Grasp):
     NoAlignment = (AxisIdentifier.Undefined, 0)
     TOP = (AxisIdentifier.Z, -1)
     BOTTOM = (AxisIdentifier.Z, 1)
+
+
+class SimoxApproachDirection(StrEnum):
+    """
+    Approach directions classified from Simox grasp planner poses.
+    """
+
+    FRONT = "front"
+    BACK = "back"
+    LEFT = "left"
+    RIGHT = "right"
+    TOP = "top"
+    BOTTOM = "bottom"
+    SKIPPED = "skipped"
 
 
 class GripperType(Enum):
@@ -293,10 +307,12 @@ class CuttingTechnique(Enum):
     """
     Cut the object into slices of equal thickness.
     """
+
     SAW = auto()
     """
     Cut with a repeated back-and-forth sawing motion.
     """
+
     HALVING = auto()
     """
     Cut the object into two halves.
@@ -313,6 +329,7 @@ class SlicingPriority(Enum):
     """
     Keep the requested slice thickness and reduce the number of cuts to fit.
     """
+
     CUT_COUNT = auto()
     """
     Keep the requested number of cuts and shrink the slice thickness to fit.
@@ -328,14 +345,17 @@ class ToolPathSegmentKind(Enum):
     """
     Vertical approach from above onto the object.
     """
+
     DESCEND = auto()
     """
     Straight downward cut into the object.
     """
+
     SAW = auto()
     """
     Oscillatory shear motion with increasing depth.
     """
+
     RETRACT = auto()
     """
     Vertical retraction away from the object.
@@ -348,14 +368,17 @@ class ToolPathSegmentKind(Enum):
     """
     Continuous circular stirring loop.
     """
+
     SHEAR = auto()
     """
     Planar oscillatory shear at constant depth.
     """
+
     RASTER = auto()
     """
     Planar raster scan covering a rectangle.
     """
+
     SWEEP = auto()
     """
     Sinusoidal sweep along one axis.
@@ -371,10 +394,12 @@ class WipingTechnique(Enum):
     """
     Wipe along a spiral covering the surface.
     """
+
     SHEAR = auto()
     """
     Wipe with an oscillatory shear motion.
     """
+
     SPREAD = auto()
     """
     Spread along straight lanes covering the surface.
@@ -390,6 +415,7 @@ class MixingPattern(Enum):
     """
     Mix along an outward spiral.
     """
+
     STIR = auto()
     """
     Mix along circular stirring laps.

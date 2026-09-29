@@ -35,58 +35,63 @@ from __future__ import annotations
 import logging
 import os
 import struct
-import time
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 from geometry_msgs.msg import Pose as RosPose
-from geometry_msgs.msg import Quaternion, Point
+from geometry_msgs.msg import Quaternion
 
 import numpy as np
 
-from coraplex.datastructures.enums import Arms
+from coraplex.datastructures.enums import Arms, SimoxApproachDirection
 from coraplex.datastructures.grasp import GraspPose
-from coraplex.ros import get_node_names, ServiceProxy
-from semantic_digital_twin.spatial_types import RotationMatrix
+from coraplex.ros import ServiceProxy
 from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world import World
 
 logger = logging.getLogger(__name__)
 
-# ─── Module-level state (ROS-style lazy init) ─────────────────────────────────
+# %% Module-level state (ROS-style lazy init)
 
 _is_init: bool = False
 _service_proxy: Optional[ServiceProxy] = None
 _init_lock: Lock = Lock()
 
-# ─── Constants ────────────────────────────────────────────────────────────────
+# %% Constants
 
-_BASE_PATH = Path(__file__).resolve().parents[5]
-if not (_BASE_PATH / 'grasp_test_files').exists():
-    _BASE_PATH = Path('/home/zakaria/grasp_planner')
+_SIMOX_ENV_PATH = os.environ.get("SIMOX_WORKSPACE_DIR")
+if _SIMOX_ENV_PATH:
+    _BASE_PATH = Path(_SIMOX_ENV_PATH)
+else:
+    _candidate = Path(__file__).resolve().parents[5]
+    if (_candidate / "grasp_test_files").exists():
+        _BASE_PATH = _candidate
+    else:
+        _BASE_PATH = Path.cwd()
 
 # Absolute path to the Simox robot XML wrapper (pr2_for_simox.urdf + EEF definitions)
 DEFAULT_ROBOT_XML: str = str(
-    _BASE_PATH / 'grasp_test_files' / 'resources' / 'robots' / 'pr2.xml'
+    _BASE_PATH / "grasp_test_files" / "resources" / "robots" / "pr2.xml"
 )
 
 # Directory where scaled mm STLs and ManipulationObject XMLs are cached
-DEFAULT_OBJECT_DIR: Path = (
-    _BASE_PATH / 'grasp_test_files' / 'resources' / 'objects'
-)
+DEFAULT_OBJECT_DIR: Path = _BASE_PATH / "grasp_test_files" / "resources" / "objects"
 
-SERVICE_TOPIC: str = '/plan_grasp'
+SERVICE_TOPIC: str = "/plan_grasp"
 SERVICE_TIMEOUT_SECONDS: float = 60.0
 
 
-# ─── Orientation & Frame Transformation helpers ──────────────────────────────
+# %% Orientation & Frame Transformation helpers
 
 
-def _classify_approach(ros_orientation) -> str:
+def _classify_approach(ros_orientation: Quaternion) -> SimoxApproachDirection:
     """
     Classify the grasp approach direction in the robot base frame based on
     Simox's tool-frame forward vector.
@@ -107,9 +112,10 @@ def _classify_approach(ros_orientation) -> str:
             - fwd[1] < 0:  gripper is on the LEFT, pointing rightwards (-Y) into object -> LEFT
 
     :param ros_orientation: geometry_msgs/Quaternion from Simox.
-    :return: One of 'top', 'front', 'back', 'left', 'right', or 'skipped'.
+    :return: SimoxApproachDirection enum member.
     """
     from coraplex.tf_transformations import quaternion_matrix
+
     q = [
         float(ros_orientation.x),
         float(ros_orientation.y),
@@ -122,29 +128,31 @@ def _classify_approach(ros_orientation) -> str:
     # 1. Vertical component
     if fwd[2] > 0.5:
         logger.debug("Skipping BOTTOM approach (fwd_z=%.3f)", fwd[2])
-        return 'skipped'
+        return SimoxApproachDirection.SKIPPED
     elif fwd[2] < -0.4:
         logger.debug("Detected TOP approach (fwd_z=%.3f)", fwd[2])
-        return 'top'
+        return SimoxApproachDirection.TOP
 
     # 2. Horizontal component
     if abs(fwd[0]) >= abs(fwd[1]):
         if fwd[0] >= 0:
             logger.debug("Detected FRONT approach (fwd_x=%.3f)", fwd[0])
-            return 'front'
+            return SimoxApproachDirection.FRONT
         else:
             logger.debug("Detected BACK approach (fwd_x=%.3f)", fwd[0])
-            return 'back'
+            return SimoxApproachDirection.BACK
     else:
         if fwd[1] >= 0:
             logger.debug("Detected RIGHT approach (fwd_y=%.3f)", fwd[1])
-            return 'right'
+            return SimoxApproachDirection.RIGHT
         else:
             logger.debug("Detected LEFT approach (fwd_y=%.3f)", fwd[1])
-            return 'left'
+            return SimoxApproachDirection.LEFT
 
 
-def _simox_pose_to_coraplex_tool_pose(ros_pose: RosPose, reference_frame=None) -> Pose:
+def _simox_pose_to_coraplex_tool_pose(
+    ros_pose: RosPose, reference_frame: Optional[KinematicStructureEntity] = None
+) -> Pose:
     """
     Transform a Simox TCP pose to CoraPlex's r_gripper_tool_frame.
 
@@ -176,6 +184,7 @@ def _simox_pose_to_coraplex_tool_pose(ros_pose: RosPose, reference_frame=None) -
     :return: CoraPlex Pose for r_gripper_tool_frame (in robot frame).
     """
     from coraplex.tf_transformations import quaternion_matrix, quaternion_from_matrix
+
     q_simox = [
         float(ros_pose.orientation.x),
         float(ros_pose.orientation.y),
@@ -183,17 +192,21 @@ def _simox_pose_to_coraplex_tool_pose(ros_pose: RosPose, reference_frame=None) -
         float(ros_pose.orientation.w),
     ]
     R_simox = quaternion_matrix(q_simox)[:3, :3]
-    P_simox = np.array([
-        float(ros_pose.position.x),
-        float(ros_pose.position.y),
-        float(ros_pose.position.z),
-    ])
+    P_simox = np.array(
+        [
+            float(ros_pose.position.x),
+            float(ros_pose.position.y),
+            float(ros_pose.position.z),
+        ]
+    )
 
-    R_simox_to_coraplex = np.array([
-        [0.0, 0.0, -1.0],
-        [0.0, 1.0,  0.0],
-        [1.0, 0.0,  0.0],
-    ])
+    R_simox_to_coraplex = np.array(
+        [
+            [0.0, 0.0, -1.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0],
+        ]
+    )
     R_coraplex = R_simox @ R_simox_to_coraplex
     P_coraplex = P_simox + 0.05 * R_simox[:, 2]
 
@@ -213,9 +226,7 @@ def _simox_pose_to_coraplex_tool_pose(ros_pose: RosPose, reference_frame=None) -
     )
 
 
-
-
-# ─── STL scale helpers ────────────────────────────────────────────────────────
+# %% STL scale helpers
 
 
 def _detect_stl_unit(path: Path) -> str:
@@ -227,83 +238,87 @@ def _detect_stl_unit(path: Path) -> str:
     :return: 'meters' or 'millimeters'
     """
     max_coord = 0.0
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         f.read(80)
-        count = struct.unpack('<I', f.read(4))[0]
+        count = struct.unpack("<I", f.read(4))[0]
         sample = min(count, 200)
         for _ in range(sample):
             f.read(12)  # normal
             for _ in range(3):
-                x, y, z = struct.unpack('<3f', f.read(12))
+                x, y, z = struct.unpack("<3f", f.read(12))
                 max_coord = max(max_coord, abs(x), abs(y), abs(z))
             f.read(2)  # attr
-    return 'meters' if max_coord < 5.0 else 'millimeters'
+    return "meters" if max_coord < 5.0 else "millimeters"
 
 
 def _scale_stl(source: Path, dest: Path, scale: float = 1000.0) -> None:
     """
-    Read a binary STL, multiply all vertex coordinates by scale, and write
-    a new binary STL.
+    Read a binary STL, multiply all vertex coordinates by scale, and write a new binary
+    STL.
 
     :param source: Input binary STL path.
     :param dest: Output binary STL path.
     :param scale: Multiplier for vertex coordinates.
     """
-    with open(source, 'rb') as f:
+    with open(source, "rb") as f:
         header = f.read(80)
-        count = struct.unpack('<I', f.read(4))[0]
+        count = struct.unpack("<I", f.read(4))[0]
         triangles = []
         for _ in range(count):
-            normal = struct.unpack('<3f', f.read(12))
-            v1 = struct.unpack('<3f', f.read(12))
-            v2 = struct.unpack('<3f', f.read(12))
-            v3 = struct.unpack('<3f', f.read(12))
-            attr = struct.unpack('<H', f.read(2))[0]
+            normal = struct.unpack("<3f", f.read(12))
+            v1 = struct.unpack("<3f", f.read(12))
+            v2 = struct.unpack("<3f", f.read(12))
+            v3 = struct.unpack("<3f", f.read(12))
+            attr = struct.unpack("<H", f.read(2))[0]
             triangles.append((normal, v1, v2, v3, attr))
 
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with open(dest, 'wb') as f:
-        f.write(header[:80].ljust(80, b'\x00'))
-        f.write(struct.pack('<I', len(triangles)))
+    with open(dest, "wb") as f:
+        f.write(header[:80].ljust(80, b"\x00"))
+        f.write(struct.pack("<I", len(triangles)))
         for normal, v1, v2, v3, attr in triangles:
-            f.write(struct.pack('<3f', *normal))
-            f.write(struct.pack('<3f', v1[0] * scale, v1[1] * scale, v1[2] * scale))
-            f.write(struct.pack('<3f', v2[0] * scale, v2[1] * scale, v2[2] * scale))
-            f.write(struct.pack('<3f', v3[0] * scale, v3[1] * scale, v3[2] * scale))
-            f.write(struct.pack('<H', attr))
+            f.write(struct.pack("<3f", *normal))
+            f.write(struct.pack("<3f", v1[0] * scale, v1[1] * scale, v1[2] * scale))
+            f.write(struct.pack("<3f", v2[0] * scale, v2[1] * scale, v2[2] * scale))
+            f.write(struct.pack("<3f", v3[0] * scale, v3[1] * scale, v3[2] * scale))
+            f.write(struct.pack("<H", attr))
 
 
 def _scale_stl_to_mm(source: Path, dest: Path) -> None:
-    """Convenience wrapper to scale meters to millimetres."""
+    """
+    Convenience wrapper to scale meters to millimetres.
+    """
     _scale_stl(source, dest, scale=1000.0)
 
 
-# ─── Object XML helpers ───────────────────────────────────────────────────────
+# %% Object XML helpers
 
 
 def _get_object_stl_path(body: Body) -> Optional[Path]:
     """
-    Extract the STL collision mesh path from a CoraPlex Body.
-    Tries body.description.urdf_object.collision_mesh_path first,
-    then falls back to searching resources/objects/ by body name.
+    Extract the STL collision mesh path from a CoraPlex Body. Tries
+    body.description.urdf_object.collision_mesh_path first, then falls back to searching
+    resources/objects/ by body name.
 
     :param body: A CoraPlex Body instance.
     :return: Path to the STL file, or None if not found.
     """
     # Method 1: body may expose its mesh path directly
-    for attr in ('mesh_path', 'urdf_object', 'description'):
+    direct = getattr(body, "mesh_path", None)
+    if direct and Path(str(direct)).suffix.lower() == ".stl":
+        return Path(str(direct))
+
+    for attr in ("urdf_object", "description"):
         obj = getattr(body, attr, None)
         if obj is None:
             continue
-        for sub_attr in ('collision_mesh_path', 'visual_mesh_path', 'mesh_path'):
+        for sub_attr in ("collision_mesh_path", "visual_mesh_path", "mesh_path"):
             candidate = getattr(obj, sub_attr, None)
-            if candidate and Path(candidate).suffix.lower() == '.stl':
+            if candidate and Path(candidate).suffix.lower() == ".stl":
                 return Path(candidate)
 
     # Method 2: search resources/objects by body name
-    resources_dir = (
-        Path(__file__).resolve().parents[2] / 'resources' / 'objects'
-    )
+    resources_dir = Path(__file__).resolve().parents[2] / "resources" / "objects"
     candidates = [
         resources_dir / f"{str(body.name)}.stl",
         resources_dir / str(body.name),
@@ -320,11 +335,11 @@ def _ensure_simox_object_xml(
     body: Body,
     end_effector_name: str,
     object_dir: Path,
-    robot_type: str = 'PR2',
+    robot_type: str = "PR2",
 ) -> Optional[Path]:
     """
-    Ensure a Simox ManipulationObject XML exists for this body in object_dir.
-    Creates it (and a scaled mm STL) if not already present.
+    Ensure a Simox ManipulationObject XML exists for this body in object_dir. Creates it
+    (and a scaled mm STL) if not already present.
 
     :param body: CoraPlex Body to generate XML for.
     :param end_effector_name: EEF name for the GraspSet element.
@@ -350,47 +365,51 @@ def _ensure_simox_object_xml(
     target_stl_path = object_dir / target_stl_name
 
     if not target_stl_path.exists():
-        if unit == 'millimeters':
+        if unit == "millimeters":
             logger.info(
                 "STL '%s' is in mm (>5.0). Scaling to meters for Simox → %s",
-                source_stl.name, target_stl_path,
+                source_stl.name,
+                target_stl_path,
             )
             _scale_stl(source_stl, target_stl_path, scale=0.001)
         else:
             import shutil
+
             shutil.copy2(source_stl, target_stl_path)
 
     # Write ManipulationObject XML
     xml_content = (
         f'<?xml version="1.0" encoding="UTF-8" ?>\n'
-        f'<!-- Auto-generated by simox_grasp_planner.py for body: {body.name} -->\n'
+        f"<!-- Auto-generated by simox_grasp_planner.py for body: {body.name} -->\n"
         f'<ManipulationObject name="{body.name}">\n'
-        f'    <Visualization>\n'
+        f"    <Visualization>\n"
         f'        <File type="stl">{target_stl_name}</File>\n'
-        f'    </Visualization>\n'
-        f'    <CollisionModel>\n'
+        f"    </Visualization>\n"
+        f"    <CollisionModel>\n"
         f'        <File type="stl">{target_stl_name}</File>\n'
-        f'    </CollisionModel>\n'
+        f"    </CollisionModel>\n"
         f'    <GraspSet name="Simox_{end_effector_name}" RobotType="{robot_type}" '
         f'EndEffector="{end_effector_name}"/>\n'
-        f'</ManipulationObject>\n'
+        f"</ManipulationObject>\n"
     )
     object_dir.mkdir(parents=True, exist_ok=True)
-    xml_path.write_text(xml_content, encoding='utf-8')
+    xml_path.write_text(xml_content, encoding="utf-8")
     logger.info("Written Simox ManipulationObject XML: %s", xml_path)
     return xml_path
 
 
-# ─── ROS 2 client ────────────────────────────────────────────────────────────
+# %% ROS 2 client
 
 
 class _SimoxClient:
     def __init__(self):
         import rclpy
+
         if not rclpy.ok():
             rclpy.init()
         from grasp_planner_msgs.srv import PlanGrasp
-        self.node = rclpy.create_node('simox_grasp_client')
+
+        self.node = rclpy.create_node("simox_grasp_client")
         self.client = self.node.create_client(PlanGrasp, SERVICE_TOPIC)
 
     def is_available(self, timeout_sec: float = 3.0) -> bool:
@@ -398,6 +417,7 @@ class _SimoxClient:
 
     def call(self, request, timeout_sec: float = 60.0):
         import rclpy
+
         if not self.is_available():
             logger.error("Simox service '%s' is not available.", SERVICE_TOPIC)
             return None
@@ -405,7 +425,9 @@ class _SimoxClient:
         rclpy.spin_until_future_complete(self.node, future, timeout_sec=timeout_sec)
         if future.done():
             return future.result()
-        logger.error("Simox service '%s' timed out after %.1fs", SERVICE_TOPIC, timeout_sec)
+        logger.error(
+            "Simox service '%s' timed out after %.1fs", SERVICE_TOPIC, timeout_sec
+        )
         return None
 
 
@@ -418,8 +440,8 @@ def get_simox_client() -> Optional[_SimoxClient]:
     with _init_lock:
         if _client is None:
             try:
-                import rclpy
-                from grasp_planner_msgs.srv import PlanGrasp
+                import rclpy  # noqa: F401
+                from grasp_planner_msgs.srv import PlanGrasp  # noqa: F401
             except ImportError:
                 logger.error(
                     "grasp_planner_msgs not importable. "
@@ -430,10 +452,12 @@ def get_simox_client() -> Optional[_SimoxClient]:
         return _client
 
 
-# ─── Pose conversion ─────────────────────────────────────────────────────────
+# %% Pose conversion
 
 
-def _ros_pose_to_coraplex_pose(ros_pose: RosPose, reference_frame=None) -> Pose:
+def _ros_pose_to_coraplex_pose(
+    ros_pose: RosPose, reference_frame: Optional[KinematicStructureEntity] = None
+) -> Pose:
     """
     Convert a geometry_msgs/Pose to a CoraPlex Pose (world frame, meters).
 
@@ -453,7 +477,7 @@ def _ros_pose_to_coraplex_pose(ros_pose: RosPose, reference_frame=None) -> Pose:
     )
 
 
-# ─── Public API ───────────────────────────────────────────────────────────────
+# %% Public API
 
 
 def plan_grasps_for_body(
@@ -462,16 +486,16 @@ def plan_grasps_for_body(
     end_effector_name: str,
     kinematic_chain_name: str,
     world: World,
-    robot_xml: str = DEFAULT_ROBOT_XML,
-    object_dir: Path = DEFAULT_OBJECT_DIR,
-    preshape_name: str = 'Power Preshape',
+    robot_xml: Optional[str] = None,
+    object_dir: Optional[Path] = None,
+    preshape_name: str = "Power Preshape",
     num_grasps_to_plan: int = 50,
     quality_threshold: float = 0.001,
     timeout_ms: int = 30000,
-) -> Dict[str, List[GraspPose]]:
+) -> Dict[Union[SimoxApproachDirection, str], List[GraspPose]]:
     """
-    Call the Simox grasp planner service for the given body and return a
-    dictionary of GraspPose lists grouped by approach direction.
+    Call the Simox grasp planner service for the given body and return a dictionary of
+    GraspPose lists grouped by approach direction.
 
     Structure::
 
@@ -500,9 +524,16 @@ def plan_grasps_for_body(
     :return: Dict mapping approach direction → list of GraspPose (best-quality-first).
              Returns {} if the service fails or returns no valid grasps.
     """
+    if robot_xml is None:
+        robot_xml = DEFAULT_ROBOT_XML
+    if object_dir is None:
+        object_dir = DEFAULT_OBJECT_DIR
+
     client = get_simox_client()
     if client is None or not client.is_available():
-        logger.error("Simox grasp_planner_service node not available on %s", SERVICE_TOPIC)
+        logger.error(
+            "Simox grasp_planner_service node not available on %s", SERVICE_TOPIC
+        )
         return {}
 
     # 1. Ensure ManipulationObject XML exists
@@ -515,7 +546,7 @@ def plan_grasps_for_body(
     robot_frame = None
     for candidate in world.bodies:
         c_str = str(candidate.name).lower()
-        if 'base_footprint' in c_str or 'base_link' in c_str:
+        if "base_footprint" in c_str or "base_link" in c_str:
             robot_frame = candidate
             break
 
@@ -529,7 +560,13 @@ def plan_grasps_for_body(
     _fill_ros_pose(ros_object_pose, object_pose_in_robot)
 
     # 3. Build service request
-    from grasp_planner_msgs.srv import PlanGrasp
+    try:
+        from grasp_planner_msgs.srv import PlanGrasp
+    except ImportError:
+        logger.error(
+            "grasp_planner_msgs not importable. Did you source install/setup.bash?"
+        )
+        return {}
     request = PlanGrasp.Request()
     request.robot_model_path = robot_xml
     request.object_model_path = str(xml_path)
@@ -543,7 +580,8 @@ def plan_grasps_for_body(
 
     logger.info(
         "Calling Simox /plan_grasp for '%s' with %s (object in robot frame: x=%.3f y=%.3f z=%.3f)",
-        str(body.name), end_effector_name,
+        str(body.name),
+        end_effector_name,
         ros_object_pose.position.x,
         ros_object_pose.position.y,
         ros_object_pose.position.z,
@@ -560,10 +598,10 @@ def plan_grasps_for_body(
         logger.error("Simox /plan_grasp failed: %s", response.error_message)
         return {}
 
-
     logger.info(
         "Simox returned %d grasp poses for '%s'",
-        len(response.grasp_poses), str(body.name),
+        len(response.grasp_poses),
+        str(body.name),
     )
 
     # 5. Convert geometry_msgs/Pose[] → GraspPose grouped by approach direction.
@@ -574,26 +612,35 @@ def plan_grasps_for_body(
 
     # Read quality scores — Simox sends a parallel float[] alongside grasp_poses[].
     # Fall back to zeros if the field is absent (older service versions).
-    qualities = list(response.qualities) if hasattr(response, 'qualities') else []
+    qualities = list(response.qualities) if hasattr(response, "qualities") else []
     if len(qualities) != len(response.grasp_poses):
         qualities = [0.0] * len(response.grasp_poses)
 
-    counts = {'front': 0, 'back': 0, 'left': 0, 'right': 0, 'top': 0, 'skipped': 0}
+    counts: Dict[SimoxApproachDirection, int] = {
+        SimoxApproachDirection.FRONT: 0,
+        SimoxApproachDirection.BACK: 0,
+        SimoxApproachDirection.LEFT: 0,
+        SimoxApproachDirection.RIGHT: 0,
+        SimoxApproachDirection.TOP: 0,
+        SimoxApproachDirection.SKIPPED: 0,
+    }
 
     # Accumulate into groups: direction → list of (quality, GraspPose)
-    grouped: Dict[str, List[tuple]] = {}
+    grouped: Dict[Union[SimoxApproachDirection, str], List[tuple]] = {}
 
     for ros_pose, quality in zip(response.grasp_poses, qualities):
         # Classify approach direction in robot frame (bottom grasps skipped)
         label = _classify_approach(ros_pose.orientation)
-        if label == 'skipped':
-            counts['skipped'] += 1
+        if label == SimoxApproachDirection.SKIPPED:
+            counts[SimoxApproachDirection.SKIPPED] += 1
             continue
         counts[label] += 1
 
         # Transform Simox TCP pose (rpy=[0, pi/2, 0], xyz=[0.13, 0, 0])
         # to CoraPlex tool frame (rpy=[0, 0, 0], xyz=[0.18, 0, 0]) in robot frame.
-        local_coraplex_pose = _simox_pose_to_coraplex_tool_pose(ros_pose, reference_frame=robot_frame)
+        local_coraplex_pose = _simox_pose_to_coraplex_tool_pose(
+            ros_pose, reference_frame=robot_frame
+        )
 
         # Convert TCP pose from robot frame to world frame
         if robot_frame != world.root:
@@ -602,45 +649,51 @@ def plan_grasps_for_body(
             world_coraplex_pose = local_coraplex_pose
 
         grasp_pose = GraspPose.from_pose(
-            world_coraplex_pose, arm,
+            world_coraplex_pose,
+            arm,
             grasp_description=None,
-            approach=label,
+            approach=str(label),
             quality=float(quality),
         )
 
-        direction = label if label else 'unknown'
-        if direction not in grouped:
-            grouped[direction] = []
-        grouped[direction].append((float(quality), grasp_pose))
-
+        if label not in grouped:
+            grouped[label] = []
+        grouped[label].append((float(quality), grasp_pose))
 
     # Sort each direction group by quality descending and strip the sort key
-    grasp_dict: Dict[str, List[GraspPose]] = {
-        direction: [gp for _, gp in sorted(candidates, key=lambda t: t[0], reverse=True)]
+    grasp_dict: Dict[Union[SimoxApproachDirection, str], List[GraspPose]] = {
+        direction: [
+            gp for _, gp in sorted(candidates, key=lambda t: t[0], reverse=True)
+        ]
         for direction, candidates in grouped.items()
     }
 
     total = sum(len(v) for v in grasp_dict.values())
     logger.info(
         "Pose classification: front=%d back=%d left=%d right=%d top=%d skipped(bottom)=%d → %d total",
-        counts['front'], counts['back'], counts['left'], counts['right'],
-        counts['top'], counts['skipped'], total,
+        counts[SimoxApproachDirection.FRONT],
+        counts[SimoxApproachDirection.BACK],
+        counts[SimoxApproachDirection.LEFT],
+        counts[SimoxApproachDirection.RIGHT],
+        counts[SimoxApproachDirection.TOP],
+        counts[SimoxApproachDirection.SKIPPED],
+        total,
     )
     for direction, poses in grasp_dict.items():
         logger.info(
             "  [%s] %d candidate(s) — best quality=%.4f",
-            direction, len(poses), poses[0].quality if poses else 0.0,
+            direction,
+            len(poses),
+            poses[0].quality if poses else 0.0,
         )
 
     return grasp_dict
 
 
-
-
 def _fill_ros_pose(ros_pose: RosPose, coraplex_pose: Pose) -> None:
     """
-    Fill a geometry_msgs/Pose from a CoraPlex Pose (in-place).
-    Assumes CoraPlex Pose is already in world frame, meters.
+    Fill a geometry_msgs/Pose from a CoraPlex Pose (in-place). Assumes CoraPlex Pose is
+    already in world frame, meters.
 
     :param ros_pose: ROS Pose message to fill.
     :param coraplex_pose: CoraPlex Pose source.

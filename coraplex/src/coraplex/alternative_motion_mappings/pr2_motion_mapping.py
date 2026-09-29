@@ -44,66 +44,68 @@ from semantic_digital_twin.robots.pr2 import PR2
 logger = logging.getLogger(__name__)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  Container detection helpers
-# ══════════════════════════════════════════════════════════════════════════════
+# %% Container detection helpers
 
 # Known container names in priority order.
 # docker compose names containers as <project>-<service>-<index>
 _CANDIDATE_CONTAINERS = [
-    'ros1_2_bridge-sim_bridge-1',   # simulation
-    'ros1_2_bridge-bridge-1',       # real robot
+    "ros1_2_bridge-sim_bridge-1",  # simulation
+    "ros1_2_bridge-bridge-1",  # real robot
 ]
 
 _DEFAULT_JOINT_POSITIONS = {
-    'torso_lift_joint': 0.0,
-    'head_pan_joint': 0.0,
-    'head_tilt_joint': 0.0,
+    "torso_lift_joint": 0.0,
+    "head_pan_joint": 0.0,
+    "head_tilt_joint": 0.0,
     # arms default to 0 — override if needed
 }
 
 
 def _find_bridge_container() -> Optional[str]:
-    """Return the first running bridge container name, or None."""
+    """
+    Return the first running bridge container name, or None.
+    """
     for name in _CANDIDATE_CONTAINERS:
         try:
             result = subprocess.run(
-                ['docker', 'inspect', '-f', '{{.State.Running}}', name],
-                capture_output=True, text=True, timeout=3,
+                ["docker", "inspect", "-f", "{{.State.Running}}", name],
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
-            if result.returncode == 0 and 'true' in result.stdout:
-                logger.debug(f'Found running container: {name}')
+            if result.returncode == 0 and "true" in result.stdout:
+                logger.debug(f"Found running container: {name}")
                 return name
-        except Exception:
+        except (subprocess.SubprocessError, OSError):
             pass
     return None
 
 
 def _controller_topic(joint_names: List[str]) -> str:
-    """Map joint names to their ROS 1 controller command topic."""
+    """
+    Map joint names to their ROS 1 controller command topic.
+    """
     first = joint_names[0].lower()
-    if 'head' in first:
-        return '/head_traj_controller/command'
-    elif 'torso' in first:
-        return '/torso_controller/command'
-    elif 'gripper' in first:
+    if "head" in first:
+        return "/head_traj_controller/command"
+    elif "torso" in first:
+        return "/torso_controller/command"
+    elif "gripper" in first:
         # Must check gripper BEFORE arm (r_gripper_joint starts with r_)
-        if first.startswith('l_'):
-            return '/l_gripper_controller/command'
+        if first.startswith("l_"):
+            return "/l_gripper_controller/command"
         else:
-            return '/r_gripper_controller/command'
-    elif first.startswith('l_'):
-        return '/l_arm_controller/command'
-    elif first.startswith('r_'):
-        return '/r_arm_controller/command'
+            return "/r_gripper_controller/command"
+    elif first.startswith("l_"):
+        return "/l_arm_controller/command"
+    elif first.startswith("r_"):
+        return "/r_arm_controller/command"
     else:
-        raise ValueError(f'Cannot determine controller for joint: {first}')
+        raise ValueError(f"Cannot determine controller for joint: {first}")
 
 
+# %% PR2ROS1TrajectoryTask — duck-typed Task (no giskardpy.graph_node.Task base)
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  PR2ROS1TrajectoryTask — duck-typed Task (no giskardpy.graph_node.Task base)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class PR2ROS1TrajectoryTask:
@@ -121,33 +123,36 @@ class PR2ROS1TrajectoryTask:
     duration_sec: float = 5.0
     timeout_sec: float = 15.0
 
-    # ── Runtime state ─────────────────────────────────────────────────────────
+    # %% Runtime state
     _container: Optional[str] = field(init=False, default=None)
     _start_positions: List[float] = field(init=False, default_factory=list)
     _start_time: Optional[float] = field(init=False, default=None)
     _done: bool = field(init=False, default=False)
 
-    # ── Phase 1: build ────────────────────────────────────────────────────────
+    # %% Phase 1: build
 
     def build(self, context=None):
-        """Find the bridge container and determine start positions."""
+        """
+        Find the bridge container and determine start positions.
+        """
         self._container = _find_bridge_container()
         if self._container:
-            print(f'[bridge] Using container: {self._container}', flush=True)
+            logger.info(f"[bridge] Using container: {self._container}")
         else:
-            print('[bridge] ⚠ No bridge container found — is docker compose up?',
-                  flush=True)
+            logger.warning("[bridge] No bridge container found — is docker compose up?")
 
         # We will attempt to read the real joint positions in on_start().
         # For now, default to 0.0
         self._start_positions = [0.0] * len(self.joint_names)
 
-    # ── Phase 2: on_start ─────────────────────────────────────────────────────
+    # %% Phase 2: on_start
 
     def on_start(self, context=None):
-        """Run the publisher script inside the bridge container via docker exec."""
+        """
+        Run the publisher script inside the bridge container via docker exec.
+        """
         if not self._container:
-            print('[bridge] ERROR: no container — cannot publish', flush=True)
+            logger.error("[bridge] No container — cannot publish")
             self._done = True
             return
 
@@ -159,42 +164,42 @@ class PR2ROS1TrajectoryTask:
         )
         try:
             state_result = subprocess.check_output(
-                ['docker', 'exec', self._container, 'bash', '-c', state_cmd],
-                text=True, timeout=15.0
+                ["docker", "exec", self._container, "bash", "-c", state_cmd],
+                text=True,
+                timeout=15.0,
             )
             raw_out = state_result.strip()
-            json_start = raw_out.find('{')
+            json_start = raw_out.find("{")
             if json_start != -1:
                 state_dict = json.loads(raw_out[json_start:])
                 self._start_positions = [
                     float(state_dict.get(name, _DEFAULT_JOINT_POSITIONS.get(name, 0.0)))
                     for name in self.joint_names
                 ]
-        except Exception as e:
-            print(f'[bridge] ⚠ Failed to read real joint state: {e}', flush=True)
+        except (subprocess.SubprocessError, json.JSONDecodeError, OSError) as e:
+            logger.warning(f"[bridge] Failed to read real joint state: {e}")
             # fallback to defaults
             self._start_positions = [
-                _DEFAULT_JOINT_POSITIONS.get(name, 0.0)
-                for name in self.joint_names
+                _DEFAULT_JOINT_POSITIONS.get(name, 0.0) for name in self.joint_names
             ]
 
         controller = _controller_topic(self.joint_names)
         params = {
-            'joint_names':    self.joint_names,
-            'start_positions': self._start_positions,
-            'positions':      self.positions,
-            'duration_sec':   self.duration_sec,
-            'controller':     controller,
+            "joint_names": self.joint_names,
+            "start_positions": self._start_positions,
+            "positions": self.positions,
+            "duration_sec": self.duration_sec,
+            "controller": controller,
         }
         params_json = json.dumps(params)
 
-        print(f'[bridge] Trajectory: {self.joint_names}', flush=True)
-        print(f'[bridge]   start  = {[round(p, 3) for p in self._start_positions]}',
-              flush=True)
-        print(f'[bridge]   target = {[round(p, 3) for p in self.positions]}',
-              flush=True)
-        print(f'[bridge]   → {controller}  ({self.duration_sec}s)', flush=True)
-        print(f'[bridge] Running publisher inside {self._container} ...', flush=True)
+        logger.info(f"[bridge] Trajectory: {self.joint_names}")
+        logger.info(
+            f"[bridge]   start  = {[round(p, 3) for p in self._start_positions]}"
+        )
+        logger.info(f"[bridge]   target = {[round(p, 3) for p in self.positions]}")
+        logger.info(f"[bridge]   → {controller}  ({self.duration_sec}s)")
+        logger.info(f"[bridge] Running publisher inside {self._container} ...")
 
         cmd = (
             f"source /opt/ros/foxy/setup.bash && "
@@ -203,41 +208,41 @@ class PR2ROS1TrajectoryTask:
 
         try:
             result = subprocess.run(
-                ['docker', 'exec', self._container, 'bash', '-c', cmd],
+                ["docker", "exec", self._container, "bash", "-c", cmd],
                 timeout=self.duration_sec + 10,
                 text=True,
             )
-            # Print container output so user can see what happened
+            # Log container output
             if result.stdout:
                 for line in result.stdout.strip().splitlines():
-                    print(f'  {line}', flush=True)
+                    logger.info(f"  {line}")
             if result.returncode == 0:
-                print('[bridge] ✔ Publisher finished successfully', flush=True)
+                logger.info("[bridge] Publisher finished successfully")
             else:
-                print(f'[bridge] ✗ Publisher exited with code {result.returncode}',
-                      flush=True)
+                logger.error(f"[bridge] Publisher exited with code {result.returncode}")
                 if result.stderr:
-                    print(result.stderr[:500], flush=True)
+                    logger.error(result.stderr[:500])
         except subprocess.TimeoutExpired:
-            print('[bridge] ✗ Publisher timed out', flush=True)
-        except Exception as e:
-            print(f'[bridge] ✗ docker exec failed: {e}', flush=True)
+            logger.error("[bridge] Publisher timed out")
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error(f"[bridge] docker exec failed: {e}")
 
         self._start_time = time.time()
         self._done = True
 
-    # ── Phase 3: on_tick ──────────────────────────────────────────────────────
+    # %% Phase 3: on_tick
 
     def on_tick(self, context=None) -> ObservationStateValues:
-        """Return TRUE once on_start() has completed."""
+        """
+        Return TRUE once on_start() has completed.
+        """
         if self._done:
             return ObservationStateValues.TRUE
         return ObservationStateValues.FALSE
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  PR2MoveJointsMotion — AlternativeMotion[PR2]
-# ══════════════════════════════════════════════════════════════════════════════
+# %% PR2MoveJointsMotion — AlternativeMotion[PR2]
+
 
 @dataclass
 class PR2MoveJointsMotion(MoveJointsMotion, AlternativeMotion[PR2]):
@@ -264,13 +269,14 @@ class PR2MoveJointsMotion(MoveJointsMotion, AlternativeMotion[PR2]):
         )
 
     def perform(self):
-        """Handled by MotionExecutor._execute_for_bridge()."""
+        """
+        Handled by MotionExecutor._execute_for_bridge().
+        """
         return
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  PR2LookingMotion — AlternativeMotion[PR2]
-# ══════════════════════════════════════════════════════════════════════════════
+# %% PR2LookingMotion — AlternativeMotion[PR2]
+
 
 @dataclass
 class PR2LookingMotion(LookingMotion, AlternativeMotion[PR2]):
@@ -285,7 +291,7 @@ class PR2LookingMotion(LookingMotion, AlternativeMotion[PR2]):
     @property
     def _motion_chart(self) -> PR2ROS1TrajectoryTask:
         return PR2ROS1TrajectoryTask(
-            joint_names=['head_pan_joint', 'head_tilt_joint'],
+            joint_names=["head_pan_joint", "head_tilt_joint"],
             positions=[0.0, 0.0],
             duration_sec=2.0,
             timeout_sec=8.0,
@@ -295,9 +301,8 @@ class PR2LookingMotion(LookingMotion, AlternativeMotion[PR2]):
         return
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  PR2NavigateTask — base navigation via base_cmd_vel.py (docker exec)
-# ══════════════════════════════════════════════════════════════════════════════
+# %% PR2NavigateTask — base navigation via base_cmd_vel.py (docker exec)
+
 
 @dataclass
 class PR2NavigateTask:
@@ -316,7 +321,7 @@ class PR2NavigateTask:
 
     target_x: float
     target_y: float
-    speed:    float = 0.1
+    speed: float = 0.1
 
     _container: Optional[str] = field(init=False, default=None)
     _done: bool = field(init=False, default=False)
@@ -324,15 +329,16 @@ class PR2NavigateTask:
     def build(self, context=None):
         self._container = _find_bridge_container()
         if not self._container:
-            print('[bridge_nav] ⚠ No bridge container found', flush=True)
+            logger.warning("[bridge_nav] No bridge container found")
 
     def on_start(self, context=None):
         if not self._container:
-            print('[bridge_nav] ERROR: no container', flush=True)
+            logger.error("[bridge_nav] No container")
             self._done = True
             return
 
         import math
+
         # 1. Get true current state from ROS 1
         state_cmd = (
             "source /opt/ros/noetic/setup.bash && "
@@ -341,22 +347,23 @@ class PR2NavigateTask:
         )
         try:
             state_result = subprocess.check_output(
-                ['docker', 'exec', self._container, 'bash', '-c', state_cmd],
-                text=True, timeout=15.0
+                ["docker", "exec", self._container, "bash", "-c", state_cmd],
+                text=True,
+                timeout=15.0,
             )
             raw_out = state_result.strip()
-            json_start = raw_out.find('{')
+            json_start = raw_out.find("{")
             if json_start != -1:
                 state = json.loads(raw_out[json_start:])
             else:
                 state = {}
-        except Exception as e:
-            print(f'[bridge_nav] ⚠ Could not read robot state: {e}', flush=True)
+        except (subprocess.SubprocessError, json.JSONDecodeError, OSError) as e:
+            logger.warning(f"[bridge_nav] Could not read robot state: {e}")
             state = {}
 
-        base_x = float(state.get('base_x', 1.5))
-        base_y = float(state.get('base_y', 2.5))
-        base_yaw = float(state.get('base_yaw', 0.0))
+        base_x = float(state.get("base_x", 1.5))
+        base_y = float(state.get("base_y", 2.5))
+        base_yaw = float(state.get("base_yaw", 0.0))
 
         # 2. Compute world displacement
         dx_world = self.target_x - base_x
@@ -370,14 +377,18 @@ class PR2NavigateTask:
 
         distance = math.sqrt(dx_base**2 + dy_base**2)
         if distance < 0.01:
-            print('[bridge_nav] Already at target', flush=True)
+            logger.info("[bridge_nav] Already at target")
             self._done = True
             return
 
-        print(f'[bridge_nav] Base pos: ({base_x:.2f}, {base_y:.2f})  Target: ({self.target_x:.2f}, {self.target_y:.2f})')
-        print(f'[bridge_nav] base_cmd_vel: dx={dx_base:.2f}  dy={dy_base:.2f}  speed={self.speed:.2f} m/s', flush=True)
+        logger.info(
+            f"[bridge_nav] Base pos: ({base_x:.2f}, {base_y:.2f})  Target: ({self.target_x:.2f}, {self.target_y:.2f})"
+        )
+        logger.info(
+            f"[bridge_nav] base_cmd_vel: dx={dx_base:.2f}  dy={dy_base:.2f}  speed={self.speed:.2f} m/s"
+        )
 
-        params = json.dumps({'dx': dx_base, 'dy': dy_base, 'speed': self.speed})
+        params = json.dumps({"dx": dx_base, "dy": dy_base, "speed": self.speed})
         cmd = (
             f"source /opt/ros/noetic/setup.bash && "
             "([ -f /catkin_ws/install/setup.bash ] && source /catkin_ws/install/setup.bash || true) && "
@@ -386,41 +397,42 @@ class PR2NavigateTask:
         timeout = distance / self.speed + 10.0
         try:
             result = subprocess.run(
-                ['docker', 'exec', self._container, 'bash', '-c', cmd],
+                ["docker", "exec", self._container, "bash", "-c", cmd],
                 timeout=timeout,
                 text=True,
             )
             if result.stdout:
                 for line in result.stdout.strip().splitlines():
-                    print(f'  {line}', flush=True)
+                    logger.info(f"  {line}")
             if result.returncode == 0:
-                print('[bridge_nav] ✔ Navigation complete', flush=True)
+                logger.info("[bridge_nav] Navigation complete")
             else:
-                print(f'[bridge_nav] ✗ Exited {result.returncode}', flush=True)
+                logger.error(f"[bridge_nav] Exited {result.returncode}")
                 if result.stderr:
-                    print(result.stderr[:500], flush=True)
+                    logger.error(result.stderr[:500])
         except subprocess.TimeoutExpired:
-            print('[bridge_nav] ✗ Timed out', flush=True)
-        except Exception as e:
-            print(f'[bridge_nav] ✗ docker exec failed: {e}', flush=True)
+            logger.error("[bridge_nav] Timed out")
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error(f"[bridge_nav] docker exec failed: {e}")
         self._done = True
 
     def on_tick(self, context=None):
-        return ObservationStateValues.TRUE if self._done else ObservationStateValues.FALSE
+        return (
+            ObservationStateValues.TRUE if self._done else ObservationStateValues.FALSE
+        )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  PR2NavigateMotion — AlternativeMotion[PR2]
-# ══════════════════════════════════════════════════════════════════════════════
+# %% PR2NavigateMotion — AlternativeMotion[PR2]
+
 
 @dataclass
 class PR2NavigateMotion(MoveMotion, AlternativeMotion[PR2]):
     """
     PR2-specific handler for MoveMotion with BRIDGE execution.
 
-    Routes base navigation through base_cmd_vel.py inside the bridge
-    container (ROS 1), avoiding the ROS 2 action server discovery issue
-    where Giskard's action server disappears between goals.
+    Routes base navigation through base_cmd_vel.py inside the bridge container (ROS 1),
+    avoiding the ROS 2 action server discovery issue where Giskard's action server
+    disappears between goals.
     """
 
     execution_type = ExecutionType.BRIDGE
