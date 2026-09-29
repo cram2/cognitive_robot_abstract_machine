@@ -224,25 +224,22 @@ type; only a batch whose simple sets disagree on the type (for instance a Gaussi
 where one simple set leaves the whole real line and another bounds it) reports that it
 cannot be batched, and the circuit falls back to truncating once per simple set.
 
-Measured on a joint probability tree with 319 nodes over 4 variables, truncated to a
+Measured on a joint probability tree with 528 nodes over 4 variables, truncated to a
 staircase of disjoint boxes:
 
 | simple sets | rustworkx | numpy layered | layers in the result |
 | --- | --- | --- | --- |
-| 5 | 56 ms | 5.2 ms | 10 |
-| 10 | 102 ms | 7.7 ms | 10 |
-| 25 | 357 ms | 15.2 ms | 10 |
-| 50 | 501 ms | 30.6 ms | 10 |
-| 100 | 1225 ms | 56.8 ms | 10 |
+| 5 | 77 ms | 6.6 ms | 11 |
+| 10 | 142 ms | 9.1 ms | 11 |
+| 25 | 381 ms | 17.1 ms | 11 |
+| 50 | 722 ms | 30.3 ms | 11 |
+| 100 | 1420 ms | 62.4 ms | 11 |
 
-Truncating one simple set at a time instead, the same 100-set result is spread over 801
-layers and takes 192 ms to build.
+Truncating one simple set at a time instead, the same 100-set result is spread over 821
+layers and takes 287 ms to build.
 
 `experiments/src/experiments/probabilistic_model_experiments/layered_circuit_speed.py`
-reproduces this table and the query timings below it, along with conditioning on a
-partial point measured the same way; conditioning sees a much smaller speedup since
-there is nothing to batch in a single point the way there is in a many-simple-set
-truncation.
+reproduces this table and the query timings below it.
 
 ### Speed of the other queries
 
@@ -250,26 +247,43 @@ On the same joint probability tree, before truncation:
 
 | query | rustworkx | numpy layered |
 | --- | --- | --- |
-| `log_likelihood`, 100 events | 10.5 ms | 1.2 ms |
-| `log_likelihood`, 1000 events | 14.9 ms | 7.7 ms |
-| `log_likelihood`, 10000 events | 56.4 ms | 65.4 ms |
-| `sample`, 10000 samples | 7.0 ms | 4.2 ms |
-| `probability_of_simple_event` | 8.4 ms | 0.6 ms |
+| `log_likelihood`, 100 events | 8.7 ms | 2.1 ms |
+| `log_likelihood`, 1000 events | 14.6 ms | 16.2 ms |
+| `log_likelihood`, 10000 events | 68.8 ms | 165 ms |
+| `sample`, 1000 samples | 5.0 ms | 6.3 ms |
+| `sample`, 10000 samples | 6.0 ms | 7.5 ms |
+| `probability_of_simple_event` | 11.7 ms | 0.7 ms |
 
-and on the circuit truncated to 100 simple sets, which has 16258 nodes:
+and on the circuit truncated to 100 simple sets, which has 5575 nodes:
 
 | query | rustworkx | numpy layered |
 | --- | --- | --- |
-| `log_likelihood`, 1000 events | 785 ms | 337 ms |
-| `sample`, 1000 samples | 43 ms | 22 ms |
-| `probability_of_simple_event` | 452 ms | 0.9 ms |
+| `log_likelihood`, 100 events | 79 ms | 14 ms |
+| `log_likelihood`, 1000 events | 122 ms | 197 ms |
+| `log_likelihood`, 10000 events | 452 ms | 1807 ms |
+| `sample`, 1000 samples | 26 ms | 104 ms |
+| `sample`, 10000 samples | 41 ms | 66 ms |
+| `probability_of_simple_event` | 264 ms | 4.4 ms |
 
-The layered layout removes the per-node python overhead, which dominates small and medium
-queries, and a query over a `SimpleEvent` becomes one pass over a handful of arrays. It
-does not make the *asymptotics* better, and it can be slower than the rustworkx
-implementation for very large batches on circuits whose leaves have small disjoint
-supports: rustworkx evaluates each leaf only at the events inside its support, while a
-layer evaluates its whole `(#events, #nodes)` block.
+Conditioning on a partial point, on the tree before truncation:
+
+| conditioned variables | rustworkx | numpy layered |
+| --- | --- | --- |
+| 1 | 14.5 ms | 3.6 ms |
+| 2 | 15.1 ms | 3.3 ms |
+| 3 | 15.7 ms | 3.0 ms |
+| 4 | 17.2 ms | 2.3 ms |
+
+Conditioning sees a smaller speedup than truncation, since there is nothing to batch in
+a single point the way there is in a many-simple-set truncation.
+
+The layered layout removes the per-node python overhead, which dominates small queries,
+and a query over a `SimpleEvent` becomes one pass over a handful of arrays. It does not
+make the *asymptotics* better, and it is slower than the rustworkx implementation for
+large batches of events or samples on circuits whose leaves have small disjoint
+supports, like the leaves of a joint probability tree: rustworkx evaluates each leaf only
+at the events inside its support, while a layer evaluates its whole `(#events, #nodes)`
+block.
 
 Use the rustworkx implementation to build and learn circuits, the numpy implementation
 when the same fixed circuit is queried many times and the structural inferences are
