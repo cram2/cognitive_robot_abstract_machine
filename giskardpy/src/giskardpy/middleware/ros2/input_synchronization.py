@@ -235,20 +235,6 @@ class PendingJointStateSynchronizer(JointStateInputSynchronizer):
         return message
 
 
-@dataclass
-class LatestJointStateSynchronizer(JointStateInputSynchronizer):
-    """
-    Writes the most recent joint state message in every cycle, however old it is.
-
-    Keeps the world state on the last measurement of the robot even when the cycle
-    itself moved the state away from it, as a control cycle does when it integrates the
-    commanded velocities.
-    """
-
-    def take_message(self) -> JointState | None:
-        return self.latest_message
-
-
 # %% base pose
 
 

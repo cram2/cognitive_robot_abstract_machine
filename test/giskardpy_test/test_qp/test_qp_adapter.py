@@ -4,7 +4,7 @@ import numpy as np
 
 import pytest
 
-from giskardpy.qp.dof_limits import DirectLimits, QuadraticProgramDegreeOfFreedomLimits
+from giskardpy.qp.dof_limits import DirectLimits, DegreeOfFreedomDecisionVariables
 from giskardpy.qp.enforcement_strategy import (
     SystemDynamicsStrategy,
     IntegralStrategy,
@@ -70,16 +70,33 @@ def test_direct_limits_empty():
     assert empty.names == []
 
 
+def _jerk_bound_derived_from_braking_time(
+    velocity_limit: float, config: QPControllerConfig
+) -> float:
+    """
+    The bound on a jerk decision variable, which is jerk times the squared time step,
+    for a degree of freedom whose jerk limit is derived from the configured braking
+    time.
+
+    :param velocity_limit: Velocity limit of the degree of freedom.
+    :param config: Controller configuration providing the braking time and time step.
+    :return: Bound on the jerk decision variable.
+    """
+    jerk_limit = 4 * velocity_limit / config.braking_time.total_seconds() ** 2
+    return jerk_limit * config.control_time_step.total_seconds() ** 2
+
+
 def test_DofLimits(prismatic_bot):
     target_frequency = 20
     prediction_horizon = 10
-    expected_jerk_limit = 1 / target_frequency
-    limits = QuadraticProgramDegreeOfFreedomLimits.create(
-        prismatic_bot.active_degrees_of_freedom,
-        qp_controller_config=QPControllerConfig(
-            target_frequency=target_frequency, prediction_horizon=prediction_horizon
-        ),
+    config = QPControllerConfig(
+        target_frequency=target_frequency, prediction_horizon=prediction_horizon
     )
+    expected_jerk_limit = _jerk_bound_derived_from_braking_time(1.0, config)
+    limits = DegreeOfFreedomDecisionVariables(
+        degrees_of_freedom=prismatic_bot.active_degrees_of_freedom,
+        qp_controller_config=config,
+    ).direct_limits()
     assert np.allclose(
         limits.lower_bounds.evaluate(),
         np.array([-1.0] * 8 + [-expected_jerk_limit] * 10),
@@ -111,14 +128,15 @@ def test_DofLimits(prismatic_bot):
 def test_DofLimits_two_joints(prismatic_bot2):
     target_frequency = 20
     prediction_horizon = 10
-    expected_jerk_limit1 = 1 / target_frequency
-    expected_jerk_limit2 = 1 / (target_frequency * 2)
-    limits = QuadraticProgramDegreeOfFreedomLimits.create(
-        prismatic_bot2.active_degrees_of_freedom,
-        qp_controller_config=QPControllerConfig(
-            target_frequency=target_frequency, prediction_horizon=prediction_horizon
-        ),
+    config = QPControllerConfig(
+        target_frequency=target_frequency, prediction_horizon=prediction_horizon
     )
+    expected_jerk_limit1 = _jerk_bound_derived_from_braking_time(1.0, config)
+    expected_jerk_limit2 = _jerk_bound_derived_from_braking_time(0.5, config)
+    limits = DegreeOfFreedomDecisionVariables(
+        degrees_of_freedom=prismatic_bot2.active_degrees_of_freedom,
+        qp_controller_config=config,
+    ).direct_limits()
     expected_limits = np.array(
         [1.0, 0.5] * 8 + [expected_jerk_limit1, expected_jerk_limit2] * 10
     )
@@ -536,3 +554,32 @@ def test_constraint_collection_groups_constraints_by_enforcement_strategy(
     assert set(constraints.get_equality_constraint_blocks()) == {IntegralStrategy}
     assert set(constraints.get_inequality_constraint_blocks()) == {VelocityStrategy}
     assert QPDataTwoSidedInequalityFactory.qp_data_type() is QPDataTwoSidedInequality
+
+
+def test_integral_strategy_bounds_slack_by_the_slack_limits_of_the_constraint(
+    prismatic_bot2,
+):
+    constraints = ConstraintCollection()
+    dof1 = prismatic_bot2.active_degrees_of_freedom[0]
+    constraints.add_inequality_constraint(
+        task_expression=dof1.variables.position,
+        lower_error=0,
+        upper_error=1,
+        quadratic_weight=1,
+        reference_velocity=1,
+        lower_slack_limit=-0.1,
+        upper_slack_limit=0.2,
+    )
+    [constraint] = constraints.inequality_constraints
+    strategy = IntegralStrategy(
+        degrees_of_freedom=prismatic_bot2.active_degrees_of_freedom,
+        constraints=constraints.inequality_constraints,
+        qp_controller_config=QPControllerConfig(
+            target_frequency=20, prediction_horizon=10
+        ),
+    )
+
+    slack_variables = strategy.create_slack_variables()
+
+    assert slack_variables.lower_bounds.to_np()[0] == constraint.lower_slack_limit
+    assert slack_variables.upper_bounds.to_np()[0] == constraint.upper_slack_limit

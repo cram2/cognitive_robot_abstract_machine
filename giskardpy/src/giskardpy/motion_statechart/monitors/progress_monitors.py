@@ -66,9 +66,9 @@ class NotApproachingGoal(MotionStatechartNode):
     Error measured on the previous control cycle.
     """
 
-    _control_dt: float = field(default=0.0, init=False, repr=False)
+    _control_time_step: timedelta = field(default=timedelta(), init=False, repr=False)
     """
-    Seconds between control cycles, used to turn a difference into a rate.
+    Time between control cycles, used to turn a difference into a rate.
     """
 
     @property
@@ -84,7 +84,7 @@ class NotApproachingGoal(MotionStatechartNode):
         velocities. One that cannot is differenced across control cycles in
         :meth:`on_tick` instead.
         """
-        self._control_dt = context.qp_controller_config.control_dt
+        self._control_time_step = context.qp_controller_config.control_time_step
         error_signal = self.monitored_task.error_signal
         rate = error_signal.create_rate_expression()
         if rate is None:
@@ -150,7 +150,7 @@ class NotApproachingGoal(MotionStatechartNode):
             # No rate is measurable from a single sample, so assume the task is moving.
             return ObservationStateValues.FALSE
         normalized_rate = (error - previous_error) / (
-            self._control_dt * self.monitored_task.threshold
+            self._control_time_step.total_seconds() * self.monitored_task.threshold
         )
         if abs(normalized_rate) <= self.minimum_convergence_rate:
             return ObservationStateValues.TRUE

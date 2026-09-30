@@ -920,6 +920,17 @@ def test_path_custom_type(session, database):
     assert reconstructed == path
 
 
+def test_duration_keeps_sub_second_resolution(session, database):
+    duration = DurationAssociation(timedelta(seconds=3, microseconds=12500))
+
+    dao = to_dao(duration)
+    session.add(dao)
+    session.commit()
+
+    queried = session.scalars(select(DurationAssociationDAO)).one()
+    assert queried.from_dao() == duration
+
+
 def test_selectin_loading_preloads_relationships(session, database):
     """
     Relationship attributes are loaded eagerly (the generated relationships use

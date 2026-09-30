@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import logging
 import pathlib
 import uuid
@@ -121,10 +122,11 @@ class ORMatic:
         default_factory=dict, init=False
     )
     """
-    Lookup-only stand-ins for classes already mapped by an ormatic-interface
-    dependency (see :attr:`externally_mapped_classes`). Never rendered by the
-    generator; consulted only to resolve foreign keys, relationships, and parent
-    classes that point at them.
+    Lookup-only stand-ins for classes already mapped by an ormatic-interface dependency
+    (see :attr:`externally_mapped_classes`).
+
+    Never rendered by the generator; consulted only to resolve foreign keys,
+    relationships, and parent classes that point at them.
     """
 
     association_objects: List[AssociationObject] = field(
@@ -146,7 +148,9 @@ class ORMatic:
         self.create_type_annotations_map()
 
         for wrapped_table in self.wrapped_tables.values():
-            self.imported_modules.add(get_module_of_type(wrapped_table.wrapped_clazz.clazz))
+            self.imported_modules.add(
+                get_module_of_type(wrapped_table.wrapped_clazz.clazz)
+            )
 
         # externally-mapped classes may live further up the chain than the immediate dependency
         for external_table in self.external_tables.values():
@@ -173,6 +177,7 @@ class ORMatic:
         self.type_mappings[Enum] = PolymorphicEnumType
         self.type_mappings[SubclassJSONSerializer] = JSON
         self.type_mappings[uuid.UUID] = sqlalchemy.UUID
+        self.type_mappings[datetime.timedelta] = sqlalchemy.Interval
         self.type_mappings[pathlib.Path] = PathType
         self.type_mappings[JSONData] = JSONDataType
         self.type_mappings[NoneType] = TypeType

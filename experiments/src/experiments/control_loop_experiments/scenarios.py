@@ -212,7 +212,7 @@ class BenchmarkRobot(GiskardTester):
 
         :return: The length of one control cycle in seconds.
         """
-        return self.giskard.executor.context.qp_controller_config.control_dt
+        return self.giskard.executor.context.qp_controller_config.control_time_step
 
     def get_kinematic_structure_entity(self, name: str) -> KinematicStructureEntity:
         """
