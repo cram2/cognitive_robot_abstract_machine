@@ -96,13 +96,13 @@ def perception_pipeline_process(pipeline_process_reporting):
 
 
 def test_detection_crosses_a_process_boundary(
-    immutable_model_world, whole_scene_region, rclpy_node, perception_pipeline_process
+    pr2_apartment_context, whole_scene_region, rclpy_node, perception_pipeline_process
 ):
     """
     A pipeline that shares no interpreter state with the test is discovered through the
     middleware alone, and what it reports arrives intact.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
     detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
@@ -116,14 +116,14 @@ def test_detection_crosses_a_process_boundary(
 
 
 def test_absent_perception_source_is_reported(
-    immutable_model_world, whole_scene_region, rclpy_node
+    pr2_apartment_context, whole_scene_region, rclpy_node
 ):
     """
     With nothing serving the action, the source has to give up and say so rather than
     block forever or return an empty result that reads like "saw nothing".
     """
     pytest.importorskip("robokudo_msgs")
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
     with pytest.raises(PerceptionSourceUnavailable):
@@ -133,13 +133,13 @@ def test_absent_perception_source_is_reported(
 
 
 def test_untyped_detection_crosses_a_process_boundary(
-    immutable_model_world, whole_scene_region, rclpy_node, pipeline_process_reporting
+    pr2_apartment_context, whole_scene_region, rclpy_node, pipeline_process_reporting
 ):
     """
     The shape the real Stretch engine produces: a pipeline in another process that
     localizes without recognizing, so the annotation has to come from what was asked for.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     pipeline_process_reporting("")
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 

@@ -1,3 +1,4 @@
+import math
 import unittest
 
 from krrood.adapters.json_serializer import to_json, from_json
@@ -81,6 +82,21 @@ class SimpleIntervalTestCase(unittest.TestCase):
 
     def test_size_of_unbounded_interval(self):
         self.assertEqual(SimpleInterval.from_data(0, float("inf")).size, float("inf"))
+
+
+class NearestContainedValueTestCase(unittest.TestCase):
+    interval = SimpleInterval.from_data(0, 1, Bound.OPEN, Bound.CLOSED)
+
+    def test_a_contained_value_is_its_own_nearest(self):
+        self.assertEqual(self.interval.nearest_contained_value(0.5), 0.5)
+
+    def test_a_value_beyond_an_included_end_is_moved_onto_it(self):
+        self.assertEqual(self.interval.nearest_contained_value(2.0), 1.0)
+
+    def test_a_value_beyond_an_excluded_end_is_moved_just_inside_it(self):
+        nearest = self.interval.nearest_contained_value(-1.0)
+        self.assertEqual(nearest, math.nextafter(0.0, math.inf))
+        self.assertTrue(self.interval.contains(nearest))
 
 
 class IntervalTestCase(unittest.TestCase):

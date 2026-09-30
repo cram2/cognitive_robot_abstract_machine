@@ -7,11 +7,17 @@ from typing_extensions import TYPE_CHECKING, Type, List
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
-from coraplex.datastructures.enums import Arms, ExecutionType
+from coraplex.datastructures.enums import (
+    Arms,
+    ExecutionType,
+    VisualizationBackend,
+    VisualizationOption,
+)
 from coraplex.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
     from coraplex.plans.designator import Designator
+    from coraplex.plans.plan_node import PlanNode
     from coraplex.robot_plans.actions.base import ActionDescription
     from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
     from semantic_digital_twin.world_description.world_entity import (
@@ -20,6 +26,61 @@ if TYPE_CHECKING:
     )
 
 
+# %% visualization
+@dataclass
+class UnknownVisualizationOption(DataclassException):
+    """
+    A configuration value does not name a supported visualization option.
+    """
+
+    variable: VisualizationOption
+    """
+    The environment setting containing the unknown value.
+    """
+
+    value: str
+    """
+    The rejected value.
+    """
+
+    def error_message(self) -> str:
+        """
+        Identify the rejected environment setting and value.
+        """
+        return f"Unknown visualization option {self.variable}={self.value!r}."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to select a supported renderer configuration.
+        """
+        return "Choose a supported visualization backend or Rerun mode."
+
+
+@dataclass
+class VisualizationBackendUnavailable(DataclassException):
+    """
+    A selected renderer has no available provider.
+    """
+
+    backend: VisualizationBackend
+    """
+    The renderer that could not be started.
+    """
+
+    def error_message(self) -> str:
+        """
+        Identify the renderer whose provider could not be loaded.
+        """
+        return f"Visualization backend {self.backend.value!r} is unavailable."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to make the selected provider available.
+        """
+        return "Install the selected visualization provider or select another backend."
+
+
+# %% plan execution
 @dataclass
 class ContextIsUnavailable(DataclassException):
     """
@@ -42,6 +103,54 @@ class ContextIsUnavailable(DataclassException):
         return (
             "did you forget to call `add_subplan` when creating plans inside actions?"
         )
+
+
+@dataclass
+class CannotMatchOnType(DataclassException):
+    """
+    Raised when a plan transformation is bound to a type that is neither a plan node nor
+    a designator, leaving no rule by which it could select the nodes it rewrites.
+    """
+
+    transformation: Type
+    """
+    The transformation class that carries the binding.
+    """
+
+    matched_type: Type
+    """
+    The type it is bound to.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.transformation.__name__} is bound to {self.matched_type}, which is "
+            f"neither a plan node nor a designator."
+        )
+
+    def suggest_correction(self) -> str:
+        return "bind the transformation to a plan node type or a designator type"
+
+
+@dataclass
+class CannotInsertBesideRoot(DataclassException):
+    """
+    Raised when a node is to be inserted before or after the root node, which has no
+    parent that could hold the new sibling.
+    """
+
+    root: PlanNode
+    """
+    The root node that was given as the reference node.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.root} is the root of the plan and has no parent to hold a sibling."
+        )
+
+    def suggest_correction(self) -> str:
+        return "insert the node as the last child of the root instead"
 
 
 @dataclass
@@ -107,7 +216,7 @@ class WipingTargetMissing(DataclassException):
 @dataclass
 class PerceptionTargetMissing(DataclassException):
     """
-    Raised when an action is asked to perceive before grasping but names no object.
+    Raised when a rule is to perceive before grasping but the action names no object.
     """
 
     instance: Designator
@@ -116,10 +225,13 @@ class PerceptionTargetMissing(DataclassException):
     """
 
     def error_message(self) -> str:
-        return f"{self.instance} perceives before grasping but names no object."
+        return f"{self.instance} is to perceive before grasping but names no object."
 
     def suggest_correction(self) -> str:
-        return "provide an object_designator or leave perceive_before_grasp off."
+        return (
+            "provide an object_designator or drop the detect-before-grasp rule from the"
+            " context."
+        )
 
 
 @dataclass

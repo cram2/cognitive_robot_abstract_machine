@@ -11,6 +11,7 @@ from types import NoneType
 from typing import List, Optional, TypeAlias, TYPE_CHECKING
 
 import numpy as np
+from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
 
@@ -702,6 +703,65 @@ class NumpyNDarrayJSONSerializer(ExternalClassJSONSerializer[np.ndarray]):
     ) -> np.ndarray:
         return np.array(
             data[NumpyArrayJSONKey.ELEMENTS], dtype=data[NumpyArrayJSONKey.ELEMENT_TYPE]
+        )
+
+
+class CoordinateSparseArrayJSONKey(enum.StrEnum):
+    """
+    The keys of the JSON a sparse array in coordinate format is serialized to.
+    """
+
+    DATA = "data"
+    """
+    The values of the stored entries.
+    """
+
+    ROWS = "rows"
+    """
+    The row of every stored entry.
+    """
+
+    COLUMNS = "columns"
+    """
+    The column of every stored entry.
+    """
+
+    SHAPE = "shape"
+    """
+    The shape of the dense array the sparse array describes.
+    """
+
+
+class CoordinateSparseArrayJSONSerializer(ExternalClassJSONSerializer[coo_array]):
+    """
+    External JSON serializer for scipy sparse arrays in coordinate format.
+
+    Every stored entry is kept, including an explicitly stored zero.
+    """
+
+    @classmethod
+    def to_json(cls, obj: coo_array, **kwargs) -> Dict[str, Any]:
+        return {
+            JSONField.TYPE: get_full_class_name(type(obj)),
+            CoordinateSparseArrayJSONKey.DATA: to_json(obj.data, **kwargs),
+            CoordinateSparseArrayJSONKey.ROWS: to_json(obj.row, **kwargs),
+            CoordinateSparseArrayJSONKey.COLUMNS: to_json(obj.col, **kwargs),
+            CoordinateSparseArrayJSONKey.SHAPE: list(obj.shape),
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[coo_array], **kwargs
+    ) -> coo_array:
+        return coo_array(
+            (
+                from_json(data[CoordinateSparseArrayJSONKey.DATA], **kwargs),
+                (
+                    from_json(data[CoordinateSparseArrayJSONKey.ROWS], **kwargs),
+                    from_json(data[CoordinateSparseArrayJSONKey.COLUMNS], **kwargs),
+                ),
+            ),
+            shape=tuple(data[CoordinateSparseArrayJSONKey.SHAPE]),
         )
 
 

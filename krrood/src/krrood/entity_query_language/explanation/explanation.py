@@ -7,7 +7,16 @@ import weakref
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing_extensions import Any, Callable, List, Optional, Type, TYPE_CHECKING
+from typing_extensions import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Self,
+    Type,
+    TYPE_CHECKING,
+)
 
 from ordered_set import OrderedSet
 
@@ -291,6 +300,13 @@ class InferenceExplanation(Symbol):
     _instance_ref: Optional[weakref.ref] = field(
         default=None, init=False, repr=False, compare=False
     )
+
+    def __deepcopy__(self, memo: Dict[int, Any]) -> Self:
+        """
+        :return: This explanation itself, so a copy of an inferred instance shares the record
+            of the query that inferred the original.
+        """
+        return self
 
     @property
     def instance(self) -> Any:

@@ -1975,9 +1975,6 @@ class CancelMotion(TerminalNode):
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=Scalar.const_true())
 
-    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
-        raise self.exception
-
     @classmethod
     def when_true(
         cls, node: MotionStatechartNode, exception: Optional[Exception] = None

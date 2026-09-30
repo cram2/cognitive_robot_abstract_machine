@@ -7,23 +7,23 @@ from coraplex.datastructures.dataclasses import Context
 # %% debug validation
 
 
-def test_debug_requires_a_ros_node(immutable_model_world):
+def test_debug_requires_a_ros_node(pr2_apartment_context):
     """
     Debug output is visualized over ROS, so a context constructed in debug mode without
     a node is rejected at construction rather than failing later during execution.
     """
-    world, robot, _ = immutable_model_world
+    world, robot, _ = pr2_apartment_context
 
     with pytest.raises(ValueError):
         Context(world, robot, _debug=True)
 
 
-def test_debug_raises_the_coraplex_log_level(immutable_model_world, rclpy_node):
+def test_debug_raises_the_coraplex_log_level(pr2_apartment_context, rclpy_node):
     """
     Constructing a context in debug mode lowers the package's log level, so debug
     messages are emitted without the caller touching logging.
     """
-    world, robot, _ = immutable_model_world
+    world, robot, _ = pr2_apartment_context
     coraplex_logger = logging.getLogger("coraplex")
     previous_level = coraplex_logger.level
 
@@ -34,11 +34,11 @@ def test_debug_raises_the_coraplex_log_level(immutable_model_world, rclpy_node):
         coraplex_logger.setLevel(previous_level)
 
 
-def test_default_context_logs_at_info(immutable_model_world):
+def test_default_context_logs_at_info(pr2_apartment_context):
     """
     Without debug mode the package logs at info level.
     """
-    world, robot, _ = immutable_model_world
+    world, robot, _ = pr2_apartment_context
     coraplex_logger = logging.getLogger("coraplex")
     previous_level = coraplex_logger.level
 

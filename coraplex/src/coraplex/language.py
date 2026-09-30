@@ -74,8 +74,7 @@ class LanguageNode(PlanNode, BuildsMotionStateChart, ABC):
             self.merge(child)
 
     def notify(self):
-        for child in self.children:
-            child.notify()
+        self.notify_children()
 
     def parse(self) -> Executable:
         return self.parse_children(self.children)
@@ -162,7 +161,7 @@ class ParallelNode(ExecutesInParallel):
         self._perform_parallel(self.children)
         for child in self.children:
             if child.status == LifeCycleValues.FAILED:
-                raise child.reason
+                raise child.execution_error or child.reason or PlanFailure()
 
 
 @dataclass(eq=False)

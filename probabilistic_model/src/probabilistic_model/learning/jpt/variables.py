@@ -57,6 +57,13 @@ class AnnotatedVariable:
     The minimum impurity improvement for JPT learning.
     """
 
+    max_standard_deviation: Optional[float] = field(default=None)
+    """
+    The precision a JPT has to reach for this variable: a node is only split while
+    the standard deviation of some numeric target in it is above that target's
+    maximum. ``None`` sets no maximum, so this variable never stops a split.
+    """
+
     def __lt__(self, other):
         return self.variable < other.variable
 

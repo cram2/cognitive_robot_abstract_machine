@@ -1,5 +1,6 @@
 import gc
 import operator
+from copy import deepcopy
 from dataclasses import dataclass
 
 import pytest
@@ -1070,3 +1071,17 @@ def drawer_rule(doors_and_drawers_world):
         container=fixed_connection.expression.parent,
         handle=fixed_connection.expression.child,
     )
+
+
+# %% copying inferred instances
+
+
+def test_a_copy_of_an_inferred_instance_shares_its_explanation():
+    template = variable(Person, domain=[Person(name="Bob")])
+    (bob,) = entity(inference(Person)(name=template.name)).evaluate()
+
+    copied_bob = deepcopy(bob)
+
+    assert copied_bob is not bob
+    assert copied_bob == bob
+    assert explain_inference(copied_bob) is explain_inference(bob)

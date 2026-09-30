@@ -42,9 +42,8 @@ from typing_extensions import (
 
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.entity_query_language.evaluation_context import (
+    EvaluationContext,
     get_evaluation_context,
-    set_evaluation_context,
-    _evaluation_context_var,
 )
 from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
 from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
@@ -457,17 +456,37 @@ class SymbolicExpression(AbstractContextManager, HasExpression):
         :return: An iterator of OperationResult instances.
         """
         evaluation_context = get_evaluation_context()
-        owns_an_evaluation_context = evaluation_context is None
-        if owns_an_evaluation_context:
-            from krrood.entity_query_language.evaluation import (
-                create_default_evaluation_context,
-            )
+        if evaluation_context is not None:
+            yield from self._evaluate_within_(evaluation_context, sources)
+            return
 
-            evaluation_context = create_default_evaluation_context()
-            context_token = set_evaluation_context(evaluation_context)
-            evaluation_context.active_conditions_root.set_active_root_if_not_set(
-                self._conditions_root_, has_condition=self._has_condition_
-            )
+        from krrood.entity_query_language.evaluation import (
+            create_default_evaluation_context,
+        )
+
+        evaluation_context = create_default_evaluation_context()
+        evaluation_context.active_conditions_root.set_active_root_if_not_set(
+            self._conditions_root_, has_condition=self._has_condition_
+        )
+        yield from evaluation_context.iterate_as_current(
+            self._evaluate_within_(evaluation_context, sources)
+        )
+
+    def _evaluate_within_(
+        self,
+        evaluation_context: EvaluationContext,
+        sources: Optional[OperationResult] = None,
+    ) -> Iterator[OperationResult]:
+        """
+        Evaluate this expression within the given evaluation context, notifying its
+        observers of every step.
+
+        :param evaluation_context: The context of the evaluation this expression is part
+            of.
+        :param sources: The current OperationResult carrying bindings of variables, or
+            None.
+        :return: An iterator of OperationResult instances.
+        """
         try:
             evaluation_context.on_evaluate_enter(expression=self, sources=sources)
             # Normalize sources: always work with an OperationResult
@@ -490,8 +509,6 @@ class SymbolicExpression(AbstractContextManager, HasExpression):
                     yield result
         finally:
             evaluation_context.on_evaluate_exit(expression=self)
-            if owns_an_evaluation_context:
-                _evaluation_context_var.reset(context_token)
 
     def _evaluate_conclusions_and_update_bindings_(
         self, current_result: OperationResult

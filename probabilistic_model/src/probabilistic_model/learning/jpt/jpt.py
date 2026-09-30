@@ -499,7 +499,7 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
         )
         max_variances = np.array(
             [
-                annotated_variable.standard_deviation**2
+                (annotated_variable.max_standard_deviation or 0.0) ** 2
                 for annotated_variable in self.annotated_variables
                 if annotated_variable.variable in self.numeric_targets
             ],

@@ -55,3 +55,20 @@ def test_sqlalchemy_column_type_extraction():
 
     with pytest.raises(UnsupportedColumnType):
         get_python_type_from_sqlalchemy_column(Column(TestUnsupportedCustomType))
+
+
+def test_column_type_reporting_object_as_python_type_is_unsupported():
+    from sqlalchemy import Column
+
+    class ColumnTypeWithoutSpecificPythonType(TypeDecorator):
+        impl = types.Unicode(50)
+        cache_ok = True
+
+        @property
+        def python_type(self) -> type:
+            return object
+
+    with pytest.raises(UnsupportedColumnType):
+        get_python_type_from_sqlalchemy_column(
+            Column(ColumnTypeWithoutSpecificPythonType)
+        )

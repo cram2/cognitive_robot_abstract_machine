@@ -4,7 +4,7 @@ import ast
 import types
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Type, Tuple, Protocol
+from typing import Any, Type, Tuple, Protocol
 
 from typing_extensions import Optional
 
@@ -95,6 +95,33 @@ class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class UnboundGenericParameter(DataclassException):
+    """
+    Raised when a generic type parameter is read back from a class that binds it to no
+    concrete type.
+    """
+
+    affected_class: Type
+    """
+    The class the parameter was read from.
+    """
+
+    parameter: Any
+    """
+    The type parameter that is left unbound.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.affected_class.__name__} binds {self.parameter} to no concrete type."
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Bind it in a subclass, for example "
+            f"class Concrete({self.affected_class.__name__}[SomeType])."
+        )
 
 
 @dataclass

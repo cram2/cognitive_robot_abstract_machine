@@ -5,7 +5,6 @@ from enum import Enum
 import numpy as np
 import pytest
 
-from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.exceptions import BodyIsNotHeld
@@ -81,21 +80,22 @@ def tracy_milk_world(tracy_world):
     return tracy_copy, tracy_copy.get_semantic_annotations_by_type(Tracy)[0]
 
 
-@pytest.fixture(scope="session")
-def immutable_simple_pr2_holding_world(simple_pr2_world_setup):
-    world, robot_view, context = simple_pr2_world_setup
-    copy_world = deepcopy(world)
-    robot_view = copy_world.get_semantic_annotation_by_id(robot_view.id)
+@pytest.fixture
+def simple_pr2_holding_milk_context(simple_pr2_context):
+    """
+    The shared simple PR2 world with the milk held in the left gripper, its robot and a
+    context for both, returned to its initial model and state after the test.
+    """
+    world, robot_view, context = simple_pr2_context
+    milk = world.get_body_by_name("milk.stl")
+    tcp = world.get_body_by_name("l_gripper_tool_frame")
+    with world.modify_world():
+        world.move_branch(milk, tcp)
+    return world, robot_view, context
 
-    milk = copy_world.get_body_by_name("milk.stl")
-    tcp = copy_world.get_body_by_name("l_gripper_tool_frame")
-    with copy_world.modify_world():
-        copy_world.move_branch(milk, tcp)
-    return copy_world, robot_view, Context(copy_world, robot_view)
 
-
-def test_grasp_pose_front(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_grasp_pose_front(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
 
     man = robot_view.left_arm.end_effector
 
@@ -120,8 +120,8 @@ def test_grasp_pose_front(immutable_simple_pr2_world):
     )
 
 
-def test_grasp_pose_right(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_grasp_pose_right(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
 
     man = robot_view.left_arm.end_effector
 
@@ -149,8 +149,8 @@ def test_grasp_pose_right(immutable_simple_pr2_world):
     )
 
 
-def test_grasp_pose_left(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_grasp_pose_left(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
 
     man = robot_view.left_arm.end_effector
 
@@ -178,8 +178,8 @@ def test_grasp_pose_left(immutable_simple_pr2_world):
     )
 
 
-def test_grasp_pose_top(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_grasp_pose_top(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
 
     man = robot_view.left_arm.end_effector
 
@@ -268,8 +268,8 @@ def test_grasp_left(tracy_milk_world):
     )
 
 
-def test_grasp_sequence_front(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_grasp_sequence_front(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
 
     man = robot_view.left_arm.end_effector
 
@@ -297,8 +297,8 @@ def test_grasp_sequence_front(immutable_simple_pr2_world):
     )
 
 
-def test_man_axis(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_man_axis(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
     man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
@@ -310,8 +310,8 @@ def test_man_axis(immutable_simple_pr2_world):
     assert grasp_desc.manipulation_axis() == [1, 0, 0]
 
 
-def test_lift_axis(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_lift_axis(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
     man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
@@ -362,8 +362,8 @@ def test_man_axis_tracy_right(tracy_milk_world):
     assert grasp_desc.manipulation_axis() == [0, 0, 1]
 
 
-def test_grasp_sequence(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_grasp_sequence(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
     man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
@@ -398,8 +398,8 @@ def test_grasp_sequence(immutable_simple_pr2_world):
     )
 
 
-def test_grasp_sequence_reverse(immutable_simple_pr2_holding_world):
-    world, robot_view, context = immutable_simple_pr2_holding_world
+def test_grasp_sequence_reverse(simple_pr2_holding_milk_context):
+    world, robot_view, context = simple_pr2_holding_milk_context
     man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
@@ -504,8 +504,8 @@ def test_grasp_sequence_right_tracy(tracy_milk_world):
     )
 
 
-def test_place_sequence(immutable_simple_pr2_holding_world):
-    world, robot_view, context = immutable_simple_pr2_holding_world
+def test_place_sequence(simple_pr2_holding_milk_context):
+    world, robot_view, context = simple_pr2_holding_milk_context
     man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
@@ -578,8 +578,8 @@ def test_place_sequence_right_tracy(tracy_milk_world):
     )
 
 
-def test_pose_sequence_top(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_pose_sequence_top(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
     man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
@@ -684,8 +684,8 @@ def test_pose_sequence_top_tracy_box(tracy_milk_world):
     )
 
 
-def test_pose_sequence_180_flip(immutable_simple_pr2_world):
-    world, robot_view, context = immutable_simple_pr2_world
+def test_pose_sequence_180_flip(simple_pr2_context):
+    world, robot_view, context = simple_pr2_context
 
     man = robot_view.left_arm.end_effector
     grasp_desc = GraspDescription(
@@ -733,7 +733,7 @@ def test_pose_sequence_180_flip(immutable_simple_pr2_world):
 @pytest.mark.parametrize("approach_direction", list(ApproachDirection))
 @pytest.mark.parametrize("vertical_alignment", list(VerticalAlignment))
 def test_from_attachment_recovers_the_grasp_the_body_is_held_in(
-    immutable_simple_pr2_world, approach_direction, vertical_alignment
+    simple_pr2_context, approach_direction, vertical_alignment
 ):
     """
     A held body's grasp orientation is recovered from the world, so a placing action
@@ -743,7 +743,7 @@ def test_from_attachment_recovers_the_grasp_the_body_is_held_in(
     grasp has two equivalent (approach direction, rotate gripper) spellings, so only the
     orientation itself is guaranteed.
     """
-    world = deepcopy(immutable_simple_pr2_world[0])
+    world = simple_pr2_context[0]
     end_effector = world.get_semantic_annotations_by_type(PR2)[0].left_arm.end_effector
     milk = world.get_body_by_name("milk.stl")
 
@@ -775,11 +775,11 @@ def test_from_attachment_recovers_the_grasp_the_body_is_held_in(
     assert alignment == pytest.approx(1.0, abs=1e-6)
 
 
-def test_from_attachment_rejects_a_body_that_is_not_held(immutable_simple_pr2_world):
+def test_from_attachment_rejects_a_body_that_is_not_held(simple_pr2_context):
     """
     Reading a grasp off a body no end effector holds is an error rather than a guess.
     """
-    world, robot_view, context = immutable_simple_pr2_world
+    world, robot_view, context = simple_pr2_context
     end_effector = robot_view.left_arm.end_effector
 
     with pytest.raises(BodyIsNotHeld):

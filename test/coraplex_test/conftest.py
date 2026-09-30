@@ -8,7 +8,6 @@ from ..orm_interface_build import regenerate_orm_interfaces
 regenerate_orm_interfaces()
 
 
-from copy import deepcopy
 from functools import partial
 
 import pytest
@@ -45,6 +44,8 @@ from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
+from .world_snapshot import WorldSnapshot
+
 
 @pytest.fixture(scope="session")
 def viz_marker_publisher():
@@ -55,38 +56,46 @@ def viz_marker_publisher():
     rclpy.shutdown()
 
 
-@pytest.fixture(scope="function")
-def mutable_model_world(pr2_apartment_world):
-    world = deepcopy(pr2_apartment_world)
-    pr2 = world.get_semantic_annotations_by_type(PR2)[0]
-    return world, pr2, Context(world, pr2)
+# %% world rollback
 
 
 @pytest.fixture(scope="function")
-def immutable_model_world(pr2_apartment_world):
-    world = pr2_apartment_world
+def pr2_apartment_context(pr2_apartment_world):
+    """
+    The shared PR2 apartment world, its robot and a context for both, returned to its
+    initial model and state after the test.
+    """
+    snapshot = WorldSnapshot.capture(pr2_apartment_world)
     pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
-    state = deepcopy(world.state._data)
-    yield world, pr2, Context(world, pr2)
-    world.state._data[:] = state
-    world.notify_state_change()
+    yield pr2_apartment_world, pr2, Context(pr2_apartment_world, pr2)
+    snapshot.restore()
 
 
-@pytest.fixture
-def immutable_simple_pr2_world(simple_pr2_world_setup):
+@pytest.fixture(scope="function")
+def simple_pr2_context(simple_pr2_world_setup):
+    """
+    The shared PR2 world in the simple apartment, its robot and a context for both,
+    returned to its initial model and state after the test.
+    """
     world, robot_view, context = simple_pr2_world_setup
-    state = deepcopy(world.state._data)
+    snapshot = WorldSnapshot.capture(world)
     yield world, robot_view, context
-    world.state._data[:] = state
-    world.notify_state_change()
+    snapshot.restore()
 
 
-@pytest.fixture
-def mutable_simple_pr2_world(simple_pr2_world_setup):
-    world, robot_view, context = simple_pr2_world_setup
-    copy_world = deepcopy(world)
-    robot_view = world.get_semantic_annotations_by_type(PR2)[0]
-    return world, robot_view, Context(copy_world, robot_view)
+@pytest.fixture(scope="function")
+def stretch_apartment_context(stretch_apartment_world):
+    """
+    The shared Stretch apartment world, its robot and a context for both, returned to
+    its initial model and state after the test.
+    """
+    snapshot = WorldSnapshot.capture(stretch_apartment_world)
+    robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
+    yield stretch_apartment_world, robot, Context(stretch_apartment_world, robot)
+    snapshot.restore()
+
+
+# %% database session
 
 
 @pytest.fixture(scope="function")
@@ -101,26 +110,17 @@ def coraplex_testing_session():
     engine.dispose()
 
 
-@pytest.fixture(scope="function")
-def immutable_stretch_apartment_world(stretch_apartment_world):
-    robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
-    context = Context(stretch_apartment_world, robot)
-    state = deepcopy(stretch_apartment_world.state._data)
-
-    yield stretch_apartment_world, robot, context
-
-    stretch_apartment_world.state._data[:] = state
-    stretch_apartment_world.notify_state_change()
+# %% perception regions
 
 
 @pytest.fixture
-def whole_scene_region(immutable_model_world) -> VolumetricBoundingBox:
+def whole_scene_region(pr2_apartment_context) -> VolumetricBoundingBox:
     """
     A region large enough to contain everything in the apartment fixture.
 
     Lets a perception test say "look everywhere" without restating the extents.
     """
-    world, _, _ = immutable_model_world
+    world, _, _ = pr2_apartment_context
     return VolumetricBoundingBox(
         origin=HomogeneousTransformationMatrix(reference_frame=world.root),
         min_x=-10,

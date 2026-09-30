@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <library_images>
+    <image id="color"><init_from>color.png</init_from></image>
+  </library_images>
+</COLLADA>

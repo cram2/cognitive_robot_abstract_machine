@@ -101,6 +101,13 @@ Install the CRAM package along with its dependencies:
 poetry install
 ```
 
+## Browser visualization
+
+The workspace includes [CRAMERA](cramera/README.md) for live 3D visualization,
+recorded playback, EQL questions and plan/statechart inspection. Start `cramera`
+from the activated environment, then run an existing demo with
+`cramera-live path/to/demo.py`.
+
 ## To run tests
 
 **1. Install system dependencies, set up and build the ROS 2 workspace**

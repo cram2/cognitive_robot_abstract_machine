@@ -5,7 +5,11 @@ Module holding all enums of CoraPlex.
 from __future__ import annotations
 
 from enum import Enum, auto, IntEnum, StrEnum
+from typing_extensions import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from coraplex.plans.plan import Plan
+    from coraplex.plans.plan_node import PlanNode
 
 class VisualizationLayout(Enum):
     BFS = "bfs"
@@ -89,6 +93,45 @@ class ExecutionType(Enum):
     Used by PR2 AlternativeMotion handlers that route commands to the real robot via
     docker exec into the ROS 1/2 bridge container, instead of sending them through
     Giskard's motion planning pipeline.
+    """
+
+
+class VisualizationBackend(StrEnum):
+    """The renderer selected for a simulated world."""
+
+    NONE = "none"
+    """Run without a renderer."""
+    RVIZ = "rviz"
+    """Publish native ROS visualization markers."""
+    RERUN = "rerun"
+    """Use the native Rerun adapter."""
+    CRAMERA = "cramera"
+    """Use an installed browser visualization provider."""
+
+
+class VisualizationOption(StrEnum):
+    """
+    Configuration names for optional visualization providers.
+    """
+
+    BACKEND = "CORAPLEX_VISUALIZATION"
+    """
+    Environment setting selecting the renderer.
+    """
+
+    RERUN_MODE = "CORAPLEX_RERUN_MODE"
+    """
+    Environment setting selecting Rerun's output mode.
+    """
+
+    RERUN_TARGET = "CORAPLEX_RERUN_TARGET"
+    """
+    Environment setting selecting Rerun's file or server.
+    """
+
+    PROVIDER_GROUP = "coraplex.visualizations"
+    """
+    Installed entry points implementing PlanVisualization.
     """
 
 
@@ -298,6 +341,43 @@ class FilterConfig(Enum):
     butterworth = 1
 
 
+class InsertionPosition(Enum):
+    """
+    Where an insertion rewrite places its nodes relative to the anchor node.
+    """
+
+    BEFORE = auto()
+    """
+    As the left neighbour of the anchor node.
+    """
+
+    AFTER = auto()
+    """
+    As the right neighbour of the anchor node.
+    """
+
+    LAST_CHILD = auto()
+    """
+    As the last child of the anchor node.
+    """
+
+    def insert(self, plan: Plan, reference_node: PlanNode, node: PlanNode) -> None:
+        """
+        Inserts a node at this position relative to a node of a plan.
+
+        :param plan: The plan both nodes belong to
+        :param reference_node: The node the given node is placed relative to
+        :param node: The node to insert
+        """
+        match self:
+            case InsertionPosition.BEFORE:
+                plan.insert_before(reference_node, node)
+            case InsertionPosition.AFTER:
+                plan.insert_after(reference_node, node)
+            case InsertionPosition.LAST_CHILD:
+                plan.insert_as_last_child(reference_node, node)
+
+
 class CuttingTechnique(Enum):
     """
     Enum for the techniques of cutting an object.
@@ -419,4 +499,50 @@ class MixingPattern(Enum):
     STIR = auto()
     """
     Mix along circular stirring laps.
+    """
+
+
+class NodeDetail(StrEnum):
+    """
+    The names a plan node is described by in the plan visualization.
+    """
+
+    EXECUTION = "Execution"
+    """
+    The section holding how far a node got and what came out of it.
+    """
+
+    STATUS = "status"
+    """
+    Where the node is in its execution.
+    """
+
+    START_TIME = "start"
+    """
+    When the node started.
+    """
+
+    END_TIME = "end"
+    """
+    When the node finished.
+    """
+
+    RESULT = "result"
+    """
+    What the node returned.
+    """
+
+    REASON = "reason"
+    """
+    The failure that ended the node.
+    """
+
+    DESIGNATOR_PARAMETER = "Designator Parameter"
+    """
+    The section holding the designator a node manages.
+    """
+
+    DESIGNATOR_TYPE = "Designator Type"
+    """
+    The class of that designator.
     """

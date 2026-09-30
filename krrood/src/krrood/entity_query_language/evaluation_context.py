@@ -11,6 +11,7 @@ from __future__ import annotations
 import uuid
 import weakref
 from abc import ABC
+from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
@@ -358,6 +359,44 @@ class EvaluationContext:
             ``TruthValueOperator`` during the current evaluation pass.
         """
         return expression._id_ in self.truth_value_operator_children
+
+    @contextmanager
+    def as_current(self) -> Iterator[None]:
+        """
+        Make this context the current evaluation context for the duration of the block,
+        restoring the previous one afterwards.
+        """
+        context_token = set_evaluation_context(self)
+        try:
+            yield
+        finally:
+            _evaluation_context_var.reset(context_token)
+
+    def iterate_as_current(
+        self, results: Iterator[OperationResult]
+    ) -> Iterator[OperationResult]:
+        """
+        Iterate the given results with this context as the current evaluation context
+        while each of them is produced, and while they are closed.
+
+        The context is current only while the results advance or are closed, never while
+        the caller holds a result, so a caller that stops iterating part way does not
+        leave it set.
+
+        :param results: The results of an evaluation this context belongs to.
+        :return: The same results.
+        """
+        results_exhausted = object()
+        try:
+            while True:
+                with self.as_current():
+                    result = next(results, results_exhausted)
+                if result is results_exhausted:
+                    return
+                yield result
+        finally:
+            with self.as_current():
+                results.close()
 
     def on_evaluate_enter(
         self,

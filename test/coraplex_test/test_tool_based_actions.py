@@ -53,8 +53,8 @@ def _add_box_body(world, name, size, position):
 
 
 @pytest.fixture
-def tool_action_world(mutable_model_world):
-    world, robot, context = mutable_model_world
+def tool_action_world(pr2_apartment_context):
+    world, robot, context = pr2_apartment_context
     container = _add_box_body(
         world, "tool_test_container", (0.2, 0.2, 0.1), (2.4, 2.2, 1.0)
     )
