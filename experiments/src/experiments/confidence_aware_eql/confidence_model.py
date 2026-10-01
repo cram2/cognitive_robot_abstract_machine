@@ -3,7 +3,7 @@
 The confidence model is a relational probabilistic circuit fitted per class on the
 familiar instances of that class. It answers one question about a new object: how
 likely is it under the distribution of familiar instances of its own class. An
-object whose likelihood falls below its class's calibrated threshold does not
+object whose log-likelihood falls below its class's calibrated threshold does not
 resemble anything the model was trained on and is judged unfamiliar.
 """
 
@@ -17,10 +17,13 @@ from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
 from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.dao import get_dao_schema, to_dao
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
 from typing_extensions import Any, List
+
+from experiments.confidence_aware_eql.feature_pipeline import extract_feature_dataframe
 
 # %% exceptions
 
@@ -78,7 +81,8 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
     """
     schema = get_dao_schema(type(to_dao(instance)))
     collection_relationships = {
-        relationship.key: relationship for relationship in schema.collection_relationships
+        relationship.key: relationship
+        for relationship in schema.collection_relationships
     }
     kwargs = {}
     for field in dataclasses.fields(domain_class):
@@ -88,7 +92,10 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
                 _build_grounding_query(child_domain_type, child)
                 for child in getattr(instance, field.name)
             ]
-        elif field.default is dataclasses.MISSING and field.default_factory is dataclasses.MISSING:
+        elif (
+            field.default is dataclasses.MISSING
+            and field.default_factory is dataclasses.MISSING
+        ):
             kwargs[field.name] = ...
     query = a(domain_class)(**kwargs)
     query.resolve()
@@ -96,6 +103,17 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
 
 
 # %% per-class model
+
+
+MINIMUM_INSTANCES_PER_LEAF = 2
+"""Fewest training instances a leaf of the class circuit may describe.
+
+A leaf fitted to a single instance collapses onto that instance's exact feature
+values, leaving the circuit a point mass per training instance: every object the
+model was not trained on then scores an infinitely low log-likelihood, however
+ordinary it is, and no threshold can tell such an object from a genuinely odd one.
+Two is the fewest that leaves a leaf spanning a range of feature values.
+"""
 
 
 @dataclass
@@ -112,6 +130,10 @@ class PerClassConfidenceModel:
     def fit(cls, domain_class: type, instances: List[Any]) -> PerClassConfidenceModel:
         """Fit a relational probabilistic circuit and calibrate its threshold.
 
+        The circuit is fitted on the class + volume + aspect ratio dataframe
+        :func:`extract_feature_dataframe` produces, rather than the DAO's own mapped
+        columns, since those are the class's real, non-redundant features.
+
         The threshold is calibrated as the first percentile of the training
         instances' own log-likelihoods, so an instance less likely than almost every
         familiar one is judged unfamiliar.
@@ -120,8 +142,14 @@ class PerClassConfidenceModel:
         :param instances: The familiar instances of ``domain_class`` to learn from.
         :return: A fitted per-class confidence model.
         """
-        circuit = RelationalProbabilisticCircuit(domain_class)
-        circuit.fit([to_dao(instance) for instance in instances])
+        circuit = RelationalProbabilisticCircuit(
+            domain_class,
+            learning_method=JointProbabilityTree(
+                min_samples_per_leaf=MINIMUM_INSTANCES_PER_LEAF
+            ),
+        )
+        daos = [to_dao(instance) for instance in instances]
+        circuit.fit(daos, dataframe_from_parent=extract_feature_dataframe(instances))
         model = cls(circuit, threshold=-np.inf)
         training_log_likelihoods = [
             model.log_likelihood_of(instance) for instance in instances
@@ -140,14 +168,15 @@ class PerClassConfidenceModel:
         :param instance: The instance to score; must belong to this model's class.
         :return: The instance's log-likelihood under the fitted circuit.
         """
-        grounded = self.circuit.ground(_build_grounding_query(self.circuit.class_, instance))
-        dataframe = self.circuit.feature_extractor.create_dataframe([to_dao(instance)])
-        dataframe = self.circuit.feature_extractor.preprocess_dataframe(dataframe)
+        grounded = self.circuit.ground(
+            _build_grounding_query(self.circuit.class_, instance)
+        )
+        feature_row = extract_feature_dataframe([instance])
         variable_names = [variable.name for variable in grounded.variables]
-        event = np.full((1, len(variable_names)), np.nan)
+        event = np.full((1, len(variable_names)), np.nan, dtype=object)
         for index, name in enumerate(variable_names):
-            if name in dataframe.columns:
-                event[0, index] = dataframe[name].iloc[0]
+            if name in feature_row.columns:
+                event[0, index] = feature_row[name].iloc[0]
         return float(grounded.log_likelihood(event)[0])
 
 
