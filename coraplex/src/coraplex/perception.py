@@ -11,7 +11,7 @@ from rclpy.node import Node
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.reasoning.predicates import visible
+from semantic_digital_twin.reasoning.robot_predicates import VisibleTo
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.spatial_types import (
@@ -108,7 +108,11 @@ class PerceptionQuery(SubclassJSONSerializer):
         ]
 
         robot_camera = self.robot.get_default_camera()
-        return [body for body in region_bodies if visible(robot_camera, body)]
+        return [
+            body
+            for body in region_bodies
+            if VisibleTo(entity=body, camera=robot_camera)()
+        ]
 
     def to_json(self, **kwargs) -> Dict[str, Any]:
         result = super().to_json(**kwargs)

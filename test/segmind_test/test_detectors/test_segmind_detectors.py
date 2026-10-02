@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from segmind.datastructures.events import (
     ContactEvent,
@@ -24,10 +25,12 @@ from segmind.detectors.spatial_relation_detector_nodes import SupportDetector, L
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.statecharts.segmind_statechart import SegmindStatechart
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.reasoning.predicates import InContactWith, SupportedBy
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -389,3 +392,67 @@ def test_slow_motion_with_all_motion_detectors(_simple_apartment_setup):
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
+
+# %% relations between tracked bodies
+
+
+def _unit_box(name: str) -> Body:
+    """
+    A body whose collision is a one-metre cube centred on its own frame.
+    """
+    body = Body(name=PrefixedName(name))
+    collision = Box(
+        scale=Scale(1.0, 1.0, 1.0),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+    )
+    body.collision = ShapeCollection([collision], reference_frame=body)
+    return body
+
+
+@pytest.fixture
+def box_resting_on_another_beside_a_distant_one():
+    """
+    A box resting on top of another, and a third box far from both.
+
+    :return: The world, the box on top, and the box it rests on.
+    """
+    world = World()
+    bottom = _unit_box("bottom")
+    top = _unit_box("top")
+    distant = _unit_box("distant")
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection(
+                parent=bottom,
+                child=top,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    z=1.0, reference_frame=bottom
+                ),
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=bottom,
+                child=distant,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=5.0, reference_frame=bottom
+                ),
+            )
+        )
+    return world, top, bottom
+
+
+@pytest.mark.parametrize("relation", [SupportedBy, InContactWith])
+def test_a_relation_relates_only_the_bodies_it_holds_between(
+    box_resting_on_another_beside_a_distant_one, relation
+):
+    """
+    A detector is handed the relation itself, and relates a tracked body only to the
+    bodies that relation holds for.
+    """
+    world, top, bottom = box_resting_on_another_beside_a_distant_one
+    context = MotionStatechartContext(world=world)
+
+    related = SupportDetector().get_relation(context, [top], relation)
+
+    assert related == {top: {bottom}}

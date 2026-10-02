@@ -24,6 +24,9 @@ from typing_extensions import (
     TYPE_CHECKING,
     Dict,
     Union,
+    Generic,
+    TypeVar,
+    Self,
 )
 
 if TYPE_CHECKING:
@@ -47,6 +50,7 @@ from krrood.entity_query_language.utils import camel_case_to_words
 from krrood.patterns.code_parsing_utils import (
     get_accessed_attribute_name_in_return_statement_of_property,
 )
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
@@ -332,29 +336,77 @@ class SymbolicFunction(SymbolicCallable, ABC):
         """
 
 
+SubjectType = TypeVar("SubjectType")
+"""
+The type of what a :class:`Triple` relates to its object.
+"""
+
+ObjectType = TypeVar("ObjectType")
+"""
+The type of what a :class:`Triple` relates its subject to.
+"""
+
+
 @dataclass(eq=False)
-class Triple(Predicate):
+class Triple(Predicate, Generic[SubjectType, ObjectType], SubClassSafeGeneric):
     """
     A Triple is a type predicate that represents a relation between two entities.
 
     To know if your predicate is a Triple or not ask yourself can I say
     "subject" "predicate_name" "object" and it makes sense? if so then
     yes. Check the verbalization function below as a reference.
+
+    A Triple binds the types it relates as its parameters, e.g. ``Triple[Body, Body]``.
     """
 
     @property
     @abstractmethod
-    def subject(self) -> Any:
+    def subject(self) -> SubjectType:
         """
         The subject of the predicate.
         """
 
     @property
     @abstractmethod
-    def object(self) -> Any:
+    def object(self) -> ObjectType:
         """
         The object of the predicate.
         """
+
+    @classmethod
+    def from_subject_object(cls, subject: SubjectType, object_: ObjectType) -> Self:
+        """
+        Build this relation between a subject and an object, whatever order its fields
+        are declared in.
+
+        :param subject: What the relation relates to the object.
+        :param object_: What the relation relates the subject to.
+        :return: The relation, symbolic when either of them is.
+        """
+        return cls(
+            **{
+                cls.subject_field_name(): subject,
+                cls.object_field_name(): object_,
+            }
+        )
+
+    @classmethod
+    def subject_field_name(cls) -> str:
+        """
+        :return: The name of the field :attr:`subject` reads.
+        """
+        return get_accessed_attribute_name_in_return_statement_of_property(
+            cls.subject, cls
+        )
+
+    @classmethod
+    def object_field_name(cls) -> str:
+        """
+        :return: The name of the field :attr:`object` reads.
+        """
+        return get_accessed_attribute_name_in_return_statement_of_property(
+            cls.object, cls
+        )
 
     @classmethod
     def _verbalization_fragment_(
@@ -378,23 +430,17 @@ class Triple(Predicate):
         )
 
         words = camel_case_to_words(cls.__name__).split()
-        subject_name = get_accessed_attribute_name_in_return_statement_of_property(
-            cls.subject, cls
-        )
-        object_name = get_accessed_attribute_name_in_return_statement_of_property(
-            cls.object, cls
-        )
         particles = [WordFragment(text=word) for word in words[1:]]
         return clause(
-            Noun(fields[subject_name]),
+            Noun(fields[cls.subject_field_name()]),
             Verb(morphology.verb_lemma(words[0])),
             *particles,
-            Noun(fields[object_name]),
+            Noun(fields[cls.object_field_name()]),
         )
 
 
 @dataclass(eq=False)
-class HasType(Triple):
+class HasType(Triple[Any, Type]):
     """
     Represents a predicate to check if a given variable is an instance of a specified
     type.

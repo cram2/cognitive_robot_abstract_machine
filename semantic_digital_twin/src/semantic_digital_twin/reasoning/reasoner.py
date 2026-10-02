@@ -2,23 +2,19 @@ from __future__ import annotations
 
 from collections import UserDict
 from dataclasses import dataclass, field
+from functools import cached_property
 from os.path import dirname
 
 from typing_extensions import (
-    ClassVar,
     Dict,
     Any,
     Optional,
-    Type,
 )
 
 from krrood.ripple_down_rules.rdr import GeneralRDR
 
 
 class ReasoningResult(UserDict[str, Any]): ...
-
-
-class CaseRDRs(UserDict[Type, GeneralRDR]): ...
 
 
 @dataclass
@@ -49,26 +45,18 @@ class CaseReasoner:
     The directory where the rdr model folder is located.
     """
 
-    rdrs: ClassVar[CaseRDRs] = CaseRDRs()
-    """
-    This is a collection of ripple down rules reasoners that infer case attributes.
-    """
-
-    def __post_init__(self):
-        if self.case.__class__ not in self.rdrs:
-            self.rdrs[self.case.__class__] = GeneralRDR(
-                save_dir=self.model_directory,
-                model_name=f"{self.case.__class__.__name__.lower()}_rdr",
-            )
-
-    @property
+    @cached_property
     def rdr(self) -> GeneralRDR:
         """
         The Ripple Down Rules instance that is used for reasoning on the case concepts.
 
-        :return: The Ripple Down Rules instance.
+        ..note:: Each reasoner reads its own, since the rules keep the last case they
+            classified in memory for as long as they are kept.
         """
-        return self.rdrs[self.case.__class__]
+        return GeneralRDR(
+            save_dir=self.model_directory,
+            model_name=f"{self.case.__class__.__name__.lower()}_rdr",
+        )
 
     def reason(self) -> Dict[str, Any]:
         """
