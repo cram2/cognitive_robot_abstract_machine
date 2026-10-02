@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from random_events.interval import Bound, Interval, SimpleInterval
-from typing_extensions import Dict, List, Self, Type
+from typing_extensions import List, Self, Type
 
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
@@ -27,10 +27,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base impor
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
-)
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    RowGroupedSparseArray,
-    SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
     LayerWithLogProbabilities,
@@ -95,7 +91,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
             )
         if len(pieces) == 1:
             return pieces[0]
-        return self.mixture_of_pieces(pieces)
+        return SumLayer.mixture_of_pieces(pieces)
 
     def log_truncated_of_simple_interval(
         self, interval: SimpleInterval, singleton_allowed: bool
@@ -104,8 +100,8 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
         Truncate every node of this layer to a simple interval.
 
         :param interval: The simple interval.
-        :param singleton_allowed: Whether a singleton interval truncates to a Dirac delta
-            rather than to an impossible node.
+        :param singleton_allowed: Whether a singleton interval truncates to a Dirac
+            delta rather than to an impossible node.
         :return: The truncated layer and the log-probabilities of its nodes.
         """
         if not (singleton_allowed and interval.is_singleton()):
@@ -119,55 +115,6 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
             np.ones(self.number_of_nodes),
         )
         return LayerWithLogProbabilities(dirac_delta_layer, log_likelihood)
-
-    def mixture_of_pieces(
-        self, pieces: List[LayerWithLogProbabilities]
-    ) -> LayerWithLogProbabilities:
-        """
-        Mix the truncations of this layer to the simple intervals of a composite
-        interval.
-
-        Node ``i`` of the result mixes node ``i`` of every piece, weighted by the
-        probability of that piece. Pieces of the same type are joined into one child
-        layer, so the number of layers does not grow with the number of simple
-        intervals.
-
-        :param pieces: The truncated layer and the log-probabilities of its nodes, per
-            simple interval.
-        :return: The mixture and the log-probabilities of its nodes.
-        """
-        number_of_nodes = self.number_of_nodes
-        pieces_by_type: Dict[Type[Layer], List[LayerWithLogProbabilities]] = {}
-        for piece in pieces:
-            pieces_by_type.setdefault(type(piece.layer), []).append(piece)
-
-        child_layers = []
-        log_probabilities_per_child_layer = []
-        for layer_type, typed_pieces in pieces_by_type.items():
-            child_layers.append(
-                layer_type.concatenate([piece.layer for piece in typed_pieces])
-            )
-            log_probabilities_per_child_layer.extend(
-                piece.log_probabilities for piece in typed_pieces
-            )
-
-        # the pieces are the columns in order, and node i of every piece sits in row i
-        number_of_pieces = len(pieces)
-        log_weights = RowGroupedSparseArray.from_entries(
-            SparseEntries(
-                np.concatenate(log_probabilities_per_child_layer),
-                np.tile(np.arange(number_of_nodes), number_of_pieces),
-                np.arange(number_of_pieces * number_of_nodes),
-            ),
-            (number_of_nodes, number_of_pieces * number_of_nodes),
-        )
-
-        node_log_probabilities = np.logaddexp.reduce(
-            [piece.log_probabilities for piece in pieces], axis=0
-        )
-        return LayerWithLogProbabilities(
-            SumLayer(child_layers, log_weights), node_log_probabilities
-        )
 
     def log_conditional_of_value(self, value: float) -> LayerWithLogProbabilities:
         log_likelihood = self.log_likelihood_of_nodes_from_column(np.array([value]))[0]

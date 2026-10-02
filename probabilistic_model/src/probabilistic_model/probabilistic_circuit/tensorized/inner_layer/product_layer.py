@@ -91,6 +91,23 @@ class ProductLayer(InnerLayer):
         ).to_coo_array((number_of_child_layers, 1))
         return cls(child_layers, edges)
 
+    @classmethod
+    def node_wise_product_of(cls, child_layers: List[Layer]) -> Self:
+        """
+        :param child_layers: The child layers, all with the same number of nodes.
+        :return: A product layer whose node ``i`` multiplies node ``i`` of every child
+            layer.
+        """
+        number_of_nodes = child_layers[0].number_of_nodes
+        number_of_child_layers = len(child_layers)
+        nodes = np.tile(np.arange(number_of_nodes), number_of_child_layers)
+        edges = SparseEntries(
+            nodes,
+            np.repeat(np.arange(number_of_child_layers), number_of_nodes),
+            nodes,
+        ).to_coo_array((number_of_child_layers, number_of_nodes))
+        return cls(child_layers, edges)
+
     @property
     def number_of_nodes(self) -> int:
         return self.edges.shape[1]

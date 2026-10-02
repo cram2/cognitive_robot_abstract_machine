@@ -25,6 +25,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer 
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base import (
     InputLayer,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.multivariate_gaussian.base import (
+    AbstractMultivariateGaussianLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
@@ -127,6 +130,28 @@ class InputLayerToLeavesConverter(
             for distribution in data.node_distributions(
                 builder.variables[data.variable]
             )
+        ]
+
+
+class MultivariateGaussianLayerToLeavesConverter(
+    TensorizedToRustworkxConverter[AbstractMultivariateGaussianLayer, List[Unit]]
+):
+    """
+    Convert either multivariate Gaussian layer into one leaf per node, through the
+    distributions of its nodes.
+    """
+
+    @classmethod
+    def can_convert(cls, data: Any) -> bool:
+        return isinstance(data, AbstractMultivariateGaussianLayer)
+
+    @classmethod
+    def convert(
+        cls, data: AbstractMultivariateGaussianLayer, builder: RustworkxCircuitBuilder
+    ) -> List[Unit]:
+        return [
+            leaf(distribution, builder.circuit)
+            for distribution in data.node_distributions(builder.variables)
         ]
 
 
