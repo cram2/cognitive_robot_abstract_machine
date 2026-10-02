@@ -157,7 +157,11 @@ class VizMarkerPublisher(ModelChangeCallback):
         self._started_tf_publisher = TFPublisher(_world=self._world, node=self.node)
         return self._started_tf_publisher
 
+    def with_tf_publisher(self):
+        return self
+
     def stop(self):
+
         """
         Deregister this publisher and stop the publishers it started.
 

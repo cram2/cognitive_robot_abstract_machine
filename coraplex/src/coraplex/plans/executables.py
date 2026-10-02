@@ -338,6 +338,9 @@ class GiskardExecutable(Executable):
             return
         if GiskardExecutable.execution_type == ExecutionType.NO_EXECUTION:
             return
+        if GiskardExecutable.execution_type == ExecutionType.BRIDGE:
+            self._execute_bridge()
+            return
         self.prepare_for_execution()
 
         match GiskardExecutable.execution_type:
@@ -347,6 +350,38 @@ class GiskardExecutable(Executable):
                 self._execute_real()
             case _:
                 raise UnknownExecutionType(GiskardExecutable.execution_type)
+
+    def _execute_bridge(self) -> None:
+        """
+        Execute PR2 bridge tasks locally via docker exec into the ROS 1/2 bridge
+        container — no Giskard QP or action server needed.
+        """
+        import time
+        try:
+            from giskardpy.motion_statechart.data_types import ObservationStateValues
+        except ImportError:
+            ObservationStateValues = None
+
+        logger.debug("BRIDGE: executing %d task(s)", len(self.motion_mappings))
+
+        for task in self.motion_mappings.values():
+            if hasattr(task, "build"):
+                task.build(context=None)
+            if hasattr(task, "on_start"):
+                task.on_start(context=None)
+            if hasattr(task, "on_tick"):
+                deadline = time.time() + getattr(task, "timeout_sec", 30.0) + 5.0
+                while time.time() < deadline:
+                    result = task.on_tick(context=None)
+                    if ObservationStateValues is not None:
+                        if result == ObservationStateValues.TRUE:
+                            break
+                    elif result:
+                        break
+                    time.sleep(0.05)
+
+        logger.debug("BRIDGE: all tasks complete")
+
 
     def _execute_simulation(self) -> None:
         """

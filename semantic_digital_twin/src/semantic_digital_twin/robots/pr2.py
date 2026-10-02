@@ -456,7 +456,7 @@ class PR2Torso(Torso, HasLeftRightArm[PR2LeftArm, PR2RightArm], HasNeck[PR2Neck]
 
         torso_high = JointState.from_mapping(
             name=PrefixedName("torso_high", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.3])),
+            mapping=dict(zip(torso_joint, [0.325])),  # soft upper limit of torso_lift_joint
             state_type=TorsoState.HIGH,
         )
 
