@@ -158,7 +158,7 @@ def test_sample_reachability(pr2_apartment_context):
     assert np.sum(reach_map.map[:200, :]) < 5
 
     for pose in reach_map:
-        assert pose.to_position().x > 3
+        assert pose.position.x > 3
 
 
 # ----- Sampling test ---------------
@@ -178,8 +178,8 @@ def test_position_generation(pr2_apartment_context):
     gaussian_map.map = np_map
 
     for pose in gaussian_map:
-        assert 0.8 <= pose.to_position().x <= 1.2
-        assert 0.8 <= pose.to_position().y <= 1.2
+        assert 0.8 <= pose.position.x <= 1.2
+        assert 0.8 <= pose.position.y <= 1.2
 
 
 def test_segment_map(pr2_apartment_context):
@@ -240,7 +240,7 @@ def test_sample_x_axis(pr2_apartment_context):
     gaussian_map.map = np_map
 
     for pose in gaussian_map:
-        assert -0.05 < pose.to_position().y < 0.05
+        assert -0.05 < pose.position.y < 0.05
 
 
 def test_sample_x_axis_offset(pr2_apartment_context):
@@ -259,8 +259,8 @@ def test_sample_x_axis_offset(pr2_apartment_context):
     gaussian_map.map = np_map
 
     for pose in gaussian_map:
-        assert -0.2 <= pose.to_position().y <= 0.2
-        assert 0.4 <= pose.to_position().x <= 0.8
+        assert -0.2 <= pose.position.y <= 0.2
+        assert 0.4 <= pose.position.x <= 0.8
 
 
 def test_sample_x_axis_offset_non_id(pr2_apartment_context):
@@ -279,8 +279,8 @@ def test_sample_x_axis_offset_non_id(pr2_apartment_context):
 
     tolerance = 0.01
     for pose in gaussian_map:
-        assert 1.8 <= pose.to_position().y <= 2.2 + tolerance
-        assert 3.4 <= pose.to_position().x <= 3.8 + tolerance
+        assert 1.8 <= pose.position.y <= 2.2 + tolerance
+        assert 3.4 <= pose.position.x <= 3.8 + tolerance
 
 
 def test_sample_to_pose_gau(pr2_apartment_context):
@@ -307,8 +307,8 @@ def test_sample_to_pose_gau(pr2_apartment_context):
     final_map = gaussian_map + gaussian_map2
 
     for pose in final_map:
-        assert -1.8 < pose.to_position().y < 2.2
-        assert 2.6 <= pose.to_position().x <= 3.6
+        assert -1.8 < pose.position.y < 2.2
+        assert 2.6 <= pose.position.x <= 3.6
 
 
 def test_sample_y_axis(pr2_apartment_context):
@@ -325,7 +325,7 @@ def test_sample_y_axis(pr2_apartment_context):
 
     gaussian_map.map = np_map
     for pose in gaussian_map:
-        assert -0.05 < pose.to_position().x < 0.05
+        assert -0.05 < pose.position.x < 0.05
 
 
 def test_sample_rotated(pr2_apartment_context):
@@ -343,16 +343,16 @@ def test_sample_rotated(pr2_apartment_context):
     assert len(list(gaussian_map)) == 2
 
     for pose in gaussian_map:
-        assert -0.05 < pose.to_position().y < 0.05
-        assert 0.4 <= pose.to_position().x <= 0.45
+        assert -0.05 < pose.position.y < 0.05
+        assert 0.4 <= pose.position.x <= 0.45
 
     gaussian_map.origin = Pose.from_xyz_quaternion(0, 0, 0, 0, 0, 1, 1, world.root)
 
     assert len(list(gaussian_map)) == 2
 
     for pose in gaussian_map:
-        assert -0.05 < pose.to_position().y < 0.05
-        assert 0.4 <= pose.to_position().x <= 0.45
+        assert -0.05 < pose.position.y < 0.05
+        assert 0.4 <= pose.position.x <= 0.45
 
 
 def test_sample_to_pose(pr2_apartment_context):
@@ -372,9 +372,9 @@ def test_sample_to_pose(pr2_apartment_context):
 
     pose = list(gaussian_map)[0]
 
-    assert pose.to_position().x == 1.6
-    assert pose.to_position().y == 2.2
-    assert pose.to_position().z == 0
+    assert pose.position.x == 1.6
+    assert pose.position.y == 2.2
+    assert pose.position.z == 0
 
 
 def test_sample_highest_first(pr2_apartment_context):
@@ -397,12 +397,8 @@ def test_sample_highest_first(pr2_apartment_context):
 
     assert len(poses) == 3
 
-    assert (
-        poses[2].to_position().x < poses[1].to_position().x < poses[0].to_position().x
-    )
-    assert (
-        poses[2].to_position().y < poses[1].to_position().y < poses[0].to_position().y
-    )
+    assert poses[2].position.x < poses[1].position.x < poses[0].position.x
+    assert poses[2].position.y < poses[1].position.y < poses[0].position.y
 
 
 def test_segment_highest_first(pr2_apartment_context):

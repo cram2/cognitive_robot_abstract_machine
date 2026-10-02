@@ -152,10 +152,10 @@ def build_plan(world: World, robot: UnitreeG1) -> Plan:
     )
     context = Context(world=world, robot=robot, evaluate_conditions=False)
     place_pose = Pose(
-        PLACE_POSE.to_position(), PLACE_POSE.to_quaternion(), reference_frame=world.root
+        PLACE_POSE.position, PLACE_POSE.quaternion, reference_frame=world.root
     )
     pick_pose = Pose(
-        PICK_POSE.to_position(), PICK_POSE.to_quaternion(), reference_frame=world.root
+        PICK_POSE.position, PICK_POSE.quaternion, reference_frame=world.root
     )
 
     return sequential(
@@ -207,10 +207,10 @@ def build_plan2(world: World, robot: UnitreeG1) -> Plan:
     )
     context = Context(world=world, robot=robot, evaluate_conditions=False)
     place_pose = Pose(
-        PLACE_POSE.to_position(), PLACE_POSE.to_quaternion(), reference_frame=world.root
+        PLACE_POSE.position, PLACE_POSE.quaternion, reference_frame=world.root
     )
     pick_pose = Pose(
-        PICK_POSE.to_position(), PICK_POSE.to_quaternion(), reference_frame=world.root
+        PICK_POSE.position, PICK_POSE.quaternion, reference_frame=world.root
     )
 
     return sequential(
@@ -274,6 +274,6 @@ with simulated_robot:
     build_plan(world, robot).perform()
 
 parcel_position = world.get_body_by_name("parcel").global_pose
-print(f"parcel delivered to {np.round(parcel_position.to_position(), 3)}")
-print(f"Expected parcel to be delivered to {np.round(PLACE_POSE.to_position(), 3)}")
+print(f"parcel delivered to {np.round(parcel_position.position, 3)}")
+print(f"Expected parcel to be delivered to {np.round(PLACE_POSE.position, 3)}")
 assert np.allclose(parcel_position, PLACE_POSE, atol=0.05)

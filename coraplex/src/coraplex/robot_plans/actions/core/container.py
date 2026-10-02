@@ -122,10 +122,8 @@ class OpenAction(ActionDescription):
                 )
                 > 0.9,
                 allclose(
-                    variable_from(
-                        kwargs["object_designator"]
-                    ).global_pose.to_position(),
-                    variable_from(end_effector.tool_frame).global_pose.to_position(),
+                    variable_from(kwargs["object_designator"]).global_pose.position,
+                    variable_from(end_effector.tool_frame).global_pose.position,
                     atol=3e-2,
                 ),
             ),

@@ -118,8 +118,8 @@ class IsVisibleBy(PoseValidator):
         ray_tracer = self.world.ray_tracer
         camera = self.robot.get_default_camera()
         ray = ray_tracer.ray_test(
-            camera.bodies[0].global_transform.to_position()[:3].to_np(),
-            target_body.global_transform.to_position()[:3].to_np(),
+            camera.bodies[0].global_transform.position[:3].to_np(),
+            target_body.global_transform.position[:3].to_np(),
             multiple_hits=True,
         )
 

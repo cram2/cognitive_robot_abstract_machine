@@ -723,10 +723,10 @@ class TestFactories(unittest.TestCase):
 
         surface_P_milk = world.transform(
             milk.root.global_transform, table.supporting_surface
-        ).to_position()
+        ).position
         surface_P_cereal = world.transform(
             cereal.root.global_transform, table.supporting_surface
-        ).to_position()
+        ).position
 
         assert not surface_event.contains(surface_P_milk[:2])
         assert not surface_event.contains(surface_P_cereal[:2])

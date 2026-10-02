@@ -8,7 +8,6 @@ from sortedcontainers import SortedSet
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.entity_query_language.factories import a, an
-from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.distributions.distributions import IntegerDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
@@ -63,14 +62,14 @@ def scenario():
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
         objects=objects,
     )
-    return to_dao(room), to_dao(room2)
+    return room, room2
 
 
 @pytest.fixture
 def relational_probabilistic_circuit(scenario):
-    room_dao, room2_dao = scenario
+    room, room2 = scenario
     model = RelationalProbabilisticCircuit(SceneRoom)
-    model.fit([room_dao, room2_dao])
+    model.fit([room, room2])
     return model
 
 
@@ -207,6 +206,7 @@ def test_non_positive_sample_count_raises_when_integration_needed(
     with pytest.raises(InvalidMonteCarloSampleCountError):
         relational_probabilistic_circuit.ground(room_query_4)
 
+
 @pytest.fixture
 def relational_probabilistic_circuit_with_ambiguous_total_count_4():
     """
@@ -247,7 +247,7 @@ def relational_probabilistic_circuit_with_ambiguous_total_count_4():
     model = RelationalProbabilisticCircuit(
         SceneRoom, learning_method=JointProbabilityTree(min_samples_per_leaf=2)
     )
-    model.fit([to_dao(three_chairs_one_table), to_dao(two_chairs_two_tables)])
+    model.fit([three_chairs_one_table, two_chairs_two_tables])
     return model
 
 
@@ -620,7 +620,7 @@ def correlated_relational_probabilistic_circuit() -> RelationalProbabilisticCirc
         _room_with_chair_count(random_generator, 3) for _ in range(20)
     ]
     model = RelationalProbabilisticCircuit(SceneRoom)
-    model.fit([to_dao(room) for room in rooms])
+    model.fit(rooms)
     return model
 
 

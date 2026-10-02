@@ -47,7 +47,7 @@ def test_recenter_origin_centers_bounding_box():
 
     mesh.recenter_origin()
 
-    np.testing.assert_allclose(mesh.origin.to_position().to_np()[:3], -expected_center)
+    np.testing.assert_allclose(mesh.origin.position.to_np()[:3], -expected_center)
 
 
 def test_recenter_origin_preserves_existing_rotation():

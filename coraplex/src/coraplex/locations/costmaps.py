@@ -68,7 +68,7 @@ class OrientationGenerator:
         )[0]
         world_R_rotation = RotationMatrix.from_rpy(0, 0, angle)
         world_R_new_rotation = world_R_rotation @ rotation_R_new_rotation
-        return world_R_new_rotation.to_quaternion()
+        return world_R_new_rotation.quaternion
 
     @staticmethod
     def orientation_generator_for_axis(
@@ -409,7 +409,7 @@ class Costmap(PoseGeneratorBackend):
                 # Compute world position independent of origin orientation:
                 # map indices increase with world axes; origin is at the center.
                 offset = (ind - center) * self.resolution
-                position = self.origin.to_position() + Vector3(offset[0], offset[1], 0)
+                position = self.origin.position + Vector3(offset[0], offset[1], 0)
 
                 orientation: Quaternion = ori_gen(position, self.origin)
                 yield Pose(
@@ -484,7 +484,7 @@ class OccupancyCostmap(Costmap):
 
         :return: A 2d numpy array of the occupied space
         """
-        origin_position = self.origin.to_position().to_list()
+        origin_position = self.origin.position.to_list()
         # Generate 2d grid with indices
         indices = np.concatenate(
             np.dstack(

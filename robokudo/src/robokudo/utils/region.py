@@ -35,7 +35,7 @@ def _box_obb_from_shape(
     world_T_box = world_T_region @ box_origin
 
     # Build OBB from center, rotation, scale
-    center_np = world_T_box.to_position().to_np()
+    center_np = world_T_box.position.to_np()
     if center_np.shape[0] == 4:
         center_np = center_np[:3]
     center = center_np.reshape(3, 1).astype(float)
@@ -94,7 +94,7 @@ def region_obb_in_camera_coordinates(
     obb = region_obb(region, world=world)
     if isinstance(world_T_camera, HomogeneousTransformationMatrix):
         R = world_T_camera.to_rotation_matrix().to_np()
-        t = world_T_camera.to_position().to_np()
+        t = world_T_camera.position.to_np()
     else:
         R = world_T_camera[:3, :3]
         t = world_T_camera[:3, 3]
@@ -109,8 +109,8 @@ def region_pose_annotation(region: Region) -> robokudo.types.annotation.PoseAnno
     """
     pose = robokudo.types.annotation.PoseAnnotation()
     T = region.global_pose
-    pose.translation = T.to_position().to_np().tolist()
-    pose.rotation = T.to_quaternion().to_np().tolist()
+    pose.translation = T.position.to_np().tolist()
+    pose.rotation = T.quaternion.to_np().tolist()
     return pose
 
 

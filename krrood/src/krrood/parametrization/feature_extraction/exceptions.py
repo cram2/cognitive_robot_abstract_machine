@@ -18,9 +18,7 @@ class NoInstancesProvidedError(InputError):
         return "At least one instance must be provided to build a FeatureExtractor."
 
     def suggest_correction(self) -> str:
-        return (
-            "Pass a non-empty list of DAO instances to FeatureExtractor.from_instances."
-        )
+        return "Pass a non-empty list of instances to FeatureExtractor.from_instances."
 
 
 @dataclass

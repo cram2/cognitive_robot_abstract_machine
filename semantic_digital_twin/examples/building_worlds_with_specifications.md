@@ -138,7 +138,7 @@ for index, (x, y) in enumerate([(0.55, -0.35), (-0.55, 0.35), (-0.55, -0.35)], s
 assert len(world.bodies) == 6
 # The baked-in pose placed leg_0 at its parent-frame offset.
 root_T_leg_0 = world.compute_forward_kinematics(world.root, leg)
-np.testing.assert_allclose(root_T_leg_0.to_position().to_np()[:3], [0.55, 0.35, -0.35])
+np.testing.assert_allclose(root_T_leg_0.position.to_np()[:3], [0.55, 0.35, -0.35])
 assert leg.parent_connection.parent is table_top
 print("Bodies now in the world:", sorted(str(body.name) for body in world.bodies))
 ```
@@ -334,8 +334,8 @@ connection = FixedConnectionSpecification().connect(
 
 assert connection.child is free_body
 root_T_crate = world.compute_forward_kinematics(world.root, free_body)
-np.testing.assert_allclose(root_T_crate.to_position().to_np()[:3], [1, 2, 3])
-print("Crate position:", root_T_crate.to_position().to_np()[:3].tolist())
+np.testing.assert_allclose(root_T_crate.position.to_np()[:3], [1, 2, 3])
+print("Crate position:", root_T_crate.position.to_np()[:3].tolist())
 ```
 
 ## Semantic annotation specifications

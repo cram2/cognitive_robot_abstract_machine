@@ -178,10 +178,10 @@ def test_pouring_action_poses_tilt_and_mirror(tool_action_world):
     right_pre_pose, right_pour_pose = right_action._pour_poses()
 
     pre_rotation = Rotation.from_quat(
-        [float(value) for value in right_pre_pose.to_quaternion().to_np()]
+        [float(value) for value in right_pre_pose.quaternion.to_np()]
     )
     pour_rotation = Rotation.from_quat(
-        [float(value) for value in right_pour_pose.to_quaternion().to_np()]
+        [float(value) for value in right_pour_pose.quaternion.to_np()]
     )
     tilt_magnitude = (pre_rotation.inv() * pour_rotation).magnitude()
     assert tilt_magnitude == pytest.approx(right_action.tilt_angle, abs=1e-6)

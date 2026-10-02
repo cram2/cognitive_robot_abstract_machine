@@ -167,9 +167,9 @@ def test_load_successful_grasps_from_dataset(tmp_path):
     )
 
     assert len(grasps) == 1
-    assert grasps[0].to_position().x == 1.0
-    assert grasps[0].to_position().y == 2.0
-    assert grasps[0].to_position().z == 3.0
+    assert grasps[0].position.x == 1.0
+    assert grasps[0].position.y == 2.0
+    assert grasps[0].position.z == 3.0
 
     # Test with non-existing UUID
     empty_grasps = load_successful_grasps_from_dataset(

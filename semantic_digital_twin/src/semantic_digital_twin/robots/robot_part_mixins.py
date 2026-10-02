@@ -240,8 +240,8 @@ class HasLeftRightArm(
         pov = self.root.global_transform
         [first_arm, second_arm] = self.arms
         # the arms may share a root, but the first body after the root should be different
-        world_P_first_body = first_arm.bodies[1].global_transform.to_position()
-        world_P_second_body = second_arm.bodies[1].global_transform.to_position()
+        world_P_first_body = first_arm.bodies[1].global_transform.position
+        world_P_second_body = second_arm.bodies[1].global_transform.position
 
         return (
             first_arm

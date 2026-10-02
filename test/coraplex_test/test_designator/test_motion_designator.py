@@ -142,7 +142,7 @@ def test_move_motion_chart(pr2_apartment_context):
     msc = motion.motion_chart
 
     assert msc
-    np.testing.assert_equal(msc.goal_pose.to_position().to_np(), np.array([1, 1, 1, 1]))
+    np.testing.assert_equal(msc.goal_pose.position.to_np(), np.array([1, 1, 1, 1]))
 
 
 def test_move_tool_center_point_motion_uses_tight_threshold(pr2_apartment_context):
@@ -737,7 +737,7 @@ def test_looking_motion_pointing_parameters(pr2_apartment_context):
     assert pointing.pointing_axis is camera.forward_facing_axis
     assert pointing.pointing_axis.reference_frame is camera.root
     assert pointing.goal_point.reference_frame is world.root
-    assert np.array_equal(pointing.goal_point.to_np(), target.to_position().to_np())
+    assert np.array_equal(pointing.goal_point.to_np(), target.position.to_np())
 
 
 # %% stretch tool center point

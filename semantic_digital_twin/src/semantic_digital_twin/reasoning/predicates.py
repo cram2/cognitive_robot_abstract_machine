@@ -231,8 +231,8 @@ def compute_euclidean_planar_distance(
     :return: The Euclidean distance between the two bodies in the 2D plane after
         ignoring the specified dimension.
     """
-    body1_position = body1.global_pose.to_position()
-    body2_position = body2.global_pose.to_position()
+    body1_position = body1.global_pose.position
+    body2_position = body2.global_pose.position
 
     if np.allclose(ignore_dimension, Vector3.X()):
         body1_position.x = 0.0

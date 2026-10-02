@@ -241,7 +241,7 @@ def test_reachability_location_stands_at_the_arm_length_fraction_from_its_target
     expected_distance = (
         float(ViewManager.get_arm_view(Arms.RIGHT, robot).approximate_length()) * 0.66
     )
-    target_position = target.to_position().to_np()[:2]
+    target_position = target.position.to_np()[:2]
 
     candidates = list(
         islice(
@@ -252,7 +252,7 @@ def test_reachability_location_stands_at_the_arm_length_fraction_from_its_target
 
     assert len(candidates) == CANDIDATES_TO_SAMPLE
     distances = [
-        np.linalg.norm(candidate.to_position().to_np()[:2] - target_position)
+        np.linalg.norm(candidate.position.to_np()[:2] - target_position)
         for candidate in candidates
     ]
     assert distances == pytest.approx(

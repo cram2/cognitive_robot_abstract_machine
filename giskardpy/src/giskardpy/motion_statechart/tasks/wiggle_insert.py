@@ -194,7 +194,7 @@ class WiggleInsert(ConvergingTask):
 
         root_P_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
         root_P_hole = context.world.transform(
             target_frame=self.root_link, spatial_object=self.hole_point
         )

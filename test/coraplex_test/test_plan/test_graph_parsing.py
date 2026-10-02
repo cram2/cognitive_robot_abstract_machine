@@ -58,7 +58,10 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.templates import (
     Parallel,
     RepeatOnStall,
-    Sequence, TryAll, TryInOrder, CancelledWhenTrue,
+    Sequence,
+    TryAll,
+    TryInOrder,
+    CancelledWhenTrue,
 )
 from giskardpy.motion_statechart.graph_node import CancelMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import CountNodeResets
@@ -700,16 +703,16 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(pr2_apartment_c
         node.designator.target
         for node in plan.descendants
         if isinstance(node, MotionNode)
-           and isinstance(node.designator, MoveToolCenterPointMotion)
+        and isinstance(node.designator, MoveToolCenterPointMotion)
     ]
     positions_before = [
-        world.transform(target, world.root).to_position().to_np().flatten()[:3]
+        world.transform(target, world.root).position.to_np().flatten()[:3]
         for target in targets
     ]
 
     displacement = np.array([0.25, -0.4, 0.1])
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *(milk_body.global_pose.to_position().to_np().flatten()[:3] + displacement),
+        *(milk_body.global_pose.position.to_np().flatten()[:3] + displacement),
         reference_frame=world.root,
     )
 
@@ -717,7 +720,7 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(pr2_apartment_c
     assert all(target.reference_frame is milk_body for target in targets)
     for target, position_before in zip(targets, positions_before):
         np.testing.assert_allclose(
-            world.transform(target, world.root).to_position().to_np().flatten()[:3],
+            world.transform(target, world.root).position.to_np().flatten()[:3],
             position_before + displacement,
             atol=1e-9,
         )
@@ -806,9 +809,18 @@ def test_detect_before_grasp_transformation_applies(pr2_apartment_context):
 
     context.plan_transformations.append(DetectBeforeGrasp())
 
-    plan = execute_single(PickUpAction(world.get_semantic_annotations_by_type(Milk)[0], Arms.RIGHT,
-                                       GraspDescription(ApproachDirection.FRONT, VerticalAlignment.NoAlignment,
-                                                        view.right_arm.end_effector)), context=context)
+    plan = execute_single(
+        PickUpAction(
+            world.get_semantic_annotations_by_type(Milk)[0],
+            Arms.RIGHT,
+            GraspDescription(
+                ApproachDirection.FRONT,
+                VerticalAlignment.NoAlignment,
+                view.right_arm.end_effector,
+            ),
+        ),
+        context=context,
+    )
     plan.notify()
 
     assert plan.plan.get_nodes_by_designator_type(DetectAction)

@@ -16,7 +16,8 @@ import numpy as np
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
 from krrood.exceptions import DataclassException
-from krrood.ormatic.data_access_objects.dao import get_dao_schema, to_dao
+from krrood.ormatic.data_access_objects.dao import get_dao_schema
+from krrood.ormatic.data_access_objects.helper import get_dao_class
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
@@ -76,9 +77,10 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
     :param instance: The domain instance whose collection structure the query mirrors.
     :return: A resolved query ready to pass to :meth:`RelationalProbabilisticCircuit.ground`.
     """
-    schema = get_dao_schema(type(to_dao(instance)))
+    schema = get_dao_schema(get_dao_class(type(instance)))
     collection_relationships = {
-        relationship.key: relationship for relationship in schema.collection_relationships
+        relationship.key: relationship
+        for relationship in schema.collection_relationships
     }
     kwargs = {}
     for field in dataclasses.fields(domain_class):
@@ -88,7 +90,10 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
                 _build_grounding_query(child_domain_type, child)
                 for child in getattr(instance, field.name)
             ]
-        elif field.default is dataclasses.MISSING and field.default_factory is dataclasses.MISSING:
+        elif (
+            field.default is dataclasses.MISSING
+            and field.default_factory is dataclasses.MISSING
+        ):
             kwargs[field.name] = ...
     query = a(domain_class)(**kwargs)
     query.resolve()
@@ -121,7 +126,7 @@ class PerClassConfidenceModel:
         :return: A fitted per-class confidence model.
         """
         circuit = RelationalProbabilisticCircuit(domain_class)
-        circuit.fit([to_dao(instance) for instance in instances])
+        circuit.fit(instances)
         model = cls(circuit, threshold=-np.inf)
         training_log_likelihoods = [
             model.log_likelihood_of(instance) for instance in instances
@@ -140,8 +145,10 @@ class PerClassConfidenceModel:
         :param instance: The instance to score; must belong to this model's class.
         :return: The instance's log-likelihood under the fitted circuit.
         """
-        grounded = self.circuit.ground(_build_grounding_query(self.circuit.class_, instance))
-        dataframe = self.circuit.feature_extractor.create_dataframe([to_dao(instance)])
+        grounded = self.circuit.ground(
+            _build_grounding_query(self.circuit.class_, instance)
+        )
+        dataframe = self.circuit.feature_extractor.create_dataframe([instance])
         dataframe = self.circuit.feature_extractor.preprocess_dataframe(dataframe)
         variable_names = [variable.name for variable in grounded.variables]
         event = np.full((1, len(variable_names)), np.nan)

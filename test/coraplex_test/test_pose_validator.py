@@ -207,8 +207,8 @@ def test_is_object_reachable_by_copies_current_world_lazily(
     # The copy reflects the *current* (moved) object pose, not the parse-time one.
     copied_milk = captured["world"].get_body_by_name("milk.stl")
     assert np.allclose(
-        copied_milk.global_pose.to_position().to_np()[:3],
-        milk.global_pose.to_position().to_np()[:3],
+        copied_milk.global_pose.position.to_np()[:3],
+        milk.global_pose.position.to_np()[:3],
     )
     # A full grasp sequence (pre-pose, grasp, lift) is generated.
     assert len(captured["pose_sequence"]) == 3
@@ -285,8 +285,8 @@ def test_is_object_reachable_by_single_grasp_delegates_to_is_reachable_by(
     assert not seq_calls
     assert len(single_calls) == 1
     assert np.allclose(
-        single_calls[0].to_position().to_np()[:3],
-        milk.global_pose.to_position().to_np()[:3],
+        single_calls[0].position.to_np()[:3],
+        milk.global_pose.position.to_np()[:3],
     )
 
 

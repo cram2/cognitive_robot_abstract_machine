@@ -82,17 +82,17 @@ class TestPose2DToPose:
         p2 = Pose2D(x=1, y=2, yaw=0, reference_frame=frame)
         assert p2.to_pose().reference_frame is frame
 
-    def test_to_position(self):
+    def test_position_of_its_pose(self):
         p2 = Pose2D(x=2.0, y=-3.0, yaw=0)
-        pt = p2.to_position()
+        pt = p2.to_pose().position
         assert isinstance(pt, Point3)
         assert pt.x.to_np() == pytest.approx(2.0)
         assert pt.y.to_np() == pytest.approx(-3.0)
         assert pt.z.to_np() == pytest.approx(0.0)
 
-    def test_to_quaternion(self):
+    def test_quaternion(self):
         p2 = Pose2D(x=0, y=0, yaw=0)
-        q = p2.to_quaternion()
+        q = p2.quaternion
         assert isinstance(q, Quaternion)
         # identity quaternion: x=0, y=0, z=0, w=1
         expected = np.array([0, 0, 0, 1], dtype=float)

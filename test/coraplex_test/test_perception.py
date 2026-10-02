@@ -132,7 +132,7 @@ def test_detection_moves_the_annotated_body_to_the_perceived_pose(
 
     assert annotations == world.get_semantic_annotations_by_type(Milk)
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -189,7 +189,7 @@ def test_several_annotations_on_one_body_are_not_ambiguous(pr2_apartment_context
     assert len(annotations) == 2
     assert {annotation.root for annotation in annotations} == {milk_body}
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -212,7 +212,7 @@ def test_an_upside_down_detection_is_flipped_without_moving_the_body(
     Detection(semantic_annotation=Milk, pose=upside_down_pose).apply_to(world)
 
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -242,7 +242,7 @@ def test_untrusted_orientation_still_moves_the_body_to_the_perceived_position(
     )
 
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -307,8 +307,8 @@ def test_world_perception_reports_the_pose_the_world_holds(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         atol=1e-9,
     )
 
@@ -463,10 +463,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
         return [
             float(
                 np.linalg.norm(
-                    world.transform(target, world.root)
-                    .to_position()
-                    .to_np()
-                    .flatten()[:3]
+                    world.transform(target, world.root).position.to_np().flatten()[:3]
                     - np.array(position)
                 )
             )
@@ -614,7 +611,7 @@ def test_robokudo_detection_is_named_and_placed_by_the_pipeline(
     assert robokudo_query_server.received_types == ["milk"]
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -633,10 +630,7 @@ def test_robokudo_detection_moves_the_body_in_the_world(
     RoboKudoPerception(ros_node=rclpy_node).detect(query).apply_to(world)
 
     np.testing.assert_allclose(
-        world.get_body_by_name("milk.stl")
-        .global_pose.to_position()
-        .to_np()
-        .flatten()[:3],
+        world.get_body_by_name("milk.stl").global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -660,7 +654,7 @@ def test_untyped_detection_is_identified_from_the_query(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -723,7 +717,7 @@ def test_a_caller_that_accepts_any_candidate_gets_one_of_them(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -795,10 +789,7 @@ def test_perception_task_moves_the_detected_body(
     run_perception_task(task, build_perception_task(task, world, rclpy_node))
 
     np.testing.assert_allclose(
-        world.get_body_by_name("milk.stl")
-        .global_pose.to_position()
-        .to_np()
-        .flatten()[:3],
+        world.get_body_by_name("milk.stl").global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -998,7 +989,7 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
     reach.on_start(build_context)
 
     np.testing.assert_allclose(
-        reach.root_T_goal_reference_frame.to_position().evaluate().flatten()[:3],
+        reach.root_T_goal_reference_frame.position.evaluate().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )

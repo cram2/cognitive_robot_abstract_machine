@@ -55,7 +55,7 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
         tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
         goal_copy = deepcopy(self.target)
         goal_copy = self.world.transform(goal_copy, self.world.root)
-        goal_point = goal_copy.to_position()
+        goal_point = goal_copy.position
         goal_point.z = 0
         return Parallel(
             [

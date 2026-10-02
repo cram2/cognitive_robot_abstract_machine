@@ -382,7 +382,7 @@ class WipingAction(ToolMotionAction):
             final waypoint.
         """
         tool_point = self.world.transform(
-            self.tool.root.global_pose.to_position(), self.world.root
+            self.tool.root.global_pose.position, self.world.root
         )
         tool_xyz = np.asarray(tool_point.to_np(), dtype=float).reshape(-1)[:3]
         goal_point = self.world.transform(self._waypoints[-1], self.world.root)
@@ -489,9 +489,7 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
             approach_x /= approach_norm
             approach_y /= approach_norm
 
-        target_quaternion = [
-            float(value) for value in target_pose.to_quaternion().to_np()
-        ]
+        target_quaternion = [float(value) for value in target_pose.quaternion.to_np()]
         target_rotation = Rotation.from_quat(target_quaternion)
         target_x_axis = target_rotation.apply([1, 0, 0])
         target_y_axis = target_rotation.apply([0, 1, 0])

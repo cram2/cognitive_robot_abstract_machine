@@ -329,8 +329,8 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
     def is_applicable(self, plan_node: PlanNode) -> bool:
         navigate = plan_node.designator
         target = navigate.world.transform(navigate.target_location, navigate.world.root)
-        distance = navigate.robot.root.global_pose.to_position().euclidean_distance(
-            target.to_position()
+        distance = navigate.robot.root.global_pose.position.euclidean_distance(
+            target.position
         )
         return float(distance) > self.minimum_distance
 ```

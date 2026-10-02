@@ -1509,9 +1509,7 @@ def test_set_omni_after_copy(pr2_world_state_reset):
     pr2_copy.notify_state_change()
 
     np.testing.assert_array_almost_equal(
-        pr2_copy.get_body_by_name("base_footprint")
-        .global_transform.to_position()
-        .to_np(),
+        pr2_copy.get_body_by_name("base_footprint").global_transform.position.to_np(),
         np.array([10.0, 10.0, 0.0, 1.0]),
     )
 

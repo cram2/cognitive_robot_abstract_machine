@@ -209,8 +209,7 @@ class TestCartesianPositionTrajectory:
             world.notify_state_change()
             p = (
                 world.compute_forward_kinematics(root_link, tip_link)
-                .to_position()
-                .evaluate()[:-1]
+                .position.evaluate()[:-1]
                 .astype(float)
             )
             executed_points.append(p.copy())
@@ -671,7 +670,7 @@ class TestCartesianTasks:
                         tip_link=hand.tool_frame,
                         goal_point=_hsr_world_setup.bodies[
                             -1
-                        ].global_transform.to_position(),
+                        ].global_transform.position,
                     ),
                 ]
             )

@@ -458,7 +458,7 @@ class KitchenPointingScenario(BenchmarkScenario):
         handle_point = robot.api.world.compute_forward_kinematics(
             root=map_frame,
             tip=robot.get_kinematic_structure_entity("iai_fridge_door_handle"),
-        ).to_position()
+        ).position
         arm_pose = {
             name: position
             for name, position in robot.better_pose.items()

@@ -44,7 +44,7 @@ class FaceAtAction(ActionDescription):
 
         # create new robot pose
         new_robot_pose = Pose(
-            robot_position.to_position(),
+            robot_position.position,
             Quaternion.from_rpy(0, 0, angle),
             reference_frame=self.world.root,
         )

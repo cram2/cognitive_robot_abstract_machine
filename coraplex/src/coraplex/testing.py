@@ -210,7 +210,7 @@ def _make_sine_scan_poses(
     x0 = anchor.x
     y0 = anchor.y
     z0 = anchor.z
-    q = anchor.to_quaternion()
+    q = anchor.quaternion
 
     y_min = y0 - 0.5 * y_span
     y_max = y0 + 0.5 * y_span

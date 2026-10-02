@@ -212,7 +212,7 @@ def test_the_position_is_the_headings_own(robot_type: Type[AbstractRobot]):
     base_pose = mobile_base.pose_facing(heading)
 
     np.testing.assert_allclose(
-        base_pose.to_position().to_np(), heading.to_position().to_np(), atol=1e-9
+        base_pose.position.to_np(), heading.position.to_np(), atol=1e-9
     )
     assert base_pose.reference_frame is heading.reference_frame
 

@@ -166,8 +166,8 @@ class ReachAction(
                 threshold=kwargs["grasp_detection_threshold"],
             ),
             allclose(
-                variable_from(object_body).global_pose.to_position(),
-                variable_from(end_effector.tool_frame).global_pose.to_position(),
+                variable_from(object_body).global_pose.position,
+                variable_from(end_effector.tool_frame).global_pose.position,
                 atol=3e-2,
             ),
         )

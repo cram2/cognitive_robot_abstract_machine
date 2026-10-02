@@ -656,8 +656,8 @@ class Connection6DoF(Connection):
         local_kinematics = self._calculate_local_kinematics(
             self._world.transform(transformation, self.parent)
         )
-        position = local_kinematics.to_position()
-        orientation = local_kinematics.to_rotation_matrix().to_quaternion()
+        position = local_kinematics.position
+        orientation = local_kinematics.to_rotation_matrix().quaternion
         with self._world._world_lock:
             self._world.state[self.x.id].position = position[0]
             self._world.state[self.y.id].position = position[1]
@@ -780,7 +780,7 @@ class WheeledDrive(ActiveConnection, HasUpdateState, ABC):
         :param transformation: The desired parent-to-child origin.
         """
         local_kinematics = self._calculate_local_kinematics(transformation)
-        position = local_kinematics.to_position()
+        position = local_kinematics.position
         roll, pitch, yaw = local_kinematics.to_rotation_matrix().to_rpy()
         with self._world._world_lock:
             self._world.state[self.x.id].position = position.x

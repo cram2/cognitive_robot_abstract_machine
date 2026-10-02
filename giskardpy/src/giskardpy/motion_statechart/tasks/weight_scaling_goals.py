@@ -45,7 +45,7 @@ class MaxManipulability(ConvergingTask):
         artifacts = NodeArtifacts()
         root_P_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()[:3]
+        ).position[:3]
 
         joint_symbols = root_P_tip.free_variables()
         position_expression = sm.vstack([root_P_tip])

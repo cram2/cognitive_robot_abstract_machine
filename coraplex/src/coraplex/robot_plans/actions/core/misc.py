@@ -161,11 +161,11 @@ class MoveToReach(ActionDescription, HasTcpGoalThresholds):
     def _action_plan(self) -> PlanNode:
         grasp_orientation = self.grasp_description.grasp_orientation()
         target_pose = Pose(
-            self.target_pose_end_effector.to_position(),
+            self.target_pose_end_effector.position,
             (
                 self.target_pose_end_effector.to_rotation_matrix()
                 @ grasp_orientation.to_rotation_matrix()
-            ).to_quaternion(),
+            ).quaternion,
             self.target_pose_end_effector.reference_frame,
         )
         return sequential(

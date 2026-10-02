@@ -114,7 +114,7 @@ class GraspDescription:
             body.global_pose.to_rotation_matrix().inverse()
             @ end_effector.tool_frame.global_pose.to_rotation_matrix()
         )
-        return body_R_tool.to_quaternion()
+        return body_R_tool.quaternion
 
     def pose_sequence(
         self, target_T_grasp_pose: Pose, body: Body = None, reverse: bool = False
@@ -143,8 +143,8 @@ class GraspDescription:
             @ grasp_pose_R_gripper_goal.to_rotation_matrix()
         )
         target_T_gripper_goal: Pose = Pose(
-            position=target_T_grasp_pose.to_position(),
-            orientation=target_R_gripper_goal.to_quaternion(),
+            position=target_T_grasp_pose.position,
+            orientation=target_R_gripper_goal.quaternion,
             reference_frame=target,
         )
 
@@ -179,14 +179,14 @@ class GraspDescription:
         )
 
         # the grasp pose, not adjusted for the gripper orientation, used to calculate the lift pose
-        map_T_lift = (map_T_grasp @ grasp_T_lift).to_position()
+        map_T_lift = (map_T_grasp @ grasp_T_lift).position
 
         # the result is transformed to the target frame
         target_P_lift = world.transform(map_T_lift, target)
 
         # the lift pose is adjusted for the gripper orientation, but without rotating the point we want to grasp
         lift_pose = Pose(
-            target_P_lift, target_T_gripper_goal.to_quaternion(), reference_frame=target
+            target_P_lift, target_T_gripper_goal.quaternion, reference_frame=target
         )
 
         sequence = [pre_pose, target_T_gripper_goal_copy, lift_pose]
@@ -364,8 +364,8 @@ class GraspDescription:
                 False,
             )
 
-        map_P_object = map_T_object.to_position()
-        map_P_robot = map_T_robot.to_position()
+        map_P_object = map_T_object.position
+        map_P_robot = map_T_robot.position
 
         map_V_robot_to_object = map_P_robot - map_P_object
 
@@ -530,8 +530,8 @@ class GraspPose(Pose):
         grasp_description: GraspDescription,
     ) -> GraspPose:
         return cls(
-            position=pose.to_position(),
-            orientation=pose.to_quaternion(),
+            position=pose.position,
+            orientation=pose.quaternion,
             reference_frame=pose.reference_frame,
             arm=arm,
             grasp_description=grasp_description,

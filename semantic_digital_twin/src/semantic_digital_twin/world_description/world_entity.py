@@ -1090,8 +1090,8 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
 
         :return: A 1x7 matrix of ``[x, y, z, qx, qy, qz, qw]``.
         """
-        position = parent_T_child.to_position()[:3]
-        orientation = parent_T_child.to_quaternion()
+        position = parent_T_child.position[:3]
+        orientation = parent_T_child.quaternion
         return Matrix.vstack([position, orientation]).T
 
     def origin_as_position_quaternion(self) -> Matrix:

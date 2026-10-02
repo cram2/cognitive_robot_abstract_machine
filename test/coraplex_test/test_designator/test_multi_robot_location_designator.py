@@ -202,7 +202,7 @@ def test_deferred_location_reflects_state_changed_after_construction():
     moving_pose = {"value": Pose.from_xyz_rpy(0.0, 0.0, 0.0)}
 
     def build_poses() -> List[Pose]:
-        observed_positions.append(moving_pose["value"].to_position().to_list())
+        observed_positions.append(moving_pose["value"].position.to_list())
         return [moving_pose["value"]]
 
     domain_variable = variable(Pose, domain=DeferredLocation(build_poses))
@@ -233,8 +233,8 @@ def test_new_reachability_location_pose(
         )
 
         pose = next(iter(location))
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
+    assert len(pose.position.to_list()) == 4
+    assert len(pose.quaternion.to_list()) == 4
 
 
 def test_new_reachability_location_body(
@@ -256,8 +256,8 @@ def test_new_reachability_location_body(
         )
 
         pose = next(iter(location))
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
+    assert len(pose.position.to_list()) == 4
+    assert len(pose.quaternion.to_list()) == 4
 
 
 def test_merge_reachability_location(multiple_robot_simple_apartment_context):
@@ -283,8 +283,8 @@ def test_merge_reachability_location(multiple_robot_simple_apartment_context):
         merged_location = location_body & location_pose
         pose = next(iter(merged_location))
 
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
+    assert len(pose.position.to_list()) == 4
+    assert len(pose.quaternion.to_list()) == 4
 
 
 def test_visibility_location_pose(multiple_robot_simple_apartment_context):
@@ -305,8 +305,8 @@ def test_visibility_location_pose(multiple_robot_simple_apartment_context):
 
         pose = next(iter(location))
 
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
+    assert len(pose.position.to_list()) == 4
+    assert len(pose.quaternion.to_list()) == 4
 
 
 def test_visibility_location_body(multiple_robot_simple_apartment_context):
@@ -325,8 +325,8 @@ def test_visibility_location_body(multiple_robot_simple_apartment_context):
 
         pose = next(iter(location))
 
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
+    assert len(pose.position.to_list()) == 4
+    assert len(pose.quaternion.to_list()) == 4
 
 
 def test_visibility_reachability_merge(multiple_robot_simple_apartment_context):
@@ -354,9 +354,8 @@ def test_visibility_reachability_merge(multiple_robot_simple_apartment_context):
 
         pose = next(iter(location))
 
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
-
+    assert len(pose.position.to_list()) == 4
+    assert len(pose.quaternion.to_list()) == 4
 
 
 def test_giskard_location_pose(multiple_robot_simple_apartment_context):
@@ -387,6 +386,5 @@ def test_giskard_location_pose(multiple_robot_simple_apartment_context):
 
         pose = next(iter(location))
 
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
-
+    assert len(pose.position.to_list()) == 4
+    assert len(pose.quaternion.to_list()) == 4

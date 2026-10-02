@@ -274,6 +274,21 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         return self._world._world_lock
 
     @property
+    def data(self) -> List[float]:
+        """
+        :return: The derivatives of all degrees of freedom as one flat list, one
+            derivative after the other.
+        """
+        return self._data.ravel().tolist()
+
+    @property
+    def ids(self) -> List[UUID]:
+        """
+        :return: The ids of the degrees of freedom, in column order.
+        """
+        return self._ids
+
+    @property
     def positions(self) -> np.ndarray:
         return self.get_derivative(Derivatives.position)
 

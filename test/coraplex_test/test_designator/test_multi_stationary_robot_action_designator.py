@@ -194,8 +194,8 @@ def test_reach_action_multi(stationary_block_context):
         plan.perform()
 
     end_effector_pose = left_arm.end_effector.tool_frame.global_transform
-    end_effector_position = end_effector_pose.to_position().to_np()
-    end_effector_orientation = end_effector_pose.to_quaternion().to_np()
+    end_effector_position = end_effector_pose.position.to_np()
+    end_effector_orientation = end_effector_pose.quaternion.to_np()
 
     target_orientation = grasp_description.grasp_orientation()
 
@@ -339,7 +339,7 @@ def test_place_multi(stationary_block_context, place_position):
             world.get_body_by_name("box1"),
         )
     box_body = world.get_body_by_name("box1")
-    milk_position = box_body.global_transform.to_position().to_np()
+    milk_position = box_body.global_transform.position.to_np()
 
     assert milk_position[:3] == pytest.approx(place_position.to_list()[:3], abs=0.01)
     plan.validate()
@@ -380,5 +380,5 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
     tip_pose = right_arm.end_effector.tool_frame.global_transform
     expected = waypoints.poses[-1]
 
-    assert np.allclose(tip_pose.to_position(), expected.to_position(), atol=0.01)
-    assert np.allclose(tip_pose.to_quaternion(), expected.to_quaternion(), atol=0.01)
+    assert np.allclose(tip_pose.position, expected.position, atol=0.01)
+    assert np.allclose(tip_pose.quaternion, expected.quaternion, atol=0.01)

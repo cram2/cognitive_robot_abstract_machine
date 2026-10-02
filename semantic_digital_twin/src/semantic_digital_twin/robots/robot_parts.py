@@ -494,9 +494,7 @@ class KinematicChain(AbstractRobotPart, ABC):
             dist = (
                 connection.dof.limits.upper.position
                 if isinstance(connection, PrismaticConnection)
-                else parent_pose.to_position().euclidean_distance(
-                    child_pose.to_position()
-                )
+                else parent_pose.position.euclidean_distance(child_pose.position)
             )
             length += dist
         return length
@@ -560,7 +558,7 @@ class Camera(Sensor, ABC):
         root_T_camera = self.root.global_transform
         root_V_forward = root_T_camera.to_rotation_matrix() @ self.forward_facing_axis
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=root_T_camera.to_position(),
+            point=root_T_camera.position,
             rotation_matrix=RotationMatrix.from_x_axis(root_V_forward),
             reference_frame=root_T_camera.reference_frame,
         )
@@ -711,7 +709,7 @@ class MobileBase(AbstractRobotPart, Generic[TGenericDrive], ABC):
         """
         base_R_forward = RotationMatrix.from_vectors(x=self.forward_axis, z=Vector3.Z())
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            heading.to_position(),
+            heading.position,
             heading.to_rotation_matrix() @ base_R_forward.inverse(),
             reference_frame=heading.reference_frame,
         ).to_pose()

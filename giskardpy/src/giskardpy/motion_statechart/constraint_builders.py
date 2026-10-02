@@ -147,8 +147,8 @@ class GeometricConstraintBuilder:
         # -0.0001 preserves the old behavior from before this goal was refactored
         hack = RotationMatrix.from_axis_angle(Vector3.Z(), -0.0001)
         frame_R_current = frame_R_current.dot(hack)
-        q_actual = frame_R_current.to_quaternion()
-        q_goal = frame_R_goal.to_quaternion()
+        q_actual = frame_R_current.quaternion
+        q_goal = frame_R_goal.quaternion
         q_goal = sm.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
         q_error = q_actual.diff(q_goal)
 
@@ -209,7 +209,7 @@ class GeometricConstraintBuilder:
             should depend on active dofs.
         :param max_velocity: rad/s
         """
-        root_Q_tipCurrent = frame_R_current.to_quaternion()
+        root_Q_tipCurrent = frame_R_current.quaternion
         angle_error = root_Q_tipCurrent.to_axis_angle()[1]
         self.collection.add_velocity_constraint(
             upper_velocity_limit=max_velocity,

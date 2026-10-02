@@ -357,11 +357,11 @@ def translate_pose_along_local_axis(
     rot_matrix = pose.to_rotation_matrix().to_np()[:3, :3]
     translation_in_world = rot_matrix @ normalized_translation_vector
     scaled_translation_vector = (
-        np.array(pose.to_position().to_list()[:3]) + translation_in_world * distance
+        np.array(pose.position.to_list()[:3]) + translation_in_world * distance
     )
 
     return Pose(
         Point3.from_iterable(scaled_translation_vector),
-        pose.to_quaternion(),
+        pose.quaternion,
         reference_frame=pose.reference_frame,
     )

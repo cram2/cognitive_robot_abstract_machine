@@ -245,5 +245,5 @@ if len(robot_world.get_semantic_annotations_by_type(PR2)) != 1: raise ExerciseVe
 odom_body = robot_world.get_body_by_name("odom")
 if odom_body.parent_connection.parent is not robot_world.root: raise ExerciseVerificationFailed("odom hangs off the world root.")
 root_T_odom = robot_world.compute_forward_kinematics(robot_world.root, odom_body)
-if not abs(root_T_odom.to_position().to_np()[0] - 1.0) < 1e-6: raise ExerciseVerificationFailed("The localization pose should apply.")
+if not abs(root_T_odom.position.to_np()[0] - 1.0) < 1e-6: raise ExerciseVerificationFailed("The localization pose should apply.")
 ```

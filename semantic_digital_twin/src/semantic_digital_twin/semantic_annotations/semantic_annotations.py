@@ -587,7 +587,7 @@ class Door(HasHandle, HasMechanicalJoint):
             raise MissingSemanticAnnotationError(self.__class__, Handle)
 
         connection = self.handle.root.parent_connection
-        door_P_handle = connection.origin_expression.to_position()
+        door_P_handle = connection.origin_expression.position
         scale = self.root.collision.scale
         world_T_door = self.root.global_transform
 

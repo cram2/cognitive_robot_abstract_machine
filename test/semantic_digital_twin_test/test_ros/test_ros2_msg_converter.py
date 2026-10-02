@@ -38,8 +38,8 @@ def test_convert_transform(cylinder_bot_world):
     transformation_matrix = Ros2ToSemDTConverter.convert(
         transform, world=cylinder_bot_world
     )
-    position = transformation_matrix.to_position().evaluate()
-    rotation = transformation_matrix.to_quaternion().evaluate()
+    position = transformation_matrix.position.evaluate()
+    rotation = transformation_matrix.quaternion.evaluate()
     assert position[0] == transform.transform.translation.x
     assert position[1] == transform.transform.translation.y
     assert position[2] == transform.transform.translation.z
@@ -134,8 +134,8 @@ def test_convert_pose_stamped(cylinder_bot_world):
 
     pose = Ros2ToSemDTConverter.convert(pose_msg, world=cylinder_bot_world)
 
-    pos = pose.to_position().evaluate()
-    quat = pose.to_quaternion().evaluate()
+    pos = pose.position.evaluate()
+    quat = pose.quaternion.evaluate()
 
     assert pos[0] == pose_msg.pose.position.x
     assert pos[1] == pose_msg.pose.position.y
@@ -164,8 +164,8 @@ def test_convert_pose(cylinder_bot_world):
 
     pose = Ros2ToSemDTConverter.convert(pose_msg, world=cylinder_bot_world)
 
-    pos = pose.to_position().evaluate()
-    quat = pose.to_quaternion().evaluate()
+    pos = pose.position.evaluate()
+    quat = pose.quaternion.evaluate()
 
     assert pos[0] == pose_msg.position.x
     assert pos[1] == pose_msg.position.y

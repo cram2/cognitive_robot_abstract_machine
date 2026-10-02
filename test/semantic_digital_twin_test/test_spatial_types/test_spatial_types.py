@@ -80,7 +80,7 @@ class TestRotationMatrix:
         q = Quaternion(reference_frame=reference_frame)
 
         assert m1.reference_frame == reference_frame
-        assert m1.to_quaternion().reference_frame == reference_frame
+        assert m1.quaternion.reference_frame == reference_frame
         assert m1.to_axis_angle()[0].reference_frame == reference_frame
         assert (
             RotationMatrix.from_rpy(reference_frame=reference_frame).reference_frame
@@ -424,7 +424,7 @@ class TestRotationMatrix:
         assert np.allclose(yaw, 0.3, atol=1e-10)
 
         # Test conversion to quaternion
-        q = r.to_quaternion()
+        q = r.quaternion
         assert isinstance(q, Quaternion)
 
         # Round-trip krrood_test: R -> Q -> R should preserve rotation
@@ -531,7 +531,7 @@ class TestRotationMatrix:
         """
         # Create rotation via different methods
         r_rpy = RotationMatrix.from_rpy(0.1, 0.2, 0.3)
-        q = r_rpy.to_quaternion()
+        q = r_rpy.quaternion
         r_from_q = RotationMatrix.from_quaternion(q)
 
         # Should be identical
@@ -1375,8 +1375,8 @@ class TestTransformationMatrix:
         assert (t2 @ t1).child_frame == child_frame
         assert t1.inverse().reference_frame == child_frame
         assert t1.inverse().child_frame == reference_frame
-        assert t1.to_position().reference_frame == reference_frame
-        assert t1.to_quaternion().reference_frame == reference_frame
+        assert t1.position.reference_frame == reference_frame
+        assert t1.quaternion.reference_frame == reference_frame
         assert t1.to_translation_matrix().reference_frame == reference_frame
         assert t1.to_rotation_matrix().reference_frame == reference_frame
 
@@ -1436,7 +1436,7 @@ class TestTransformationMatrix:
         assert isinstance(composed, Quaternion)
         np.testing.assert_allclose(
             composed.to_np(),
-            transformation.to_quaternion().multiply(quaternion).to_np(),
+            transformation.quaternion.multiply(quaternion).to_np(),
             atol=1e-12,
         )
 
@@ -1557,7 +1557,7 @@ class TestTransformationMatrix:
         r1 = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             Point3(x, y, z),
             RotationMatrix.from_quaternion(Quaternion(qx, qy, qz, qw)),
-        ).to_position()
+        ).position
         r2 = [x, y, z, 1]
         for i, e in enumerate(r2):
             assert np.allclose(r1[i], e)
@@ -1815,7 +1815,7 @@ class TestTransformationMatrix:
         t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
 
         # Extract position
-        position = t.to_position()
+        position = t.position
         assert isinstance(position, Point3)
         assert position.x.to_np() == 1
         assert position.y.to_np() == 2
@@ -1842,7 +1842,7 @@ class TestTransformationMatrix:
         assert translation.z.to_np() == 3
 
         # Extract quaternion
-        quaternion = t.to_quaternion()
+        quaternion = t.quaternion
         assert isinstance(quaternion, Quaternion)
 
     def test_frame_properties(self):
@@ -2052,7 +2052,7 @@ class TestTransformationMatrix:
             quat_z=q[2],
         )
 
-        q_extracted = t.to_quaternion()
+        q_extracted = t.quaternion
 
         t_roundtrip = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=1,

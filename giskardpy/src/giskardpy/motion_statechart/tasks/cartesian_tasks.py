@@ -171,7 +171,7 @@ class CartesianPosition(CartesianTask):
         # Get current tip position in root frame
         root_P_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
 
         # Add constraints to move tip towards goal
         artifacts.geometry.add_point_goal_constraints(
@@ -283,7 +283,7 @@ class CartesianPositionTrajectory(CartesianTask):
         # Get current tip position in root frame
         root_P_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
 
         # Add constraints to move tip towards goal
         artifacts.geometry.add_point_goal_constraints(
@@ -349,7 +349,7 @@ class CartesianPositionTrajectory(CartesianTask):
         goal_reference_frame_T_tip = (
             self.root_T_goal_reference_frame.inverse() @ root_T_tip
         )
-        goal_reference_frame_P_tip = goal_reference_frame_T_tip.to_position()[:-1]
+        goal_reference_frame_P_tip = goal_reference_frame_T_tip.position[:-1]
         self._compiled_goal_reference_frame_P_tip = goal_reference_frame_P_tip.compile(
             parameters=VariableParameters.from_lists(
                 context.world.state.position_float_variables,
@@ -527,10 +527,10 @@ class CartesianPositionStraight(CartesianTask):
         """
         artifacts = NodeArtifacts()
         root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
-        root_P_line_start = self._line_start_binding.root_T_tip.to_position()
+        root_P_line_start = self._line_start_binding.root_T_tip.position
         root_P_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
 
         root_V_line = root_P_goal - root_P_line_start
         # scale normalizes in place, so the length has to be read before it
@@ -697,7 +697,7 @@ class CartesianPose(Parallel):
                 name=f"{self.name}/position",
                 root_link=self.root_link,
                 tip_link=self.tip_link,
-                goal_point=self.goal_pose.to_position(),
+                goal_point=self.goal_pose.position,
                 reference_velocity=self.reference_linear_velocity,
                 threshold=self.translation_threshold,
                 weight=self.weight,
@@ -763,7 +763,7 @@ class CartesianPositionVelocityLimit(Task):
         artifacts = NodeArtifacts()
         root_P_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
         artifacts.geometry.add_translational_velocity_limit(
             frame_P_current=root_P_tip,
             max_velocity=self.max_linear_velocity,

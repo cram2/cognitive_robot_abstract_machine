@@ -69,7 +69,7 @@ class ProcTHORTestCase(unittest.TestCase):
         result = unity_to_semantic_digital_twin_transform(
             HomogeneousTransformationMatrix(data=m)
         )
-        self.assertAlmostEqual(result.to_position().to_np()[1], -1.0)
+        self.assertAlmostEqual(result.position.to_np()[1], -1.0)
         np.testing.assert_allclose(
             result.to_rotation_matrix().to_np()[:3, :3], np.eye(3)
         )
@@ -83,7 +83,7 @@ class ProcTHORTestCase(unittest.TestCase):
         result = unity_to_semantic_digital_twin_transform(
             HomogeneousTransformationMatrix(data=m)
         )
-        self.assertAlmostEqual(float(result.to_position().x), 2.0, places=6)
+        self.assertAlmostEqual(float(result.position.x), 2.0, places=6)
         np.testing.assert_allclose(
             result.to_rotation_matrix().to_np()[:3, :3], np.eye(3)
         )

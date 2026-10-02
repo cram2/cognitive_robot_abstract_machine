@@ -51,11 +51,9 @@ def tool_frame_height(giskard: StretchTester) -> float:
     The height of the tool frame above the base, which the lift motions change.
     """
     base_link = giskard.world.get_kinematic_structure_entity_by_name("base_link")
-    return (
-        giskard.world.compute_forward_kinematics(root=base_link, tip=giskard.tool_frame)
-        .to_position()
-        .to_np()[2]
-    )
+    return giskard.world.compute_forward_kinematics(
+        root=base_link, tip=giskard.tool_frame
+    ).position.to_np()[2]
 
 
 # %% controller setup
