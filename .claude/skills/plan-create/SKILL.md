@@ -119,7 +119,7 @@ written down rather than after: bulk-fetch `mcp__github__list_pull_requests`
 (`state: "all"`, paginated) for the repo, and use `mcp__github__pull_request_read`
 for anything outside that page window or referenced by number in the source
 doc. Set each item's `status` from what's actually true (open/draft →
-`in_progress` or `not_started` as appropriate, merged → `done`, closed
+`in progress` or `not started` as appropriate, merged → `done`, closed
 unmerged → `deferred` with a note), not from what a stale doc or a
 half-remembered conversation claims. If the source material and live
 GitHub disagree, that disagreement itself is worth a line in the item's
@@ -159,8 +159,8 @@ to it should check which kind it actually is rather than assuming
 Follow the schema in `plan-schema.md` exactly: `schema_version: 1`, `id`,
 `title`, `description`, `default_repository`, `tracking_issue` (if step 5 created
 one), `waves[]`, `tracks[]` (each tagged with a `wave`), `items[]` (flat,
-each tagged with a `track`, `status` from the thin enum `not_started |
-in_progress | blocked | deferred | done`, `depends_on` — a *list* of item
+each tagged with a `track`, `status` from the thin enum `not started |
+in progress | blocked | deferred | done`, `depends_on` — a *list* of item
 ids, so an item can depend on more than one prerequisite (e.g. a track that
 only starts once two other tracks have both landed) — and optional
 `pull_request_number`/`session`/`notes`/`blockers`).

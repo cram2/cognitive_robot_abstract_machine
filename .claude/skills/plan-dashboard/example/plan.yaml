@@ -34,7 +34,7 @@ items:
     title: Circuit breaker around the retry loop
     branch: retry-circuit-breaker
     track: retry-logic
-    status: in_progress
+    status: in progress
     pull_request_number: 102
     depends_on: [retry-backoff-strategy]
     notes: Stacks directly on the backoff strategy branch.
@@ -52,7 +52,7 @@ items:
     title: Retry metrics dashboard
     branch: retry-metrics-dashboard
     track: observability
-    status: not_started
+    status: not started
     depends_on: [retry-backoff-strategy]
 
   - id: retry-fallback-queue
@@ -67,6 +67,6 @@ items:
     title: Feature flag for the new retry behavior
     branch: retry-config-flag
     track: observability
-    status: in_progress
+    status: in progress
     pull_request_number: 104
     notes: No dependencies, so it can be reviewed independently.

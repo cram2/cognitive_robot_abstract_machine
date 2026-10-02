@@ -27,7 +27,7 @@ item:
 
 ```bash
 source .claude/hooks/resolve-personal-notes-config.sh
-python3 "${PLAN_ITEM_MODE_SCRIPT}" resolve --skill <kickoff|resolve>
+python3 -m "${PLAN_ITEM_MODE_MODULE}" resolve --skill <kickoff|resolve>
 ```
 
 It prints one JSON object: `mode` (`ask` | `auto` | `plan`), `source`
@@ -44,7 +44,7 @@ To pin a mode, `/plan-item-mode <mode> [kickoff|resolve|both]` — or the script
 it calls, which takes `--skill` once per skill so pinning both is one push:
 
 ```bash
-python3 "${PLAN_ITEM_MODE_SCRIPT}" set --skill kickoff --skill resolve --mode <mode>
+python3 -m "${PLAN_ITEM_MODE_MODULE}" set --skill kickoff --skill resolve --mode <mode>
 ```
 
 This writes the personal-notes branch, so don't run it unprompted. Do run it
