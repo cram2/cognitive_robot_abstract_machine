@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cached_property
 
-from geometry_msgs.msg import PoseStamped
 from typing_extensions import Optional, List
 
 from segmind.datastructures.object_tracker import (
@@ -131,13 +130,14 @@ class MotionEvent(EventWithTrackedObjects, ABC):
     vice versa.
     """
 
-    start_pose: Pose = field(default_factory=Pose)
+    world_T_start_pose: Pose = field(kw_only=True)
     """
-    The pose of the object at the start of the event.
+    The pose of the object at the start of the event, in the world frame.
     """
-    current_pose: Pose = field(default_factory=Pose)
+
+    world_T_current_pose: Pose = field(kw_only=True)
     """
-    The pose of the object at the end of the event.
+    The pose of the object at the end of the event, in the world frame.
     """
 
 
@@ -198,9 +198,9 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     Bounding box of the object.
     """
 
-    pose: Pose = field(init=False)
+    world_T_tracked_object: Pose = field(init=False)
     """
-    Pose of the object.
+    Pose of the object, in the world frame.
     """
 
     with_object_bounding_box: Optional[VolumetricBoundingBox] = field(
@@ -210,9 +210,9 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     Bounding box of the second object in contact.
     """
 
-    with_object_pose: Optional[PoseStamped] = field(init=False, default=None)
+    world_T_with_object: Optional[Pose] = field(init=False, default=None)
     """
-    Pose of the second object in contact.
+    Pose of the second object in contact, in the world frame.
     """
 
     def __post_init__(self):
@@ -220,14 +220,14 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
             self.tracked_object.collision.combined_mesh,
             origin=self.tracked_object.global_pose.to_homogeneous_matrix(),
         )
-        self.pose = self.tracked_object.global_pose
+        self.world_T_tracked_object = self.tracked_object.global_pose
 
         if self.with_object is not None:
             self.with_object_bounding_box = VolumetricBoundingBox.from_mesh(
                 self.with_object.collision.combined_mesh,
                 origin=self.with_object.global_pose.to_homogeneous_matrix(),
             )
-            self.with_object_pose = self.with_object.global_pose
+            self.world_T_with_object = self.with_object.global_pose
 
 
 @dataclass(init=False, unsafe_hash=True)
@@ -246,6 +246,23 @@ class LossOfContactEvent(AbstractContactEvent):
     """
 
     ...
+
+
+@dataclass(unsafe_hash=True)
+class GraspEvent(EventWithTrackedObjects):
+    """
+    An agent has taken hold of an object.
+
+    ..note:: :attr:`with_object` is the tool frame the object is held by, while what
+        touches the object is the hand around that frame.
+    """
+
+
+@dataclass(unsafe_hash=True)
+class LossOfGraspEvent(EventWithTrackedObjects):
+    """
+    An agent that had hold of an object has let go of it.
+    """
 
 
 @dataclass(unsafe_hash=True)
