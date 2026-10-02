@@ -35,7 +35,9 @@ if TYPE_CHECKING:
     )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.geometry import Scale
+    from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
     from semantic_digital_twin.world_description.world_entity import (
+        Connection,
         SemanticAnnotation,
         WorldEntity,
         WorldEntityWithID,
@@ -1404,6 +1406,141 @@ class MissingDefaultCameraError(UsageError):
 
     def error_message(self) -> str:
         return f"Robot {self.robot.name} does not have a default camera."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class NoLaserScanReceived(UsageError):
+    """
+    Raised when reading a lidar that has not received a scan yet.
+    """
+
+    topic_name: str
+    """
+    The topic the lidar is waiting for a scan on.
+    """
+
+    def error_message(self) -> str:
+        return f"No laser scan has been received on '{self.topic_name}' yet."
+
+    def suggest_correction(self) -> str:
+        return f"check that something publishes on '{self.topic_name}' and that the node has been spun since."
+
+
+@dataclass
+class AlreadyTrackedByTfFrameError(UsageError):
+    """
+    Raised when a connection is registered for tf tracking a second time.
+    """
+
+    connection_name: str
+    """
+    The name of the connection that is already tracked.
+    """
+
+    tf_parent_frame: str
+    """
+    The tf parent frame the connection is already tracked with.
+    """
+
+    tf_child_frame: str
+    """
+    The tf child frame the connection is already tracked with.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Connection '{self.connection_name}' is already tracked with a tf frame: "
+            f"'{self.tf_parent_frame}'<-'{self.tf_child_frame}'"
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class UnboundMessageTypeError(UsageError):
+    """
+    Raised when a topic subscriber does not name the type of its messages.
+    """
+
+    subscriber_type: Type
+    """
+    The subscriber whose message type is unknown.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.subscriber_type.__name__}' does not name the type of the "
+            f"messages it reads."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Declare it in the bases of '{self.subscriber_type.__name__}', as in "
+            f"'LatestMessageSubscriber[Odometry]'."
+        )
+
+
+@dataclass
+class ConnectionCannotBeTrackedByTfFrameError(UsageError):
+    """
+    Raised when a connection without 6 degrees of freedom is registered for tf tracking.
+    """
+
+    connection: Connection
+    """
+    The connection that cannot be tracked.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Can only sync Connection6DoF with tf, but '{str(self.connection.name)}' is of "
+            f"type '{type(self.connection).__name__}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class InvalidBeamCount(UsageError):
+    """
+    Raised when deriving a scan pattern from a beam count too small to space beams by.
+    """
+
+    beam_count: int
+    """
+    The beam count that was rejected.
+    """
+
+    def error_message(self) -> str:
+        return f"A scan pattern cannot be derived from {self.beam_count} beams."
+
+    def suggest_correction(self) -> str:
+        return "give at least two beams, or state the angle increment directly."
+
+
+@dataclass
+class InvalidScanPattern(UsageError):
+    """
+    Raised when a scan pattern describes a sweep a scanner cannot perform.
+    """
+
+    pattern: ScanPattern
+    """
+    The pattern that was rejected.
+    """
+
+    reason: str
+    """
+    What about the pattern is wrong.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid scan pattern {self.pattern}: {self.reason}."
 
     def suggest_correction(self) -> str:
         return ""

@@ -93,15 +93,11 @@ class StretchVelocityInterface(RobotInterfaceConfig):
             tf_child_frame="odom",
         )
 
-        diff_drive = self.world.get_connections_by_type(DifferentialDrive)[0]
-        self.sync_odometry_topic(
-            "/odom",
-            diff_drive,
-        )
+        self.sync_robot_parts()
 
+        diff_drive = self.world.get_connections_by_type(DifferentialDrive)[0]
         self.add_base_cmd_velocity(cmd_vel_topic="/stretch/cmd_vel", joint=diff_drive)
 
-        self.sync_joint_state_topic("/joint_states")
         self.add_joint_velocity_group_controller(
             cmd_topic="/joint_velocity_cmd",
             connections=self.velocity_controlled_joint_names(),

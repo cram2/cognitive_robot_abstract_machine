@@ -19,7 +19,7 @@ class DAiSyVelocityInterface(RobotInterfaceConfig):
     """
 
     def setup(self):
-        self.sync_joint_state_topic("/joint_states")
+        self.sync_robot_parts()
         joints_left = [
             DAiSyJoint.LEFT_SHOULDER_PAN,
             DAiSyJoint.LEFT_SHOULDER_LIFT,
