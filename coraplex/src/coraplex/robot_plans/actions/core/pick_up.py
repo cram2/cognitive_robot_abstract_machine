@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Any, Dict, Optional
 
-from coraplex.locations.pose_validator import AreReachableBy, IsObjectReachableBy
+from coraplex.locations.pose_validator import IsObjectReachableBy
 from coraplex.plans.attachment_nodes import ReAttachNode
 from coraplex.plans.plan_node import PlanNode
 from krrood.entity_query_language.core.variable import Variable
@@ -39,7 +39,6 @@ from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
-from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
@@ -108,7 +107,11 @@ class ReachAction(
         ]
         if self.open_gripper_at_pre_pose:
             children.append(
-                MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm)
+                MoveGripperMotion(
+                    specification=ViewManager.get_end_effector_view(
+                        self.arm, self.robot
+                    ).default_specification(GripperState.OPEN)
+                )
             )
         children.append(
             MoveToolCenterPointMotion(
@@ -231,10 +234,13 @@ class PickUpAction(
                     orientation_threshold=self.orientation_threshold,
                 ),
                 MoveGripperMotion(
-                    motion=GripperState.CLOSE,
-                    gripper=self.arm,
+                    specification=ViewManager.get_end_effector_view(
+                        self.arm, self.robot
+                    ).default_specification(
+                        GripperState.CLOSE,
+                        finger_velocity=self.grasp_closing_velocity,
+                    ),
                     allow_gripper_collision=True,
-                    finger_velocity=self.grasp_closing_velocity,
                     stall_minimum_time=self.grasp_stall_minimum_time,
                     tolerate_stall=self.tolerate_grasp_stall,
                 ),
@@ -348,7 +354,11 @@ class GraspingAction(ActionDescription, HasTcpGoalThresholds):
                     orientation_threshold=self.orientation_threshold,
                     allow_gripper_collision=True,
                 ),
-                MoveGripperMotion(GripperState.OPEN, self.arm),
+                MoveGripperMotion(
+                    specification=ViewManager.get_end_effector_view(
+                        self.arm, self.robot
+                    ).default_specification(GripperState.OPEN)
+                ),
                 MoveToolCenterPointMotion(
                     grasp_pose,
                     self.arm,
@@ -357,7 +367,10 @@ class GraspingAction(ActionDescription, HasTcpGoalThresholds):
                     orientation_threshold=self.orientation_threshold,
                 ),
                 MoveGripperMotion(
-                    GripperState.CLOSE, self.arm, allow_gripper_collision=True
+                    specification=ViewManager.get_end_effector_view(
+                        self.arm, self.robot
+                    ).default_specification(GripperState.CLOSE),
+                    allow_gripper_collision=True,
                 ),
             ]
         )

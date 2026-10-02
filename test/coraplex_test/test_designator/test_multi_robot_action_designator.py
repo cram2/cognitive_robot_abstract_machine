@@ -269,8 +269,10 @@ def multiple_robot_apartment_context(
         if isinstance(view, HasMobileBase)
         else False
     )
-    yield world, view, Context(
-        world, view, alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS
+    yield (
+        world,
+        view,
+        Context(world, view, alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS),
     )
     view.mobile_base.full_body_controlled = full_body_controlled
     snapshot.restore()
@@ -315,7 +317,14 @@ def test_navigate_multi(multiple_robot_apartment_context, rclpy_node):
 def test_move_gripper_multi(multiple_robot_apartment_context):
     world, view, context = multiple_robot_apartment_context
 
-    plan = execute_single(SetGripperAction(Arms.LEFT, GripperState.OPEN), context)
+    plan = execute_single(
+        SetGripperAction(
+            specification=ViewManager.get_end_effector_view(
+                Arms.LEFT, view
+            ).default_specification(GripperState.OPEN)
+        ),
+        context,
+    )
 
     with simulated_robot:
         plan.perform()
@@ -327,7 +336,14 @@ def test_move_gripper_multi(multiple_robot_apartment_context):
     for connection, target in open_state.items():
         assert connection.position == pytest.approx(target, abs=0.02)
 
-    plan = execute_single(SetGripperAction(Arms.LEFT, GripperState.CLOSE), context)
+    plan = execute_single(
+        SetGripperAction(
+            specification=ViewManager.get_end_effector_view(
+                Arms.LEFT, view
+            ).default_specification(GripperState.CLOSE)
+        ),
+        context,
+    )
 
     with simulated_robot:
         plan.perform()

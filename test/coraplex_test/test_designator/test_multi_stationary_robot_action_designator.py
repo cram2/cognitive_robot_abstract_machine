@@ -209,7 +209,12 @@ def test_move_gripper_multi(stationary_block_context):
     world, view, context = stationary_block_context
 
     plan = execute_single(
-        SetGripperAction(Arms.LEFT, GripperState.OPEN), context=context
+        SetGripperAction(
+            specification=ViewManager.get_end_effector_view(
+                Arms.LEFT, view
+            ).default_specification(GripperState.OPEN)
+        ),
+        context=context,
     ).plan
 
     with simulated_robot:
@@ -223,7 +228,12 @@ def test_move_gripper_multi(stationary_block_context):
         assert connection.position == pytest.approx(target, abs=0.01)
 
     plan = execute_single(
-        SetGripperAction(Arms.LEFT, GripperState.CLOSE), context=context
+        SetGripperAction(
+            specification=ViewManager.get_end_effector_view(
+                Arms.LEFT, view
+            ).default_specification(GripperState.CLOSE)
+        ),
+        context=context,
     ).plan
 
     with simulated_robot:

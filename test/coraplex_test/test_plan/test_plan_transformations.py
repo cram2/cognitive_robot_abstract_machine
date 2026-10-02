@@ -22,6 +22,7 @@ from coraplex.plans.plan_transformation import (
     PlanTransformation,
 )
 from coraplex.plans.underspecified import UnderspecifiedNode
+from coraplex.view_manager import ViewManager
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.navigation import LookAtAction, NavigateAction
@@ -84,8 +85,8 @@ class MoveGrippersBeforeTorsoMotion(InsertionTransformation[MoveTorsoAction]):
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
         return [
-            MoveGripperMotion(GripperState.OPEN, Arms.LEFT),
-            MoveGripperMotion(GripperState.CLOSE, Arms.RIGHT),
+            gripper_motion(plan_node, Arms.LEFT, GripperState.OPEN),
+            gripper_motion(plan_node, Arms.RIGHT, GripperState.CLOSE),
         ]
 
 
@@ -141,7 +142,7 @@ class MoveGripperLastInTheReachBody(InsertionTransformation[ReachAction]):
         return body
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.CLOSE, Arms.RIGHT)]
+        return [gripper_motion(plan_node, Arms.RIGHT, GripperState.CLOSE)]
 
 
 def motions_of(plan_node: PlanNode) -> List[MotionNode]:
@@ -150,6 +151,25 @@ def motions_of(plan_node: PlanNode) -> List[MotionNode]:
     :return: The motions directly below the given node, in their plan order.
     """
     return [node for node in plan_node.children if isinstance(node, MotionNode)]
+
+
+def gripper_motion(
+    plan_node: PlanNode, arm: Arms, state_type: GripperState
+) -> MoveGripperMotion:
+    """
+    Build a gripper motion the way the actions do, from the end effector view of the
+    robot the plan runs for.
+
+    :param plan_node: The node the transformation is applied to, to reach the plan's
+        robot.
+    :param arm: The arm whose gripper the motion moves.
+    :param state_type: The gripper state the motion commands.
+    :return: The motion commanding that state on that arm's gripper.
+    """
+    end_effector = ViewManager.get_end_effector_view(arm, plan_node.plan.robot)
+    return MoveGripperMotion(
+        specification=end_effector.default_specification(state_type)
+    )
 
 
 # %% what makes a transformation
@@ -192,7 +212,7 @@ class MoveGripperBeforeEveryAction(InsertionTransformation[ActionNode]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.CLOSE, Arms.RIGHT)]
+        return [gripper_motion(plan_node, Arms.RIGHT, GripperState.CLOSE)]
 
 
 @dataclass
@@ -205,7 +225,7 @@ class TransformationWithoutPosition(InsertionTransformation[MoveTorsoAction]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.OPEN, Arms.LEFT)]
+        return [gripper_motion(plan_node, Arms.LEFT, GripperState.OPEN)]
 
 
 @dataclass
@@ -301,7 +321,7 @@ class MoveGripperBeforeHighTorso(InsertionTransformation[MoveTorsoAction]):
         return motion_of(plan_node)
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.OPEN, Arms.LEFT)]
+        return [gripper_motion(plan_node, Arms.LEFT, GripperState.OPEN)]
 
 
 def test_a_transformation_the_case_needs_is_applied(pr2_apartment_context):
@@ -412,7 +432,7 @@ class MoveGripperBeforeJointMotion(InsertionTransformation[MoveJointsMotion]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: MotionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.CLOSE, Arms.RIGHT)]
+        return [gripper_motion(plan_node, Arms.RIGHT, GripperState.CLOSE)]
 
 
 def test_a_transformation_bound_to_a_motion_type_selects_the_motion_node(
@@ -453,9 +473,9 @@ def test_a_transformation_inserts_its_nodes_before_the_anchor(pr2_apartment_cont
         MoveGripperMotion,
         MoveJointsMotion,
     ]
-    assert [motion.designator.gripper for motion in motions[:2]] == [
-        Arms.LEFT,
-        Arms.RIGHT,
+    assert [motion.designator.specification.end_effector for motion in motions[:2]] == [
+        ViewManager.get_end_effector_view(Arms.LEFT, view),
+        ViewManager.get_end_effector_view(Arms.RIGHT, view),
     ]
 
 
@@ -476,9 +496,9 @@ def test_a_transformation_inserts_its_nodes_after_the_anchor(pr2_apartment_conte
         MoveGripperMotion,
         MoveGripperMotion,
     ]
-    assert [motion.designator.gripper for motion in motions[1:]] == [
-        Arms.LEFT,
-        Arms.RIGHT,
+    assert [motion.designator.specification.end_effector for motion in motions[1:]] == [
+        ViewManager.get_end_effector_view(Arms.LEFT, view),
+        ViewManager.get_end_effector_view(Arms.RIGHT, view),
     ]
 
 
@@ -907,7 +927,7 @@ class MoveLeftGripperBeforeTorso(InsertionTransformation[MoveTorsoAction]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.OPEN, Arms.LEFT)]
+        return [gripper_motion(plan_node, Arms.LEFT, GripperState.OPEN)]
 
 
 @dataclass
@@ -917,7 +937,7 @@ class MoveRightGripperBeforeTorso(MoveLeftGripperBeforeTorso):
     """
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.CLOSE, Arms.RIGHT)]
+        return [gripper_motion(plan_node, Arms.RIGHT, GripperState.CLOSE)]
 
 
 def warnings_of(caplog) -> List[str]:
@@ -966,9 +986,11 @@ def test_the_transformations_that_collide_are_still_applied(pr2_apartment_contex
     plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context)
     plan.notify()
 
-    assert [motion.designator.gripper for motion in motions_of(plan)] == [
-        Arms.LEFT,
-        Arms.RIGHT,
+    assert [
+        motion.designator.specification.end_effector for motion in motions_of(plan)
+    ] == [
+        ViewManager.get_end_effector_view(Arms.LEFT, view),
+        ViewManager.get_end_effector_view(Arms.RIGHT, view),
     ]
 
 

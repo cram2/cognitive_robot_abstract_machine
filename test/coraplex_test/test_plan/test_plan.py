@@ -35,7 +35,6 @@ from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     variable_from,
     a,
-    an,
     variable,
 )
 from krrood.parametrization.model_registries import (
@@ -43,7 +42,7 @@ from krrood.parametrization.model_registries import (
 )
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.orm.model import (
     Point3Mapping,
     QuaternionMapping,
@@ -690,11 +689,16 @@ def test_motion_order_pick_up(pr2_apartment_context):
 
     motion_names = [motion.name for motion in all_motions]
 
+    end_effector = robot_view.left_arm.end_effector
+    open_state_name = end_effector.get_joint_state_by_type(GripperState.OPEN).name.name
+    close_state_name = end_effector.get_joint_state_by_type(
+        GripperState.CLOSE
+    ).name.name
     assert motion_names == [
         "MoveTCP",
-        "OpenGripper",
+        open_state_name,
         "MoveTCP",
-        "CloseGripper",
+        close_state_name,
         "MoveTCP",
     ]
 
@@ -708,7 +712,6 @@ def test_motion_order_place(pr2_apartment_context):
     ).global_pose.to_homogeneous_matrix()
 
     with world.modify_world():
-
         world.move_branch_with_fixed_connection(
             world.get_body_by_name("milk.stl"),
             world.get_body_by_name("l_gripper_tool_frame"),
@@ -747,10 +750,12 @@ def test_motion_order_place(pr2_apartment_context):
 
     motion_names = [motion.name for motion in all_motions]
 
+    end_effector = robot_view.left_arm.end_effector
+    open_state_name = end_effector.get_joint_state_by_type(GripperState.OPEN).name.name
     assert motion_names == [
         "MoveTCP",
         "MoveTCP",
-        "OpenGripper",
+        open_state_name,
         "MoveTCP",
     ]
 

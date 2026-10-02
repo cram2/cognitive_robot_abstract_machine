@@ -147,10 +147,11 @@ class PlaceAction(
                     orientation_threshold=self.orientation_threshold,
                 ),
                 MoveGripperMotion(
-                    GripperState.OPEN,
-                    self.arm,
+                    specification=end_effector.default_specification(
+                        GripperState.OPEN,
+                        finger_velocity=self.release_opening_velocity,
+                    ),
                     allow_gripper_collision=True,
-                    finger_velocity=self.release_opening_velocity,
                 ),
                 self._retract_plan(retract_pose),
             ],

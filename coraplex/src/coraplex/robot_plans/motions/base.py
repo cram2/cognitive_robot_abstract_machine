@@ -10,13 +10,11 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.graph_node import Task, MotionStatechartNode
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.designator import Designator
-from coraplex.view_manager import ViewManager
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
 )
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from coraplex.alternative_motion_mapping import AlternativeMotion
 
 logger = logging.getLogger(__name__)
@@ -41,6 +39,19 @@ class BaseMotion(Designator):
         Will be overwritten by each motion.
         """
         pass
+
+    @classmethod
+    def handles(cls, motion: BaseMotion) -> bool:
+        """
+        Whether this alternative can be built from the given motion.
+
+        Defaults to ``True``; motions that carry a specification type override this to
+        reject motions whose specification they do not understand.
+
+        :param motion: The motion instance to check.
+        :return: True if this alternative can be built from the motion.
+        """
+        return True
 
     @property
     def motion_chart(self) -> Task:
@@ -68,25 +79,22 @@ class BaseMotion(Designator):
 
     def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
         return AlternativeMotion.check_for_alternative(
-            self.context.alternative_motion_mappings, self.robot, self.__class__
+            self.context.alternative_motion_mappings, self.robot, self
         )
 
     def _only_allow_gripper_collision_rules(
-        self, arm: Arms
+        self, end_effector: EndEffector
     ) -> list[MotionStatechartNode]:
         """
-        :param arm: The arm whose manipulator may collide with the environment.
+        :param end_effector: The end effector whose manipulator may collide with the
+            environment.
         :return: Collision rules that only allow collisions between the manipulator of
-            the given arm, together with whatever it holds, and the environment.
+            the given end effector, together with whatever it holds, and the environment.
         """
         return [
             UpdateTemporaryCollisionRules(
                 temporary_rules=[
-                    AllowCollisionForEndEffector(
-                        end_effector=ViewManager().get_end_effector_view(
-                            arm, self.robot
-                        )
-                    )
+                    AllowCollisionForEndEffector(end_effector=end_effector)
                 ]
             )
         ]

@@ -18,20 +18,21 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from coraplex.datastructures.enums import AxisIdentifier, Arms
 
 from coraplex.datastructures.trajectory import PoseTrajectory
-from coraplex.plans.factories import execute_single, sequential
-from coraplex.robot_plans.actions.base import ActionDescription, DescriptionType
+from coraplex.plans.factories import execute_single
+from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.mixins import HasMaxJointVelocity, HasTcpGoalThresholds
 from coraplex.robot_plans.motions.gripper import (
     MoveGripperMotion,
     MoveTCPWaypointsMotion,
 )
 from coraplex.robot_plans.motions.robot_body import MoveJointsMotion
-from coraplex.validation.goal_validator import create_multiple_joint_goal_validator
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
-    GripperState,
     StaticJointState,
+)
+from semantic_digital_twin.datastructures.robots.gripper_specification import (
+    GripperSpecification,
 )
 
 
@@ -72,25 +73,26 @@ class MoveTorsoAction(ActionDescription):
 @dataclass
 class SetGripperAction(ActionDescription):
     """
-    Set the gripper state of the robot.
+    Sets a gripper to the configuration its specification describes.
     """
 
-    gripper: Arms
+    specification: GripperSpecification
     """
-    The gripper that should be set.
-    """
-
-    motion: GripperState
-    """
-    The motion that should be set on the gripper.
+    The gripper configuration to reach.
     """
 
     @property
     def _action_plan(self) -> PlanNode:
-        arms = [Arms.LEFT, Arms.RIGHT] if self.gripper == Arms.BOTH else [self.gripper]
-        return sequential(
-            [MoveGripperMotion(gripper=arm, motion=self.motion) for arm in arms]
-        )
+        return execute_single(MoveGripperMotion(specification=self.specification))
+
+    @staticmethod
+    def post_condition(
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        """
+        The gripper's target joint state needs to be achieved.
+        """
+        return variable_from(kwargs["specification"].joint_state).is_achieved()
 
 
 @dataclass

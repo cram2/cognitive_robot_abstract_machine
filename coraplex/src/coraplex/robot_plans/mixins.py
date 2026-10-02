@@ -160,14 +160,7 @@ class PlaceTuningParameters:
 @dataclass
 class GripperStallToleranceParameters:
     """
-    Adds an optional finger speed and stall-tolerance to a gripper open/close motion.
-    """
-
-    finger_velocity: Optional[float] = field(default=None, kw_only=True)
-    """
-    Maximum finger joint velocity (in m/s), enforced via
-    :class:`~giskardpy.motion_statechart.tasks.joint_tasks.JointVelocityLimit`. ``None``
-    leaves the speed unconstrained.
+    Adds optional stall-tolerance to a gripper open/close motion.
     """
 
     stall_minimum_time: Optional[float] = field(default=None, kw_only=True)

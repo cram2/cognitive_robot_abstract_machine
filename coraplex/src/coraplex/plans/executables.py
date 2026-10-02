@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import AbstractContextManager, ExitStack, nullcontext
-from datetime import datetime
+from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 
 from typing_extensions import Callable, List, Dict, ClassVar, Optional, TYPE_CHECKING
@@ -29,6 +30,7 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
 from krrood.entity_query_language.factories import evaluate_condition
 from krrood.symbolic_math.symbolic_math import Scalar, trinary_logic_not
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
@@ -343,7 +345,7 @@ class GiskardExecutable(Executable):
         match GiskardExecutable.execution_type:
             case ExecutionType.SIMULATED:
                 self._execute_simulation()
-            case ExecutionType.REAL:
+            case ExecutionType.REAL | ExecutionType.SEMI_REAL:
                 self._execute_real()
             case _:
                 raise UnknownExecutionType(GiskardExecutable.execution_type)
@@ -430,6 +432,9 @@ class MoveBranchExecutable(Executable):
     """
     Executable that moves a body under a new parent, keeping the body's own connection
     so an actively driven body stays drivable afterwards.
+
+    By default, the body's current global pose is preserved. Pass
+    ``parent_T_connection_expression`` to override the attachment transform.
     """
 
     body: Body = field(kw_only=True)
@@ -442,6 +447,28 @@ class MoveBranchExecutable(Executable):
     The new parent to which the branch is moved.
     """
 
+    parent_T_connection_expression: Optional[HomogeneousTransformationMatrix] = field(
+        default=None, kw_only=True
+    )
+    """
+    Explicit transform from ``new_parent`` to the body.
+
+    When ``None`` (default), the transform is computed to preserve the body's current
+    global pose. When provided, it is used directly as the transform from ``new_parent``
+    to the branch root.
+    """
+
+    giskard_idle_settle_delta: timedelta = field(
+        default=timedelta(seconds=0.3), kw_only=True
+    )
+    """
+    Time to wait after publishing the model change on the real robot.
+
+    Giskard only applies buffered world updates, and only republishes tf, while its
+    behavior tree is idle between goals; this delay gives it a few idle ticks to catch
+    up before the next motion goal is sent.
+    """
+
     execution_scope: Callable[[], AbstractContextManager[None]] = field(
         default=nullcontext, kw_only=True, repr=False, compare=False
     )
@@ -451,7 +478,13 @@ class MoveBranchExecutable(Executable):
         Move the branch and report the attached node's execution outcome.
         """
         with self.execution_scope():
-            self.context.world.move_branch(self.body, self.new_parent)
+            self.context.world.move_branch(
+                self.body,
+                self.new_parent,
+                parent_T_connection_expression=self.parent_T_connection_expression,
+            )
+        if GiskardExecutable.execution_type == ExecutionType.REAL:
+            time.sleep(self.giskard_idle_settle_delta.total_seconds())
 
 
 @dataclass

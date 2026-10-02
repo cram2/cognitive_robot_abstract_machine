@@ -3,7 +3,6 @@ from __future__ import annotations
 from copy import deepcopy
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
-from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.cartesian_goals import (
     DifferentialDriveBaseGoal,
     CartesianPoseStraight,
@@ -17,7 +16,6 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianOrientation,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.tasks.pointing import Pointing
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.robot_plans import (
     MoveToolCenterPointMotion,
@@ -27,12 +25,12 @@ from coraplex.robot_plans import (
 )
 from coraplex.robot_plans.motions.base import AlternativeMotion
 from coraplex.view_manager import ViewManager
-from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.robots.gripper_specification import (
+    GripperSpecification,
+)
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import (
     Vector3,
-    HomogeneousTransformationMatrix,
     RotationMatrix,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -153,7 +151,9 @@ class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):
         return Parallel([cart, align, close])
 
 
-class StretchMoveGripperMotion(MoveGripperMotion, AlternativeMotion[Stretch]):
+class StretchMoveGripperMotion(
+    AlternativeMotion[Stretch], MoveGripperMotion[GripperSpecification]
+):
     """
     Gripper motion tuned for Stretch: forces convergence checks to hold for at least one
     second so the local minimum isn't reported before the gripper has actually moved.
@@ -166,17 +166,13 @@ class StretchMoveGripperMotion(MoveGripperMotion, AlternativeMotion[Stretch]):
 
     @property
     def _motion_chart(self):
-        arm = ViewManager().get_end_effector_view(self.gripper, self.robot)
+        goal_state = self.specification.joint_state
 
         return Parallel(
             [
                 JointPositionList(
-                    goal_state=arm.get_joint_state_by_type(self.motion),
-                    name=(
-                        "OpenGripper"
-                        if self.motion == GripperState.OPEN
-                        else "CloseGripper"
-                    ),
+                    goal_state=goal_state,
+                    name=goal_state.name.name,
                     threshold=0,
                 ),
                 LocalMinimumReached(

@@ -32,7 +32,6 @@ from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
-from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -73,7 +72,8 @@ class OpenAction(ActionDescription):
                 GraspingAction(self.object_designator, self.arm, grasp_description),
                 OpeningMotion(self.object_designator, self.arm),
                 MoveGripperMotion(
-                    GripperState.OPEN, self.arm, allow_gripper_collision=True
+                    specification=end_effector.default_specification(GripperState.OPEN),
+                    allow_gripper_collision=True,
                 ),
             ]
         )
@@ -171,7 +171,8 @@ class CloseAction(ActionDescription):
                 GraspingAction(self.object_designator, self.arm, grasp_description),
                 ClosingMotion(self.object_designator, self.arm),
                 MoveGripperMotion(
-                    GripperState.OPEN, self.arm, allow_gripper_collision=True
+                    specification=end_effector.default_specification(GripperState.OPEN),
+                    allow_gripper_collision=True,
                 ),
             ]
         )

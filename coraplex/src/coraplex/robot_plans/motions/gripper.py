@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Generic, Optional, List
 
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
@@ -18,8 +20,11 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointVelocityLimit,
 )
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
-from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.datastructures.robots.gripper_specification import (
+    TGripperSpecification,
+)
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import EndEffector
@@ -52,8 +57,9 @@ class ReachMotion(BaseMotion, HasTcpGoalThresholds):
 
     object_designator: Body
     """
-    Object designator_description describing the object that should be picked up
+    Object designator_description describing the object that should be picked up.
     """
+
     arm: Arms
     """
     The arm that should be used for pick up.
@@ -61,8 +67,9 @@ class ReachMotion(BaseMotion, HasTcpGoalThresholds):
 
     grasp_description: GraspDescription
     """
-    The grasp description that should be used for picking up the object
+    The grasp description that should be used for picking up the object.
     """
+
     movement_type: MovementType = MovementType.CARTESIAN
     """
     The type of movement that should be performed.
@@ -120,19 +127,19 @@ class ReachMotion(BaseMotion, HasTcpGoalThresholds):
 
 
 @dataclass
-class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
+class MoveGripperMotion(
+    BaseMotion,
+    Generic[TGripperSpecification],
+    SubClassSafeGeneric,
+    GripperStallToleranceParameters,
+):
     """
-    Opens or closes the gripper.
+    Moves a gripper into the configuration its specification describes.
     """
 
-    motion: GripperState
+    specification: TGripperSpecification
     """
-    Motion that should be performed, either 'open' or 'close'.
-    """
-
-    gripper: Arms
-    """
-    Name of the gripper that should be moved.
+    The gripper configuration to command.
     """
 
     allow_gripper_collision: Optional[bool] = None
@@ -145,10 +152,13 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
 
     @property
     def _motion_chart(self):
-        arm = ViewManager().get_end_effector_view(self.gripper, self.robot)
-
-        name = "OpenGripper" if self.motion == GripperState.OPEN else "CloseGripper"
-        goal_state = arm.get_joint_state_by_type(self.motion)
+        """
+        :return: The chart driving the gripper's connections to the joint state the
+            specification commands, with the velocity limit and collision rules the
+            specification and parameters ask for.
+        """
+        goal_state = self.specification.joint_state
+        name = goal_state.name.name
         joint_task = JointPositionList(goal_state=goal_state, name=name)
 
         done_node = joint_task
@@ -168,21 +178,47 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
                 [joint_task, stall_monitor], minimum_success=1, name=name
             )
 
-        accompanying_nodes: List[MotionStatechartNode] = []
-        if self.finger_velocity is not None:
-            accompanying_nodes.append(
+        nodes = [done_node]
+
+        finger_velocity = self.specification.finger_velocity
+        if finger_velocity is not None:
+            nodes.append(
                 JointVelocityLimit(
                     connections=list(goal_state.connections),
-                    max_velocity=self.finger_velocity,
+                    max_velocity=finger_velocity,
                 )
             )
+
         if self.allow_gripper_collision:
-            accompanying_nodes.extend(
-                self._only_allow_gripper_collision_rules(self.gripper)
+            nodes.extend(
+                self._only_allow_gripper_collision_rules(
+                    self.specification.end_effector
+                )
             )
-        if not accompanying_nodes:
-            return done_node
-        return Parallel([done_node, *accompanying_nodes], name=name)
+
+        if len(nodes) == 1:
+            return nodes[0]
+        return Parallel(nodes, name=name)
+
+    @classmethod
+    def handles(cls, motion: MoveGripperMotion) -> bool:
+        """
+        Whether this alternative can be built from the given motion's specification.
+
+        :param motion: The motion whose specification is checked.
+        :return: True if the motion's specification is an instance of the specification
+            type this alternative is bound to. Also True when this class binds no
+            concrete specification type.
+        """
+        bound_specification = cls.get_generic_type_parameters()
+        if not bound_specification:
+            return True
+        specification_type = bound_specification[0]
+        if not isinstance(specification_type, type):
+            # The generic parameter is still an unresolved type variable, so this class
+            # binds no concrete specification type it could check against.
+            return True
+        return isinstance(motion.specification, specification_type)
 
 
 @dataclass
@@ -277,7 +313,9 @@ class MoveToolCenterPointMotion(
         )
         if self.allow_gripper_collision:
             accompanying_nodes.extend(
-                self._only_allow_gripper_collision_rules(self.arm)
+                self._only_allow_gripper_collision_rules(
+                    ViewManager().get_end_effector_view(self.arm, self.robot)
+                )
             )
         if not accompanying_nodes:
             return task
@@ -440,7 +478,9 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion, HasTcpGoalThresholds):
         if isinstance(self.robot, Justin):
             tasks.append(self._upright_torso_task(tip_link, root_link))
         motion_statechart_nodes = (
-            self._only_allow_gripper_collision_rules(self.arm)
+            self._only_allow_gripper_collision_rules(
+                ViewManager().get_end_effector_view(self.arm, self.robot)
+            )
             if self.allow_gripper_collision
             else []
         )

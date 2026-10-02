@@ -173,6 +173,9 @@ class StretchApartmentDemonstration(RobotDemonstration):
             VerticalAlignment.NoAlignment,
             ViewManager.get_arm_view(Arms.LEFT, context.robot).end_effector,
         )
+        gripper_specification = ViewManager.get_arm_view(
+            Arms.LEFT, context.robot
+        ).end_effector.default_specification(GripperState.CLOSE)
 
         cereal = world.get_semantic_annotations_by_type(CheezeIt)[0]
         cereal_body = cereal.root
@@ -183,7 +186,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
         plan = sequential(
             [
                 ParkArmsAction(Arms.BOTH),
-                SetGripperAction(Arms.BOTH, motion=GripperState.CLOSE),
+                SetGripperAction(specification=gripper_specification),
                 NavigateAction(
                     Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
@@ -220,7 +223,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     arm=Arms.LEFT,
                 ),
                 ParkArmsAction(Arms.BOTH),
-                SetGripperAction(Arms.BOTH, motion=GripperState.CLOSE),
+                SetGripperAction(specification=gripper_specification),
                 NavigateAction(
                     Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
@@ -256,7 +259,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     arm=Arms.LEFT,
                 ),
                 ParkArmsAction(Arms.BOTH),
-                SetGripperAction(Arms.BOTH, motion=GripperState.CLOSE),
+                SetGripperAction(specification=gripper_specification),
             ],
             context=context,
         )

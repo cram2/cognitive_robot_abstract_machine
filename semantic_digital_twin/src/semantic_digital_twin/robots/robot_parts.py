@@ -30,8 +30,14 @@ from krrood.class_diagrams.attribute_introspector import (
 from krrood.entity_query_language.factories import variable, contains, a, entity
 from krrood.ormatic.utils import classproperty
 from krrood.utils import get_generic_type_parameters
-from semantic_digital_twin.datastructures.definitions import JointStateType
+from semantic_digital_twin.datastructures.definitions import (
+    JointStateType,
+    GripperState,
+)
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
+from semantic_digital_twin.datastructures.robots.gripper_specification import (
+    GripperStateSpecification,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -39,6 +45,8 @@ from semantic_digital_twin.exceptions import (
     UselessConceptError,
     DuplicateRobotAssignmentsError,
     MissingDefaultCameraError,
+    CopiedWorldDiffersFromOriginalError,
+    RobotPartBelongsToAnotherRobotError,
 )
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasEndEffector,
@@ -70,7 +78,6 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
-    DegreeOfFreedomLimits,
     DegreeOfFreedom,
 )
 from semantic_digital_twin.world_description.geometry import (
@@ -606,6 +613,24 @@ class EndEffector(AbstractRobotPart, ABC):
 The axis of the end_effector's tool frame that is facing forward.
     """
 
+    def default_specification(
+        self,
+        state_type: GripperState,
+        finger_velocity: Optional[float] = None,
+    ) -> GripperStateSpecification:
+        """
+        Build the default gripper specification for a state this end effector declares.
+
+        :param state_type: The state type to build the specification for.
+        :param finger_velocity: Optional maximum finger joint velocity (in m/s) to
+            enforce during the motion.
+        :return: The specification carrying the declared joint state for that type.
+        """
+        specification = GripperStateSpecification.from_state_type(self, state_type)
+        if finger_velocity is not None:
+            specification.finger_velocity = finger_velocity
+        return specification
+
     def __post_init__(self):
         super().__post_init__()
         rotation_matrix = RotationMatrix.from_quaternion(self.front_facing_orientation)
@@ -924,27 +949,38 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         Validates the robot semantic annotation.
             The validation process includes:
             1. Deepcopy the resulting world to ensure that all parts of the robot are initialized in the correct order
-            2. Assert that the copied world is the same as the original world
-            3. Assert that the robot semantic annotation has a default camera.
+            2. Check that the copied world is the same as the original world
+            3. Check that a robot that declares cameras marks one as its default camera.
             4. Call validate method on all robot parts inheriting froma RobotPartMixin
 
         :return: True if the robot semantic annotation is valid, False otherwise.
+        :raises CopiedWorldDiffersFromOriginalError: If deepcopying the world does not
+            reproduce the original world's entities.
+        :raises MissingDefaultCameraError: If the robot declares cameras but marks none
+            of them as its default camera.
+        :raises RobotPartBelongsToAnotherRobotError: If a robot part refers to a robot
+            other than this one.
         """
         self_world_copy = deepcopy(self._world)
 
-        assert set(self_world_copy._world_entity_hash_table.keys()) == set(
-            self._world._world_entity_hash_table.keys()
-        )
+        differing_entity_hashes = set(
+            self_world_copy._world_entity_hash_table.keys()
+        ) ^ set(self._world._world_entity_hash_table.keys())
+        if differing_entity_hashes:
+            raise CopiedWorldDiffersFromOriginalError(
+                world=self._world,
+                differing_entity_hashes=sorted(differing_entity_hashes),
+            )
 
-        assert (
-            self_world_copy.get_semantic_annotations_by_type(AbstractRobot)[
-                0
-            ].get_default_camera()
-            is not None
-        )
+        declared_cameras = [
+            part for part in self._robot_parts if isinstance(part, Camera)
+        ]
+        if declared_cameras and self.get_default_camera() is None:
+            raise MissingDefaultCameraError(robot=type(self))
 
         for part in self._robot_parts:
-            assert part._robot == self, f"Part {part} refers to wrong robot"
+            if part._robot != self:
+                raise RobotPartBelongsToAnotherRobotError(robot_part=part, robot=self)
 
             if isinstance(part, RobotPartMixin):
                 part.validate()
