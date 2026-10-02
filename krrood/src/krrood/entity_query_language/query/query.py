@@ -1159,7 +1159,7 @@ class Entity(Query[T]):
         if isinstance(selected, InstantiatedVariable):
             return [
                 child
-                for child in selected._child_vars_.values()
+                for child in selected._child_variables_.values()
                 if chain_root(child)._id_ not in group_key_root_ids
             ]
         return super().aggregated_selections(group_key_root_ids)

@@ -4,7 +4,6 @@ User interface (grammar & vocabulary) for entity query language.
 
 from __future__ import annotations
 
-import inspect
 import operator
 from dataclasses import dataclass
 from inspect import isclass
@@ -26,7 +25,6 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
     TruthValueOperator,
-    OperationResult,
 )
 from krrood.entity_query_language.operators.causal import (
     cause,
@@ -883,27 +881,25 @@ def distinct(
 
 
 def get_conditioned_statements(
-    statement, condition: Callable[OperationResult, bool]
+    statement, condition: Callable[[Iterable[Any]], bool]
 ) -> List[SymbolicExpression]:
     """
     Iterates over all sub-statements of the statement and returns all statements that
     satisfy the condition.
 
     :param statement: The statement to iterate over.
-    :param condition: The condition to evaluate each sub-statement against.
+    :param condition: The condition to evaluate each sub-statement's results against.
     :return: A list of sub-statements that satisfy the condition.
     """
     condition_results = []
     for node in [
-        s
-        for s in statement._children_
-        if not isinstance(s, (Variable, inspect.Attribute))
+        child
+        for child in statement._children_
+        if child._id_ != statement._id_ and not isinstance(child, (Variable, Attribute))
     ]:
         node_result = node.evaluate()
         if condition(node_result):
             condition_results.append(node)
-    if statement in condition_results:
-        condition_results.remove(statement)
 
     return condition_results
 
@@ -914,7 +910,7 @@ def get_false_statements(statement: SymbolicExpression) -> List[SymbolicExpressi
 
     :return: The false statements of all statements of this condition.
     """
-    return get_conditioned_statements(statement, lambda x: not x == [])
+    return get_conditioned_statements(statement, lambda results: not any(results))
 
 
 def get_true_statements(statement: SymbolicExpression) -> List[SymbolicExpression]:
@@ -923,7 +919,7 @@ def get_true_statements(statement: SymbolicExpression) -> List[SymbolicExpressio
 
     :return: The true statements of this condition.
     """
-    return get_conditioned_statements(statement, lambda x: x == [])
+    return get_conditioned_statements(statement, any)
 
 
 def evaluate_condition(condition: ConditionType) -> bool:

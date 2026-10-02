@@ -106,7 +106,7 @@ def _child_edges_by_id(
     """:return: every node's parent edges in *expression*, keyed by the child's ``_id_``. A
     :class:`ParentEdge`'s field name is set only when the parent is an :class:`InstantiatedVariable`
     and the edge is one of its declared fields (so the same variable filling two fields on one
-    predicate is two distinct edges, via :attr:`InstantiatedVariable._child_vars_`; every other
+    predicate is two distinct edges, via :attr:`InstantiatedVariable._child_variables_`; every other
     structural edge carries no field name).
 
     Used to tell an operand that fills exactly one predicate field, and appears nowhere else, from
@@ -124,7 +124,7 @@ def _child_edges_by_id(
             continue
         visited_parents.add(node._id_)
         if isinstance(node, InstantiatedVariable):
-            for field_name, child in node._child_vars_.items():
+            for field_name, child in node._child_variables_.items():
                 edges[child._id_].append(ParentEdge(node, field_name))
         else:
             for child in node._children_:

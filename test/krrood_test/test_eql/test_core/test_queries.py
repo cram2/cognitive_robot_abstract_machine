@@ -62,6 +62,7 @@ from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
 from ...dataset.example_classes import (
+    KRROODPosition,
     KRROODVectorsWithProperty,
 )
 from ...dataset.semantic_world_like_classes import (
@@ -77,6 +78,7 @@ from ...dataset.semantic_world_like_classes import (
     Drawer,
     Cabinet,
 )
+from ...dataset.value_comparisons import IsGreaterThan, IsGreaterThanByMargin
 
 
 def test_variable_from_type_setting(handles_and_containers_world):
@@ -744,6 +746,33 @@ def test_literal_predicate(handles_and_containers_world):
     has_name = HasName(world.bodies[0], world.bodies[0].name)
     with pytest.raises(LiteralConditionError):
         query = the(entity(variable(Body, world.bodies)).where(has_name))
+
+
+def test_predicate_taking_one_variable_attribute_twice():
+    """
+    An attribute filling two arguments of a predicate gives its value to both of them.
+    """
+    values = [0.0, 1.0, 2.0]
+    position = variable(KRROODPosition, [KRROODPosition(x, x, 0.0) for x in values])
+    query = entity(position).where(IsGreaterThan(position.x, position.x))
+
+    assert query.tolist() == []
+
+
+def test_predicate_argument_left_out_takes_its_default():
+    """
+    A predicate argument the query does not pass takes the predicate's default.
+    """
+    values = [0.0, 1.0, 2.0]
+    positions = [KRROODPosition(x, y, 0.0) for x in values for y in values]
+    position = variable(KRROODPosition, positions)
+    query = entity(position).where(IsGreaterThanByMargin(position.x, position.y))
+
+    assert query.tolist() == [
+        candidate
+        for candidate in positions
+        if candidate.x > candidate.y + IsGreaterThanByMargin.margin
+    ]
 
 
 def test_contains_type():
