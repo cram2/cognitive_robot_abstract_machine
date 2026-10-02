@@ -337,7 +337,7 @@ class TestWordingFromCode:
         runner = make_runner()
         runner.verbalize("an(entity(record))")
 
-        assert runner.run("an(entity(record))").ok
+        assert runner.run_source("an(entity(record))").ok
 
 
 # %% verbalizing what cannot be verbalized
@@ -367,7 +367,7 @@ class TestUnverbalizableQueries:
         """
         A sentence is a nicety; failing to word one must not cost the caller its answer.
         """
-        result = make_runner().run("an(entity(record))")
+        result = make_runner().run_source("an(entity(record))")
 
         assert result.count == 3
         assert result.verbalization is None
@@ -376,13 +376,15 @@ class TestUnverbalizableQueries:
 # %% the runner attaches it to the answer
 class TestTheAnswerCarriesTheQuestion:
     def test_a_run_answer_reads_its_own_query_back(self):
-        result = make_runner().run("an(entity(record).where(record.score > 1.0))")
+        result = make_runner().run_source(
+            "an(entity(record).where(record.score > 1.0))"
+        )
 
         assert result.verbalization is not None
         assert "NamedRecord" in result.verbalization.text
 
     def test_the_payload_carries_both_renderings(self):
-        result = make_runner().run("an(entity(record))")
+        result = make_runner().run_source("an(entity(record))")
 
         payload = result.to_payload()
         assert payload["verbalization"]["text"] == result.verbalization.text
@@ -398,7 +400,7 @@ class TestTheAnswerCarriesTheQuestion:
             extra_names={"records": make_records()},
         )
 
-        result = runner.run("records")
+        result = runner.run_source("records")
 
         assert result.count == 3
         assert result.verbalization is None

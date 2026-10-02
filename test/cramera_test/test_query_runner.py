@@ -10,6 +10,7 @@ import pytest
 krrood = pytest.importorskip("krrood", reason="EQL requires krrood")
 
 from krrood.entity_query_language.evaluable import Evaluable  # noqa: E402
+from krrood.entity_query_language.factories import an, entity, variable  # noqa: E402
 from semantic_digital_twin.spatial_types import Point3, Pose  # noqa: E402
 from typing_extensions import Any, List  # noqa: E402
 
@@ -85,7 +86,7 @@ class TestDomainsBecomeVariables:
     """
 
     def test_a_domain_is_in_scope_under_its_own_name(self):
-        result = make_runner().run("an(entity(record))")
+        result = make_runner().run_source("an(entity(record))")
 
         assert result.ok
         assert [row["__entity__"] for row in result.rows] == [
@@ -99,7 +100,7 @@ class TestDomainsBecomeVariables:
         A query may name the type itself, so a source needs no extra names to be
         queryable.
         """
-        result = make_runner().run("an(entity(variable(NamedRecord, [])))")
+        result = make_runner().run_source("an(entity(variable(NamedRecord, [])))")
 
         assert result.ok
         assert result.count == 0
@@ -116,8 +117,8 @@ class TestDomainsBecomeVariables:
         """
         runner = make_runner()
 
-        first = runner.run("an(entity(record))")
-        second = runner.run("an(entity(record))")
+        first = runner.run_source("an(entity(record))")
+        second = runner.run_source("an(entity(record))")
 
         assert first.count == second.count == 3
 
@@ -130,7 +131,7 @@ class TestDomainsBecomeVariables:
         runner = make_runner(records)
         records.append(NamedRecord("late", "alpha", 4.0, Point3(0.0, 0.0, 0.0)))
 
-        assert runner.run("an(entity(record))").count == 1
+        assert runner.run_source("an(entity(record))").count == 1
 
 
 # %% where the answer is worked out
@@ -140,6 +141,36 @@ class TestEvaluation:
     told where to work it out rather than assuming the objects are already here.
     """
 
+    def test_native_query_reaches_evaluation_without_building_source(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """
+        A native query reaches its evaluator unchanged and produces rendered rows.
+
+        :param monkeypatch: Rejects source parsing for an existing expression.
+        """
+        records = make_records()
+        expression = an(entity(variable(NamedRecord, domain=records)))
+        evaluation = AnswersElsewhere(answer=records)
+        runner = EqlQueryRunner(domains=[], evaluation=evaluation)
+
+        def reject_source(code: str) -> None:
+            """
+            Fail if a native query is sent through the source parser.
+
+            :param code: Unexpected source text.
+            """
+            pytest.fail("A native expression must not be parsed as source.")
+
+        monkeypatch.setattr(runner, "build", reject_source)
+
+        result = runner.run(expression)
+
+        assert len(evaluation.asked) == 1
+        assert evaluation.asked[0] is expression
+        assert result.count == len(records)
+        assert result.verbalization is not None
+
     def test_a_query_is_answered_by_the_declared_evaluation(self):
         runner = EqlQueryRunner(
             domains=[QueryDomain("record", NamedRecord, make_records())],
@@ -148,7 +179,7 @@ class TestEvaluation:
             ),
         )
 
-        result = runner.run("an(entity(record))")
+        result = runner.run_source("an(entity(record))")
 
         assert [row["__entity__"] for row in result.rows] == ["recorded"]
 
@@ -161,7 +192,7 @@ class TestEvaluation:
         EqlQueryRunner(
             domains=[QueryDomain("record", NamedRecord, make_records())],
             evaluation=evaluation,
-        ).run("an(entity(record))")
+        ).run_source("an(entity(record))")
 
         assert [isinstance(seen, Evaluable) for seen in evaluation.asked] == [True]
 
@@ -173,7 +204,7 @@ class TestEvaluation:
         evaluation = AnswersElsewhere(answer=[])
         EqlQueryRunner(
             domains=[QueryDomain("stored", NamedRecord)], evaluation=evaluation
-        ).run("an(entity(stored))")
+        ).run_source("an(entity(stored))")
 
         assert len(evaluation.asked) == 1
 
@@ -185,7 +216,9 @@ class TestRowRendering:
     """
 
     def test_a_named_dataclass_is_rendered_as_an_entity(self):
-        result = make_runner().run("the(entity(record).where(record.name == 'third'))")
+        result = make_runner().run_source(
+            "the(entity(record).where(record.name == 'third'))"
+        )
 
         assert result.rows == [
             {
@@ -204,7 +237,7 @@ class TestRowRendering:
         is already the answer's subject and repeating it in every heading only crowds
         the table.
         """
-        result = make_runner().run("set_of(record.name, record.category)")
+        result = make_runner().run_source("set_of(record.name, record.category)")
 
         assert result.rows == [
             {"name": "first", "category": "alpha"},
@@ -228,7 +261,7 @@ class TestRowRendering:
             ]
         )
 
-        result = runner.run("set_of(record.name, posed.name)")
+        result = runner.run_source("set_of(record.name, posed.name)")
 
         assert list(result.rows[0]) == ["NamedRecord.name", "PosedRecord.name"]
 
@@ -248,7 +281,7 @@ class TestRowRendering:
             ]
         )
 
-        result = runner.run("an(entity(posed))")
+        result = runner.run_source("an(entity(posed))")
 
         assert result.rows[0]["target"] == pose_label(target)
 
@@ -291,13 +324,13 @@ class TestRowRendering:
         assert row.values["revision"] == 0
 
     def test_rows_stop_at_the_limit_and_say_so(self):
-        result = make_runner().run("an(entity(record))", limit=2)
+        result = make_runner().run_source("an(entity(record))", limit=2)
 
         assert result.count == 2
         assert result.more is True
 
     def test_an_unlimited_result_does_not_claim_to_be_truncated(self):
-        assert make_runner().run("an(entity(record))").more is False
+        assert make_runner().run_source("an(entity(record))").more is False
 
 
 # %% highlightable answer values
@@ -321,19 +354,19 @@ class TestHighlightableAnswerValues:
     def test_a_string_answer_value_naming_a_highlightable_id_is_highlighted(self):
         runner = self.make_highlighting_runner("alpha")
 
-        result = runner.run("set_of(record.name, record.category)")
+        result = runner.run_source("set_of(record.name, record.category)")
 
         assert result.highlight == ["alpha"]
 
     def test_an_answer_value_naming_nothing_highlightable_is_left_alone(self):
-        result = make_runner().run("set_of(record.name, record.category)")
+        result = make_runner().run_source("set_of(record.name, record.category)")
 
         assert result.highlight == []
 
     def test_an_entity_field_value_lights_up_the_id_it_names(self):
         runner = self.make_highlighting_runner("beta")
 
-        result = runner.run("an(entity(record))")
+        result = runner.run_source("an(entity(record))")
 
         assert result.highlight == ["beta", "first", "second", "third"]
 
@@ -381,17 +414,19 @@ class TestReplayableAnswerRows:
         assert window.end - window.start == 2.0
 
     def test_a_timestamped_entity_row_carries_the_window_around_its_moment(self):
-        result = self.make_moment_runner().run("an(entity(moment))")
+        result = self.make_moment_runner().run_source("an(entity(moment))")
 
         assert result.replay == [ReplayWindow.around(DETECTED_AT)]
 
     def test_an_asked_for_timestamp_value_makes_its_row_replayable(self):
-        result = self.make_moment_runner().run("set_of(moment.name, moment.timestamp)")
+        result = self.make_moment_runner().run_source(
+            "set_of(moment.name, moment.timestamp)"
+        )
 
         assert result.replay == [ReplayWindow.around(DETECTED_AT)]
 
     def test_a_row_without_a_moment_offers_no_replay(self):
-        result = make_runner().run("an(entity(record))")
+        result = make_runner().run_source("an(entity(record))")
 
         assert result.replay == [None, None, None]
 
@@ -401,17 +436,19 @@ class TestReplayableAnswerRows:
         nothing of replay shows the answer as it always did instead of rendering the
         window as a column of its own.
         """
-        result = self.make_moment_runner().run("an(entity(moment))")
+        result = self.make_moment_runner().run_source("an(entity(moment))")
 
         assert list(result.rows[0]) == ["__entity__", "__type__", "timestamp"]
 
     def test_the_payload_offers_the_windows_beside_the_rows(self):
-        payload = self.make_moment_runner().run("an(entity(moment))").to_payload()
+        payload = (
+            self.make_moment_runner().run_source("an(entity(moment))").to_payload()
+        )
 
         assert payload["replay"] == [ReplayWindow.around(DETECTED_AT).to_payload()]
 
     def test_a_timestamp_reads_as_a_time_rather_than_a_repr(self):
-        result = self.make_moment_runner().run("an(entity(moment))")
+        result = self.make_moment_runner().run_source("an(entity(moment))")
 
         assert result.rows[0]["timestamp"] == "2026-08-13 12:00:30"
 
@@ -424,12 +461,12 @@ class TestQueryFailures:
 
     def test_an_unknown_name_raises(self):
         with pytest.raises(NameError):
-            make_runner().run("no_such_variable")
+            make_runner().run_source("no_such_variable")
 
     def test_a_syntactically_invalid_query_raises(self):
         with pytest.raises(SyntaxError):
-            make_runner().run("definitely not python (((")
+            make_runner().run_source("definitely not python (((")
 
     def test_an_empty_query_raises(self):
         with pytest.raises(ValueError):
-            make_runner().run("   ")
+            make_runner().run_source("   ")

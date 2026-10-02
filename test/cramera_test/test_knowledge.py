@@ -4,6 +4,7 @@ Tests for the scene-driven knowledge base and its graph-panel payloads.
 
 import json
 import os
+from pathlib import Path
 
 import pytest
 
@@ -15,11 +16,12 @@ from semantic_digital_twin.datastructures.prefixed_name import (
     PrefixedName,
 )  # noqa: E402
 from semantic_digital_twin.spatial_types import Point3  # noqa: E402
+from semantic_digital_twin.world import World  # noqa: E402
 from semantic_digital_twin.world_description.world_entity import Body  # noqa: E402
 
 from cramera.knowledge.entities import BenchObject  # noqa: E402
 from cramera.knowledge.eql_session import EqlSession  # noqa: E402
-from cramera.knowledge.query_runner import RowRenderer  # noqa: E402
+from cramera.knowledge.query_runner import EqlQueryRunner, RowRenderer  # noqa: E402
 from cramera.knowledge.graph_payload import KnowledgeGraphPayload  # noqa: E402
 from cramera.knowledge.knowledge_base import EpisodeKnowledgeBase  # noqa: E402
 from cramera.knowledge.presets import (  # noqa: E402
@@ -246,6 +248,10 @@ class TestArmSideInference:
 
 
 class TestQueries:
+    """
+    Query results preserve entity identity and report invalid expressions.
+    """
+
     def test_entity_query(self, fixture_scene):
         result = EqlSession.of_active_scene().run(
             "the(entity(scene_object).where(scene_object.name == 'milk'))"
@@ -269,11 +275,10 @@ class TestQueries:
             {"name": "place_area", "kind": "location"},
         ]
 
-    def test_only_a_real_entity_is_treated_as_one(self):
+    def test_only_a_real_entity_is_treated_as_one(self) -> None:
         """
-        A result value is an entity because of its type, not because it happens to carry
-        a ``name``: semantic_digital_twin's ``Body`` is a dataclass with one and must
-        not be reported as an entity to highlight.
+        Recorded and native world entities retain their names, while a name value alone
+        does not identify an entity to highlight.
         """
         milk = BenchObject(
             name="milk",
@@ -284,8 +289,9 @@ class TestQueries:
         )
         body = Body(name=PrefixedName("milk"))
 
-        assert RowRenderer._entity_name(milk) == "milk"
-        assert RowRenderer._entity_name(body) is None
+        assert RowRenderer._entity_name(milk) == milk.name
+        assert RowRenderer._entity_name(body) == str(body.name)
+        assert RowRenderer._entity_name(body.name) is None
 
     def test_an_unknown_name_raises(self, fixture_scene):
         """
@@ -961,6 +967,62 @@ class TestPresetWording:
     Every preset carries its question read back as English, so the panel can show what
     is asked instead of EQL source.
     """
+
+    def test_world_presets_leave_the_label_absent_until_worded(
+        self, world_with_two_bodies: tuple[World, Body, Body]
+    ) -> None:
+        """
+        Generated collection presets request native wording with an absent label.
+
+        :param world_with_two_bodies: The world whose collection presets are generated.
+        """
+        world, _, _ = world_with_two_bodies
+        presets = Preset.of_world(world, World.__name__.lower())
+
+        assert presets
+        assert all(preset.text is None for preset in presets)
+
+    def test_an_absent_label_uses_native_verbalization(
+        self, fixture_scene: Path
+    ) -> None:
+        """
+        Wording supplies a display label when the preset does not declare one.
+
+        :param fixture_scene: The scene whose runner verbalizes the preset.
+        """
+        preset = Preset(None, SCENE_PRESETS[0].code)
+        worded = preset.worded(EqlSession.of_active_scene().runner())
+
+        assert worded.verbalization is not None
+        assert worded.text == worded.verbalization.text
+        assert preset.text is None
+
+    @pytest.mark.parametrize("label", [SCENE_PRESETS[0].text, ""])
+    def test_an_explicit_label_is_preserved(
+        self, fixture_scene: Path, label: str
+    ) -> None:
+        """
+        An explicit label, including an empty one, overrides native wording.
+
+        :param fixture_scene: The scene whose runner verbalizes the preset.
+        :param label: The label supplied by the preset's author.
+        """
+        preset = Preset(label, SCENE_PRESETS[0].code)
+
+        worded = preset.worded(EqlSession.of_active_scene().runner())
+
+        assert worded.text == label
+
+    def test_an_absent_label_uses_code_when_verbalization_is_unavailable(self) -> None:
+        """
+        A query outside the runner's namespace remains identifiable by its source.
+        """
+        preset = Preset(None, SCENE_PRESETS[0].code)
+
+        worded = preset.worded(EqlQueryRunner(domains=[]))
+
+        assert worded.verbalization is None
+        assert worded.text == preset.code
 
     def test_every_scene_preset_is_worded_by_the_scenes_own_runner(self, fixture_scene):
         runner = EqlSession.of_active_scene().runner()
