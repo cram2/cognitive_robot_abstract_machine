@@ -49,7 +49,7 @@ execition_mode = ExecutionType.REAL
 
 print("Init ROS")
 rclpy.init()
-node = rclpy.create_node("stretch_demo_node")
+node = rclpy.create_node("tracy_demo_node")
 
 executor = MultiThreadedExecutor()
 executor.add_node(node)
@@ -189,5 +189,6 @@ try:
     with ExecutionEnvironment(execution_type=execition_mode, collision_avoidance=False):
         plan.perform()
 finally:
+    rclpy.shutdown()
     os.killpg(os.getpgid(giskard_process.pid), signal.SIGTERM)
     giskard_process.wait()
