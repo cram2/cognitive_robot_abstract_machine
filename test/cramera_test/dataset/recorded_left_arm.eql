@@ -1,1 +1,1 @@
-an(entity(arm).where(arm.side == Arms.LEFT))
+an(entity(arm).where(arm.side == ArmSide.LEFT))

@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
-from typing_extensions import ClassVar, List, Type
+from typing_extensions import List, Type
 
 from coraplex.alternative_motion_mapping import AlternativeMotion
 from coraplex.datastructures.dataclasses import Context
@@ -145,7 +145,7 @@ class RobotDemonstration(ABC):
     The robot this demonstration uses.
     """
 
-    ros_node_name: ClassVar[str] = "robot_demonstration"
+    ros_node_name: str = "robot_demonstration"
     """
     Name of the node a real run registers.
     """
@@ -158,6 +158,12 @@ class RobotDemonstration(ABC):
     collision_avoidance: bool = False
     """
     Whether collision avoidance is added to every motion state chart of this run.
+    """
+
+    debug: bool = False
+    """
+    Whether the plan runs in debug mode, logging debug messages and publishing every
+    copy of the world a candidate is tried in.
     """
 
     repetitions: int = 1
@@ -262,7 +268,9 @@ class RobotDemonstration(ABC):
             if not self.is_scene_populated(world):
                 self.populate_scene(world)
             for _ in range(self.repetitions):
-                plan = self.build_plan(self.build_context(world))
+                context = self.build_context(world)
+                context.debug = self.debug
+                plan = self.build_plan(context)
                 if self.visualization is not None:
                     self.visualization.attach_plan(plan)
                 with ExecutionEnvironment(

@@ -838,9 +838,6 @@ def test_set_of_move_action_transitive(session):
     """
     Verify that set_of with both direct and transitive attributes generates correct
     JOINs.
-
-    This simulates the pattern of MoveToReachDAO.robot_x and
-    MoveToReachDAO.grasp_description.rotate_gripper from coraplex.
     """
     from sqlalchemy.orm import aliased
 

@@ -20,7 +20,9 @@ from krrood.entity_query_language.factories import (
     variable,
 )
 
+from ...dataset.example_classes import KRROODPosition
 from ...dataset.semantic_world_like_classes import Body, Cabinet, Container, Handle
+from ...dataset.value_comparisons import IsGreaterThan
 
 
 def selected_values(query):
@@ -159,6 +161,23 @@ def test_query_rooted_condition_keeps_one_flattening_shared(
     )
 
     assert query.tolist() == variable_rooted.tolist()
+
+
+# %% predicates over several attributes of the query
+
+
+def test_query_rooted_predicate_over_two_attributes_filters():
+    """
+    Each query-rooted attribute a predicate takes follows the row being filtered.
+    """
+    values = [0.0, 1.0, 2.0]
+    positions = [KRROODPosition(x, y, 0.0) for x in values for y in values]
+    query = entity(variable(KRROODPosition, domain=positions))
+    query.where(IsGreaterThan(query.x, query.y))
+
+    assert query.tolist() == [
+        position for position in positions if position.x > position.y
+    ]
 
 
 # %% conditions that must keep their subquery meaning

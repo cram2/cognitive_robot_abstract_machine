@@ -32,7 +32,7 @@ from semantic_digital_twin.reasoning.robot_predicates import (
 )
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Quaternion
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -657,6 +657,14 @@ def test_empty_gripper_is_not_holding_something():
         Minimal concrete EndEffector for predicate tests.
         """
 
+        @property
+        def approach_axis(self) -> Vector3:
+            return Vector3.X(reference_frame=self.tool_frame)
+
+        @property
+        def closing_axis(self) -> Vector3:
+            return Vector3.Y(reference_frame=self.tool_frame)
+
         def setup_hardware_interfaces(self):
             pass
 
@@ -688,7 +696,6 @@ def test_empty_gripper_is_not_holding_something():
             name=PrefixedName("gripper", prefix="review"),
             root=palm,
             tool_frame=tool_frame,
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
         world.add_semantic_annotation(gripper)
 
@@ -701,6 +708,10 @@ class ReviewCamera(Camera):
     """
     Minimal concrete Camera for predicate tests.
     """
+
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.root)
 
     def setup_hardware_interfaces(self):
         pass
@@ -751,7 +762,6 @@ def test_nothing_occludes_a_body_in_clear_line_of_sight():
         camera = ReviewCamera(
             name=PrefixedName("camera", prefix="review"),
             root=camera_body,
-            forward_facing_axis=Vector3.X(),
             field_of_view=FieldOfView(horizontal_angle=0.99, vertical_angle=0.75),
         )
         world.add_semantic_annotation(camera)

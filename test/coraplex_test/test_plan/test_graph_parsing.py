@@ -4,14 +4,9 @@ import numpy as np
 from typing_extensions import List
 
 from coraplex.datastructures.enums import (
-    Arms,
-    ApproachDirection,
     DetectionTechnique,
-    VerticalAlignment,
 )
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.execution_environment import simulated_robot
-from coraplex.plans.attachment_nodes import ReAttachNode
 from coraplex.perception import PerceptionQuery
 from coraplex.plans.executables import (
     Executable,
@@ -27,7 +22,6 @@ from coraplex.plans.factories import (
     repeat,
     sequential,
 )
-from coraplex.exceptions import PerceptionTargetMissing
 from coraplex.plans.plan_node import (
     ActionNode,
     ExecutionBoundaryNode,
@@ -53,12 +47,14 @@ from giskardpy.motion_statechart.monitors.templates import (
     PausedWhileTrue,
 )
 from coraplex.robot_plans.plan_transformations import DetectBeforeGrasp
-from coraplex.utils import split_list_by_type
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.templates import (
     Parallel,
     RepeatOnStall,
-    Sequence, TryAll, TryInOrder, CancelledWhenTrue,
+    Sequence,
+    TryAll,
+    TryInOrder,
+    CancelledWhenTrue,
 )
 from giskardpy.motion_statechart.graph_node import CancelMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import CountNodeResets
@@ -70,6 +66,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.semantic_annotations.mixins import GraspCandidate
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
@@ -308,14 +305,10 @@ def test_merge_motions(pr2_apartment_context, rclpy_node):
 
     plan = execute_single(
         ReachAction(
-            Pose.from_xyz_rpy(2, 1.5, 0.7, reference_frame=world.root),
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
+            grasp=GraspCandidate.from_body_origin(
+                world.get_semantic_annotations_by_type(Milk)[0]
             ),
-            world.get_semantic_annotations_by_type(Milk)[0],
+            arm=context.robot.right_arm,
         ),
         context=context,
     )
@@ -336,16 +329,9 @@ def test_merge_motions(pr2_apartment_context, rclpy_node):
 def test_parse_pick_up(pr2_apartment_context):
     world, view, context = pr2_apartment_context
 
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan = execute_single(
-        PickUpAction(
-            world.get_semantic_annotations_by_type(Milk)[0],
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
-        ),
+        PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
         context=context,
     )
 
@@ -369,16 +355,9 @@ def test_parse_pick_up_merges_motions_around_model_change(pr2_apartment_context)
     """
     world, view, context = pr2_apartment_context
 
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan = execute_single(
-        PickUpAction(
-            world.get_semantic_annotations_by_type(Milk)[0],
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
-        ),
+        PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
         context=context,
     )
 
@@ -396,18 +375,12 @@ def test_parse_complex_plan(pr2_apartment_context):
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(context.robot.get_arms()),
             ReachAction(
-                target_pose=Pose(
-                    Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root
+                grasp=GraspCandidate.from_body_origin(
+                    world.get_semantic_annotations_by_type(Milk)[0]
                 ),
-                object_designator=world.get_semantic_annotations_by_type(Milk)[0],
-                arm=Arms.LEFT,
-                grasp_description=GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
+                arm=context.robot.left_arm,
             ),
         ],
         context=context,
@@ -424,18 +397,12 @@ def test_parsing_two_actions_into_one_exec(pr2_apartment_context):
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(context.robot.get_arms()),
             ReachAction(
-                target_pose=Pose(
-                    Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root
+                grasp=GraspCandidate.from_body_origin(
+                    world.get_semantic_annotations_by_type(Milk)[0]
                 ),
-                object_designator=world.get_semantic_annotations_by_type(Milk)[0],
-                arm=Arms.LEFT,
-                grasp_description=GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
+                arm=context.robot.left_arm,
             ),
         ],
         context=context,
@@ -451,21 +418,13 @@ def test_parsing_two_actions_into_one_exec(pr2_apartment_context):
 def test_parse_pick_place(pr2_apartment_context):
     world, view, context = pr2_apartment_context
 
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan = sequential(
         [
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.RIGHT,
-                GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
-            ),
+            PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
             PlaceAction(
-                world.get_body_by_name("milk.stl"),
+                milk,
                 Pose(reference_frame=world.root),
-                Arms.RIGHT,
             ),
         ],
         context=context,
@@ -488,11 +447,12 @@ def test_parse_transport_plan(pr2_apartment_context, rclpy_node):
     plan = sequential(
         [
             MoveTorsoAction(TorsoState.HIGH),
-            ParkArmsAction(Arms.BOTH),
-            TransportAction(
+            ParkArmsAction(context.robot.get_arms()),
+            TransportAction.from_graspable_by_closest_grasps(
                 world.get_semantic_annotations_by_type(Milk)[0],
                 Pose.from_xyz_rpy(2.37, 2.5, 1.05, reference_frame=world.root),
-                Arms.RIGHT,
+                context.robot.right_arm,
+                context,
             ),
         ],
         context=context,
@@ -533,10 +493,16 @@ def test_execution_boundary_splits_the_merged_motion_chart(pr2_apartment_context
 
     plan = sequential(
         [
-            MoveToolCenterPointMotion(Pose(reference_frame=world.root), Arms.LEFT),
-            MoveToolCenterPointMotion(Pose(reference_frame=world.root), Arms.RIGHT),
+            MoveToolCenterPointMotion(
+                Pose(reference_frame=world.root), context.robot.left_arm
+            ),
+            MoveToolCenterPointMotion(
+                Pose(reference_frame=world.root), context.robot.right_arm
+            ),
             BoundaryNode(),
-            MoveToolCenterPointMotion(Pose(reference_frame=world.root), Arms.LEFT),
+            MoveToolCenterPointMotion(
+                Pose(reference_frame=world.root), context.robot.left_arm
+            ),
         ],
         context=context,
     )
@@ -579,9 +545,13 @@ def test_detecting_motion_merges_with_the_motions_around_it(pr2_apartment_contex
 
     plan = sequential(
         [
-            MoveToolCenterPointMotion(Pose(reference_frame=world.root), Arms.LEFT),
+            MoveToolCenterPointMotion(
+                Pose(reference_frame=world.root), context.robot.left_arm
+            ),
             DetectingMotion(query=query),
-            MoveToolCenterPointMotion(Pose(reference_frame=world.root), Arms.RIGHT),
+            MoveToolCenterPointMotion(
+                Pose(reference_frame=world.root), context.robot.right_arm
+            ),
         ],
         context=context,
     )
@@ -642,14 +612,8 @@ def reach_action(milk: Milk, view, **kwargs) -> ReachAction:
     :return: A reach at the object's own frame.
     """
     return ReachAction(
-        target_pose=Pose(reference_frame=milk.root),
-        arm=Arms.RIGHT,
-        grasp_description=GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            view.right_arm.end_effector,
-        ),
-        object_designator=milk,
+        grasp=GraspCandidate.from_body_origin(milk),
+        arm=view.right_arm,
         **kwargs,
     )
 
@@ -666,6 +630,24 @@ def test_a_reach_does_not_perceive_without_a_rule(pr2_apartment_context):
     plan.notify()
 
     assert detect_actions_of(plan) == []
+
+
+def test_detect_before_grasp_transformation_applies(pr2_apartment_context):
+    world, view, context = pr2_apartment_context
+
+    context.plan_transformations.append(DetectBeforeGrasp())
+
+    plan = execute_single(
+        PickUpAction(
+            world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
+            context.robot.right_arm,
+        ),
+        context=context,
+    )
+    plan.notify()
+
+    assert plan.plan.get_nodes_by_designator_type(DetectAction)
+    assert plan.plan.get_nodes_by_designator_type(LookAtAction)
 
 
 # %% expansion-time pose capture
@@ -685,13 +667,8 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(pr2_apartment_c
 
     plan = execute_single(
         PickUpAction(
-            milk,
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
+            milk.grasp_candidates()[0],
+            context.robot.right_arm,
         ),
         context=context,
     )
@@ -700,7 +677,7 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(pr2_apartment_c
         node.designator.target
         for node in plan.descendants
         if isinstance(node, MotionNode)
-           and isinstance(node.designator, MoveToolCenterPointMotion)
+        and isinstance(node.designator, MoveToolCenterPointMotion)
     ]
     positions_before = [
         world.transform(target, world.root).to_position().to_np().flatten()[:3]
@@ -721,95 +698,3 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(pr2_apartment_c
             position_before + displacement,
             atol=1e-9,
         )
-
-
-# %% splitting helper
-
-
-def test_split_by_type(pr2_apartment_context):
-    world, view, context = pr2_apartment_context
-
-    split_list = [
-        MoveToolCenterPointMotion(Pose(), Arms.LEFT),
-        ReAttachNode(body=world.get_body_by_name("milk.stl"), new_parent=world.root),
-        MoveToolCenterPointMotion(Pose(), Arms.RIGHT),
-    ]
-
-    splitted_list = split_list_by_type(split_list, ReAttachNode)
-
-    assert len(splitted_list) == 3
-    assert len(splitted_list[0]) == 1
-    assert len(splitted_list[1]) == 1
-    assert len(splitted_list[2]) == 1
-
-
-def test_split_by_type_empty_list():
-    assert split_list_by_type([], ReAttachNode) == []
-
-
-def test_split_by_type_without_match_stays_one_group():
-    no_model_change = [
-        MoveToolCenterPointMotion(Pose(), Arms.LEFT),
-        MoveToolCenterPointMotion(Pose(), Arms.RIGHT),
-    ]
-
-    splitted_list = split_list_by_type(no_model_change, ReAttachNode)
-
-    assert len(splitted_list) == 1
-    assert splitted_list[0] == no_model_change
-
-
-def test_split_by_type_groups_consecutive_elements(pr2_apartment_context):
-    world, view, context = pr2_apartment_context
-    model_change = ReAttachNode(
-        body=world.get_body_by_name("milk.stl"), new_parent=world.root
-    )
-
-    split_list = [
-        MoveToolCenterPointMotion(Pose(), Arms.LEFT),
-        MoveToolCenterPointMotion(Pose(), Arms.RIGHT),
-        model_change,
-        MoveToolCenterPointMotion(Pose(), Arms.LEFT),
-    ]
-
-    splitted_list = split_list_by_type(split_list, ReAttachNode)
-
-    assert [len(group) for group in splitted_list] == [2, 1, 1]
-    assert splitted_list[1] == [model_change]
-    assert all(not isinstance(element, ReAttachNode) for element in splitted_list[0])
-
-
-def test_split_by_type_leading_and_trailing_match(pr2_apartment_context):
-    world, view, context = pr2_apartment_context
-    first_model_change = ReAttachNode(
-        body=world.get_body_by_name("milk.stl"), new_parent=world.root
-    )
-    last_model_change = ReAttachNode(
-        body=world.get_body_by_name("milk.stl"), new_parent=world.root
-    )
-
-    split_list = [
-        first_model_change,
-        MoveToolCenterPointMotion(Pose(), Arms.LEFT),
-        last_model_change,
-    ]
-
-    splitted_list = split_list_by_type(split_list, ReAttachNode)
-
-    assert [len(group) for group in splitted_list] == [1, 1, 1]
-    assert splitted_list[0] == [first_model_change]
-    assert splitted_list[2] == [last_model_change]
-
-
-def test_detect_before_grasp_transformation_applies(pr2_apartment_context):
-    world, view, context = pr2_apartment_context
-
-    context.plan_transformations.append(DetectBeforeGrasp())
-
-    plan = execute_single(PickUpAction(world.get_semantic_annotations_by_type(Milk)[0], Arms.RIGHT,
-                                       GraspDescription(ApproachDirection.FRONT, VerticalAlignment.NoAlignment,
-                                                        view.right_arm.end_effector)), context=context)
-    plan.notify()
-
-    assert plan.plan.get_nodes_by_designator_type(DetectAction)
-    assert plan.plan.get_nodes_by_designator_type(LookAtAction)

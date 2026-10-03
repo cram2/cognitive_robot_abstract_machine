@@ -389,6 +389,32 @@ def test_frame_is_named_after_the_entity():
     assert TfFrameNames().assign(milk) == "milk"
 
 
+def test_a_prefix_is_put_in_front_of_every_frame_name():
+    world, (milk,) = world_with_bodies("milk")
+    frame_names = TfFrameNames(prefix="copy/")
+
+    assert frame_names.assign(milk) == f"{frame_names.prefix}milk"
+
+
+def test_a_prefixed_tree_hangs_under_the_root_of_the_unprefixed_one(rclpy_node):
+    """
+    A copy of a world published under a prefix is joined to the tree of the world it
+    copies at their common root, so both can be shown in one fixed frame.
+    """
+    world, (milk,) = world_with_bodies("milk")
+    frame_names = TfFrameNames(prefix="copy/")
+    tf_wrapper = TFWrapper(node=rclpy_node)
+
+    TFPublisher(node=rclpy_node, _world=world, frame_names=frame_names)
+
+    assert tf_wrapper.wait_for_transform(
+        str(world.root.name),
+        frame_names.assign(milk),
+        timeout=Duration(seconds=1.0),
+        time=Time(),
+    )
+
+
 def test_first_of_two_equally_named_bodies_keeps_the_plain_frame_name():
     world, (first, second) = world_with_bodies("milk", "milk")
     frame_names = TfFrameNames()

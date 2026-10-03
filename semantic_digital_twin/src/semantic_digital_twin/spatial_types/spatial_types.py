@@ -38,6 +38,7 @@ from semantic_digital_twin.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
     )
@@ -2353,6 +2354,26 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def to_homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
         return HomogeneousTransformationMatrix(
             data=self, reference_frame=self.reference_frame
+        )
+
+    def copy_for_world(self, world: World) -> Pose:
+        """
+        The same pose, read against the given copy of the world it belongs to.
+
+        A pose is expressed in its own reference frame, so the numbers naming it on one
+        copy of a world name it on any other; what changes is which copy's frame they
+        are read against.
+
+        :param world: The copy of the world to read this pose against.
+        :return: The pose, referring to that copy's frame.
+        :raises WorldEntityWithIDNotFoundError: If the copy holds no such frame.
+        """
+        return Pose(
+            position=self.to_position(),
+            orientation=self.to_quaternion(),
+            reference_frame=world.get_kinematic_structure_entity_by_id(
+                self.reference_frame.id
+            ),
         )
 
     def __hash__(self):

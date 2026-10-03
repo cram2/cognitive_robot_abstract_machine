@@ -66,8 +66,8 @@ from coraplex.locations.costmaps import VisibilityCostmap
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 visibility = VisibilityCostmap(
-    min_height=1.27,
-    max_height=1.6,
+    minimum_height=1.27,
+    maximum_height=1.6,
     resolution=0.02,
     width=200,
     height=200,
@@ -124,7 +124,7 @@ from coraplex.locations.costmaps import RingCostmap
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 ring = RingCostmap(
-    std=15,
+    standard_deviation=15,
     distance=0.7,
     resolution=0.02,
     width=200,

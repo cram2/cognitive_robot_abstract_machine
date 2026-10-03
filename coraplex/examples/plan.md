@@ -42,13 +42,12 @@ context = Context(world, pr2)
 
 ```python
 from coraplex.robot_plans import *
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import *
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 
 navigate = NavigateAction(Pose.from_xyz_quaternion(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.get_arms())
 
 plan = sequential([navigate, park], context=context).plan
 ```

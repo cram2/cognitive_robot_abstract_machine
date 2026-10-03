@@ -394,10 +394,14 @@ class SymbolicExpression(
 
         :param parent: The parent expression to remove.
         """
-        if parent in self._parents_:
-            self._parents_.remove(parent)
-        if self._id_ in [child._id_ for child in parent._children_]:
-            parent._children_.remove(self)
+        self._parents_[:] = [
+            other_parent
+            for other_parent in self._parents_
+            if other_parent._id_ != parent._id_
+        ]
+        parent._children_[:] = [
+            child for child in parent._children_ if child._id_ != self._id_
+        ]
         if parent is self._parent__:
             self._parent__ = self._parents_[-1] if self._parents_ else None
 
@@ -1096,11 +1100,9 @@ class MultiArityExpression(SymbolicExpression, ABC):
     def _replace_child_field_(
         self, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
-        old_child_index = self._operation_children_.index(old_child)
-        self._operation_children_ = (
-            self._operation_children_[:old_child_index]
-            + (new_child,)
-            + self._operation_children_[old_child_index + 1 :]
+        self._operation_children_ = tuple(
+            new_child if child._id_ == old_child._id_ else child
+            for child in self._operation_children_
         )
 
     def update_children(self, *children: SymbolicExpression) -> None:
@@ -1136,7 +1138,7 @@ class BinaryExpression(SymbolicExpression, ABC):
     ):
         if self.left is old_child:
             self.left = new_child
-        elif self.right is old_child:
+        if self.right is old_child:
             self.right = new_child
 
     def _is_equality_literal_comparator_or_conjunction_(self) -> bool:

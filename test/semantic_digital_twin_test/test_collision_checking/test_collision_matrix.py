@@ -1274,12 +1274,29 @@ class TestCollisionRuleEquality:
 
         assert copied_rule == rule
 
-    def test_rules_with_different_distances_are_not_equal(self, cylinder_bot_world):
+    @pytest.mark.parametrize(
+        "create_rule",
+        [
+            pytest.param(
+                lambda robot, buffer_zone_distance: AvoidSelfCollisions(
+                    robot=robot, buffer_zone_distance=buffer_zone_distance
+                ),
+                id="avoid_self",
+            ),
+            pytest.param(
+                lambda robot, buffer_zone_distance: AvoidExternalCollisions(
+                    robot=robot, buffer_zone_distance=buffer_zone_distance
+                ),
+                id="external",
+            ),
+        ],
+    )
+    def test_rules_with_different_distances_are_not_equal(
+        self, cylinder_bot_world, create_rule
+    ):
         robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
 
-        assert AvoidSelfCollisions(
-            robot=robot, buffer_zone_distance=0.3
-        ) != AvoidSelfCollisions(robot=robot, buffer_zone_distance=0.2)
+        assert create_rule(robot, 0.3) != create_rule(robot, 0.2)
 
 
 # %% a rule listed again after another rule

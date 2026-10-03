@@ -16,7 +16,7 @@ import pytest
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
 )
@@ -31,8 +31,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
-from coraplex.datastructures.enums import Arms, VisualizationBackend
-from coraplex.view_manager import ViewManager
+from coraplex.datastructures.enums import VisualizationBackend
 from coraplex.visualization import WorldVisualization
 
 logger = logging.getLogger(__name__)
@@ -65,20 +64,17 @@ def start_visualization(world: World) -> WorldVisualization:
     return WorldVisualization.from_environment(world, default_backend).start()
 
 
-def attach_tool(
-    world: World, robot: AbstractRobot, arm: Arms, tool_world: World, mount: dict
-) -> Body:
+def attach_tool(world: World, arm: Arm, tool_world: World, mount: dict) -> Body:
     """
     Rigidly attach a tool mesh to the arm's tool frame.
 
     :param world: The world the robot lives in.
-    :param robot: The robot holding the tool.
     :param arm: The arm the tool is mounted on.
     :param tool_world: The world containing the parsed tool mesh.
     :param mount: Keyword arguments describing the mount transform.
     :return: The tool's root body inside ``world``.
     """
-    tool_frame = ViewManager.get_end_effector_view(arm, robot).tool_frame
+    tool_frame = arm.end_effector.tool_frame
     connection = FixedConnection(
         parent=tool_frame,
         child=tool_world.root,

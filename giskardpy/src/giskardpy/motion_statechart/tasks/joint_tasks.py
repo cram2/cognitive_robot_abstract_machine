@@ -7,7 +7,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.exceptions import EmptyGoalStateError
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
+from giskardpy.motion_statechart.error_signals import ErrorSignal
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
 from giskardpy.motion_statechart.graph_node import ConvergingTask
 from semantic_digital_twin.datastructures.joint_state import JointState
@@ -83,7 +83,7 @@ class JointPositionList(ConvergingTask):
                 task_expression=current,
             )
             errors.append(sm.abs(error))
-        artifacts.error = SymbolicErrorSignal(sm.max(sm.Vector(errors)))
+        artifacts.error = ErrorSignal(sm.max(sm.Vector(errors)))
         return artifacts
 
     def apply_limits_to_target(

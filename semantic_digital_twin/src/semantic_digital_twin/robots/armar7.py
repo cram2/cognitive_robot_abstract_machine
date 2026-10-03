@@ -30,7 +30,7 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     EndEffector,
 )
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -343,6 +343,14 @@ class Armar7LeftGripper(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.NEGATIVE_X(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -354,7 +362,6 @@ class Armar7LeftGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "Hand L TCP_link"
             ),
-            front_facing_orientation=Quaternion(-0.5, 0.5, -0.5, 0.5),
         )
 
 
@@ -390,6 +397,14 @@ class Armar7RightGripper(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.NEGATIVE_X(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -401,7 +416,6 @@ class Armar7RightGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "Hand R TCP_link"
             ),
-            front_facing_orientation=Quaternion(-0.5, 0.5, -0.5, 0.5),
         )
 
 
@@ -466,6 +480,10 @@ class Armar7RightArm(Arm[Armar7RightGripper]):
 @dataclass(eq=False)
 class AzureKinectRGB(Camera):
 
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.root)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -474,7 +492,6 @@ class AzureKinectRGB(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "AzureKinect_RGB_link"
             ),
-            forward_facing_axis=Vector3.Z(),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=1.3715,
             maximal_height=1.7365,

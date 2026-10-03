@@ -20,6 +20,7 @@ from semantic_digital_twin.api import RobotSpecification
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, MobileBase
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
 from semantic_digital_twin.world import World
 
@@ -215,6 +216,37 @@ def test_the_position_is_the_headings_own(robot_type: Type[AbstractRobot]):
         base_pose.to_position().to_np(), heading.to_position().to_np(), atol=1e-9
     )
     assert base_pose.reference_frame is heading.reference_frame
+
+
+# %% the heading a base stands at is read back off its pose
+
+
+@pytest.mark.parametrize(
+    "robot_type", ROBOTS_WITH_DISTINCT_FORWARD_AXES, ids=robot_name
+)
+@pytest.mark.parametrize("heading_yaw", [0.0, np.pi / 2, -np.pi / 2, np.pi, 0.3])
+def test_the_heading_of_a_base_pose_is_the_heading_it_was_placed_at(
+    robot_type: Type[AbstractRobot], heading_yaw: float
+):
+    """
+    A caller handed a base pose has to be able to say which heading it stands at, or
+    offering it back as one turns the robot by whatever its forward axis is. Turning it
+    back is :attr:`base_T_front` the other way round.
+    """
+    mobile_base = spawn(robot_type)
+    heading = Pose.from_xyz_rpy(
+        1.3, 2.0, 0.0, yaw=heading_yaw, reference_frame=mobile_base.root._world.root
+    )
+
+    base_pose = mobile_base.pose_facing(heading)
+
+    read_back = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        base_pose.to_position(),
+        base_pose.to_rotation_matrix() @ mobile_base.base_R_front,
+        reference_frame=base_pose.reference_frame,
+    ).to_pose()
+
+    np.testing.assert_allclose(read_back.to_np(), heading.to_np(), atol=1e-9)
 
 
 # %% a base whose front is already the x-axis needs no correction

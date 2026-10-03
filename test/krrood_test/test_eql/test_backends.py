@@ -1,3 +1,4 @@
+import time
 from copy import deepcopy
 from datetime import datetime
 from types import EllipsisType
@@ -34,6 +35,7 @@ from krrood.entity_query_language.factories import (
     an,
     variable_from,
 )
+from krrood.entity_query_language.query.match import Match
 from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.entity_query_language.core.variable import Variable as KRROODVariable
@@ -54,6 +56,7 @@ from ..dataset.example_classes import (
     EnumAction,
 )
 from ..dataset.ormatic_interface import *  # type: ignore
+from ..dataset.value_comparisons import IsGreaterThan
 
 
 def test_nested_action():
@@ -238,6 +241,56 @@ def test_generative_eql_backend():
     for result in results:
         assert isinstance(result.element, Element)
         assert result.type > result.charge
+
+
+def test_generative_backend_grounds_a_predicate_over_two_attributes_of_the_match():
+    """
+    A predicate in a match's where condition can take several attributes of the match,
+    each standing for that attribute of the instance being checked.
+    """
+    values = [0.0, 1.0, 2.0]
+    position = a(KRROODPosition)(
+        x=variable_from(values), y=variable_from(values), z=0.0
+    )
+    position.where(IsGreaterThan(position.x, position.y))
+
+    results = list(position.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+
+    assert {(result.x, result.y) for result in results} == {
+        (x, y) for x in values for y in values if x > y
+    }
+
+
+def test_generative_backend_grounds_a_predicate_taking_one_attribute_of_the_match_twice():
+    """
+    An attribute of the match filling two arguments of a predicate stands for that
+    attribute of the instance being checked in both of them.
+    """
+    values = [0.0, 1.0, 2.0]
+    position = a(KRROODPosition)(
+        x=variable_from(values), y=variable_from(values), z=0.0
+    )
+    position.where(IsGreaterThan(position.x, position.x))
+
+    results = list(position.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+
+    assert results == []
+
+
+def test_generative_backend_grounds_a_comparison_of_an_attribute_of_the_match_with_itself():
+    """
+    An attribute of the match on both sides of a comparison stands for that attribute of
+    the instance being checked on both sides.
+    """
+    values = [0.0, 1.0, 2.0]
+    position = a(KRROODPosition)(
+        x=variable_from(values), y=variable_from(values), z=0.0
+    )
+    position.where(position.x > position.x)
+
+    results = list(position.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+
+    assert results == []
 
 
 def test_selective_backend_rejects_match_with_ellipsis_attribute():

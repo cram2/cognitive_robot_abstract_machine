@@ -25,8 +25,9 @@ composed of structured semantic annotations of its parts (all defined in
 `semantic_digital_twin.robots.robot_parts`):
 
 * A `KinematicChain` is a contiguous sequence of kinematic structure entities from a `root` body to a `tip` body.
-* An `EndEffector` is the abstract base for end effectors and always defines a `tool_frame` as well as a
-  `front_facing_orientation` and the derived `front_facing_axis` used for tasks such as approach planning. Concrete
+* An `EndEffector` is the abstract base for end effectors and always defines a `tool_frame`. Each concrete end
+  effector states, in its tool frame, the `approach_axis` it travels toward an object along and the `closing_axis`
+  its fingers close along; together they are the grasp frame's x- and y-axis. Concrete
   grippers such as `PR2RightGripper` and `HSRBGripper` extend `EndEffector` (together with the `HasTwoFingers`
   mixin and one or more `Finger` parts).
 * A `Sensor` is any perceptual device; `Camera` is a concrete sensor that adds a forward-facing axis, a field of

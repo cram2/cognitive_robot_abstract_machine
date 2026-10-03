@@ -60,10 +60,9 @@ Like any designator we start by creating a description and then resolving and pe
 ```python
 from coraplex.robot_plans.motions.gripper import MoveToolCenterPointMotion
 from coraplex.execution_environment import simulated_robot
-from coraplex.datastructures.enums import Arms
 
 motion_description = MoveToolCenterPointMotion(
-    target=Pose.from_xyz_quaternion(1.5, 0.6, 0.6, 0, 0, 0, 1, reference_frame=world.root), arm=Arms.LEFT)
+    target=Pose.from_xyz_quaternion(1.5, 0.6, 0.6, 0, 0, 0, 1, reference_frame=world.root), arm=pr2_view.left_arm)
 
 with simulated_robot:
     execute_single(motion_description, context=context).perform()
@@ -93,10 +92,9 @@ and close the gripper respectively.
 ```python
 from coraplex.robot_plans.motions import MoveGripperMotion
 from coraplex.execution_environment import simulated_robot
-from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.datastructures.definitions import GripperState
 
-motion_description = MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT)
+motion_description = MoveGripperMotion(motion=GripperState.OPEN, gripper=pr2_view.left_arm.end_effector)
 
 with simulated_robot:
     execute_single(motion_description, context=context).perform()

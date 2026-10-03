@@ -56,29 +56,15 @@ def show(node, depth=0):
 plan is built by `notify`, which expands the whole plan without executing it.
 
 ```python
-from coraplex.datastructures.enums import ApproachDirection, Arms, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 milk = world.get_semantic_annotations_by_type(Milk)[0]
+grasp = milk.grasp_candidates()[0]
 
-grasp_description = GraspDescription(
-    ApproachDirection.FRONT,
-    VerticalAlignment.NoAlignment,
-    pr2.right_arm.end_effector,
-)
-
-
-reach = execute_single(
-    ReachAction(
-        target_pose=Pose(reference_frame=milk.root),
-        arm=Arms.RIGHT,
-        grasp_description=grasp_description,
-        object_designator=milk,
-    ), context=context)
+reach = execute_single(ReachAction(grasp=grasp, arm=pr2.right_arm), context=context)
 reach.notify()
 
 show(reach)
@@ -98,12 +84,7 @@ from coraplex.robot_plans.plan_transformations import DetectBeforeGrasp
 
 context.plan_transformations.append(DetectBeforeGrasp())
 
-reach = execute_single( ReachAction(
-        target_pose=Pose(reference_frame=milk.root),
-        arm=Arms.RIGHT,
-        grasp_description=grasp_description,
-        object_designator=milk,
-    ), context=context)
+reach = execute_single(ReachAction(grasp=grasp, arm=pr2.right_arm), context=context)
 reach.notify()
 
 show(reach)
@@ -125,9 +106,7 @@ reach that `PickUpAction` builds. Nothing has to be passed down to it:
 ```python
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 
-pick_up = execute_single(
-    PickUpAction(milk, Arms.RIGHT, grasp_description), context=context
-)
+pick_up = execute_single(PickUpAction(grasp, pr2.right_arm), context=context)
 pick_up.notify()
 
 show(pick_up)
@@ -138,8 +117,10 @@ stops at the expanded plan here. The next section performs a plan that a transfo
 
 ## Opening What the Object Lies In
 
-`OpenDrawerBeforePickUp` puts a drive to the handle and an opening in front of a pick-up whose object
-lies in a drawer. To see it, the apartment needs a drawer that something lies in — a spoon in the top
+`OpenDrawerBeforePickUp` puts an opening of the drawer in front of a pick-up whose object lies in one,
+followed by parking the arms and driving back to where the object can be reached from. The opening is
+a move-and-open step, so where the robot stands to open the drawer is tried together with the opening
+itself. To see it, the apartment needs a drawer that something lies in — a spoon in the top
 drawer of cabinet 10:
 
 ```python
@@ -191,18 +172,19 @@ context.plan_transformations = [OpenDrawerBeforePickUp()]
 spoon_annotation = world.get_semantic_annotations_by_type(Spoon)[0]
 
 pick_up = sequential(
-    [PickUpAction(spoon_annotation, Arms.RIGHT, grasp_description)], context
+    [PickUpAction(spoon_annotation.grasp_candidates()[0], pr2.right_arm)], context
 )
 pick_up.notify()
 
 show(pick_up)
 ```
 
-The drive and the opening now precede the pick-up, and both were expanded in turn. The milk stands in
-the open, so the same registration leaves its pick-up alone:
+The opening, the parking and the drive back to the spoon now precede the pick-up. The opening and the
+drive are grounded when they are run, and the parking was expanded in turn. The milk stands in the
+open, so the same registration leaves its pick-up alone:
 
 ```python
-milk_pick_up = sequential([PickUpAction(milk, Arms.RIGHT, grasp_description)], context)
+milk_pick_up = sequential([PickUpAction(grasp, pr2.right_arm)], context)
 milk_pick_up.notify()
 
 show(milk_pick_up)
@@ -255,7 +237,7 @@ class ParkArmsBeforeNavigating(InsertionTransformation[NavigateAction]):
         return drive
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [ParkArmsAction(Arms.BOTH)]
+        return [ParkArmsAction(plan_node.action.robot.get_arms())]
 ```
 
 ```python

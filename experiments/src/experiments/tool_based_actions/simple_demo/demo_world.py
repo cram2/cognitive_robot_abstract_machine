@@ -11,7 +11,7 @@ from typing_extensions import Optional
 import coraplex
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -19,8 +19,6 @@ from semantic_digital_twin.world_description.geometry import Box, Color, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
-from coraplex.datastructures.enums import Arms
-from coraplex.view_manager import ViewManager
 
 OBJECTS_DIRECTORY = os.path.join(
     os.path.dirname(coraplex.__file__), "..", "..", "resources", "objects"
@@ -90,7 +88,7 @@ def parse_object(stl_file_name: str, color: Optional[Color] = None) -> World:
     return object_world
 
 
-def attach_sponge(world: World, robot: AbstractRobot, arm: Arms) -> Body:
+def attach_sponge(world: World, arm: Arm) -> Body:
     """
     Attach a primitive box sponge to the arm's tool frame.
 
@@ -103,7 +101,7 @@ def attach_sponge(world: World, robot: AbstractRobot, arm: Arms) -> Body:
             [Box(scale=Scale(0.05, 0.05, 0.05), color=SPONGE_COLOR)]
         ),
     )
-    tool_frame = ViewManager.get_end_effector_view(arm, robot).tool_frame
+    tool_frame = arm.end_effector.tool_frame
     connection = FixedConnection(
         parent=tool_frame,
         child=sponge_body,

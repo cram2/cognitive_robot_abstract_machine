@@ -62,14 +62,13 @@ the execution will be aborted and the state FAILED will be returned.
 We will start with a simple example that uses an action designator for moving the robot and parking its arms.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.get_arms())
 
 plan = sequential([navigate, park], context=context).plan
 ```
@@ -101,14 +100,13 @@ be returned if all designator executions raise an error.
 Besides the described difference in behaviour this language expression can be used in the same way as Sequential.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import try_in_order
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.get_arms())
 
 plan = try_in_order([navigate, park], context=context).plan
 
@@ -126,14 +124,13 @@ in any other case FAILED will be returned.
 Using the parallel expressions works like Sequential and TryInOrder.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import parallel
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.get_arms())
 
 plan = parallel([navigate, park], context=context).plan
 
@@ -149,14 +146,13 @@ will return SUCCEEDED if at least one designator is executed without raising an 
 TryAll can be used like any other language expression.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import try_all
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.get_arms())
 
 plan = try_all([navigate, park], context=context).plan
 
@@ -170,7 +166,6 @@ You can also combine different language expressions to further structure your pl
 Sequential expression inside a Parallel one by passing the result of one factory as a child of another.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import parallel, sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
@@ -178,7 +173,7 @@ from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.get_arms())
 move_torso = MoveTorsoAction(TorsoState.HIGH)
 
 plan = parallel([navigate, sequential([park, move_torso])], context=context).plan
@@ -202,7 +197,6 @@ Although this expression is more intended for debugging and testing purposes sin
 other parts of the plan.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import code, parallel
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 
@@ -212,7 +206,7 @@ def code_test():
     print("Code function")
 
 
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.get_arms())
 code_lambda = code(lambda: print("This is from the code object"), context=context)
 code_func = code(code_test, context=context)
 

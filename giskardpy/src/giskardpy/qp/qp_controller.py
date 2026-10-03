@@ -8,6 +8,7 @@ import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.constraint_collection import ConstraintCollection
+from giskardpy.qp.exceptions import InfeasibleException, SolverReturnedFailureError
 from giskardpy.qp.qp_data_factories import QPDataFactory
 from giskardpy.qp.qp_data_symbolic import QPDataSymbolic
 from giskardpy.qp.qp_debugger import QuadraticProgramDebugger
@@ -120,7 +121,13 @@ class QPController:
             world_state, life_cycle_state, float_variables
         )
         qp_data_filtered = qp_data_raw.apply_filters()
-        solution = self.qp_solver.solver_call(qp_data_filtered)
+        try:
+            solution = self.qp_solver.solver_call(qp_data_filtered)
+        except (InfeasibleException, SolverReturnedFailureError):
+            logger.warning(qp_data_filtered.pretty_print_problem())
+            qp_data_filtered.analyze_well_posedness()
+            raise
+
         return self.xdot_to_control_commands(solution)
 
     def xdot_to_control_commands(self, xdot: np.ndarray) -> np.ndarray:

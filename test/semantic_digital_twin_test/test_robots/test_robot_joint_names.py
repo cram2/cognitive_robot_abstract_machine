@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import gc
+import weakref
+from dataclasses import dataclass, field
 from enum import StrEnum
-from functools import lru_cache
 
 import pytest
 
@@ -49,14 +51,40 @@ Test identifiers naming the robot under test.
 """
 
 
-@lru_cache(maxsize=None)
-def parse_robot_description(robot_type: type[AbstractRobot]) -> World:
+@dataclass
+class ParsedRobotDescriptions:
     """
-    Parses the robot's description into a world, reusing the result across tests.
+    The worlds parsed from robot descriptions, reused by everything holding the same
+    instance.
 
-    :param robot_type: The robot whose description is parsed
+    .. note:: The worlds live exactly as long as the instance, so whoever holds it decides
+        how long the parsed descriptions stay in memory.
     """
-    return URDFParser.from_file(robot_type.get_ros_file_path()).parse()
+
+    worlds_by_robot: dict[type[AbstractRobot], World] = field(default_factory=dict)
+    """
+    The world already parsed for a robot.
+    """
+
+    def world_of(self, robot_type: type[AbstractRobot]) -> World:
+        """
+        The world holding the robot's description, parsing it on first request.
+
+        :param robot_type: The robot whose description is parsed.
+        """
+        if robot_type not in self.worlds_by_robot:
+            self.worlds_by_robot[robot_type] = URDFParser.from_file(
+                robot_type.get_ros_file_path()
+            ).parse()
+        return self.worlds_by_robot[robot_type]
+
+
+@pytest.fixture(scope="module")
+def parsed_robot_descriptions() -> ParsedRobotDescriptions:
+    """
+    Descriptions parsed once for this module, and released when it is done with them.
+    """
+    return ParsedRobotDescriptions()
 
 
 # %% joint-name enums against the parsed description
@@ -66,12 +94,14 @@ def parse_robot_description(robot_type: type[AbstractRobot]) -> World:
     "robot_type, joint_enum", ROBOTS_WITH_JOINT_ENUM, ids=ROBOT_IDENTIFIERS
 )
 def test_joint_enum_members_name_connections_of_the_robot(
-    robot_type: type[AbstractRobot], joint_enum: type[StrEnum]
+    robot_type: type[AbstractRobot],
+    joint_enum: type[StrEnum],
+    parsed_robot_descriptions: ParsedRobotDescriptions,
 ):
     """
     Every member must spell a connection name that the robot's description contains.
     """
-    world = parse_robot_description(robot_type)
+    world = parsed_robot_descriptions.world_of(robot_type)
     connection_names = {connection.name.name for connection in world.connections}
 
     assert {joint.value for joint in joint_enum} - connection_names == set()
@@ -81,12 +111,14 @@ def test_joint_enum_members_name_connections_of_the_robot(
     "robot_type, joint_enum", ROBOTS_WITH_JOINT_ENUM, ids=ROBOT_IDENTIFIERS
 )
 def test_joint_enum_members_name_actuated_connections(
-    robot_type: type[AbstractRobot], joint_enum: type[StrEnum]
+    robot_type: type[AbstractRobot],
+    joint_enum: type[StrEnum],
+    parsed_robot_descriptions: ParsedRobotDescriptions,
 ):
     """
     Every member must name an actuated connection, since only those accept a joint goal.
     """
-    world = parse_robot_description(robot_type)
+    world = parsed_robot_descriptions.world_of(robot_type)
     actuated_connection_names = {
         connection.name.name
         for connection in world.connections
@@ -94,3 +126,20 @@ def test_joint_enum_members_name_actuated_connections(
     }
 
     assert {joint.value for joint in joint_enum} - actuated_connection_names == set()
+
+
+# %% lifetime of the parsed descriptions
+
+
+def test_parsed_descriptions_are_released_with_their_holder():
+    """
+    Nothing may keep a parsed world alive once the descriptions holding it are gone, so
+    that a module does not pin worlds for the rest of the test session.
+    """
+    descriptions = ParsedRobotDescriptions()
+    world_reference = weakref.ref(descriptions.world_of(PR2))
+
+    del descriptions
+    gc.collect()
+
+    assert world_reference() is None

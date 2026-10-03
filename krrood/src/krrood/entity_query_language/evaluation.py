@@ -179,7 +179,7 @@ class InferenceRecorder(EvaluationObserver):
         if expression._id_ not in result.bindings:
             return
         # Only record for InstantiatedVariable subclasses whose _evaluate__
-        # delegates to _instantiate_using_child_vars_and_yield_results_ (that is,
+        # delegates to _instantiate_using_child_variables_and_yield_results_ (that is,
         # those that actually create new instances).  Query and its subclasses
         # (Entity, SetOf) override _evaluate__ and merely remap bindings
         # without creating new inferred instances.

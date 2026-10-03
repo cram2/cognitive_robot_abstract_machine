@@ -44,7 +44,7 @@ from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
 )
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     DifferentialDrive,
@@ -212,6 +212,14 @@ class TiagoLeftGripper(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -223,7 +231,6 @@ class TiagoLeftGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "gripper_left_grasping_frame"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
@@ -259,6 +266,14 @@ class TiagoRightGripper(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -270,7 +285,6 @@ class TiagoRightGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "gripper_right_grasping_frame"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
@@ -369,6 +383,10 @@ class TiagoRightArm(Arm[TiagoRightGripper]):
 @dataclass(eq=False)
 class TiagoCamera(Camera):
 
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.root)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -377,7 +395,6 @@ class TiagoCamera(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "head_front_camera_optical_frame"
             ),
-            forward_facing_axis=Vector3.Z(),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=1.0665,
             maximal_height=1.4165,
@@ -653,6 +670,14 @@ class TiagoMujocoLeftGripper(
         )
         return [gripper_close, gripper_open]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -664,7 +689,6 @@ class TiagoMujocoLeftGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "arm_left_7_link"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
@@ -690,6 +714,14 @@ class TiagoMujocoRightGripper(
         )
         return [gripper_close, gripper_open]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -701,7 +733,6 @@ class TiagoMujocoRightGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "arm_right_7_link"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 

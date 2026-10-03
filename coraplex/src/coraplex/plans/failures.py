@@ -4,9 +4,12 @@ from dataclasses import dataclass
 
 from typing_extensions import TYPE_CHECKING
 
+from giskardpy.motion_statechart.exceptions import (
+    CollisionViolatedError,
+    NoProgressError,
+)
 from krrood.exceptions import DataclassException
-from coraplex.datastructures.enums import Arms
-from semantic_digital_twin.robots.robot_parts import EndEffector
+from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -28,6 +31,56 @@ class PlanFailure(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+# %% what a plan can recover from
+
+
+@dataclass
+class MotionMadeNoProgress(PlanFailure):
+    """
+    Raised when a motion stopped approaching its goal.
+
+    The chart cancels itself with a
+    :class:`~giskardpy.motion_statechart.exceptions.NoProgressError`, which says this
+    attempt did not work rather than that the plan cannot go on. Wrapping it where it
+    crosses into a plan is what lets a plan choose an alternative by catching
+    :class:`PlanFailure` alone.
+    """
+
+    no_progress: NoProgressError
+    """
+    The stall the motion reported, which names the tasks that stopped converging.
+    """
+
+    def error_message(self) -> str:
+        return self.no_progress.error_message()
+
+    def suggest_correction(self) -> str:
+        return self.no_progress.suggest_correction()
+
+
+@dataclass
+class MotionViolatedCollisionAvoidance(PlanFailure):
+    """
+    Raised when a motion brought bodies closer to each other than collision avoidance
+    allows.
+
+    Like :class:`MotionMadeNoProgress`, this says the attempt did not work from where it
+    started rather than that the plan cannot go on, so a plan can try another candidate
+    by catching :class:`PlanFailure` alone.
+    """
+
+    violation: CollisionViolatedError
+    """
+    The violation the motion reported, which names the body pairs that came too close.
+    """
+
+    def error_message(self) -> str:
+        return self.violation.error_message()
+
+    def suggest_correction(self) -> str:
+        return self.violation.suggest_correction()
 
 
 @dataclass
@@ -169,7 +222,7 @@ class BodyUnfetchable(PlanFailure):
     The body that cannot be fetched.
     """
 
-    arm: Arms
+    arm: Arm
     """
     The arm from which the body cannot be fetched.
     """

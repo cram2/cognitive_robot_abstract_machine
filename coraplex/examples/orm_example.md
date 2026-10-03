@@ -36,13 +36,15 @@ from coraplex.orm.ormatic_interface import *
 coraplex.orm.ormatic_interface.Base.metadata.create_all(engine)
 ```
 
-Next, we will write a simple plan where the robot parks its arms, moves somewhere, picks up an object, navigates somewhere else, and places it.
+Next, we will write a simple plan where the robot raises its torso and transports a milk carton: it parks its arms,
+navigates to the milk, faces and looks at it, picks it up, navigates to the target, faces and looks at it, and places
+the milk there.
 
 ```python
 from coraplex.robot_plans import *
 from coraplex.execution_environment import simulated_robot
-from coraplex.robot_plans.actions.composite.transporting import TransportAction, MoveTorsoAction
-from coraplex.datastructures.enums import Arms, Grasp
+from coraplex.robot_plans.actions.composite.transporting import TransportAction
+from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from coraplex.plans.factories import *
 from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2, TorsoState
@@ -51,12 +53,16 @@ from coraplex.datastructures.dataclasses import Context
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
-context = Context(world, pr2_view)
+# A location samples its candidates from a costmap, so a seed is what makes this
+# example run the same way twice.
+context = Context(world, pr2_view, sampling_seed=0)
 
-description = TransportAction(world.get_semantic_annotations_by_type(Milk)[0],
-                              Pose.from_xyz_quaternion(2.4, 2.8, 1,
-                                                       0.0, 0.0, 0.0, 1.0, reference_frame=world.root),
-                              Arms.LEFT)
+description = TransportAction.from_graspable_by_closest_grasps(
+    world.get_semantic_annotations_by_type(Milk)[0],
+    Pose.from_xyz_quaternion(2.4, 3, 1.05, 0.0, 0.0, 0.0, 1.0, reference_frame=world.root),
+    pr2_view.left_arm,
+    context,
+)
 plan = sequential([MoveTorsoAction(TorsoState.HIGH),
                    description], context=context).plan
 with simulated_robot:
@@ -83,7 +89,8 @@ navigations = session.scalars(select(get_dao_class(NavigateAction))).all()
 print(*navigations, sep="\n")
 ```
 
-This should print all the pick up actions that occurred during the plan execution, which is one.
+This should print both NavigateActions of the plan: the one to where the robot picks up the milk and the one to where
+it places it.
 
 Due to the inheritance mapped in the ORM package, we can also get all executed actions with just one query.
 
@@ -94,7 +101,10 @@ actions = session.scalars(select(get_dao_class(ActionDescription))).all()
 print(*actions, sep="\n")
 ```
 
-This should print all the actions that occurred during the plan execution, which is five.
+This should print every action that occurred during the plan execution, including the steps the composite actions are
+made of: besides the MoveTorsoAction and the TransportAction, it lists the TransportAction's ParkArmsActions, its
+MoveAndPickUpAction and MoveAndPlaceAction, and the steps inside those, such as the NavigateActions, the PickUpAction and
+the PlaceAction.
 
 If you want to know more about the memory component, read the documentation of the 
 [KRR component](https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html).
