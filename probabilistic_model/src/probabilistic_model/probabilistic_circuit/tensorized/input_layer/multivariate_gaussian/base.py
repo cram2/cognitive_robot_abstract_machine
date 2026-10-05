@@ -48,6 +48,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.multivaria
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.multivariate_gaussian.multivariate_gaussian_array import (
     MultivariateGaussianArray,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.stacked_copies import (
+    StackedLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
     QueryCache,
     memoized,
@@ -216,6 +219,12 @@ class AbstractMultivariateGaussianLayer(Layer, ABC):
         :return: A layer that only holds the selected nodes.
         """
         raise NotImplementedError
+
+    @classmethod
+    def stacked(
+        cls, copies: List[Self], stacked_child_layers: List[StackedLayer]
+    ) -> StackedLayer:
+        return StackedLayer.of_input_layer_copies(copies)
 
     @classmethod
     @abstractmethod

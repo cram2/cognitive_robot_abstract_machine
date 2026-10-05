@@ -1,6 +1,8 @@
-from unittest.mock import patch
-
+import functools
 import json
+import operator
+import random
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -18,12 +20,22 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
     InvalidMonteCarloSampleCountError,
+    NestedExchangeablePartsNotLayeredError,
+)
+from probabilistic_model.probabilistic_circuit.relational.layered_grounding import (
+    LayeredExchangeableInstances,
+    NoRetainedLatents,
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
+    ExchangeableDistributionTemplate,
     ExchangeablePartGrounder,
     GroundingMode,
+    InstanceMixture,
     RelationalProbabilisticCircuit,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -33,8 +45,8 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from probabilistic_model.utils import MissingDict
 from random_events.interval import closed
-from random_events.product_algebra import SimpleEvent
-from random_events.variable import Continuous, Integer
+from random_events.product_algebra import Event, SimpleEvent
+from random_events.variable import Continuous, Integer, Symbolic
 from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
     KRROODOrientation,
@@ -206,6 +218,7 @@ def test_non_positive_sample_count_raises_when_integration_needed(
     relational_probabilistic_circuit.monte_carlo_sample_count = 0
     with pytest.raises(InvalidMonteCarloSampleCountError):
         relational_probabilistic_circuit.ground(room_query_4)
+
 
 @pytest.fixture
 def relational_probabilistic_circuit_with_ambiguous_total_count_4():
@@ -826,4 +839,121 @@ def test_partition_disjointly_false_for_overlapping_branches():
     root.normalize()
     assert not ExchangeablePartGrounder._undetermined_latents_partition_disjointly(
         circuit
+    )
+
+
+# %% grounding into a layered circuit
+
+
+def events_over_discrete_variables(
+    variables: SortedSet, number_of_events: int
+) -> list[Event]:
+    """
+    Events that pick a random subset of the values of every symbolic and integer
+    variable, and leave every continuous variable free.
+
+    :param variables: The variables of a grounded circuit.
+    :param number_of_events: How many events to make.
+    :return: The events.
+    """
+    generator = random.Random(0)
+    events = []
+    for _ in range(number_of_events):
+        assignment = {}
+        for variable in variables:
+            if isinstance(variable, Symbolic):
+                elements = list(variable.domain.simple_sets)
+                chosen = generator.sample(elements, generator.randint(1, len(elements)))
+                assignment[variable] = functools.reduce(
+                    operator.or_, [element.as_composite_set() for element in chosen]
+                )
+            elif isinstance(variable, Integer):
+                lower = generator.randint(0, 4)
+                assignment[variable] = closed(lower, lower + generator.randint(0, 3))
+            else:
+                assignment[variable] = variable.domain
+        events.append(SimpleEvent.from_data(assignment).as_composite_set())
+    return events
+
+
+def assert_same_distribution(
+    grounded: ProbabilisticCircuit, layered: LayeredProbabilisticCircuit
+):
+    """
+    Assert that a grounding and a layered grounding have the same variables and give
+    every event over their discrete variables the same probability.
+    """
+    assert list(layered.variables) == list(grounded.variables)
+    events = events_over_discrete_variables(grounded.variables, 50)
+    np.testing.assert_allclose(
+        [layered.probability(event) for event in events],
+        [grounded.probability(event) for event in events],
+        atol=1e-12,
+    )
+
+
+def test_layered_grounding_with_sampled_latents_is_the_grounding(
+    relational_probabilistic_circuit_with_ambiguous_total_count_4, room_query_4
+):
+    model = relational_probabilistic_circuit_with_ambiguous_total_count_4
+    np.random.seed(0)
+    grounded = model.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
+    np.random.seed(0)
+    layered = model.ground_layered(room_query_4, grounding_mode=GroundingMode.SAMPLED)
+    assert_same_distribution(grounded, layered)
+
+
+def test_layered_grounding_over_the_exact_partition_is_the_grounding(
+    correlated_relational_probabilistic_circuit, correlated_room_query
+):
+    model = correlated_relational_probabilistic_circuit
+    grounded = model.ground(correlated_room_query, grounding_mode=GroundingMode.EXACT)
+    layered = model.ground_layered(
+        correlated_room_query, grounding_mode=GroundingMode.EXACT
+    )
+    assert_same_distribution(grounded, layered)
+
+
+def test_layered_grounding_of_a_query_that_determines_every_statistic_is_the_grounding(
+    relational_probabilistic_circuit,
+):
+    query = a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[
+            a(SceneObject)(type=SceneObjectType.TABLE),
+            a(SceneObject)(type=SceneObjectType.CHAIR),
+            a(SceneObject)(type=SceneObjectType.CHAIR),
+        ],
+    )
+    query.resolve()
+    grounded = relational_probabilistic_circuit.ground(query)
+    layered = relational_probabilistic_circuit.ground_layered(query)
+    assert_same_distribution(grounded, layered)
+
+
+def test_layered_grounding_rejects_a_template_with_exchangeable_relations_of_its_own():
+    nested_template = ExchangeableDistributionTemplate(
+        RelationalProbabilisticCircuit(SceneRoom)
+    )
+    template = ExchangeableDistributionTemplate(
+        RelationalProbabilisticCircuit(
+            SceneRoom,
+            exchangeable_distribution_templates={"objects": nested_template},
+        )
+    )
+    with pytest.raises(NestedExchangeablePartsNotLayeredError):
+        LayeredExchangeableInstances(template, [], [], NoRetainedLatents(SortedSet()))
+
+
+def test_instance_mixture_gives_every_distinct_assignment_one_instance():
+    variable = Integer("value")
+    first, second, third = {variable: 1}, {variable: 2}, {variable: 3}
+    mixture = InstanceMixture.of_node_local_assignments(
+        [([first, second], [-1.0, -2.0]), ([second, third], [-3.0, -4.0])],
+        lambda assignment: (assignment[variable],),
+    )
+    assert mixture.assignments == [first, second, third]
+    np.testing.assert_array_equal(
+        mixture.log_weights, [[-1.0, -2.0, -np.inf], [-np.inf, -3.0, -4.0]]
     )

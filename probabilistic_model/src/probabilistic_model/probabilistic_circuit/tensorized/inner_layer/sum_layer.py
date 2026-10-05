@@ -117,6 +117,41 @@ class SumLayer(InnerLayer):
         )
 
     @classmethod
+    def from_edges(
+        cls,
+        child_layers: List[Layer],
+        edges: InnerLayerEdges,
+        log_weights: EdgeValues,
+        number_of_nodes: int,
+    ) -> Self:
+        """
+        :param child_layers: The child layers.
+        :param edges: The edges from the nodes of the new layer into the child layers.
+        :param log_weights: The logarithmic weight of every edge.
+        :param number_of_nodes: The number of nodes of the new layer.
+        :return: The sum layer with these edges and weights.
+        """
+        offsets = np.concatenate(
+            [
+                [0],
+                np.cumsum(
+                    [child_layer.number_of_nodes for child_layer in child_layers]
+                ),
+            ]
+        ).astype(np.int64)
+        return cls(
+            child_layers,
+            RowGroupedSparseArray.from_entries(
+                SparseEntries(
+                    log_weights,
+                    edges.nodes,
+                    offsets[edges.child_layer_indices] + edges.child_nodes,
+                ),
+                (number_of_nodes, int(offsets[-1])),
+            ),
+        )
+
+    @classmethod
     def mixture_of_pieces(
         cls, pieces: List[LayerWithLogProbabilities]
     ) -> LayerWithLogProbabilities:
@@ -231,6 +266,21 @@ class SumLayer(InnerLayer):
         ):
             return values
         return values[..., columns]
+
+    def has_equal_edges(self, other: Self) -> bool:
+        return super().has_equal_edges(other) and np.array_equal(
+            self.log_weights.data, other.log_weights.data
+        )
+
+    def with_edges(
+        self, child_layers: List[Layer], edges: InnerLayerEdges, copies: List[Self]
+    ) -> Self:
+        return self.from_edges(
+            child_layers,
+            edges,
+            np.concatenate([copy.log_weights.data for copy in copies]),
+            len(copies) * self.number_of_nodes,
+        )
 
     # %% weights
 

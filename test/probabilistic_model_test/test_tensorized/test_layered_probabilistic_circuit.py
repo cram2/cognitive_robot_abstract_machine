@@ -38,6 +38,7 @@ from random_events.variable import Continuous, Integer, Symbolic
 from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
     CannotConvertError,
     NotExactlyOneRootError,
+    UnitNotConvertedError,
 )
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
@@ -306,6 +307,26 @@ class ConversionTestCase(unittest.TestCase):
                 layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
                 self.assertEqual(list(layered.variables), list(rx_circuit.variables))
                 layered.validate()
+
+    def test_the_product_units_of_a_level_become_the_nodes_of_one_layer(self):
+        circuit = shared_children_circuit()
+        converted = RustworkxCircuitToLayeredCircuitConverter.convert_with_layers(
+            circuit
+        )
+        product_units = [
+            unit for unit in circuit.nodes() if isinstance(unit, ProductUnit)
+        ]
+        nodes = [converted.node_of(unit) for unit in product_units]
+        self.assertIs(nodes[0].layer, nodes[1].layer)
+        self.assertIsInstance(nodes[0].layer, ProductLayer)
+        self.assertEqual({node.node for node in nodes}, {0, 1})
+
+    def test_a_unit_of_another_circuit_was_not_converted(self):
+        converted = RustworkxCircuitToLayeredCircuitConverter.convert_with_layers(
+            shared_children_circuit()
+        )
+        with self.assertRaises(UnitNotConvertedError):
+            converted.node_of(shared_children_circuit().root)
 
     def test_a_leaf_without_a_converter_is_reported(self):
         circuit = RxCircuit()
