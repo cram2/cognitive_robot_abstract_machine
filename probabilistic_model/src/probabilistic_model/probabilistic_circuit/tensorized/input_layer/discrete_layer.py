@@ -354,7 +354,7 @@ class SymbolicLayer(DiscreteLayer):
     ) -> Dict[int, float]:
         encoding = SymbolicEncoding(distribution.variable)
         return {
-            encoding.index_of_element(hash_value): probability
+            encoding.index_of_hash(hash_value): probability
             for hash_value, probability in distribution.probabilities.items()
         }
 

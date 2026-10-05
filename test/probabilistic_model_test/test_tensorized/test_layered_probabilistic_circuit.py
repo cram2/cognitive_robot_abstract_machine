@@ -25,7 +25,7 @@ numerically integrating the joint density.
 from __future__ import annotations
 
 import unittest
-from enum import IntEnum
+from enum import Enum, IntEnum
 from unittest import mock
 
 import numpy as np
@@ -118,6 +118,19 @@ class SparseSymbolEnum(IntEnum):
 
 
 sparse = Symbolic(name="sparse", domain=Set.from_iterable(SparseSymbolEnum))
+
+
+class SymbolWithLargeHash(Enum):
+    """
+    Domain elements whose hashes are larger than the hashes Python reduces integers to,
+    so that hashing such a hash again does not give it back.
+    """
+
+    FIRST = 2**62 + 2**20
+    SECOND = 2**62 + 2**21
+
+    def __hash__(self) -> int:
+        return self.value
 
 
 class UnconvertibleUniformDistribution(UniformDistribution):
@@ -1255,6 +1268,28 @@ class SymbolicEncodingTestCase(unittest.TestCase):
         encoding = SymbolicEncoding(sparse)
         np.testing.assert_array_equal(
             encoding.indices_of_hashes(np.array([5.0, np.nan])), [-1, -1]
+        )
+
+    def test_a_distribution_over_elements_with_large_hashes_keeps_its_probabilities(
+        self,
+    ):
+        variable = Symbolic(
+            name="large_hash", domain=Set.from_iterable(SymbolWithLargeHash)
+        )
+        distribution = SymbolicDistribution(
+            variable=variable,
+            probabilities=MissingDict(
+                float,
+                {
+                    hash(SymbolWithLargeHash.FIRST): 0.25,
+                    hash(SymbolWithLargeHash.SECOND): 0.75,
+                },
+            ),
+        )
+        layer = SymbolicLayer.from_distributions(0, [distribution])
+        self.assertEqual(
+            dict(layer.node_distribution(0, variable).probabilities),
+            dict(distribution.probabilities),
         )
 
     def test_symbolic_layer_stores_positions_in_the_domain(self):
