@@ -1198,6 +1198,34 @@ class TestCartesianTasks:
         line = StraightLine(start=path[0], end=goal_pose.to_np()[:3, 3])
         assert line.maximum_distance_from(path) <= STRAIGHT_LINE_TOLERANCE
 
+    def test_cartesian_position_straight_weighs_its_rows_by_its_weight(
+        self, cylinder_bot_world: World
+    ):
+        """
+        Progress along the line costs the task's weight, and leaving the line costs that
+        weight times the lateral weight factor.
+        """
+        task = CartesianPositionStraight(
+            root_link=cylinder_bot_world.root,
+            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            goal_point=Point3(x=1, reference_frame=cylinder_bot_world.root),
+            weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+            name="straight",
+        )
+
+        artifacts = task.build(MotionStatechartContext(world=cylinder_bot_world))
+
+        weights = {
+            constraint.name: constraint.quadratic_weight
+            for constraint in artifacts.constraints.equality_constraints
+        }
+        lateral_weight = task.weight * task.LATERAL_WEIGHT_FACTOR
+        assert weights == {
+            "line/progress": task.weight,
+            "line/y": lateral_weight,
+            "line/z": lateral_weight,
+        }
+
     def test_cartesian_position_moves_straight_towards_a_diagonal_goal(
         self, pr2_world_state_reset: World
     ):
