@@ -50,3 +50,22 @@ def test_attribute_taken_from_a_query_carries_the_attribute_type():
     """
     body = variable(Body, domain=[])
     assert entity(body).size._type_ is body.size._type_ is int
+
+
+# %% the variable-rooted form of an expression
+
+
+def test_chain_taken_from_a_query_has_the_variable_rooted_form_of_its_variable():
+    body = variable(Body, domain=[])
+    assert entity(body).size._variable_rooted_._name_ == body.size._name_
+
+
+def test_chain_taken_from_a_variable_is_its_own_variable_rooted_form():
+    body = variable(Body, domain=[])
+    assert body.size._variable_rooted_ is body.size
+
+
+def test_expression_that_is_no_chain_is_its_own_variable_rooted_form():
+    body = variable(Body, domain=[])
+    condition = body.size > 1
+    assert condition._variable_rooted_ is condition

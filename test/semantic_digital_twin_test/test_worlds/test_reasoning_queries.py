@@ -12,6 +12,7 @@ from semantic_digital_twin.reasoning.queries import (
     annotation_class_by_label,
     sort_annotations_by_volume,
 )
+from semantic_digital_twin.reasoning.reasoner import CaseReasoner
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.world import World
@@ -65,6 +66,16 @@ def test_world_reasoner_reason_returns_dicts():
     result = reasoner.reason()
 
     assert isinstance(result, dict)
+
+
+def test_each_reasoner_applies_rules_of_its_own():
+    """
+    The rules keep the last case they classified in memory for as long as they are kept,
+    so they belong to the reasoner that applied them rather than to the process.
+    """
+    world = World()
+
+    assert CaseReasoner(world).rdr is not CaseReasoner(world).rdr
 
 
 def test_semantic_annotations_on_surfaces(kitchen_environment_fixture):

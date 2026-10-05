@@ -36,7 +36,7 @@ def test_an_entity_carrying_an_enum_keeps_that_enums_members_as_its_domain():
     enum has to come from the value standing there; without it the variable describing
     the entity's kind has no members to be conditioned on.
     """
-    action = a(ApproachSceneObject)(
+    action = an(ApproachSceneObject)(
         target=SceneObject(type=SceneObjectType.TABLE), speed=...
     )
 

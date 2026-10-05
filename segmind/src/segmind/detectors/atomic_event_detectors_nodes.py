@@ -18,7 +18,7 @@ from segmind.datastructures.events import (
     StopRotationEvent,
 )
 from segmind.detectors.base import SegmindContext, AbstractDetector
-from semantic_digital_twin.reasoning.predicates import contact
+from semantic_digital_twin.reasoning.predicates import InContactWith
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -46,7 +46,7 @@ class ContactDetector(AbstractDetector):
         :param tracked_objects: List of bodies to check for new contacts.
         :return: List of ContactEvent instances generated during this update.
         """
-        new_contact_pairs = self.get_relation(context, tracked_objects, contact)
+        new_contact_pairs = self.get_relation(context, tracked_objects, InContactWith)
 
         events = []
         for obj, contact_list in new_contact_pairs.items():
@@ -95,7 +95,7 @@ class LossOfContactDetector(AbstractDetector):
         :param tracked_objects: List of bodies to check for lost contacts.
         :return: List of LossOfContactEvent instances generated during this update.
         """
-        new_contact_pairs = self.get_relation(context, tracked_objects, contact)
+        new_contact_pairs = self.get_relation(context, tracked_objects, InContactWith)
 
         events = []
         for obj, contact_list in list(segmind_context.latest_contact_bodies.items()):

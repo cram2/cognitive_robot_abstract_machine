@@ -4,10 +4,13 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Set, List, Any
 
+from typing_extensions import TypeVar
+
 from giskardpy.motion_statechart.context import MotionStatechartContext, ContextExtension
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from krrood.entity_query_language.predicate import Triple
 from segmind.datastructures.events import MotionEvent, DetectionEvent, RotationEvent
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from segmind.event_logger import EventLogger
@@ -29,6 +32,11 @@ class DetectorStateChart(MotionStatechart):
 IndexedBodyPairs = Dict[Body, Set[Body]]
 """
 Type hint for dictionaries mapping bodies to sets of bodies
+"""
+
+BodyRelation = TypeVar("BodyRelation", bound=Triple[Body, Body])
+"""
+A relation whose subject and object are both bodies.
 """
 
 
@@ -132,24 +140,25 @@ class AbstractDetector(MotionStatechartNode, ABC):
         return ObservationStateValues.TRUE if events else ObservationStateValues.FALSE
 
 
-    def get_relation(self, context: MotionStatechartContext, tracked_objects: List[Body], predicate) -> Dict[Body, Set[Body]]:
+    def get_relation(self, context: MotionStatechartContext, tracked_objects: List[Body], relation: type[BodyRelation]) -> Dict[Body, Set[Body]]:
         """
         Get the relation between tracked objects.
 
         :param context: The context containing world information.
         :param tracked_objects: List of bodies to check for contact changes.
-        :param predicate: Function that returns true if the objects are related.
+        :param relation: The relation between two bodies, with each tracked body as its
+            subject and each other body as its object.
         :return: Dictionary mapping bodies to sets of related bodies.
         """
 
         related_bodies: Dict[Body, Set[Body]] = {}
         bodies_with_collision = context.world.bodies_with_collision
-        for obj in tracked_objects:
+        for tracked_body in tracked_objects:
             for body in bodies_with_collision:
-                if body is obj:
+                if body is tracked_body:
                     continue
-                if predicate(obj, body):
-                    related_bodies.setdefault(obj, set()).add(body)
+                if relation.from_subject_object(tracked_body, body)():
+                    related_bodies.setdefault(tracked_body, set()).add(body)
         return related_bodies
 
     @abstractmethod

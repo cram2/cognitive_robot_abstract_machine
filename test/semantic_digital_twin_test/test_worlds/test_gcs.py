@@ -239,7 +239,7 @@ def test_constrain_to_free_space_adds_a_where_condition(table_world: World):
 
     query = a(Point3)(x=..., y=..., z=..., reference_frame=None)
 
-    condition = graph_of_convex_sets.constrain_to_free_space(query.expression)
+    condition = graph_of_convex_sets.constrain_to_free_space(query._get_expression_())
 
     assert condition is not None
     assert condition._children_

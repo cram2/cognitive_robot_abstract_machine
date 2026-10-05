@@ -6,9 +6,7 @@ from typing_extensions import Optional
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.aggregators import Aggregator
-from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
-    SpecificityRule,
-)
+from krrood.patterns.specificity_ranking import SpecificityRule
 from krrood.entity_query_language.query.aggregation_structure import (
     aggregation_source_root,
 )

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing_extensions import List
 
-from krrood.entity_query_language.factories import a, cause, confounder
+from krrood.entity_query_language.factories import a, an, cause, confounder
 from krrood.parametrization.feature_extraction.aggregations import (
     AggregationStatistic,
     aggregation_statistic,
@@ -68,7 +68,7 @@ def test_without_cause_no_search_cause_variables_are_registered():
 
 def test_causes_effect_condition_registers_its_effect_variable():
     match = a(Pick)(arm=cause, status=...)
-    match.causes_effect(match.variable.status == Status.SUCCESS)
+    match.causes_effect(match.status == Status.SUCCESS)
     parameters = UnderspecifiedParameters(match)
     assert len(parameters.effect_variables_from_causes_effect) == 1
     assert parameters.effect_variables_from_causes_effect[0].name == "Pick.status"
@@ -82,9 +82,7 @@ def test_without_causes_effect_no_effect_variables_are_registered():
 
 def test_causes_effect_conjunction_registers_every_effect_variable():
     match = a(Pick)(arm=cause, status=...)
-    match.causes_effect(
-        match.variable.status == Status.SUCCESS, match.variable.arm == 0.3
-    )
+    match.causes_effect(match.status == Status.SUCCESS, match.arm == 0.3)
     parameters = UnderspecifiedParameters(match)
     names = {v.name for v in parameters.effect_variables_from_causes_effect}
     assert names == {"Pick.status", "Pick.arm"}
@@ -101,7 +99,7 @@ def test_cause_on_an_aggregation_statistic_resolves_its_return_type():
     names this variable on the circuit, so a search variable under that name would never
     match anything a real ``RelationalCircuitRegistry`` grounds.
     """
-    match = a(Assembly)(
+    match = an(Assembly)(
         component_count=cause,
         components=[a(Component)(weight=...)],
     )
@@ -114,7 +112,7 @@ def test_cause_on_an_aggregation_statistic_resolves_its_return_type():
 
 
 def test_confounder_on_an_aggregation_statistic_resolves_its_return_type():
-    match = a(Assembly)(
+    match = an(Assembly)(
         component_count=confounder,
         components=[a(Component)(weight=...)],
     )

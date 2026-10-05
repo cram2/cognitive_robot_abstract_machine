@@ -99,7 +99,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
                 is_plural=morphology.is_plural(field_name),
                 value=child,
             )
-            for field_name, child in self.node._child_vars_.items()
+            for field_name, child in self.node._child_variables_.items()
         ]
 
     @staticmethod

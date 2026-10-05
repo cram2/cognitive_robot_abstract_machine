@@ -7,11 +7,9 @@ from dataclasses import (
 
 import numpy as np
 from random_events.product_algebra import Event, SimpleEvent
-from random_events.variable import Variable
 from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 from typing_extensions import (
-    Any,
     Dict,
     List,
     Optional,
@@ -20,6 +18,7 @@ from typing_extensions import (
 )
 
 from probabilistic_model.exceptions import ShapeMismatchError
+from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeMask,
     NodeValues,
@@ -422,7 +421,7 @@ class ProductLayer(InnerLayer):
     @memoized
     def log_conditional_of_point(
         self,
-        point: Dict[Variable, Any],
+        point: PartialPointType,
         query: StructuralQuery,
         cache: Optional[QueryCache] = None,
     ) -> LayerWithLogProbabilities:

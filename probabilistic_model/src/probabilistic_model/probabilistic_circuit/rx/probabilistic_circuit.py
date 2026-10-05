@@ -1476,10 +1476,12 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         root = self._condition_leaves_in_place(point)
         if root is None:
             return None, -np.inf
+        # read before marginalizing, which may simplify the root away
+        log_probability = root.result_of_current_query
 
         if preserve_structure:
             self.normalize()
-            return self, root.result_of_current_query
+            return self, log_probability
 
         # simplify dirac parts
         remaining_variables = [v for v in self.variables if v not in point]
@@ -1498,12 +1500,12 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         for variable, value in point.items():
             new_root.add_subcircuit(leaf(make_dirac(variable, value), self))
 
-        new_root.result_of_current_query = root.result_of_current_query
+        new_root.result_of_current_query = log_probability
 
         self.simplify()
         self.normalize()
 
-        return self, root.result_of_current_query
+        return self, log_probability
 
     def log_conditional(
         self, point: Dict[Variable, Any]

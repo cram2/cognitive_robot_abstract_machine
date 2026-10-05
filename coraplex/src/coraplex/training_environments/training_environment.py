@@ -206,7 +206,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
             ),
         )
 
-        move_to_reach.expression.limit(limit)
+        move_to_reach.limit(limit)
 
         if self.model_path:
             query_backend = self.setup_backend_from_path(move_to_reach)

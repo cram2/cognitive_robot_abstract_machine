@@ -2,18 +2,20 @@
 Generic specificity-ranked selection: pick the single most-specific candidate from a
 set, with class-hierarchy depth as the usual ranking key.
 
-These are domain-agnostic — they know nothing about verbalization. The grammar's
-:class:`~krrood.entity_query_language.verbalization.grammar.framework.specificity.SpecificityRule`
-families and the ``PhraseRule`` registry build on them, but so could any other consumer that ranks
-guarded alternatives by how specific they are.
+These are domain-agnostic. :class:`SpecificityRule` builds a family of guarded
+alternatives on them; the verbalization grammar and ORMatic's field storage rules are
+such families, and the verbalization ``PhraseRule`` registry ranks its rules with the
+same functions.
 """
 
 from __future__ import annotations
 
 import inspect
+from abc import ABC, abstractmethod
 
 from typing_extensions import Any, Callable, List, Optional, Sequence, Type, TypeVar
 
+from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.utils import recursive_subclasses
 
 _T = TypeVar("_T")
@@ -101,3 +103,59 @@ def concrete_subclasses(base: Type[_T]) -> List[Type[_T]]:
         for subclass in recursive_subclasses(base)
         if not inspect.isabstract(subclass)
     ]
+
+
+class SpecificityRule(ABC):
+    """
+    A guarded alternative selected by specificity: the base of a family of rules of
+    which at most one decides for any subject.
+
+    An alternative is a concrete subclass that implements the ``applies(...)`` guard (its
+    signature is the family's concern) and whatever payload the family needs. Alternatives
+    register themselves by subclassing and are ranked by class specificity: a more-derived
+    alternative, one that subclasses another and refines its guard, outranks the alternative it
+    refines. Alternatives that are not in a subclass relationship must have mutually exclusive
+    guards, so at most one applies; a tie raises
+    :class:`~krrood.patterns.exceptions.AmbiguousRuleError`.
+
+    Precedence comes from the class hierarchy (genuine subsumption) or from disjoint guards,
+    never from a hand-assigned number or the order in which rules are checked.
+
+    Reference: production-rule selection; the systemic-functional "most delicate system wins"
+    principle (:cite:t:`halliday2014functional`).
+    """
+
+    @classmethod
+    @abstractmethod
+    def applies(cls, *args: Any) -> bool:
+        """
+        :return: True when this alternative decides for the given subject.
+        """
+
+    @classmethod
+    def alternatives(cls) -> List[Type[SpecificityRule]]:
+        """
+        :return: The concrete alternative subclasses of this family, transitively, with abstract
+            family bases excluded.
+        """
+        return concrete_subclasses(cls)
+
+    @classmethod
+    def most_applicable(cls, *args: Any) -> Optional[Type[SpecificityRule]]:
+        """
+        :param args: Forwarded to each alternative's ``applies``.
+        :return: The most specific alternative whose ``applies(*args)`` holds, or ``None``.
+        :raises AmbiguousRuleError: When several alternatives are equally specific.
+        """
+        applicable = [
+            alternative
+            for alternative in cls.alternatives()
+            if alternative.applies(*args)
+        ]
+        return sole_maximum(
+            applicable,
+            key=mro_depth,
+            collision_error=lambda tied: AmbiguousRuleError(
+                subject=args, candidates=tied
+            ),
+        )

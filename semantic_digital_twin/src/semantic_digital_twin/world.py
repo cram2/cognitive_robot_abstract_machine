@@ -1255,7 +1255,12 @@ class World(HasSimulatorProperties):
         The atomic method that removes a semantic annotation from the current list of
         semantic annotations.
         """
-        self.semantic_annotations.remove(semantic_annotation)
+        index = next(
+            index
+            for index, candidate in enumerate(self.semantic_annotations)
+            if candidate is semantic_annotation
+        )
+        del self.semantic_annotations[index]
         semantic_annotation.remove_from_world()
 
     def remove_actuator(self, actuator: Actuator) -> None:

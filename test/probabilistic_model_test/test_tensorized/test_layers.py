@@ -12,7 +12,7 @@ import pandas as pd
 from krrood.adapters.json_serializer import from_json, to_json
 from random_events.interval import Bound, SimpleInterval, closed, open, reals, singleton
 from random_events.product_algebra import SimpleEvent
-from random_events.variable import Continuous
+from random_events.variable import Continuous, Integer
 from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 
@@ -22,6 +22,7 @@ from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized i
 from probabilistic_model.adapters.rustworkx_tensorized.tensorized_to_rustworkx import (
     LayeredCircuitToRustworkxCircuitConverter,
 )
+from probabilistic_model.distributions.distributions import IntegerDistribution
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
     TruncatedGaussianDistribution,
@@ -70,6 +71,13 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer 
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    IntegerLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
+    DenseProbabilityTable,
+    SparseProbabilityTable,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
     TruncatedGaussianLayer,
@@ -83,11 +91,13 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
 from probabilistic_model.probabilistic_circuit.tensorized.utils import (
     embedded_logsumexp,
 )
+from probabilistic_model.utils import MissingDict
 from .test_layered_probabilistic_circuit import shared_children_circuit
 
 
 x = Continuous("x")
 y = Continuous("y")
+n = Integer("n")
 
 
 def uniform_layer_of(variable_index: int, intervals) -> UniformLayer:
@@ -379,6 +389,36 @@ class VectorizedTruncationTestCase(unittest.TestCase):
         )
         np.testing.assert_array_equal(layered.log_likelihood(points), likelihood_before)
 
+    def test_discrete_layer_agrees_with_the_scalar_truncation(self):
+        distributions = [
+            IntegerDistribution(
+                variable=n, probabilities=MissingDict(float, {0: 0.2, 1: 0.3, 2: 0.5})
+            ),
+            IntegerDistribution(variable=n, probabilities=MissingDict(float, {0: 1.0})),
+        ]
+        layer = IntegerLayer.from_distributions(0, distributions)
+
+        for assignment in (closed(0, 1), closed(2, 2), closed(5, 6)):
+            with self.subTest(str(assignment)):
+                truncated = layer.log_truncated_of_assignment(assignment, False)
+                truncated_layer = truncated.layer
+                log_probabilities = truncated.log_probabilities
+                for node, distribution in enumerate(distributions):
+                    expected, expected_log_probability = distribution.log_truncated(
+                        SimpleEvent.from_data({n: assignment}).as_composite_set()
+                    )
+                    if expected is None:
+                        self.assertEqual(log_probabilities[node], -np.inf)
+                        continue
+                    self.assertAlmostEqual(
+                        float(log_probabilities[node]),
+                        float(expected_log_probability),
+                    )
+                    self.assertEqual(
+                        truncated_layer.probabilities_of_node(node),
+                        expected.probabilities,
+                    )
+
     def test_gaussian_layer_agrees_with_the_scalar_truncation(self):
         bound_pairs = [
             (Bound.CLOSED, Bound.CLOSED),
@@ -515,6 +555,27 @@ class VectorizedTruncationTestCase(unittest.TestCase):
                         expected.likelihood(points),
                         atol=1e-9,
                     )
+
+    def test_conditioning_a_discrete_layer_on_a_value(self):
+        layer = IntegerLayer.from_distributions(
+            0,
+            [
+                IntegerDistribution(
+                    variable=n, probabilities=MissingDict(float, {0: 0.2, 2: 0.8})
+                ),
+                IntegerDistribution(
+                    variable=n, probabilities=MissingDict(float, {0: 1.0})
+                ),
+            ],
+        )
+        conditioned = layer.log_conditional_of_value(2)
+        np.testing.assert_allclose(conditioned.log_probabilities, np.log([0.8, 0.0]))
+        self.assertEqual(
+            conditioned.layer.probabilities_of_node(0), MissingDict(float, {2: 1.0})
+        )
+        np.testing.assert_array_equal(
+            layer.log_conditional_of_value(7).log_probabilities, [-np.inf, -np.inf]
+        )
 
 
 class LayerGraphTraversalTestCase(unittest.TestCase):
@@ -818,6 +879,52 @@ class LocationAndScaleValidationTestCase(unittest.TestCase):
         layer.bounds = layer.bounds[:1]
         with self.assertRaises(ShapeMismatchError):
             layer.validate()
+
+
+class DiscreteLayerSamplingTestCase(unittest.TestCase):
+    """
+    A discrete layer draws the samples of all of its nodes together, whichever way its
+    probabilities are stored.
+    """
+
+    distributions = [
+        IntegerDistribution(
+            variable=n, probabilities=MissingDict(float, {2: 0.2, 5: 0.3, 9: 0.5})
+        ),
+        IntegerDistribution(variable=n, probabilities=MissingDict(float, {5: 1.0})),
+    ]
+
+    def setUp(self):
+        np.random.seed(69)
+
+    def layers(self):
+        return {
+            table_type.__name__: IntegerLayer.from_distributions(
+                0, self.distributions, table_type
+            )
+            for table_type in (DenseProbabilityTable, SparseProbabilityTable)
+        }
+
+    def test_samples_of_every_node_follow_its_distribution(self):
+        amount = 20000
+        for name, layer in self.layers().items():
+            with self.subTest(name):
+                nodes = np.repeat(np.arange(layer.number_of_nodes), amount)
+                samples = layer.sample_of_nodes(nodes, SortedSet([n]))
+                for node, distribution in enumerate(self.distributions):
+                    of_node = samples[nodes == node]
+                    for state, probability in distribution.probabilities.items():
+                        self.assertAlmostEqual(
+                            float(np.mean(of_node == state)), probability, delta=0.015
+                        )
+
+    def test_a_node_without_mass_samples_nothing(self):
+        for name, layer in self.layers().items():
+            with self.subTest(name):
+                truncated = layer.log_truncated_of_assignment(closed(2, 2), False).layer
+                samples = truncated.sample_of_nodes(np.array([0, 1, 1]), SortedSet([n]))
+                self.assertEqual(samples[0], 2.0)
+                self.assertTrue(np.isnan(samples[1:]).all())
 
 
 class SupportWithoutCopiesTestCase(unittest.TestCase):

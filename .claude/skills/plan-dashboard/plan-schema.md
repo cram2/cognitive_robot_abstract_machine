@@ -71,7 +71,7 @@ items:                         # the actual trackable units of work - flat,
     pull_request_number: <int or null>  # the real GitHub PR number, once one exists
     track: <track-id>
     depends_on: [<item-id>, ...]  # structural/stacking dependency, by item id
-    status: not_started | in_progress | blocked | deferred | done
+    status: not started | in progress | blocked | deferred | done  # underscores (not_started) still read
     session: <url or omitted>
     notes: "short, freeform"
     blockers: ["freeform reasons", ...]   # optional, defaults to []
@@ -88,7 +88,7 @@ the authority.
 never encodes draft/ready-for-review/merged/closed/CI-green/mergeable —
 those are fetched live from GitHub every time `/plan-dashboard` runs, so
 they can never go stale in the manifest. The dashboard shows both side by
-side and flags any item where the two disagree (e.g. `status: in_progress`
+side and flags any item where the two disagree (e.g. `status: in progress`
 on a PR that's already merged) — this is the actual mechanism that replaces
 "a session has to notice a note is stale by accident."
 

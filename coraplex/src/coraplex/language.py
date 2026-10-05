@@ -74,8 +74,7 @@ class LanguageNode(PlanNode, BuildsMotionStateChart, ABC):
             self.merge(child)
 
     def notify(self):
-        for child in self.children:
-            child.notify()
+        self.notify_children()
 
     def parse(self) -> Executable:
         return self.parse_children(self.children)

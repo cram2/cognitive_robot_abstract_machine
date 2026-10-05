@@ -14,7 +14,11 @@ from probabilistic_model.adapters.rustworkx_tensorized.converter import (
 from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
     NotExactlyOneRootError,
 )
-from probabilistic_model.distributions.distributions import DiracDeltaDistribution
+from probabilistic_model.distributions.distributions import (
+    DiracDeltaDistribution,
+    IntegerDistribution,
+    SymbolicDistribution,
+)
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
     TruncatedGaussianDistribution,
@@ -35,6 +39,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer 
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    IntegerLayer,
+    SymbolicLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
@@ -216,6 +224,16 @@ class GaussianLeavesToGaussianLayerConverter(
 
 class TruncatedGaussianLeavesToTruncatedGaussianLayerConverter(
     LeavesToInputLayerConverter[TruncatedGaussianDistribution, TruncatedGaussianLayer]
+): ...
+
+
+class SymbolicLeavesToSymbolicLayerConverter(
+    LeavesToInputLayerConverter[SymbolicDistribution, SymbolicLayer]
+): ...
+
+
+class IntegerLeavesToIntegerLayerConverter(
+    LeavesToInputLayerConverter[IntegerDistribution, IntegerLayer]
 ): ...
 
 

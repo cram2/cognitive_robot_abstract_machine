@@ -168,32 +168,3 @@ class UnknownAggregatorError(DataclassException):
             "Add the aggregator to `_AGGREGATOR_PHRASES` in "
             "verbalization/vocabulary/english.py."
         )
-
-
-@dataclass
-class AmbiguousRuleError(DataclassException):
-    """
-    Two or more grammar rules (or specificity-ranked forms) are equally specific for the
-    same dispatch target — a collision that would otherwise resolve silently by
-    registration order.
-
-    Surfaced as an error so an accidental overlap is caught rather than masked.
-    """
-
-    subject: object
-    """The expression or request being dispatched when the collision occurred."""
-
-    candidates: "list[type]"
-    """
-    The equally-specific rule/form classes that collided.
-    """
-
-    def error_message(self) -> str:
-        names = ", ".join(sorted(candidate.__name__ for candidate in self.candidates))
-        return f"{names} are equally specific for {self.subject!r}."
-
-    def suggest_correction(self) -> str:
-        return (
-            "Make the colliding guards mutually exclusive, or have one rule subclass the other "
-            "to declare it the more-specific special case."
-        )

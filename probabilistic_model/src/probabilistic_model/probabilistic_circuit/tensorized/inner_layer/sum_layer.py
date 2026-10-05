@@ -6,10 +6,8 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 from random_events.product_algebra import Event, SimpleEvent
-from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import (
-    Any,
     Dict,
     Iterable,
     List,
@@ -19,6 +17,7 @@ from typing_extensions import (
 )
 
 from probabilistic_model.exceptions import ShapeMismatchError
+from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     EdgeMask,
     EdgeValues,
@@ -566,7 +565,7 @@ class SumLayer(InnerLayer):
     @memoized
     def log_conditional_of_point(
         self,
-        point: Dict[Variable, Any],
+        point: PartialPointType,
         query: StructuralQuery,
         cache: Optional[QueryCache] = None,
     ) -> LayerWithLogProbabilities:

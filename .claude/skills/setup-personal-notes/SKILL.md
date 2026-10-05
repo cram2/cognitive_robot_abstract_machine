@@ -144,7 +144,7 @@ That helper is idempotent — it pushes nothing if the content already matches.
 Mechanical, not a preference. Say what's missing and install it:
 
 ```bash
-pip install -r "${PLAN_DASHBOARD_REQUIREMENTS_FILE}"
+pip install "./${BASSTLER_PACKAGE_DIRECTORY}"
 ```
 
 If the install fails (no network, a managed environment, a read-only

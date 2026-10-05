@@ -341,7 +341,7 @@ def main():
             "https://github.com/code-iai/iai_weiss_wpg_300-120-gripper.git",
             "main",
             "iai_weiss_wpg_300-120-gripper",
-            ["griplink"],
+            ["griplink/griplink"],
         ),
         Repository(
             "https://github.com/aws-robotics/aws-robomaker-small-warehouse-world.git",

@@ -19,7 +19,7 @@ import plotly.graph_objects as go
 import tqdm
 
 import coraplex.orm.ormatic_interface  # type: ignore
-import coraplex.plans.plan_node
+import coraplex.plans.underspecified
 import semantic_digital_twin  # type: ignore
 from experiments.experiment_definitions import (
     ExperimentResult,
@@ -383,7 +383,10 @@ def plot_scalability(table: ExperimentsTable) -> go.Figure:
 
 def main():
     classes, alternative_mappings, type_mappings = build_cram_class_sets()
-    required_classes = [coraplex.plans.plan_node.UnderspecifiedNode, ActionDescription]
+    required_classes = [
+        coraplex.plans.underspecified.UnderspecifiedNode,
+        ActionDescription,
+    ]
     results = []
     for class_drop_probability in tqdm.tqdm(
         [

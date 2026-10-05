@@ -103,9 +103,8 @@ def _random_navigate_action(world: World):
             yaw=...,
             reference_frame=world.root,
         ),
-        keep_joint_states=True,
     )
-    action.expression.limit(10)
+    action.limit(10)
     return action
 
 

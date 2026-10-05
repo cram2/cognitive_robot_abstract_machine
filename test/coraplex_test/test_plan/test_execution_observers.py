@@ -250,9 +250,9 @@ def test_aborting_does_not_overwrite_a_completed_motion(tracked_motion) -> None:
 
 
 # %% performed native plans
-def test_native_motion_reports_boundaries_and_ticks(immutable_model_world) -> None:
+def test_native_motion_reports_boundaries_and_ticks(pr2_apartment_context) -> None:
     """A real native torso plan reports its exact motion nodes and finished chart."""
-    world, robot, context = immutable_model_world
+    world, robot, context = pr2_apartment_context
     plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context).plan
     recorder = ExecutionRecorder(plan=plan)
     plan.node_callbacks.append(recorder)
@@ -284,9 +284,9 @@ def test_native_motion_reports_boundaries_and_ticks(immutable_model_world) -> No
     assert recorder.statecharts[-1].is_end_motion()
 
 
-def test_native_attachment_reports_its_own_completion(mutable_model_world) -> None:
+def test_native_attachment_reports_its_own_completion(pr2_apartment_context) -> None:
     """A model change receives a lifecycle even when compiled below the plan root."""
-    world, robot, context = mutable_model_world
+    world, robot, context = pr2_apartment_context
     attachment = ReAttachNode(
         body=world.get_body_by_name("milk.stl"), new_parent=robot.root
     )
@@ -554,9 +554,9 @@ def test_parallel_plan_preserves_unexpected_child_error() -> None:
     assert child.execution_error is failure
 
 
-def test_direct_motion_reports_one_pair_of_boundaries(immutable_model_world) -> None:
+def test_direct_motion_reports_one_pair_of_boundaries(pr2_apartment_context) -> None:
     """Directly performing a motion shares its boundary with native history."""
-    world, robot, context = immutable_model_world
+    world, robot, context = pr2_apartment_context
     root = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context)
     root.notify()
     node = next(node for node in root.plan.all_nodes if isinstance(node, MotionNode))
@@ -643,9 +643,9 @@ def test_end_observer_does_not_replace_execution_error(monkeypatch) -> None:
     assert root.execution_error is failure
 
 
-def test_direct_motion_observer_receives_native_history(immutable_model_world) -> None:
+def test_direct_motion_observer_receives_native_history(pr2_apartment_context) -> None:
     """The first motion start exposes the bound chart for native subscriptions."""
-    world, robot, context = immutable_model_world
+    world, robot, context = pr2_apartment_context
     root = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context)
     root.notify()
     node = next(node for node in root.plan.all_nodes if isinstance(node, MotionNode))
@@ -821,8 +821,8 @@ def test_parallel_plan_reports_failed_native_verdict(
 
 
 # %% node-owned execution scopes
-def test_direct_attachment_reports_one_pair_of_boundaries(mutable_model_world) -> None:
-    world, robot, context = mutable_model_world
+def test_direct_attachment_reports_one_pair_of_boundaries(pr2_apartment_context) -> None:
+    world, robot, context = pr2_apartment_context
     attachment = ReAttachNode(
         body=world.get_body_by_name("milk.stl"), new_parent=robot.root
     )
@@ -840,9 +840,9 @@ def test_direct_attachment_reports_one_pair_of_boundaries(mutable_model_world) -
 
 
 def test_parsed_attachment_reports_its_own_failure(
-    monkeypatch, mutable_model_world
+    monkeypatch, pr2_apartment_context
 ) -> None:
-    world, robot, context = mutable_model_world
+    world, robot, context = pr2_apartment_context
     attachment = ReAttachNode(
         body=world.get_body_by_name("milk.stl"), new_parent=robot.root
     )

@@ -1,4 +1,10 @@
-from krrood.entity_query_language.factories import a, and_, distribution_of, probability_of, variable
+from krrood.entity_query_language.factories import (
+    a,
+    and_,
+    distribution_of,
+    probability_of,
+    variable,
+)
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 from ._fixtures import Coin
@@ -6,7 +12,7 @@ from ._fixtures import Coin
 
 def test_verbalize_distribution_of_match():
     match = a(Coin)(a=..., b=..., c=1.5)
-    match.where(match.variable.a > 0.2)
+    match.where(match.a > 0.2)
 
     text = verbalize_expression(distribution_of(match))
 
@@ -31,7 +37,7 @@ def test_verbalize_distribution_of_select_all():
 def test_verbalize_distribution_of_narrowed_to_variables():
     match = a(Coin)(a=..., b=..., c=1.5)
 
-    text = verbalize_expression(distribution_of(match, marginalize_for=(match.variable.a,)))
+    text = verbalize_expression(distribution_of(match, marginalize_for=(match.a,)))
 
     # marginalization narrows which variable(s) the joint is over -- named directly in
     # the subject, not a trailing "restricted to" qualifier (that reads like a

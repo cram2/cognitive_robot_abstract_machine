@@ -8,7 +8,6 @@ import numpy as np
 from krrood.adapters import json_serializer
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from random_events.product_algebra import Event, SimpleEvent
-from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import (
     Any,
@@ -20,6 +19,7 @@ from typing_extensions import (
     Tuple,
 )
 
+from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeMask,
     NodeValues,
@@ -373,7 +373,7 @@ class Layer(SubclassJSONSerializer, ABC):
     @abstractmethod
     def log_conditional_of_point(
         self,
-        point: Dict[Variable, Any],
+        point: PartialPointType,
         query: StructuralQuery,
         cache: Optional[QueryCache] = None,
     ) -> LayerWithLogProbabilities:

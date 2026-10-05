@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import enum
 import inspect
+import pathlib
+import re
 import uuid
-from datetime import timedelta
+from datetime import timedelta, timezone
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields, is_dataclass
 from dataclasses import field
@@ -11,7 +13,7 @@ from types import NoneType
 from typing import List, Optional, TypeAlias, TYPE_CHECKING
 
 import numpy as np
-from scipy.sparse import coo_array
+from scipy.sparse import coo_array, csr_array
 from sortedcontainers import SortedSet
 from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
 
@@ -129,6 +131,22 @@ class JSONSerializableTypeRegistry(metaclass=SingletonMeta):
             raise ClassNotSerializableError(clazz)
         else:
             return min(distances, key=distances.get)
+
+    def has_type_specific_serializer(self, clazz: Type) -> bool:
+        """
+        Whether a serializer is registered for the class or one of its superclasses.
+
+        Serializers that match classes by their shape, such as the one for any dataclass,
+        do not count.
+
+        :param clazz: The class to check.
+        :return: True if a serializer is registered for the class hierarchy.
+        """
+        return inspect.isclass(clazz) and any(
+            inspect.isclass(serializer.original_class())
+            and issubclass(clazz, serializer.original_class())
+            for serializer in recursive_subclasses(ExternalClassJSONSerializer)
+        )
 
 
 class SubclassJSONSerializer:
@@ -587,6 +605,185 @@ class TimedeltaJSONSerializer(ExternalClassJSONSerializer[timedelta]):
         )
 
 
+class TimezoneJSONKey(enum.StrEnum):
+    """
+    The keys of the JSON a fixed-offset timezone is serialized to.
+    """
+
+    OFFSET = "offset"
+    """
+    The offset from UTC.
+    """
+
+    NAME = "name"
+    """
+    The name the timezone was created with, or None.
+    """
+
+
+@dataclass
+class TimezoneJSONSerializer(ExternalClassJSONSerializer[timezone]):
+    """
+    External JSON serializer for fixed-offset timezones, which keeps the name they were
+    created with.
+    """
+
+    @classmethod
+    def to_json(cls, obj: timezone, **kwargs) -> Dict[str, Any]:
+        offset, *name = obj.__getinitargs__()
+        return {
+            JSONField.TYPE: get_full_class_name(type(obj)),
+            TimezoneJSONKey.OFFSET: to_json(offset, **kwargs),
+            TimezoneJSONKey.NAME: name[0] if name else None,
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[timezone], **kwargs
+    ) -> timezone:
+        offset = from_json(data[TimezoneJSONKey.OFFSET], **kwargs)
+        name = data[TimezoneJSONKey.NAME]
+        if name is None:
+            return clazz(offset)
+        return clazz(offset, name)
+
+
+class PurePathJSONKey(enum.StrEnum):
+    """
+    The keys of the JSON a path is serialized to.
+    """
+
+    PATH = "path"
+    """
+    The path as text.
+    """
+
+
+@dataclass
+class PurePathJSONSerializer(ExternalClassJSONSerializer[pathlib.PurePath]):
+    """
+    External JSON serializer for paths of any flavour.
+    """
+
+    @classmethod
+    def to_json(cls, obj: pathlib.PurePath, **kwargs) -> Dict[str, Any]:
+        return {
+            JSONField.TYPE: get_full_class_name(type(obj)),
+            PurePathJSONKey.PATH: str(obj),
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[pathlib.PurePath], **kwargs
+    ) -> pathlib.PurePath:
+        return clazz(data[PurePathJSONKey.PATH])
+
+
+class RangeJSONKey(enum.StrEnum):
+    """
+    The keys of the JSON a range or slice is serialized to.
+    """
+
+    START = "start"
+    """
+    The first index.
+    """
+
+    STOP = "stop"
+    """
+    The index the range or slice ends before.
+    """
+
+    STEP = "step"
+    """
+    The distance between consecutive indices.
+    """
+
+
+@dataclass
+class RangeJSONSerializer(ExternalClassJSONSerializer[range]):
+    """
+    External JSON serializer for ranges of integers.
+    """
+
+    @classmethod
+    def to_json(cls, obj: range, **kwargs) -> Dict[str, Any]:
+        return {
+            JSONField.TYPE: get_full_class_name(type(obj)),
+            RangeJSONKey.START: obj.start,
+            RangeJSONKey.STOP: obj.stop,
+            RangeJSONKey.STEP: obj.step,
+        }
+
+    @classmethod
+    def from_json(cls, data: Dict[str, Any], clazz: Type[range], **kwargs) -> range:
+        return clazz(
+            data[RangeJSONKey.START], data[RangeJSONKey.STOP], data[RangeJSONKey.STEP]
+        )
+
+
+@dataclass
+class SliceJSONSerializer(ExternalClassJSONSerializer[slice]):
+    """
+    External JSON serializer for slices, whose bounds are serialized with
+    :func:`to_json`.
+    """
+
+    @classmethod
+    def to_json(cls, obj: slice, **kwargs) -> Dict[str, Any]:
+        return {
+            JSONField.TYPE: get_full_class_name(type(obj)),
+            RangeJSONKey.START: to_json(obj.start, **kwargs),
+            RangeJSONKey.STOP: to_json(obj.stop, **kwargs),
+            RangeJSONKey.STEP: to_json(obj.step, **kwargs),
+        }
+
+    @classmethod
+    def from_json(cls, data: Dict[str, Any], clazz: Type[slice], **kwargs) -> slice:
+        return clazz(
+            from_json(data[RangeJSONKey.START], **kwargs),
+            from_json(data[RangeJSONKey.STOP], **kwargs),
+            from_json(data[RangeJSONKey.STEP], **kwargs),
+        )
+
+
+class PatternJSONKey(enum.StrEnum):
+    """
+    The keys of the JSON a compiled regular expression is serialized to.
+    """
+
+    PATTERN = "pattern"
+    """
+    The source of the regular expression.
+    """
+
+    FLAGS = "flags"
+    """
+    The flags the regular expression was compiled with.
+    """
+
+
+@dataclass
+class PatternJSONSerializer(ExternalClassJSONSerializer[re.Pattern]):
+    """
+    External JSON serializer for compiled regular expressions over text.
+    """
+
+    @classmethod
+    def to_json(cls, obj: re.Pattern, **kwargs) -> Dict[str, Any]:
+        return {
+            JSONField.TYPE: get_full_class_name(type(obj)),
+            PatternJSONKey.PATTERN: obj.pattern,
+            PatternJSONKey.FLAGS: obj.flags,
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[re.Pattern], **kwargs
+    ) -> re.Pattern:
+        return re.compile(data[PatternJSONKey.PATTERN], data[PatternJSONKey.FLAGS])
+
+
 @dataclass
 class ClassJSONSerializer(ExternalClassJSONSerializer[None]):
     """
@@ -762,6 +959,30 @@ class CoordinateSparseArrayJSONSerializer(ExternalClassJSONSerializer[coo_array]
                 ),
             ),
             shape=tuple(data[CoordinateSparseArrayJSONKey.SHAPE]),
+        )
+
+
+class CompressedSparseRowArrayJSONSerializer(ExternalClassJSONSerializer[csr_array]):
+    """
+    External JSON serializer for scipy sparse arrays in compressed sparse row format.
+
+    The array is written like a sparse array in coordinate format, through its stored
+    entries.
+    """
+
+    @classmethod
+    def to_json(cls, obj: csr_array, **kwargs) -> Dict[str, Any]:
+        return {
+            **CoordinateSparseArrayJSONSerializer.to_json(obj.tocoo(), **kwargs),
+            JSONField.TYPE: get_full_class_name(type(obj)),
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[csr_array], **kwargs
+    ) -> csr_array:
+        return csr_array(
+            CoordinateSparseArrayJSONSerializer.from_json(data, coo_array, **kwargs)
         )
 
 

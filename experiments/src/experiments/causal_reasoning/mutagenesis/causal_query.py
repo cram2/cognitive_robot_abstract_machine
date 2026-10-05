@@ -356,7 +356,7 @@ class BranchingAtomCountCausalQuery:
             ],
             bonds=[a(MutagenesisBond)(bond_type=...) for _ in range(bond_count)],
         )
-        query.causes_effect(query.variable.mutagenic == True)
+        query.causes_effect(query.mutagenic == True)
         return query
 
     @staticmethod

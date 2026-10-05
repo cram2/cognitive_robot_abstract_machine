@@ -64,7 +64,7 @@ The rule is in `${SCOPE_DECISION_DOCUMENT}` — read it rather than re-deriving
 it here. Gather its evidence in one call:
 
 ```bash
-python3 "${CHECK_SCOPE_OVERLAP_SCRIPT}" \
+python3 -m "${CHECK_SCOPE_OVERLAP_MODULE}" \
     --base <base-branch> \
     --path <path> [--path <path> ...] \
     --candidate '<item-id-or-title>=<branch>' [--candidate ... ]

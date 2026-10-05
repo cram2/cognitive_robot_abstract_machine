@@ -137,7 +137,7 @@ instead of generating robots, it hands back the distribution itself.
 
 ```python
 match = a(Robot)(temperature=..., speed=..., charge=1.5)
-match.where(match.variable.speed > 0.2)
+match.where(match.speed > 0.2)
 
 result = distribution_of(match).first(backend=backend)
 print(sorted(v.name for v in result.variables))
@@ -164,7 +164,7 @@ print(result.probability(temperature_range))
 To narrow down to temperature specifically:
 
 ```python
-narrowed = distribution_of(match, marginalize_for=(match.variable.temperature,)).first(backend=backend)
+narrowed = distribution_of(match, marginalize_for=(match.temperature,)).first(backend=backend)
 print({v.name for v in narrowed.variables})
 # {'Robot.temperature'}
 ```

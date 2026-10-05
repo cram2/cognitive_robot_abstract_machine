@@ -44,7 +44,7 @@ already exists**, which is where the cause of a stall almost always is:
   exists to surface. A failing check or a requested-changes review is
   usually the actual blocker; state exactly which one and why, don't just
   say "CI is failing."
-- If the fork PR carries the `in_review_label` from `.claude/stack/stack.toml`
+- If the fork PR carries the `in_review_label` from `basstler/stack.toml`
   (`in-review` by default, the recorded signal for "promoted upstream, under
   review"), the branch also has a pull request on the upstream, whose review
   threads none of the calls above can see — a fork PR can look entirely clean

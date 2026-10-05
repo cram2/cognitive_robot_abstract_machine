@@ -15,11 +15,11 @@ from semantic_digital_twin.datastructures.definitions import TorsoState
 
 
 # %% recording native execution
-def test_native_motion_recording_retains_completed_chart(immutable_model_world) -> None:
+def test_native_motion_recording_retains_completed_chart(pr2_apartment_context) -> None:
     """
     A real torso motion records its final native chart and releases its observers.
     """
-    world, robot, context = immutable_model_world
+    world, robot, context = pr2_apartment_context
     plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context).plan
     bridge = Bridge()
     bridge.attach(world)

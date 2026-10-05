@@ -4,7 +4,6 @@ User interface (grammar & vocabulary) for entity query language.
 
 from __future__ import annotations
 
-import inspect
 import operator
 from dataclasses import dataclass
 from inspect import isclass
@@ -26,7 +25,6 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
     TruthValueOperator,
-    OperationResult,
 )
 from krrood.entity_query_language.operators.causal import (
     cause,
@@ -36,8 +34,10 @@ from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
     CanBehaveLikeAVariable,
+    HasSymbolicOperations,
     Attribute,
 )
+from krrood.entity_query_language.evaluation import evaluate_statements_of
 from krrood.entity_query_language.core.variable import (
     DomainType,
     Literal,
@@ -146,7 +146,7 @@ def distribution_of(
     :param match: The match whose conditions describe the distribution.
     :param marginalize_for: Optionally, a subset of the match's free variables to
         narrow the result to (further marginalization), e.g. ``distribution_of(match,
-        marginalize_for=(match.variable.outcome,))``. Without it, every one of the
+        marginalize_for=(match.outcome,))``. Without it, every one of the
         match's free variables is kept.
     :return: Distribution descriptor.
     """
@@ -385,9 +385,12 @@ def _quantify_or_build_match(
 
     The behaviour is selected by the runtime type of ``arg``:
 
-    * If ``arg`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`
-      (an entity, a set expression, a variable or an attribute), it is quantified with
-      ``quantifier_type``. Raw selectables that are not already a
+    * If ``arg`` stands for an expression - a
+      :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression` (an
+      entity, a set expression, a variable or an attribute), or a
+      :class:`~krrood.entity_query_language.query.match.Match`, which contributes the
+      query carrying its pattern - it is quantified with ``quantifier_type``. Raw
+      selectables that are not already a
       :class:`~krrood.entity_query_language.query.query.Query` are first wrapped with
       :py:func:`entity`.
     * Otherwise ``arg`` is treated as a type (or a callable factory) and a structural
@@ -395,6 +398,10 @@ def _quantify_or_build_match(
       and generative-ready through a
       :class:`~krrood.entity_query_language.backends.GenerativeBackend`. Restrict the search to
       specific instances with :meth:`~krrood.entity_query_language.query.match.Match.from_`.
+      The match reads like an instance of the matched class, both statically (the
+      overloads return ``Union[T, Match[T]]``, so IDEs offer the class's own attributes)
+      and at runtime (attribute access is delegated symbolically, see
+      :meth:`~krrood.entity_query_language.query.match.Match.__getattr__`).
 
     :param arg: An entity/set/variable/attribute to quantify, or a type/callable to match.
     :param quantifier_type: The result quantifier to apply (``An`` or ``The``).
@@ -402,12 +409,13 @@ def _quantify_or_build_match(
     :param target_type: Optional explicit type for callable factories (match path only).
     :return: A quantified query, or a ``Match`` builder.
     """
-    if isinstance(arg, SymbolicExpression):
+    if isinstance(arg, (SymbolicExpression, HasSymbolicOperations)):
+        arg = SymbolicExpression._as_operand_(arg)
         if not isinstance(arg, Query):
             arg = entity(arg)
         return arg._quantify_(quantifier_type, quantification_constraint=quantification)
 
-    match_ = Match(factory=arg, type_=target_type)
+    match_ = Match(_factory_=arg, _declared_type_=target_type)
     match_._quantifier_type_ = quantifier_type
     return match_
 
@@ -434,7 +442,7 @@ def an(
     quantification: None = ...,
     *,
     target_type: None = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -452,7 +460,7 @@ def an(
     quantification: None = ...,
     *,
     target_type: Type[T] = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -495,7 +503,7 @@ def a(
     quantification: None = ...,
     *,
     target_type: None = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -513,7 +521,7 @@ def a(
     quantification: None = ...,
     *,
     target_type: Type[T] = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -551,7 +559,7 @@ def the(
     entity_: Type[T],
     *,
     target_type: None = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -567,7 +575,7 @@ def the(
     entity_: Callable[..., T],
     *,
     target_type: Type[T] = ...,
-) -> Match[T]: ...
+) -> Union[T, Match[T]]: ...
 
 
 @overload
@@ -873,48 +881,35 @@ def distinct(
             raise UnsupportedExpressionTypeForDistinct(type(expression))
 
 
-def get_conditioned_statements(
-    statement, condition: Callable[OperationResult, bool]
-) -> List[SymbolicExpression]:
-    """
-    Iterates over all sub-statements of the statement and returns all statements that
-    satisfy the condition.
-
-    :param statement: The statement to iterate over.
-    :param condition: The condition to evaluate each sub-statement against.
-    :return: A list of sub-statements that satisfy the condition.
-    """
-    condition_results = []
-    for node in [
-        s
-        for s in statement._children_
-        if not isinstance(s, (Variable, inspect.Attribute))
-    ]:
-        node_result = node.evaluate()
-        if condition(node_result):
-            condition_results.append(node)
-    if statement in condition_results:
-        condition_results.remove(statement)
-
-    return condition_results
-
-
 def get_false_statements(statement: SymbolicExpression) -> List[SymbolicExpression]:
     """
-    The false statements of all statements of this condition.
-
-    :return: The false statements of all statements of this condition.
+    :param statement: The condition whose statements are checked.
+    :return: The statements of the condition that held for none of the values they were
+        evaluated on, see :func:`evaluate_statements_of`. In a conjunction that is the
+        first conjunct that could not hold together with the conjuncts before it.
     """
-    return get_conditioned_statements(statement, lambda x: not x == [])
+    statement_results = evaluate_statements_of(statement)
+    held_ids = {result.operand._id_ for result in statement_results if result.is_true}
+    never_held = {
+        result.operand._id_: result.operand
+        for result in statement_results
+        if result.operand._id_ not in held_ids
+    }
+    return list(never_held.values())
 
 
 def get_true_statements(statement: SymbolicExpression) -> List[SymbolicExpression]:
     """
-    The true statements of all statements of this condition.
-
-    :return: The true statements of this condition.
+    :param statement: The condition whose statements are checked.
+    :return: The statements of the condition that held for at least one of the values
+        they were evaluated on, see :func:`evaluate_statements_of`.
     """
-    return get_conditioned_statements(statement, lambda x: x == [])
+    held = {
+        result.operand._id_: result.operand
+        for result in evaluate_statements_of(statement)
+        if result.is_true
+    }
+    return list(held.values())
 
 
 def evaluate_condition(condition: ConditionType) -> bool:

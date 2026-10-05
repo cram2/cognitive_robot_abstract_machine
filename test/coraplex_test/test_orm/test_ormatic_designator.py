@@ -20,8 +20,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 
 @pytest.fixture()
-def simple_plan(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def simple_plan(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     plan = sequential(
         [
@@ -29,7 +29,6 @@ def simple_plan(immutable_model_world):
                 Pose.from_xyz_quaternion(
                     1.6, 1.9, 0, 0, 0, 0, 1, reference_frame=world.root
                 ),
-                True,
             ),
             MoveTorsoAction(TorsoState.HIGH),
             ParkArmsAction(Arms.BOTH),
@@ -84,8 +83,8 @@ def test_replay_simple_plan(coraplex_testing_session, simple_plan):
 
 
 @pytest.fixture
-def complex_plan(mutable_model_world):
-    world, robot_view, context = mutable_model_world
+def complex_plan(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     context.evaluate_conditions = False
 
     plan = execute_single(

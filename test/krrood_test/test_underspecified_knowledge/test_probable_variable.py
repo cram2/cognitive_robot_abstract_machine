@@ -27,7 +27,7 @@ def test_probable_variable_with_concrete_kwarg():
         position=a(KRROODPosition)(x=..., y=..., z=...),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
-    prob_q.where(prob_q.variable.position.x > 0.5)
+    prob_q.where(prob_q.position.x > 0.5)
     instance = prob_q.construct_instance()
 
     correct_instance = KRROODPose(
@@ -35,7 +35,7 @@ def test_probable_variable_with_concrete_kwarg():
     )
 
     assert instance == correct_instance
-    assert len(list(prob_q.matches_with_variables)) == 4
+    assert len(list(prob_q._matches_with_variables_)) == 4
 
 
 def test_new_underspecified_with_factory():
@@ -46,8 +46,8 @@ def test_new_underspecified_with_factory():
         ),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
-    prob_q.where(prob_q.variable.position.x > 0.5)
-    prob_q.expression.build()
+    prob_q.where(prob_q.position.x > 0.5)
+    prob_q._get_expression_().build()
     r = prob_q.construct_instance()
     assert r == KRROODPose(
         KRROODPosition(..., ..., ...), KRROODOrientation(0.0, 0.0, 0.0, 1.0)
@@ -63,14 +63,14 @@ def test_underspecified_with_list():
         some_strings=["a", "b"],
     )
 
-    for literal in q.matches_with_variables:
+    for literal in q._matches_with_variables_:
         if literal.assigned_value is ...:
             literal.assigned_variable._value_ = 0.0
 
     q._update_kwargs_from_literal_values()
 
-    assert q.kwargs["positions"][0].kwargs == {"x": 1.0, "y": 0.0, "z": 0.0}
-    assert q.factory == KRROODPositions
+    assert q._kwargs_["positions"][0]._kwargs_ == {"x": 1.0, "y": 0.0, "z": 0.0}
+    assert q._factory_ == KRROODPositions
     r = q.construct_instance()
     assert r == KRROODPositions(
         [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(1, 2, 3)], ["a", "b"]
