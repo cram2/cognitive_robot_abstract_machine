@@ -328,10 +328,11 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
     def equality_bound_of(self, constraint: GiskardEqualityConstraint) -> Scalar:
         """
         An equality bound always demands motion, so it is capped to the reachable change
-        in both directions.
+        by the constraint's own bound cap.
         """
-        reach = self.reachable_change(constraint)
-        return sm.limit(constraint.bound, -reach, reach)
+        return constraint.bound_cap.capped(
+            constraint.bound, self.reachable_change(constraint)
+        )
 
     def create_bounds(
         self, bounds_getter: Callable[[GiskardConstraint], Scalar]

@@ -86,6 +86,15 @@ Some deviation is unavoidable: the controller has to accelerate out of the pose 
 motion starts at, and it can only correct a lateral offset on the tick after it appeared.
 """
 
+REAIMED_LINE_TOLERANCE = 0.025
+"""
+How far the tip of a point goal may stray from the straight line to the goal, in meters.
+
+A point goal aims at the goal again from wherever the tip is on every tick, instead of
+pulling the tip back onto the line the motion started on, so a lateral offset is not
+corrected but only stops growing. On the PR2 arm this accumulates to about 22 mm.
+"""
+
 
 @dataclass
 class StraightLine:
@@ -1188,6 +1197,41 @@ class TestCartesianTasks:
 
         line = StraightLine(start=path[0], end=goal_pose.to_np()[:3, 3])
         assert line.maximum_distance_from(path) <= STRAIGHT_LINE_TOLERANCE
+
+    def test_cartesian_position_moves_straight_towards_a_diagonal_goal(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        A point goal whose direction is not aligned with an axis of the root frame must
+        still be approached along the straight line to it.
+
+        Capping each axis of the error on its own would point the motion along the
+        diagonal of the cap instead.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
+        start = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)[:3, 3]
+        goal_point = Point3(
+            start[0] + 0.25, start[1] + 0.15, start[2] + 0.1, reference_frame=root
+        )
+
+        motion_statechart = MotionStatechart()
+        position_goal = CartesianPosition(
+            root_link=root, tip_link=tip, goal_point=goal_point
+        )
+        motion_statechart.add_node(position_goal)
+        motion_statechart.add_node(EndMotion.when_true(position_goal))
+
+        executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        executor.compile(motion_statechart=motion_statechart)
+        path = record_tip_path(executor, position_goal, root, tip)
+
+        line = StraightLine(start=path[0], end=goal_point.to_np()[:3])
+        assert line.maximum_distance_from(path) <= REAIMED_LINE_TOLERANCE
 
     def test_straight_line_starts_where_the_task_starts(
         self, pr2_world_state_reset: World

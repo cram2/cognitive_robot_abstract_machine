@@ -7,6 +7,7 @@ from typing_extensions import Optional
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.qp.bound_cap import VectorBoundCap
 from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
@@ -46,6 +47,9 @@ class GeometricConstraintBuilder:
         """
         Adds three constraints to move frame_P_current to frame_P_goal.
 
+        The error is capped by its length rather than per axis, so a far away goal is
+        approached along the straight line to it.
+
         Make sure that both points are expressed relative to the same frame!
         :param frame_P_current: a vector describing a 3D point. It should depend on
             active dofs.
@@ -53,6 +57,9 @@ class GeometricConstraintBuilder:
         :param reference_velocity: m/s
         """
         frame_V_error = frame_P_goal - frame_P_current
+        error_cap = VectorBoundCap(
+            bounds=sm.Vector([frame_V_error[i] for i in range(3)])
+        )
         for i in range(3):
             self.collection.add_equality_constraint(
                 task_expression=frame_P_current[i],
@@ -60,6 +67,7 @@ class GeometricConstraintBuilder:
                 quadratic_weight=quadratic_weight,
                 reference_velocity=reference_velocity,
                 name=self._indexed_constraint_name(name, i),
+                bound_cap=error_cap,
             )
 
     def add_position_constraint(

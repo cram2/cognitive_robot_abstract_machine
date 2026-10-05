@@ -13,6 +13,7 @@ from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.exceptions import (
     InvalidConstraintExpressionShapeError,
 )
+from giskardpy.qp.bound_cap import BoundCap, ScalarBoundCap
 from giskardpy.qp.constraint import (
     GiskardConstraint,
     GiskardEqualityConstraint,
@@ -150,6 +151,7 @@ class ConstraintCollection:
         name: Optional[str] = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
+        bound_cap: BoundCap | None = None,
     ) -> None:
         """
         Add a task constraint to the motion problem.
@@ -168,6 +170,8 @@ class ConstraintCollection:
             unless you know what you are doing
         :param upper_slack_limit: how much the upper error can be violated, don't use
             unless you know what you are doing
+        :param bound_cap: how the bound is limited to what one plan may demand; caps
+            the bound on its own if not given
         """
         if task_expression.shape != (1, 1):
             raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
@@ -182,6 +186,7 @@ class ConstraintCollection:
             name=name,
             expression=task_expression,
             bound=equality_bound,
+            bound_cap=bound_cap if bound_cap is not None else ScalarBoundCap(),
             normalization_factor=reference_velocity,
             quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,

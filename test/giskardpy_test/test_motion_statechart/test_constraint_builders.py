@@ -1,8 +1,33 @@
+import numpy as np
+import pytest
+
 from semantic_digital_twin.spatial_types import Point3, RotationMatrix, Vector3
 
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
 from giskardpy.qp.constraint_collection import ConstraintCollection
+from giskardpy.qp.enforcement_strategy import IntegralStrategy
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+
+
+def capped_equality_bounds(
+    collection: ConstraintCollection,
+) -> tuple[np.ndarray, float]:
+    """
+    Evaluates the bounds an integral strategy enforces for the collection's equality
+    constraints.
+
+    :return: The capped bounds, and the reachable change of the first constraint.
+    """
+    strategy = IntegralStrategy(
+        degrees_of_freedom=[],
+        constraints=collection.equality_constraints,
+        qp_controller_config=QPControllerConfig(
+            target_frequency=20, prediction_horizon=10
+        ),
+    )
+    reach = float(strategy.reachable_change(strategy.constraints[0]).to_np())
+    return strategy.create_equality_bounds().to_np(), reach
 
 
 def test_point_goal_writes_three_equality_constraints():
@@ -17,6 +42,22 @@ def test_point_goal_writes_three_equality_constraints():
     )
     assert len(collection.equality_constraints) == 3
     assert len(collection.inequality_constraints) == 0
+
+
+def test_point_goal_caps_the_length_of_its_error_and_keeps_its_direction():
+    error = np.array([1.0, 0.3, 0.0])
+    collection = ConstraintCollection()
+    GeometricConstraintBuilder(collection).add_point_goal_constraints(
+        frame_P_current=Point3(0.0, 0.0, 0.0),
+        frame_P_goal=Point3(*error),
+        reference_velocity=0.1,
+        quadratic_weight=1.0,
+    )
+
+    bounds, reach = capped_equality_bounds(collection)
+
+    assert np.linalg.norm(bounds) == pytest.approx(reach)
+    assert np.allclose(bounds / np.linalg.norm(bounds), error / np.linalg.norm(error))
 
 
 def test_rotation_goal_writes_three_equality_constraints():
