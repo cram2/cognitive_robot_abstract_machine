@@ -20,7 +20,7 @@ from krrood.parametrization.feature_extraction.aggregations import (
 from semantic_digital_twin.world_description.geometry import Mesh, Shape
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
-from typing_extensions import Any, List
+from typing_extensions import Any, ClassVar, List
 
 # %% object classes
 
@@ -55,9 +55,6 @@ class ObjectClass(enum.StrEnum):
 
 # %% modelled object
 
-SHAPES = "shapes"
-"""Name of the field :class:`ObjectShapeAggregations` aggregates over."""
-
 
 @dataclass
 class ObjectShape:
@@ -80,7 +77,10 @@ class ObjectShape:
 class ObjectShapeAggregations(AggregationStatistic[ObjectShape]):
     """Statistics describing the collision geometry of an :class:`ObjectShape`."""
 
-    @aggregation_statistic(SHAPES)
+    aggregated_field: ClassVar[str] = f"{ObjectShape.__name__}.shapes"
+    """Path of the field these statistics aggregate over."""
+
+    @aggregation_statistic(aggregated_field)
     def volume(self) -> float:
         """The volume the object's collision geometry encloses.
 
@@ -97,7 +97,7 @@ class ObjectShapeAggregations(AggregationStatistic[ObjectShape]):
             if isinstance(shape, Mesh) and shape.mesh.is_watertight
         )
 
-    @aggregation_statistic(SHAPES)
+    @aggregation_statistic(aggregated_field)
     def aspect_ratio(self) -> float:
         """How tall the object stands relative to how wide it spreads.
 
@@ -147,7 +147,8 @@ def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
             {
                 Feature.CLASS: ObjectClass(type(instance).__name__),
                 **ObjectShapeAggregations(
-                    instance=ObjectShape.from_annotation(instance), field_name=SHAPES
+                    instance=ObjectShape.from_annotation(instance),
+                    field_name=ObjectShapeAggregations.aggregated_field,
                 ).apply_mapping(),
             }
             for instance in objects

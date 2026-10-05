@@ -19,7 +19,6 @@ from experiments.confidence_aware_eql.confidence_model import (
     UnmodeledClassError,
 )
 from experiments.confidence_aware_eql.feature_pipeline import (
-    SHAPES,
     Feature,
     ObjectClass,
     ObjectShape,
@@ -34,7 +33,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    SemanticAnnotation,
+)
+from typing_extensions import List, Type
 
 # %% stand-in objects
 
@@ -54,7 +57,9 @@ POT_MESHES = ("bread.stl", "big-knife.stl", "whisk.stl")
 """Watertight meshes standing in for the familiar instances of another class."""
 
 
-def annotated_object(annotation_class, name: str, mesh_file: str):
+def annotated_object(
+    annotation_class: Type[SemanticAnnotation], name: str, mesh_file: str
+) -> SemanticAnnotation:
     """Build an object of ``annotation_class`` whose collision geometry is one mesh."""
     body = Body(name=PrefixedName(name))
     body.collision = ShapeCollection([Mesh(filename=str(MESH_DIRECTORY / mesh_file))])
@@ -62,7 +67,7 @@ def annotated_object(annotation_class, name: str, mesh_file: str):
 
 
 @pytest.fixture(scope="module")
-def cups():
+def cups() -> List[SemanticAnnotation]:
     """The familiar instances of the first class."""
     return [
         annotated_object(Cup, f"cup_{index}", mesh_file)
@@ -71,7 +76,7 @@ def cups():
 
 
 @pytest.fixture(scope="module")
-def pots():
+def pots() -> List[SemanticAnnotation]:
     """The familiar instances of the second class."""
     return [
         annotated_object(Pot, f"pot_{index}", mesh_file)
@@ -101,7 +106,9 @@ def test_geometric_features_are_the_aggregation_statistics(cups):
     """Every feature but the class is a statistic the aggregation class declares."""
     statistics = {
         statistic.__name__
-        for statistic in ObjectShapeAggregations.aggregation_features_of_field(SHAPES)
+        for statistic in ObjectShapeAggregations.aggregation_features_of_field(
+            ObjectShapeAggregations.aggregated_field
+        )
     }
     assert set(extract_feature_dataframe(cups)) == {Feature.CLASS} | statistics
 

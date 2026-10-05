@@ -21,7 +21,7 @@ from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
-from typing_extensions import Any, List
+from typing_extensions import Any, ClassVar, List
 
 from experiments.confidence_aware_eql.feature_pipeline import extract_feature_dataframe
 
@@ -105,17 +105,6 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
 # %% per-class model
 
 
-MINIMUM_INSTANCES_PER_LEAF = 2
-"""Fewest training instances a leaf of the class circuit may describe.
-
-A leaf fitted to a single instance collapses onto that instance's exact feature
-values, leaving the circuit a point mass per training instance: every object the
-model was not trained on then scores an infinitely low log-likelihood, however
-ordinary it is, and no threshold can tell such an object from a genuinely odd one.
-Two is the fewest that leaves a leaf spanning a range of feature values.
-"""
-
-
 @dataclass
 class PerClassConfidenceModel:
     """A relational probabilistic circuit and familiarity threshold fitted on one class."""
@@ -125,6 +114,16 @@ class PerClassConfidenceModel:
 
     threshold: float
     """The log-likelihood below which an instance of this class is judged unfamiliar."""
+
+    minimum_instances_per_leaf: ClassVar[int] = 2
+    """Fewest training instances a leaf of the class circuit may describe.
+
+    A leaf fitted to a single instance collapses onto that instance's exact feature
+    values, leaving the circuit a point mass per training instance: every object the
+    model was not trained on then scores an infinitely low log-likelihood, however
+    ordinary it is, and no threshold can tell such an object from a genuinely odd
+    one. Two is the fewest that leaves a leaf spanning a range of feature values.
+    """
 
     @classmethod
     def fit(cls, domain_class: type, instances: List[Any]) -> PerClassConfidenceModel:
@@ -145,7 +144,7 @@ class PerClassConfidenceModel:
         circuit = RelationalProbabilisticCircuit(
             domain_class,
             learning_method=JointProbabilityTree(
-                min_samples_per_leaf=MINIMUM_INSTANCES_PER_LEAF
+                min_samples_per_leaf=cls.minimum_instances_per_leaf
             ),
         )
         daos = [to_dao(instance) for instance in instances]
