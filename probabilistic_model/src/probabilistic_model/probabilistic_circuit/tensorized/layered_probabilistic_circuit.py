@@ -6,7 +6,7 @@ import numpy as np
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Symbolic, Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, Iterable, List, Optional, Self, Tuple, Type
+from typing_extensions import Dict, Iterable, List, Optional, Self, Tuple, Type
 
 from probabilistic_model.distributions.distributions import (
     IntegerDistribution,
@@ -62,6 +62,7 @@ from probabilistic_model.probabilistic_model import (
     CenterType,
     MomentType,
     OrderType,
+    PartialPointType,
     ProbabilisticModel,
 )
 from probabilistic_model.utils import logsumexp
@@ -169,7 +170,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
             )
         return samples
 
-    def encoded_point(self, point: Dict[Variable, Any]) -> Dict[Variable, Any]:
+    def encoded_point(self, point: PartialPointType) -> PartialPointType:
         """
         :param point: A partial point whose symbolic values are domain elements.
         :return: The point with every symbolic value replaced by its position in the
@@ -450,14 +451,12 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
         self.root = root
         return self, log_probability
 
-    def log_conditional(
-        self, point: Dict[Variable, Any]
-    ) -> Tuple[Optional[Self], float]:
+    def log_conditional(self, point: PartialPointType) -> Tuple[Optional[Self], float]:
         result = self.__deepcopy__()
         return result.log_conditional_in_place(point)
 
     def log_conditional_in_place(
-        self, point: Dict[Variable, Any]
+        self, point: PartialPointType
     ) -> Tuple[Optional[Self], float]:
         """
         Condition this circuit on a partial point in place.

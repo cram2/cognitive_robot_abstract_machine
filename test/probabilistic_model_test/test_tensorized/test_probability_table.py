@@ -193,6 +193,42 @@ class ProbabilityTableTestCase(unittest.TestCase):
                         converted.dense_probabilities(), PROBABILITIES
                     )
 
+    def test_dense_table_stores_the_log_probability_of_every_state(self):
+        np.testing.assert_allclose(
+            table_of(DenseProbabilityTable).log_probabilities, log_of(PROBABILITIES)
+        )
+
+    def test_sparse_table_stores_the_log_probabilities_of_the_non_zero_entries(self):
+        stored = table_of(SparseProbabilityTable).log_probabilities
+        rows, columns = np.nonzero(PROBABILITIES)
+        np.testing.assert_array_equal(stored.indices, columns)
+        np.testing.assert_array_equal(
+            np.diff(stored.indptr), np.bincount(rows, minlength=3)
+        )
+        np.testing.assert_allclose(stored.data, np.log(PROBABILITIES[rows, columns]))
+
+    def test_sparse_table_keeps_a_state_with_probability_one(self):
+        # the log-probability of such a state is a stored zero, which must not be taken
+        # for a state that is not stored
+        only_certain_node = np.array([False, True, False])
+        table = table_of(SparseProbabilityTable)
+        derived_tables = {
+            "selected": table.select_nodes(only_certain_node),
+            "concatenated": SparseProbabilityTable.concatenate(
+                [table.select_nodes(only_certain_node)]
+            ),
+            "copied": table.select_nodes(only_certain_node).copy(),
+            "restored": json_serializer.from_json(
+                json_serializer.to_json(table.select_nodes(only_certain_node))
+            ),
+        }
+        for name, derived in derived_tables.items():
+            with self.subTest(name):
+                self.assertEqual(derived.number_of_stored_entries, 1)
+                np.testing.assert_array_equal(
+                    derived.dense_probabilities(), PROBABILITIES[only_certain_node]
+                )
+
     def test_sparse_table_stores_only_the_non_zero_entries(self):
         self.assertEqual(
             table_of(SparseProbabilityTable).number_of_stored_entries,

@@ -280,7 +280,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
                 is_plural_field=morphology.is_plural(field_name),
                 aggregation_status=self._aggregation_status(child._id_, group_key_ids),
             )
-            for field_name, child in self._inferred._child_vars_.items()
+            for field_name, child in self._inferred._child_variables_.items()
         ]
 
     # %% antecedents (IF roots + their conditions)
@@ -296,7 +296,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
         >>> handle = variable(Handle, [])
         >>> prismatic = variable(PrismaticConnection, [])
         >>> fixed = a(FixedConnection)(parent=prismatic.child, child=handle).from_([])
-        >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.expression.parent, handle=fixed.expression.child)))
+        >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.parent, handle=fixed.child)))
         >>> _ = planner.node.build()
         >>> antecedents, unmatched = planner._plan_antecedents(frozenset())
         >>> (len(antecedents), len(unmatched))
@@ -315,13 +315,13 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
         >>> handle = variable(Handle, [])
         >>> prismatic = variable(PrismaticConnection, [])
         >>> fixed = a(FixedConnection)(parent=prismatic.child, child=handle).from_([])
-        >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.expression.parent, handle=fixed.expression.child)))
+        >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.parent, handle=fixed.child)))
         >>> _ = planner.node.build()
         >>> [antecedent.type_name for antecedent in planner._discover_antecedents(frozenset())]
         ['FixedConnection']
         """
         antecedents_by_root_id: Dict[uuid.UUID, AntecedentInformation] = {}
-        for child in self._inferred._child_vars_.values():
+        for child in self._inferred._child_variables_.values():
             root = self._find_root(child)
             if root is None or root._id_ in antecedents_by_root_id:
                 continue

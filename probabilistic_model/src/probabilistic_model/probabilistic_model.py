@@ -44,6 +44,11 @@ from random_events.variable import Integer, Continuous, Variable, Symbolic
 # Type definitions
 FullEvidenceType = np.array  # [Union[float, int, SetElement]]
 
+PartialPointType = Dict[Variable, Any]
+"""
+A partial point: one value for each of some variables of a model.
+"""
+
 # # Type hinting for Python 3.7 to 3.9
 if TYPE_CHECKING:
     OrderType = VariableMap[Union[Integer, Continuous], int]
@@ -245,7 +250,7 @@ class ProbabilisticModel(ABC):
         :return: The truncated distribution and the log-probability of the event.
         """
 
-    def conditional(self, point: Dict[Variable, Any]) -> Tuple[Optional[Self], float]:
+    def conditional(self, point: PartialPointType) -> Tuple[Optional[Self], float]:
         """
         Calculate the conditioned distribution P(*| point) and the probability of the
         event.
@@ -258,7 +263,7 @@ class ProbabilisticModel(ABC):
 
     @abstractmethod
     def log_conditional(
-        self, point: Dict[Variable, Any]
+        self, point: PartialPointType
     ) -> Tuple[Optional[Self], float]:
         """
         Calculate the conditioned distribution P(*| point) and the probability of the

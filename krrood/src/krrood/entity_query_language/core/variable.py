@@ -8,7 +8,6 @@ variables that are instantiated from other expressions.
 
 from __future__ import annotations
 
-import uuid
 import inspect
 from abc import ABC
 from dataclasses import dataclass, field
@@ -216,19 +215,12 @@ class InstantiatedVariable(
     The properties of the variable as keyword arguments.
     """
 
-    _child_vars_: Dict[str, SymbolicExpression] = field(
+    _child_variables_: Dict[str, SymbolicExpression] = field(
         default_factory=dict, init=False, repr=False
     )
     """
     A dictionary mapping child variable names to variables, these are from the
     _kwargs_ dictionary.
-    """
-
-    _child_var_id_name_map_: Dict[uuid.UUID, str] = field(
-        default_factory=dict, init=False, repr=False
-    )
-    """
-    A dictionary mapping child variable ids to their names.
     """
 
     _domain_source_: DomainSource = field(init=False, default=DomainSource.DEDUCTION)
@@ -237,30 +229,25 @@ class InstantiatedVariable(
     """
 
     def __post_init__(self):
-        self._update_child_vars_from_kwargs_()
-        self._operation_children_ = tuple(self._child_vars_.values())
+        self._update_child_variables_from_kwargs_()
+        self._operation_children_ = tuple(self._child_variables_.values())
         # This is done here as it uses `_operation_children_`
         super().__post_init__()
 
-    def _update_child_vars_from_kwargs_(self):
+    def _update_child_variables_from_kwargs_(self):
         """
         Set the child variables from the kwargs dictionary.
         """
-        for k, v in self._kwargs_.items():
-            self._child_vars_[k] = (
-                v
-                if isinstance(v, SymbolicExpression)
-                else Literal(_value_=v, _name__=k)
-            )
-            self._child_var_id_name_map_[self._child_vars_[k]._id_] = k
+        for name, value in self._kwargs_.items():
+            self._child_variables_[name] = SymbolicExpression._as_operand_(value, name)
 
     def _evaluate__(
         self,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        yield from self._instantiate_using_child_vars_and_yield_results_(sources)
+        yield from self._instantiate_using_child_variables_and_yield_results_(sources)
 
-    def _instantiate_using_child_vars_and_yield_results_(
+    def _instantiate_using_child_variables_and_yield_results_(
         self, sources: OperationResult
     ) -> Iterator[OperationResult]:
         """
@@ -268,11 +255,11 @@ class InstantiatedVariable(
         arguments the child variables values.
         """
         for child_result in self._evaluate_product_(sources):
-            # Build once: unwrapped hashed kwargs for already provided child vars
-            kwargs = {
-                self._child_var_id_name_map_[id_]: v
-                for id_, v in child_result.bindings.items()
-                if id_ in self._child_var_id_name_map_
+            # An argument without a binding is left out, so its default applies.
+            arguments = {
+                name: child_result.bindings[child._id_]
+                for name, child in self._child_variables_.items()
+                if child._id_ in child_result.bindings
             }
             # A callable class (Predicate / SymbolicFunction) implements HasBoundValue -- it binds the
             # constructed instance, or, for a value operation, its constructed-and-called value -- the
@@ -284,7 +271,7 @@ class InstantiatedVariable(
                 and issubclass(self._type_, HasBoundValue)
                 else self._type_
             )
-            instance = bind(**kwargs)
+            instance = bind(**arguments)
 
             bindings = {self._id_: instance} | child_result.bindings
             result = self._build_operation_result_(bindings, child_result)
@@ -297,11 +284,9 @@ class InstantiatedVariable(
         MultiArityExpressionThatPerformsACartesianProduct._replace_child_field_(
             self, old_child, new_child
         )
-        for k, v in self._child_vars_.items():
-            if v is old_child:
-                self._child_vars_[k] = new_child
-                self._child_var_id_name_map_[self._child_vars_[k]._id_] = k
-                break
+        for name, child in self._child_variables_.items():
+            if child._id_ == old_child._id_:
+                self._child_variables_[name] = new_child
 
     @cached_property
     def _name_(self):

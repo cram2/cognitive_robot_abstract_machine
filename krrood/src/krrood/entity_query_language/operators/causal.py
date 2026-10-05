@@ -11,7 +11,7 @@ resemble) so causal-specific code has its own, easily reviewable surface, mirror
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import TYPE_CHECKING, Any, Iterable, List
+from typing_extensions import TYPE_CHECKING, Any, Iterable, List, Optional, Type, Self
 
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import (
@@ -35,7 +35,31 @@ if TYPE_CHECKING:
 
 
 @dataclass(eq=False, repr=False)
-class Cause(Literal):
+class CausalRoleMarker(Literal):
+    """
+    Marks a keyword argument of a match pattern as a variable whose value the query
+    searches for rather than one it observes. Always wraps ``Ellipsis``.
+
+    Each kind is written as one shared instance with no type of its own, so every
+    attribute it marks gets a fresh copy carrying that attribute's type, and marking
+    several attributes never makes them interfere.
+    """
+
+    _value_: Any = field(default=Ellipsis, init=False)
+
+    def _as_assigned_variable_(self, attribute_type: Optional[Type]) -> Self:
+        """
+        :param attribute_type: The type of the attribute this marks.
+        :return: This marker if it already has a type, otherwise a fresh copy of it
+            carrying the attribute's type.
+        """
+        if self._type_ is not None:
+            return self
+        return type(self)(_type_=attribute_type)
+
+
+@dataclass(eq=False, repr=False)
+class Cause(CausalRoleMarker):
     """
     Marks a :class:`~krrood.entity_query_language.query.match.Match` keyword argument as
     a ``do()``-intervention target searched for by the query, rather than an observed
@@ -43,20 +67,9 @@ class Cause(Literal):
 
     ``arm=cause`` means: find the value of ``arm`` whose intervention (Pearl's
     ``do(arm=value)``) best explains the effect declared via
-    :meth:`~krrood.entity_query_language.query.match.Match.causes_effect`. Always wraps
-    ``Ellipsis`` -- there is no pinned-value form; pin a value with a plain assignment
-    (``arm=0.3``) instead.
-
-    :data:`cause` is a single shared instance written directly into every ``cause``
-    kwarg (``arm=cause``); it carries no attribute-specific type of its own until one
-    is attached. :meth:`AttributeMatch.assigned_variable
-    <krrood.entity_query_language.query.match.AttributeMatch.assigned_variable>`
-    returns a fresh, per-attribute copy with the type filled in rather than mutating
-    this shared instance, so multiple ``cause``-marked fields on the same query never
-    interfere with each other.
+    :meth:`~krrood.entity_query_language.query.match.Match.causes_effect`. There is no
+    pinned-value form; pin a value with a plain assignment (``arm=0.3``) instead.
     """
-
-    _value_: Any = field(default=Ellipsis, init=False)
 
     def __repr__(self) -> str:
         return "cause"
@@ -70,7 +83,7 @@ Marks a :class:`~krrood.entity_query_language.query.match.Match` keyword argumen
 
 
 @dataclass(eq=False, repr=False)
-class Confounder(Literal):
+class Confounder(CausalRoleMarker):
     """
     Marks a :class:`~krrood.entity_query_language.query.match.Match` keyword argument
     as a variable to adjust for when searching a :class:`Cause` intervention -- Pearl's
@@ -79,16 +92,8 @@ class Confounder(Literal):
 
     ``season=confounder`` means: season is a common cause of the searched
     :class:`Cause` and the declared effect, and must be summed back out rather than
-    left baked into the correlation between them. Always wraps ``Ellipsis``, the same
-    as :class:`Cause`.
-
-    :data:`confounder` is a single shared instance, for the same reason as
-    :data:`cause`: :meth:`AttributeMatch.assigned_variable
-    <krrood.entity_query_language.query.match.AttributeMatch.assigned_variable>`
-    returns a fresh, per-attribute copy rather than mutating it.
+    left baked into the correlation between them.
     """
-
-    _value_: Any = field(default=Ellipsis, init=False)
 
     def __repr__(self) -> str:
         return "confounder"

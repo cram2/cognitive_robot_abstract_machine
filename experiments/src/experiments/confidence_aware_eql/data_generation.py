@@ -47,7 +47,7 @@ class MassDistribution:
         :return: The generated objects.
         """
         query = a(self.object_class)(root=a(Body)(inertial=an(Inertial)(mass=...)))
-        query.expression.limit(self.number_of_samples)
+        query.limit(self.number_of_samples)
         parameters = UnderspecifiedParameters(query)
         [mass_variable] = parameters.variables.values()
 

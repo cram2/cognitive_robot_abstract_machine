@@ -77,7 +77,7 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
         ):
             if kse != other:
                 is_inside = InsideOf(kse, other)
-                if is_inside() > 0.0:
+                if is_inside.compute_containment_ratio() > 0.0:
                     dao = to_dao(is_inside, state=state)
                     daos.append(dao)
 

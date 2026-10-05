@@ -1,4 +1,7 @@
+import datetime
 import json
+import pathlib
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -24,6 +27,7 @@ from krrood.adapters.json_serializer import (
     JSONAttributeDiff,
     shallow_diff_json,
     DataclassJSONSerializer,
+    JSONSerializableTypeRegistry,
 )
 from krrood.utils import get_full_class_name
 
@@ -521,6 +525,68 @@ def test_timedelta_field_of_a_dataclass_roundtrips():
     obj = HasDuration()
     result = from_json(to_json(obj))
     assert result == obj
+
+
+# %% standard library values
+
+
+STANDARD_LIBRARY_VALUES = [
+    datetime.timezone(datetime.timedelta(hours=2)),
+    datetime.timezone(datetime.timedelta(hours=-3), "BRT"),
+    pathlib.PurePosixPath("/a/b"),
+    pathlib.PureWindowsPath("C:/a/b"),
+    range(1, 10, 2),
+    slice(1, None, -1),
+    re.compile("a+b", re.IGNORECASE),
+]
+
+
+@pytest.mark.parametrize(
+    "value",
+    STANDARD_LIBRARY_VALUES,
+    ids=[repr(value) for value in STANDARD_LIBRARY_VALUES],
+)
+def test_standard_library_value_roundtrips(value):
+    result = from_json(json.loads(json.dumps(to_json(value))))
+
+    assert result == value
+    assert type(result) is type(value)
+
+
+def test_timezone_keeps_its_name():
+    zone = datetime.timezone(datetime.timedelta(hours=-3), "BRT")
+
+    result = from_json(to_json(zone))
+
+    assert result.tzname(None) == zone.tzname(None)
+
+
+# %% serializers registered for a type
+
+
+@pytest.mark.parametrize(
+    "clazz",
+    [datetime.timezone, pathlib.PurePath, pathlib.PurePosixPath, range, re.Pattern],
+)
+def test_type_with_its_own_serializer_is_recognised(clazz):
+    assert JSONSerializableTypeRegistry().has_type_specific_serializer(clazz)
+
+
+@dataclass
+class DataclassWithoutOwnSerializer:
+    """
+    A dataclass that only the generic dataclass serializer can handle.
+    """
+
+    value: int
+    """
+    Some value.
+    """
+
+
+@pytest.mark.parametrize("clazz", [DataclassWithoutOwnSerializer, object])
+def test_type_without_its_own_serializer_is_not_recognised(clazz):
+    assert not JSONSerializableTypeRegistry().has_type_specific_serializer(clazz)
 
 
 # %% list diffs with repeated items

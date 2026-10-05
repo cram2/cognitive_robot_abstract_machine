@@ -19,9 +19,7 @@ from krrood.entity_query_language.operators.logical_quantifiers import (
     QuantifiedConditional,
 )
 from krrood.entity_query_language.query.query import Entity, Query
-from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
-    SpecificityRule,
-)
+from krrood.patterns.specificity_ranking import SpecificityRule
 from krrood.entity_query_language.verbalization.grammar.query.planner import (
     QueryPlan,
     QueryPlanner,

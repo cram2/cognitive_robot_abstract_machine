@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import numpy as np
 import pytest
 from rustworkx import NoEdgeBetweenNodes
@@ -42,6 +40,8 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
+
+from ..world_snapshot import WorldSnapshot
 
 
 @pytest.fixture(
@@ -126,25 +126,20 @@ def graspable_annotation(world: World, body: Body) -> HasRootBody:
 
 
 @pytest.fixture
-def immutable_stationary_block_world(robot_setup):
+def stationary_block_context(robot_setup):
+    """
+    The shared block world with one stationary robot, the robot and a context for both,
+    returned to its initial model and state after the test.
+    """
     block_world, robot_class = robot_setup
-    state = deepcopy(block_world.state._data)
+    snapshot = WorldSnapshot.capture(block_world)
     view = block_world.get_semantic_annotations_by_type(robot_class)[0]
     yield block_world, view, Context(block_world, view)
-    block_world.state._data[:] = state
-    block_world.notify_state_change()
+    snapshot.restore()
 
 
-@pytest.fixture
-def mutable_stationary_block_world(robot_setup):
-    block_world, robot_class = robot_setup
-    copy_world = deepcopy(block_world)
-    copy_view = copy_world.get_semantic_annotations_by_type(robot_class)[0]
-    return copy_world, copy_view, Context(copy_world, copy_view)
-
-
-def test_park_arms_multi(immutable_stationary_block_world):
-    world, view, context = immutable_stationary_block_world
+def test_park_arms_multi(stationary_block_context):
+    world, view, context = stationary_block_context
 
     description = ParkArmsAction(Arms.BOTH)
     plan = execute_single(description, context=context).plan
@@ -167,8 +162,8 @@ def test_park_arms_multi(immutable_stationary_block_world):
         )
 
 
-def test_reach_action_multi(immutable_stationary_block_world):
-    world, view, context = immutable_stationary_block_world
+def test_reach_action_multi(stationary_block_context):
+    world, view, context = stationary_block_context
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
 
     grasp_description = GraspDescription(
@@ -210,8 +205,8 @@ def test_reach_action_multi(immutable_stationary_block_world):
     )
 
 
-def test_move_gripper_multi(immutable_stationary_block_world):
-    world, view, context = immutable_stationary_block_world
+def test_move_gripper_multi(stationary_block_context):
+    world, view, context = stationary_block_context
 
     plan = execute_single(
         SetGripperAction(Arms.LEFT, GripperState.OPEN), context=context
@@ -238,8 +233,8 @@ def test_move_gripper_multi(immutable_stationary_block_world):
         assert connection.position == pytest.approx(target, abs=0.01)
 
 
-def test_grasping(immutable_stationary_block_world):
-    world, robot_view, context = immutable_stationary_block_world
+def test_grasping(stationary_block_context):
+    world, robot_view, context = stationary_block_context
     left_arm = ViewManager.get_arm_view(Arms.LEFT, robot_view)
 
     grasp_description = GraspDescription(
@@ -262,8 +257,8 @@ def test_grasping(immutable_stationary_block_world):
     assert dist < 0.01
 
 
-def test_pick_up_multi(mutable_stationary_block_world):
-    world, view, context = mutable_stationary_block_world
+def test_pick_up_multi(stationary_block_context):
+    world, view, context = stationary_block_context
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     grasp_description = GraspDescription(
@@ -308,8 +303,8 @@ def place_position(robot_setup) -> Point3:
         raise ValueError(f"Unsupported robot class: {robot_class}")
 
 
-def test_place_multi(mutable_stationary_block_world, place_position):
-    world, view, context = mutable_stationary_block_world
+def test_place_multi(stationary_block_context, place_position):
+    world, view, context = stationary_block_context
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     grasp_description = GraspDescription(
@@ -361,10 +356,8 @@ def anchor_position(robot_setup) -> Point3:
         raise ValueError(f"Unsupported robot class: {robot_class}")
 
 
-def test_move_tcp_follows_sine_waypoints(
-    immutable_stationary_block_world, anchor_position
-):
-    world, view, context = immutable_stationary_block_world
+def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_position):
+    world, view, context = stationary_block_context
     right_arm = ViewManager.get_arm_view(Arms.RIGHT, view)
     anchor = Pose(anchor_position, reference_frame=world.root)
     anchor_T = anchor.to_homogeneous_matrix()

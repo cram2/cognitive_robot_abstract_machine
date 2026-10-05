@@ -566,6 +566,12 @@ class Camera(Sensor, ABC):
         )
 
 
+TCamera = TypeVar("TCamera", bound=Camera)
+"""
+A kind of camera.
+"""
+
+
 @dataclass(eq=False)
 class Finger(KinematicChain, ABC):
     """

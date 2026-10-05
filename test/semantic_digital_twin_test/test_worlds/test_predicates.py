@@ -7,19 +7,27 @@ import numpy as np
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.reasoning.predicates import (
-    contact,
-    visible,
     Above,
     Below,
     LeftOf,
     RightOf,
     Behind,
     InFrontOf,
-    is_body_in_region,
-    occluding_bodies,
-    is_supported_by,
-    reachable,
-    is_place_occupied,
+    InsideOf,
+    InsideRegion,
+    InContactWith,
+    PlaceIsOccupied,
+    Reachable,
+    SupportedBy,
+    Supports,
+    ViewDependentSpatialRelation,
+)
+from krrood.entity_query_language.predicate import Predicate
+from krrood.entity_query_language.testing.result_verification import (
+    placeholder_operands,
+)
+from krrood.entity_query_language.verbalization.pipeline import (
+    verbalize_expression,
 )
 from semantic_digital_twin.reasoning.robot_predicates import (
     robot_in_collision,
@@ -29,8 +37,10 @@ from semantic_digital_twin.reasoning.robot_predicates import (
     bodies_in_gripper,
     is_pose_free_for_robot,
     is_gripper_holding_something,
+    occluding_bodies,
+    VisibleTo,
 )
-from semantic_digital_twin.robots.robot_parts import Camera, EndEffector
+from semantic_digital_twin.robots.robot_parts import Camera, EndEffector, TCamera
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Quaternion
 from semantic_digital_twin.testing import *
@@ -46,10 +56,13 @@ from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.semantic_annotations.mixins import TKinematicStructureEntity
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
     KinematicStructureEntity,
+    TBody,
+    TRegion,
 )
 
 
@@ -126,9 +139,9 @@ def test_in_contact():
         w.add_kinematic_structure_entity(b3)
         w.add_connection(Connection6DoF.create_with_dofs(parent=b1, child=b2, world=w))
         w.add_connection(Connection6DoF.create_with_dofs(parent=b2, child=b3, world=w))
-    assert contact(b1, b2)
-    assert not contact(b1, b3)
-    assert contact(b2, b3)
+    assert InContactWith(b1, b2)()
+    assert not InContactWith(b1, b3)()
+    assert InContactWith(b2, b3)()
 
 
 def test_robot_in_contact(pr2_world_copy: World):
@@ -186,7 +199,7 @@ def test_get_visible_objects(pr2_world_copy: World):
 
     camera = pr2_world_copy.get_semantic_annotations_by_type(Camera)[0]
 
-    assert visible(camera, body)
+    assert VisibleTo(entity=body, camera=camera)()
 
 
 def test_camera_view_frame_x_axis_is_the_forward_axis(pr2_world_copy: World):
@@ -234,12 +247,12 @@ def test_visibility_follows_camera_orientation(pr2_world_copy: World):
     camera = pr2_world_copy.get_semantic_annotations_by_type(Camera)[0]
     head_pan = pr2_world_copy.get_degree_of_freedom_by_name("head_pan_joint")
 
-    assert not visible(camera, body)
+    assert not VisibleTo(entity=body, camera=camera)()
 
     pr2_world_copy.state[head_pan.id].position = np.pi / 2
     pr2_world_copy.notify_state_change()
 
-    assert visible(camera, body)
+    assert VisibleTo(entity=body, camera=camera)()
 
 
 def test_occluding_bodies(pr2_world_state_reset: World):
@@ -396,8 +409,10 @@ def test_body_in_region(two_block_world):
             ),
         )
         center._world.add_connection(connection)
-    assert is_body_in_region(center, region) == 0.5
-    assert is_body_in_region(top, region) == 0.0
+    assert InsideRegion(center, region).compute_contained_fraction() == 0.5
+    assert InsideRegion(top, region).compute_contained_fraction() == 0.0
+    assert InsideRegion(center, region)()
+    assert not InsideRegion(top, region)()
 
 
 def test_supporting(two_block_world):
@@ -407,8 +422,8 @@ def test_supporting(two_block_world):
         top.parent_connection.parent_T_connection_expression = (
             HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=center, z=1.0)
         )
-    assert is_supported_by(top, center)
-    assert not is_supported_by(center, top)
+    assert SupportedBy(top, center)()
+    assert not SupportedBy(center, top)()
 
 
 def test_is_body_in_gripper(pr2_world_copy):
@@ -475,11 +490,11 @@ def test_reachable(pr2_world_state_reset, rclpy_node):
         reference_frame=pr2.left_arm.end_effector.tool_frame,
     )
 
-    assert reachable(
+    assert Reachable(
         tool_frame_T_reachable_goal,
         pr2.left_arm.root,
         pr2.left_arm.end_effector.tool_frame,
-    )
+    )()
     assert not blocking(
         tool_frame_T_reachable_goal,
         pr2.left_arm.root,
@@ -488,11 +503,11 @@ def test_reachable(pr2_world_state_reset, rclpy_node):
     tool_frame_T_unreachable_goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=10, y=10, reference_frame=pr2.left_arm.end_effector.tool_frame
     )
-    assert not reachable(
+    assert not Reachable(
         tool_frame_T_unreachable_goal,
         pr2.left_arm.root,
         pr2.left_arm.end_effector.tool_frame,
-    )
+    )()
 
     tool_frame_T_rotated_reachable_goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=-0.2,
@@ -500,11 +515,11 @@ def test_reachable(pr2_world_state_reset, rclpy_node):
         yaw=np.pi / 2,
         reference_frame=pr2.left_arm.end_effector.tool_frame,
     )
-    assert reachable(
+    assert Reachable(
         tool_frame_T_rotated_reachable_goal,
         pr2.left_arm.root,
         pr2.left_arm.end_effector.tool_frame,
-    )
+    )()
 
     tool_frame_T_rotated_unreachable_goal = (
         HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -514,11 +529,11 @@ def test_reachable(pr2_world_state_reset, rclpy_node):
             reference_frame=pr2.left_arm.end_effector.tool_frame,
         )
     )
-    assert not reachable(
+    assert not Reachable(
         tool_frame_T_rotated_unreachable_goal,
         pr2.left_arm.root,
         pr2.left_arm.end_effector.tool_frame,
-    )
+    )()
 
 
 def test_blocking(pr2_world_copy):
@@ -563,25 +578,25 @@ def test_region_is_occupied(pr2_world_state_reset):
     target_box = VolumetricBoundingBox(
         0, 0, 0, 1, 1, 1, HomogeneousTransformationMatrix()
     )
-    assert not is_place_occupied(
+    assert not PlaceIsOccupied(
         target_box,
         Pose.from_xyz_rpy(2.5, 2, 0, reference_frame=pr2_world_state_reset.root),
         pr2_world_state_reset,
-    )
+    )()
 
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         3.5, 2.5, 0
     )
     pr2_world_state_reset.notify_state_change()
 
-    assert is_place_occupied(target_box, view.root.global_pose, pr2_world_state_reset)
+    assert PlaceIsOccupied(target_box, view.root.global_pose, pr2_world_state_reset)()
 
-    assert not is_place_occupied(
+    assert not PlaceIsOccupied(
         target_box,
         Pose.from_xyz_rpy(3.5, 2.5, 1, 0, reference_frame=pr2_world_state_reset.root),
         pr2_world_state_reset,
         view.bodies_with_collision,
-    )
+    )()
 
 
 def test_is_pose_free_for_robot(pr2_apartment_state_reset):
@@ -757,3 +772,135 @@ def test_nothing_occludes_a_body_in_clear_line_of_sight():
         world.add_semantic_annotation(camera)
 
     assert occluding_bodies(camera, target) == []
+
+
+# %% a spatial relation is something a query can state
+
+
+def test_a_view_dependent_spatial_relation_is_a_predicate():
+    """
+    A relation a statement asserts has to be a predicate rather than a bare symbol, so a
+    query can state it and a search can be devised from it rather than only evaluating
+    it after the fact.
+    """
+    assert issubclass(ViewDependentSpatialRelation, Predicate)
+
+
+@pytest.mark.parametrize(
+    "relation",
+    [
+        InContactWith,
+        VisibleTo,
+        Reachable,
+        SupportedBy,
+        Supports,
+        InsideOf,
+        InsideRegion,
+        PlaceIsOccupied,
+        ViewDependentSpatialRelation,
+    ],
+)
+def test_every_relation_is_a_predicate(relation):
+    """
+    A relation belongs in the vocabulary a statement can assert, so it is a predicate
+    even where what it reads is a measurement.
+    """
+    assert issubclass(relation, Predicate)
+
+
+def test_containment_answers_whether_it_holds_rather_than_by_how_much(two_block_world):
+    center, top = two_block_world
+
+    assert InsideOf(top, center)() in (True, False)
+
+
+def test_containment_reports_the_fraction_it_measured(two_block_world):
+    """
+    The judgement is a threshold over a measurement, and the measurement stays readable
+    on its own for the callers that compare it against a threshold of their own.
+    """
+    center, top = two_block_world
+    relation = InsideOf(top, center)
+
+    assert relation.compute_containment_ratio() == pytest.approx(
+        InsideOf(top, center).compute_containment_ratio()
+    )
+
+
+def test_the_threshold_is_what_turns_the_measurement_into_a_verdict(two_block_world):
+    """
+    The same pair reads either way depending only on how much containment is asked for,
+    which is what makes the threshold the statement of intent rather than a tuned
+    constant hidden in the caller.
+    """
+    center, top = two_block_world
+    measured = InsideOf(top, center).compute_containment_ratio()
+
+    assert InsideOf(top, center, minimum_containment_ratio=measured)()
+    assert not InsideOf(top, center, minimum_containment_ratio=measured + 0.01)()
+
+
+def test_support_relates_the_supported_thing_to_what_holds_it_up():
+    supported = Body(name=PrefixedName("supported"))
+    supporting = Body(name=PrefixedName("supporting"))
+
+    relation = SupportedBy(supported=supported, supporting=supporting)
+
+    assert relation.subject is supported
+    assert relation.object is supporting
+
+
+@pytest.mark.parametrize(
+    "relation, type_parameters",
+    [
+        (InContactWith, [TBody]),
+        (SupportedBy, [TBody]),
+        (InsideRegion, [TBody, TRegion]),
+        (VisibleTo, [TKinematicStructureEntity, TCamera]),
+    ],
+)
+def test_a_relation_is_generic_in_the_kinds_of_thing_it_relates(
+    relation, type_parameters
+):
+    """
+    A relation leaves open which kind of body, region or camera it relates, up to the
+    bound of each type parameter, so a narrower relation can bind them.
+    """
+    assert relation.get_generic_type_parameters() == type_parameters
+
+
+# %% how a relation reads
+
+
+def test_reachability_reads_the_pose_as_what_is_reachable():
+    """
+    Reachability is stated about the pose, by the tip that has to arrive at it, so the
+    pose is the subject of the sentence rather than the chain that reaches for it.
+    """
+    operands = placeholder_operands(Reachable)
+    operands.update(Reachable._example_operand_values_())
+
+    assert (
+        verbalize_expression(Reachable(**operands))
+        == "a HomogeneousTransformationMatrix is reachable by a Body"
+    )
+
+
+@pytest.mark.parametrize(
+    "relation, sentence",
+    [
+        (SupportedBy, "a Body is supported by another Body"),
+        (VisibleTo, "a Body or a Region is visible to a Camera"),
+        (InContactWith, "a Body is in contact with another Body"),
+        (Supports, "a Body is supporting a body"),
+    ],
+)
+def test_a_relation_named_for_its_object_still_reads_as_a_sentence(relation, sentence):
+    """
+    A relation whose name is not verb-first cannot have its verb read off that name, so
+    it states its own clause rather than inheriting one that renders ungrammatically.
+    """
+    operands = placeholder_operands(relation)
+    operands.update(relation._example_operand_values_())
+
+    assert verbalize_expression(relation(**operands)) == sentence

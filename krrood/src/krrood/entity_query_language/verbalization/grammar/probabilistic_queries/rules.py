@@ -70,7 +70,7 @@ class DistributionRule(PhraseRule):
     >>> match = a(Robot)(name="R2", battery=...)
     >>> verbalize_expression(distribution_of(match))
     "The distribution over a Robot given that its name is 'R2'"
-    >>> verbalize_expression(distribution_of(match, marginalize_for=(match.variable.battery,)))
+    >>> verbalize_expression(distribution_of(match, marginalize_for=(match.battery,)))
     "The distribution over the battery of a Robot given that its name is 'R2'"
     """
 
@@ -112,7 +112,9 @@ class DistributionRule(PhraseRule):
         if where is not None:
             items.append(where)
 
-        return BlockFragment(header=header, items=items, source=node.match.expression)
+        return BlockFragment(
+            header=header, items=items, source=node.match._get_expression_()
+        )
 
 
 @dataclass

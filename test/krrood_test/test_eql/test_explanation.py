@@ -1,5 +1,6 @@
 import gc
 import operator
+from copy import deepcopy
 from dataclasses import dataclass
 
 import pytest
@@ -1029,8 +1030,8 @@ def test_explanation_lifecycle_tied_to_instance():
             parent=prismatic_connection.child, child=handle
         ).from_(world.connections)
         drawers = inference(Drawer)(
-            container=fixed_connection.expression.parent,
-            handle=fixed_connection.expression.child,
+            container=fixed_connection.parent,
+            handle=fixed_connection.child,
         ).tolist()
         assert drawers, "Need at least one inferred Drawer for this test"
 
@@ -1067,6 +1068,20 @@ def drawer_rule(doors_and_drawers_world):
         parent=prismatic_connection.child, child=handle
     ).from_(world.connections)
     return inference(Drawer)(
-        container=fixed_connection.expression.parent,
-        handle=fixed_connection.expression.child,
+        container=fixed_connection.parent,
+        handle=fixed_connection.child,
     )
+
+
+# %% copying inferred instances
+
+
+def test_a_copy_of_an_inferred_instance_shares_its_explanation():
+    template = variable(Person, domain=[Person(name="Bob")])
+    (bob,) = entity(inference(Person)(name=template.name)).evaluate()
+
+    copied_bob = deepcopy(bob)
+
+    assert copied_bob is not bob
+    assert copied_bob == bob
+    assert explain_inference(copied_bob) is explain_inference(bob)

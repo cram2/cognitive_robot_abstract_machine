@@ -162,7 +162,7 @@ backend = ProbabilisticBackend(
     model_registry=DictRegistry({SummerStatistics: circuit}), number_of_samples=1000
 )
 high_ice_cream = a(SummerStatistics)(season=..., ice_cream_sales=..., drowning_incidents=...)
-high_ice_cream.where(high_ice_cream.variable.ice_cream_sales >= 9.0)
+high_ice_cream.where(high_ice_cream.ice_cream_sales >= 9.0)
 results = high_ice_cream.tolist(backend=backend)
 sum(r.drowning_incidents == DrowningLevel.HIGH for r in results) / len(results)
 # approximately 0.7 -- matches the direct computation above, up to sampling noise: this
@@ -199,13 +199,13 @@ backend = ProbabilisticBackend(
 
 # Without confounder: the search can't separate the confound from the effect.
 naive = a(SummerStatistics)(season=..., ice_cream_sales=cause, drowning_incidents=...)
-naive.causes_effect(naive.variable.drowning_incidents == DrowningLevel.HIGH)
+naive.causes_effect(naive.drowning_incidents == DrowningLevel.HIGH)
 backend.rank_causes(naive)[0].effect_probability_given_region
 # 0.7 -- spurious, the same number plain conditioning on ice_cream_sales gave above.
 
 # With confounder: season is summed back out, recovering the causal truth.
 adjusted = a(SummerStatistics)(season=confounder, ice_cream_sales=cause, drowning_incidents=...)
-adjusted.causes_effect(adjusted.variable.drowning_incidents == DrowningLevel.HIGH)
+adjusted.causes_effect(adjusted.drowning_incidents == DrowningLevel.HIGH)
 backend.rank_causes(adjusted)[0].effect_probability_given_region
 # 0.5 -- back to the unconfounded baseline, correctly showing ice_cream_sales has no
 # real effect on drowning_incidents once season is accounted for.
@@ -232,7 +232,7 @@ from krrood.entity_query_language.factories import a, cause
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 pick = a(Pick)(arm=cause, outcome=...)
-pick.causes_effect(pick.variable.outcome == Status.SUCCESS)
+pick.causes_effect(pick.outcome == Status.SUCCESS)
 verbalize_expression(pick)
 # 'Generate a Pick and predict its arm and outcome values where its arm causes
 #  its outcome to be SUCCESS'
@@ -310,7 +310,7 @@ returns every candidate's score instead:
 
 ```python
 match = a(Pick)(arm=cause, grip=cause, outcome=...)
-match.causes_effect(match.variable.outcome == Status.SUCCESS)
+match.causes_effect(match.outcome == Status.SUCCESS)
 
 ranking = backend.rank_causes(match)
 for scored in ranking:

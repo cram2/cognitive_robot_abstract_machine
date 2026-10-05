@@ -15,9 +15,9 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 # ---- Occupancy locations tests ----
 
 
-def test_attachment_exclusion(immutable_model_world, rclpy_node):
+def test_attachment_exclusion(pr2_apartment_context, rclpy_node):
 
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = pr2_apartment_context
 
     robot_view.root.parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -50,8 +50,8 @@ def test_attachment_exclusion(immutable_model_world, rclpy_node):
     assert np.sum(o.map[80:90, 90:110]) != 0
 
 
-def test_merge_costmap(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_merge_costmap(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     o = OccupancyCostmap(
         distance_to_obstacle=0.2,
         height=200,
@@ -81,8 +81,8 @@ def test_merge_costmap(immutable_model_world):
     assert np.all(o3.map == o2.map)
 
 
-def test_occupancy_robot_exclusion(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_occupancy_robot_exclusion(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     robot_view.root.parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(10, 10)
     )
@@ -98,12 +98,12 @@ def test_occupancy_robot_exclusion(immutable_model_world):
     assert np.sum(occupancy_map.map) == 137641
 
 
-def test_occupancy_leaves_the_floor_free(immutable_model_world):
+def test_occupancy_leaves_the_floor_free(pr2_apartment_context):
     """
     The ground the robot drives on is not an obstacle: over a patch of open floor every
     cell stays free, and only what stands on the floor occupies anything.
     """
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = pr2_apartment_context
 
     occupancy_map = OccupancyCostmap(
         resolution=0.02,
@@ -118,9 +118,9 @@ def test_occupancy_leaves_the_floor_free(immutable_model_world):
     assert np.all(occupancy_map.create_ray_mask_around_origin() == 1)
 
 
-def test_gaussian_costmap(immutable_model_world):
+def test_gaussian_costmap(pr2_apartment_context):
 
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = pr2_apartment_context
     gaussian_map = GaussianCostmap(
         resolution=0.02,
         origin=Pose.from_xyz_quaternion(3.1, 2.2, 0, 0, 0, 1, 0, world.root),
@@ -133,8 +133,8 @@ def test_gaussian_costmap(immutable_model_world):
     assert np.sum(gaussian_map.map == 0) == (400 * 0.05 * 2) ** 2
 
 
-def test_sample_reachability(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_sample_reachability(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     occupancy_map = OccupancyCostmap(
         resolution=0.02,
         height=400,
@@ -164,8 +164,8 @@ def test_sample_reachability(immutable_model_world):
 # ----- Sampling test ---------------
 
 
-def test_position_generation(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_position_generation(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[90:110, 90:110] = 1
     gaussian_map = GaussianCostmap(
@@ -182,8 +182,8 @@ def test_position_generation(immutable_model_world):
         assert 0.8 <= pose.to_position().y <= 1.2
 
 
-def test_segment_map(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_segment_map(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[90:110, 90:110] = 1
     np_map[20:40, 20:40] = 1
@@ -206,8 +206,8 @@ def test_segment_map(immutable_model_world):
     assert np.sum(map_1[90:110, 90:110]) == 20**2 and np.sum(map_1[20:40, 20:40]) == 0
 
 
-def test_orientation_generation(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_orientation_generation(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     orientation = OrientationGenerator.generate_origin_orientation(
         Point3(0, 1, 0),
@@ -224,8 +224,8 @@ def test_orientation_generation(immutable_model_world):
     assert orientation.to_list() == pytest.approx([0, 0, 0.707, 0.707], abs=0.001)
 
 
-def test_sample_x_axis(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_sample_x_axis(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[:, 99:101] = 1
 
@@ -243,8 +243,8 @@ def test_sample_x_axis(immutable_model_world):
         assert -0.05 < pose.to_position().y < 0.05
 
 
-def test_sample_x_axis_offset(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_sample_x_axis_offset(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[120:140, 90:110] = 1
 
@@ -263,8 +263,8 @@ def test_sample_x_axis_offset(immutable_model_world):
         assert 0.4 <= pose.to_position().x <= 0.8
 
 
-def test_sample_x_axis_offset_non_id(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_sample_x_axis_offset_non_id(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[120:140, 90:110] = 1
 
@@ -283,8 +283,8 @@ def test_sample_x_axis_offset_non_id(immutable_model_world):
         assert 3.4 <= pose.to_position().x <= 3.8 + tolerance
 
 
-def test_sample_to_pose_gau(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_sample_to_pose_gau(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[120:140, 90:110] = 1
     gaussian_map = GaussianCostmap(
@@ -311,8 +311,8 @@ def test_sample_to_pose_gau(immutable_model_world):
         assert 2.6 <= pose.to_position().x <= 3.6
 
 
-def test_sample_y_axis(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_sample_y_axis(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[99:101, :] = 1
     gaussian_map = GaussianCostmap(
@@ -328,8 +328,8 @@ def test_sample_y_axis(immutable_model_world):
         assert -0.05 < pose.to_position().x < 0.05
 
 
-def test_sample_rotated(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_sample_rotated(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[120:121, 99:101] = 1
     gaussian_map = GaussianCostmap(
@@ -355,8 +355,8 @@ def test_sample_rotated(immutable_model_world):
         assert 0.4 <= pose.to_position().x <= 0.45
 
 
-def test_sample_to_pose(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_sample_to_pose(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     np_map = np.zeros((200, 200))
     np_map[130, 160] = 1
@@ -377,8 +377,8 @@ def test_sample_to_pose(immutable_model_world):
     assert pose.to_position().z == 0
 
 
-def test_sample_highest_first(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_sample_highest_first(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[40, 40] = 1
     np_map[80, 80] = 2
@@ -405,8 +405,8 @@ def test_sample_highest_first(immutable_model_world):
     )
 
 
-def test_segment_highest_first(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_segment_highest_first(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     np_map[40:45, 40:45] = 1
     np_map[80:85, 80:85] = 3
@@ -428,8 +428,8 @@ def test_segment_highest_first(immutable_model_world):
     assert np.max(segmented_maps[2]) == 1
 
 
-def test_segment_empty_map(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_segment_empty_map(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
     np_map = np.zeros((200, 200))
     gaussian_map = GaussianCostmap(
         resolution=0.02,
@@ -446,8 +446,8 @@ def test_segment_empty_map(immutable_model_world):
     assert np.sum(segmented_maps[0]) == 0
 
 
-def test_orientation_generator_by_axis_y(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_orientation_generator_by_axis_y(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     ori_gen = OrientationGenerator.orientation_generator_for_axis(
         Vector3.from_iterable([0, 1, 0])
@@ -463,8 +463,8 @@ def test_orientation_generator_by_axis_y(immutable_model_world):
     )
 
 
-def test_orientation_generator_by_axis_minus_y(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_orientation_generator_by_axis_minus_y(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     ori_gen = OrientationGenerator.orientation_generator_for_axis(
         Vector3.from_iterable([0, -1, 0])
@@ -480,8 +480,8 @@ def test_orientation_generator_by_axis_minus_y(immutable_model_world):
     )
 
 
-def test_orientation_generator_by_axis_x(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_orientation_generator_by_axis_x(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     ori_gen = OrientationGenerator.orientation_generator_for_axis(
         Vector3.from_iterable([1, 0, 0])

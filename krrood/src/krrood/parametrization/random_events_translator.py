@@ -22,7 +22,6 @@ from krrood.entity_query_language.operators.core_logical_operators import OR, AN
 from krrood.entity_query_language.operators.logical_quantifiers import (
     QuantifiedConditional,
 )
-from krrood.entity_query_language.query.query import variable_rooted
 from krrood.parametrization.exceptions import (
     WhereExpressionHasNoRandomEventRepresentation,
     WhereExpressionIsFirstOrder,
@@ -70,7 +69,7 @@ class WhereExpressionToRandomEventTranslator:
             # of one field have to arrive here as one: a chain taken from a query is
             # read in the variable-rooted form the same chain taken from the variable
             # already has.
-            subject = variable_rooted(comparator.left)
+            subject = comparator.left._variable_rooted_
             result[comparator.left] = (
                 random_events.variable.variable_from_name_and_type(
                     subject._name_, subject._type_

@@ -14,7 +14,7 @@ from segmind.datastructures.events import (
     LossOfContainmentEvent, ContactEvent, InsertionEvent,
 )
 
-from semantic_digital_twin.reasoning.predicates import is_supported_by, InsideOf
+from semantic_digital_twin.reasoning.predicates import SupportedBy, InsideOf
 from semantic_digital_twin.world_description.world_entity import Body
 
 from segmind.detectors.base import AbstractDetector, SegmindContext
@@ -46,7 +46,7 @@ class SupportDetector(AbstractDetector):
 
         events = []
         latest_support = segmind_context.latest_support
-        new_support_pairs = self.get_relation(context, objects_to_check, is_supported_by)
+        new_support_pairs = self.get_relation(context, objects_to_check, SupportedBy)
         for body, support in new_support_pairs.items():
             new_supports = (
                 support
@@ -92,7 +92,7 @@ class LossOfSupportDetector(AbstractDetector):
 
         events = []
         latest_support = segmind_context.latest_support
-        new_support_pairs = self.get_relation(context, objects_to_check, is_supported_by)
+        new_support_pairs = self.get_relation(context, objects_to_check, SupportedBy)
 
         for body, support in list(latest_support.items()):
             loss_supports = support - new_support_pairs.get(body, set())

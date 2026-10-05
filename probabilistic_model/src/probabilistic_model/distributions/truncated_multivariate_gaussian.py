@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
+import functools
 import math
-from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
 from random_events.interval import Bound, SimpleInterval, singleton
-from random_events.product_algebra import Event, SimpleEvent
+from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Variable
 from scipy.optimize import lsq_linear
-from scipy.stats import truncnorm
+from scipy.special import ndtr
+from scipy.stats import multivariate_normal, norm, truncnorm
 from typing_extensions import (
     Any,
     Dict,
+    Iterable,
     Optional,
     Self,
     Tuple,
@@ -22,8 +25,13 @@ from typing_extensions import (
 
 from probabilistic_model.exceptions import (
     EventIsNotABoxError,
+    InvalidMomentOrderError,
+    NoClosedFormError,
 )
 from probabilistic_model.probabilistic_model import (
+    CenterType,
+    MomentType,
+    OrderType,
     ProbabilisticModel,
 )
 
@@ -33,10 +41,68 @@ if TYPE_CHECKING:
     )
 
 
+# %% how moments are integrated numerically
+
+
+@dataclasses.dataclass
+class QuadraturePoints:
+    """
+    Where an integrand is evaluated and what each evaluation is weighted with.
+    """
+
+    values: npt.NDArray
+    """
+    The points to evaluate the integrand at.
+    """
+
+    weights: npt.NDArray
+    """
+    The weight of the integrand at every point.
+    """
+
+
+@dataclasses.dataclass(frozen=True)
+class MomentIntegration:
+    """
+    How the moments of a Gaussian confined to a box are integrated numerically: by
+    Gauss-Legendre quadrature over panels of equal width.
+    """
+
+    deviations_integrated_over: float = 10.0
+    """
+    How many standard deviations around its mean an unbounded variable is integrated
+    over.
+    """
+
+    panels: int = 16
+    """
+    How many panels the interval of a variable is split into.
+    """
+
+    nodes_per_panel: int = 16
+    """
+    How many Gauss-Legendre nodes every panel is integrated with.
+    """
+
+    def points_between(self, lower: float, upper: float) -> QuadraturePoints:
+        """
+        :param lower: The lower end of the interval to integrate over.
+        :param upper: The upper end of the interval to integrate over.
+        :return: The points and weights that integrate a function over the interval.
+        """
+        edges = np.linspace(lower, upper, self.panels + 1)
+        half_widths = np.diff(edges)[:, None] / 2
+        nodes, node_weights = np.polynomial.legendre.leggauss(self.nodes_per_panel)
+        return QuadraturePoints(
+            values=(edges[:-1, None] + half_widths + half_widths * nodes).ravel(),
+            weights=(half_widths * node_weights).ravel(),
+        )
+
+
 # %% a Gaussian that has been confined to a box
 
 
-@dataclass
+@dataclasses.dataclass
 class TruncatedMultivariateGaussianDistribution(ProbabilisticModel):
     """
     A Gaussian confined to a box, which is what is left of one once part of the space is
@@ -67,6 +133,13 @@ class TruncatedMultivariateGaussianDistribution(ProbabilisticModel):
     sample.
     """
 
+    moment_integration: MomentIntegration = dataclasses.field(
+        default_factory=MomentIntegration
+    )
+    """
+    How the moments are integrated numerically.
+    """
+
     @property
     def variables(self) -> Tuple[Variable, ...]:
         return self.untruncated.variables
@@ -75,11 +148,12 @@ class TruncatedMultivariateGaussianDistribution(ProbabilisticModel):
     def support(self) -> Event:
         return self.box.as_composite_set()
 
-    @property
+    @functools.cached_property
     def normalizing_constant(self) -> float:
         """
         :return: How probable the box was before it was the only thing left, which is
-            what every density here is scaled up by.
+            what every density here is scaled up by. It is a numerical integral, so it
+            is computed once.
         """
         return self.untruncated.probability_of_simple_event(self.box)
 
@@ -222,11 +296,7 @@ class TruncatedMultivariateGaussianDistribution(ProbabilisticModel):
         if probability == 0.0:
             return None, -np.inf
         return (
-            type(self)(
-                untruncated=self.untruncated,
-                box=surviving,
-                burn_in_period_length=self.burn_in_period_length,
-            ),
+            dataclasses.replace(self, box=surviving),
             math.log(probability),
         )
 
@@ -264,13 +334,127 @@ class TruncatedMultivariateGaussianDistribution(ProbabilisticModel):
         if log_likelihood == -np.inf:
             return None, -np.inf
         return (
-            type(self)(
-                untruncated=confined.untruncated,
-                box=confined.box,
-                burn_in_period_length=self.burn_in_period_length,
+            dataclasses.replace(
+                self, untruncated=confined.untruncated, box=confined.box
             ),
             log_likelihood,
         )
+
+    # %% marginals and moments
+
+    def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
+        """
+        :param variables: The variables to keep.
+        :return: A copy of this distribution if all of its variables are kept, or
+            nothing if none of them is.
+        :raises NoClosedFormError: If only some of its variables are kept. Integrating
+            a variable out of a correlated Gaussian confined to a box does not leave a
+            Gaussian confined to a box.
+        """
+        kept = set(variables)
+        number_of_kept_variables = sum(variable in kept for variable in self.variables)
+        if number_of_kept_variables == 0:
+            return None
+        if number_of_kept_variables < len(self.variables):
+            raise NoClosedFormError(type(self), type(self).marginal)
+        return self.__copy__()
+
+    def moment(self, order: OrderType, center: CenterType) -> MomentType:
+        """
+        Every moment asked for here is of one variable on its own, and is answered by
+        integrating the density of that variable numerically.
+
+        :param order: The order of the moment of each variable to answer for.
+        :param center: What to take each of those moments about.
+        :return: The moment of each variable asked for.
+        :raises InvalidMomentOrderError: If an order is not a whole number or is
+            negative.
+        """
+        moments = VariableMap()
+        for variable in order:
+            if order[variable] < 0 or order[variable] != int(order[variable]):
+                raise InvalidMomentOrderError(order[variable])
+            requested_order = int(order[variable])
+            moments_about_zero = self.moments_about_zero_of(
+                self.untruncated.index_of(variable), requested_order
+            )
+            # the binomial expansion of (x - center) ** order
+            moments[variable] = float(
+                sum(
+                    math.comb(requested_order, power)
+                    * (-center[variable]) ** (requested_order - power)
+                    * moments_about_zero[power]
+                    for power in range(requested_order + 1)
+                )
+            )
+        return moments
+
+    def moments_about_zero_of(self, index: int, highest_order: int) -> npt.NDArray:
+        """
+        The density of one variable on its own is its Gaussian density times the
+        probability that the other variables stay inside the box given its value
+        (Cartinhour, 1990). It is integrated over the interval of the variable as
+        :attr:`moment_integration` says.
+
+        :param index: The index of a variable.
+        :param highest_order: The highest order to answer.
+        :return: The moments of that variable about zero, the entry at ``k`` being the
+            moment of order ``k``.
+        """
+        interval = self.interval_of(self.variables[index])
+        mean = self.untruncated.mean[index]
+        deviation = math.sqrt(self.untruncated.covariance.between(index, index))
+        reach = self.moment_integration.deviations_integrated_over * deviation
+        points = self.moment_integration.points_between(
+            max(interval.lower, min(mean - reach, interval.upper - reach)),
+            min(interval.upper, max(mean + reach, interval.lower + reach)),
+        )
+        density = (
+            points.weights
+            * norm.pdf(points.values, loc=mean, scale=deviation)
+            * self.probability_of_the_other_variables_given(index, points.values)
+        )
+        return np.array(
+            [
+                np.sum(density * points.values**power)
+                for power in range(highest_order + 1)
+            ]
+        ) / np.sum(density)
+
+    def probability_of_the_other_variables_given(
+        self, index: int, values: npt.NDArray
+    ) -> npt.NDArray:
+        """
+        :param index: The index of a variable.
+        :param values: Values of that variable.
+        :return: For each value, how probable it is under the untruncated Gaussian that
+            every other variable is inside its interval given that the variable takes
+            the value.
+        """
+        others = [other for other in range(len(self.variables)) if other != index]
+        if not others:
+            return np.ones(len(values))
+        intervals = [self.interval_of(self.variables[other]) for other in others]
+        lower = np.array([interval.lower for interval in intervals])
+        upper = np.array([interval.upper for interval in intervals])
+
+        covariance = self.untruncated.covariance.matrix
+        gain = covariance[others, index] / covariance[index, index]
+        conditional_means = self.untruncated.mean[others] + np.outer(
+            values - self.untruncated.mean[index], gain
+        )
+        conditional_covariance = covariance[np.ix_(others, others)] - np.outer(
+            gain, covariance[index, others]
+        )
+        if len(others) == 1:
+            deviation = math.sqrt(conditional_covariance[0, 0])
+            return ndtr((upper - conditional_means[:, 0]) / deviation) - ndtr(
+                (lower - conditional_means[:, 0]) / deviation
+            )
+        probability = multivariate_normal(
+            mean=np.zeros(len(others)), cov=conditional_covariance
+        ).cdf(upper - conditional_means, lower_limit=lower - conditional_means)
+        return np.clip(np.atleast_1d(probability), 0.0, 1.0)
 
     # %% sampling
 
@@ -318,11 +502,7 @@ class TruncatedMultivariateGaussianDistribution(ProbabilisticModel):
         return samples
 
     def __copy__(self) -> Self:
-        return type(self)(
-            untruncated=copy.copy(self.untruncated),
-            box=self.box,
-            burn_in_period_length=self.burn_in_period_length,
-        )
+        return dataclasses.replace(self, untruncated=copy.copy(self.untruncated))
 
     def __deepcopy__(self, memo=None) -> Self:
         if memo is None:
@@ -330,10 +510,10 @@ class TruncatedMultivariateGaussianDistribution(ProbabilisticModel):
         id_self = id(self)
         if id_self in memo:
             return memo[id_self]
-        result = type(self)(
+        result = dataclasses.replace(
+            self,
             untruncated=copy.deepcopy(self.untruncated, memo),
             box=self.box.__deepcopy__(),
-            burn_in_period_length=self.burn_in_period_length,
         )
         memo[id_self] = result
         return result

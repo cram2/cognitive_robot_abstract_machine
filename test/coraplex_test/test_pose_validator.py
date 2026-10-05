@@ -33,8 +33,8 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 
 
-def test_pose_reachable(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_pose_reachable(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     pose = Pose(Point3.from_iterable([1.7, 1.4, 1]), reference_frame=world.root)
 
@@ -49,8 +49,8 @@ def test_pose_reachable(immutable_model_world):
     )
 
 
-def test_pose_not_reachable(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_pose_not_reachable(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     pose = Pose(Point3.from_iterable([2.3, 2, 1]), reference_frame=world.root)
 
@@ -65,8 +65,8 @@ def test_pose_not_reachable(immutable_model_world):
     )
 
 
-def test_pose_sequence_reachable(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_pose_sequence_reachable(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     pose1 = Pose(Point3.from_iterable([1.6, 1.4, 1]), reference_frame=world.root)
     pose2 = Pose(Point3.from_iterable([1.7, 1.4, 1]), reference_frame=world.root)
@@ -83,8 +83,8 @@ def test_pose_sequence_reachable(immutable_model_world):
     )
 
 
-def test_pose_sequence_not_reachable(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_pose_sequence_not_reachable(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     pose1 = Pose(Point3.from_iterable([2.6, 1.4, 1]), reference_frame=world.root)
     pose2 = Pose(Point3.from_iterable([2.7, 1.4, 1]), reference_frame=world.root)
@@ -109,8 +109,8 @@ class _MoveTcpAlternativeForPr2(MoveToolCenterPointMotion, AlternativeMotion[PR2
     execution_type = ExecutionType.SIMULATED
 
 
-def test_unmatched_tip_link_raises(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_unmatched_tip_link_raises(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     pose = Pose(Point3.from_iterable([1.7, 1.4, 1]), reference_frame=world.root)
 
@@ -128,8 +128,8 @@ def test_unmatched_tip_link_raises(immutable_model_world):
         validator.create_msc()
 
 
-def test_pose_sequence_one_not_reachable(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_pose_sequence_one_not_reachable(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     pose1 = Pose(Point3.from_iterable([1.6, 1.4, 1]), reference_frame=world.root)
     pose2 = Pose(Point3.from_iterable([1.7, 1.4, 1]), reference_frame=world.root)
@@ -165,14 +165,14 @@ def _right_front_grasp(view):
 
 
 def test_is_object_reachable_by_copies_current_world_lazily(
-    immutable_model_world, monkeypatch
+    pr2_apartment_context, monkeypatch
 ):
     """
     The world copy and pose sequence must be produced when the predicate is
     *evaluated*, not when it is constructed, so the check reflects the current
     world state. We capture what the predicate hands to ``AreReachableBy``.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk = world.get_body_by_name("milk.stl")
 
     captured = {}
@@ -217,12 +217,12 @@ def test_is_object_reachable_by_copies_current_world_lazily(
 
 
 def test_is_object_reachable_by_uses_target_pose_sequence(
-    immutable_model_world, monkeypatch
+    pr2_apartment_context, monkeypatch
 ):
     """
     With a target pose set, the reach pose sequence is checked.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk = world.get_body_by_name("milk.stl")
     target = Pose(Point3.from_iterable([2, 1.5, 0.7]), reference_frame=world.root)
 
@@ -248,12 +248,12 @@ def test_is_object_reachable_by_uses_target_pose_sequence(
 
 
 def test_is_object_reachable_by_single_grasp_delegates_to_is_reachable_by(
-    immutable_model_world, monkeypatch
+    pr2_apartment_context, monkeypatch
 ):
     """
     ``as_single_grasp`` checks a single grasp pose at the object's pose.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk = world.get_body_by_name("milk.stl")
 
     seq_calls = []
@@ -290,11 +290,11 @@ def test_is_object_reachable_by_single_grasp_delegates_to_is_reachable_by(
     )
 
 
-def test_is_object_reachable_by_reachable(immutable_model_world):
+def test_is_object_reachable_by_reachable(pr2_apartment_context):
     """
     End-to-end: a graspable object in front of the robot is reachable.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         2, 1.5, 0.7, 0, 0, 0, reference_frame=milk.parent_connection.parent
@@ -311,11 +311,11 @@ def test_is_object_reachable_by_reachable(immutable_model_world):
     )
 
 
-def test_is_object_reachable_by_not_reachable(immutable_model_world):
+def test_is_object_reachable_by_not_reachable(pr2_apartment_context):
     """
     End-to-end: an object far away from the robot is not reachable.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         5, 5, 0.7, 0, 0, 0, reference_frame=milk.parent_connection.parent
@@ -352,7 +352,7 @@ def _reachability_validator(world, robot_view, context):
     )
 
 
-def test_validation_avoids_collisions_when_the_run_does(immutable_model_world):
+def test_validation_avoids_collisions_when_the_run_does(pr2_apartment_context):
     """
     Collision avoidance does not only reject poses the robot would collide on, it
     changes the trajectory the solver produces at all.
@@ -360,7 +360,7 @@ def test_validation_avoids_collisions_when_the_run_does(immutable_model_world):
     A validation run without it answers for a different trajectory than the one the plan
     goes on to execute, so it carries the same collision goals the executed chart does.
     """
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = pr2_apartment_context
     validator = _reachability_validator(world, robot_view, context)
 
     with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
@@ -371,12 +371,12 @@ def test_validation_avoids_collisions_when_the_run_does(immutable_model_world):
 
 
 def test_validation_leaves_out_collision_avoidance_when_the_run_does(
-    immutable_model_world,
+    pr2_apartment_context,
 ):
     """
     A run that does not avoid collisions is validated the same way.
     """
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = pr2_apartment_context
     validator = _reachability_validator(world, robot_view, context)
 
     with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=False):
@@ -387,7 +387,7 @@ def test_validation_leaves_out_collision_avoidance_when_the_run_does(
 
 
 def test_validation_frees_the_gripper_like_the_reach_it_validates(
-    immutable_model_world,
+    pr2_apartment_context,
 ):
     """
     The reach being validated allows the gripper to touch what it grasps, so the
@@ -397,7 +397,7 @@ def test_validation_frees_the_gripper_like_the_reach_it_validates(
     object, no trajectory ever converges on it, and every candidate is reported
     unreachable.
     """
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = pr2_apartment_context
     validator = _reachability_validator(world, robot_view, context)
 
     with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
@@ -411,14 +411,14 @@ def test_validation_frees_the_gripper_like_the_reach_it_validates(
 
 
 def test_validation_uses_the_same_goal_tolerances_the_motions_do(
-    immutable_model_world,
+    pr2_apartment_context,
 ):
     """
     A reach is only finished once it is within the tolerance its motion was given, so a
     probe that settles for a looser one reports poses reachable that the motion would
     still be working towards.
     """
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = pr2_apartment_context
     validator = _reachability_validator(world, robot_view, context)
 
     msc = validator.create_msc()
@@ -432,7 +432,7 @@ def test_validation_uses_the_same_goal_tolerances_the_motions_do(
         assert goal.orientation_threshold == tolerances.tool_orientation_threshold
 
 
-def test_validation_gives_up_on_a_pose_it_stops_approaching(immutable_model_world):
+def test_validation_gives_up_on_a_pose_it_stops_approaching(pr2_apartment_context):
     """
     A probe that cannot get any closer to its goal would otherwise hold the whole tick
     budget before being called unreachable, and a location grounds by trying candidates
@@ -441,7 +441,7 @@ def test_validation_gives_up_on_a_pose_it_stops_approaching(immutable_model_worl
     Watching the sequence for a stall abandons a bad candidate as soon as it stops
     making progress.
     """
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = pr2_apartment_context
     validator = _reachability_validator(world, robot_view, context)
 
     msc = validator.create_msc()
@@ -451,12 +451,12 @@ def test_validation_gives_up_on_a_pose_it_stops_approaching(immutable_model_worl
     assert progress_monitor.monitored_node is sequence
 
 
-def test_an_unreachable_pose_is_given_up_on_by_the_stall_monitor(immutable_model_world):
+def test_an_unreachable_pose_is_given_up_on_by_the_stall_monitor(pr2_apartment_context):
     """
     The stall monitor is what ends a hopeless probe, so the validator does not need a
     tick budget of its own to stop one.
     """
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = pr2_apartment_context
     validator = AreReachableBy(
         context=Context(
             world=world,

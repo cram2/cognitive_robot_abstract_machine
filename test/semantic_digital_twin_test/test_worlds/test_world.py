@@ -2835,6 +2835,29 @@ def test_world_does_not_record_removing_a_semantic_annotation_it_does_not_hold()
     assert annotation in world.semantic_annotations
 
 
+def test_removing_a_semantic_annotation_keeps_an_equal_one():
+    """
+    Removing one of two equal semantic annotations removes that instance and keeps the
+    other one in the world.
+    """
+    world = World()
+    body = Body(name=PrefixedName("milk"))
+    kept = Milk(root=body)
+    removed = Milk(root=body)
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+        world.add_semantic_annotation(kept)
+    with world.modify_world():
+        world.add_semantic_annotation(removed)
+
+    with world.modify_world():
+        world.remove_semantic_annotation(removed)
+
+    assert len(world.semantic_annotations) == 1
+    assert world.semantic_annotations[0] is kept
+    assert kept._world is world
+
+
 def test_world_does_not_record_removing_an_actuator_it_does_not_hold():
     """
     A world only records the removal of an actuator it actually holds.

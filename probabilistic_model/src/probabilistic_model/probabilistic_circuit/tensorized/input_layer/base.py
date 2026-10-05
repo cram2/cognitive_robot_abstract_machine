@@ -20,6 +20,7 @@ from typing_extensions import (
 )
 
 from probabilistic_model.distributions.distributions import UnivariateDistribution
+from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeIndices,
     NodeMask,
@@ -360,7 +361,7 @@ class InputLayer(Layer, ABC):
     @memoized
     def log_conditional_of_point(
         self,
-        point: Dict[Variable, Any],
+        point: PartialPointType,
         query: StructuralQuery,
         cache: Optional[QueryCache] = None,
     ) -> LayerWithLogProbabilities:

@@ -8,7 +8,7 @@ pipeline without polluting the core evaluation methods.
 from __future__ import annotations
 
 from ordered_set import OrderedSet
-from typing_extensions import Any, Optional
+from typing_extensions import Any, List, Optional
 
 from krrood.entity_query_language._monitoring import monitored
 from krrood.entity_query_language.core.base_expressions import (
@@ -27,7 +27,10 @@ from krrood.entity_query_language.evaluation_context import (
 from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import (
+    AND,
+    OR,
     LogicalOperator,
+    Not,
 )
 from krrood.entity_query_language.predicate import Predicate
 from krrood.entity_query_language.query.query import Query
@@ -179,7 +182,7 @@ class InferenceRecorder(EvaluationObserver):
         if expression._id_ not in result.bindings:
             return
         # Only record for InstantiatedVariable subclasses whose _evaluate__
-        # delegates to _instantiate_using_child_vars_and_yield_results_ (that is,
+        # delegates to _instantiate_using_child_variables_and_yield_results_ (that is,
         # those that actually create new instances).  Query and its subclasses
         # (Entity, SetOf) override _evaluate__ and merely remap bindings
         # without creating new inferred instances.
@@ -194,6 +197,49 @@ class InferenceRecorder(EvaluationObserver):
         )
 
         register_inference(result.bindings[expression._id_], expression, result)
+
+
+def evaluate_statements_of(condition: SymbolicExpression) -> List[OperationResult]:
+    """
+    Evaluate *condition* and collect the results of its statements.
+
+    The statements are *condition* itself and every expression its evaluation evaluated
+    as a condition, at any depth, except the conjunctions and disjunctions joining
+    statements, since their truth follows from the statements they join. A negation is
+    one statement as a whole: what it negates holds exactly when the negation does not,
+    so nothing inside a negation is a statement of its own. The values the statements
+    are about, such as variables, attributes and literals, are not statements. A
+    statement is evaluated only on the values its operator lets through, for example
+    only where the conjuncts before it hold.
+
+    :param condition: The condition to evaluate.
+    :return: The results of the statements of *condition*, in the order they were
+        evaluated.
+    """
+    evaluation_context = create_default_evaluation_context()
+    results = list(condition._evaluate_in_new_context_(evaluation_context))
+    steps = [
+        step
+        for result in results
+        for step in result.result_chain
+        if step.operand is not None
+    ]
+    negated_ids = {
+        negated._id_
+        for step in steps
+        if isinstance(step.operand, Not)
+        for negated in step.operand._descendants_
+    }
+    return [
+        step
+        for step in steps
+        if not isinstance(step.operand, (AND, OR))
+        and step.operand._id_ not in negated_ids
+        and (
+            step.operand._id_ == condition._id_
+            or evaluation_context.is_child_of_truth_value_operator(step.operand)
+        )
+    ]
 
 
 def create_default_evaluation_context() -> EvaluationContext:

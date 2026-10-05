@@ -5,9 +5,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
-import numpy.typing as npt
 from scipy.sparse import csc_array, csr_array, vstack
-from typing_extensions import List, Self, Tuple
+from typing_extensions import Generic, List, Self, Tuple, TypeVar
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeIndices,
@@ -17,16 +16,29 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleNodeValues,
     StateIndices,
     StateMask,
+    StateValues,
+    TableEntryValues,
 )
 
+StoredLogProbabilities = TypeVar("StoredLogProbabilities")
+"""
+The representation a probability table stores its log-probabilities in.
+"""
 
-class ProbabilityTable(ABC):
+
+class ProbabilityTable(ABC, Generic[StoredLogProbabilities]):
     """
     The probability of every state for every node of a discrete layer, a table of shape
     (#nodes, #states).
 
     A discrete layer answers every query through the operations of its table. A table is not changed after it was created; every operation that changes the
     probabilities returns a new table of the same type.
+    """
+
+    log_probabilities: StoredLogProbabilities
+    """
+    The log-probabilities of the table. Every type of table declares the representation
+    it stores them in.
     """
 
     # %% construction
@@ -37,7 +49,7 @@ class ProbabilityTable(ABC):
         cls,
         rows: NodeIndices,
         columns: StateIndices,
-        probabilities: npt.NDArray[np.float64],
+        probabilities: TableEntryValues,
         shape: Tuple[int, int],
     ) -> Self:
         """
@@ -52,7 +64,7 @@ class ProbabilityTable(ABC):
     @abstractmethod
     def entries(
         self,
-    ) -> Tuple[NodeIndices, StateIndices, npt.NDArray[np.float64]]:
+    ) -> Tuple[NodeIndices, StateIndices, TableEntryValues]:
         """
         :return: The node, the state and the probability of every non-zero entry.
         """
@@ -115,18 +127,17 @@ class ProbabilityTable(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def dot(self, values: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    def dot(self, values: StateValues) -> NodeValues:
         """
-        :param values: Values per state, with shape (#states,) or (#states, k).
+        :param values: The values of the states.
         :return: The product of the table with the values, the expectation of the
-            values under every node, with shape (#nodes,) or (#nodes, k).
+            values under every node, with shape (#nodes,), or (#nodes, k) for k
+            values per state.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def probabilities_of_node(
-        self, node: int
-    ) -> Tuple[StateIndices, npt.NDArray[np.float64]]:
+    def probabilities_of_node(self, node: int) -> Tuple[StateIndices, TableEntryValues]:
         """
         :param node: The index of a node.
         :return: The states with a non-zero probability under the node, ascending, and
@@ -188,7 +199,7 @@ class ProbabilityTable(ABC):
 
     def cumulative_distribution_of_entries(
         self,
-    ) -> Tuple[NodeIndices, StateIndices, npt.NDArray[np.float64]]:
+    ) -> Tuple[NodeIndices, StateIndices, TableEntryValues]:
         """
         :return: The node and the state of every non-zero entry, sorted by node and then
             by state, and the probability of the node for all states up to and including
@@ -239,7 +250,7 @@ class ProbabilityTable(ABC):
 
 
 @dataclass(eq=False)
-class DenseProbabilityTable(ProbabilityTable):
+class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
     """
     A probability table stored as one dense array of log-probabilities.
 
@@ -258,7 +269,7 @@ class DenseProbabilityTable(ProbabilityTable):
         cls,
         rows: NodeIndices,
         columns: StateIndices,
-        probabilities: npt.NDArray[np.float64],
+        probabilities: TableEntryValues,
         shape: Tuple[int, int],
     ) -> Self:
         dense = np.zeros(shape)
@@ -266,7 +277,7 @@ class DenseProbabilityTable(ProbabilityTable):
         with np.errstate(divide="ignore"):
             return cls(np.log(dense))
 
-    def entries(self) -> Tuple[NodeIndices, StateIndices, npt.NDArray[np.float64]]:
+    def entries(self) -> Tuple[NodeIndices, StateIndices, TableEntryValues]:
         rows, columns = np.nonzero(np.isfinite(self.log_probabilities))
         return rows, columns, np.exp(self.log_probabilities[rows, columns])
 
@@ -292,12 +303,10 @@ class DenseProbabilityTable(ProbabilityTable):
     def probability_of_states(self, selected: StateMask) -> NodeValues:
         return np.exp(self.log_probabilities[:, selected]).sum(axis=1)
 
-    def dot(self, values: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    def dot(self, values: StateValues) -> NodeValues:
         return np.exp(self.log_probabilities) @ values
 
-    def probabilities_of_node(
-        self, node: int
-    ) -> Tuple[StateIndices, npt.NDArray[np.float64]]:
+    def probabilities_of_node(self, node: int) -> Tuple[StateIndices, TableEntryValues]:
         [states] = np.nonzero(np.isfinite(self.log_probabilities[node]))
         return states, np.exp(self.log_probabilities[node, states])
 
@@ -333,7 +342,7 @@ class DenseProbabilityTable(ProbabilityTable):
 
 
 @dataclass(eq=False)
-class SparseProbabilityTable(ProbabilityTable):
+class SparseProbabilityTable(ProbabilityTable[csr_array]):
     """
     A probability table that stores only the non-zero probabilities, row by row.
 
@@ -344,12 +353,12 @@ class SparseProbabilityTable(ProbabilityTable):
     range.
     """
 
-    probabilities: csr_array
+    log_probabilities: csr_array
     """
-    The probability of every state for every node.
+    The log-probability of every state with a non-zero probability, for every node.
 
-    The probabilities are stored in linear space, so that a state that is not stored has
-    probability zero.
+    A state that is not stored has probability zero. A stored zero is the log-probability
+    of a state with probability one.
     """
 
     @classmethod
@@ -357,7 +366,7 @@ class SparseProbabilityTable(ProbabilityTable):
         cls,
         rows: NodeIndices,
         columns: StateIndices,
-        probabilities: npt.NDArray[np.float64],
+        probabilities: TableEntryValues,
         shape: Tuple[int, int],
     ) -> Self:
         stored = probabilities > 0
@@ -366,13 +375,27 @@ class SparseProbabilityTable(ProbabilityTable):
         )
         table.sum_duplicates()
         table.sort_indices()
-        return cls(table)
+        return cls(csr_array((np.log(table.data), table.indices, table.indptr), shape))
 
-    def entries(self) -> Tuple[NodeIndices, StateIndices, npt.NDArray[np.float64]]:
+    def entries(self) -> Tuple[NodeIndices, StateIndices, TableEntryValues]:
         return (
             self.rows_of_entries,
             self.probabilities.indices.astype(np.int64),
             self.probabilities.data,
+        )
+
+    @functools.cached_property
+    def probabilities(self) -> csr_array:
+        """
+        :return: The probability of every stored state, in linear space.
+        """
+        return csr_array(
+            (
+                np.exp(self.log_probabilities.data),
+                self.log_probabilities.indices,
+                self.log_probabilities.indptr,
+            ),
+            self.log_probabilities.shape,
         )
 
     @functools.cached_property
@@ -381,7 +404,7 @@ class SparseProbabilityTable(ProbabilityTable):
         :return: The row of every stored entry.
         """
         return np.repeat(
-            np.arange(self.number_of_nodes), np.diff(self.probabilities.indptr)
+            np.arange(self.number_of_nodes), np.diff(self.log_probabilities.indptr)
         )
 
     @functools.cached_property
@@ -393,15 +416,15 @@ class SparseProbabilityTable(ProbabilityTable):
 
     @property
     def number_of_nodes(self) -> int:
-        return self.probabilities.shape[0]
+        return self.log_probabilities.shape[0]
 
     @property
     def number_of_states(self) -> int:
-        return self.probabilities.shape[1]
+        return self.log_probabilities.shape[1]
 
     @property
     def number_of_stored_entries(self) -> int:
-        return int(self.probabilities.nnz)
+        return int(self.log_probabilities.nnz)
 
     def log_probabilities_of_states(self, indices: StateIndices) -> SampleNodeValues:
         result = np.full((len(indices), self.number_of_nodes), -np.inf)
@@ -422,12 +445,10 @@ class SparseProbabilityTable(ProbabilityTable):
             minlength=self.number_of_nodes,
         )
 
-    def dot(self, values: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    def dot(self, values: StateValues) -> NodeValues:
         return self.probabilities @ values
 
-    def probabilities_of_node(
-        self, node: int
-    ) -> Tuple[StateIndices, npt.NDArray[np.float64]]:
+    def probabilities_of_node(self, node: int) -> Tuple[StateIndices, TableEntryValues]:
         start, end = self.probabilities.indptr[node : node + 2]
         return (
             self.probabilities.indices[start:end].astype(np.int64),
@@ -441,7 +462,7 @@ class SparseProbabilityTable(ProbabilityTable):
         rows, columns, probabilities = self.entries()
         kept = selected[columns]
         return self.from_entries(
-            rows[kept], columns[kept], probabilities[kept], self.probabilities.shape
+            rows[kept], columns[kept], probabilities[kept], self.log_probabilities.shape
         )
 
     def normalized(self) -> Self:
@@ -450,15 +471,15 @@ class SparseProbabilityTable(ProbabilityTable):
             rows, weights=probabilities, minlength=self.number_of_nodes
         )
         return self.from_entries(
-            rows, columns, probabilities / totals[rows], self.probabilities.shape
+            rows, columns, probabilities / totals[rows], self.log_probabilities.shape
         )
 
     def select_nodes(self, mask: NodeMask) -> Self:
-        return self.__class__(csr_array(self.probabilities[np.flatnonzero(mask)]))
+        return self.__class__(csr_array(self.log_probabilities[np.flatnonzero(mask)]))
 
     @classmethod
     def concatenate(cls, tables: List[Self]) -> Self:
-        return cls(csr_array(vstack([table.probabilities for table in tables])))
+        return cls(csr_array(vstack([table.log_probabilities for table in tables])))
 
     def copy(self) -> Self:
-        return self.__class__(self.probabilities.copy())
+        return self.__class__(self.log_probabilities.copy())

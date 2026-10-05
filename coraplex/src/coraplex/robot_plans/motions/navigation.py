@@ -22,11 +22,6 @@ class MoveMotion(BaseMotion):
     Location to which the robot should be moved
     """
 
-    keep_joint_states: bool = False
-    """
-    Keep the joint states of the robot during/at the end of the motion.
-    """
-
     def perform(self):
         return
 

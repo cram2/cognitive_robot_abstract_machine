@@ -36,6 +36,7 @@ parts:
       - file: designator_example.md
         sections:
         - file: notebooks/plan
+        - file: notebooks/plan_transformations
         - file: notebooks/action_designator
         - file: notebooks/object_designator
         - file: notebooks/location_designator

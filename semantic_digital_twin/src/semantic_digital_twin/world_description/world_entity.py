@@ -693,6 +693,16 @@ GenericKinematicStructureEntity = TypeVar(
 
 GenericWorldEntity = TypeVar("GenericWorldEntity", bound=WorldEntity)
 
+TBody = TypeVar("TBody", bound=Body)
+"""
+A kind of body.
+"""
+
+TRegion = TypeVar("TRegion", bound=Region)
+"""
+A kind of region.
+"""
+
 
 @dataclass(eq=False)
 class SemanticAnnotation(WorldEntityWithSimulatorProperties):

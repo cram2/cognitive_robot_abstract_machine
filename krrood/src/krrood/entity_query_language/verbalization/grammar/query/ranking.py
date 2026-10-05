@@ -17,9 +17,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.fragments.features import (
     GrammaticalNumber,
 )
-from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
-    SpecificityRule,
-)
+from krrood.patterns.specificity_ranking import SpecificityRule
 from krrood.entity_query_language.verbalization.grammar.query.planner import (
     SortDirection,
     RankingKeyRelation,
@@ -121,6 +119,18 @@ class RankingForm(SpecificityRule):
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(entity(employee).ordered_by(employee.salary, descending=True).limit(3))
     'Find the top three Employees by salary'
+
+    The family's alternatives are its three templates, and a descending ranking by an
+    attribute selects the attribute form:
+
+    >>> sorted(rule.__name__ for rule in RankingForm.alternatives())
+    ['AttributeRankedByForm', 'AttributeSuperlativeForm', 'LeadingRankForm']
+    >>> from krrood.entity_query_language.verbalization.grammar.query.planner import (
+    ...     RankingPlan, SortDirection, RankingKeyRelation)
+    >>> plan = RankingPlan(limit_number=3, direction=SortDirection.DESCENDING,
+    ...     relation=RankingKeyRelation.ATTRIBUTE, order_key=None)
+    >>> RankingForm.most_applicable(RankingRequest(plan=plan)).__name__
+    'AttributeRankedByForm'
     """
 
     @classmethod

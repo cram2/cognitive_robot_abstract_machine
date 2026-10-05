@@ -86,9 +86,10 @@ class InstantiatedVerbalizableRule(PhraseRule):
         """
         fields = RenderedFields(
             fragments={
-                name: context.child(child) for name, child in node._child_vars_.items()
+                name: context.child(child)
+                for name, child in node._child_variables_.items()
             },
-            raw=node._child_vars_,
+            raw=node._child_variables_,
         )
         fragment = node._type_._verbalization_fragment_(fields)
         if not isinstance(fragment, VerbalizationFragment):

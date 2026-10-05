@@ -16,8 +16,8 @@ from krrood.entity_query_language.predicate import symbolic_function, length
 from krrood.utils import recursive_subclasses
 
 from semantic_digital_twin.reasoning.predicates import (
-    is_supported_by,
-    is_supporting,
+    SupportedBy,
+    Supports,
     compute_euclidean_planar_distance,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -108,7 +108,7 @@ def goal_surface_of_object(
     supporting_surface = variable(HasSupportingSurface, supporting_surfaces)
     supporting_body = supporting_surface.bodies[0]
     non_supporting_table = entity(supporting_surface).where(
-        not_(is_supporting(supporting_body)))
+        not_(Supports(supporting_body)))
 
     # Query annotations on the surfaces of the tables
     obj = variable(SemanticAnnotation, semantic_annotations_on_surfaces(
@@ -117,7 +117,7 @@ def goal_surface_of_object(
 
     query = set_of(obj, supporting_surface).where(
         (distance := inheritance_distance(object_of_interest, type_(obj))) <= threshold,
-        is_supported_by(obj.bodies[0], supporting_body)
+        SupportedBy(obj.bodies[0], supporting_body)
     ).ordered_by(distance)
     return next(query[supporting_surface].evaluate(), next(non_supporting_table.evaluate(), None))
 

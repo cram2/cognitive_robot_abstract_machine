@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import dataclass
 from typing import Optional, List
 
+import numpy as np
 import trimesh.sample
 
 from krrood.entity_query_language.factories import (
@@ -11,7 +14,23 @@ from krrood.entity_query_language.factories import (
     an,
     the,
 )
-from krrood.entity_query_language.predicate import symbolic_function
+from krrood.entity_query_language.predicate import (
+    RenderedFields,
+    symbolic_function,
+    Triple,
+)
+from krrood.entity_query_language.verbalization.fragments.base import (
+    VerbalizationFragment,
+)
+from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    Adjective,
+    clause,
+    Copula,
+    Noun,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.collision_checking.collision_detector import (
     ClosestPoints,
 )
@@ -20,17 +39,25 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AllowSelfCollisions,
 )
-from semantic_digital_twin.reasoning.predicates import is_place_occupied
+from semantic_digital_twin.reasoning.predicates import PlaceIsOccupied
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
+    Camera,
     EndEffector,
+    TCamera,
 )
+from semantic_digital_twin.semantic_annotations.mixins import TKinematicStructureEntity
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
+from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+)
 
 
 @symbolic_function
@@ -212,7 +239,7 @@ def is_gripper_holding_something(gripper: EndEffector) -> bool:
 
 @symbolic_function
 def is_pose_free_for_robot(robot: AbstractRobot, pose: Pose) -> bool:
-    return not is_place_occupied(
+    return not PlaceIsOccupied(
         robot.mobile_base.bounding_box,
         pose,
         robot._world,
@@ -222,4 +249,138 @@ def is_pose_free_for_robot(robot: AbstractRobot, pose: Pose) -> bool:
             for annotation in robot._world.get_semantic_annotations_by_type(Floor)
             for kse in annotation.kinematic_structure_entities
         ],
+    )()
+
+
+@symbolic_function
+def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
+    """
+    Get all bodies and regions that are visible from the given camera using a
+    segmentation mask.
+
+    :param camera: The camera for which the visible objects should be returned
+    :return: A list of bodies/regions that are visible from the camera
+    """
+    rt = RayTracer(camera._world)
+    rt.update_scene()
+
+    seg = rt.create_segmentation_mask(
+        camera.root_T_forward_view,
+        resolution=CameraResolution(width=256, height=256),
+        min_distance=0.2,
+        field_of_view=camera.field_of_view,
     )
+    indices = np.unique(seg)
+    indices = indices[indices > -1]
+    bodies = [camera._world.kinematic_structure[i] for i in indices]
+
+    return bodies
+
+
+@dataclass(eq=False)
+class VisibleTo(Triple[TKinematicStructureEntity, TCamera]):
+    """
+    Whether a camera can see something.
+    """
+
+    entity: TKinematicStructureEntity
+    """
+    The thing that may be in view.
+    """
+
+    camera: TCamera
+    """
+    The camera looking.
+    """
+
+    @property
+    def subject(self) -> TKinematicStructureEntity:
+        return self.entity
+
+    @property
+    def object(self) -> TCamera:
+        return self.camera
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Reads as *"the entity is visible to the camera"*.
+
+        :param fields: The rendered fragment for each field, keyed by field name.
+        """
+        return clause(
+            Noun(fields["entity"]),
+            Copula(),
+            Adjective("visible"),
+            Prepositions.TO,
+            Noun(fields["camera"]),
+        )
+
+    def __call__(self) -> bool:
+        return self.entity in get_visible_bodies(self.camera)
+
+
+@symbolic_function
+def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
+    """
+    Determines the bodies that occlude a given body in the scene as seen from a
+    specified camera.
+
+    This function uses a ray-tracing approach to check occlusion. Every body that hides
+    anything from the target body is an occluding body.
+
+    :param camera: The camera for which the occluding bodies should be returned
+    :param body: The body for which the occluding bodies should be returned
+    :return: A list of bodies that are occluding the given body.
+    """
+    camera_pose = camera.root_T_forward_view
+
+    # create a world only containing the target body
+    world_without_occlusion = deepcopy(body._world)
+    root = Body(name=PrefixedName("root"))
+    copied_body = Body.from_json(body.to_json())
+    root_T_body = body.global_transform
+    root_T_body.reference_frame = root
+    root_to_copied_body = FixedConnection(
+        parent=root,
+        child=copied_body,
+        parent_T_connection_expression=root_T_body,
+    )
+    with world_without_occlusion.modify_world():
+        world_without_occlusion.clear()
+        world_without_occlusion.add_body(root)
+        world_without_occlusion.add_connection(root_to_copied_body)
+
+    # get segmentation mask without occlusion
+    ray_tracer_without_occlusion = RayTracer(world_without_occlusion)
+    ray_tracer_without_occlusion.update_scene()
+    segmentation_mask_without_occlusion = (
+        ray_tracer_without_occlusion.create_segmentation_mask(
+            camera_pose,
+            resolution=CameraResolution(width=256, height=256),
+            min_distance=0.1,
+            field_of_view=camera.field_of_view,
+        )
+    )
+
+    # get segmentation mask with occlusion
+    ray_tracer_with_occlusion = RayTracer(camera._world)
+    ray_tracer_with_occlusion.update_scene()
+    segmentation_mask_with_occlusion = (
+        ray_tracer_with_occlusion.create_segmentation_mask(
+            camera_pose,
+            resolution=CameraResolution(width=256, height=256),
+            min_distance=0.1,
+            field_of_view=camera.field_of_view,
+        )
+    )
+
+    # pixels where the target body is visible when nothing else is in the scene
+    target_pixels = segmentation_mask_without_occlusion == copied_body.index
+
+    # whatever covers those pixels in the real scene (except the target itself)
+    # is occluding the target
+    indices = np.unique(segmentation_mask_with_occlusion[target_pixels])
+    indices = indices[(indices > -1) & (indices != body.index)]
+    bodies = [camera._world.kinematic_structure[i] for i in indices]
+    return bodies

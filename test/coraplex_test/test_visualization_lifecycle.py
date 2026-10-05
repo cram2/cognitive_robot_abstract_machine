@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 import rclpy
 from rclpy.node import Node
-from typing_extensions import Self
+from typing_extensions import Self, Type
 
 import coraplex.visualization as visualization_module
 from coraplex.datastructures.enums import VisualizationBackend, VisualizationOption
@@ -79,10 +79,11 @@ def test_failed_plugin_start_stops_partially_started_provider(
 
 
 # %% cleanup failures and reuse
-@pytest.mark.parametrize("failure", [RuntimeError(), KeyboardInterrupt()])
+@pytest.mark.parametrize("failure_type", [RuntimeError, KeyboardInterrupt])
 def test_collision_setup_failure_closes_publisher_and_owned_ros(
-    monkeypatch: pytest.MonkeyPatch, failure: BaseException
+    monkeypatch: pytest.MonkeyPatch, failure_type: Type[BaseException]
 ) -> None:
+    failure = failure_type()
     publisher = Mock()
     publisher.with_collision_visualization.side_effect = failure
     monkeypatch.setattr(
@@ -92,7 +93,7 @@ def test_collision_setup_failure_closes_publisher_and_owned_ros(
         World(), collision_visualization=True
     )
     assert not rclpy.ok()
-    with pytest.raises(type(failure)) as caught:
+    with pytest.raises(failure_type) as caught:
         selected.start()
     assert caught.value is failure
     publisher.stop.assert_called_once_with()

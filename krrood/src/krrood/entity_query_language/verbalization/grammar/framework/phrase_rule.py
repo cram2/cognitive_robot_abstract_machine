@@ -10,7 +10,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.fragments.features import (
     GrammaticalNumber,
 )
-from krrood.entity_query_language.verbalization.exceptions import AmbiguousRuleError
+from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.patterns.specificity_ranking import mro_depth, sole_maximum
 
 if TYPE_CHECKING:
@@ -211,7 +211,7 @@ def select(
     refinement of a top-level entity). This only models *subsumption* — a guard that implies
     another's. Rules whose guards merely *overlap* (neither implies the other) have no is-a
     relationship to express; their guards must be mutually exclusive, since an equal-specificity
-    tie is a collision raised as :class:`~krrood.entity_query_language.verbalization.exceptions.AmbiguousRuleError`.
+    tie is a collision raised as :class:`~krrood.patterns.exceptions.AmbiguousRuleError`.
 
     :param node: The EQL expression being dispatched.
     :param rules: The grammar.

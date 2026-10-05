@@ -93,12 +93,12 @@ def test_only_goal_owning_nodes_build_charts():
 # %% building a chart outside a plan
 
 
-def test_executable_is_built_without_a_plan(immutable_simple_pr2_world):
+def test_executable_is_built_without_a_plan(simple_pr2_context):
     """
     The mixin builds a complete executable from the hooks alone, without reaching into a
     plan tree.
     """
-    world, robot_view, context = immutable_simple_pr2_world
+    world, robot_view, context = simple_pr2_context
     builder = ChartBuilderWithoutPlan(context)
     child = ChartBuilderWithoutPlan(context)
 
@@ -114,11 +114,11 @@ def test_executable_is_built_without_a_plan(immutable_simple_pr2_world):
 # %% children that contribute nothing
 
 
-def test_children_without_motions_are_left_out_of_the_chart(immutable_simple_pr2_world):
+def test_children_without_motions_are_left_out_of_the_chart(simple_pr2_context):
     """
     A child contributing no motions is skipped, so it cannot leave an empty goal behind.
     """
-    world, robot_view, context = immutable_simple_pr2_world
+    world, robot_view, context = simple_pr2_context
     builder = ChartBuilderWithoutPlan(context)
     without_motions = ChartBuilderWithoutPlan(context, contributes_motions=False)
     with_motions = ChartBuilderWithoutPlan(context)

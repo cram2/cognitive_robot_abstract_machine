@@ -155,9 +155,7 @@ def test_rule_if_then_carry_keyword_role(doors_and_drawers_world):
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
     fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
-    drawer_var = inference(Drawer)(
-        container=fc.expression.parent, handle=fc.expression.child
-    )
+    drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     frag = EQLVerbalizer().build(entity(drawer_var))
     keyword_texts = _collect_role_texts(frag, SemanticRole.KEYWORD)
     assert any("If" in t for t in keyword_texts)
@@ -239,9 +237,7 @@ def test_rule_is_block_fragment(doors_and_drawers_world):
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
     fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
-    drawer_var = inference(Drawer)(
-        container=fc.expression.parent, handle=fc.expression.child
-    )
+    drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     frag = EQLVerbalizer().build(entity(drawer_var))
     assert isinstance(frag, BlockFragment)
 
@@ -586,9 +582,7 @@ def test_hierarchical_plain_rule_structure(doors_and_drawers_world):
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
     fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
-    drawer_var = inference(Drawer)(
-        container=fc.expression.parent, handle=fc.expression.child
-    )
+    drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
 
     text = VerbalizationPipeline(HierarchicalRenderer(PlainFormatter())).verbalize(
         entity(drawer_var)
@@ -627,9 +621,7 @@ def _drawer_rule_fragment(doors_and_drawers_world) -> VerbalizationFragment:
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
     fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
-    drawer_var = inference(Drawer)(
-        container=fc.expression.parent, handle=fc.expression.child
-    )
+    drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     return EQLVerbalizer().build(entity(drawer_var))
 
 

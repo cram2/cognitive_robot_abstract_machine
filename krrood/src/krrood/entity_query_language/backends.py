@@ -36,7 +36,7 @@ from krrood.entity_query_language.exceptions import (
     SelectiveBackendCannotResolveEllipsisMatch,
     UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration,
 )
-from krrood.entity_query_language.factories import entity, set_of, variable
+from krrood.entity_query_language.factories import set_of, variable
 from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.entity_query_language.query.query import Entity, Query
 from krrood.ormatic.eql_interface import eql_to_sql
@@ -117,7 +117,7 @@ class QueryBackend(ABC):
 
         :param expression: The expression about to be evaluated.
         """
-        if not (isinstance(expression, Match) and expression.has_cause_attributes):
+        if not (isinstance(expression, Match) and expression._has_cause_attributes_):
             return
         if self.raise_on_unresolvable_cause:
             raise BackendCannotEvaluateCause(expression, backend_type=type(self))
@@ -138,7 +138,7 @@ class SelectiveBackend(QueryBackend, ABC):
     """
 
     def evaluate(self, expression: Evaluable) -> Iterable[T]:
-        if isinstance(expression, Match) and expression.has_ellipsis_attributes:
+        if isinstance(expression, Match) and expression._has_ellipsis_attributes_:
             raise SelectiveBackendCannotResolveEllipsisMatch(expression)
         self._warn_or_raise_on_unresolved_cause_(expression)
         yield from self._evaluate(expression)
@@ -206,28 +206,25 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
     A generative backend that constructs new instances deterministically: it treats a
     match's unspecified leaves as variables, enumerates every combination over their
     (discrete) domains, constructs an instance per combination via the type's
-    constructor, and keeps those that satisfy the match's ``where`` conditions.
+    constructor, and keeps those that satisfy the match: the values its pattern states
+    and its ``where`` conditions.
     """
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
         self._warn_or_raise_on_unresolved_cause_(expression)
         variables: Dict[str, Variable] = {}
-        for attribute_match in expression.matches_with_variables:
+        for attribute_match in expression._matches_with_variables_:
             self._check_attribute_match_is_suitable_for_generation(attribute_match)
             variables[attribute_match.name_from_variable_access_path] = (
                 self._convert_attribute_match_to_variable(attribute_match)
             )
 
-        expression.variable._update_domain_(
+        satisfying = expression._select_satisfying_(
             self._generate_raw_results(expression, variables)
         )
-
-        filtered_results = entity(expression.variable)._quantify_(
+        yield from satisfying._quantify_(
             expression._quantifier_type_
-        )
-        if expression._where_conditions_:
-            filtered_results = filtered_results.where(*expression._where_conditions_)
-        yield from filtered_results._evaluate_natively_()
+        )._evaluate_natively_()
 
     @staticmethod
     def _check_attribute_match_is_suitable_for_generation(
@@ -298,6 +295,10 @@ class ProbabilisticBackend(GenerativeBackend):
     """
     A backend that generates elements from a tractable probabilistic model using a model
     registry.
+
+    A sampled instance contradicting the match, in a value the model does not cover such
+    as a property's, is rejected, so fewer instances than :attr:`number_of_samples` may
+    be generated.
     """
 
     model_registry: ModelRegistry = field(default_factory=FullyFactorizedRegistry)
@@ -410,21 +411,24 @@ class ProbabilisticBackend(GenerativeBackend):
             truncated = parameters.resolve_conditioned_and_truncated_model(model)
 
         if truncated is None:
-            raise NoSolutionFound(expression.expression)
+            raise NoSolutionFound(expression._get_expression_())
 
-        number_of_samples = expression.expression._limit_ or self.number_of_samples
+        number_of_samples = (
+            expression._get_expression_()._limit_ or self.number_of_samples
+        )
 
         # sample and sort by log likelihood
         samples = truncated.sample(number_of_samples)
         log_likelihoods = truncated.log_likelihood(samples)
         samples = samples[log_likelihoods.argsort()[::-1]]
 
-        # create new objects with the values from the samples
-        for sample in samples:
-            instance = parameters.construct_instance_from_model_sample(
-                truncated.variables, sample
-            )
-            yield instance
+        # create new objects with the values from the samples, and reject those
+        # contradicting a value the model does not cover, such as a property's
+        instances = (
+            parameters.construct_instance_from_model_sample(truncated.variables, sample)
+            for sample in samples
+        )
+        yield from expression._select_satisfying_(instances)._evaluate_natively_()
 
     @staticmethod
     def _resolve_cause_and_effect_variables(
@@ -448,7 +452,7 @@ class ProbabilisticBackend(GenerativeBackend):
         :return: The resolved cause candidates and effect variable.
         """
         if not parameters.effect_variables_from_causes_effect:
-            raise NoCausesEffectConditionForCause(expression.expression)
+            raise NoCausesEffectConditionForCause(expression._get_expression_())
         if len(parameters.effect_variables_from_causes_effect) > 1:
             raise MultipleEffectVariablesNotSupported(
                 parameters.effect_variables_from_causes_effect
@@ -502,7 +506,7 @@ class ProbabilisticBackend(GenerativeBackend):
             confounder_variables,
         )
         if not scored_interventions:
-            raise NoSolutionFound(expression.expression)
+            raise NoSolutionFound(expression._get_expression_())
         return scored_interventions[0]
 
     @classmethod
@@ -586,7 +590,7 @@ class ProbabilisticBackend(GenerativeBackend):
         """
         parameters = UnderspecifiedParameters(expression)
         if not parameters.search_cause_variables:
-            raise NoCauseVariablesForRanking(expression.expression)
+            raise NoCauseVariablesForRanking(expression._get_expression_())
         model = self.model_registry.get_model(parameters)
         if not isinstance(model, CausalCircuit):
             raise DoRequiresCausalCircuitModel(model)

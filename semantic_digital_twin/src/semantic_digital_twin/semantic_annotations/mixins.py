@@ -54,7 +54,7 @@ from semantic_digital_twin.exceptions import (
     NoSupportingSurfaceError,
     UnknownPartWholeRelationshipField,
 )
-from semantic_digital_twin.reasoning.predicates import is_supported_by
+from semantic_digital_twin.reasoning.predicates import SupportedBy
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
@@ -939,9 +939,9 @@ class HasSupportingSurface(IsStorageSpace):
         """
         bodies = variable_from(self._world.bodies_with_collision)
         body = entity(bodies).where(
-            is_supported_by(
-                supported_body=bodies,
-                supporting_body=self.root,
+            SupportedBy(
+                supported=bodies,
+                supporting=self.root,
             )
         )
         objects = an(

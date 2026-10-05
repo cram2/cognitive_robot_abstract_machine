@@ -143,7 +143,7 @@ def _scene_object_parts(count: int) -> list:
         objects=[a(SceneObject)(type=...) for _ in range(count)],
     )
     room_query.resolve()
-    return room_query.kwargs["objects"]
+    return room_query._kwargs_["objects"]
 
 
 # %% __post_init__ validation
@@ -183,7 +183,7 @@ def test_ground_single_part_uses_starting_distribution(
     grounded = markov_chain_template.ground([part])
     assert grounded.is_valid()
     [type_variable_at_position] = [
-        v for v in grounded.variables if v.name == f"{part.variable}.type"
+        v for v in grounded.variables if v.name == f"{part._variable_}.type"
     ]
     for state, type_value in enumerate(type_by_state):
         probability = grounded.probability(
@@ -214,7 +214,7 @@ def test_ground_three_parts_matches_forward_algorithm(
     parts = _scene_object_parts(3)
     grounded = markov_chain_template.ground(parts)
     type_variables_by_position = [
-        next(v for v in grounded.variables if v.name == f"{part.variable}.type")
+        next(v for v in grounded.variables if v.name == f"{part._variable_}.type")
         for part in parts
     ]
 
@@ -252,7 +252,7 @@ def test_ground_position_probability_matches_forward_marginal(
     forward_marginal = starting_probabilities
     for part in parts:
         type_variable_at_position = next(
-            v for v in grounded.variables if v.name == f"{part.variable}.type"
+            v for v in grounded.variables if v.name == f"{part._variable_}.type"
         )
         for state, type_value in enumerate(type_by_state):
             probability = grounded.probability(

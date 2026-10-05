@@ -7,11 +7,9 @@ from dataclasses import (
 
 import numpy as np
 from random_events.product_algebra import Event, SimpleEvent
-from random_events.variable import Variable
 from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 from typing_extensions import (
-    Any,
     Dict,
     List,
     Optional,
@@ -20,6 +18,7 @@ from typing_extensions import (
 )
 
 from probabilistic_model.exceptions import ShapeMismatchError
+from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeMask,
     NodeValues,
@@ -90,6 +89,23 @@ class ProductLayer(InnerLayer):
             np.arange(number_of_child_layers),
             np.zeros(number_of_child_layers, dtype=np.int64),
         ).to_coo_array((number_of_child_layers, 1))
+        return cls(child_layers, edges)
+
+    @classmethod
+    def node_wise_product_of(cls, child_layers: List[Layer]) -> Self:
+        """
+        :param child_layers: The child layers, all with the same number of nodes.
+        :return: A product layer whose node ``i`` multiplies node ``i`` of every child
+            layer.
+        """
+        number_of_nodes = child_layers[0].number_of_nodes
+        number_of_child_layers = len(child_layers)
+        nodes = np.tile(np.arange(number_of_nodes), number_of_child_layers)
+        edges = SparseEntries(
+            nodes,
+            np.repeat(np.arange(number_of_child_layers), number_of_nodes),
+            nodes,
+        ).to_coo_array((number_of_child_layers, number_of_nodes))
         return cls(child_layers, edges)
 
     @property
@@ -422,7 +438,7 @@ class ProductLayer(InnerLayer):
     @memoized
     def log_conditional_of_point(
         self,
-        point: Dict[Variable, Any],
+        point: PartialPointType,
         query: StructuralQuery,
         cache: Optional[QueryCache] = None,
     ) -> LayerWithLogProbabilities:

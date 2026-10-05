@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import logging
-import pathlib
-import uuid
 from dataclasses import dataclass, field, is_dataclass
-from enum import Enum
+from functools import cached_property
 from inspect import isclass
-from types import ModuleType, NoneType
+from types import ModuleType
 from typing import Set
 
 import rustworkx as rx
@@ -19,16 +17,11 @@ from krrood.ormatic.helper import (
     OrmaticInterfaceInformation,
 )
 from sortedcontainers import SortedSet
-from sqlalchemy import JSON
 from typing_extensions import List, Type, Dict
 from typing_extensions import Optional, TextIO
 
-from krrood.ormatic.custom_types import (
-    TypeType,
-    PolymorphicEnumType,
-    PathType,
-    JSONDataType,
-)
+from krrood.ormatic.default_type_mappings import DefaultTypeMapping
+from krrood.ormatic.field_storage import FieldClassifier
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
 
@@ -42,7 +35,6 @@ from krrood.ormatic.wrapped_table import (
     AssociationObject,
     TableLike,
 )
-from krrood.adapters.json_serializer import SubclassJSONSerializer, JSONData
 from krrood.class_diagrams.class_diagram import (
     ClassDiagram,
     ClassRelation,
@@ -121,10 +113,11 @@ class ORMatic:
         default_factory=dict, init=False
     )
     """
-    Lookup-only stand-ins for classes already mapped by an ormatic-interface
-    dependency (see :attr:`externally_mapped_classes`). Never rendered by the
-    generator; consulted only to resolve foreign keys, relationships, and parent
-    classes that point at them.
+    Lookup-only stand-ins for classes already mapped by an ormatic-interface dependency
+    (see :attr:`externally_mapped_classes`).
+
+    Never rendered by the generator; consulted only to resolve foreign keys,
+    relationships, and parent classes that point at them.
     """
 
     association_objects: List[AssociationObject] = field(
@@ -137,6 +130,8 @@ class ORMatic:
     def __post_init__(self):
         self.imported_modules.add(get_module_of_type(TypeDict))
         self.imported_modules.add("krrood.ormatic.base")
+        # optional columns are annotated with typing.Optional
+        self.imported_modules.add(get_module_of_type(Optional))
         for dependency in self.ormatic_interface_dependencies:
             self.imported_modules.add(dependency.__name__)
         self._fill_type_mappings()
@@ -146,7 +141,9 @@ class ORMatic:
         self.create_type_annotations_map()
 
         for wrapped_table in self.wrapped_tables.values():
-            self.imported_modules.add(get_module_of_type(wrapped_table.wrapped_clazz.clazz))
+            self.imported_modules.add(
+                get_module_of_type(wrapped_table.wrapped_clazz.clazz)
+            )
 
         # externally-mapped classes may live further up the chain than the immediate dependency
         for external_table in self.external_tables.values():
@@ -166,16 +163,11 @@ class ORMatic:
 
     def _fill_type_mappings(self):
         """
-        Fill the type mappings of this with needed defaults.
+        Add the default type mappings for every type that has no mapping yet.
         """
-        self.type_mappings[Type] = TypeType
-        self.type_mappings[type] = TypeType
-        self.type_mappings[Enum] = PolymorphicEnumType
-        self.type_mappings[SubclassJSONSerializer] = JSON
-        self.type_mappings[uuid.UUID] = sqlalchemy.UUID
-        self.type_mappings[pathlib.Path] = PathType
-        self.type_mappings[JSONData] = JSONDataType
-        self.type_mappings[NoneType] = TypeType
+        for default in DefaultTypeMapping:
+            if default.python_type not in self.type_mappings.keys():
+                self.type_mappings[default.python_type] = default.column_type
 
         for key in self.type_mappings.keys():
             self.imported_modules.add(get_module_of_type(key))
@@ -317,6 +309,14 @@ class ORMatic:
         return [key.clazz for key in self.wrapped_tables.keys()] + [
             key.clazz for key in self.external_tables.keys()
         ]
+
+    @cached_property
+    def field_classifier(self) -> FieldClassifier:
+        """
+        :return: The classifier that decides how each field of the mapped classes is
+            stored.
+        """
+        return FieldClassifier(self)
 
     def table_for(self, wrapped_class: WrappedClass) -> TableLike:
         """

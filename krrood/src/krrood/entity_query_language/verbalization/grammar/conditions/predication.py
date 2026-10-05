@@ -51,9 +51,7 @@ from krrood.entity_query_language.verbalization.grammar.conditions.recognition i
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     RuleContext,
 )
-from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
-    SpecificityRule,
-)
+from krrood.patterns.specificity_ranking import SpecificityRule
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
     CoindexedFold,
     coindexed_natural_parts,
