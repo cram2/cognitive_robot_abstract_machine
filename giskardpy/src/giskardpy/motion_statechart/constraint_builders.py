@@ -7,7 +7,7 @@ from typing_extensions import Optional
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.qp.bound_cap import VectorBoundCap
+from giskardpy.qp.bound_cap import RotationBoundCap, VectorBoundCap
 from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
@@ -148,7 +148,9 @@ class GeometricConstraintBuilder:
         :param frame_R_current: current rotation as rotation matrix. It should depend on
             active dofs.
         :param frame_R_goal: goal rotation as rotation matrix
-        :param reference_velocity: value used for normalization rad/s
+        :param reference_velocity: value used for normalization rad/s. The constraints
+            act on the vector part of the quaternion error, which changes by half the
+            angle, so they are normalized with half of it.
         """
         # avoid singularity
         # the sign determines in which direction the robot moves when in singularity.
@@ -161,13 +163,15 @@ class GeometricConstraintBuilder:
         q_error = q_actual.diff(q_goal)
 
         # w is redundant
+        error_cap = RotationBoundCap(bounds=sm.Vector([-q_error[i] for i in range(3)]))
         for i in range(3):
             self.collection.add_equality_constraint(
                 task_expression=q_error[i],
                 equality_bound=-q_error[i],
                 quadratic_weight=quadratic_weight,
-                reference_velocity=reference_velocity,
+                reference_velocity=reference_velocity / 2,
                 name=self._indexed_constraint_name(name, i),
+                bound_cap=error_cap,
             )
 
     def add_translational_velocity_limit(

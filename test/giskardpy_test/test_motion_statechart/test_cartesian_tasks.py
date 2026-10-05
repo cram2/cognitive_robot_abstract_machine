@@ -124,6 +124,48 @@ class StraightLine:
         return max(self.distance_from(position) for position in positions)
 
 
+ORIENTATION_SPEED_RATIO_TOLERANCE = 1.15
+"""
+How much faster a far away orientation goal may turn than a close one.
+
+Both turn at the speed the reference velocity sets once they are under way; the margin
+covers that the closer goal starts braking sooner.
+"""
+
+
+def peak_angle_per_tick_towards_roll_goal(world: World, angle: float) -> float:
+    """
+    Rolls the PR2's right gripper about its own x-axis and measures how fast it turns.
+
+    :param world: A PR2 world.
+    :param angle: How far the goal is rolled away from the current orientation.
+    :return: The largest angle the gripper turned within one control cycle.
+    """
+    tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    root = world.get_kinematic_structure_entity_by_name("base_link")
+    motion_statechart = MotionStatechart()
+    orientation_goal = CartesianOrientation(
+        root_link=root,
+        tip_link=tip,
+        goal_orientation=RotationMatrix.from_axis_angle(
+            Vector3.X(), angle, reference_frame=tip
+        ),
+    )
+    motion_statechart.add_node(orientation_goal)
+    motion_statechart.add_node(EndMotion.when_true(orientation_goal))
+    executor = Executor(MotionStatechartContext(world=world))
+    executor.compile(motion_statechart=motion_statechart)
+
+    rotations = [world.compute_forward_kinematics_np(root, tip)[:3, :3].copy()]
+    while not executor.motion_statechart.is_end_motion():
+        executor.tick()
+        rotations.append(world.compute_forward_kinematics_np(root, tip)[:3, :3].copy())
+    return max(
+        np.arccos(np.clip((np.trace(before.T @ after) - 1) / 2, -1, 1))
+        for before, after in zip(rotations, rotations[1:])
+    )
+
+
 def record_tip_path(
     executor: Executor,
     task: MotionStatechartNode,
@@ -1198,6 +1240,28 @@ class TestCartesianTasks:
         line = StraightLine(start=path[0], end=goal_pose.to_np()[:3, 3])
         assert line.maximum_distance_from(path) <= STRAIGHT_LINE_TOLERANCE
 
+    def test_orientation_goal_turns_as_fast_far_away_as_close_by(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        The angular speed towards an orientation goal is set by its reference velocity,
+        not by how far away the goal is.
+
+        Capping the half-angle rows directly makes the angular speed grow with
+        1/cos(angle/2), so a goal at 150 degrees would turn more than twice as fast as
+        one at 30 degrees.
+        """
+        initial_state = pr2_world_state_reset.state._data.copy()
+        peak_speeds = []
+        for angle in (np.radians(30), np.radians(150)):
+            pr2_world_state_reset.state._data[:] = initial_state
+            pr2_world_state_reset.notify_state_change()
+            peak_speeds.append(
+                peak_angle_per_tick_towards_roll_goal(pr2_world_state_reset, angle)
+            )
+
+        assert peak_speeds[1] <= ORIENTATION_SPEED_RATIO_TOLERANCE * peak_speeds[0]
+
     def test_cartesian_position_straight_weighs_its_rows_by_its_weight(
         self, cylinder_bot_world: World
     ):
@@ -1528,6 +1592,7 @@ class TestVelocityTasks:
                     yaw=np.pi / 2, reference_frame=tip
                 ),
                 weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
+                reference_velocity=1.0,
             )
 
         low_weight_limit = limit_cls(

@@ -56,3 +56,30 @@ class VectorBoundCap(BoundCap):
     def capped(self, bound: Scalar, reach: Scalar) -> Scalar:
         scale = sm.min(1, reach.safe_division(self.bounds.norm(), if_nan=1))
         return bound * scale
+
+
+@dataclass
+class RotationBoundCap(BoundCap):
+    """
+    Caps the bounds of the three constraints of a rotation goal, which demand a change
+    of the vector part of the quaternion error, sin(angle / 2) * axis.
+
+    The cap is applied to the rotation angle rather than to the vector part, so that the
+    angle one plan may demand does not depend on how far away the goal is. The reachable
+    change is read in units of the half angle, which the vector part changes by close to
+    the goal.
+    """
+
+    bounds: sm.Vector
+    """
+    The bounds of the three constraints, the vector part of the quaternion error.
+    """
+
+    def capped(self, bound: Scalar, reach: Scalar) -> Scalar:
+        sine_of_half_angle = self.bounds.norm()
+        cosine_of_half_angle = sm.max(0, 1 - sine_of_half_angle**2) ** 0.5
+        angle = 2 * sm.atan2(sine_of_half_angle, cosine_of_half_angle)
+        capped_angle = sm.min(angle, 2 * reach)
+        capped_sine_change = sine_of_half_angle - sm.sin((angle - capped_angle) / 2)
+        scale = capped_sine_change.safe_division(sine_of_half_angle, if_nan=1)
+        return bound * scale

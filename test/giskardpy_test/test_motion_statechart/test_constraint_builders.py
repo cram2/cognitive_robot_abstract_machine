@@ -74,6 +74,48 @@ def test_rotation_goal_writes_three_equality_constraints():
     assert len(collection.inequality_constraints) == 0
 
 
+def rotation_goal_bounds(angle: float) -> tuple[np.ndarray, np.ndarray, float]:
+    """
+    Builds a rotation goal about the z-axis and evaluates its bounds.
+
+    :param angle: How far the goal is rotated away from the current orientation.
+    :return: The uncapped bounds, the capped bounds, and the reachable change.
+    """
+    collection = ConstraintCollection()
+    GeometricConstraintBuilder(collection).add_rotation_goal_constraints(
+        frame_R_current=RotationMatrix(),
+        frame_R_goal=RotationMatrix.from_axis_angle(Vector3.Z(), angle),
+        reference_velocity=0.1,
+        quadratic_weight=1.0,
+    )
+    uncapped = np.array(
+        [float(c.bound.to_np()) for c in collection.equality_constraints]
+    )
+    capped, reach = capped_equality_bounds(collection)
+    return uncapped, capped, reach
+
+
+def test_rotation_goal_caps_the_angle_it_demands():
+    """
+    The bounds are in units of the half angle, so the cap is applied to the angle:
+
+    a far away goal demands a rotation of exactly twice the reachable change.
+    """
+    uncapped, capped, reach = rotation_goal_bounds(np.pi / 2)
+    half_angle = np.arcsin(np.linalg.norm(uncapped))
+
+    remaining_half_angle = np.arcsin(np.linalg.norm(uncapped) - np.linalg.norm(capped))
+
+    assert remaining_half_angle == pytest.approx(half_angle - reach)
+
+
+def test_rotation_goal_within_reach_is_not_capped():
+    uncapped, capped, reach = rotation_goal_bounds(0.01)
+
+    assert 0.01 < 2 * reach
+    assert np.allclose(capped, uncapped)
+
+
 def test_node_artifacts_geometry_writes_into_its_constraints():
     artifacts = NodeArtifacts()
     artifacts.geometry.add_point_goal_constraints(
