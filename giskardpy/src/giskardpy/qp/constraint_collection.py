@@ -209,8 +209,10 @@ class ConstraintCollection:
         This should be used for most constraints. It will not strictly stick to the
         reference velocity, but requires only a single constraint in the final
         optimization problem and is therefore faster.
-        :param reference_velocity: used by Giskard to limit the error and normalize the
-            weight, will not be strictly enforced.
+        :param reference_velocity: used by Giskard to normalize the weight and to cap a
+            bound that demands motion (a positive lower or a negative upper error) to what
+            is reachable at this velocity. A bound that only permits motion is not capped.
+            Will not be strictly enforced.
         :param lower_error: lower bound for the error of expression
         :param upper_error: upper bound for the error of expression
         :param quadratic_weight:
