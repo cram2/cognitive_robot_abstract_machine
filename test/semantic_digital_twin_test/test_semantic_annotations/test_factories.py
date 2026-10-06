@@ -77,11 +77,13 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import (
+    Box,
     VolumetricBoundingBox,
     Scale,
 )
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
+    ShapeCollection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.api import (
@@ -610,6 +612,54 @@ class TestFactories(unittest.TestCase):
         self.assertIsNotNone(surface)
         self.assertEqual(surface, table.supporting_surface)
         self.assertEqual(expected_z, surface.global_transform.z)
+
+    def test_supporting_surface_on_top_of_table_with_origin_at_a_corner(self):
+        """
+        A table whose origin is a corner on the floor, as a scanned or vendor asset
+        often has it, still gets its supporting surface on its top.
+        """
+        world = World.create_with_root_body("root")
+        with world.modify_world():
+            table = Table.create_with_new_body_in_world(
+                name="table",
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=2.0, y=-1.0, yaw=np.pi / 2
+                ),
+            )
+        table.root.collision = ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=0.5, y=0.3, z=0.25, reference_frame=table.root
+                    ),
+                    scale=Scale(1.0, 0.6, 0.5),
+                )
+            ],
+            reference_frame=table.root,
+        )
+        table.root.visual = table.root.collision
+
+        with world.modify_world():
+            surface = table.calculate_supporting_surface()
+
+        self.assertIsNotNone(surface)
+        table_top = Point3(0.5, 0.3, 0.5, reference_frame=table.root)
+        expected = world.transform(table_top, world.root).to_np()[:3]
+        np.testing.assert_allclose(
+            surface.global_transform.to_position().to_np()[:3], expected, atol=1e-9
+        )
+        surface_box = surface.area.as_bounding_box_collection_in_frame(
+            world.root
+        ).bounding_box()
+        table_box = table.root.collision.as_bounding_box_collection_in_frame(
+            world.root
+        ).bounding_box()
+        np.testing.assert_allclose(
+            [surface_box.min_x, surface_box.max_x, surface_box.min_y, surface_box.max_y],
+            [table_box.min_x, table_box.max_x, table_box.min_y, table_box.max_y],
+            atol=1e-9,
+        )
 
     def test_sample_points_from_surface(self):
         world = World.create_with_root_body("root")
