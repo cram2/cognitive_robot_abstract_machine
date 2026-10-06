@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
 from semantic_digital_twin.spatial_types import Point3, Vector3
@@ -82,9 +81,7 @@ class Pointing(CartesianTask):
             artifacts, goal=root_V_goal_axis, current=root_V_pointing_axis
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            root_V_pointing_axis.angle_between(root_V_goal_axis)
-        )
+        artifacts.error = root_V_pointing_axis.angle_between(root_V_goal_axis)
         return artifacts
 
 
@@ -165,7 +162,5 @@ class PointingCone(CartesianTask):
             artifacts, goal=root_V_goal_axis_proj, current=root_V_pointing_axis
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            root_V_pointing_axis.angle_between(root_V_goal_axis_proj)
-        )
+        artifacts.error = root_V_pointing_axis.angle_between(root_V_goal_axis_proj)
         return artifacts

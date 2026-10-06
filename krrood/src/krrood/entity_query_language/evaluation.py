@@ -201,16 +201,9 @@ class InferenceRecorder(EvaluationObserver):
 
 def evaluate_statements_of(condition: SymbolicExpression) -> List[OperationResult]:
     """
-    Evaluate *condition* and collect the results of its statements.
-
-    The statements are *condition* itself and every expression its evaluation evaluated
-    as a condition, at any depth, except the conjunctions and disjunctions joining
-    statements, since their truth follows from the statements they join. A negation is
-    one statement as a whole: what it negates holds exactly when the negation does not,
-    so nothing inside a negation is a statement of its own. The values the statements
-    are about, such as variables, attributes and literals, are not statements. A
-    statement is evaluated only on the values its operator lets through, for example
-    only where the conjuncts before it hold.
+    Evaluate *condition* and collect the results of its statements: *condition* itself
+    and every condition evaluated within it, except conjunctions, disjunctions and
+    anything inside a negation.
 
     :param condition: The condition to evaluate.
     :return: The results of the statements of *condition*, in the order they were

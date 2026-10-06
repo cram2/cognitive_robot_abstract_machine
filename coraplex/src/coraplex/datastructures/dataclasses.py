@@ -119,20 +119,24 @@ class Context(PlanEntity):
     Should debug information be printed or visualized.
     """
 
+    sampling_seed: Optional[int] = field(default=None, kw_only=True)
+    """
+    Seed for the locations of this plan that have none of their own, so a run can be
+    repeated; ``None`` samples afresh each run.
+    """
+
+    candidates_to_try: int = field(default=50, kw_only=True)
+    """
+    How many candidates an underspecified step of this plan tries before giving up,
+    unless the step has a limit of its own.
+    """
+
     motion_tolerances: MotionToleranceConfig = field(
         default_factory=MotionToleranceConfig
     )
     """
     Default goal-achievement tolerances motions fall back to when they leave their own
     thresholds unset.
-    """
-
-    ticks_per_motion: int = 2000
-    """
-    How many ticks each motion of a chart may take before the run gives up on it.
-
-    Also the budget a reachability check gives the same motions, so a pose is not
-    rejected for running out of time sooner than the run that would perform it.
     """
 
     def __post_init__(self):

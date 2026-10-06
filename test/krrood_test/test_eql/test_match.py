@@ -430,6 +430,16 @@ def test_limit_bounds_the_results_and_keeps_the_chain_on_the_match():
     assert len(match.tolist()) == 1
 
 
+def test_a_match_reports_the_limit_it_was_given():
+    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
+    match = a(KRROODPosition).from_(positions)
+    assert match._limit_ is None
+
+    match.limit(1)
+
+    assert match._limit_ == 1
+
+
 def test_ordered_by_a_forwarded_attribute_orders_the_results():
     positions = [
         KRROODPosition(1.0, 0.0, 0.0),

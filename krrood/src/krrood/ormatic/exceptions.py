@@ -63,6 +63,28 @@ class NoDAOFoundError(DataclassException, TypeError):
 
 
 @dataclass
+class QueryCannotBePersisted(DataclassException, TypeError):
+    """
+    Raised when an object that is to be stored holds an entity query language query in
+    place of a value.
+
+    A query describes the objects that would satisfy it rather than one of them, so
+    there is nothing to store until it is answered.
+    """
+
+    query: Any
+    """
+    The query that was to be stored.
+    """
+
+    def error_message(self) -> str:
+        return f"The query {self.query} cannot be stored."
+
+    def suggest_correction(self) -> str:
+        return "Store the objects the query was answered with instead of the query."
+
+
+@dataclass
 class NoDAOFoundForTypeError(NoDAOFoundError):
     """
     Raised when no DAO class is found for a domain *type* rather than for a concrete

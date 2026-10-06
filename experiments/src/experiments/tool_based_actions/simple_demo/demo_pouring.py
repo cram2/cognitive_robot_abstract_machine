@@ -21,7 +21,6 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.composite.tool_based import PouringAction
@@ -54,8 +53,7 @@ def main() -> None:
 
     cup_body = attach_tool(
         world,
-        pr2,
-        Arms.RIGHT,
+        pr2.right_arm,
         parse_object("jeroen_cup.stl", color=CUP_COLOR),
         POUR_MOUNT,
     )
@@ -69,14 +67,14 @@ def main() -> None:
 
     plan = sequential(
         [
-            SetGripperAction(Arms.RIGHT, GripperState.CLOSE),
-            ParkArmsAction(Arms.BOTH),
+            SetGripperAction(pr2.right_arm.end_effector, GripperState.CLOSE),
+            ParkArmsAction(pr2.all_arms),
             MoveTorsoAction(TorsoState.HIGH),
             NavigateAction(
                 Pose.from_xyz_rpy(*BASE_POSITION_XYZ, reference_frame=world.root)
             ),
             PouringAction(
-                target_container=bowl_body, source_container=cup, arm=Arms.RIGHT
+                target_container=bowl_body, source_container=cup, arm=pr2.right_arm
             ),
         ],
         context=context,

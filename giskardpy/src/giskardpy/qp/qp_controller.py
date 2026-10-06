@@ -8,6 +8,8 @@ import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.constraint_collection import ConstraintCollection
+from giskardpy.qp.exceptions import InfeasibleException, SolverReturnedFailureError
+from giskardpy.qp.qp_data import QPData, QPDataExplicit
 from giskardpy.qp.qp_data_factories import QPDataFactory
 from giskardpy.qp.qp_data_symbolic import QPDataSymbolic
 from giskardpy.qp.qp_debugger import QuadraticProgramDebugger
@@ -120,8 +122,32 @@ class QPController:
             world_state, life_cycle_state, float_variables
         )
         qp_data_filtered = qp_data_raw.apply_filters()
-        solution = self.qp_solver.solver_call(qp_data_filtered)
+        try:
+            solution = self.qp_solver.solver_call(qp_data_filtered)
+        except (InfeasibleException, SolverReturnedFailureError):
+            self.report_unsolvable_problem(qp_data_filtered)
+            raise
+
         return self.xdot_to_control_commands(solution)
+
+    @staticmethod
+    def report_unsolvable_problem(qp_data: QPData) -> None:
+        """
+        Log a problem the solver failed on, so it can be turned into a test case.
+
+        Only :class:`~giskardpy.qp.qp_data.QPDataExplicit` is printed and its numerical
+        problems logged; other formats only report the failure.
+
+        :param qp_data: The problem the solver failed on.
+        """
+        if not isinstance(qp_data, QPDataExplicit):
+            logger.warning(
+                f"The QP solver failed on a {type(qp_data).__name__}, which cannot be "
+                f"printed."
+            )
+            return
+        logger.warning(qp_data.pretty_print_problem())
+        qp_data.analyze_well_posedness()
 
     def xdot_to_control_commands(self, xdot: np.ndarray) -> np.ndarray:
         offset = len(self.active_dofs) * (self.config.prediction_horizon - 2)

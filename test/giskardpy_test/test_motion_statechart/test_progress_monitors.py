@@ -12,8 +12,6 @@ from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.error_signals import (
-    SampledErrorSignal,
-    SymbolicErrorSignal,
     time_derivative_from_joint_motion,
 )
 from giskardpy.motion_statechart.exceptions import (
@@ -21,7 +19,7 @@ from giskardpy.motion_statechart.exceptions import (
     NoProgressError,
 )
 from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
-from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
     MotionStatechartNode,
@@ -50,12 +48,18 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import OmniDrive
 
 # %% helpers
 
 # Simulated time without progress before a watched node counts as stalled. Short so
 # that a test waiting it out stays fast.
 STALL_TIMEOUT = timedelta(seconds=0.2)
+
+JITTER_POSITIONS = (0.0, 0.001)
+"""
+The x positions, in meters, a jittering bot is put back to on alternate control cycles.
+"""
 
 
 def unreachable_arm_goal(world: World) -> CartesianPosition:
@@ -155,6 +159,38 @@ class TestStallDetection:
             executor.tick_until_end(2000)
 
         assert goal.unique_name in str(exception_info.value)
+
+    def test_a_task_jittering_in_place_stalls(self, cylinder_bot_world: World):
+        """
+        A task pushed back every cycle, as an arm held off by a collision is, keeps
+        moving without getting any closer to its goal, so the motion is cancelled.
+        """
+        goal = CartesianPosition(
+            root_link=cylinder_bot_world.root,
+            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+        )
+        progressing = StillProgressing(monitored_node=goal, timeout=STALL_TIMEOUT)
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_nodes([goal, progressing])
+        motion_statechart.add_node(EndMotion.when_true(goal))
+        motion_statechart.add_node(progressing.cancel_motion())
+
+        context = MotionStatechartContext(world=cylinder_bot_world)
+        executor = Executor(context)
+        executor.compile(motion_statechart=motion_statechart)
+        drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
+        cycles = 4 * ceil(
+            STALL_TIMEOUT.total_seconds() / context.qp_controller_config.control_dt
+        )
+
+        with pytest.raises(NoProgressError):
+            for cycle in range(cycles):
+                executor.tick()
+                cylinder_bot_world.state[drive.x.id].position = JITTER_POSITIONS[
+                    cycle % len(JITTER_POSITIONS)
+                ]
+                cylinder_bot_world.notify_state_change()
 
     def test_reachable_goal_is_never_reported_as_stalled(
         self, cylinder_bot_world: World
@@ -271,6 +307,90 @@ class TestStallDetection:
         assert unreachable.unique_name in str(exception_info.value)
         assert reachable.unique_name not in str(exception_info.value)
 
+    def test_a_stall_names_only_the_stuck_task_not_one_holding_its_goal(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        A task that holds its goal while another one is stuck has not stopped
+        approaching anything, so the stall must not blame it.
+        """
+        base_footprint = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        other_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "l_gripper_tool_frame"
+        )
+        holding = CartesianPosition(
+            name="holding",
+            root_link=base_footprint,
+            tip_link=other_tip,
+            goal_point=Point3(0, 0, 0, reference_frame=other_tip),
+        )
+        unreachable = CartesianPosition(
+            name="unreachable",
+            root_link=base_footprint,
+            tip_link=tip,
+            goal_point=Point3(5, 0, 0, reference_frame=base_footprint),
+        )
+        motion_statechart = MotionStatechart()
+        parallel = Parallel(nodes=[holding, unreachable])
+        motion_statechart.add_node(parallel)
+        motion_statechart.add_node(EndMotion.when_true(parallel))
+        progressing = StillProgressing(
+            monitored_node=parallel, timeout=timedelta(seconds=1)
+        )
+        motion_statechart.add_node(progressing)
+        motion_statechart.add_node(progressing.cancel_motion())
+
+        executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        executor.compile(motion_statechart=motion_statechart)
+
+        with pytest.raises(NoProgressError) as exception_info:
+            executor.tick_until_end(2000)
+
+        assert progressing.stalled_tasks == [unreachable]
+        assert holding.unique_name not in str(exception_info.value)
+
+    def test_a_motion_whose_running_tasks_all_reached_their_goals_is_not_stalled(
+        self, cylinder_bot_world: World
+    ):
+        """
+        A task at its goal has nothing left to approach, so it must not keep alive the
+        guard that stops finished work from reading as a stall.
+
+        Nothing ends a task for reaching its goal, so a task that arrived keeps running,
+        and a motion also holds invariants that sit at zero error for its whole length.
+        Counting either as work still in progress makes every wait after the last goal
+        was reached a stall.
+        """
+        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        arrived = CartesianPosition(
+            root_link=cylinder_bot_world.root,
+            tip_link=bot,
+            goal_point=Point3(0, 0, 0, reference_frame=bot),
+        )
+        progressing = StillProgressing(monitored_node=arrived, timeout=STALL_TIMEOUT)
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_nodes([arrived, progressing])
+        motion_statechart.add_node(progressing.cancel_motion())
+
+        context = MotionStatechartContext(world=cylinder_bot_world)
+        executor = Executor(context)
+        executor.compile(motion_statechart=motion_statechart)
+        for _ in range(
+            2
+            * ceil(
+                STALL_TIMEOUT.total_seconds() / context.qp_controller_config.control_dt
+            )
+        ):
+            executor.tick()
+
+        assert arrived.goal_reached_state == ObservationStateValues.TRUE
+        assert progressing.observation_state == ObservationStateValues.TRUE
+
     def test_stall_time_does_not_accumulate_before_the_goal_starts(
         self, cylinder_bot_world: World
     ):
@@ -300,7 +420,7 @@ class TestStallDetection:
 
         assert (
             motion_statechart.observation_state[progressing]
-            != ObservationStateValues.FALSE
+            == ObservationStateValues.TRUE
         )
 
     def test_the_stall_timer_counts_the_whole_timeout(self, cylinder_bot_world: World):
@@ -328,13 +448,10 @@ class TestStallDetection:
         ]
         assert [node.seconds for node in timer] == [timeout.total_seconds()]
 
-    def test_a_task_at_its_goal_is_not_approaching_one(
-        self, cylinder_bot_world: World
-    ):
+    def test_a_task_at_its_goal_is_not_approaching_one(self, cylinder_bot_world: World):
         """
-        A task that is exactly at its goal has no rate to measure, since the rate of a
-        distance divides by that distance. Having arrived is not approaching, so it must
-        not read as the progress that keeps a stalled motion from being given up on.
+        A task that is exactly at its goal has nothing left to approach, so it must not
+        read as the progress that keeps a stalled motion from being given up on.
         """
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         arrived = CartesianPosition(
@@ -354,64 +471,165 @@ class TestStallDetection:
         executor.tick()
         executor.tick()
 
-        assert arrived.error_signal.expression.evaluate()[0] == 0
+        assert arrived.error_signal.evaluate()[0] == pytest.approx(0)
         assert monitor.observation_state == ObservationStateValues.TRUE
 
-# %% measuring the convergence rate
+
+# %% the rule that decides whether a task approaches its goal
 
 
-class TestConvergenceRate:
+CONVERGENCE_RATE = 0.5
+"""
+A minimum convergence rate other than the default, so it is seen to be what the rule
+follows.
+"""
 
-    def test_rate_is_zero_when_the_robot_stands_still(self, cylinder_bot_world: World):
-        """
-        The convergence rate is the error's derivative times the joint velocities, so it
-        vanishes when nothing moves.
-        """
-        goal = CartesianPosition(
-            root_link=cylinder_bot_world.root,
-            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+TASK_THRESHOLD = 0.1
+"""
+The error below which the watched task would count as having reached its goal.
+"""
+
+GOAL_X = 10.0
+"""
+The x position of the watched task's goal, far enough away that the task never reaches
+it.
+"""
+
+
+@dataclass
+class ScriptedErrorRun:
+    """
+    A :class:`NotApproachingGoal` watching a task whose error a test sets on every
+    control cycle, by putting the bot that far short of the task's goal.
+    """
+
+    world: World
+    """
+    The world of the bot whose distance to the goal is the task's error.
+    """
+
+    monitor: NotApproachingGoal = field(init=False)
+    """
+    The monitor under test.
+    """
+
+    context: MotionStatechartContext = field(init=False)
+    """
+    The context the motion runs in.
+    """
+
+    executor: Executor = field(init=False)
+    """
+    The executor ticking the motion.
+    """
+
+    def __post_init__(self):
+        task = CartesianPosition(
+            root_link=self.world.root,
+            tip_link=self.world.get_kinematic_structure_entity_by_name("bot"),
+            goal_point=Point3(GOAL_X, 0, 0, reference_frame=self.world.root),
+            threshold=TASK_THRESHOLD,
         )
-        artifacts = goal.build(MotionStatechartContext(world=cylinder_bot_world))
-        rate = artifacts.error.create_rate_expression()
+        self.monitor = NotApproachingGoal(
+            monitored_task=task, minimum_convergence_rate=CONVERGENCE_RATE
+        )
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_nodes([task, self.monitor])
+        motion_statechart.add_node(EndMotion.when_true(task))
+        self.context = MotionStatechartContext(world=self.world)
+        self.executor = Executor(self.context)
+        self.executor.compile(motion_statechart=motion_statechart)
 
-        for degree_of_freedom in cylinder_bot_world.active_degrees_of_freedom:
-            cylinder_bot_world.state[degree_of_freedom.id].velocity = 0.0
-        cylinder_bot_world.notify_state_change()
+    @property
+    def required_fall_per_cycle(self) -> float:
+        """
+        :return: How far the task's error has to fall on every control cycle.
+        """
+        return (
+            CONVERGENCE_RATE
+            * TASK_THRESHOLD
+            * self.context.qp_controller_config.control_dt
+        )
 
-        assert rate.evaluate()[0] == pytest.approx(0.0)
+    def observations_while_the_error_is(
+        self, errors: List[float]
+    ) -> List[ObservationStateValues]:
+        """
+        :param errors: The task's error on each control cycle.
+        :return: What the monitor observes on each of those control cycles.
+        """
+        drive = self.world.get_connections_by_type(OmniDrive)[0]
+        observations = []
+        for error in errors:
+            self.world.state[drive.x.id].position = GOAL_X - error
+            self.world.notify_state_change()
+            self.executor.tick()
+            observations.append(self.monitor.observation_state)
+        return observations
 
-    def test_rate_is_negative_while_closing_on_the_goal(
+
+class TestConvergenceRule:
+
+    @pytest.mark.parametrize(
+        "fall_factor, observed",
+        [(0.8, ObservationStateValues.TRUE), (1.2, ObservationStateValues.FALSE)],
+        ids=["too-slow", "fast-enough"],
+    )
+    def test_an_error_has_to_fall_by_the_minimum_rate(
+        self, cylinder_bot_world: World, fall_factor, observed
+    ):
+        run = ScriptedErrorRun(cylinder_bot_world)
+        start = 1.0
+
+        observations = run.observations_while_the_error_is(
+            [start, start - fall_factor * run.required_fall_per_cycle]
+        )
+
+        assert observations == [ObservationStateValues.FALSE, observed]
+
+    def test_falling_back_after_a_detour_is_not_progress_until_it_beats_the_start(
         self, cylinder_bot_world: World
     ):
         """
-        Moving towards the goal shrinks the error, so its rate of change is negative.
+        An error that rises and then falls back to where it was has made no progress,
+        and only falling below that by the rate for all the time since counts.
         """
-        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-        goal = CartesianPosition(
-            root_link=cylinder_bot_world.root,
-            tip_link=bot,
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+        run = ScriptedErrorRun(cylinder_bot_world)
+        start = 1.0
+        beyond = start - 4 * run.required_fall_per_cycle
+
+        observations = run.observations_while_the_error_is(
+            [start, start + 0.5, start, beyond]
         )
-        artifacts = goal.build(MotionStatechartContext(world=cylinder_bot_world))
-        rate = artifacts.error.create_rate_expression()
 
-        # Drive every degree of freedom that shortens the distance to the goal.
-        error_gradient = artifacts.error.expression.jacobian(
-            [
-                degree_of_freedom.variables.position
-                for degree_of_freedom in cylinder_bot_world.active_degrees_of_freedom
-            ]
-        ).evaluate()[0]
-        for index, degree_of_freedom in enumerate(
-            cylinder_bot_world.active_degrees_of_freedom
-        ):
-            cylinder_bot_world.state[degree_of_freedom.id].velocity = -float(
-                np.sign(error_gradient[index])
-            )
-        cylinder_bot_world.notify_state_change()
+        assert observations == [
+            ObservationStateValues.FALSE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.FALSE,
+        ]
 
-        assert rate.evaluate()[0] < 0
+    def test_a_restarted_task_is_judged_afresh(self, cylinder_bot_world: World):
+        """
+        A task that starts again has nothing to be compared with from its last run.
+        """
+        run = ScriptedErrorRun(cylinder_bot_world)
+        assert run.observations_while_the_error_is([1.0, 1.0]) == [
+            ObservationStateValues.FALSE,
+            ObservationStateValues.TRUE,
+        ]
+
+        run.monitor.on_start(run.context)
+
+        assert run.observations_while_the_error_is([5.0]) == [
+            ObservationStateValues.FALSE
+        ]
+
+
+# %% differentiating with respect to time
+
+
+class TestTimeDerivative:
 
     def test_expression_without_joints_has_no_rate(self):
         """
@@ -419,12 +637,22 @@ class TestConvergenceRate:
         """
         assert time_derivative_from_joint_motion(Scalar(3.0)).evaluate()[0] == 0.0
 
-    def test_sampled_error_has_no_symbolic_rate(self):
+    def test_an_expression_of_a_joint_changes_with_its_velocity(
+        self, cylinder_bot_world: World
+    ):
         """
-        A sampled error is differenced across control cycles instead of differentiated.
+        An error that depends on a joint changes as fast as the joint moves, scaled by
+        how strongly it depends on it.
         """
-        assert SampledErrorSignal(Scalar(1.0)).create_rate_expression() is None
-        assert SymbolicErrorSignal(Scalar(1.0)).create_rate_expression() is not None
+        drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
+        scale = 2.0
+        velocity = 0.5
+        rate = time_derivative_from_joint_motion(drive.x.variables.position * scale)
+
+        cylinder_bot_world.state[drive.x.id].velocity = velocity
+        cylinder_bot_world.notify_state_change()
+
+        assert rate.evaluate()[0] == pytest.approx(scale * velocity)
 
 
 # %% error drives the observation
@@ -448,7 +676,7 @@ class TestErrorDrivesObservation:
             cylinder_bot_world.root, bot
         )[:3, 3]
         expected = np.linalg.norm(goal_point.to_np()[:3] - tip_position)
-        assert artifacts.error.expression.evaluate()[0] == pytest.approx(expected)
+        assert artifacts.error.evaluate()[0] == pytest.approx(expected)
 
     def test_observation_follows_from_the_error(self, cylinder_bot_world: World):
         """
@@ -464,7 +692,7 @@ class TestErrorDrivesObservation:
 
         artifacts = goal.build(MotionStatechartContext(world=cylinder_bot_world))
 
-        expected = (artifacts.error.expression <= goal.threshold).evaluate()[0]
+        expected = (artifacts.error <= goal.threshold).evaluate()[0]
         assert artifacts.observation.evaluate()[0] == expected
 
     def test_normalized_error_is_one_at_the_threshold(self, cylinder_bot_world: World):
@@ -484,10 +712,92 @@ class TestErrorDrivesObservation:
         executor = Executor(MotionStatechartContext(world=cylinder_bot_world))
         executor.compile(motion_statechart=motion_statechart)
 
-        raw_error = goal.error_signal.expression.evaluate()[0]
+        raw_error = goal.error_signal.evaluate()[0]
         assert goal.normalized_error.evaluate()[0] == pytest.approx(
             raw_error / goal.threshold
         )
+
+
+# %% a task that has reached its goal
+
+GOAL_DISTANCE = 1.0
+"""
+How far from where the cylinder bot starts the task's goal lies, in meters.
+"""
+
+THRESHOLD_WIDER_THAN_THE_GOAL_DISTANCE = 2.0
+"""
+A threshold the bot starts inside of, so the task counts as having reached its goal from
+the first cycle, yet small enough that the bot moving towards the goal changes the error
+by far more than the minimum convergence rate.
+"""
+
+MOTION_DURATION = timedelta(seconds=1)
+"""
+How long the bot is driven, so its error keeps changing throughout.
+"""
+
+
+def position_task_at_its_goal(world: World) -> CartesianPosition:
+    """
+    A position task already within its threshold, whose error keeps changing because it
+    still drives the bot.
+    """
+    return CartesianPosition(
+        root_link=world.root,
+        tip_link=world.get_kinematic_structure_entity_by_name("bot"),
+        goal_point=Point3(GOAL_DISTANCE, 0, 0, reference_frame=world.root),
+        threshold=THRESHOLD_WIDER_THAN_THE_GOAL_DISTANCE,
+    )
+
+
+def trajectory_task_at_its_goal(world: World) -> CartesianPositionTrajectory:
+    """
+    A trajectory task already within its threshold, whose error is sampled rather than
+    differentiated and keeps changing as the bot follows the trajectory.
+    """
+    return CartesianPositionTrajectory(
+        root_link=world.root,
+        tip_link=world.get_kinematic_structure_entity_by_name("bot"),
+        goal_points=[
+            Point3(GOAL_DISTANCE * x / 100, 0, 0, reference_frame=world.root)
+            for x in range(100)
+        ],
+        threshold=THRESHOLD_WIDER_THAN_THE_GOAL_DISTANCE,
+    )
+
+
+class TestTaskAtItsGoal:
+
+    @pytest.mark.parametrize(
+        "task_at_its_goal", [position_task_at_its_goal, trajectory_task_at_its_goal]
+    )
+    def test_a_task_at_its_goal_is_not_approaching_it(
+        self, cylinder_bot_world: World, task_at_its_goal
+    ):
+        """
+        A task holding its goal, like a grip held while something else moves, can see
+        its error move within the threshold for as long as the motion runs.
+
+        That movement is not progress, so it must not keep a stuck motion from being
+        given up on.
+        """
+        task = task_at_its_goal(cylinder_bot_world)
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_node(task)
+        not_approaching = NotApproachingGoal(monitored_task=task)
+        motion_statechart.add_node(not_approaching)
+        timer = CountSimulationTimeSeconds(seconds=MOTION_DURATION.total_seconds())
+        motion_statechart.add_node(timer)
+        motion_statechart.add_node(EndMotion.when_true(timer))
+
+        executor = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        executor.compile(motion_statechart=motion_statechart)
+        recorded = tick_until_end_recording(
+            executor, motion_statechart, [not_approaching]
+        )
+
+        assert ObservationStateValues.FALSE not in recorded[not_approaching]
 
 
 # %% nodes with nothing converging beneath them
@@ -602,17 +912,17 @@ class TestNodeDependencies:
             executor.compile(motion_statechart=motion_statechart)
 
 
-# %% errors that cannot be differentiated
+# %% errors kept by the task itself
 
 
-class TestSampledError:
+class TestTrajectoryProgress:
 
-    def test_trajectory_progress_is_measured_by_sampling(
+    def test_a_trajectory_being_followed_is_progressing(
         self, cylinder_bot_world: World
     ):
         """
-        A trajectory task knows how far it has come only from its own bookkeeping, so
-        its progress is differenced across control cycles rather than differentiated.
+        A trajectory task knows how far it has come only from its own bookkeeping, and
+        following it reads as progress for the whole motion.
         """
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         trajectory = CartesianPositionTrajectory(
@@ -634,6 +944,5 @@ class TestSampledError:
         executor = Executor(MotionStatechartContext(world=cylinder_bot_world))
         executor.compile(motion_statechart=motion_statechart)
 
-        assert isinstance(trajectory.error_signal, SampledErrorSignal)
         recorded = tick_until_end_recording(executor, motion_statechart, [progressing])
         assert ObservationStateValues.FALSE not in recorded[progressing]

@@ -51,17 +51,13 @@ class HSRVelocityInterface(RobotInterfaceConfig):
             tf_child_frame="odom",
         )
 
-        omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
-        self.sync_odometry_topic(
-            "/laser_odom",
-            omni_drive,
-        )
+        self.sync_robot_parts()
 
+        omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
         self.add_base_cmd_velocity(
             cmd_vel_topic="/omni_base_controller/cmd_vel", joint=omni_drive
         )
 
-        self.sync_joint_state_topic("/joint_states")
         joints_left = [
             HSRBJoint.ARM_FLEX,
             HSRBJoint.ARM_LIFT,

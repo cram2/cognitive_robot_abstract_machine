@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import pytest
 import scipy.sparse as sp
@@ -7,6 +9,7 @@ from giskardpy.qp.qp_data import (
     QPDataExplicit,
     QPDataTwoSidedInequality,
 )
+from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 
 CONSTRAINT_TOLERANCE = 1e-6
@@ -509,3 +512,61 @@ def test_apply_filters_keeps_dof_columns_without_slack_two_sided_inequality():
     filtered = qp_data.apply_filters()
 
     assert filtered.quadratic_weights.shape[0] == 2
+
+
+# %% reporting a problem the solver could not solve
+
+
+def test_a_problem_in_any_format_can_be_reported_as_unsolvable(
+    simple_inequality_qp, caplog
+):
+    """
+    Reporting a failed problem must not itself fail for a format that cannot be
+    printed, or it would replace the solver's error with one about the report.
+    """
+    qp_data, _ = simple_inequality_qp
+    two_sided = qp_data.to_two_sided_inequality()
+
+    with caplog.at_level(logging.WARNING):
+        QPController.report_unsolvable_problem(two_sided)
+
+    assert type(two_sided).__name__ in caplog.text
+
+
+def test_an_explicit_problem_is_reported_in_full(simple_inequality_qp, caplog):
+    qp_data, _ = simple_inequality_qp
+
+    with caplog.at_level(logging.WARNING):
+        QPController.report_unsolvable_problem(qp_data)
+
+    assert qp_data.pretty_print_problem() in caplog.text
+
+
+def test_a_problem_without_weights_can_be_analysed(simple_inequality_qp, caplog):
+    """
+    A problem whose weights are all zero has no conditioning to compute, which the
+    analysis has to say rather than fail on.
+    """
+    qp_data, _ = simple_inequality_qp
+    qp_data.quadratic_weights = np.zeros_like(qp_data.quadratic_weights)
+
+    with caplog.at_level(logging.WARNING):
+        qp_data.analyze_well_posedness()
+
+    assert "all zero" in caplog.text
+
+
+def test_infeasible_box_constraints_are_reported_as_a_warning(
+    simple_inequality_qp, caplog
+):
+    qp_data, _ = simple_inequality_qp
+    qp_data.box_lower_constraints = np.array([1.0, -np.inf])
+    qp_data.box_upper_constraints = np.array([0.0, np.inf])
+
+    with caplog.at_level(logging.WARNING):
+        qp_data.analyze_well_posedness()
+
+    assert any(
+        record.levelno == logging.WARNING and "infeasible" in record.getMessage()
+        for record in caplog.records
+    )

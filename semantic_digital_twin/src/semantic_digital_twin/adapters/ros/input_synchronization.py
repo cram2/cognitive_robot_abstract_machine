@@ -2,23 +2,27 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Generic, List, Tuple, Type, Union
 
 from nav_msgs.msg import Odometry
-from rclpy.subscription import Subscription
 from sensor_msgs.msg import JointState
-from typing_extensions import TypeVar
+from typing_extensions import Dict, List, Tuple, Union
 
-from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.exceptions import (
+from semantic_digital_twin.adapters.ros.latest_message_subscriber import (
+    LatestMessageSubscriber,
+    MessageType,
+)
+from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
+from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
+from semantic_digital_twin.exceptions import (
     AlreadyTrackedByTfFrameError,
     ConnectionCannotBeTrackedByTfFrameError,
-    UnboundMessageTypeError,
 )
-from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
+from semantic_digital_twin.input_synchronization import InputSynchronizer
+from semantic_digital_twin.robots.input_source import (
+    BasePoseSource,
+    JointPositionSource,
+)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     Connection6DoF,
@@ -28,148 +32,14 @@ from semantic_digital_twin.world_description.connections import (
 
 # %% base classes
 
-MessageType = TypeVar("MessageType")
-
-
-@dataclass
-class InputSynchronizer(ABC):
-    """
-    Writes an external source of truth, e.g. a robot's joint states, into the world
-    state.
-    """
-
-    world: World
-    """
-    The world whose state is kept in sync with the external source.
-    """
-
-    @abstractmethod
-    def apply(self) -> bool:
-        """
-        Write the most recent input into the world state.
-
-        :return: Whether anything was written.
-        """
-
-    def close(self) -> None:
-        """
-        Release the resources used to receive inputs.
-        """
-
-
-@dataclass
-class WorldStateInputs:
-    """
-    All inputs that one loop of Giskard reads before it computes anything.
-    """
-
-    world: World
-    """
-    The world whose state is written and whose observers are notified.
-    """
-
-    synchronizers: List[InputSynchronizer] = field(default_factory=list)
-    """
-    The inputs, applied in the order they were added.
-    """
-
-    def apply_inputs(self) -> bool:
-        """
-        Write all inputs into the world state, in the order they were added.
-
-        :return: Whether any of them wrote something.
-        """
-        wrote_something = False
-        for synchronizer in self.synchronizers:
-            wrote_something |= synchronizer.apply()
-        return wrote_something
-
-    def synchronize(self) -> None:
-        """
-        Write all inputs into the world state and announce the change.
-
-        Nothing is announced when no input wrote, because announcing recomputes the
-        forward kinematics and reaches every observer of the world.
-        """
-        if not self.apply_inputs():
-            return
-        self.announce_state()
-
-    def synchronize_and_announce(self) -> None:
-        """
-        Write all inputs into the world state and announce the state even if no input
-        wrote.
-
-        Use this where nothing else announces, so that the observers of the world do not
-        go stale.
-        """
-        self.apply_inputs()
-        self.announce_state()
-
-    def announce_state(self) -> None:
-        """
-        Hand the current world state to the observers of the world.
-
-        Nothing is announced while the world model is being modified, because the
-        observers would see an inconsistent model.
-        """
-        if self.world.world_is_being_modified:
-            return
-        self.world.notify_state_change()
-
 
 @dataclass
 class TopicInputSynchronizer(
-    InputSynchronizer, Generic[MessageType], SubClassSafeGeneric, ABC
+    LatestMessageSubscriber[MessageType], InputSynchronizer, ABC
 ):
     """
-    Buffers the latest message of a topic and applies it on demand.
-
-    Subclasses name the type of their messages by binding the generic parameter, as in
-    ``TopicInputSynchronizer[Odometry]``.
+    Applies the latest message of a topic on demand.
     """
-
-    topic_name: str
-    """
-    Name of the topic the inputs are read from.
-    """
-
-    latest_message: MessageType | None = field(init=False, default=None)
-    """
-    The most recently received message, or ``None`` if nothing was received yet.
-    """
-
-    subscription: Subscription = field(init=False)
-    """
-    The subscription feeding ``latest_message``.
-    """
-
-    def __post_init__(self):
-        if not self.topic_name.startswith("/"):
-            self.topic_name = f"/{self.topic_name}"
-        self.subscription = rospy.get_node().create_subscription(
-            self.message_type(), self.topic_name, self.buffer_message, 1
-        )
-        rospy.get_node().get_logger().info(f"Subscribed to {self.topic_name}")
-
-    @classmethod
-    def message_type(cls) -> Type[MessageType]:
-        """
-        The type of the messages published on ``topic_name``.
-
-        :raises UnboundMessageTypeError: If the class does not bind the generic
-            parameter.
-        """
-        message_types = cls.get_generic_type_parameters()
-        if not message_types or isinstance(message_types[0], TypeVar):
-            raise UnboundMessageTypeError(synchronizer_type=cls)
-        return message_types[0]
-
-    def buffer_message(self, message: MessageType) -> None:
-        """
-        Remember the message so that the next :meth:`apply` can use it.
-        """
-        self.latest_message = message
 
     def apply(self) -> bool:
         message = self.take_message()
@@ -190,9 +60,6 @@ class TopicInputSynchronizer(
         Write the message into the world state.
         """
 
-    def close(self) -> None:
-        rospy.get_node().destroy_subscription(self.subscription)
-
 
 # %% joint states
 
@@ -208,7 +75,18 @@ class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
             connection: ActiveConnection1DOF = self.world.get_connection_by_name(
                 joint_name
             )
+            if not self.writes(connection):
+                continue
             self.world.state[connection.raw_dof.id].position = position
+
+    def writes(self, connection: ActiveConnection1DOF) -> bool:
+        """
+        Whether the position this synchronizer received for a connection is its to
+        write.
+
+        :param connection: The connection the message reports a position for.
+        """
+        return True
 
     @abstractmethod
     def take_message(self) -> JointState | None:
@@ -249,6 +127,54 @@ class LatestJointStateSynchronizer(JointStateInputSynchronizer):
         return self.latest_message
 
 
+@dataclass
+class SubscribedJointPositionSource(
+    JointStateInputSynchronizer, JointPositionSource, ABC
+):
+    """
+    The joint positions one robot part reports on a ROS 2 topic.
+
+    A robot publishes all of its joints on one topic, so this source writes only the
+    connections of the part it is attached to and leaves the rest of the robot to
+    whatever reads it.
+    """
+
+    connections: List[ActiveConnection1DOF] = field(kw_only=True)
+    """
+    The connections of the part this source is attached to.
+    """
+
+    def writes(self, connection: ActiveConnection1DOF) -> bool:
+        return connection in self.connections
+
+
+@dataclass
+class PendingJointPositionSource(
+    SubscribedJointPositionSource, PendingJointStateSynchronizer
+):
+    """
+    The joint positions of one robot part, written once per message the robot publishes.
+    """
+
+    def rewriting_every_cycle(self) -> LatestJointPositionSource:
+        return LatestJointPositionSource(
+            world=self.world,
+            node=self.node,
+            topic_name=self.topic_name,
+            connections=self.connections,
+        )
+
+
+@dataclass
+class LatestJointPositionSource(
+    SubscribedJointPositionSource, LatestJointStateSynchronizer
+):
+    """
+    The joint positions of one robot part, written again in every cycle however old the
+    last message is.
+    """
+
+
 # %% base pose
 
 
@@ -277,7 +203,14 @@ class OdometrySynchronizer(TopicInputSynchronizer[Odometry]):
 
 
 @dataclass
-class TfFrameSynchronizer(InputSynchronizer):
+class SubscribedBasePoseSource(OdometrySynchronizer, BasePoseSource):
+    """
+    The pose a real mobile base reports as odometry on a ROS 2 topic.
+    """
+
+
+@dataclass
+class TfFrameSynchronizer(InputSynchronizer, HasROS2Node):
     """
     Writes tf transforms into 6 degree of freedom connections.
     """
@@ -295,7 +228,7 @@ class TfFrameSynchronizer(InputSynchronizer):
     """
 
     def __post_init__(self):
-        self.tf_wrapper = TFWrapper(node=rospy.get_node())
+        self.tf_wrapper = TFWrapper(node=self.node)
 
     def track(
         self, connection: Connection6DoF, tf_parent_frame: str, tf_child_frame: str

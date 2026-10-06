@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Self
+from typing import List
 
 from krrood.ormatic.data_access_objects.alternative_mappings import (
     AlternativeMapping,
@@ -8,13 +8,10 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 from typing_extensions import Optional
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms
-from coraplex.datastructures.grasp import GraspPose, GraspDescription
 from coraplex.plans.plan import (
     Plan,
 )
 from coraplex.plans.plan_node import PlanNode
-from semantic_digital_twin.orm.model import PoseMapping
 from semantic_digital_twin.world import World
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -67,32 +64,3 @@ class PlanMapping(AlternativeMapping[Plan]):
         for edge in self.edges:
             result.add_edge(edge.parent, edge.child)
         return result
-
-
-@dataclass(eq=False)
-class GrasPoseMapping(PoseMapping, AlternativeMapping[GraspPose]):
-    arm: Optional[Arms]
-
-    grasp_description: Optional[GraspDescription]
-
-    @classmethod
-    def from_domain_object(cls, obj: GraspPose) -> Self:
-        position = obj.to_position()
-        orientation = obj.to_quaternion()
-        result = cls(
-            position=position,
-            orientation=orientation,
-            reference_frame=obj.reference_frame,
-            grasp_description=obj.grasp_description,
-            arm=obj.arm,
-        )
-        return result
-
-    def to_domain_object(self) -> T:
-        return GraspPose(
-            position=self.position,
-            orientation=self.orientation,
-            reference_frame=self.reference_frame,
-            grasp_description=self.grasp_description,
-            arm=self.arm,
-        )

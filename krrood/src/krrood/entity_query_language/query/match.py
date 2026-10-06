@@ -719,6 +719,14 @@ class Match(
         self._symbolic_expression_.limit(n)
         return self
 
+    @property
+    def _limit_(self) -> Optional[int]:
+        """
+        :return: The most matched instances this match returns, or ``None`` if it was
+            given no :meth:`limit`.
+        """
+        return self._get_expression_()._limit_
+
     def causes_effect(self, *conditions: ConditionType) -> Match[T]:
         """
         Mark condition(s) as the effect side of a causal query, e.g.

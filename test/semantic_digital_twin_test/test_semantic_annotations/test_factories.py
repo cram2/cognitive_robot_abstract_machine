@@ -1609,6 +1609,41 @@ def test_drawer_create_default_mechanical_joint_inserts_slider_for_bare_prismati
     assert world.validate()
 
 
+def test_a_drawer_on_a_slider_stands_as_far_open_as_its_slider_has_travelled():
+    """
+    A drawer carried by a slider is fixed to it, so how far the drawer stands open is
+    read from the slider's travel.
+    """
+    world = _world_with_root()
+    lower = DerivativeMap[float]()
+    lower.position = 0.0
+    upper = DerivativeMap[float]()
+    upper.position = 0.3
+    limits = DegreeOfFreedomLimits(lower=lower, upper=upper)
+
+    with world.modify_world():
+        fridge = Fridge.create_with_new_body_in_world(
+            name="fridge", world=world, scale=Scale(1, 1, 2.0)
+        )
+        drawer = Drawer.get_annotation_specification(
+            "drawer",
+            Drawer.get_default_root_kinematic_structure_entity_specification(
+                scale=Scale(0.2, 0.3, 0.2)
+            ),
+            parent_connection_specification=PrismaticConnectionSpecification(
+                axis=Vector3.X(), multiplier=1.0, offset=0.0, dof_limits=limits
+            ),
+        ).spawn(world, parent=fridge.root)
+    with world.modify_world():
+        drawer.create_default_mechanical_joint()
+
+    slider_connection = drawer.mechanical_joint.root.parent_connection
+    slider_connection.position = upper.position
+    world.notify_state_change()
+
+    assert drawer.opening_ratio == 1
+
+
 def test_create_default_mechanical_joint_is_a_noop_when_a_joint_already_exists():
     """
     ``create_default_mechanical_joint`` does nothing for a door that already has a

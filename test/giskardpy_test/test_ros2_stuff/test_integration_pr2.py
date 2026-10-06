@@ -170,17 +170,17 @@ class PR2Tester(GiskardTester):
     @property
     def l_gripper_annotation(self) -> EndEffector:
         return next(
-            sa
-            for sa in self.robot.get_end_effectors()
-            if "left" in str(sa.name).lower()
+            end_effector
+            for end_effector in self.robot.all_end_effectors
+            if "left" in str(end_effector.name).lower()
         )
 
     @property
     def r_gripper_annotation(self) -> EndEffector:
         return next(
-            sa
-            for sa in self.robot.get_end_effectors()
-            if "right" in str(sa.name).lower()
+            end_effector
+            for end_effector in self.robot.all_end_effectors
+            if "right" in str(end_effector.name).lower()
         )
 
     def get_l_gripper_links(self) -> Set[Body]:

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Self, List
 
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -23,8 +24,10 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasNeck,
+    HasLidar,
     HasLeftRightArm,
     HasTorso,
     HasMobileBase,
@@ -40,7 +43,7 @@ from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     EndEffector,
 )
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     OmniDrive,
@@ -48,6 +51,18 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+
+class PR2Topic(StrEnum):
+    """
+    Topics the PR2 publishes the state of its parts on, where it does not follow the
+    conventional name.
+    """
+
+    ODOMETRY = "odom"
+    """
+    The topic the mobile base reports its odometry on.
+    """
 
 
 class PR2Joint(StrEnum):
@@ -95,6 +110,10 @@ class PR2KinectV1(Camera):
     def setup_joint_states(self) -> List[JointState]:
         return []
 
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.root)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -103,11 +122,35 @@ class PR2KinectV1(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "wide_stereo_optical_frame"
             ),
-            forward_facing_axis=Vector3.Z(),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=1.27,
             maximal_height=1.60,
             default_camera=True,
+        )
+
+
+@dataclass(eq=False)
+class PR2BaseLidar(Lidar):
+    """
+    The Hokuyo scanner sweeping the floor in front of the PR2's base.
+    """
+
+    @classmethod
+    def with_source(
+        cls, robot_root: KinematicStructureEntity, source: LidarSource
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "base_laser_link"
+            ),
+            scan_pattern=ScanPattern(
+                minimum_angle=-2.2689,
+                maximum_angle=2.2689,
+                angle_increment=0.0043633,
+                minimum_range=0.023,
+                maximum_range=60.0,
+            ),
+            source=source,
         )
 
 
@@ -228,6 +271,14 @@ class PR2RightGripper(
     def setup_hardware_interfaces(self):
         return
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -239,7 +290,6 @@ class PR2RightGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "r_gripper_tool_frame"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
@@ -264,6 +314,14 @@ class PR2LeftGripper(
 
         return [left_gripper_open, left_gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -275,7 +333,6 @@ class PR2LeftGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "l_gripper_tool_frame"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
     def setup_hardware_interfaces(self):
@@ -364,7 +421,7 @@ class PR2LeftArm(Arm[PR2LeftGripper]):
                 robot_root, "torso_lift_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_wrist_roll_link"
+                robot_root, "l_force_torque_link"
             ),
         )
 
@@ -464,7 +521,14 @@ class PR2Torso(Torso, HasLeftRightArm[PR2LeftArm, PR2RightArm], HasNeck[PR2Neck]
 
 
 @dataclass(eq=False)
-class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso]):
+class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseLidar]):
+
+    @classproperty
+    def topic_name(cls) -> str:
+        """
+        The topic the PR2 publishes the pose of its base on.
+        """
+        return PR2Topic.ODOMETRY
 
     @classproperty
     def forward_axis(cls) -> Vector3:
