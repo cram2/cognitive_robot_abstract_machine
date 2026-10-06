@@ -196,7 +196,7 @@ def test_the_robot_is_checked_against_an_object_when_it_is_not_left_out(pr2_worl
     assert palm in _contacts_detected_for(pr2_world_copy, box, exclude_robot=False)
 
 
-def _box_set_down_inside(world: World, container: Body) -> Body:
+def _box_inside(world: World, container: Body) -> Body:
     """
     Add a box free to move to ``world``, set down on a shelf in the middle of
     ``container``'s collision geometry, so it rests where it is.
@@ -266,7 +266,7 @@ def test_an_object_is_not_contained_in_the_robot(pr2_world_copy):
     as put into something.
     """
     base = pr2_world_copy.get_body_by_name("base_link")
-    box = _box_set_down_inside(pr2_world_copy, base)
+    box = _box_inside(pr2_world_copy, base)
 
     assert set(_containers_detected_for(pr2_world_copy, box)).isdisjoint(
         pr2_world_copy.robot_bodies_with_collision
@@ -279,6 +279,6 @@ def test_an_object_is_contained_in_the_robot_when_it_is_not_left_out(pr2_world_c
     is what contains it.
     """
     base = pr2_world_copy.get_body_by_name("base_link")
-    box = _box_set_down_inside(pr2_world_copy, base)
+    box = _box_inside(pr2_world_copy, base)
 
     assert base in _containers_detected_for(pr2_world_copy, box, exclude_robot=False)

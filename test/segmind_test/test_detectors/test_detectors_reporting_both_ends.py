@@ -36,8 +36,12 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-from ..conftest import RESTING_ON_THE_TABLE, WHERE_THE_MILK_STOOD
-from ..trays import add_tray, lift_out_of, set_down_in, world_with_a_box
+from ..conftest import (
+    LIFTED_OUT_OF_THE_TRAY,
+    RESTING_ON_THE_TABLE,
+    SET_DOWN_IN_THE_TRAY,
+    WHERE_THE_MILK_STOOD,
+)
 
 MOVING_TICKS = 5
 """
@@ -113,23 +117,24 @@ def test_the_support_detector_reports_gaining_and_losing_a_support(
     _put_back(milk)
 
 
-def test_the_containment_detector_reports_gaining_and_losing_a_containment():
+def test_the_containment_detector_reports_gaining_and_losing_a_containment(
+    box_and_trays,
+):
     """
     Containment is looked for once an object comes to rest, so the supports it is read
     from are ticked along with it.
     """
-    world, box = world_with_a_box()
-    tray = add_tray(world, "tray")
+    world, box, _, _ = box_and_trays
     executor, segmind_context = _ticking(
         world, SupportDetector(), ContainmentDetector()
     )
 
-    set_down_in(box, tray)
+    _place(box, *SET_DOWN_IN_THE_TRAY)
     executor.tick()
     assert len(_events_of(segmind_context, ContainmentEvent)) == 1
     assert _events_of(segmind_context, LossOfContainmentEvent) == []
 
-    lift_out_of(box, tray)
+    _place(box, *LIFTED_OUT_OF_THE_TRAY)
     executor.tick()
 
     [lost] = _events_of(segmind_context, LossOfContainmentEvent)
