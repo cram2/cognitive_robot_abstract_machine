@@ -77,25 +77,14 @@ def test_asking_for_grasps_brings_the_contacts_they_are_read_from():
     assert selection.detector_types == (ContactDetector, GraspDetector)
 
 
-def test_insertions_bring_contact_containment_and_the_supports_it_is_read_from():
+def test_insertions_bring_contact_and_containment():
     selection = DetectorSelection.of(InsertionDetector)
 
     assert set(selection.detector_types) == {
         InsertionDetector,
         ContactDetector,
         ContainmentDetector,
-        SupportDetector,
     }
-
-
-def test_containment_brings_the_supports_it_is_read_from():
-    """
-    An object is put into something by being set down in it, so containment is looked
-    for once an object comes to rest.
-    """
-    selection = DetectorSelection.of(ContainmentDetector)
-
-    assert selection.detector_types == (SupportDetector, ContainmentDetector)
 
 
 # %% one detector reports both ends of a relation
