@@ -9,7 +9,7 @@ def main() -> None:
     try:
         import demo
 
-        demo.main(event_segmentation=False)
+        demo.main()
     except Exception:
         traceback.print_exc()
         exit(1)
