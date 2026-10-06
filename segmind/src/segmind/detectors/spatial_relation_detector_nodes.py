@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Set, Tuple, Type
 
@@ -23,6 +23,7 @@ from segmind.detectors.atomic_event_detectors_nodes import ContactDetector
 from segmind.detectors.base import (
     AbstractDetector,
     EventCombiningDetector,
+    IndexedBodyPairs,
     SegmindContext,
 )
 
@@ -91,12 +92,60 @@ class ContainmentDetector(AbstractDetector):
     The detector reports a :class:`ContainmentEvent` when a body ends up inside
     something and a :class:`LossOfContainmentEvent` when it leaves something it was
     inside.
+
+    A body is put into something by being set down in it, so what a body is inside is
+    looked for only when it comes to rest on something new; from then on, only whether
+    it is still inside what it was found in is checked.
     """
 
     containment_threshold: float = 0.9
     """
     The threshold for the containment ratio between two bodies to be considered containment.
     """
+
+    _supporters_seen: IndexedBodyPairs = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    What each tracked body rested on at the previous tick.
+    """
+
+    @classmethod
+    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+        return (SupportDetector,)
+
+    def bodies_come_to_rest(
+        self, segmind_context: SegmindContext, tracked_objects: List[Body]
+    ) -> List[Body]:
+        """
+        The tracked objects resting on something they did not rest on at the previous
+        tick.
+
+        :param segmind_context: The shared SegmindContext holding what each body rests on.
+        :param tracked_objects: Bodies that should be checked.
+        """
+        come_to_rest = []
+        for tracked_object in tracked_objects:
+            supporters = set(segmind_context.latest_support.get(tracked_object, set()))
+            if supporters - self._supporters_seen.get(tracked_object, set()):
+                come_to_rest.append(tracked_object)
+            self._supporters_seen[tracked_object] = supporters
+        return come_to_rest
+
+    def containers_still_holding(
+        self, tracked_object: Body, containers: Set[Body]
+    ) -> Set[Body]:
+        """
+        :param tracked_object: The body found inside ``containers``.
+        :param containers: What ``tracked_object`` was found inside.
+        :return: Those of ``containers`` it is still inside.
+        """
+        return {
+            container
+            for container in containers
+            if InsideOf(tracked_object, container).compute_containment_ratio()
+            > self.containment_threshold
+        }
 
     def get_containment_pairs(
         self, context: MotionStatechartContext, tracked_objects: List[Body]
@@ -146,13 +195,24 @@ class ContainmentDetector(AbstractDetector):
         :param objects_to_check: List of Body objects to check for containment changes.
         :return: The containments established, then the containments lost.
         """
-        containments_now = self.get_containment_pairs(context, objects_to_check)
         latest_containments = segmind_context.latest_containments
+        come_to_rest = self.bodies_come_to_rest(segmind_context, objects_to_check)
+        containments_now = self.get_containment_pairs(context, come_to_rest)
+        inside_something = [
+            body
+            for body in objects_to_check
+            if body not in come_to_rest and latest_containments.get(body)
+        ]
+        for body in inside_something:
+            containments_now[body] = self.containers_still_holding(
+                body, latest_containments[body]
+            )
+        checked = come_to_rest + inside_something
         new_containments = self.remember_new_relations(
             latest_containments, containments_now
         )
         lost_containments = self.forget_lost_relations(
-            latest_containments, containments_now, objects_to_check
+            latest_containments, containments_now, checked
         )
         return [
             ContainmentEvent(tracked_object=body, with_object=container)

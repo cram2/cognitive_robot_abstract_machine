@@ -37,6 +37,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ..conftest import RESTING_ON_THE_TABLE, WHERE_THE_MILK_STOOD
+from ..trays import add_tray, lift_out_of, set_down_in, world_with_a_box
 
 MOVING_TICKS = 5
 """
@@ -44,13 +45,13 @@ How many ticks a test keeps a body moving, which is more than a motion detector'
 """
 
 
-def _ticking(world: World, detector: AbstractDetector):
+def _ticking(world: World, *detectors: AbstractDetector):
     """
-    :return: An executor ticking only ``detector``, and the context it logs to.
+    :return: An executor ticking only ``detectors``, and the context they log to.
     """
     executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
     segmind_context = executor.context.require_extension(SegmindContext)
-    executor.compile(SegmindStatechart().build_statechart([detector]))
+    executor.compile(SegmindStatechart().build_statechart(list(detectors)))
     executor.tick()
     return executor, segmind_context
 
@@ -112,23 +113,27 @@ def test_the_support_detector_reports_gaining_and_losing_a_support(
     _put_back(milk)
 
 
-def test_the_containment_detector_reports_gaining_and_losing_a_containment(
-    milk_in_the_apartment,
-):
-    world, milk, box = milk_in_the_apartment
-    executor, segmind_context = _ticking(world, ContainmentDetector())
+def test_the_containment_detector_reports_gaining_and_losing_a_containment():
+    """
+    Containment is looked for once an object comes to rest, so the supports it is read
+    from are ticked along with it.
+    """
+    world, box = world_with_a_box()
+    tray = add_tray(world, "tray")
+    executor, segmind_context = _ticking(
+        world, SupportDetector(), ContainmentDetector()
+    )
 
-    _place(milk, box.global_pose.x, box.global_pose.y, box.global_pose.z)
+    set_down_in(box, tray)
     executor.tick()
     assert len(_events_of(segmind_context, ContainmentEvent)) == 1
     assert _events_of(segmind_context, LossOfContainmentEvent) == []
 
-    _place(milk, 0, 0, 1)
+    lift_out_of(box, tray)
     executor.tick()
 
     [lost] = _events_of(segmind_context, LossOfContainmentEvent)
-    assert lost.tracked_object is milk
-    _put_back(milk)
+    assert lost.tracked_object is box
 
 
 def test_the_translation_detector_reports_starting_and_stopping(

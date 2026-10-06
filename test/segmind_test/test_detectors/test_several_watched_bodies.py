@@ -32,6 +32,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ..conftest import RESTING_ON_THE_TABLE
+from ..trays import add_tray, set_down_in, world_with_a_box
 
 TICKS_WITHOUT_ANYTHING_MOVING = 4
 """
@@ -106,16 +107,14 @@ def test_a_support_that_lasts_is_not_reported_lost_by_another_bodys_detector(
     assert _events_of(segmind_context, LossOfSupportEvent, milk) == []
 
 
-def test_a_containment_that_lasts_is_not_reported_lost_by_another_bodys_detector(
-    milk_in_the_apartment,
-):
-    world, milk, box = milk_in_the_apartment
-    box_x, box_y, box_z = box.global_pose.to_position().to_np()[:3]
-    _place(milk, box_x, box_y, box_z)
+def test_a_containment_that_lasts_is_not_reported_lost_by_another_bodys_detector():
+    world, box = world_with_a_box()
+    tray = add_tray(world, "tray")
+    set_down_in(box, tray)
 
     segmind_context = _ticked_while_nothing_moves(
-        world, [ContainmentDetector], [milk, box]
+        world, [SupportDetector, ContainmentDetector], [box, tray]
     )
 
-    assert len(_events_of(segmind_context, ContainmentEvent, milk)) == 1
-    assert _events_of(segmind_context, LossOfContainmentEvent, milk) == []
+    assert len(_events_of(segmind_context, ContainmentEvent, box)) == 1
+    assert _events_of(segmind_context, LossOfContainmentEvent, box) == []
