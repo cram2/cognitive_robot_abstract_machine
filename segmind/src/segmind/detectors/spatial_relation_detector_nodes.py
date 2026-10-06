@@ -104,11 +104,19 @@ class ContainmentDetector(AbstractDetector):
         """
         Computes containment relationships.
 
+        A tracked object is never checked against the bodies :meth:`bodies_left_out`
+        names.
+
         :param tracked_objects: Bodies that should be checked.
         :return: Mapping of body → containing bodies.
         """
         containment_pairs: Dict[Body, Set[Body]] = {}
-        candidates = self.bodies_outside_end_effectors(context.world)
+        left_out = self.bodies_left_out(context.world)
+        candidates = [
+            body
+            for body in self.bodies_outside_end_effectors(context.world)
+            if body not in left_out
+        ]
 
         for tracked_object in tracked_objects:
             containers = {
