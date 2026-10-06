@@ -9,23 +9,17 @@ that was running when it was created turns that total into the list of tests to 
 from __future__ import annotations
 
 import gc
-import json
 import weakref
 from collections import Counter
 from dataclasses import dataclass, field
-from enum import StrEnum
-from pathlib import Path
 
 from krrood.exceptions import DataclassException
-from typing_extensions import Any, ClassVar, List, Tuple
+from typing_extensions import Any, List, Tuple
 
 MAXIMUM_LIVING_WORLDS: int = 30
 """
-The default budget of worlds still in memory: how many one process may still have
-when a test module has finished, and separately, how many every process of a run may
-add up to together - :meth:`LivingWorlds.enforce_limit` and
-:meth:`WorldTallyLedger.enforce_combined_limit` each default to this same number for
-their own, unrelated budget.
+The default number of worlds one process may still have in memory when a test module
+has finished.
 """
 
 BEFORE_THE_FIRST_TEST = "before the first test ran"
@@ -270,193 +264,4 @@ class LivingWorlds:
             worlds_in_memory=worlds_in_memory,
             limit=limit,
             left_behind=left_behind,
-        )
-
-
-# %% combining tallies across processes
-
-
-class WorkerTallyJSONKey(StrEnum):
-    """
-    Field names of a :class:`WorkerTally` as written to its JSON file.
-    """
-
-    WORKER = "worker"
-    LEFT_BEHIND = "left_behind"
-    TEST = "test"
-    WORLDS = "worlds"
-
-
-@dataclass(frozen=True)
-class WorkerTally:
-    """
-    One process's final tally of worlds still in memory when its share of the suite
-    finished, written where every other process of the same run can read it back.
-    """
-
-    worker: str
-    """
-    Name of the process that wrote this tally: an xdist worker id (``"gw0"``, ...), or
-    ``"master"`` when the run was not split across xdist workers.
-    """
-
-    left_behind: Tuple[WorldsLeftBehind, ...]
-    """
-    The tests whose worlds this process still held, the test that left the most first.
-    """
-
-    @property
-    def worlds_in_memory(self) -> int:
-        """
-        How many worlds this process still held in total.
-        """
-        return sum(entry.worlds for entry in self.left_behind)
-
-    def to_json(self) -> dict:
-        """
-        :return: This tally as a JSON-compatible mapping.
-        """
-        return {
-            WorkerTallyJSONKey.WORKER: self.worker,
-            WorkerTallyJSONKey.LEFT_BEHIND: [
-                {
-                    WorkerTallyJSONKey.TEST: entry.test,
-                    WorkerTallyJSONKey.WORLDS: entry.worlds,
-                }
-                for entry in self.left_behind
-            ],
-        }
-
-    @classmethod
-    def from_json(cls, data: dict) -> WorkerTally:
-        """
-        :param data: A mapping as written by :meth:`to_json`.
-        :return: The tally it describes.
-        """
-        return cls(
-            worker=data[WorkerTallyJSONKey.WORKER],
-            left_behind=tuple(
-                WorldsLeftBehind(
-                    test=entry[WorkerTallyJSONKey.TEST],
-                    worlds=entry[WorkerTallyJSONKey.WORLDS],
-                )
-                for entry in data[WorkerTallyJSONKey.LEFT_BEHIND]
-            ),
-        )
-
-
-@dataclass
-class LeakedWorldsAcrossWorkersError(DataclassException, MemoryError):
-    """
-    Raised when the worlds still in memory across every process of a run add up to
-    more than the run's combined budget, even where no single process went over its
-    own share.
-    """
-
-    worlds_in_memory: int
-    """
-    How many worlds were still in memory, summed across every process.
-    """
-
-    limit: int
-    """
-    How many the run's combined budget allows.
-    """
-
-    tallies: Tuple[WorkerTally, ...]
-    """
-    Each process's own tally.
-    """
-
-    def error_message(self) -> str:
-        ranked = sorted(
-            self.tallies, key=lambda tally: tally.worlds_in_memory, reverse=True
-        )
-        return "\n".join(
-            [
-                f"{self.worlds_in_memory} worlds are still in memory across every "
-                f"process when the run finished, more than the {self.limit} its "
-                "combined budget allows.",
-                "The processes that held them:",
-                *(f"  {tally.worker}: {tally.worlds_in_memory}" for tally in ranked),
-            ]
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "No single process necessarily went over its own limit; look at which "
-            "processes held the most above, then that process's own LeakedWorldsError "
-            "reports for the tests responsible."
-        )
-
-
-@dataclass
-class WorldTallyLedger:
-    """
-    Where every process of a run writes its final :class:`WorkerTally`, so whichever
-    process finishes last can read every other process's tally back and enforce a
-    limit on their combined total.
-    """
-
-    DIRECTORY_NAME: ClassVar[str] = ".living_worlds_tally"
-    """
-    Name of the directory each tally is written into and read back from, relative to
-    the run's root directory so every process - however xdist started it - resolves
-    the same path.
-    """
-
-    directory: Path
-    """
-    Directory each tally is written into and read back from, shared by every process
-    of one run rather than a per-process temporary directory.
-    """
-
-    def record(self, tally: WorkerTally) -> None:
-        """
-        Write a process's tally where the ledger's other readers will find it.
-
-        :param tally: The tally to record.
-        """
-        self.directory.mkdir(parents=True, exist_ok=True)
-        (self.directory / f"{tally.worker}.json").write_text(
-            json.dumps(tally.to_json())
-        )
-
-    def read_all(self) -> Tuple[WorkerTally, ...]:
-        """
-        :return: Every tally recorded so far.
-        """
-        if not self.directory.is_dir():
-            return ()
-        return tuple(
-            WorkerTally.from_json(json.loads(tally_path.read_text()))
-            for tally_path in sorted(self.directory.glob("*.json"))
-        )
-
-    def clear(self) -> None:
-        """
-        Remove every tally a previous run left behind, so this run starts from none.
-        """
-        if not self.directory.is_dir():
-            return
-        for tally_path in self.directory.glob("*.json"):
-            tally_path.unlink()
-
-    def enforce_combined_limit(self, limit: int = MAXIMUM_LIVING_WORLDS) -> None:
-        """
-        Report the worlds every process recorded, combined, when they add up to more
-        than the run's combined budget.
-
-        :param limit: How many worlds every process's tally may add up to across the
-            whole run, whatever number of processes reported one.
-        :raises LeakedWorldsAcrossWorkersError: When the combined total exceeds it.
-        """
-        tallies = self.read_all()
-        worlds_in_memory = sum(tally.worlds_in_memory for tally in tallies)
-        if worlds_in_memory <= limit:
-            return
-        raise LeakedWorldsAcrossWorkersError(
-            worlds_in_memory=worlds_in_memory,
-            limit=limit,
-            tallies=tallies,
         )

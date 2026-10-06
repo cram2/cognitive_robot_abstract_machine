@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     NodeArtifacts,
@@ -104,7 +103,5 @@ class AlignPlanes(ConvergingTask):
             reference_velocity=self.reference_velocity,
             quadratic_weight=self.weight,
         )
-        artifacts.error = SymbolicErrorSignal(
-            root_V_tip_normal.angle_between(root_V_root_normal)
-        )
+        artifacts.error = root_V_tip_normal.angle_between(root_V_root_normal)
         return artifacts

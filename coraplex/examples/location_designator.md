@@ -1,4 +1,4 @@
-from test import world---
+---
 jupyter:
   jupytext:
     text_representation:
@@ -14,28 +14,23 @@ jupyter:
 
 # Location Designator
 
-This example will show you what location designators are, how to use them and what they are capable of.
+This example shows what location designators are, how to use them and what they are capable of.
 
-Location Designators are used to semantically describe locations in the world. You could, for example, create a location
-designator that describes every position where a robot can be placed without colliding with the environment. Location
-designator can describe locations for:
+A location designator describes a region of poses the robot can be sent to, for example every position from which the
+robot can reach a certain object. In CoraPlex location designators are the locations in {mod}`coraplex.locations`. A
+{class}`~coraplex.locations.base.Location` is iterable: iterating it yields candidate poses, and a plan tries them in
+turn until one works. CoraPlex provides locations for:
 
-* Visibility
-* Reachability
-* Occupancy
-* URDF Links (for example a table)
+* Reachability: {class}`~coraplex.locations.locations.ReachabilityLocation`
+* Visibility: {class}`~coraplex.locations.locations.VisibilityLocation`
 
-To find locations that fit the given constrains, location designator create Costmaps. Costmaps are a 2D distribution
-that have a value greater than 0 for every position that fits the costmap criteria.
+Both sample their candidates from costmaps (see {doc}`../costmap`): 2D grids around the target whose cells are rated
+above zero wherever the robot meets the criterion. Both also merge in an occupancy costmap, so every candidate is a
+position where the robot can stand without colliding with its surroundings. The costmaps are built from the world as it
+is when the candidates are sampled.
 
-Location designators work similar to other designators, meaning you have to create a location designator description
-which describes the location. This description can then be resolved to the actual 6D pose on runtime.
-
-## Occupancy
-
-We will start with a simple location designator that describes a location where the robot can be placed without
-colliding with the environment. To do this we need a BulletWorld since the costmaps are mostly created from the current
-state of the BulletWorld.
+We start with a world holding the PR2 in the apartment. The candidates are sampled at random, so the context is given a
+seed, which makes this example run the same way every time.
 
 ```python
 from coraplex.testing import setup_world
@@ -45,64 +40,43 @@ from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
-context = Context(world, pr2_view)
+context = Context(world, pr2_view, sampling_seed=0)
 
 origin_pose = pr2_view.root.global_pose
 ```
 
-Next up we will create the location designator description, the {meth}`~coraplex.designators.location_designator.CostmapLocation` that we will be using needs a
-target as a parameter. This target describes what the location designator is for, this could either be a pose or object
-that the robot should be able to see or reach.
-
-In this case we only want poses where the robot can be placed, this is the default behaviour of the location designator
-which we will be extending later.
-
-Since every designator in CoraPlex needs to be part of a plan we create a simple plan which contains our Location Designator.
-
-```python
-# from coraplex.designators.location_designator import CostmapLocation
-# from coraplex.language import SequentialPlan
-# from coraplex.robot_plans import NavigateActionDescription
-# 
-# location_description = CostmapLocation(world.root)
-# 
-# location_description = SequentialPlan((world, None), pr2_view, NavigateActionDescription(location_description))
-# 
-# pose = location_description.resolve()
-# 
-# print(pose)
-```
-
 ## Reachable
 
-Next we want to have locations from where the robot can reach a specific point, like an object the robot should pick up. This
-can also be done with the {meth}`~coraplex.designators.location_designator.CostmapLocation` description, but this time we need to provide an additional argument.
-The additional argument is the robot which should be able to reach the pose.
+A {class}`~coraplex.locations.locations.ReachabilityLocation` describes where the robot can stand to reach a target
+pose with one arm, for example an object the robot should pick up. It needs the target and the arm that is to reach it.
 
-Since a robot is needed we will use the PR2 and use a milk as a target point for the robot to reach. The torso of the
-PR2 will be set to 0.2 since otherwise the arms of the robot will be too low to reach on the countertop.
+We use the milk as the target. The torso of the PR2 is raised first, since otherwise its arms are too low to reach onto
+the countertop.
 
 ```python
 from coraplex.execution_environment import simulated_robot
-from coraplex.plans.factories import *
+from coraplex.plans.factories import execute_single, sequential
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
-from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.datastructures.definitions import TorsoState
 
 with simulated_robot:
-    sequential([ParkArmsAction(Arms.BOTH),
+    sequential([ParkArmsAction(pr2_view.all_arms),
                 MoveTorsoAction(TorsoState.HIGH)], context=context).perform()
 
 ```
 
 ```python
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
-from coraplex.execution_environment import simulated_robot
-from coraplex.locations.factories import reachability_location
+from coraplex.locations.locations import ReachabilityLocation
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
-location = reachability_location(world.get_body_by_name("milk.stl"), context=context, arm=Arms.LEFT)
+location = ReachabilityLocation(
+    Pose(reference_frame=world.get_body_by_name("milk.stl")),
+    pr2_view.left_arm,
+    context=context,
+)
 
-plan = execute_single(NavigateAction(next(iter(location))), context=context)
+plan = execute_single(NavigateAction(location.ground()), context=context)
 
 with simulated_robot:
     plan.perform()
@@ -110,25 +84,55 @@ with simulated_robot:
 pr2_view.root.parent_connection.origin = origin_pose.to_homogeneous_matrix()
 ```
 
-As you can see we get a pose near the countertop where the robot can be placed without colliding with it. Furthermore,
-we get a list of arms with which the robot can reach the given object.
+{meth}`~coraplex.locations.base.Location.ground` returns the first candidate. It is a pose near the countertop where
+the robot can stand without colliding with it, facing the milk, at about half the arm's length from it. Candidates
+farther from the target than the arm is long are left out, since the target cannot be reached from there.
+
+The target is given relative to the milk, so the location follows the milk wherever it is when the candidates are
+sampled.
+
+## Accessing
+
+How far the robot stands off the target is a fraction of the arm's length, given as a
+{class}`~coraplex.datastructures.enums.ReachFraction`. The default, `GRASPING`, suits an object that stays where it is.
+A container's handle is pulled towards the robot when it opens, so for a handle the robot stands further back, at
+`ACCESSING`.
+
+```python
+from coraplex.datastructures.enums import ReachFraction
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle
+
+with world.modify_world():
+    world.add_semantic_annotation_recursively(
+        drawer := Drawer(
+            root=world.get_body_by_name("cabinet10_drawer_middle"),
+            handle=Handle(root=world.get_body_by_name("handle_cab10_m")),
+        )
+    )
+
+location = ReachabilityLocation(
+    Pose(reference_frame=drawer.handle.root),
+    pr2_view.left_arm,
+    ReachFraction.ACCESSING,
+    context=context,
+)
+
+print(location.ground())
+```
 
 ## Visible
 
-The {meth}`~coraplex.designators.location_designator.CostmapLocation` can also find position from which the robot can see a given object or location. This is very
-similar to how reachable locations are described, meaning we provide a object designator or a pose and a robot
-designator but this time we use the ```visible_for``` parameter.
-
-For this example we need the milk as well as the PR2, so if you did not spawn them during the previous location
-designator you can spawn them with the following cell.
+A {class}`~coraplex.locations.locations.VisibilityLocation` describes where the robot can stand to see a target pose
+with its default camera. It only needs the target.
 
 ```python
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
-from coraplex.locations.factories import visibility_location
+from coraplex.locations.locations import VisibilityLocation
 
-location = visibility_location(world.get_body_by_name("milk.stl"), context=context)
+location = VisibilityLocation(
+    Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
+)
 
-plan = execute_single(NavigateAction(next(iter(location))), context=context)
+plan = execute_single(NavigateAction(location.ground()), context=context)
 
 with simulated_robot:
     plan.perform()
@@ -136,20 +140,66 @@ with simulated_robot:
 pr2_view.root.parent_connection.origin = origin_pose.to_homogeneous_matrix()
 ```
 
-## Location Designator as Generator
+## Iterating the Candidates
 
-Location designator descriptions implement an iter method, so they can be used as generators which generate valid poses
-for the location described in the description. This can be useful if the first pose does not work for some reason.
-
-We will see this at the example of a location designator for visibility. For this example we need the milk, if you
-already have a milk spawned in you world you can ignore the following cell.
+A location is a generator of candidates, which is useful when the first candidate does not work for some reason. A
+location samples at most `number_of_samples` candidates. It draws them with its own `seed`, or with the context's
+`sampling_seed` if it has none; a seed of `None` draws different candidates each time.
 
 ```python
+from semantic_digital_twin.spatial_types.spatial_types import Point3
 
-location = visibility_location(Pose(Point3.from_iterable([-1, 0, 1.2]), reference_frame=world.root), context=context)
+location = VisibilityLocation(
+    Pose(Point3.from_iterable([-1, 0, 1.2]), reference_frame=world.root),
+    context=context,
+    number_of_samples=5,
+)
 
-for i, pose in enumerate(location):
+for pose in location:
     print(pose)
-    if i > 3:
-        break
+```
+
+## Locations in a Plan
+
+A plan does not have to pick a candidate itself. Given as the domain of a variable, a location leaves the pose of an
+action open, and the plan tries the candidates in turn when it gets to that action, until the action succeeds with one
+of them.
+
+```python
+from krrood.entity_query_language.factories import a, variable
+
+navigate = a(NavigateAction)(
+    target_location=variable(
+        Pose,
+        domain=ReachabilityLocation(
+            Pose(reference_frame=world.get_body_by_name("milk.stl")),
+            pr2_view.left_arm,
+            context=context,
+        ),
+    )
+)
+
+with simulated_robot:
+    sequential([navigate], context=context).perform()
+
+pr2_view.root.parent_connection.origin = origin_pose.to_homogeneous_matrix()
+```
+
+## Tuning the Costmaps
+
+The costmaps a location samples from are square, `map_cells` cells along each side, each cell `map_resolution` meters
+wide. The defaults cover 4 m by 4 m around the target. A reachability location also takes `ring_standard_deviation`,
+how far, in cells, its candidates spread around the stand-off distance.
+
+```python
+location = ReachabilityLocation(
+    Pose(reference_frame=world.get_body_by_name("milk.stl")),
+    pr2_view.left_arm,
+    context=context,
+    map_resolution=0.04,
+    map_cells=100,
+    ring_standard_deviation=8,
+)
+
+print(location.ground())
 ```

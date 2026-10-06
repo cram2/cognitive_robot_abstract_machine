@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
     StretchStandaloneInterface,
@@ -71,7 +73,7 @@ def test_velocity_interface_sets_up_against_the_robot_description(init_rospy):
         robot_interface_config=StretchVelocityInterface(),
         server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
         qp_controller_config=QPControllerConfig(
-            target_frequency=25, prediction_horizon=30
+            target_frequency=25, braking_time=timedelta(seconds=1.15)
         ),
     )
 

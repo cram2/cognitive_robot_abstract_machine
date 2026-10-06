@@ -24,7 +24,7 @@ For bayesian networks, the next class diagram is relevant.
         :caption: Inheritance Diagram for baysian networks.
 ```
 
-For networkx based probabilistic circuits the next class diagram is relevant.
+For rustworkx based probabilistic circuits the next class diagram is relevant.
 
 ```{eval-rst}
     .. autoclasstree:: probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit probabilistic_model.probabilistic_circuit.rx.helper

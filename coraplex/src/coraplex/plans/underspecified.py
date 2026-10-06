@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from typing import Optional, Tuple, Type, TYPE_CHECKING, Iterator
 
-from coraplex.datastructures.enums import ExecutionType
+from coraplex.datastructures.enums import ActionTrialVisualization, ExecutionType
 from coraplex.execution_environment import ExecutionEnvironment
 from coraplex.language import SequentialNode
 from coraplex.plans.executables import (
@@ -15,11 +15,13 @@ from coraplex.plans.executables import (
 from coraplex.plans.failures import PlanFailure
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import ActionNode, ExecutionBoundaryNode
+from coraplex.visualization import RvizVisualization
 from krrood.entity_query_language.query.match import Match
 
 if TYPE_CHECKING:
     from coraplex.datastructures.dataclasses import Context
     from coraplex.robot_plans.actions.base import ActionDescription
+    from semantic_digital_twin.world import World
 
 
 # %% trying a grounded action out before it is executed for real
@@ -28,21 +30,18 @@ if TYPE_CHECKING:
 @dataclass
 class ActionTrial:
     """
-    Tries grounded actions against a disposable copy of the world, to check that a
-    candidate can succeed before it is attempted for real.
+    Tries grounded actions against a copy of the world, to check that a candidate can
+    succeed before it is attempted for real.
 
-    One copy serves every candidate: after an attempt the copy is rolled back to the
-    model version it was at and its state is restored, so the next candidate starts from
-    the same point without another copy having to be made. A fresh copy is taken
-    whenever `context.world` has itself moved on, so a trial always reflects the state
-    and model changes actually in it.
+    One copy serves every candidate: after each attempt its model is rolled back and its
+    state restored, and when `context.world` has changed since, the copy replays those
+    model and state changes instead of being taken anew. Collision rules changed after
+    the copy was taken are not carried over.
 
-    The copy is never connected to a synchronizer, so nothing a trial does is published,
-    and a trial always runs under a forced
-    :attr:`~coraplex.datastructures.enums.ExecutionType.SIMULATED` execution regardless
-    of the execution type the real attempt will use. Conditions are always evaluated
-    too: whether a candidate is worth attempting for real is exactly what its pre- and
-    postconditions decide, so a plan that skips them elsewhere does not skip them here.
+    Trials never publish to a synchronizer, always run as
+    :attr:`~coraplex.datastructures.enums.ExecutionType.SIMULATED`, and always evaluate
+    pre- and postconditions. While the context is debugging, the copy is shown in RViz
+    under its own frame prefix and marker topic.
     """
 
     context: Context
@@ -64,18 +63,36 @@ class ActionTrial:
         default=None, init=False, repr=False
     )
     """
-    The model and state versions `context.world` had when the copy was taken, used to
-    notice that it has moved on and the copy has to be replaced.
+    The model and state versions `context.world` had when the copy last matched it, used
+    to notice that it has moved on and the copy has to be caught up.
+    """
+
+    _replayed_modification_blocks: int = field(default=0, init=False, repr=False)
+    """
+    How many of the modification blocks of `context.world` the copy already holds.
+    """
+
+    copy_marker_alpha: float = field(default=0.9, kw_only=True)
+    """
+    The opacity the copy is drawn with while debugging, so it can be told apart from the
+    world it copies where the two overlap.
+    """
+
+    _visualization: Optional[RvizVisualization] = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The RViz publishing of the current copy, while the context is debugging.
     """
 
     def succeeds(self, action: ActionDescription) -> bool:
         """
         Run `action` against the copy and restore the copy afterwards.
 
-        The action is copied onto the copy first: reading through a reference to the
-        world it was grounded in would be harmless, but an action that modifies the
-        model (attaching a grasped body, say) requires the entities it is given to
-        belong to the world being modified.
+        The action is copied onto the copy first (see :meth:`_on_the_copy`): reading
+        through a reference to the world it was grounded in would be harmless, but an
+        action that modifies the model (attaching a grasped body, say) requires the
+        entities it is given to belong to the world being modified.
 
         The version to roll back to is read here rather than when the copy is taken, so
         each attempt undoes only its own modifications. Reverting is itself recorded, so
@@ -87,20 +104,23 @@ class ActionTrial:
         rather than failing on a candidate that has no siblings.
 
         :param action: The grounded action to try out.
-        :return: True if `action` runs to completion without raising a `PlanFailure`.
+        :return: True if `action` runs to completion without failing.
         """
         context = self._copy()
         world = context.world
         plan = Plan(context=context)
         candidate_sequence = SequentialNode()
-        candidate = ActionNode(designator=world.rebind_world_entities(action))
+        candidate = ActionNode(designator=self._on_the_copy(action, world))
         plan.add_node(candidate_sequence)
         candidate_sequence.add_child(candidate)
         version = world.get_world_model_manager().version
 
-        with world.reset_state_context(), ExecutionEnvironment(
-            ExecutionType.SIMULATED,
-            collision_avoidance=GiskardExecutable.collision_avoidance,
+        with (
+            world.reset_state_context(),
+            ExecutionEnvironment(
+                ExecutionType.SIMULATED,
+                collision_avoidance=GiskardExecutable.collision_avoidance,
+            ),
         ):
             try:
                 candidate_sequence.perform()
@@ -108,36 +128,107 @@ class ActionTrial:
             except PlanFailure:
                 return False
             finally:
+                if plan.action_trial is not None:
+                    plan.action_trial.discard()
                 # Undo the model changes before leaving the reset context restores the
                 # state, which needs the degrees of freedom it was snapshotted with.
                 world.rollback_to_version(version)
 
+    @staticmethod
+    def _on_the_copy(action: ActionDescription, world: World) -> ActionDescription:
+        """
+        :param action: The grounded action to try out.
+        :param world: The copy to try it against.
+        :return: A new action with the parameters of `action`, referring to `world`.
+            Only the parameters are carried over: the plan node of `action` belongs to
+            the plan it was grounded in, not to the trial.
+        """
+        return replace(
+            action,
+            **{
+                parameter.name: world.rebind_world_entities(
+                    getattr(action, parameter.name)
+                )
+                for parameter in fields(action)
+                if parameter.init
+            },
+        )
+
     def _copy(self) -> Context:
         """
-        :return: The context pointing at the copy to try candidates against, taken again
-            if `context.world` has changed since the current one was made.
+        :return: The context pointing at the copy to try candidates against, caught up
+            with `context.world` if that has changed since the copy last matched it.
         """
         versions = (
             self.context.world.get_world_model_manager().version,
             self.context.world.state.version,
         )
-        if self._copied_context is None or self._source_versions != versions:
-            world = deepcopy(self.context.world)
-            self._copied_context = replace(
-                self.context,
-                world=world,
-                robot=world.get_semantic_annotation_by_id(self.context.robot.id),
-                evaluate_conditions=True,
-            )
-            self._source_versions = versions
+        if self._copied_context is None:
+            self._take_copy()
+        elif self._source_versions != versions:
+            self._catch_up()
+        self._source_versions = versions
         return self._copied_context
+
+    def _take_copy(self) -> None:
+        """
+        Copy `context.world` and, while the context is debugging, start publishing the
+        copy.
+        """
+        world = deepcopy(self.context.world)
+        self._replayed_modification_blocks = len(
+            self.context.world.get_world_model_manager().model_modification_blocks
+        )
+        self._copied_context = replace(
+            self.context,
+            world=world,
+            robot=world.get_semantic_annotation_by_id(self.context.robot.id),
+            evaluate_conditions=True,
+        )
+        if self.context.debug:
+            self._visualization = RvizVisualization(
+                world,
+                ros_node=self.context.ros_node,
+                collision_visualization=True,
+                frame_prefix=ActionTrialVisualization.FRAME_PREFIX,
+                marker_topic=ActionTrialVisualization.MARKER_TOPIC,
+                marker_alpha=self.copy_marker_alpha,
+            ).start()
+
+    def _catch_up(self) -> None:
+        """
+        Bring the copy up to date with `context.world`: replay the modifications made to
+        it since, the way copying it replays all of them, and take over its state.
+
+        The copy's own modifications are all rolled back by then, so it still matches
+        the world as it was when it last caught up.
+        """
+        modification_blocks = (
+            self.context.world.get_world_model_manager().model_modification_blocks
+        )
+        world = self._copied_context.world
+        with world.modify_world():
+            for block in modification_blocks[self._replayed_modification_blocks :]:
+                block.update_references_for_world_and_apply(world=world)
+            world.state.merge_state(self.context.world.state)
+        self._replayed_modification_blocks = len(modification_blocks)
 
     def discard(self) -> None:
         """
         Release the copy, so the next trial takes a fresh one.
         """
+        self._stop_visualization()
         self._copied_context = None
         self._source_versions = None
+
+    def _stop_visualization(self) -> None:
+        """
+        Stop publishing the current copy, if it is being published.
+        """
+        if self._visualization is None:
+            return
+        self._visualization.stop()
+        self._visualization = None
 
 
 # %% resolving an underspecified action to a candidate that works
@@ -151,7 +242,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
 
     This node is used to generate fully specified actions  or language expressions.
     The semantics are: try until it succeeds or fails if the underspecified action is exhausted.
-    If you want to limit the number of attempts, add a limit clause to the underspecified action.
+    It tries at most :attr:`candidate_limit` candidates.
     """
 
     underspecified_action: Match = field(kw_only=True)
@@ -188,32 +279,72 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
     those nodes are part of what this node runs rather than being skipped.
     """
 
-    _trial: Optional[ActionTrial] = field(default=None, init=False, repr=False)
+    _candidates_pulled: int = field(default=0, init=False, repr=False)
     """
-    The trial every candidate of this node is tried against.
+    How many candidates the current run through the underspecified statement has
+    produced.
+    """
 
-    Held across candidates so they share one copy of the world, rather than each paying
-    for its own.
+    _transformations_applied: bool = field(default=False, init=False, repr=False)
+    """
+    Whether the plan transformations matching this node have rewritten the plan around
+    it already, so that expanding the plan again does not apply them a second time.
     """
 
     @property
     def designator_type(self) -> Type:
         return self.underspecified_action._type_
 
+    @property
+    def candidate_limit(self) -> int:
+        """
+        :return: How many candidates this node tries: the underspecified statement's own
+            limit, or the context's if it has none.
+        """
+        return self.underspecified_action._limit_ or self.context.candidates_to_try
+
+    @property
+    def reached_candidate_limit(self) -> bool:
+        """
+        :return: Whether the last run through the underspecified statement stopped
+            because it produced :attr:`candidate_limit` candidates.
+        """
+        return self._candidates_pulled == self.candidate_limit
+
+    @property
+    def trial(self) -> ActionTrial:
+        """
+        The trial every candidate of this node is tried against.
+
+        It is the trial of this node's plan, shared with every other underspecified node
+        of the plan, so they all try their candidates in one copy of the world rather
+        than each paying for its own.
+        """
+        if self.plan.action_trial is None:
+            self.plan.action_trial = ActionTrial(context=self.context)
+        return self.plan.action_trial
+
     def _pull_next_action(self) -> Optional[ActionDescription]:
         """
         Pull the next grounded action from the iterator, without attaching it anywhere.
 
-        :return: The next grounded action, or None if the iterator is exhausted.
+        :return: The next grounded action, or None if the iterator is exhausted or has
+            produced :attr:`candidate_limit` candidates already.
         """
         if self._action_iterator is None:
             self._action_iterator = self.context.query_backend.evaluate(
                 self.underspecified_action
             )
+            self._candidates_pulled = 0
 
+        if self.reached_candidate_limit:
+            self.stop_grounding()
+            return None
         action = next(self._action_iterator, None)
         if action is None:
             self._action_iterator = None
+            return None
+        self._candidates_pulled += 1
         return action
 
     def _attach(self, action: ActionDescription) -> ActionNode:
@@ -243,20 +374,23 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
         deep-copied test world). Once a candidate is accepted and no retry will happen,
         closing the iterator here releases those resources immediately instead of
         retaining them for this node's whole lifetime. The trial's copy of the world is
-        released for the same reason.
+        kept, since the plan's other underspecified nodes try their candidates in it
+        too.
         """
         if self._action_iterator is not None:
             self._action_iterator.close()
             self._action_iterator = None
-        if self._trial is not None:
-            self._trial.discard()
 
     def notify(self):
         # Resolution is deferred to execution time: the underspecified statement can
         # only be grounded once the preceding actions have run and mutated the world
         # (e.g. the torso is raised, the object is in the gripper). The grounding
-        # happens in UnderspecifiedExecutable, so expansion does nothing here.
-        pass
+        # happens in UnderspecifiedExecutable, so expansion only lets the plan
+        # transformations matching this node rewrite the plan around it.
+        if self._transformations_applied:
+            return
+        self._transformations_applied = True
+        self.plan.apply_plan_transformations(self)
 
     def advance(self) -> bool:
         """
@@ -276,12 +410,9 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
         :return: True if a new candidate was generated, False if the iterator is
             exhausted without any candidate surviving its trial.
         """
-        if self._trial is None:
-            self._trial = ActionTrial(context=self.context)
-
         action = self._pull_next_action()
         while action is not None:
-            if self._trial.succeeds(action):
+            if self.trial.succeeds(action):
                 self._attach(action)
                 self.current_candidate_sequence.notify()
                 return True

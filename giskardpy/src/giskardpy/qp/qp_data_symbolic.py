@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp import qp_controller_config
-from giskardpy.qp.dof_limits import QuadraticProgramDegreeOfFreedomLimits
+from giskardpy.qp.dof_limits import DegreeOfFreedomDecisionVariables
 from giskardpy.qp.enforcement_strategy import (
     EnforcementStrategy,
     SystemDynamicsStrategy,
@@ -166,9 +166,10 @@ class QPDataSymbolic:
         Creates the variable accumulator seeded with the box bounds, weights, and names of the
         degree-of-freedom decision variables.
         """
-        direct_limits = QuadraticProgramDegreeOfFreedomLimits.create(
-            self.degrees_of_freedom, self.qp_controller_config
-        )
+        direct_limits = DegreeOfFreedomDecisionVariables(
+            degrees_of_freedom=self.degrees_of_freedom,
+            qp_controller_config=self.qp_controller_config,
+        ).direct_limits()
         return QPVariableAccumulator(
             quadratic_weights=[direct_limits.quadratic_weights],
             linear_weights=[direct_limits.linear_weights],

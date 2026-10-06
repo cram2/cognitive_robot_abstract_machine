@@ -6,10 +6,13 @@ which world a run acts on, whether it has to spawn its scene, and who owns the R
 context. None of it needs a controller.
 """
 
+import logging
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import pytest
 import rclpy
+from typing_extensions import Iterator
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import ExecutionType
@@ -19,6 +22,8 @@ from coraplex.plans.plan_node import PlanNode
 from coraplex.demonstrations import RobotDemonstration, RobotDemonstrationRosSession
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.world import World
+
+from ..conftest import SAMPLING_SEED
 
 
 class PlanDeliberatelyFailed(Exception):
@@ -68,6 +73,21 @@ class RecordingDemonstration(RobotDemonstration):
     Collision avoidance setting in force while the plan ran.
     """
 
+    built_context: Context | None = field(default=None)
+    """
+    The context this demonstration built for its plan.
+    """
+
+    segmenting_events: bool = False
+    """
+    Whether the events of the run are being segmented right now.
+    """
+
+    observed_segmenting_events: bool | None = field(default=None)
+    """
+    Whether the events of the run were being segmented while the plan ran.
+    """
+
     def build_simulated_world(self) -> World:
         return self.world
 
@@ -78,10 +98,23 @@ class RecordingDemonstration(RobotDemonstration):
         self.populate_scene_calls += 1
 
     def build_context(self, world: World) -> Context:
-        return Context(world, world.get_semantic_annotations_by_type(MinimalRobot)[0])
+        self.built_context = Context(
+            world,
+            world.get_semantic_annotations_by_type(MinimalRobot)[0],
+            ros_node=self.ros_node,
+            sampling_seed=SAMPLING_SEED,
+            _debug=self.debug,
+        )
+        return self.built_context
 
     def build_plan(self, context: Context) -> PlanNode:
         return code(self.run_plan_body, context)
+
+    @contextmanager
+    def segment_events(self, world: World) -> Iterator[None]:
+        self.segmenting_events = True
+        yield
+        self.segmenting_events = False
 
     def run_plan_body(self) -> None:
         """
@@ -91,6 +124,7 @@ class RecordingDemonstration(RobotDemonstration):
             raise PlanDeliberatelyFailed()
         self.observed_execution_type = GiskardExecutable.execution_type
         self.observed_collision_avoidance = GiskardExecutable.collision_avoidance
+        self.observed_segmenting_events = self.segmenting_events
 
     def tear_down(self) -> None:
         self.tear_down_calls += 1
@@ -177,6 +211,67 @@ def test_run_returns_the_world_it_acted_on(cylinder_bot_world):
     )
 
     assert demonstration.run() is cylinder_bot_world
+
+
+# %% event segmentation
+
+
+def test_the_events_of_the_plan_are_segmented_while_it_runs(cylinder_bot_world):
+    demonstration = RecordingDemonstration(
+        world=cylinder_bot_world, used_robot=MinimalRobot
+    )
+
+    demonstration.run()
+
+    assert demonstration.observed_segmenting_events is True
+    assert demonstration.segmenting_events is False
+
+
+def test_the_events_of_the_plan_are_not_segmented_when_switched_off(
+    cylinder_bot_world,
+):
+    demonstration = RecordingDemonstration(
+        world=cylinder_bot_world, used_robot=MinimalRobot, event_segmentation=False
+    )
+
+    demonstration.run()
+
+    assert demonstration.observed_segmenting_events is False
+
+
+# %% debugging
+
+
+def test_a_demonstration_runs_without_debugging_by_default(cylinder_bot_world):
+    """
+    Debugging publishes every copy of the world a candidate is tried in, which a run
+    only pays for when someone is watching it.
+    """
+    coraplex_logger = logging.getLogger("coraplex")
+    previous_level = coraplex_logger.level
+    demonstration = RecordingDemonstration(
+        world=cylinder_bot_world, used_robot=MinimalRobot
+    )
+
+    try:
+        demonstration.run()
+        assert not demonstration.built_context.debug
+    finally:
+        coraplex_logger.setLevel(previous_level)
+
+
+def test_a_demonstration_debugs_its_plan_when_asked_to(cylinder_bot_world):
+    coraplex_logger = logging.getLogger("coraplex")
+    previous_level = coraplex_logger.level
+    demonstration = RecordingDemonstration(
+        world=cylinder_bot_world, used_robot=MinimalRobot, debug=True
+    )
+
+    try:
+        demonstration.run()
+        assert demonstration.built_context.debug
+    finally:
+        coraplex_logger.setLevel(previous_level)
 
 
 # %% tear down

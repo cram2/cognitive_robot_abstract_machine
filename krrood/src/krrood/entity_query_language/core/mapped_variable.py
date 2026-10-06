@@ -60,6 +60,7 @@ from krrood.entity_query_language.utils import (
     merge_args_and_kwargs,
     convert_args_and_kwargs_into_hashable_key,
 )
+from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.symbol_graph.helpers import (
     get_field_type_endpoint,
     get_method_return_type,
@@ -539,6 +540,10 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         Follow this chain from a value outside query evaluation, applying each mapping
         along the access path in turn.
 
+        A pattern met along the way, such as a :class:`~krrood.entity_query_language.query.match.Match`,
+        stands for the instance it describes: an attribute of it is the value the pattern
+        states for that attribute.
+
         .. warning::
             This is only for use cases where symbolic access is needed outside of EQL's
             query evaluation.
@@ -569,7 +574,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         """
         if not isinstance(step, SingleValueMapping):
             raise MultipleValuesAlongAccessPath(self, step)
-        for reached in step._apply_mapping_(instance):
+        for reached in step._apply_mapping_on_external_value_(instance):
             return reached
         raise NoValueAlongAccessPath(self, step, instance)
 
@@ -600,6 +605,13 @@ class SingleValueMapping(MappedVariable[T], ABC):
         instance does not have that attribute, and an index by a value reaches no value
         when nothing is stored under that key.
     """
+
+    def _apply_mapping_on_external_value_(self, value: Any) -> Iterable[T]:
+        """
+        :param value: A value outside query evaluation.
+        :return: The value this mapping reaches from it, or nothing when it reaches none.
+        """
+        return self._apply_mapping_(value)
 
 
 @dataclass(eq=False, repr=False)
@@ -639,6 +651,15 @@ class Attribute(SingleValueMapping[T]):
         return child._get_mapped_variable_(
             Attribute, _attribute_name_=self._attribute_name_
         )
+
+    def _apply_mapping_on_external_value_(self, value: Any) -> Iterable[T]:
+        """
+        :param value: A value outside query evaluation.
+        :return: The value of this attribute, which for a pattern is the value it states.
+        """
+        if isinstance(value, HasFactoryAndKwargs):
+            return value._stated_values_(self._attribute_name_)
+        return self._apply_mapping_(value)
 
     @property
     def _name_(self):

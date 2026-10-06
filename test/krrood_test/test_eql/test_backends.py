@@ -1,4 +1,3 @@
-from copy import deepcopy
 from datetime import datetime
 from types import EllipsisType
 
@@ -34,7 +33,6 @@ from krrood.entity_query_language.factories import (
     an,
     variable_from,
 )
-from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.entity_query_language.core.variable import Variable as KRROODVariable
 from krrood.parametrization.model_registries import DictRegistry

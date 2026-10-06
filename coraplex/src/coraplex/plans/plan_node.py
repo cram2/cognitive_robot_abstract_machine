@@ -11,6 +11,7 @@ from typing import Optional, Any, List, Type, TYPE_CHECKING, Iterable
 from typing_extensions import Union, Iterator
 
 from coraplex.datastructures.enums import NodeDetail
+from coraplex.exceptions import NodeNotInPlanTree
 from coraplex.plans.designator import Designator
 from coraplex.plans.failures import PlanFailure
 from giskardpy.motion_statechart.goals.templates import NodeListGoal
@@ -238,13 +239,17 @@ class PlanNode(PlanEntity):
         nodes.
 
         :return: The previous nodes as a list of nodes
+        :raises NodeNotInPlanTree: If this node cannot be reached from the plan's root.
         """
         previous_nodes = []
-        for search_node in self.plan.nodes:
+        to_visit = [self.plan.root]
+        while to_visit:
+            search_node = to_visit.pop()
             if search_node is self:
-                break
+                return previous_nodes
             previous_nodes.append(search_node)
-        return previous_nodes
+            to_visit.extend(reversed(search_node.children))
+        raise NodeNotInPlanTree(self)
 
     def get_previous_node_by_designator_type(
         self, *type_: Type[Designator]

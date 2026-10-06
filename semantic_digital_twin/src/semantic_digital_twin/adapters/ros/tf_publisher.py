@@ -1,6 +1,7 @@
 import logging
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from enum import StrEnum
 from time import sleep
 from typing import Optional
 from typing_extensions import Dict, Set
@@ -9,6 +10,7 @@ from uuid import UUID
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
 from rclpy.publisher import Publisher
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from tf2_msgs.msg import TFMessage
 from typing_extensions import Self
 
@@ -18,6 +20,7 @@ from krrood.symbolic_math.symbolic_math import (
     CompiledFunction,
 )
 from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
+from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
 from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
@@ -29,6 +32,17 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class TfTopic(StrEnum):
+    """
+    The topics tf is published on.
+    """
+
+    STATIC = "tf_static"
+    """
+    Transforms that never change, latched for late subscribers.
+    """
 
 
 @dataclass
@@ -45,6 +59,15 @@ class TfFrameNames:
     The name an entity is first published under is kept for as long as this publisher
     lives, so a frame never moves to another entity and an entity arriving later never
     renames the ones already on the tree.
+    """
+
+    prefix: str = field(default="", kw_only=True)
+    """
+    Put in front of every frame name, so a copy of a world can be published next to
+    the world it copies without the two trees claiming the same frames.
+
+    It is prepended as it is, so it carries its own separator: ``"copy/"`` names a
+    body ``copy/milk``, while ``"copy"`` would name it ``copymilk``.
     """
 
     _frame_name_per_entity: Dict[UUID, str] = field(init=False, default_factory=dict)
@@ -76,21 +99,16 @@ class TfFrameNames:
         :param entity: The entity about to be published.
         :return: the frame name a not yet published entity should get.
         """
-        frame_name = str(entity.name)
+        frame_name = f"{self.prefix}{entity.name}"
         if frame_name not in self._assigned_frame_names:
             return frame_name
         return f"{frame_name}_{entity.id.hex}"
 
 
 @dataclass(eq=False)
-class TfPublisherModelCallback(ModelChangeCallback):
+class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
     """
     Publishes the TF tree of the world.
-    """
-
-    node: Node = field(kw_only=True)
-    """
-    Ros2 node used to publish tf messages.
     """
 
     ignored_kinematic_structure_entities: set[KinematicStructureEntity] = field(
@@ -193,17 +211,12 @@ class TfPublisherModelCallback(ModelChangeCallback):
 
 
 @dataclass(eq=False)
-class TFPublisher(StateChangeCallback):
+class TFPublisher(StateChangeCallback, HasROS2Node):
     """
     On state change, publishes the TF tree of the world.
 
     Puts a frame in every kinematic structure entity that is not in the ignored_bodies
     set.
-    """
-
-    node: Node = field(kw_only=True)
-    """
-    Ros2 node used to publish tf messages.
     """
 
     ignored_kinematic_structure_entities: set[KinematicStructureEntity] = field(
@@ -235,6 +248,17 @@ class TFPublisher(StateChangeCallback):
     Only published every n-th state update.
     """
 
+    frame_names: TfFrameNames = field(default_factory=TfFrameNames, kw_only=True)
+    """
+    The tf frame name of every entity this publisher publishes.
+    """
+
+    root_link_pub: Optional[Publisher] = field(init=False, default=None)
+    """
+    Publisher of the static transform joining a prefixed tree to the unprefixed one,
+    kept for as long as this publisher lives so the transform stays latched.
+    """
+
     def __post_init__(self):
         super().__post_init__()
 
@@ -244,9 +268,30 @@ class TFPublisher(StateChangeCallback):
             node=self.node,
             _world=self._world,
             ignored_kinematic_structure_entities=self.ignored_kinematic_structure_entities,
+            frame_names=self.frame_names,
         )
         self.tf_model_callback.notify_model_change()
+        if self.frame_names.prefix:
+            self._publish_root_link()
         self.on_state_change()
+
+    def _publish_root_link(self):
+        """
+        Publish the prefixed root as coinciding with the unprefixed root, the frame the
+        world this one copies is published under, so both trees can be shown in one
+        fixed frame.
+        """
+        self.root_link_pub = self.node.create_publisher(
+            TFMessage,
+            TfTopic.STATIC,
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL),
+        )
+        root_link = TransformStamped()
+        root_link.header.stamp = self.node.get_clock().now().to_msg()
+        root_link.header.frame_id = str(self._world.root.name)
+        root_link.child_frame_id = self.frame_names.assign(self._world.root)
+        root_link.transform.rotation.w = 1.0
+        self.root_link_pub.publish(TFMessage(transforms=[root_link]))
 
     def stop(self):
         """
@@ -256,6 +301,8 @@ class TFPublisher(StateChangeCallback):
         callback would leave it publishing on a node that may already be gone.
         """
         self.tf_model_callback.stop()
+        if self.root_link_pub is not None:
+            self.node.destroy_publisher(self.root_link_pub)
         super().stop()
 
     @classmethod

@@ -12,7 +12,6 @@ from giskardpy.motion_statechart.data_types import (
     DefaultWeights,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     DebugExpression,
@@ -181,8 +180,8 @@ class WiggleInsert(ConvergingTask):
             ),
         )
 
-        control_dt = context.qp_controller_config.control_dt
-        self._control_frequency = 1 / control_dt
+        control_time_step = context.qp_controller_config.control_time_step
+        self._control_frequency = 1 / control_time_step.total_seconds()
 
         self._current_angle = 0.0
         self._angular_momentum = 0.0
@@ -242,9 +241,7 @@ class WiggleInsert(ConvergingTask):
             DebugExpression(f"{self.name}/root_P_hole_wiggled", root_P_hole_wiggled)
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            root_P_current.euclidean_distance(root_P_hole)
-        )
+        artifacts.error = root_P_current.euclidean_distance(root_P_hole)
         return artifacts
 
     def on_tick(

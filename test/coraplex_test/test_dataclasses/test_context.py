@@ -4,6 +4,8 @@ import pytest
 
 from coraplex.datastructures.dataclasses import Context
 
+from ...conftest import SAMPLING_SEED
+
 # %% debug validation
 
 
@@ -48,3 +50,27 @@ def test_default_context_logs_at_info(pr2_apartment_context):
         assert coraplex_logger.level == logging.INFO
     finally:
         coraplex_logger.setLevel(previous_level)
+
+
+# %% repeatable location samples
+
+WORLD_FIXTURES_WITH_A_CONTEXT = [
+    "pr2_apartment_context",
+    "simple_pr2_context",
+    "stretch_apartment_context",
+    "apartment_world_pr2_copy_with_context",
+]
+"""
+The shared fixtures that hand a test a plan context to run its actions in.
+"""
+
+
+@pytest.mark.parametrize("world_fixture", WORLD_FIXTURES_WITH_A_CONTEXT)
+def test_a_shared_fixture_fixes_the_samples_its_context_makes(world_fixture, request):
+    """
+    A location samples its candidates from a costmap rather than ranking it, so a test
+    handed an unseeded context would stand somewhere else every run.
+    """
+    _, _, context = request.getfixturevalue(world_fixture)
+
+    assert context.sampling_seed == SAMPLING_SEED

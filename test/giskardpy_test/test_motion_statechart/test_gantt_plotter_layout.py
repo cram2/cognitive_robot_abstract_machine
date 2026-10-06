@@ -169,7 +169,9 @@ def test_x_axis_units_control_cycles_vs_seconds(monkeypatch):
     assert ax_main_seconds.get_xlabel() == "Time [s]"
     # Upper xlim should equal total_cycles * dt
     total_cycles = msc.history.history[-1].control_cycle
-    expected_span = total_cycles * context.qp_controller_config.control_dt
+    expected_span = (
+        total_cycles * context.qp_controller_config.control_time_step
+    ).total_seconds()
     assert ax_main_seconds.get_xlim()[1] == pytest.approx(
         expected_span, rel=1e-6, abs=1e-6
     )

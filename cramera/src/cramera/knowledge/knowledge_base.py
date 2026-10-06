@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Any, ClassVar, Dict, List, Optional, Tuple
 
-from coraplex.datastructures.enums import Arms
+from cramera.robot_parts import ArmSide
 from semantic_digital_twin.spatial_types import Point3
 
 from cramera.knowledge.architecture_entities import Package, PythonClass, SubPackage
@@ -335,9 +335,9 @@ class EpisodeKnowledgeBase:
         region = cls._side_of_name(part) if part else None
         if region is None:
             region = cls._side_of_name(joint_name)
-        if region is Arms.LEFT:
+        if region is ArmSide.LEFT:
             return JointRegion.LEFT
-        if region is Arms.RIGHT:
+        if region is ArmSide.RIGHT:
             return JointRegion.RIGHT
         return JointRegion.BODY
 
@@ -399,7 +399,7 @@ class EpisodeKnowledgeBase:
         ]
 
     @staticmethod
-    def _side_of_name(name: str) -> Optional[Arms]:
+    def _side_of_name(name: str) -> Optional[ArmSide]:
         """
         Which arm a part/link name encodes, or None when it names neither.
 
@@ -407,7 +407,7 @@ class EpisodeKnowledgeBase:
         """
         lowered = name.lower()
         if "left" in lowered or lowered.startswith("l_"):
-            return Arms.LEFT
+            return ArmSide.LEFT
         if "right" in lowered or lowered.startswith("r_"):
-            return Arms.RIGHT
+            return ArmSide.RIGHT
         return None

@@ -45,6 +45,25 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 from .world_snapshot import WorldSnapshot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
+
+from ..conftest import SAMPLING_SEED
+
+# %% the arm a test runs with on any robot
+
+
+def left_or_only_arm(robot: AbstractRobot) -> Arm:
+    """
+    :return: The left arm of a robot that names one, otherwise its first arm.
+    """
+    return robot.get_left_arm_if_specified() or robot.all_arms[0]
+
+
+def right_or_only_arm(robot: AbstractRobot) -> Arm:
+    """
+    :return: The right arm of a robot that names one, otherwise its first arm.
+    """
+    return robot.get_right_arm_if_specified() or robot.all_arms[0]
 
 
 @pytest.fixture(scope="session")
@@ -67,7 +86,9 @@ def pr2_apartment_context(pr2_apartment_world):
     """
     snapshot = WorldSnapshot.capture(pr2_apartment_world)
     pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
-    yield pr2_apartment_world, pr2, Context(pr2_apartment_world, pr2)
+    yield pr2_apartment_world, pr2, Context(
+        pr2_apartment_world, pr2, sampling_seed=SAMPLING_SEED
+    )
     snapshot.restore()
 
 
@@ -91,7 +112,9 @@ def stretch_apartment_context(stretch_apartment_world):
     """
     snapshot = WorldSnapshot.capture(stretch_apartment_world)
     robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
-    yield stretch_apartment_world, robot, Context(stretch_apartment_world, robot)
+    yield stretch_apartment_world, robot, Context(
+        stretch_apartment_world, robot, sampling_seed=SAMPLING_SEED
+    )
     snapshot.restore()
 
 

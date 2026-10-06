@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from datetime import timedelta
+
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
@@ -21,7 +23,9 @@ def main():
             execution_mode=ExecutionMode.STANDALONE, debug_mode=True
         ),
         qp_controller_config=QPControllerConfig(
-            target_frequency=25, prediction_horizon=30
+            # reproduces the braking of the former prediction_horizon=30
+            target_frequency=25,
+            braking_time=timedelta(seconds=1.15),
         ),
     )
     giskard.live()

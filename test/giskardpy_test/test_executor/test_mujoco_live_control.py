@@ -47,7 +47,7 @@ def parked_tracy() -> Tracy:
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
     robot = RobotSpecification(Tracy).spawn(world)
-    for arm in robot.get_arms():
+    for arm in robot.all_arms:
         arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
     world.notify_state_change()
     return robot

@@ -12,9 +12,10 @@ from krrood.ormatic.data_access_objects.conversion_order import HoldingOrder
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.helper import to_dao, get_dao_class
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
-from krrood.ormatic.exceptions import ConversionOrderCycle
+from krrood.ormatic.exceptions import ConversionOrderCycle, QueryCannotBePersisted
 from krrood.ormatic.ormatic import ORMatic
 from krrood.entity_query_language.core.mapped_variable import Attribute
+from krrood.entity_query_language.factories import a
 from ..dataset.alternative_mappings_construction_order import (
     BuildFirst,
     BuildFirstAssociation,
@@ -396,7 +397,7 @@ def _reexecuted_under(
     being the same object.
 
     :param domain_class: The class as normally imported.
-    :param entry_point_module_name: ``"__main__"`` or ``"__mp_main__"``.
+    :param entry_point_module_name:``"__main__"`` or ``"__mp_main__"``.
     :param monkeypatch: Registers the synthetic module so it is torn down afterwards.
     :return: A distinct class object standing in for the entry-point reload.
     """
@@ -442,3 +443,22 @@ def test_dao_lookup_does_not_conflate_unrelated_same_named_classes():
     unrelated_class.__qualname__ = _SpawnWorkerDomainClass.__qualname__
 
     assert get_dao_class(unrelated_class) is None
+
+
+# %% queries cannot be stored
+
+
+def test_an_object_holding_a_query_cannot_be_stored():
+    """
+    A query describes the objects that would satisfy it rather than one of them, so
+    there is nothing to store until it is answered.
+    """
+    pose = KRROODPose(
+        position=a(KRROODPosition)(x=1.0, y=2.0, z=3.0),
+        orientation=KRROODOrientation(0.0, 0.0, 0.0, 1.0),
+    )
+
+    with pytest.raises(QueryCannotBePersisted) as failure:
+        to_dao(pose)
+
+    assert failure.value.query is pose.position

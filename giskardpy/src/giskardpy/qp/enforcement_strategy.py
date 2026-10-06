@@ -17,7 +17,6 @@ from giskardpy.qp.constraint import (
     GiskardConstraint,
     GiskardEqualityConstraint,
     GiskardInequalityConstraint,
-    LargeNumber,
 )
 from giskardpy.qp.dof_limits import DirectLimits
 from giskardpy.qp.exceptions import ConstraintTypeMismatchError
@@ -247,7 +246,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
         return sm.hstack(
             [jacobian for _ in range(self.qp_controller_config.control_horizon)]
@@ -262,19 +261,19 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             return sm.Matrix()
         return sm.Matrix.diag(
             [
-                self.qp_controller_config.model_predictive_control_time_step
+                self.qp_controller_config.control_time_step.total_seconds()
                 for _ in self.constraints
             ]
         )
 
     def create_slack_variables(self) -> DirectLimits:
         """
-        Creates one slack variable per constraint with normalized weights.
+        Creates one slack variable per constraint, bounded by the constraint's slack
+        limits, with normalized weights.
         """
-        number_of_slack_variables = len(self.constraints)
         return DirectLimits(
-            lower_bounds=Vector([-LargeNumber] * number_of_slack_variables),
-            upper_bounds=Vector([LargeNumber] * number_of_slack_variables),
+            lower_bounds=Vector([c.lower_slack_limit for c in self.constraints]),
+            upper_bounds=Vector([c.upper_slack_limit for c in self.constraints]),
             quadratic_weights=Vector(
                 [
                     normalize_slack_weight(
@@ -305,7 +304,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         """
         return (
             sm.Scalar(constraint.normalization_factor)
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_time_step.total_seconds()
             * self.qp_controller_config.control_horizon
         )
 
@@ -394,7 +393,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
         missing_variables = self.qp_controller_config.max_derivative - 1
         eye = sm.Matrix.eye(self.qp_controller_config.prediction_horizon)[
@@ -423,7 +422,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         )
         return (
             sm.Matrix.eye(num_slack_variables)
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
 
     def create_slack_variables(self) -> DirectLimits:
@@ -464,7 +463,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             for c in self.constraints:
                 bounds.append(
                     bounds_getter(c)
-                    * self.qp_controller_config.model_predictive_control_time_step
+                    * self.qp_controller_config.control_time_step.total_seconds()
                 )
         return Vector(bounds)
 
@@ -610,7 +609,7 @@ class SystemDynamicsStrategy(EnforcementStrategy):
         res[: self.number_of_free_variables] = (
             -self.velocity_variables
             - self.acceleration_variables
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
         res[self.number_of_free_variables : self.number_of_free_variables * 2] = (
             self.velocity_variables

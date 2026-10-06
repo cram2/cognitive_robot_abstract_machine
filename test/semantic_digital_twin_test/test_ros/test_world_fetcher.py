@@ -264,9 +264,9 @@ def test_pr2_semantic_annotation(rclpy_node, pr2_world_state_reset):
 
     fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
 
-    assert set(map(lambda x: x.id, fetched_pr2.get_end_effectors())) == set(
-        map(lambda x: x.id, pr2.get_end_effectors())
-    )
+    assert set(
+        map(lambda end_effector: end_effector.id, fetched_pr2.all_end_effectors)
+    ) == set(map(lambda end_effector: end_effector.id, pr2.all_end_effectors))
 
     assert [sa.name for sa in pr2_world_state_reset.semantic_annotations] == [
         sa.name for sa in pr2_world_copy.semantic_annotations

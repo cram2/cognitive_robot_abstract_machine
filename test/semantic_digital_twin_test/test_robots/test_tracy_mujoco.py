@@ -103,7 +103,7 @@ def test_every_arm_and_gripper_degree_of_freedom_is_driven_by_one_servo(
 
     servoed_degrees_of_freedom = {
         connection.raw_dof
-        for arm in mounted_tracy.get_arms()
+        for arm in mounted_tracy.all_arms
         for connection in arm.active_connections + arm.end_effector.active_connections
     }
     driven_degrees_of_freedom = [
@@ -148,7 +148,7 @@ def test_the_servoed_parts_carry_their_weight_and_the_links_pass_through_each_ot
     Pairs the description itself lists as adjacent, such as the table and the arm bases
     mounted on it, stay excluded.
     """
-    for arm in mounted_tracy.get_arms():
+    for arm in mounted_tracy.all_arms:
         for body in arm.bodies + arm.end_effector.bodies:
             assert body.get_simulator_property_of_type(GravityCompensation) == (
                 GravityCompensation(fraction=1.0)
@@ -179,7 +179,7 @@ def test_the_servos_hold_the_parked_arms_up(mounted_tracy):
     weight between one control cycle and the next.
     """
     world = mounted_tracy._world
-    for arm in mounted_tracy.get_arms():
+    for arm in mounted_tracy.all_arms:
         arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
     world.notify_state_change()
     tool_frame = mounted_tracy.left_arm.end_effector.tool_frame

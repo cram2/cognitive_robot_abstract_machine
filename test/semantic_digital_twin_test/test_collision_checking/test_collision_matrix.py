@@ -1274,12 +1274,50 @@ class TestCollisionRuleEquality:
 
         assert copied_rule == rule
 
-    def test_rules_with_different_distances_are_not_equal(self, cylinder_bot_world):
+    def test_a_subset_of_bodies_without_collision_stays_empty_through_json(
+        self, cylinder_bot_world
+    ):
+        """
+        A subset of bodies none of which can collide covers no bodies at all, which is
+        not the same as no subset, covering every body of the robot.
+        """
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        with cylinder_bot_world.modify_world():
+            without_collision = Body(name=PrefixedName("no_collision"))
+            cylinder_bot_world.add_connection(
+                FixedConnection(parent=robot.root, child=without_collision)
+            )
+        rule = AvoidExternalCollisions(robot=robot, body_subset={without_collision})
+        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
+
+        copied_rule = from_json(to_json(rule), **tracker.create_kwargs())
+
+        assert rule.body_subset == set()
+        assert copied_rule.body_subset == set()
+
+    @pytest.mark.parametrize(
+        "create_rule",
+        [
+            pytest.param(
+                lambda robot, buffer_zone_distance: AvoidSelfCollisions(
+                    robot=robot, buffer_zone_distance=buffer_zone_distance
+                ),
+                id="avoid_self",
+            ),
+            pytest.param(
+                lambda robot, buffer_zone_distance: AvoidExternalCollisions(
+                    robot=robot, buffer_zone_distance=buffer_zone_distance
+                ),
+                id="external",
+            ),
+        ],
+    )
+    def test_rules_with_different_distances_are_not_equal(
+        self, cylinder_bot_world, create_rule
+    ):
         robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
 
-        assert AvoidSelfCollisions(
-            robot=robot, buffer_zone_distance=0.3
-        ) != AvoidSelfCollisions(robot=robot, buffer_zone_distance=0.2)
+        assert create_rule(robot, 0.3) != create_rule(robot, 0.2)
 
 
 # %% a rule listed again after another rule

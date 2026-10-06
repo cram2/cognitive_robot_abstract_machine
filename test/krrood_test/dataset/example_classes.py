@@ -4,7 +4,7 @@ import importlib
 import uuid
 from abc import ABC
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum, auto
 from pathlib import Path
 from types import FunctionType, NoneType
@@ -851,6 +851,18 @@ class TypeVarFieldHolder(Symbol):
 @dataclass
 class PathAssociation:
     path: Path
+
+
+@dataclass
+class DurationAssociation:
+    """
+    Holds a duration, to test that the ORM stores a time span.
+    """
+
+    duration: timedelta
+    """
+    The stored time span.
+    """
 
 
 class SceneObjectType(Enum):

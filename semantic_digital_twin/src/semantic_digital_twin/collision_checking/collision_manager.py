@@ -9,6 +9,7 @@ from typing_extensions import List, TYPE_CHECKING
 from krrood.adapters.json_serializer import to_json, from_json
 from krrood.patterns.caching import memoize, clear_memoization_cache
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
+from krrood.patterns.field_metadata import JSONMetadata
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionMatrix,
     CollisionCheckingResult,
@@ -149,7 +150,9 @@ class CollisionManager(ModelChangeCallback):
     between two bodies.
     """
 
-    collision_consumers: list[CollisionConsumer] = field(default_factory=list)
+    collision_consumers: list[CollisionConsumer] = field(
+        default_factory=list, metadata=JSONMetadata(serialize=False).as_dict()
+    )
     """
     Objects that are notified about changes in the collision matrix.
     """

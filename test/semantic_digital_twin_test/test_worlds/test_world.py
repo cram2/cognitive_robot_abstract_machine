@@ -2,6 +2,7 @@ import gc
 import os
 import subprocess
 import sys
+import threading
 from copy import deepcopy
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
@@ -9,7 +10,7 @@ from uuid import UUID, uuid4
 import numpy as np
 import pytest
 from numpy.testing import assert_raises
-from typing_extensions import Tuple, Type
+from typing_extensions import Optional, Tuple, Type
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.callbacks.callback import (
@@ -1470,6 +1471,76 @@ def test_rebind_copies_mutable_leaf_values(world_setup):
 
     rebound.value = 2
     assert leaf.value == 1
+
+
+def test_rebind_a_cycle_keeps_its_shape(world_setup):
+    """
+    Objects that refer to each other are rebound once each, so the rebound objects refer
+    to each other the same way instead of being walked without end.
+    """
+
+    @dataclass(eq=False)
+    class Link:
+        body: Body
+        partner: Optional["Link"] = None
+
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    first = Link(body=l1)
+    first.partner = Link(body=l2, partner=first)
+
+    rebound = world_copy.rebind_world_entities(first)
+
+    assert rebound.partner.partner is rebound
+    assert rebound.partner.body is world_copy.get_body_by_name(l2.name)
+
+
+def test_rebind_keeps_an_object_reached_twice_one_object(world_setup):
+    @dataclass(eq=False)
+    class Mark:
+        body: Body
+
+    @dataclass(eq=False)
+    class TwoReferences:
+        first: Mark
+        second: Mark
+
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    mark = Mark(body=l1)
+
+    rebound = world_copy.rebind_world_entities(TwoReferences(first=mark, second=mark))
+
+    assert rebound.first is rebound.second
+    assert rebound.first is not mark
+
+
+def test_rebind_copies_a_type_that_says_how_it_is_copied_its_own_way(world_setup):
+    """
+    A type defining how it is deep-copied, for example to share a resource that cannot
+    be copied, is copied that way rather than having its fields walked.
+    """
+
+    @dataclass(eq=False)
+    class SharedResource:
+        lock: type(threading.Lock()) = field(default_factory=threading.Lock)
+
+        def __deepcopy__(self, memo):
+            return self
+
+    @dataclass(eq=False)
+    class UsesResource:
+        body: Body
+        resource: SharedResource
+
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    resource = SharedResource()
+
+    rebound = world_copy.rebind_world_entities(UsesResource(body=l1, resource=resource))
+
+    assert rebound.resource is resource
+    assert rebound.body is world_copy.get_body_by_name(l1.name)
 
 
 def test_world_entity_with_class_id():

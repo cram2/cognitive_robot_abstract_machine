@@ -4,6 +4,9 @@ from probabilistic_model.learning.jpt.variables import infer_variables_from_data
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
+
+# importing the layer module makes the conversion know the layer for uniform leaves
+import probabilistic_model.probabilistic_circuit.jax.uniform_layer
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RXProbabilisticCircuit,
 )
@@ -116,10 +119,10 @@ def eval_performance(
     for index in tqdm.trange(number_of_iterations, desc="Evaluating performance"):
 
         current_log_likelihood_jax, time_jax = timed_jax_method()
-        current_log_likelihood_rustworkx, times_rustworkx = timed_rustworkx_method()
+        current_log_likelihood_rustworkx, time_rustworkx = timed_rustworkx_method()
         if index >= warmup_iterations:
             times_jax.append(time_jax.total_seconds())
-            times_rustworkx.append(times_rustworkx.total_seconds())
+            times_rustworkx.append(time_rustworkx.total_seconds())
 
     return times_rustworkx, times_jax
 
@@ -146,5 +149,5 @@ times_rustworkx, times_jax = eval_performance(
 time_jax = np.mean(times_jax), np.std(times_jax)
 time_rustworkx = np.mean(times_rustworkx), np.std(times_rustworkx)
 print("Jax:", time_jax)
-print("Networkx:", time_rustworkx)
-print("Networkx/Jax ", time_rustworkx[0] / time_jax[0])
+print("Rustworkx:", time_rustworkx)
+print("Rustworkx/Jax ", time_rustworkx[0] / time_jax[0])
