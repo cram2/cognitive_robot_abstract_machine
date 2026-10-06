@@ -6,7 +6,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from typing_extensions import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Tuple
+from typing_extensions import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+)
 
 if TYPE_CHECKING:
     import numpy
@@ -620,13 +629,7 @@ class RoboCasaDatasetLoader:
         :return: The loaded world, with a SemanticAnnotation attached to the object's root body.
         """
         objects_directory = self.directory / "objects"
-        model_files = sorted(
-            model_file
-            for group in self.self_contained_object_groups
-            for model_file in (objects_directory / group).glob(
-                f"{category}/**/model.xml"
-            )
-        )
+        model_files = self._object_model_files(category)
         if not model_files:
             raise RoboCasaObjectAssetsNotFoundError(
                 category, self.self_contained_object_groups, objects_directory
@@ -643,6 +646,88 @@ class RoboCasaDatasetLoader:
         world = _parse_robosuite_mjcf(MJCFParser(str(model_files[instance_index])))
         self._apply_object_semantics(world, category)
         return world
+
+    def _object_model_files(self, category: RoboCasaObjectCategory) -> List[Path]:
+        """
+        The downloaded MJCF model files of one object category.
+
+        :param category: The object category to look up.
+        :return: The model files found, ordered by path; empty if the category was not
+            downloaded.
+        """
+        objects_directory = self.directory / "objects"
+        return sorted(
+            model_file
+            for group in self.self_contained_object_groups
+            for model_file in (objects_directory / group).glob(
+                f"{category}/**/model.xml"
+            )
+        )
+
+    def downloaded_instance_count(self, category: RoboCasaObjectCategory) -> int:
+        """
+        Count the asset instances of one object category that were downloaded.
+
+        :param category: The object category to count downloaded instances of.
+        :return: The number of instances found on disk, ``0`` if none were downloaded.
+        """
+        return len(self._object_model_files(category))
+
+    def load_object_annotation(
+        self, category: RoboCasaObjectCategory, instance_index: int = 0
+    ) -> SemanticAnnotation:
+        """
+        Load a single object and return the semantic annotation describing it.
+
+        :param category: The object category to load.
+        :param instance_index: Which of the category's downloaded asset instances to
+            load.
+        :return: The annotation attached to the loaded object's root body.
+        """
+        world = self.load_object(category, instance_index=instance_index)
+        annotation_class = self.object_annotator.category_to_annotation_class[category]
+        [annotation] = [
+            annotation
+            for annotation in world.semantic_annotations
+            if isinstance(annotation, annotation_class)
+        ]
+        return annotation
+
+    def load_all_object_annotations(
+        self, max_instances_per_category: int = 10
+    ) -> Dict[Type[SemanticAnnotation], List[SemanticAnnotation]]:
+        """
+        Load downloaded instances of every object category this loader can annotate.
+
+        A category with no downloaded instances contributes an empty list rather than
+        being left out, so the result always covers the full category set.
+
+        Loading one object leaves memory it does not release, traced as far as the
+        MuJoCo bindings loading its mesh, so at most
+        ``max_instances_per_category`` instances are loaded per category to keep the
+        whole load within a single process's memory budget. The default was measured:
+        loading every category's full downloaded catalog exhausted a 7.8GB container
+        before finishing, while capping at 10 completed at roughly 2.1GB peak.
+
+        :param max_instances_per_category: The most instances to load for any one
+            category, applied uniformly.
+        :return: Mapping from each annotation class to the instances loaded for it.
+        """
+        annotations_by_class: Dict[
+            Type[SemanticAnnotation], List[SemanticAnnotation]
+        ] = {}
+        for (
+            category,
+            annotation_class,
+        ) in self.object_annotator.category_to_annotation_class.items():
+            instance_count = min(
+                self.downloaded_instance_count(category), max_instances_per_category
+            )
+            annotations_by_class[annotation_class] = [
+                self.load_object_annotation(category, instance_index=instance_index)
+                for instance_index in range(instance_count)
+            ]
+        return annotations_by_class
 
     def _apply_kitchen_appliance_semantics(
         self, world: World, kitchen_appliances: Dict[str, Any]

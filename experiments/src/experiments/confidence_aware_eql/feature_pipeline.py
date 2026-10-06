@@ -1,20 +1,28 @@
 """Turn semantic objects into a feature dataframe for confidence-aware evaluation.
 
 The out-of-distribution check needs the features of an object as a row of a
-dataframe. This module bridges the semantic objects of a world to that
-dataframe: it converts each object to its data access object, hands the
-collection to the :class:`FeatureExtractor`, and keeps the mass and the object
-class as the features the confidence model is learned on.
+dataframe. This module bridges the semantic objects of a world to that dataframe:
+:class:`Feature` names one column each, and the geometric ones are measured by
+:class:`ObjectShapeAggregations`, which aggregates over the shapes an object's
+collision geometry is built from.
 """
 
 from __future__ import annotations
 
 import enum
+from dataclasses import dataclass, field
 
 import pandas as pd
-from krrood.ormatic.data_access_objects.dao import to_dao
-from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
-from typing_extensions import Any, List
+from krrood.parametrization.feature_extraction.aggregations import (
+    AggregationStatistic,
+    aggregation_statistic,
+)
+from semantic_digital_twin.world_description.geometry import Mesh, Shape
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
+from typing_extensions import Any, ClassVar, List
+
+# %% object classes
 
 
 class ObjectClass(enum.StrEnum):
@@ -22,11 +30,87 @@ class ObjectClass(enum.StrEnum):
 
     A :class:`~enum.StrEnum`, so a member equals and hashes like its string value.
     Enum members carry the class name as their value, so an instance's class is
-    looked up with ``ObjectClass(type(instance).__name__)``.
+    looked up with ``ObjectClass(type(instance).__name__)``. Covers every class
+    :class:`~semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaObjectResolver`
+    maps a robocasa object category to.
     """
 
+    APPLE = "Apple"
+    BANANA = "Banana"
+    ORANGE = "Orange"
+    TOMATO = "Tomato"
+    LETTUCE = "Lettuce"
+    CARROT = "Carrot"
+    POTATO = "Potato"
+    BOTTLE = "Bottle"
     CUP = "Cup"
+    MUG = "Mug"
+    BOWL = "Bowl"
+    PLATE = "Plate"
+    PAN = "Pan"
     POT = "Pot"
+    KETTLE = "Kettle"
+    BREAD = "Bread"
+
+
+# %% modelled object
+
+
+@dataclass
+class ObjectShape:
+    """The collision geometry of one object, as the shapes it is built from."""
+
+    shapes: List[Shape] = field(default_factory=list)
+    """The shapes making up the object's collision geometry."""
+
+    @classmethod
+    def from_annotation(cls, annotation: SemanticAnnotation) -> ObjectShape:
+        """Describe the object a semantic annotation is attached to.
+
+        :param annotation: The annotation whose root body's collision geometry is read.
+        :return: The shapes of that collision geometry.
+        """
+        return cls(list(annotation.root.collision))
+
+
+@dataclass
+class ObjectShapeAggregations(AggregationStatistic[ObjectShape]):
+    """Statistics describing the collision geometry of an :class:`ObjectShape`."""
+
+    aggregated_field: ClassVar[str] = f"{ObjectShape.__name__}.shapes"
+    """Path of the field these statistics aggregate over."""
+
+    @aggregation_statistic(aggregated_field)
+    def volume(self) -> float:
+        """The volume the object's collision geometry encloses.
+
+        A mesh that is not watertight encloses no well-defined volume and is left out
+        of the sum rather than raising, since a real object is commonly built from
+        several convex pieces and only some of them need to be watertight for the
+        total to stay meaningful.
+
+        :return: The total volume in cubic meters, ``0.0`` if no shape is watertight.
+        """
+        return sum(
+            shape.volume
+            for shape in self.instance.shapes
+            if isinstance(shape, Mesh) and shape.mesh.is_watertight
+        )
+
+    @aggregation_statistic(aggregated_field)
+    def aspect_ratio(self) -> float:
+        """How tall the object stands relative to how wide it spreads.
+
+        :return: The collision geometry's vertical extent divided by the greater of
+            its two horizontal extents.
+        """
+        minimum, maximum = ShapeCollection(self.instance.shapes).combined_mesh.bounds
+        horizontal_extent = maximum[:2] - minimum[:2]
+        vertical_extent = maximum[2] - minimum[2]
+        return float(vertical_extent / max(horizontal_extent))
+
+
+# %% features
 
 
 class Feature(enum.StrEnum):
@@ -36,39 +120,37 @@ class Feature(enum.StrEnum):
     code that indexes a column by its plain string name keeps working unchanged.
     """
 
-    MASS = "mass"
-    """The object's mass, in kilograms."""
-
     CLASS = "class"
     """The object's semantic-annotation class."""
 
+    VOLUME = "volume"
+    """The object's collision geometry's total watertight mesh volume, in cubic meters."""
+
+    ASPECT_RATIO = "aspect_ratio"
+    """The object's height over its widest horizontal extent."""
+
+
+# %% extraction
+
 
 def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
-    """Extract the mass and class of each object as a feature dataframe.
+    """Extract every :class:`Feature` from each object.
 
-    Each object is converted to its data access object so that the
-    :class:`FeatureExtractor` can read its mapped attributes, and its own
-    ``preprocess_dataframe`` is run on that extracted dataframe before any column
-    is selected, converting any boolean or enum-typed extracted attribute into a
-    JPT-compatible column. The mass is kept under a stable column name and the
-    object class is added as an :class:`ObjectClass` column, while the remaining
-    extracted attributes are dropped.
+    The geometric features are read from each object's own collision geometry, which
+    a data access object does not carry.
 
     :param objects: The semantic objects whose features are extracted.
-    :return: One row per object with a mass and a class column.
+    :return: One row per object, with a column per feature.
     """
-    data_access_objects = [to_dao(instance) for instance in objects]
-    extractor = FeatureExtractor.from_instances(data_access_objects)
-    extracted = extractor.create_dataframe(data_access_objects)
-    extracted = extractor.preprocess_dataframe(extracted)
-
-    mass_column = next(name for name in extracted.columns if name.endswith(".mass"))
-    dataframe = pd.DataFrame(
-        {
-            Feature.MASS: extracted[mass_column].to_numpy(),
-            Feature.CLASS: [
-                ObjectClass(type(instance).__name__) for instance in objects
-            ],
-        }
+    return pd.DataFrame(
+        [
+            {
+                Feature.CLASS: ObjectClass(type(instance).__name__),
+                **ObjectShapeAggregations(
+                    instance=ObjectShape.from_annotation(instance),
+                    field_name=ObjectShapeAggregations.aggregated_field,
+                ).apply_mapping(),
+            }
+            for instance in objects
+        ]
     )
-    return dataframe
