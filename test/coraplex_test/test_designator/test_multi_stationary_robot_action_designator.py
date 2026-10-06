@@ -197,7 +197,7 @@ def test_reach_action_multi(stationary_block_context):
     end_effector_position = end_effector_pose.to_position().to_np()
     end_effector_orientation = end_effector_pose.to_quaternion().to_np()
 
-    target_orientation = grasp_description.grasp_orientation()
+    target_orientation = grasp_description.grasp_orientation(Pose(reference_frame=box_body))
 
     assert end_effector_position[:3] == pytest.approx(position[:3], abs=0.01)
     compare_orientations(

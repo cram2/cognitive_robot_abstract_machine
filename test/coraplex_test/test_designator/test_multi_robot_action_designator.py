@@ -402,7 +402,7 @@ def test_reach_action_multi(multiple_robot_apartment_context):
     end_effector_position = end_effector_pose.to_position().to_np()
     end_effector_orientation = end_effector_pose.to_quaternion().to_np()
 
-    target_orientation = grasp_description.grasp_orientation()
+    target_orientation = grasp_description.grasp_orientation(Pose(reference_frame=milk_body))
 
     assert end_effector_position[:3] == pytest.approx([1, -2, 0.8], abs=0.01)
     compare_orientations(end_effector_orientation, target_orientation, decimal=2)
