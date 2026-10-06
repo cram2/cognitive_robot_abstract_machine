@@ -19,7 +19,9 @@ from giskardpy.motion_statechart.graph_node import Goal
 from krrood.entity_query_language.query.match import Match
 from krrood.patterns.field_metadata import JSONMetadata
 from giskardpy.motion_statechart.data_types import LifeCycleValues
+from coraplex.datastructures.enums import ExecutionType
 from coraplex.datastructures.execution_data import ExecutionData
+
 from coraplex.plans.executables import (
     Executable,
     GiskardExecutable,
@@ -741,9 +743,12 @@ class MotionNode(DesignatorNode, BuildsMotionStateChart):
         `executable`.
         """
         task = self.motion.motion_chart
-        parent_goal.add_node(task)
+        if GiskardExecutable.execution_type != ExecutionType.BRIDGE:
+            parent_goal.add_node(task)
         executable.motion_mappings[self] = task
         return task
+
+
 
     def parse(self) -> Executable:
         return self.create_giskard_executable([self])
