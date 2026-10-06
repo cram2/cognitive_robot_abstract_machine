@@ -38,6 +38,11 @@ class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
     Subclasses that override __post_init__ must call super().__post_init__() at the end.
     """
 
+    print_stack_trace: bool = field(default=True, kw_only=True)
+    """
+    Whether the stack trace of this exception should be printed when it is handled.
+    """
+
     def __post_init__(self):
         # BaseException.__new__ bypasses the usual ABC instantiation check, so enforce it here.
         if getattr(type(self), "__abstractmethods__", None):

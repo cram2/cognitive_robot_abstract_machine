@@ -9,7 +9,6 @@ from typing import Any, Dict, List
 import rclpy
 from json_msgs.action import JsonAction
 
-from giskardpy.data_types.exceptions import DontPrintStackTrace
 from giskardpy.executor import Executor, RealTimePacer
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
@@ -27,6 +26,7 @@ from giskardpy.middleware.ros2.post_goal_plotters import PostGoalPlotter
 from giskardpy.middleware.ros2.world_updates import IncomingWorldUpdates
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.adapters.json_serializer import to_json
+from krrood.exceptions import DataclassException
 from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.ros.messages import StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import PublicationProgress
@@ -171,8 +171,9 @@ class MotionServer:
             self.compile_goal(goal)
             self.control_loop.run()
         except Exception as exception:
-            if not isinstance(
-                exception, (DontPrintStackTrace, ExecutionCanceledException)
+            if not (
+                isinstance(exception, DataclassException)
+                and not exception.print_stack_trace
             ):
                 traceback.print_exc()
             error = exception
