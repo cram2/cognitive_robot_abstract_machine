@@ -67,7 +67,7 @@ class RotationBoundCap(BoundCap):
     The cap is applied to the rotation angle rather than to the vector part, so that the
     angle one plan may demand does not depend on how far away the goal is. The reachable
     change is read in units of the half angle, which the vector part changes by close to
-    the goal.
+    the goal, so close to the goal the cap equals that of a single row.
     """
 
     bounds: sm.Vector

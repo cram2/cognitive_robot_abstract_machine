@@ -358,7 +358,7 @@ def test_integral_strategy_caps_what_an_inequality_demands(prismatic_bot2):
     strategy = _integral_inequality_strategy(
         prismatic_bot2, bounds=[(1, np.inf), (-np.inf, -1)]
     )
-    reach = [float(strategy.reachable_change(c).to_np()) for c in strategy.constraints]
+    reach = [strategy.reachable_change(c).to_np().item() for c in strategy.constraints]
 
     lower_bounds = strategy.create_lower_bounds().to_np()
     upper_bounds = strategy.create_upper_bounds().to_np()

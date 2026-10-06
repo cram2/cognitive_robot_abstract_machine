@@ -1592,7 +1592,6 @@ class TestVelocityTasks:
                     yaw=np.pi / 2, reference_frame=tip
                 ),
                 weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
-                reference_velocity=1.0,
             )
 
         low_weight_limit = limit_cls(

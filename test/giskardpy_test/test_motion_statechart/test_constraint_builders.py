@@ -9,6 +9,18 @@ from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 
+ROTATION_REFERENCE_VELOCITY = 0.1
+"""
+Reference velocity of the rotation goals built in these tests, in rad/s.
+"""
+
+
+def controller_config() -> QPControllerConfig:
+    """
+    The controller configuration the bounds in these tests are evaluated with.
+    """
+    return QPControllerConfig(target_frequency=20, prediction_horizon=10)
+
 
 def capped_equality_bounds(
     collection: ConstraintCollection,
@@ -22,11 +34,9 @@ def capped_equality_bounds(
     strategy = IntegralStrategy(
         degrees_of_freedom=[],
         constraints=collection.equality_constraints,
-        qp_controller_config=QPControllerConfig(
-            target_frequency=20, prediction_horizon=10
-        ),
+        qp_controller_config=controller_config(),
     )
-    reach = float(strategy.reachable_change(strategy.constraints[0]).to_np())
+    reach = strategy.reachable_change(strategy.constraints[0]).to_np().item()
     return strategy.create_equality_bounds().to_np(), reach
 
 
@@ -85,11 +95,11 @@ def rotation_goal_bounds(angle: float) -> tuple[np.ndarray, np.ndarray, float]:
     GeometricConstraintBuilder(collection).add_rotation_goal_constraints(
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_axis_angle(Vector3.Z(), angle),
-        reference_velocity=0.1,
+        reference_velocity=ROTATION_REFERENCE_VELOCITY,
         quadratic_weight=1.0,
     )
     uncapped = np.array(
-        [float(c.bound.to_np()) for c in collection.equality_constraints]
+        [c.bound.to_np().item() for c in collection.equality_constraints]
     )
     capped, reach = capped_equality_bounds(collection)
     return uncapped, capped, reach
@@ -107,6 +117,22 @@ def test_rotation_goal_caps_the_angle_it_demands():
     remaining_half_angle = np.arcsin(np.linalg.norm(uncapped) - np.linalg.norm(capped))
 
     assert remaining_half_angle == pytest.approx(half_angle - reach)
+
+
+def test_rotation_goal_demands_as_much_rotation_as_its_reference_velocity_sustains():
+    """
+    One plan may change the half angle by the reference velocity sustained over the
+    control horizon, as much as a single row of the quaternion error was allowed to
+    change before the angle was capped.
+    """
+    _, _, reach = rotation_goal_bounds(np.pi / 2)
+    config = controller_config()
+
+    assert reach == pytest.approx(
+        ROTATION_REFERENCE_VELOCITY
+        * config.control_time_step.total_seconds()
+        * config.control_horizon
+    )
 
 
 def test_rotation_goal_within_reach_is_not_capped():

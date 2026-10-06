@@ -150,7 +150,8 @@ class GeometricConstraintBuilder:
         :param frame_R_goal: goal rotation as rotation matrix
         :param reference_velocity: value used for normalization rad/s. The constraints
             act on the vector part of the quaternion error, which changes by half the
-            angle, so they are normalized with half of it.
+            angle, so one plan may demand a rotation of up to twice the angle this
+            velocity sustains.
         """
         # avoid singularity
         # the sign determines in which direction the robot moves when in singularity.
@@ -169,7 +170,7 @@ class GeometricConstraintBuilder:
                 task_expression=q_error[i],
                 equality_bound=-q_error[i],
                 quadratic_weight=quadratic_weight,
-                reference_velocity=reference_velocity / 2,
+                reference_velocity=reference_velocity,
                 name=self._indexed_constraint_name(name, i),
                 bound_cap=error_cap,
             )
