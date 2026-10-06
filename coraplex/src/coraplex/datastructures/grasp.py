@@ -510,6 +510,16 @@ class GraspPose(Pose):
     Grasp description corresponding to the grasp pose.
     """
 
+    approach: str = ""
+    """
+    Classified approach direction for this grasp pose, as returned by the Simox planner.
+    """
+
+    quality: float = 0.0
+    """
+    Simox wrench-space grasp quality score (0.0–1.0). Higher is better.
+    """
+
     def __init__(
         self,
         position: Optional[Point3] = None,
@@ -517,17 +527,23 @@ class GraspPose(Pose):
         reference_frame: Optional[KinematicStructureEntity] = None,
         arm: Optional[Arms] = None,
         grasp_description: Optional[GraspDescription] = None,
+        approach: str = "",
+        quality: float = 0.0,
     ):
         super().__init__(position, orientation, reference_frame)
         self.arm = arm
         self.grasp_description = grasp_description
+        self.approach = approach
+        self.quality = quality
 
     @classmethod
     def from_pose(
         cls,
         pose: Pose,
         arm: Arms,
-        grasp_description: GraspDescription,
+        grasp_description: Optional[GraspDescription] = None,
+        approach: str = "",
+        quality: float = 0.0,
     ) -> GraspPose:
         return cls(
             position=pose.to_position(),
@@ -535,4 +551,7 @@ class GraspPose(Pose):
             reference_frame=pose.reference_frame,
             arm=arm,
             grasp_description=grasp_description,
+            approach=approach,
+            quality=quality,
         )
+
