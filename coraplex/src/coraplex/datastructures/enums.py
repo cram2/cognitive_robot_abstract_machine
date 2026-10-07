@@ -4,7 +4,7 @@ Module holding all enums of CoraPlex.
 
 from __future__ import annotations
 
-from enum import Enum, auto, StrEnum
+from enum import Enum, IntEnum, StrEnum, auto
 from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -491,3 +491,27 @@ class NodeDetail(StrEnum):
     """
     The class of that designator.
     """
+
+
+class Arms(IntEnum):
+    """
+    Enum for Arms.
+    """
+
+    LEFT = 0
+    RIGHT = 1
+    BOTH = 2
+
+
+class SimoxApproachDirection(StrEnum):
+    """
+    Standard approach directions classified from Simox grasp surface normals.
+    """
+
+    TOP = "top"
+    FRONT = "front"
+    BACK = "back"
+    LEFT = "left"
+    RIGHT = "right"
+    BOTTOM = "bottom"
+    SKIPPED = "skipped"
