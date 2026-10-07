@@ -542,7 +542,7 @@ class Connection6DoF(Connection):
             y=self.qy.variables.position,
             z=self.qz.variables.position,
             w=self.qw.variables.position,
-        ).to_rotation_matrix()
+        ).rotation_matrix
         self._kinematics = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=parent_P_child,
             rotation_matrix=parent_R_child,
@@ -651,13 +651,13 @@ class Connection6DoF(Connection):
             :class:`~semantic_digital_twin.exceptions.MissingReferenceFrameError`
             otherwise); does not need to already be expressed in the parent frame. Other
             spatial types (e.g. ``Pose``) must be converted with their own
-            ``to_homogeneous_matrix()`` before being assigned here.
+            ``homogeneous_matrix`` before being assigned here.
         """
         local_kinematics = self._calculate_local_kinematics(
             self._world.transform(transformation, self.parent)
         )
-        position = local_kinematics.to_position()
-        orientation = local_kinematics.to_rotation_matrix().to_quaternion()
+        position = local_kinematics.position
+        orientation = local_kinematics.rotation_matrix.quaternion
         with self._world._world_lock:
             self._world.state[self.x.id].position = position[0]
             self._world.state[self.y.id].position = position[1]
@@ -780,8 +780,8 @@ class WheeledDrive(ActiveConnection, HasUpdateState, ABC):
         :param transformation: The desired parent-to-child origin.
         """
         local_kinematics = self._calculate_local_kinematics(transformation)
-        position = local_kinematics.to_position()
-        roll, pitch, yaw = local_kinematics.to_rotation_matrix().to_rpy()
+        position = local_kinematics.position
+        roll, pitch, yaw = local_kinematics.rotation_matrix.rpy
         with self._world._world_lock:
             self._world.state[self.x.id].position = position.x
             self._world.state[self.y.id].position = position.y

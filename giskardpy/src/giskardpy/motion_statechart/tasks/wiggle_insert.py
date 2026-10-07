@@ -17,7 +17,12 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
     NodeArtifacts,
 )
-from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
+from semantic_digital_twin.spatial_types import (
+    AxisAngle,
+    Point3,
+    Vector3,
+    RotationMatrix,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -180,8 +185,8 @@ class WiggleInsert(ConvergingTask):
             ),
         )
 
-        control_dt = context.qp_controller_config.control_dt
-        self._control_frequency = 1 / control_dt
+        control_time_step = context.qp_controller_config.control_time_step
+        self._control_frequency = 1 / control_time_step.total_seconds()
 
         self._current_angle = 0.0
         self._angular_momentum = 0.0
@@ -193,7 +198,7 @@ class WiggleInsert(ConvergingTask):
 
         root_P_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
         root_P_hole = context.world.transform(
             target_frame=self.root_link, spatial_object=self.hole_point
         )
@@ -220,11 +225,11 @@ class WiggleInsert(ConvergingTask):
             target_frame=self.tip_link, spatial_object=hole_normal
         )
         tip_R_hole_normal = RotationMatrix.from_axis_angle(
-            angle=self._random_angle, axis=tip_V_hole_normal
+            AxisAngle(angle=self._random_angle, axis=tip_V_hole_normal)
         )
         root_R_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_rotation_matrix()
+        ).rotation_matrix
         root_R_goal = root_R_current.dot(tip_R_hole_normal)
 
         artifacts.geometry.add_rotation_goal_constraints(

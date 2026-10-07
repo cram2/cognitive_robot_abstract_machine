@@ -207,9 +207,9 @@ def test_tool_frame_goal_applies_the_end_effectors_own_orientation(
 
     goal = pr2_gripper.tool_frame_goal(grasp)
 
-    expected = grasp.to_rotation_matrix() @ pr2_gripper.tool_R_grasp.inverse()
+    expected = grasp.rotation_matrix @ pr2_gripper.tool_R_grasp.inverse()
     np.testing.assert_allclose(
-        goal.to_rotation_matrix().to_np(), expected.to_np(), atol=1e-9
+        goal.rotation_matrix.to_np(), expected.to_np(), atol=1e-9
     )
 
 
@@ -249,7 +249,7 @@ def test_the_held_grasp_is_turned_the_way_the_gripper_faces(pr2_gripper):
     """
     body = hold_body(pr2_gripper)
 
-    body_R_grasp = pr2_gripper.held_body_T_grasp.to_rotation_matrix()
+    body_R_grasp = pr2_gripper.held_body_T_grasp.rotation_matrix
 
     grasp_R_tool = pr2_gripper.tool_R_grasp.inverse()
     body_T_tool = pr2_gripper._world.transform(
@@ -257,7 +257,7 @@ def test_the_held_grasp_is_turned_the_way_the_gripper_faces(pr2_gripper):
     )
     np.testing.assert_allclose(
         (body_R_grasp @ grasp_R_tool).to_np(),
-        body_T_tool.to_rotation_matrix().to_np(),
+        body_T_tool.rotation_matrix.to_np(),
         atol=1e-9,
     )
 

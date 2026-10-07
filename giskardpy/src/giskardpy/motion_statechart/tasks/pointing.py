@@ -65,7 +65,7 @@ class Pointing(CartesianTask):
             self.root_T_goal_reference_frame @ goal_reference_frame_P_goal_point
         )
 
-        root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
+        root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip @ tip_V_pointing_axis
         root_V_pointing_axis.visualisation_frame = self.tip_link
@@ -140,7 +140,7 @@ class PointingCone(CartesianTask):
 
         root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point
 
-        root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
+        root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
         root_V_pointing_axis.visualisation_frame = self.tip_link

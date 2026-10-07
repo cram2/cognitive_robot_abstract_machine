@@ -78,8 +78,8 @@ def test_pick_up_keeps_its_grasp_even_when_it_cannot_be_reached(pr2_apartment_co
     )
     world.notify_state_change()
     out_of_reach = np.linalg.norm(
-        milk.root.global_pose.to_position().to_np()[:2]
-        - view.root.global_pose.to_position().to_np()[:2]
+        milk.root.global_pose.position.to_np()[:2]
+        - view.root.global_pose.position.to_np()[:2]
     )
     assert out_of_reach > float(arm.approximate_length())
     grasp = milk.grasp_candidates()[0]

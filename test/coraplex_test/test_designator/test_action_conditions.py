@@ -155,7 +155,7 @@ def _grasp_offset_from_the_tool_frame(
         where the left gripper's tool frame is now.
     """
     world_T_tool = view.left_arm.end_effector.tool_frame.global_transform
-    world_P_grasp = world_T_tool.to_position().to_np()[:3] + [offset, 0.0, 0.0]
+    world_P_grasp = world_T_tool.position.to_np()[:3] + [offset, 0.0, 0.0]
     return GraspCandidate(
         milk,
         world.transform(

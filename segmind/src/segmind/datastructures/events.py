@@ -218,14 +218,14 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     def __post_init__(self):
         self.bounding_box = VolumetricBoundingBox.from_mesh(
             self.tracked_object.collision.combined_mesh,
-            origin=self.tracked_object.global_pose.to_homogeneous_matrix(),
+            origin=self.tracked_object.global_pose.homogeneous_matrix,
         )
         self.world_T_tracked_object = self.tracked_object.global_pose
 
         if self.with_object is not None:
             self.with_object_bounding_box = VolumetricBoundingBox.from_mesh(
                 self.with_object.collision.combined_mesh,
-                origin=self.with_object.global_pose.to_homogeneous_matrix(),
+                origin=self.with_object.global_pose.homogeneous_matrix,
             )
             self.world_T_with_object = self.with_object.global_pose
 

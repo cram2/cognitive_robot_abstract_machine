@@ -184,10 +184,10 @@ def test_pouring_action_poses_tilt_and_mirror(tool_action_world):
     right_pre_pose, right_pour_pose = right_action._pour_poses()
 
     pre_rotation = Rotation.from_quat(
-        [float(value) for value in right_pre_pose.to_quaternion().to_np()]
+        [float(value) for value in right_pre_pose.quaternion.to_np()]
     )
     pour_rotation = Rotation.from_quat(
-        [float(value) for value in right_pour_pose.to_quaternion().to_np()]
+        [float(value) for value in right_pour_pose.quaternion.to_np()]
     )
     tilt_magnitude = (pre_rotation.inv() * pour_rotation).magnitude()
     assert tilt_magnitude == pytest.approx(right_action.tilt_angle, abs=1e-6)
@@ -326,7 +326,7 @@ def test_pouring_action_pour_point_lands_on_target_container_center(
     tool_frame = context.robot.right_arm.end_effector.tool_frame
     tool_frame_T_source = world.compute_forward_kinematics_np(tool_frame, held_source)
     mouth_in_tool_frame = tool_frame_T_source @ np.array([0.0, 0.0, 0.1, 1.0])
-    mouth_in_world = pour_pose.to_homogeneous_matrix().to_np() @ mouth_in_tool_frame
+    mouth_in_world = pour_pose.homogeneous_matrix.to_np() @ mouth_in_tool_frame
 
     assert mouth_in_world[0] == pytest.approx(float(container.global_pose.x), abs=1e-6)
     assert mouth_in_world[1] == pytest.approx(float(container.global_pose.y), abs=1e-6)

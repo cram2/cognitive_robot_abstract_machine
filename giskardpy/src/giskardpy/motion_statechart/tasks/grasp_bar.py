@@ -105,7 +105,7 @@ class GraspBar(ConvergingTask):
             quadratic_weight=self.weight,
         )
 
-        root_P_tip = root_T_tip.to_position()
+        root_P_tip = root_T_tip.position
 
         root_P_line_start = root_P_bar_center + root_V_bar_axis * self.bar_length / 2
         root_P_line_end = root_P_bar_center - root_V_bar_axis * self.bar_length / 2

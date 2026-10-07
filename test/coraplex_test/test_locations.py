@@ -194,9 +194,7 @@ def _horizontal_distance(pose: Pose, target: Pose) -> float:
     :return: How far `pose` stands from `target` along the floor.
     """
     return float(
-        np.linalg.norm(
-            pose.to_position().to_np()[:2] - target.to_position().to_np()[:2]
-        )
+        np.linalg.norm(pose.position.to_np()[:2] - target.position.to_np()[:2])
     )
 
 
@@ -278,7 +276,7 @@ def test_a_reachability_location_offers_the_poses_in_reach_in_the_order_sampled(
     arm = context.robot.right_arm
     location = ReachabilityLocation(target, arm, context=context, seed=0)
     in_reach = [
-        pose.to_position().to_np()[:2]
+        pose.position.to_np()[:2]
         for pose in islice(
             location.costmap().sample(location.number_of_samples, location.seed),
             POSES_CHECKED,
@@ -287,7 +285,7 @@ def test_a_reachability_location_offers_the_poses_in_reach_in_the_order_sampled(
     ]
 
     offered = [
-        pose.to_position().to_np()[:2]
+        pose.position.to_np()[:2]
         for pose in islice(location.candidates(), len(in_reach))
     ]
 
@@ -329,8 +327,8 @@ def test_a_reachability_location_is_sampled_around_its_target(single_robot_world
     location = ReachabilityLocation(target, context.robot.right_arm, context=context)
 
     np.testing.assert_allclose(
-        location.costmap().origin.to_position().to_np()[:2],
-        target.to_position().to_np()[:2],
+        location.costmap().origin.position.to_np()[:2],
+        target.position.to_np()[:2],
     )
 
 
@@ -430,8 +428,8 @@ def test_a_target_given_in_a_body_frame_follows_the_body(single_robot_world):
         )
 
     np.testing.assert_allclose(
-        location.costmap().origin.to_position().to_np()[:2],
-        box.global_pose.to_position().to_np()[:2],
+        location.costmap().origin.position.to_np()[:2],
+        box.global_pose.position.to_np()[:2],
     )
 
 
@@ -461,6 +459,6 @@ def test_a_visibility_location_offers_poses_facing_its_target(single_robot_world
     location = VisibilityLocation(target, context=context, seed=0)
 
     for pose in islice(location.candidates(), POSES_CHECKED):
-        heading = pose.to_rotation_matrix().to_np()[:2, 0]
-        offset = target.to_position().to_np()[:2] - pose.to_position().to_np()[:2]
+        heading = pose.rotation_matrix.to_np()[:2, 0]
+        offset = target.position.to_np()[:2] - pose.position.to_np()[:2]
         np.testing.assert_allclose(heading, offset / np.linalg.norm(offset), atol=1e-6)

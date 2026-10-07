@@ -212,7 +212,7 @@ def test_a_reachability_map_rates_only_the_side_the_robot_can_reach_from(
 
     assert np.sum(reach_map.map[:200, :]) < 5
     poses = list(reach_map.sample(reach_map.number_of_samples, context.sampling_seed))
-    from_the_far_side = sum(1 for pose in poses if pose.to_position().x < 3.0)
+    from_the_far_side = sum(1 for pose in poses if pose.position.x < 3.0)
     assert from_the_far_side < STRAY_CANDIDATE_SHARE * len(poses)
 
 
@@ -235,8 +235,8 @@ def test_position_generation(pr2_apartment_context):
     poses = list(gaussian_map.candidates())
     assert poses
     for pose in poses:
-        assert 0.8 <= pose.to_position().x <= 1.2
-        assert 0.8 <= pose.to_position().y <= 1.2
+        assert 0.8 <= pose.position.x <= 1.2
+        assert 0.8 <= pose.position.y <= 1.2
 
 
 def test_segment_map(pr2_apartment_context):
@@ -281,7 +281,7 @@ def test_sample_x_axis(pr2_apartment_context):
     poses = list(gaussian_map.candidates())
     assert poses
     for pose in poses:
-        assert -0.05 < pose.to_position().y < 0.05
+        assert -0.05 < pose.position.y < 0.05
 
 
 def test_sample_x_axis_offset(pr2_apartment_context):
@@ -302,8 +302,8 @@ def test_sample_x_axis_offset(pr2_apartment_context):
     poses = list(gaussian_map.candidates())
     assert poses
     for pose in poses:
-        assert -0.2 <= pose.to_position().y <= 0.2
-        assert 0.4 <= pose.to_position().x <= 0.8
+        assert -0.2 <= pose.position.y <= 0.2
+        assert 0.4 <= pose.position.x <= 0.8
 
 
 def test_sample_x_axis_offset_non_id(pr2_apartment_context):
@@ -324,8 +324,8 @@ def test_sample_x_axis_offset_non_id(pr2_apartment_context):
     poses = list(gaussian_map.candidates())
     assert poses
     for pose in poses:
-        assert 1.8 <= pose.to_position().y <= 2.2 + tolerance
-        assert 3.4 <= pose.to_position().x <= 3.8 + tolerance
+        assert 1.8 <= pose.position.y <= 2.2 + tolerance
+        assert 3.4 <= pose.position.x <= 3.8 + tolerance
 
 
 def test_sample_to_pose_gau(pr2_apartment_context):
@@ -357,8 +357,8 @@ def test_sample_to_pose_gau(pr2_apartment_context):
     poses = list(final_map.candidates())
     assert poses
     for pose in poses:
-        assert 1.8 <= pose.to_position().y <= 2.2 + tolerance
-        assert 3.4 <= pose.to_position().x <= 3.8 + tolerance
+        assert 1.8 <= pose.position.y <= 2.2 + tolerance
+        assert 3.4 <= pose.position.x <= 3.8 + tolerance
 
 
 def test_sample_y_axis(pr2_apartment_context):
@@ -377,7 +377,7 @@ def test_sample_y_axis(pr2_apartment_context):
     poses = list(gaussian_map.candidates())
     assert poses
     for pose in poses:
-        assert -0.05 < pose.to_position().x < 0.05
+        assert -0.05 < pose.position.x < 0.05
 
 
 def test_sample_rotated(pr2_apartment_context):
@@ -395,16 +395,16 @@ def test_sample_rotated(pr2_apartment_context):
     assert len(list(gaussian_map.candidates())) == 2
 
     for pose in gaussian_map.candidates():
-        assert -0.05 < pose.to_position().y < 0.05
-        assert 0.4 <= pose.to_position().x <= 0.45
+        assert -0.05 < pose.position.y < 0.05
+        assert 0.4 <= pose.position.x <= 0.45
 
     gaussian_map.origin = Pose.from_xyz_quaternion(0, 0, 0, 0, 0, 1, 1, world.root)
 
     assert len(list(gaussian_map.candidates())) == 2
 
     for pose in gaussian_map.candidates():
-        assert -0.05 < pose.to_position().y < 0.05
-        assert 0.4 <= pose.to_position().x <= 0.45
+        assert -0.05 < pose.position.y < 0.05
+        assert 0.4 <= pose.position.x <= 0.45
 
 
 def test_sample_to_pose(pr2_apartment_context):
@@ -424,9 +424,9 @@ def test_sample_to_pose(pr2_apartment_context):
 
     pose = list(gaussian_map.candidates())[0]
 
-    assert pose.to_position().x == 1.6
-    assert pose.to_position().y == 2.2
-    assert pose.to_position().z == 0
+    assert pose.position.x == 1.6
+    assert pose.position.y == 2.2
+    assert pose.position.z == 0
 
 
 def test_sample_highest_first(pr2_apartment_context):
@@ -449,12 +449,8 @@ def test_sample_highest_first(pr2_apartment_context):
 
     assert len(poses) == 3
 
-    assert (
-        poses[2].to_position().x < poses[1].to_position().x < poses[0].to_position().x
-    )
-    assert (
-        poses[2].to_position().y < poses[1].to_position().y < poses[0].to_position().y
-    )
+    assert poses[2].position.x < poses[1].position.x < poses[0].position.x
+    assert poses[2].position.y < poses[1].position.y < poses[0].position.y
 
 
 def test_segment_highest_first(pr2_apartment_context):
@@ -534,10 +530,10 @@ def _stand_off_distances(
     """
     :return: How far the first ``count`` candidates stand from the map's origin.
     """
-    origin = costmap.origin.to_position().to_np()[:3]
+    origin = costmap.origin.position.to_np()[:3]
     return np.array(
         [
-            float(np.linalg.norm(pose.to_position().to_np()[:3] - origin))
+            float(np.linalg.norm(pose.position.to_np()[:3] - origin))
             for pose in islice(
                 costmap.sample(costmap.number_of_samples, seed),
                 count,
@@ -640,8 +636,8 @@ def test_a_sampled_candidate_faces_the_maps_origin(pr2_apartment_context):
 
     assert len(sampled) == 5
     for candidate in sampled:
-        facing = RotationMatrix.from_quaternion(candidate.to_quaternion()) @ Vector3.X()
-        to_origin = ring.origin.to_position() - candidate.to_position()
+        facing = RotationMatrix.from_quaternion(candidate.quaternion) @ Vector3.X()
+        to_origin = ring.origin.position - candidate.position
         assert float(facing.angle_between(to_origin)) == pytest.approx(0, abs=1e-6)
 
 
@@ -658,7 +654,7 @@ def test_a_candidate_faces_the_maps_origin_from_every_side(pr2_apartment_context
         @ Vector3.X()
     )
 
-    to_origin = ring.origin.to_position() - position
+    to_origin = ring.origin.position - position
     assert float(facing.angle_between(to_origin)) == pytest.approx(0, abs=1e-6)
 
 
@@ -672,7 +668,7 @@ def test_a_candidate_at_the_maps_origin_still_has_an_orientation(
     world, _, _ = pr2_apartment_context
     ring = _ring_map(world)
 
-    orientation = ring._orientation_facing_origin(ring.origin.to_position())
+    orientation = ring._orientation_facing_origin(ring.origin.position)
 
     assert np.all(np.isfinite(orientation.to_np()))
 
@@ -738,7 +734,7 @@ def test_a_segment_is_sampled_from_as_much_as_it_is_rated(pr2_apartment_context)
 
     preferred_share = costmap.map[20:40, 20:40].sum() / costmap.map.sum()
     sampled_from_preferred = sum(
-        1 for pose in poses if pose.to_position().x < costmap.origin.to_position().x
+        1 for pose in poses if pose.position.x < costmap.origin.position.x
     )
     assert sampled_from_preferred == round(budget * float(preferred_share))
 

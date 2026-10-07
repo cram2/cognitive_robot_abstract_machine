@@ -410,7 +410,7 @@ class BodyConverter(KinematicStructureEntityConverter, ABC):
             inertia = inertial.inertia
             principal_moments, principal_axes = inertia.to_principal_moments_and_axes()
             diagonal_inertia = principal_moments.data
-            inertia_quat = principal_axes.to_rotation_matrix().to_quaternion().to_np()
+            inertia_quat = principal_axes.to_rotation_matrix().quaternion.to_np()
             inertia_quat[:] = (
                 inertia_quat[3],
                 inertia_quat[0],

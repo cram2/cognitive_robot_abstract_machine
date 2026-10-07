@@ -247,7 +247,7 @@ def test_camera_view_frame_x_axis_is_the_forward_axis(pr2_world_copy: World):
 
     root_T_view = camera.root_T_forward_view.to_np()
     root_V_forward = (
-        root_T_camera.to_rotation_matrix() @ camera.forward_facing_axis
+        root_T_camera.rotation_matrix @ camera.forward_facing_axis
     ).to_np()
 
     assert np.allclose(root_T_view[:3, 0], root_V_forward.flatten()[:3], atol=1e-9)
@@ -486,12 +486,8 @@ def test_is_body_in_gripper(pr2_world_copy):
     test_box.collision = ShapeCollection([box_collision])
 
     # Calculate position between fingers
-    finger1_pos = (
-        left_gripper.finger.tip.collision.center_of_mass_in_world().to_vector3()
-    )
-    finger2_pos = (
-        left_gripper.thumb.tip.collision.center_of_mass_in_world().to_vector3()
-    )
+    finger1_pos = left_gripper.finger.tip.collision.center_of_mass_in_world().vector3
+    finger2_pos = left_gripper.thumb.tip.collision.center_of_mass_in_world().vector3
     between_fingers = (finger1_pos + finger2_pos) / 2.0
 
     # Add box to world

@@ -57,7 +57,7 @@ class TestPose2DConstruction:
 class TestPose2DToPose:
     def test_to_pose_position(self):
         p2 = Pose2D(x=3.0, y=-1.5, yaw=0)
-        pose = p2.to_pose()
+        pose = p2.pose
         assert isinstance(pose, Pose)
         assert pose.x.to_np() == pytest.approx(3.0)
         assert pose.y.to_np() == pytest.approx(-1.5)
@@ -66,33 +66,33 @@ class TestPose2DToPose:
     def test_to_pose_yaw_only(self):
         yaw = math.pi / 4
         p2 = Pose2D(x=0, y=0, yaw=yaw)
-        pose = p2.to_pose()
-        _, _, actual_yaw = pose.to_rotation_matrix().to_rpy()
+        pose = p2.pose
+        _, _, actual_yaw = pose.rotation_matrix.rpy
         assert actual_yaw.to_np() == pytest.approx(yaw, abs=1e-6)
 
     def test_to_pose_roll_pitch_zero(self):
         p2 = Pose2D(x=1, y=2, yaw=1.0)
-        pose = p2.to_pose()
-        roll, pitch, _ = pose.to_rotation_matrix().to_rpy()
+        pose = p2.pose
+        roll, pitch, _ = pose.rotation_matrix.rpy
         assert roll.to_np() == pytest.approx(0.0, abs=1e-6)
         assert pitch.to_np() == pytest.approx(0.0, abs=1e-6)
 
     def test_to_pose_reference_frame_propagated(self):
         frame = Body(name=PrefixedName("map"))
         p2 = Pose2D(x=1, y=2, yaw=0, reference_frame=frame)
-        assert p2.to_pose().reference_frame is frame
+        assert p2.pose.reference_frame is frame
 
-    def test_to_position(self):
+    def test_position_of_its_pose(self):
         p2 = Pose2D(x=2.0, y=-3.0, yaw=0)
-        pt = p2.to_position()
+        pt = p2.pose.position
         assert isinstance(pt, Point3)
         assert pt.x.to_np() == pytest.approx(2.0)
         assert pt.y.to_np() == pytest.approx(-3.0)
         assert pt.z.to_np() == pytest.approx(0.0)
 
-    def test_to_quaternion(self):
+    def test_quaternion(self):
         p2 = Pose2D(x=0, y=0, yaw=0)
-        q = p2.to_quaternion()
+        q = p2.quaternion
         assert isinstance(q, Quaternion)
         # identity quaternion: x=0, y=0, z=0, w=1
         expected = np.array([0, 0, 0, 1], dtype=float)
@@ -100,7 +100,7 @@ class TestPose2DToPose:
 
     def test_to_rotation_matrix(self):
         p2 = Pose2D(x=0, y=0, yaw=0)
-        r = p2.to_rotation_matrix()
+        r = p2.rotation_matrix
         assert isinstance(r, RotationMatrix)
         assert np.allclose(r.to_np()[:3, :3], np.eye(3), atol=1e-6)
 
@@ -108,7 +108,7 @@ class TestPose2DToPose:
         from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
         p2 = Pose2D(x=1, y=2, yaw=0)
-        m = p2.to_homogeneous_matrix()
+        m = p2.homogeneous_matrix
         assert isinstance(m, HomogeneousTransformationMatrix)
         assert m[0, 3].to_np() == pytest.approx(1.0)
         assert m[1, 3].to_np() == pytest.approx(2.0)
@@ -158,7 +158,7 @@ class TestPose2DFromPositionAndYaw:
 class TestPose2DFromPose:
     def test_roundtrip(self):
         original = Pose2D(x=1.5, y=-2.5, yaw=0.7)
-        pose3d = original.to_pose()
+        pose3d = original.pose
         recovered = Pose2D.from_pose(pose3d)
         assert recovered.x.to_np() == pytest.approx(1.5, abs=1e-6)
         assert recovered.y.to_np() == pytest.approx(-2.5, abs=1e-6)

@@ -53,7 +53,7 @@ Example:
 
 Notes on the EQL translator:
 
-- Variable resolution uses :py:func:`krrood.ormatic.dao.get_dao_class` to map EQL variables to DAO classes.
+- Variable resolution uses :py:func:`krrood.ormatic.data_access_objects.helper.get_data_access_object_class` to map EQL variables to DAO classes.
 - Attribute comparisons on a single table are supported, including ``==``, ``!=``, ``>``, ``>=``, ``<``, ``<=``, ``in``, logical ``and``/``or``, and ``not``.
 - If a variable’s DAO class cannot be found, a specific EQL translation error is raised to help diagnose missing mappings.
 - EQL translation is not complete; feel free to extend it.

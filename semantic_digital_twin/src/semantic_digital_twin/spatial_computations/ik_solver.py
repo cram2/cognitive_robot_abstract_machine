@@ -17,6 +17,7 @@ from krrood.symbolic_math.symbolic_math import (
     VariableParameters,
 )
 from semantic_digital_twin.spatial_types import (
+    AxisAngle,
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Vector3,
@@ -551,9 +552,9 @@ class ConstraintBuilder:
         :param root_T_tip: Forward kinematics expression.
         :return: Expression describing the position, and the error vector.
         """
-        root_P_tip = root_T_tip.to_position()
+        root_P_tip = root_T_tip.position
         root_T_tip_goal = HomogeneousTransformationMatrix(self.target)
-        root_P_tip_goal = root_T_tip_goal.to_position()
+        root_P_tip_goal = root_T_tip_goal.position
 
         translation_cap = self.max_translation_velocity * self.dt
         position_error = root_P_tip_goal[:3] - root_P_tip[:3]
@@ -576,10 +577,10 @@ class ConstraintBuilder:
         """
         rotation_cap = self.max_rotation_velocity * self.dt
 
-        hack = RotationMatrix.from_axis_angle(Vector3.Z(), -0.0001)
-        root_R_tip = root_T_tip.to_rotation_matrix().dot(hack)
-        q_actual = HomogeneousTransformationMatrix(self.target).to_quaternion()
-        q_goal = root_R_tip.to_quaternion()
+        hack = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), -0.0001))
+        root_R_tip = root_T_tip.rotation_matrix.dot(hack)
+        q_actual = HomogeneousTransformationMatrix(self.target).quaternion
+        q_goal = root_R_tip.quaternion
         q_goal = sm.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
         q_error = q_actual.diff(q_goal)
 

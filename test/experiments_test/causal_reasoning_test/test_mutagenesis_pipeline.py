@@ -27,7 +27,6 @@ from experiments.causal_reasoning.mutagenesis.dataset import (
     is_mutagenesis_dataset_reachable,
     synthetic_mutagenesis_molecules,
 )
-from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     ExchangeablePartGrounder,
     RelationalProbabilisticCircuit,
@@ -47,7 +46,7 @@ def synthetic_molecules():
 @pytest.fixture
 def synthetic_rpc(synthetic_molecules) -> RelationalProbabilisticCircuit:
     model = RelationalProbabilisticCircuit(MutagenesisMolecule)
-    model.fit([to_dao(molecule) for molecule in synthetic_molecules])
+    model.fit(synthetic_molecules)
     return model
 
 
@@ -89,7 +88,7 @@ def mutagenesis_split(mutagenesis_molecules):
 def mutagenesis_rpc(mutagenesis_split) -> RelationalProbabilisticCircuit:
     train_molecules, _ = mutagenesis_split
     model = RelationalProbabilisticCircuit(MutagenesisMolecule)
-    model.fit([to_dao(molecule) for molecule in train_molecules])
+    model.fit(train_molecules)
     return model
 
 

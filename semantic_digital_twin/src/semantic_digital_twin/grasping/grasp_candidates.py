@@ -79,7 +79,7 @@ class GraspCandidate:
         :param reference_T_object: The pose the object is going to have.
         :return:``reference_T_grasp``, the grasp in the same frame that pose is in.
         """
-        return reference_T_object.to_homogeneous_matrix() @ self.grasp_pose
+        return reference_T_object.homogeneous_matrix @ self.grasp_pose
 
 
 @dataclass(eq=False)
@@ -108,7 +108,7 @@ class HasGraspCandidates(HasRootBody):
             GraspCandidate(
                 self,
                 Pose(
-                    orientation=RotationMatrix.from_rpy(yaw=yaw).to_quaternion(),
+                    orientation=RotationMatrix.from_rpy(yaw=yaw).quaternion,
                     reference_frame=self.root,
                 ),
             )

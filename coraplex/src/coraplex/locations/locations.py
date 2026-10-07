@@ -125,10 +125,10 @@ class ReachabilityLocation(CostmapLocation):
             leaving out those farther from the target along the floor than the arm is
             long, since the target cannot be reached from there.
         """
-        target = self._in_world(self.target_pose).to_position()
+        target = self._in_world(self.target_pose).position
         arm_length = float(self.arm.approximate_length())
         for candidate in super().candidates():
-            offset = candidate.to_position().to_np()[:2] - target.to_np()[:2]
+            offset = candidate.position.to_np()[:2] - target.to_np()[:2]
             if np.linalg.norm(offset) <= arm_length:
                 yield candidate
 

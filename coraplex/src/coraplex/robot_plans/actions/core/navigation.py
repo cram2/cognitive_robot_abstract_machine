@@ -220,7 +220,7 @@ class PathPlanningNavigateAction(ActionDescription):
                     reference_frame=waypoint.reference_frame,
                 ),
                 reference_frame=waypoint.reference_frame,
-            ).to_pose()
+            ).pose
             for waypoint, next_waypoint in zip(waypoints[1:], waypoints[2:])
         ]
         return poses + [self.target]

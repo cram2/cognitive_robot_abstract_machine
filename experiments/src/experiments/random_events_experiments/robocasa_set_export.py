@@ -213,7 +213,7 @@ class PlacementRegionAttacher:
         :return: The attached region's summary statistics.
         """
         region_data.attach_to(world)
-        world_position = region_data.world_T_sampler.to_position()
+        world_position = region_data.world_T_sampler.position
         return AttachedPlacementRegion(
             task=region_data.name.prefix,
             object_name=region_data.name.name,

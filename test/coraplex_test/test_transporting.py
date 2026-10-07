@@ -330,7 +330,7 @@ def _raised(grasp: GraspCandidate, height: float) -> GraspCandidate:
         grasp.graspable,
         Pose(
             position=Point3.from_iterable(root_P_grasp),
-            orientation=grasp.grasp_pose.to_quaternion(),
+            orientation=grasp.grasp_pose.quaternion,
             reference_frame=grasp.graspable.root,
         ),
     )
@@ -349,8 +349,8 @@ def _turned_around(grasp: GraspCandidate, nearer_by: float = 0.0) -> GraspCandid
         Pose(
             position=Point3.from_iterable(root_P_grasp),
             orientation=(
-                grasp_pose.to_rotation_matrix() @ RotationMatrix.from_rpy(yaw=np.pi)
-            ).to_quaternion(),
+                grasp_pose.rotation_matrix @ RotationMatrix.from_rpy(yaw=np.pi)
+            ).quaternion,
             reference_frame=grasp.graspable.root,
         ),
     )
@@ -658,8 +658,8 @@ def _assert_every_target_is_at(targets: List[Pose], body: Body, world: World) ->
     """
     for target in targets:
         np.testing.assert_allclose(
-            world.transform(target, world.root).to_position().to_np(),
-            body.global_pose.to_position().to_np(),
+            world.transform(target, world.root).position.to_np(),
+            body.global_pose.position.to_np(),
         )
 
 
@@ -846,7 +846,7 @@ def test_a_move_and_act_step_only_ever_stands_where_it_was_sent(
 
     for target in _navigation_targets(step):
         np.testing.assert_allclose(
-            target.to_position().to_np()[:2].ravel(), STANDING_POSITION
+            target.position.to_np()[:2].ravel(), STANDING_POSITION
         )
 
 
@@ -874,11 +874,11 @@ def test_facing_after_navigating_turns_where_the_robot_was_sent(pr2_apartment_co
         plan.perform()
 
     np.testing.assert_allclose(
-        robot.root.global_pose.to_position().to_np()[:2],
+        robot.root.global_pose.position.to_np()[:2],
         STANDING_POSITION,
         atol=0.03,
     )
-    _assert_base_faces(robot, target.to_position())
+    _assert_base_faces(robot, target.position)
 
 
 def test_facing_a_target_given_relative_to_a_body_turns_towards_that_body(
@@ -897,7 +897,7 @@ def test_facing_a_target_given_relative_to_a_body_turns_towards_that_body(
     with simulated_robot:
         plan.perform()
 
-    _assert_base_faces(robot, milk.global_pose.to_position())
+    _assert_base_faces(robot, milk.global_pose.position)
 
 
 def test_facing_and_looking_at_a_target_turns_the_base_and_the_camera_towards_it(
@@ -916,9 +916,9 @@ def test_facing_and_looking_at_a_target_turns_the_base_and_the_camera_towards_it
     with simulated_robot:
         plan.perform()
 
-    _assert_base_faces(robot, target.to_position())
+    _assert_base_faces(robot, target.position)
     camera = robot.get_default_camera()
-    camera_P_target = world.transform(target.to_position(), camera.root).to_np()[:3]
+    camera_P_target = world.transform(target.position, camera.root).to_np()[:3]
     camera_V_forward = camera.forward_facing_axis.to_np()[:3]
     np.testing.assert_allclose(
         camera_P_target / np.linalg.norm(camera_P_target),

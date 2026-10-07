@@ -21,7 +21,6 @@ from semantic_digital_twin.world_description.world_entity import Body
 logger = logging.getLogger(__name__)
 
 
-
 @dataclass
 class FrameData:
     """
@@ -32,10 +31,12 @@ class FrameData:
     """
     The time of the frame.
     """
+
     objects_data: Dict[str, float]
     """
     The objects data which contains the poses of the objects.
     """
+
     frame_idx: int
     """
     The frame index.
@@ -51,7 +52,9 @@ class DataPlayer(EpisodePlayer, ABC):
     Abstract class for players that play the episode from a data source.
     """
 
-    frame_callbacks: List[Callable[[float], None]] = field(default_factory=list, hash=False, compare=False)
+    frame_callbacks: List[Callable[[float], None]] = field(
+        default_factory=list, hash=False, compare=False
+    )
     """
     Callbacks that will be called every time a new frame is processed.
     """
@@ -85,12 +88,11 @@ class DataPlayer(EpisodePlayer, ABC):
         :return: the frame data generator.
         """
 
-
     def _run(self):
         """
-        Starts the episode player and processes the frames, while also setting the time between frames.
+        Starts the episode player and processes the frames, while also setting the time
+        between frames.
         """
-
         is_first_frame = True
         start_time: float = 0.0
         for frame_data in self.frame_data_generator:
@@ -133,8 +135,7 @@ class DataPlayer(EpisodePlayer, ABC):
             return
         for obj in self.world.bodies_with_collision:
             if obj in objects_poses:
-                obj.parent_connection.origin = objects_poses[obj].to_homogeneous_matrix()
-
+                obj.parent_connection.origin = objects_poses[obj].homogeneous_matrix
 
     @abstractmethod
     def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
@@ -145,6 +146,7 @@ class DataPlayer(EpisodePlayer, ABC):
         :return: The poses of the objects.
         """
         pass
+
 
 @dataclass(eq=False)
 class FilePlayer(DataPlayer, ABC):

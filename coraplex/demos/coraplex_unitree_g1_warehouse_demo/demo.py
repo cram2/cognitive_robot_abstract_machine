@@ -91,7 +91,7 @@ def build_world() -> World:
         robots=[
             RobotSpecification(
                 semantic_annotation_type=UnitreeG1,
-                world_T_odom=ROBOT_START_POSE.to_homogeneous_matrix(),
+                world_T_odom=ROBOT_START_POSE.homogeneous_matrix,
             )
         ],
         objects=[
@@ -99,7 +99,7 @@ def build_world() -> World:
                 "parcel",
                 PARCEL_SCALE,
                 color=Color(0.85, 0.45, 0.1),
-                parent_T_self=PICK_POSE.to_homogeneous_matrix(),
+                parent_T_self=PICK_POSE.homogeneous_matrix,
             )
         ],
     ).to_domain_object()
@@ -165,8 +165,8 @@ def build_plan(
             PlaceAction(
                 parcel,
                 Pose(
-                    destination.to_position(),
-                    destination.to_quaternion(),
+                    destination.position,
+                    destination.quaternion,
                     reference_frame=world.root,
                 ),
             ),
@@ -210,6 +210,6 @@ with simulated_robot:
     build_plan(world, robot, PICK_POSE, PLACE_POSE, turn=-1.57).perform()
 
 parcel_position = world.get_body_by_name("parcel").global_pose
-print(f"parcel delivered to {np.round(parcel_position.to_position(), 3)}")
-print(f"Expected parcel to be delivered to {np.round(PLACE_POSE.to_position(), 3)}")
+print(f"parcel delivered to {np.round(parcel_position.position, 3)}")
+print(f"Expected parcel to be delivered to {np.round(PLACE_POSE.position, 3)}")
 assert np.allclose(parcel_position, PLACE_POSE, atol=0.05)

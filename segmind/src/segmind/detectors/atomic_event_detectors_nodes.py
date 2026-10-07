@@ -175,7 +175,7 @@ class MotionDetector(AbstractDetector):
         :return: True if the object is moving, False otherwise.
         """
         return (
-            poses[0].to_position().euclidean_distance(poses[-1].to_position())
+            poses[0].position.euclidean_distance(poses[-1].position)
             > self.distance_threshold
         )
 
@@ -189,9 +189,7 @@ class MotionDetector(AbstractDetector):
         """
         return (
             float(
-                poses[0]
-                .to_rotation_matrix()
-                .rotational_distance(poses[-1].to_rotation_matrix())
+                poses[0].rotation_matrix.rotational_distance(poses[-1].rotation_matrix)
             )
             > self.rotation_threshold
         )

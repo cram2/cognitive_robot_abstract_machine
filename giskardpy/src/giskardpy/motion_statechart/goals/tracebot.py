@@ -47,7 +47,7 @@ class InsertCylinder(Goal):
         root_T_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root, self.tip
         )
-        root_P_tip = root_T_tip.to_position()
+        root_P_tip = root_T_tip.position
         tip_P_cylinder_bottom = Vector3.Z() * self.cylinder_height / 2
         root_P_cylinder_bottom = root_T_tip @ tip_P_cylinder_bottom
         root_P_tip = root_P_tip + root_P_cylinder_bottom

@@ -66,10 +66,10 @@ def grasp_from_above(graspable) -> GraspCandidate:
     return GraspCandidate(
         graspable,
         Pose(
-            position=Vector3(0, 0, BOX_SCALE.z / 2).to_point3(),
+            position=Vector3(0, 0, BOX_SCALE.z / 2).point3,
             orientation=RotationMatrix.from_vectors(
                 x=Vector3.NEGATIVE_Z(), y=Vector3.X()
-            ).to_quaternion(),
+            ).quaternion,
             reference_frame=graspable.root,
         ),
     )
@@ -152,7 +152,7 @@ def test_a_grasp_outside_the_body_is_approached_from_the_clearance_alone(
     in_front = GraspCandidate(
         graspable,
         Pose(
-            position=Vector3(-BOX_SCALE.x, 0, 0).to_point3(),
+            position=Vector3(-BOX_SCALE.x, 0, 0).point3,
             reference_frame=graspable.root,
         ),
     )
@@ -174,7 +174,7 @@ def test_a_diagonal_approach_leaves_the_body_through_its_nearest_face(
     diagonal = GraspCandidate(
         graspable,
         Pose(
-            orientation=RotationMatrix.from_rpy(yaw=np.pi / 4).to_quaternion(),
+            orientation=RotationMatrix.from_rpy(yaw=np.pi / 4).quaternion,
             reference_frame=graspable.root,
         ),
     )
@@ -220,10 +220,10 @@ def test_retreat_pose_rises_along_the_world_z_axis(boxed_pr2_world, grasp_on):
     )
 
     world_P_grasp = world.transform(
-        grasp.grasp_pose.to_homogeneous_matrix(), world.root
+        grasp.grasp_pose.homogeneous_matrix, world.root
     ).to_np()
     world_P_retreat = world.transform(
-        poses.retreat.to_homogeneous_matrix(), world.root
+        poses.retreat.homogeneous_matrix, world.root
     ).to_np()
     np.testing.assert_allclose(
         world_P_retreat[:3, 3] - world_P_grasp[:3, 3],
@@ -244,8 +244,8 @@ def test_retreat_pose_keeps_the_grasp_orientation(boxed_pr2_world):
     )
 
     np.testing.assert_allclose(
-        poses.retreat.to_rotation_matrix().to_np(),
-        poses.grasp.to_rotation_matrix().to_np(),
+        poses.retreat.rotation_matrix.to_np(),
+        poses.grasp.rotation_matrix.to_np(),
         atol=1e-9,
     )
 
@@ -277,7 +277,7 @@ def _assert_the_gripper_approaches_along_the_grasp(world, end_effector) -> None:
 
     poses = action.grasp_pose_sequence(grasp.grasp_pose, end_effector, grasp)
 
-    root_R_tool = poses.grasp.to_rotation_matrix().to_np()[:3, :3]
+    root_R_tool = poses.grasp.rotation_matrix.to_np()[:3, :3]
     np.testing.assert_allclose(
         root_R_tool @ end_effector.approach_axis.to_np()[:3], [1, 0, 0], atol=1e-9
     )

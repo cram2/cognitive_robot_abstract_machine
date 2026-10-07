@@ -8,7 +8,6 @@ import piqp
 from giskardpy.qp.exceptions import InfeasibleException
 from giskardpy.qp.qp_data import QPDataExplicit
 from giskardpy.qp.solvers.qp_solver import QPSolver
-from giskardpy.utils.math import fast_sparse_diagonal
 
 
 @dataclass
@@ -63,7 +62,7 @@ class QPSolverPIQP(QPSolver[QPDataExplicit]):
         self.solver.settings.infeasibility_threshold = self.infeasibility_threshold
 
     def solver_call_explicit_interface(self, qp_data: QPDataExplicit) -> np.ndarray:
-        weight_matrix = fast_sparse_diagonal(qp_data.quadratic_weights)
+        weight_matrix = qp_data.hessian
         if len(qp_data.inequality_upper_bounds) == 0:
             self.solver.setup(
                 P=weight_matrix,

@@ -119,7 +119,7 @@ class Costmap(Location):
             not np.allclose(self.origin.x, other.origin.x)
             or not np.allclose(self.origin.y, other.origin.y)
             or not np.allclose(
-                self.origin.to_rotation_matrix(), other.origin.to_rotation_matrix()
+                self.origin.rotation_matrix, other.origin.rotation_matrix
             )
         ):
             raise ValueError(
@@ -214,7 +214,7 @@ class Costmap(Location):
             )
             + np.pi
         )[0]
-        return RotationMatrix.from_rpy(0, 0, angle).to_quaternion()
+        return RotationMatrix.from_rpy(0, 0, angle).quaternion
 
     def _budget_per_segment(
         self, segments: List[np.ndarray], number_of_samples: int
@@ -294,7 +294,7 @@ class Costmap(Location):
                 # Compute world position independent of origin orientation:
                 # map indices increase with world axes; origin is at the center.
                 offset = (index - center) * self.resolution
-                position = self.origin.to_position() + Vector3(offset[0], offset[1], 0)
+                position = self.origin.position + Vector3(offset[0], offset[1], 0)
 
                 orientation: Quaternion = self._orientation_facing_origin(position)
                 yield Pose(
@@ -371,7 +371,7 @@ class OccupancyCostmap(Costmap):
 
         :return: A 2d numpy array of the occupied space
         """
-        origin_position = self.origin.to_position().to_list()
+        origin_position = self.origin.position.to_list()
         # Generate 2d grid with indices
         indices = np.concatenate(
             np.dstack(
@@ -541,7 +541,7 @@ class VisibilityCostmap(Costmap):
 
         ray_tracer = RayTracer(self.world)
 
-        origin_copy = deepcopy(self.origin).to_homogeneous_matrix()
+        origin_copy = deepcopy(self.origin).homogeneous_matrix
 
         for _ in range(4):
             origin_copy = origin_copy @ HomogeneousTransformationMatrix.from_xyz_rpy(

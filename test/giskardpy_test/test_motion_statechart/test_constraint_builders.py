@@ -1,4 +1,9 @@
-from semantic_digital_twin.spatial_types import Point3, RotationMatrix, Vector3
+from semantic_digital_twin.spatial_types import (
+    AxisAngle,
+    Point3,
+    RotationMatrix,
+    Vector3,
+)
 
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
@@ -24,7 +29,7 @@ def test_rotation_goal_writes_three_equality_constraints():
     builder = GeometricConstraintBuilder(collection)
     builder.add_rotation_goal_constraints(
         frame_R_current=RotationMatrix(),
-        frame_R_goal=RotationMatrix.from_axis_angle(Vector3.Z(), 0.5),
+        frame_R_goal=RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), 0.5)),
         reference_velocity=0.1,
         quadratic_weight=1.0,
         name="goal",

@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from krrood.entity_query_language.factories import a, cause, confounder, variable
-from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.product_algebra import SimpleEvent
@@ -207,7 +206,7 @@ class BranchingAtomCountCausalQuery:
                 method=JointProbabilityTree(),
             ),
         )
-        model.fit([to_dao(molecule) for molecule in training_molecules])
+        model.fit(training_molecules)
 
         query = self._build_query(atom_count, bond_count)
         registry = RelationalCircuitRegistry(relational_probabilistic_circuit=model)

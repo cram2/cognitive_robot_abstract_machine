@@ -59,7 +59,7 @@ class PrePushDoor(Goal):
         door_Pose_tip = context.world._forward_kinematic_manager.compose_expression(
             self.door_object, self.tip_link
         )
-        door_P_tip = door_Pose_tip.to_position()
+        door_P_tip = door_Pose_tip.position
         dist, door_P_nearest = sm.distance_point_to_plane(
             door_P_tip, door_V_v2, door_V_v1
         )
@@ -76,7 +76,7 @@ class PrePushDoor(Goal):
         push_door_task = Task(name="pre push door")
         self.add_task(push_door_task)
         push_door_task.add_point_goal_constraints(
-            frame_P_current=root_T_tip.to_position(),
+            frame_P_current=root_T_tip.position,
             frame_P_goal=Point3.from_iterable(root_P_nearest_in_rotated_door),
             reference_velocity=self.reference_linear_velocity,
             weight=self.weight,

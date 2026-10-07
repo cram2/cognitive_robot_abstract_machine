@@ -647,7 +647,7 @@ class TestFactories(unittest.TestCase):
         table_top = Point3(0.5, 0.3, 0.5, reference_frame=table.root)
         expected = world.transform(table_top, world.root).to_np()[:3]
         np.testing.assert_allclose(
-            surface.global_transform.to_position().to_np()[:3], expected, atol=1e-9
+            surface.global_transform.position.to_np()[:3], expected, atol=1e-9
         )
         surface_box = surface.area.as_bounding_box_collection_in_frame(
             world.root
@@ -773,10 +773,10 @@ class TestFactories(unittest.TestCase):
 
         surface_P_milk = world.transform(
             milk.root.global_transform, table.supporting_surface
-        ).to_position()
+        ).position
         surface_P_cereal = world.transform(
             cereal.root.global_transform, table.supporting_surface
-        ).to_position()
+        ).position
 
         assert not surface_event.contains(surface_P_milk[:2])
         assert not surface_event.contains(surface_P_cereal[:2])

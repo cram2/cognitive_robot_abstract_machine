@@ -69,10 +69,10 @@ def test_place_derives_the_grasp_from_the_live_tool_frame_transform(pr2_holding_
     )
 
     tool_T_milk = world.transform(milk.root.global_transform, end_effector.tool_frame)
-    placed_milk = tool_goal.to_homogeneous_matrix() @ tool_T_milk
+    placed_milk = tool_goal.homogeneous_matrix @ tool_T_milk
 
     np.testing.assert_allclose(
-        placed_milk.to_np(), target.to_homogeneous_matrix().to_np(), atol=1e-9
+        placed_milk.to_np(), target.homogeneous_matrix.to_np(), atol=1e-9
     )
 
 

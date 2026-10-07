@@ -834,7 +834,7 @@ class Bridge:
         if frame_body is None:
             return local
         frame_T_marker = HomogeneousTransformationMatrix.from_xyz_quaternion(*local)
-        world_T_marker = frame_body.global_pose.to_homogeneous_matrix() @ frame_T_marker
+        world_T_marker = frame_body.global_pose.homogeneous_matrix @ frame_T_marker
         return NumericPose.of_matrix(world_T_marker.to_np()).rounded()
 
     def _marker_frame_body(self, frame: str) -> Optional[Body]:

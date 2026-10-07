@@ -574,7 +574,7 @@ def test_transform_a_pose_2d(world_setup):
     assert relative_pose_2d.reference_frame == l1
     np.testing.assert_array_almost_equal(
         relative_pose_2d.to_np(),
-        Pose2D.from_pose(world.transform(pose_2d.to_pose(), l1)).to_np(),
+        Pose2D.from_pose(world.transform(pose_2d.pose, l1)).to_np(),
     )
 
 
@@ -1580,9 +1580,7 @@ def test_set_omni_after_copy(pr2_world_state_reset):
     pr2_copy.notify_state_change()
 
     np.testing.assert_array_almost_equal(
-        pr2_copy.get_body_by_name("base_footprint")
-        .global_transform.to_position()
-        .to_np(),
+        pr2_copy.get_body_by_name("base_footprint").global_transform.position.to_np(),
         np.array([10.0, 10.0, 0.0, 1.0]),
     )
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from sqlalchemy import select
 
-from krrood.ormatic.data_access_objects.helper import get_dao_class
+from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
@@ -154,7 +154,7 @@ class WorldFromDatabaseConfig(WorldConfig):
         pass
 
     def setup_world(self):
-        ormatic_world_class = get_dao_class(World)
+        ormatic_world_class = get_data_access_object_class(World)
         session = semantic_digital_twin_sessionmaker()()
         world_dao = session.scalar(
             select(ormatic_world_class).where(

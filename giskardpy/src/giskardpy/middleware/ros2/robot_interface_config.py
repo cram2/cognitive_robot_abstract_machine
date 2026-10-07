@@ -22,7 +22,6 @@ from giskardpy.middleware.ros2.command_publishing import (
 )
 from giskardpy.middleware.ros2.control_loop import ControlLoop
 from semantic_digital_twin.adapters.ros.input_synchronization import (
-    LatestJointStateSynchronizer,
     PendingJointStateSynchronizer,
     OdometrySynchronizer,
     TfFrameSynchronizer,
@@ -188,7 +187,7 @@ class RobotInterfaceConfig(ABC):
         if not self.server_config.is_closed_loop or group_name != self.robot.name:
             return
         self.control_loop.inputs.synchronizers.append(
-            LatestJointStateSynchronizer(
+            PendingJointStateSynchronizer(
                 world=self.world, node=rospy.get_node(), topic_name=topic_name
             )
         )

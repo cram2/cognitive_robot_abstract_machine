@@ -109,7 +109,7 @@ def test_detection_crosses_a_process_boundary(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         REPORTED_POSITION,
         atol=1e-9,
     )
@@ -147,7 +147,7 @@ def test_untyped_detection_crosses_a_process_boundary(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         REPORTED_POSITION,
         atol=1e-9,
     )

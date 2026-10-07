@@ -193,7 +193,7 @@ def test_forward_axis_points_along_the_heading(
 
     base_pose = mobile_base.pose_facing(heading)
 
-    world_V_forward = base_pose.to_rotation_matrix() @ mobile_base.forward_axis
+    world_V_forward = base_pose.rotation_matrix @ mobile_base.forward_axis
     np.testing.assert_allclose(
         world_V_forward.to_np()[:3].flatten(),
         [np.cos(heading_yaw), np.sin(heading_yaw), 0.0],
@@ -213,7 +213,7 @@ def test_the_position_is_the_headings_own(robot_type: Type[AbstractRobot]):
     base_pose = mobile_base.pose_facing(heading)
 
     np.testing.assert_allclose(
-        base_pose.to_position().to_np(), heading.to_position().to_np(), atol=1e-9
+        base_pose.position.to_np(), heading.position.to_np(), atol=1e-9
     )
     assert base_pose.reference_frame is heading.reference_frame
 
@@ -240,10 +240,10 @@ def test_the_heading_of_a_base_pose_is_the_heading_it_was_placed_at(
     base_pose = mobile_base.pose_facing(heading)
 
     read_back = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-        base_pose.to_position(),
-        base_pose.to_rotation_matrix() @ mobile_base.base_R_front,
+        base_pose.position,
+        base_pose.rotation_matrix @ mobile_base.base_R_front,
         reference_frame=base_pose.reference_frame,
-    ).to_pose()
+    ).pose
 
     np.testing.assert_allclose(read_back.to_np(), heading.to_np(), atol=1e-9)
 

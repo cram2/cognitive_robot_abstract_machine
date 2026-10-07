@@ -190,12 +190,10 @@ def test_reach_action_multi(stationary_block_context):
         plan.perform()
 
     end_effector_pose = left_arm.end_effector.tool_frame.global_transform
-    end_effector_position = end_effector_pose.to_position().to_np()
-    end_effector_orientation = end_effector_pose.to_quaternion().to_np()
+    end_effector_position = end_effector_pose.position.to_np()
+    end_effector_orientation = end_effector_pose.quaternion.to_np()
 
-    target_orientation = left_arm.end_effector.tool_frame_goal(
-        grasp_pose
-    ).to_quaternion()
+    target_orientation = left_arm.end_effector.tool_frame_goal(grasp_pose).quaternion
 
     assert end_effector_position[:3] == pytest.approx(position[:3], abs=0.01)
     compare_orientations(
@@ -258,8 +256,8 @@ def test_grasping(stationary_block_context):
 
     # The grasp sits at the box's own origin, so that is where the tool frame ends up.
     assert np.allclose(
-        box_body.global_pose.to_position().to_np(),
-        left_arm.end_effector.tool_frame.global_pose.to_position().to_np(),
+        box_body.global_pose.position.to_np(),
+        left_arm.end_effector.tool_frame.global_pose.position.to_np(),
         atol=0.01,
     )
 
@@ -335,7 +333,7 @@ def test_place_multi(stationary_block_context, place_position):
             world.get_body_by_name("box1"),
         )
     box_body = world.get_body_by_name("box1")
-    milk_position = box_body.global_transform.to_position().to_np()
+    milk_position = box_body.global_transform.position.to_np()
 
     assert milk_position[:3] == pytest.approx(place_position.to_list()[:3], abs=0.01)
     plan.validate()
@@ -356,14 +354,14 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
     world, view, context = stationary_block_context
     right_arm = right_or_only_arm(context.robot)
     anchor = Pose(anchor_position, reference_frame=world.root)
-    anchor_T = anchor.to_homogeneous_matrix()
+    anchor_T = anchor.homogeneous_matrix
     offset_T = HomogeneousTransformationMatrix.from_xyz_axis_angle(
         z=-0.03,
         axis=(0, 1, 0),
         angle=np.pi / 2,
         reference_frame=world.root,
     )
-    target_pose = (anchor_T @ offset_T).to_pose()
+    target_pose = (anchor_T @ offset_T).pose
     waypoints = PoseTrajectory(_make_sine_scan_poses(target_pose, lane_axis="z"))
 
     plan = execute_single(
@@ -378,5 +376,5 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
     tip_pose = right_arm.end_effector.tool_frame.global_transform
     expected = waypoints.poses[-1]
 
-    assert np.allclose(tip_pose.to_position(), expected.to_position(), atol=0.01)
-    assert np.allclose(tip_pose.to_quaternion(), expected.to_quaternion(), atol=0.01)
+    assert np.allclose(tip_pose.position, expected.position, atol=0.01)
+    assert np.allclose(tip_pose.quaternion, expected.quaternion, atol=0.01)

@@ -319,7 +319,7 @@ class HasApproachesGraspPoses:
             x=-self._approach_distance(grasp)
         )
         pre_grasp_pose = end_effector.tool_frame_goal(
-            (reference_T_grasp.to_homogeneous_matrix() @ grasp_T_pre_grasp).to_pose()
+            (reference_T_grasp.homogeneous_matrix @ grasp_T_pre_grasp).pose
         )
         return GraspPoseSequence(
             pre_grasp=pre_grasp_pose,
@@ -387,13 +387,13 @@ class HasApproachesGraspPoses:
         target = reference_T_grasp.reference_frame
         world = target._world
         world_T_grasp = world.transform(
-            reference_T_grasp.to_homogeneous_matrix(), world.root
+            reference_T_grasp.homogeneous_matrix, world.root
         )
         world_T_lift = HomogeneousTransformationMatrix.from_xyz_rpy(
             z=self.retreat_distance, reference_frame=world.root
         )
         return Pose(
-            world.transform((world_T_lift @ world_T_grasp).to_position(), target),
-            tool_goal.to_quaternion(),
+            world.transform((world_T_lift @ world_T_grasp).position, target),
+            tool_goal.quaternion,
             reference_frame=target,
         )

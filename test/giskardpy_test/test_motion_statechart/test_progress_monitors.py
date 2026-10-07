@@ -181,7 +181,8 @@ class TestStallDetection:
         executor.compile(motion_statechart=motion_statechart)
         drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
         cycles = 4 * ceil(
-            STALL_TIMEOUT.total_seconds() / context.qp_controller_config.control_dt
+            STALL_TIMEOUT.total_seconds()
+            / context.qp_controller_config.control_time_step.total_seconds()
         )
 
         with pytest.raises(NoProgressError):
@@ -383,7 +384,8 @@ class TestStallDetection:
         for _ in range(
             2
             * ceil(
-                STALL_TIMEOUT.total_seconds() / context.qp_controller_config.control_dt
+                STALL_TIMEOUT.total_seconds()
+                / context.qp_controller_config.control_time_step.total_seconds()
             )
         ):
             executor.tick()
@@ -548,7 +550,7 @@ class ScriptedErrorRun:
         return (
             CONVERGENCE_RATE
             * TASK_THRESHOLD
-            * self.context.qp_controller_config.control_dt
+            * self.context.qp_controller_config.control_time_step.total_seconds()
         )
 
     def observations_while_the_error_is(
@@ -834,7 +836,8 @@ class TestNothingToConverge:
 
         for _ in range(
             ceil(
-                STALL_TIMEOUT.total_seconds() / context.qp_controller_config.control_dt
+                STALL_TIMEOUT.total_seconds()
+                / context.qp_controller_config.control_time_step.total_seconds()
             )
         ):
             executor.tick()

@@ -96,7 +96,7 @@ def _box_resting_on(
         world.add_connection(
             Connection6DoF.create_with_dofs(world=world, parent=world.root, child=box)
         )
-    x, y, _ = supporter.global_pose.to_position().to_np()[:3]
+    x, y, _ = supporter.global_pose.position.to_np()[:3]
     top = _top_of(supporter)
     box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x,

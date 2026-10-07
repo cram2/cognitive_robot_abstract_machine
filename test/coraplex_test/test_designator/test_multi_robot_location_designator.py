@@ -162,7 +162,7 @@ def _floor_distance(pose: Pose, body) -> float:
     """
     :return: How far `pose` stands from `body` along the floor.
     """
-    offset = body.global_pose.to_position().to_np()[:2] - pose.to_position().to_np()[:2]
+    offset = body.global_pose.position.to_np()[:2] - pose.position.to_np()[:2]
     return float(np.linalg.norm(offset))
 
 
@@ -170,8 +170,8 @@ def _assert_faces(pose: Pose, body) -> None:
     """
     Assert that a robot standing at `pose` has `body` straight ahead.
     """
-    offset = body.global_pose.to_position().to_np()[:2] - pose.to_position().to_np()[:2]
-    heading = pose.to_rotation_matrix().to_np()[:2, 0]
+    offset = body.global_pose.position.to_np()[:2] - pose.position.to_np()[:2]
+    heading = pose.rotation_matrix.to_np()[:2, 0]
     np.testing.assert_allclose(heading, offset / np.linalg.norm(offset), atol=0.05)
 
 

@@ -225,7 +225,7 @@ class BulletWorldDemonstration(RobotDemonstration):
             SceneFile.MILK,
             HomogeneousTransformationMatrix.from_xyz_rpy(2.37, 2, 1.0345),
             along_table=4.8,
-            height=0.82,
+            height=0.81,
         )
     )
     """
@@ -251,7 +251,7 @@ class BulletWorldDemonstration(RobotDemonstration):
             SceneFile.SPOON,
             HomogeneousTransformationMatrix.from_xyz_rpy(-0.05, -0.05, -0.01),
             along_table=5.2,
-            height=0.74,
+            height=0.73,
             across_table=3.25,
             starts_on=ApartmentBody.SPOON_DRAWER,
         )

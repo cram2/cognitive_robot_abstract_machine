@@ -401,9 +401,7 @@ class GiskardExecutable(Executable):
         :raises MotionExceededSimulationTimeLimit: When the motion runs for longer than
             :attr:`simulation_time_limit`.
         """
-        qp_controller_config = QPControllerConfig(
-            target_frequency=50, prediction_horizon=4, verbose=False
-        )
+        qp_controller_config = QPControllerConfig.create_with_fast_simulation_defaults()
         executor = Ros2Executor(
             context=MotionStatechartContext(
                 world=self.context.world,
@@ -412,7 +410,7 @@ class GiskardExecutable(Executable):
             ros_node=self.context.ros_node,
         )
         time_limit = GiskardExecutable.simulation_time_limit
-        maximum_ticks = time_limit.total_seconds() / qp_controller_config.control_dt
+        maximum_ticks = time_limit.total_seconds() / qp_controller_config.control_time_step.total_seconds()
         # Stop the robot and tear the chart down even when a tick raises.
         with ExitStack() as cleanup:
             history = MotionPlanHistory(self.motion_state_chart, self.motion_mappings)

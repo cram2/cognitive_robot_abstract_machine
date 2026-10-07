@@ -96,8 +96,8 @@ class OpenAction(ActionDescription):
             or_(
                 is_body_in_gripper(variable_from(handle_body), end_effector) > 0.9,
                 allclose(
-                    variable_from(handle_body).global_pose.to_position(),
-                    variable_from(end_effector.tool_frame).global_pose.to_position(),
+                    variable_from(handle_body).global_pose.position,
+                    variable_from(end_effector.tool_frame).global_pose.position,
                     atol=3e-2,
                 ),
             ),

@@ -28,12 +28,18 @@ from semantic_digital_twin.adapters.ros.input_synchronization import (
     PendingJointPositionSource,
     SubscribedBasePoseSource,
 )
+from semantic_digital_twin.input_synchronization import WorldStateInputs
 from semantic_digital_twin.robots.input_source import SimulatedJointPositionSource
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.daisy import DAiSyJoint
 from semantic_digital_twin.robots.stretch import StretchJoint
 from semantic_digital_twin.robots.tracy import TracyJoint
+from semantic_digital_twin.world import World
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+
+from ...semantic_digital_twin_test.test_ros.test_input_synchronization import (
+    joint_state_message,
+)
 
 # %% the interface hierarchy is built from dataclasses
 
@@ -285,3 +291,136 @@ def test_syncing_one_part_leaves_the_other_parts_reading_the_world(
     arm = pr2_reading_only_its_base.robot.left_arm
 
     assert isinstance(arm.source, SimulatedJointPositionSource)
+
+
+# %% reading the robot from a joint state topic
+
+
+@dataclass
+class ControlLoopMimic:
+    """
+    Holds the inputs a control loop reads in every cycle.
+    """
+
+    inputs: WorldStateInputs
+    """
+    The inputs read before every tick of the controller.
+    """
+
+
+@dataclass
+class MotionServerMimic:
+    """
+    Holds the inputs read between goals and the control loop that executes a goal.
+    """
+
+    inputs: WorldStateInputs
+    """
+    The inputs read while no goal is executed.
+    """
+
+    control_loop: ControlLoopMimic
+    """
+    The loop that executes a goal.
+    """
+
+
+@dataclass
+class ContextMimic:
+    """
+    Holds the world a motion is executed in.
+    """
+
+    world: World
+    """
+    The world whose state the inputs write.
+    """
+
+
+@dataclass
+class ExecutorMimic:
+    """
+    Holds the context of the motion.
+    """
+
+    context: ContextMimic
+    """
+    The context whose world the inputs write.
+    """
+
+
+@dataclass
+class RobotMimic:
+    """
+    A robot that is only known by its name.
+    """
+
+    name: str
+    """
+    The name that joint state topics are grouped under.
+    """
+
+
+@dataclass
+class GiskardMimic:
+    """
+    Offers the parts of Giskard that a robot interface configures.
+    """
+
+    executor: ExecutorMimic
+    """
+    The executor whose world the inputs write.
+    """
+
+    robot: RobotMimic
+    """
+    The robot the interface talks to.
+    """
+
+    server_config: GiskardServerConfig
+    """
+    Decides whether the robot is commanded in a closed loop.
+    """
+
+    motion_server: MotionServerMimic
+    """
+    The server whose inputs the interface registers.
+    """
+
+
+@dataclass
+class JointStateTopicInterface(RobotInterfaceConfig):
+    """
+    Reads the state of the robot from a single joint state topic.
+    """
+
+    def setup(self):
+        self.sync_joint_state_topic("joint_states")
+
+
+def test_closed_loop_does_not_rewrite_a_joint_state_it_already_wrote(
+    init_rospy, mini_world: World
+):
+    [connection] = mini_world.connections
+    control_loop_inputs = WorldStateInputs(world=mini_world)
+    interface = JointStateTopicInterface()
+    interface.attach(
+        GiskardMimic(
+            executor=ExecutorMimic(context=ContextMimic(world=mini_world)),
+            robot=RobotMimic(name="robot"),
+            server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
+            motion_server=MotionServerMimic(
+                inputs=WorldStateInputs(world=mini_world),
+                control_loop=ControlLoopMimic(inputs=control_loop_inputs),
+            ),
+        )
+    )
+    interface.setup()
+    [synchronizer] = control_loop_inputs.synchronizers
+    synchronizer.latest_message = joint_state_message(connection.name.name, 0.42)
+
+    control_loop_inputs.apply_inputs()
+    mini_world.state[connection.raw_dof.id].position = 1.0
+    control_loop_inputs.apply_inputs()
+
+    assert mini_world.state[connection.raw_dof.id].position == 1.0

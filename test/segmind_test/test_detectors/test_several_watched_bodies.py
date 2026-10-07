@@ -85,7 +85,7 @@ def test_a_contact_that_lasts_is_not_reported_lost_by_another_bodys_detector(
     milk_in_the_apartment,
 ):
     world, milk, box = milk_in_the_apartment
-    box_x, box_y, box_z = box.global_pose.to_position().to_np()[:3]
+    box_x, box_y, box_z = box.global_pose.position.to_np()[:3]
     _place(milk, box_x, box_y, box_z)
 
     segmind_context = _ticked_while_nothing_moves(world, [ContactDetector], [milk, box])

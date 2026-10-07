@@ -193,8 +193,8 @@ def compute_euclidean_planar_distance(
     :return: The Euclidean distance between the two bodies in the 2D plane after
         ignoring the specified dimension.
     """
-    body1_position = body1.global_pose.to_position()
-    body2_position = body2.global_pose.to_position()
+    body1_position = body1.global_pose.position
+    body2_position = body2.global_pose.position
 
     if np.allclose(ignore_dimension, Vector3.X()):
         body1_position.x = 0.0
@@ -515,8 +515,8 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
             reference_frame=self.point_of_view.reference_frame,
         )
 
-        s_body = front_norm.dot(self.point.to_vector3())
-        s_other = front_norm.dot(self.other.to_vector3())
+        s_body = front_norm.dot(self.point.vector3)
+        s_other = front_norm.dot(self.other.vector3)
         return (s_body - s_other).compile()()
 
 

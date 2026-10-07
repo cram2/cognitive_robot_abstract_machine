@@ -29,8 +29,8 @@ class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
     @classmethod
     def from_domain_object(cls, obj: SymbolGraph):
         return cls(
-            instances=obj.wrapped_instances,
-            predicate_relations=list(obj.relations()),
+            instances=obj.instances,
+            predicate_relations=obj.predicate_relations,
         )
 
     def to_domain_object(self) -> T:

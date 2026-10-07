@@ -38,7 +38,7 @@ class MoveMotion(BaseMotion):
     def _motion_chart(self):
         return (
             SetOdometry(
-                base_pose=self.target.to_homogeneous_matrix(),
+                base_pose=self.target.homogeneous_matrix,
                 odom_connection=self.robot.root.parent_connection,
             )
             if GiskardExecutable.execution_type == ExecutionType.SIMULATED
@@ -93,6 +93,6 @@ class TurnMotion(BaseMotion):
         :return: :attr:`target` moved vertically to the height of the base, which can
             only turn about the vertical and so can only point level.
         """
-        root_P_target = self.world.transform(self.target, self.world.root).to_position()
+        root_P_target = self.world.transform(self.target, self.world.root).position
         root_P_target.z = self.robot.root.global_pose.z
         return root_P_target

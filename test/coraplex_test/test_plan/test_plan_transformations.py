@@ -815,8 +815,8 @@ def test_opening_a_drawer_faces_the_handle_where_it_is_when_it_opens_it(
         facing["look_at"]._kwargs_["target"],
     ]:
         np.testing.assert_allclose(
-            world.transform(target, world.root).to_position().to_np(),
-            drawer.handle.root.global_pose.to_position().to_np(),
+            world.transform(target, world.root).position.to_np(),
+            drawer.handle.root.global_pose.position.to_np(),
         )
 
 

@@ -543,9 +543,7 @@ class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC
             dist = (
                 connection.dof.limits.upper.position
                 if isinstance(connection, PrismaticConnection)
-                else parent_pose.to_position().euclidean_distance(
-                    child_pose.to_position()
-                )
+                else parent_pose.position.euclidean_distance(child_pose.position)
             )
             length += dist
         return length
@@ -605,9 +603,9 @@ class Camera(Sensor, ABC):
         The y and z axes only complete the frame and carry no meaning.
         """
         root_T_camera = self.root.global_transform
-        root_V_forward = root_T_camera.to_rotation_matrix() @ self.forward_facing_axis
+        root_V_forward = root_T_camera.rotation_matrix @ self.forward_facing_axis
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=root_T_camera.to_position(),
+            point=root_T_camera.position,
             rotation_matrix=RotationMatrix.from_x_axis(root_V_forward),
             reference_frame=root_T_camera.reference_frame,
         )
@@ -702,10 +700,8 @@ class EndEffector(AbstractRobotPart, ABC):
         """
         grasp_R_tool = self.tool_R_grasp.inverse()
         return Pose(
-            position=grasp_pose.to_position(),
-            orientation=(
-                grasp_pose.to_rotation_matrix() @ grasp_R_tool
-            ).to_quaternion(),
+            position=grasp_pose.position,
+            orientation=(grasp_pose.rotation_matrix @ grasp_R_tool).quaternion,
             reference_frame=grasp_pose.reference_frame,
         )
 
@@ -737,12 +733,12 @@ class EndEffector(AbstractRobotPart, ABC):
         if body is None:
             raise NothingHeld(self)
         body_T_tool = self._world.transform(self.tool_frame.global_transform, body)
-        body_R_grasp = body_T_tool.to_rotation_matrix() @ self.tool_R_grasp
+        body_R_grasp = body_T_tool.rotation_matrix @ self.tool_R_grasp
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=body_T_tool.to_position(),
+            point=body_T_tool.position,
             rotation_matrix=body_R_grasp,
             reference_frame=body,
-        ).to_pose()
+        ).pose
 
     @property
     def held_bodies(self) -> list[Body]:
@@ -883,10 +879,10 @@ class MobileBase(
         position is kept as it is.
         """
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            heading.to_position(),
-            heading.to_rotation_matrix() @ self.base_R_front.inverse(),
+            heading.position,
+            heading.rotation_matrix @ self.base_R_front.inverse(),
             reference_frame=heading.reference_frame,
-        ).to_pose()
+        ).pose
 
     @classmethod
     def get_drive_connection_type(cls) -> Type[TGenericDrive]:
@@ -1162,7 +1158,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         if pose.reference_frame is not parent_kinematic_structure_entity:
             pose = self._world.transform(pose, parent_kinematic_structure_entity)
 
-        connection.origin = pose.to_homogeneous_matrix()
+        connection.origin = pose.homogeneous_matrix
 
     @property
     def _one_dof_connections(self) -> list[ActiveConnection1DOF]:

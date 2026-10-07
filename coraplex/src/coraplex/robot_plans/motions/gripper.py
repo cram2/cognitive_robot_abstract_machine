@@ -175,7 +175,7 @@ class MoveToolCenterPointMotion(
             task = CartesianPosition(
                 root_link=root,
                 tip_link=tip,
-                goal_point=self.target.to_position(),
+                goal_point=self.target.position,
                 name="MoveTCP",
                 weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                 threshold=self.resolved_position_threshold(),

@@ -589,7 +589,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         center_z = (bounding_box.min_z + bounding_box.max_z) / 2
         self.origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=Point3(-center_x, -center_y, -center_z),
-            rotation_matrix=self.origin.to_rotation_matrix(),
+            rotation_matrix=self.origin.rotation_matrix,
             reference_frame=self.origin.reference_frame,
         )
 

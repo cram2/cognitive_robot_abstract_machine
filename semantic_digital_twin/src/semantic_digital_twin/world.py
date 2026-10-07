@@ -2724,6 +2724,13 @@ class World(HasSimulatorProperties):
     def get_world_model_manager(self) -> WorldModelManager:
         return self._model_manager
 
+    @property
+    def modification_history(self) -> List[WorldModelModificationBlock]:
+        """
+        :return: The modification blocks that were applied to this world, oldest first.
+        """
+        return self._model_manager.model_modification_blocks
+
     def rollback_modification_blocks(
         self, count: int = 1
     ) -> List[WorldModelModificationBlock]:

@@ -104,7 +104,9 @@ class NotApproachingGoal(MotionStatechartNode):
         return [self.monitored_task]
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        self._control_dt = context.qp_controller_config.control_dt
+        self._control_dt = (
+            context.qp_controller_config.control_time_step.total_seconds()
+        )
         self._error_at_last_progress = self._registered_variable(
             "error_at_last_progress", context
         )
