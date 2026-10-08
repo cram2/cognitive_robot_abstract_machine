@@ -95,7 +95,9 @@ class ContainmentDetector(AbstractDetector):
 
     A body is put into something by being set down in it, so what a body is inside is
     looked for only when it comes to rest on something new; from then on, only whether
-    it is still inside what it was found in is checked.
+    it is still inside what it was found in is checked. What a body rests on is read
+    from a :class:`SupportDetector` ticked before this one; without one, no containment
+    is ever found.
     """
 
     containment_threshold: float = 0.9
@@ -118,19 +120,33 @@ class ContainmentDetector(AbstractDetector):
         self, segmind_context: SegmindContext, tracked_objects: List[Body]
     ) -> List[Body]:
         """
-        The tracked objects resting on something they did not rest on at the previous
-        tick.
+        The tracked objects resting on something they did not rest on when their
+        supporters were last remembered (see :meth:`remember_supporters`).
 
         :param segmind_context: The shared SegmindContext holding what each body rests on.
         :param tracked_objects: Bodies that should be checked.
         """
-        come_to_rest = []
+        return [
+            tracked_object
+            for tracked_object in tracked_objects
+            if segmind_context.latest_support.get(tracked_object, set())
+            - self._supporters_seen.get(tracked_object, set())
+        ]
+
+    def remember_supporters(
+        self, segmind_context: SegmindContext, tracked_objects: List[Body]
+    ) -> None:
+        """
+        Remember what each tracked object rests on now, for :meth:`bodies_come_to_rest`
+        to compare against at the next tick.
+
+        :param segmind_context: The shared SegmindContext holding what each body rests on.
+        :param tracked_objects: Bodies whose supporters are remembered.
+        """
         for tracked_object in tracked_objects:
-            supporters = set(segmind_context.latest_support.get(tracked_object, set()))
-            if supporters - self._supporters_seen.get(tracked_object, set()):
-                come_to_rest.append(tracked_object)
-            self._supporters_seen[tracked_object] = supporters
-        return come_to_rest
+            self._supporters_seen[tracked_object] = set(
+                segmind_context.latest_support.get(tracked_object, set())
+            )
 
     def containers_still_holding(
         self, tracked_object: Body, containers: Set[Body]
@@ -160,6 +176,8 @@ class ContainmentDetector(AbstractDetector):
         :return: Mapping of body → containing bodies.
         """
         containment_pairs: Dict[Body, Set[Body]] = {}
+        if not tracked_objects:
+            return containment_pairs
         left_out = self.bodies_left_out(context.world)
         candidates = [
             body
@@ -197,6 +215,7 @@ class ContainmentDetector(AbstractDetector):
         """
         latest_containments = segmind_context.latest_containments
         come_to_rest = self.bodies_come_to_rest(segmind_context, objects_to_check)
+        self.remember_supporters(segmind_context, objects_to_check)
         containments_now = self.get_containment_pairs(context, come_to_rest)
         inside_something = [
             body

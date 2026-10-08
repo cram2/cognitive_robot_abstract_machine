@@ -157,6 +157,34 @@ def test_containment_detector_ignores_an_object_held_up_inside_a_container(box_a
 
     assert len(events_of(segmind_context, ContainmentEvent)) == 0
 
+def test_containment_is_not_looked_for_without_the_supports_it_is_read_from(box_and_trays):
+    """
+    Containment is looked for once an object comes to rest, which only a support
+    detector ticked alongside can tell.
+    """
+    world, box, _, _ = box_and_trays
+    segmind_executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
+    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    segmind_executor.compile(SegmindStatechart().build_statechart([ContainmentDetector()]))
+
+    box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(*SET_DOWN_IN_THE_TRAY, reference_frame=box.parent_connection.parent)
+    segmind_executor.tick()
+
+    assert len(events_of(segmind_context, ContainmentEvent)) == 0
+
+
+def test_asking_which_bodies_came_to_rest_twice_gives_the_same_answer(box_and_trays):
+    _, box, tray, _ = box_and_trays
+    detector = ContainmentDetector()
+    segmind_context = SegmindContext()
+    segmind_context.latest_support[box] = {tray}
+
+    first_answer = detector.bodies_come_to_rest(segmind_context, [box])
+    second_answer = detector.bodies_come_to_rest(segmind_context, [box])
+
+    assert first_answer == second_answer == [box]
+
+
 def test_pickup(_simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
     statechart = SegmindStatechart().build_statechart([PickUpDetector(), SupportDetector(), TranslationDetector()])
