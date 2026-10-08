@@ -8,40 +8,84 @@ const WEB = path.join(__dirname, '../../../cramera/src/cramera/web');
 const THREE = require(path.join(WEB, 'vendor/three.min.js'));
 
 // %% panel controls without a browser GPU
+/** @typedef {{left: number, top?: number, right?: number, bottom?: number, width: number, height: number}} ViewBounds */
+/** @typedef {{stopPropagation: function(): void, preventDefault: function(): void, target: ViewElement, pointerId: number, button: number, isPrimary: boolean, clientX?: number, clientY?: number, key?: string, pointerType?: string, buttonName?: string}} ViewInput */
+/** @typedef {[source: {width: number, height: number}, sourceX: number, sourceY: number, sourceWidth: number, sourceHeight: number, destinationX: number, destinationY: number, destinationWidth: number, destinationHeight: number]} ImageCopy */
+/** @typedef {{drawImage: (...coordinates: ImageCopy) => void, fillRect: function(...number): void, fillStyle?: string}} ImageContext */
+/** @typedef {{panel: InstanceType<typeof window.RobotCameraPanel>, root: ViewElement, layer: ViewElement, renderer: InsetRenderer, elements: Map<string, ViewElement>, header: ViewElement, container: ViewElement, changes: function(): number, resize: function(ViewElement): void}} MountedView */
+
+/** Element behavior needed to observe window gestures, bounds and image copies. */
 class ViewElement {
+  /** Create independent event, layout and drawing state. */
   constructor() {
+    /** Registered handler for each exercised event name. @type {Map<string, function(ViewInput): void>} */
     this.handlers = new Map();
+    /** String attributes exposed by controls. @type {Map<string, string>} */
     this.attributes = new Map();
+    /** Child elements owned by this node. @type {ViewElement[]} */
     this.children = [];
+    /** Current checkbox selection. @type {boolean} */
     this.checked = false;
+    /** Whether the element is hidden. @type {boolean} */
     this.hidden = false;
+    /** Selected camera identifier. @type {string} */
     this.value = '';
+    /** Inline positions and chosen dimensions. @type {{left: string, top: string, right: string, bottom: string, width?: string, height?: string}} */
     this.style = {left: '', top: '', right: '', bottom: ''};
+    /** Pointer identifiers retained by a gesture. @type {Set<number>} */
     this.capturedPointers = new Set();
+    /** Active CSS state classes. @type {Set<string>} */
     this.classes = new Set();
+    /** Source and destination rectangles copied into the image. @type {ImageCopy[]} */
     this.draws = [];
+    /** Opaque background rectangles requested by the panel. @type {number[][]} */
     this.fills = [];
+    /** Recorded image operations without a browser canvas. @type {ImageContext} */
     this.context = {
       drawImage: (...arguments_) => this.draws.push(arguments_),
       fillRect: (...arguments_) => this.fills.push(arguments_),
     };
+    /** CSS state operations backed by the class set. @type {{toggle: function(string, boolean): (Set<string>|boolean)}} */
     this.classList = {toggle: (name, enabled) => enabled ? this.classes.add(name) : this.classes.delete(name)};
+    /** Factory for owned controls and canvas elements. @type {{createElement: function(): ViewElement}} */
     this.ownerDocument = {createElement: () => new ViewElement()};
   }
+  /** Retain a handler for explicit dispatch. @param {string} name Event name. @param {function(ViewInput): void} handler Event callback. */
   addEventListener(name, handler) { this.handlers.set(name, handler); }
+  /** Remove the retained event callback. @param {string} name Event name. */
   removeEventListener(name) { this.handlers.delete(name); }
+  /** Preserve DOM string coercion. @param {string} name Attribute name. @param {string|number|boolean} value Attribute value. */
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
-  appendChild(child) { this.children.push(child); child.parent = this; }
+  /** Give the child this node as its owner. @param {ViewElement} child Added element. */
+  appendChild(child) {
+    this.children.push(child);
+    /** Owning node cleared when the element is detached. @type {ViewElement|null} */
+    child.parent = this;
+  }
+  /** Detach this element without removing unrelated siblings. */
   remove() {
     if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this);
     this.parent = null;
   }
+  /** Clear the camera options before replacement. */
   replaceChildren() { this.children = []; }
-  focus() { this.focused = true; this.focusCount = (this.focusCount || 0) + 1; }
+  /** Record an explicit focus request without simulating browser event bubbling. */
+  focus() {
+    if (this.hidden) return;
+    /** Whether this control has received a focus request. @type {boolean} */
+    this.focused = true;
+    /** Number of explicit focus requests made to this control. @type {number} */
+    this.focusCount = (this.focusCount || 0) + 1;
+  }
+  /** Identify a button target for drag exclusion. @param {string} selector Ancestor selector. @returns {ViewElement|null} Matching button. */
   closest(selector) { return selector === 'button' && this.button ? this : null; }
+  /** Start retaining a gesture pointer. @param {number} pointerId Gesture identifier. */
   setPointerCapture(pointerId) { this.capturedPointers.add(pointerId); }
+  /** Release a retained gesture pointer. @param {number} pointerId Gesture identifier. */
   releasePointerCapture(pointerId) { this.capturedPointers.delete(pointerId); }
+  /** Test ownership of one pointer. @param {number} pointerId Gesture identifier. @returns {boolean} Whether capture remains active. */
   hasPointerCapture(pointerId) { return this.capturedPointers.has(pointerId); }
+  /** Apply inline window coordinates to the fixture's original bounds. @returns {ViewBounds} Rectangle in page coordinates. */
   getBoundingClientRect() {
     const bounds = {...this.bounds};
     if (this.positionContainer) {
@@ -54,7 +98,12 @@ class ViewElement {
     }
     return bounds;
   }
+  /** Return the operation recorder used as the canvas context. @returns {ImageContext} Recorded drawing operations. */
   getContext() { return this.context; }
+  /** Invoke one retained handler without browser propagation.
+   * @param {string} name Event name.
+   * @param {Partial<ViewInput>} [extra] Case-specific pointer, keyboard or callback values.
+   */
   dispatch(name, extra = {}) {
     const handler = this.handlers.get(name);
     if (handler) handler({stopPropagation() {}, preventDefault() {}, target: this,
@@ -62,37 +111,72 @@ class ViewElement {
   }
 }
 
+/** Renderer state and draw observations needed to verify borrowed viewport ownership. */
 class InsetRenderer {
+  /** Start with distinct viewport and scissor bounds at double device resolution. */
   constructor() {
+    /** Current renderer viewport in CSS pixels. @type {THREE.Vector4} */
     this.viewport = new THREE.Vector4(0, 0, 800, 600);
+    /** Current renderer clipping rectangle. @type {THREE.Vector4} */
     this.scissor = new THREE.Vector4(2, 3, 400, 300);
+    /** Whether clipping is enabled. @type {boolean} */
     this.scissorTest = false;
+    /** Scene, camera and viewport observed at each render. @type {{scene: THREE.Scene, camera: THREE.Camera, viewport: THREE.Vector4, scissorTest: boolean}[]} */
     this.renders = [];
+    /** Physical canvas dimensions supplied to image-copy operations. @type {{width: number, height: number}} */
     this.domElement = {width: 1600, height: 1200};
   }
+  /** Copy the borrowed viewport. @param {THREE.Vector4} target Destination. @returns {THREE.Vector4} Copied bounds. */
   getViewport(target) { return target.copy(this.viewport); }
+  /** Return the device-to-CSS pixel ratio. @returns {number} Device pixel ratio. */
   getPixelRatio() { return 2; }
+  /** Copy the borrowed scissor rectangle. @param {THREE.Vector4} target Destination. @returns {THREE.Vector4} Copied bounds. */
   getScissor(target) { return target.copy(this.scissor); }
+  /** Read clipping state. @returns {boolean} Whether clipping is enabled. */
   getScissorTest() { return this.scissorTest; }
+  /** Accept either saved or explicit viewport bounds. @param {...(THREE.Vector4|number)} values Saved vector or XYWH coordinates. */
   setViewport(...values) { this.viewport = values[0].isVector4 ? values[0].clone() : new THREE.Vector4(...values); }
+  /** Accept either saved or explicit clipping bounds. @param {...(THREE.Vector4|number)} values Saved vector or XYWH coordinates. */
   setScissor(...values) { this.scissor = values[0].isVector4 ? values[0].clone() : new THREE.Vector4(...values); }
+  /** Change the clipping state. @param {boolean} value Whether clipping is enabled. */
   setScissorTest(value) { this.scissorTest = value; }
+  /** Accept clearing without allocating a GPU buffer. */
   clear() {}
+  /** Capture the renderer state at a draw call. @param {THREE.Scene} scene Rendered world. @param {THREE.Camera} camera Selected perspective. */
   render(scene, camera) { this.renders.push({scene, camera, viewport: this.viewport.clone(), scissorTest: this.scissorTest}); }
 }
 
-/** A loaded robot with explicitly declared camera frames and a 4:3 lens. */
+/** A loaded robot with explicitly declared camera frames and a 4:3 lens.
+ * @param {string} name Model identity.
+ * @param {string[]} [cameraNames] Native sensor and root names.
+ * @returns {CameraModel} Loaded robot with annotated camera definitions.
+ */
 function cameraModel(name, cameraNames = ['wide_stereo_optical_frame']) {
-  return {name, robot: true,
-    obj: {links: Object.fromEntries(cameraNames.map(name => [name, new THREE.Object3D()]))},
+  const object = new THREE.Group();
+  object.links = {};
+  for (const name of cameraNames) {
+    const link = new THREE.Object3D();
+    link.name = name;
+    object.links[name] = link;
+    object.add(link);
+  }
+  return {name, robot: true, obj: object,
     cameras: cameraNames.map((name, index) => ({name, link: name, forward: [0, 0, 1],
       horizontalAngle: 2 * Math.atan(4 / 3 * Math.tan(Math.PI / 6)),
       verticalAngle: Math.PI / 3, default: index === 0})),
   };
 }
 
-function mount() {
-  const scope = {};
+/** Mount independent controls with recorded rendering and manually delivered resizes.
+ * @param {function(): void} [restoreFocus] Scene-owned action choosing the control to refocus after closing.
+ * @returns {MountedView} Panel, elements and observation controls for one case.
+ */
+function mount(restoreFocus) {
+  const stylesheet = BrowserSource.read(path.join(WEB, 'app.css'));
+  const cameraRule = stylesheet.match(/\.robot-camera\s*\{([^}]+)\}/)[1];
+  const properties = new Map(Array.from(cameraRule.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g),
+    match => [match[1], match[2]]));
+  const scope = {getComputedStyle: () => ({getPropertyValue: name => properties.get(name) || ''})};
   for (const file of ['robot-camera.js', 'robot-camera-panel.js']) {
     new Function('window', BrowserSource.read(path.join(WEB, 'core', file)))(scope);
   }
@@ -112,23 +196,43 @@ function mount() {
   root.positionContainer = container;
   let changes = 0;
   const observers = [];
+  /** Resize subscriptions whose delivery is controlled by the case. */
   class SizeObserver {
-    constructor(callback) { this.callback = callback; this.observed = new Set(); observers.push(this); }
+    /** @param {function(): void} callback Layout update delivered by the harness. */
+    constructor(callback) {
+      /** Layout callback retained until disconnect. @type {function(): void} */
+      this.callback = callback;
+      /** Elements that can trigger this observer. @type {Set<ViewElement>} */
+      this.observed = new Set();
+      observers.push(this);
+    }
+    /** Subscribe to an element's dimensions. @param {ViewElement} element Observed window or scene. */
     observe(element) { this.observed.add(element); }
-    disconnect() { this.disconnected = true; }
+    /** Suppress all future manually delivered notifications. */
+    disconnect() {
+      /** Whether further observer delivery is disabled. @type {boolean} */
+      this.disconnected = true;
+    }
   }
   const panel = new scope.RobotCameraPanel({THREE, root, layer, renderer,
-    scene: new THREE.Scene(), container, invalidate: () => changes++, ResizeObserver: SizeObserver});
+    scene: new THREE.Scene(), container, invalidate: () => changes++,
+    restoreFocus: restoreFocus || (() => layer.focus()), ResizeObserver: SizeObserver});
   return {panel, root, layer, renderer, elements, header, container, changes: () => changes,
     resize: element => observers.filter(observer => observer.observed.has(element) && !observer.disconnected)
       .forEach(observer => observer.callback())};
 }
 
+/** Show the inset through its actual layer handler. @param {MountedView} view Mounted controls. */
 function show(view) {
   view.layer.checked = true;
   view.layer.dispatch('change');
 }
 
+/** Complete a title-bar pointer gesture.
+ * @param {MountedView} view Mounted controls.
+ * @param {number} left Horizontal pointer displacement.
+ * @param {number} top Vertical pointer displacement.
+ */
 function drag(view, left, top) {
   const bounds = view.root.getBoundingClientRect();
   view.header.dispatch('pointerdown', {clientX: bounds.left + 40, clientY: bounds.top + 12});
@@ -136,12 +240,24 @@ function drag(view, left, top) {
   view.header.dispatch('pointerup');
 }
 
+/** Resolve a named corner control from the panel's owned children.
+ * @param {MountedView} view Mounted controls.
+ * @param {string} corner Corner name published by the control.
+ * @returns {ViewElement} The matching resize button.
+ */
 function resizeGrip(view, corner) {
   const grip = view.root.children.find(child => child.attributes.get('data-robot-camera-resize') === corner);
   assert.ok(grip, 'a resize grip is available at ' + corner);
   return grip;
 }
 
+/** Complete a pointer resize from one corner.
+ * @param {MountedView} view Mounted controls.
+ * @param {string} corner Corner name published by the control.
+ * @param {number} horizontal Horizontal corner displacement.
+ * @param {number} vertical Vertical corner displacement.
+ * @returns {ViewElement} Control that received the gesture.
+ */
 function resizePanel(view, corner, horizontal, vertical) {
   const bounds = view.root.getBoundingClientRect();
   const grip = resizeGrip(view, corner);
@@ -587,12 +703,12 @@ test('a failed inset render restores every shared renderer setting', () => {
   }
 });
 
-test('refreshing an equal-size model collection follows the replacement robot', () => {
+test('notifying an equal-size model collection follows the replacement robot', () => {
   const view = mount();
   const original = cameraModel('pr2');
   const replacement = cameraModel('pr2');
   view.panel.setModels([original]);
-  view.panel.refreshModels([replacement]);
+  view.panel.setModels([replacement]);
   assert.equal(view.panel.selected.link, replacement.obj.links.wide_stereo_optical_frame);
 });
 
@@ -600,8 +716,8 @@ test('a replaced articulated object refreshes an existing model camera', () => {
   const view = mount();
   const robot = cameraModel('pr2');
   view.panel.setModels([robot]);
-  robot.obj = {links: {wide_stereo_optical_frame: new THREE.Object3D()}};
-  view.panel.refreshModels([robot]);
+  robot.obj = cameraModel('replacement').obj;
+  view.panel.setModels([robot]);
   assert.equal(view.panel.selected.link, robot.obj.links.wide_stereo_optical_frame);
 });
 
@@ -672,20 +788,24 @@ test('arrow keys move each focused corner by ten pixels and preserve its opposit
 
 test('keyboard resizing respects scene edges and the same minimum size as pointer resizing', () => {
   const view = mount();
+  const pointer = mount();
   show(view);
+  show(pointer);
   const grip = resizeGrip(view, 'bottom-right');
+  resizePanel(pointer, 'bottom-right', 2000, 2000);
   for (let count = 0; count < 100; count++) {
     grip.dispatch('keydown', {key: 'ArrowRight'});
     grip.dispatch('keydown', {key: 'ArrowDown'});
   }
-  assert.equal(view.root.style.width, '392px');
-  assert.equal(view.root.style.height, '392px');
+  assert.equal(view.root.style.width, pointer.root.style.width);
+  assert.equal(view.root.style.height, pointer.root.style.height);
+  resizePanel(pointer, 'bottom-right', -2000, -2000);
   for (let count = 0; count < 100; count++) {
     grip.dispatch('keydown', {key: 'ArrowLeft'});
     grip.dispatch('keydown', {key: 'ArrowUp'});
   }
-  assert.equal(view.root.style.width, '220px');
-  assert.equal(view.root.style.height, '140px');
+  assert.equal(view.root.style.width, pointer.root.style.width);
+  assert.equal(view.root.style.height, pointer.root.style.height);
 });
 
 test('unrelated keys and inactive or captured windows leave keyboard resizing untouched', () => {
@@ -702,5 +822,20 @@ test('unrelated keys and inactive or captured windows leave keyboard resizing un
       preventDefault: () => consumed = true});
     assert.deepEqual(view.root.style, before);
     assert.equal(consumed, false);
+  }
+});
+
+
+test('closing with folded Layers delegates focus to the visible scene control', () => {
+  for (const action of ['close', 'Escape']) {
+    const foldButton = new ViewElement();
+    const view = mount(() => foldButton.focus());
+    show(view);
+    view.layer.hidden = true;
+    if (action === 'close') view.elements.get('[data-robot-camera="close"]').dispatch('click');
+    else view.root.dispatch('keydown', {key: action});
+    assert.equal(view.root.hidden, true);
+    assert.equal(foldButton.focused, true);
+    assert.equal(view.layer.focused, undefined);
   }
 });

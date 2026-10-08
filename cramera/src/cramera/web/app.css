@@ -106,10 +106,12 @@ body{
 
 /* %% robot camera inset */
 .robot-camera{
+  --robot-camera-margin:8px;--robot-camera-minimum-width:220px;--robot-camera-minimum-height:140px;
   position:absolute;right:14px;bottom:48px;z-index:10;
   width:min(320px,calc(100% - 28px));height:min(248px,calc(100% - 100px));
-  min-width:min(220px,calc(100% - 16px));min-height:min(140px,calc(100% - 62px));
-  max-width:calc(100% - 16px);max-height:calc(100% - 16px);
+  min-width:min(var(--robot-camera-minimum-width),calc(100% - 2 * var(--robot-camera-margin)));
+  min-height:min(var(--robot-camera-minimum-height),calc(100% - 62px));
+  max-width:calc(100% - 2 * var(--robot-camera-margin));max-height:calc(100% - 2 * var(--robot-camera-margin));
   display:flex;flex-direction:column;overflow:hidden;
   border:1px solid var(--line2);border-radius:6px;box-shadow:var(--shadow)
 }

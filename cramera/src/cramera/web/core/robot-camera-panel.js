@@ -2,10 +2,8 @@
 (function (global) {
   'use strict';
 
-  const WINDOW_MARGIN = 8;
-  const MINIMUM_SIZE = Object.freeze({width: 220, height: 140});
-  const KEYBOARD_RESIZE_STEP = 10;
   /** Distance in CSS pixels moved by one arrow-key press on a corner control. */
+  const KEYBOARD_RESIZE_STEP = 10;
   const RESIZE_KEYS = Object.freeze({
     ArrowLeft: {horizontal: -1, vertical: 0},
     ArrowRight: {horizontal: 1, vertical: 0},
@@ -18,6 +16,15 @@
     {name: 'bottom-left', horizontal: -1, vertical: 1},
     {name: 'bottom-right', horizontal: 1, vertical: 1},
   ]);
+
+  /**
+   * One moving corner and the signs of its outward movement.
+   * @typedef {{name: string, horizontal: number, vertical: number}} ResizeCorner
+   */
+  /**
+   * Window bounds relative to the scene when a resize begins.
+   * @typedef {{corner: ResizeCorner, left: number, top: number, width: number, height: number}} ResizeOrigin
+   */
 
   /** A movable robot view with camera selection and an image from the shared renderer. */
   class RobotCameraPanel {
@@ -32,76 +39,83 @@
      * @param {THREE.Scene} options.scene Articulated scene to render.
      * @param {HTMLElement} options.container Scene area bounding window movement.
      * @param {function(): void} options.invalidate Request another scene frame.
+     * @param {function(): void} options.restoreFocus Focus a visible scene control after closing.
      * @param {typeof ResizeObserver} options.ResizeObserver Browser resize observer constructor.
      */
     constructor(options) {
+      /** Shared scene renderer, retained without taking ownership. @type {THREE.WebGLRenderer} */
       this.renderer = options.renderer;
-      /** Shared scene renderer, retained without taking ownership. */
+      /** Articulated world viewed by the camera. @type {THREE.Scene} */
       this.scene = options.scene;
-      /** Articulated world viewed by the camera. */
+      /** Scene area that bounds the movable window. @type {HTMLElement} */
       this.container = options.container;
-      /** Scene area that bounds the movable window. */
+      /** Request another frame after an input or layout change. @type {function(): void} */
       this.invalidate = options.invalidate;
-      /** Request another frame after an input or layout change. */
+      /** Scene-owned action returning focus to a visible control. @type {function(): void} */
+      this.restoreFocus = options.restoreFocus;
+      /** Window containing the camera controls and image. @type {HTMLElement} */
       this.root = options.root;
-      /** Window containing the camera controls and image. */
+      const style = global.getComputedStyle(this.root);
+      /** Space retained between the window and scene edges, in CSS pixels. @type {number} */
+      this.margin = parseFloat(style.getPropertyValue('--robot-camera-margin'));
+      /** Minimum inset dimensions specified by the stylesheet. @type {{width: number, height: number}} */
+      this.minimumSize = {
+        width: parseFloat(style.getPropertyValue('--robot-camera-minimum-width')),
+        height: parseFloat(style.getPropertyValue('--robot-camera-minimum-height')),
+      };
+      /** Visibility checkbox in the scene controls. @type {HTMLInputElement} */
       this.layer = options.layer;
-      /** Visibility checkbox in the scene controls. */
+      /** Articulated perspective camera. @type {InstanceType<typeof window.RobotCamera.Pose>} */
       this.pose = new global.RobotCamera.Pose(options.THREE);
-      /** Perspective camera following the selected articulated link. */
+      /** Available frames from the scene. @type {ReturnType<typeof window.RobotCamera.sources>} */
       this.sources = [];
-      /** Available camera frames from the current scene models. */
-      this.models = [];
-      /** Model, loaded object and camera-list identities at the last source refresh. */
-      this.primary = null;
-      /** Robot whose default camera is preferred before a user chooses one. */
+      /** Rendered camera source. @type {ReturnType<typeof window.RobotCamera.sources>[number]|null} */
       this.selected = null;
-      /** Source currently used to render the robot view. */
+      /** Whether a user choice takes precedence over the primary robot. @type {boolean} */
       this.userSelected = false;
-      /** Whether an explicit selection takes precedence over the primary robot. */
+      /** Whether the window uses the expanded scene layout. @type {boolean} */
       this.expanded = false;
-      /** Whether the window fills the scene instead of using the saved inset bounds. */
+      /** Last inset position relative to the scene. @type {{left: number, top: number}|null} */
       this.position = null;
-      /** Last inset position relative to the scene container. */
+      /** Captured movement pointer and window offset. @type {{pointer: number, offsetX: number, offsetY: number}|null} */
       this.drag = null;
-      /** Captured pointer and its offset within the window. */
+      /** Chosen inset size, retained while the scene is smaller. @type {{width: number, height: number}|null} */
       this.size = null;
-      /** Chosen inset size, retained while the scene is temporarily smaller. */
+      /** Captured resize origin. @type {(ResizeOrigin & {pointer: number, handle: HTMLButtonElement, clientX: number, clientY: number})|null} */
       this.resizing = null;
-      /** Captured resize pointer and the window geometry where it started. */
+      /** Owned event subscriptions. @type {{element: EventTarget, name: string, handler: EventListener}[]} */
       this.listeners = [];
-      /** Event subscriptions owned by the panel. */
+      /** Title bar accepting window movement gestures. @type {HTMLElement} */
       this.header = this.root.querySelector('.robot-camera-head');
-      /** Title bar accepting window movement gestures. */
       this.header.title = 'Drag to move the robot view';
+      /** Image area determining the camera image size. @type {HTMLElement} */
       this.viewport = this.root.querySelector('[data-robot-camera="viewport"]');
-      /** Image area whose bounds determine the camera image size. */
+      /** Owned image copy covering the robot viewport. @type {HTMLCanvasElement} */
       this.canvas = this.root.ownerDocument.createElement('canvas');
-      /** Owned image copy that leaves the overview canvas unobstructed. */
       this.canvas.setAttribute('aria-hidden', 'true');
+      /** Opaque drawing context for the robot view. @type {CanvasRenderingContext2D} */
       this.context = this.canvas.getContext('2d', {alpha: false});
-      /** Opaque drawing context for the robot view and its letterbox margins. */
       this.viewport.appendChild(this.canvas);
+      /** Message shown when no cameras are available. @type {HTMLElement} */
       this.status = this.root.querySelector('[data-robot-camera="status"]');
-      /** Message shown when the scene has no available cameras. */
+      /** Native selector for the scene's cameras. @type {HTMLSelectElement} */
       this.select = this.root.querySelector('[data-robot-camera="source"]');
-      /** Native select listing the scene's camera frames. */
+      /** Button toggling inset and expanded sizes. @type {HTMLButtonElement} */
       this.expand = this.root.querySelector('[data-robot-camera="expand"]');
-      /** Button toggling inset and expanded window sizes. */
+      /** Viewport restored after a camera image. @type {THREE.Vector4} */
       this.savedViewport = new options.THREE.Vector4();
-      /** Borrowed renderer viewport to restore after a camera image. */
+      /** Scissor bounds restored after a camera image. @type {THREE.Vector4} */
       this.savedScissor = new options.THREE.Vector4();
-      /** Borrowed renderer scissor bounds to restore after a camera image. */
+      /** Corner controls owned by the panel. @type {HTMLButtonElement[]} */
       this.resizeHandles = [];
-      /** Corner controls created and removed by the panel. */
       this.bindControls();
       this.addResizeHandles();
+      /** Observer keeping the window inside a resized scene. @type {ResizeObserver} */
       this.observer = new options.ResizeObserver(() => {
         this.fitSize();
         this.fitPosition();
         this.invalidate();
       });
-      /** Observer keeping the window inside a resized scene. */
       this.observer.observe(this.viewport);
       this.observer.observe(this.container);
       this.setVisible(false);
@@ -113,10 +127,7 @@
     bindControls() {
       this.listen(this.layer, 'change', () => this.setVisible(this.layer.checked));
       this.listen(this.expand, 'click', () => this.setExpanded(!this.expanded));
-      this.listen(this.root.querySelector('[data-robot-camera="close"]'), 'click', () => {
-        this.setVisible(false);
-        this.layer.focus();
-      });
+      this.listen(this.root.querySelector('[data-robot-camera="close"]'), 'click', () => this.close());
       this.listen(this.select, 'change', () => {
         this.selected = this.sources.find(source => source.id === this.select.value) || null;
         this.userSelected = true;
@@ -127,7 +138,7 @@
         if (event.key !== 'Escape') return;
         event.stopPropagation();
         if (this.expanded) this.setExpanded(false);
-        else { this.setVisible(false); this.layer.focus(); }
+        else this.close();
       });
       for (const name of ['pointerdown', 'wheel', 'dblclick']) {
         this.listen(this.root, name, event => event.stopPropagation());
@@ -160,6 +171,12 @@
       this.root.hidden = !visible;
       if (visible) { this.fitSize(); this.fitPosition(); }
       this.invalidate();
+    }
+
+    /** Hide the view and return keyboard focus to its scene controls. @returns {void} */
+    close() {
+      this.setVisible(false);
+      this.restoreFocus();
     }
 
     /**
@@ -231,8 +248,8 @@
       const container = this.container.getBoundingClientRect();
       const bounds = this.root.getBoundingClientRect();
       if (!container.width || !container.height) return;
-      const horizontalMargin = Math.min(WINDOW_MARGIN, Math.max(0, (container.width - bounds.width) / 2));
-      const verticalMargin = Math.min(WINDOW_MARGIN, Math.max(0, (container.height - bounds.height) / 2));
+      const horizontalMargin = Math.min(this.margin, Math.max(0, (container.width - bounds.width) / 2));
+      const verticalMargin = Math.min(this.margin, Math.max(0, (container.height - bounds.height) / 2));
       this.position.left = Math.max(horizontalMargin, Math.min(this.position.left, container.width - bounds.width - horizontalMargin));
       this.position.top = Math.max(verticalMargin, Math.min(this.position.top, container.height - bounds.height - verticalMargin));
       this.root.style.left = this.position.left + 'px';
@@ -267,7 +284,7 @@
      * Fix the opposite corner before capturing a resize gesture.
      * @param {PointerEvent} event Pointer pressed on a corner grip.
      * @param {HTMLButtonElement} handle Corner control retaining pointer capture.
-     * @param {{name: string, horizontal: number, vertical: number}} corner Resize directions.
+     * @param {ResizeCorner} corner Resize directions.
      */
     startResize(event, handle, corner) {
       if (this.root.hidden || this.expanded || this.drag || this.resizing ||
@@ -292,7 +309,7 @@
     /**
      * Move the focused corner with arrow keys without capturing a pointer.
      * @param {KeyboardEvent} event Key pressed on a corner control.
-     * @param {{horizontal: number, vertical: number}} corner Resize directions.
+     * @param {ResizeCorner} corner Resize directions.
      */
     resizeWithKeyboard(event, corner) {
       const direction = RESIZE_KEYS[event.key];
@@ -305,8 +322,8 @@
 
     /**
      * Capture the window rectangle relative to its containing scene.
-     * @param {{horizontal: number, vertical: number}} corner Directions of the moving corner.
-     * @returns {object} Resize origin and bounds in CSS pixels.
+     * @param {ResizeCorner} corner Directions of the moving corner.
+     * @returns {ResizeOrigin} Resize origin and bounds in CSS pixels.
      */
     resizeGeometry(corner) {
       const bounds = this.root.getBoundingClientRect();
@@ -317,7 +334,7 @@
 
     /**
      * Apply a corner displacement while preserving its opposite anchor and size limits.
-     * @param {object} geometry Window rectangle and moving corner at the resize origin.
+     * @param {ResizeOrigin} geometry Window rectangle and moving corner at the resize origin.
      * @param {number} horizontal Horizontal corner displacement in CSS pixels.
      * @param {number} vertical Vertical corner displacement in CSS pixels.
      */
@@ -327,13 +344,13 @@
       const upward = geometry.corner.vertical < 0;
       const right = geometry.left + geometry.width;
       const bottom = geometry.top + geometry.height;
-      const maximumWidth = Math.max(1, (leftward ? right : container.width - geometry.left) - WINDOW_MARGIN);
-      const maximumHeight = Math.max(1, (upward ? bottom : container.height - geometry.top) - WINDOW_MARGIN);
+      const maximumWidth = Math.max(1, (leftward ? right : container.width - geometry.left) - this.margin);
+      const maximumHeight = Math.max(1, (upward ? bottom : container.height - geometry.top) - this.margin);
       const width = geometry.width + geometry.corner.horizontal * horizontal;
       const height = geometry.height + geometry.corner.vertical * vertical;
       this.size = {
-        width: Math.max(Math.min(MINIMUM_SIZE.width, maximumWidth), Math.min(width, maximumWidth)),
-        height: Math.max(Math.min(MINIMUM_SIZE.height, maximumHeight), Math.min(height, maximumHeight)),
+        width: Math.max(Math.min(this.minimumSize.width, maximumWidth), Math.min(width, maximumWidth)),
+        height: Math.max(Math.min(this.minimumSize.height, maximumHeight), Math.min(height, maximumHeight)),
       };
       this.position = {left: leftward ? right - this.size.width : geometry.left,
         top: upward ? bottom - this.size.height : geometry.top};
@@ -357,8 +374,8 @@
     fitSize() {
       if (!this.size || this.root.hidden || this.expanded) return;
       const container = this.container.getBoundingClientRect();
-      const maximumWidth = container.width - WINDOW_MARGIN * 2;
-      const maximumHeight = container.height - WINDOW_MARGIN * 2;
+      const maximumWidth = container.width - this.margin * 2;
+      const maximumHeight = container.height - this.margin * 2;
       if (maximumWidth <= 0 || maximumHeight <= 0) return;
       this.root.style.width = Math.min(this.size.width, maximumWidth) + 'px';
       this.root.style.height = Math.min(this.size.height, maximumHeight) + 'px';
@@ -367,12 +384,10 @@
     // %% camera selection and rendering
     /**
      * Refresh camera sources after model loading, retaining a still available user choice.
-     * @param {object[]} models Scene models and their published camera definitions.
-     * @param {object} [primary] Robot whose default camera is preferred.
+     * @param {CameraModel[]} models Scene models and their published camera definitions.
+     * @param {CameraModel} [primary] Robot whose default camera is preferred.
      */
     setModels(models, primary) {
-      this.models = models.map(model => ({model, object: model.obj, cameras: model.cameras}));
-      this.primary = primary;
       this.sources = global.RobotCamera.sources(models);
       const previous = this.userSelected && this.selected
         ? this.sources.find(source => source.id === this.selected.id) : null;
@@ -392,19 +407,6 @@
       this.status.hidden = !!this.selected;
       this.canvas.hidden = !this.selected;
       this.invalidate();
-    }
-
-    /**
-     * Resolve changed model, articulated object or camera-list identities before rendering.
-     * @param {object[]} models Current scene models, including asynchronous loads.
-     * @param {object} [primary] Robot whose default camera is preferred.
-     */
-    refreshModels(models, primary) {
-      const unchanged = this.models.length === models.length && this.models.every((entry, index) => {
-        const model = models[index];
-        return entry.model === model && entry.object === model.obj && entry.cameras === model.cameras;
-      });
-      if (!unchanged || this.primary !== primary) this.setModels(models, primary);
     }
 
     /** Draw the current robot pose without changing the overview camera or GPU context. */

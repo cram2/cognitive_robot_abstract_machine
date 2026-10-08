@@ -230,6 +230,13 @@ Panels.define('robot-scene', function (root, bus) {
   let needsRender = true;
   controls.addEventListener('change', function () { needsRender = true; });
 
+  /** Return focus to the Robot view checkbox or the visible Layers control. @returns {void} */
+  function restoreRobotViewFocus() {
+    const checkbox = $('lyr-robot-view');
+    const target = checkbox.getClientRects().length ? checkbox : $('layers-fold');
+    target.focus();
+  }
+
   // %% scene
   let SCENE = null;              // scene.json payload
   let sceneBase = null;          // static/scenes/<name>/
@@ -239,6 +246,7 @@ Panels.define('robot-scene', function (root, bus) {
     THREE, root: $('robot-camera'), layer: $('lyr-robot-view'),
     renderer, scene: scene3, container, ResizeObserver,
     invalidate: function () { needsRender = true; },
+    restoreFocus: restoreRobotViewFocus,
   });
   let robotModel = null;          // the bundle's own robot entry
   const objectMeshes = {};       // mesh key ('milk.stl') -> THREE.Group
@@ -619,6 +627,7 @@ Panels.define('robot-scene', function (root, bus) {
         };
         models.push(entry);
         if (m.robot) robotModel = entry;
+        robotCameraPanel.setModels(models, robotModel);
         worldRoot.add(obj);
         refreshFrameAxes();          // every link of the model is a frame
         needsRender = true;
@@ -1556,7 +1565,6 @@ Panels.define('robot-scene', function (root, bus) {
     }
     if (!needsRender && !moved && !controls.autoRotate) return;
     renderFrame();
-    robotCameraPanel.refreshModels(models, robotModel);
     robotCameraPanel.render();
     needsRender = false;
   }
