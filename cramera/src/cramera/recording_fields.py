@@ -24,7 +24,7 @@ class SceneField(StrEnum):
 
     ROBOT = "robot"
     """
-    The scene's native robot metadata, or None when no robot is bound.
+    Key for serialized robot metadata in a scene bundle.
     """
 
     BUNDLE_SIGNATURE = "bundleSignature"
