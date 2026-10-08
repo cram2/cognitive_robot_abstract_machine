@@ -230,7 +230,7 @@ class BranchingAtomCountCausalQuery:
         )
 
         branching_atom_count_regions = (
-            causal_circuit._extract_disjoint_regions_for_variable(
+            causal_circuit.disjoint_support_regions_of(
                 branching_atom_count_variable
             )
         )

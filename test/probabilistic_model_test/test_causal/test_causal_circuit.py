@@ -1060,7 +1060,7 @@ class DiscreteConfounderAdjustmentTestCase(unittest.TestCase):
     `_build_discrete_confounded_circuit`'s treatment has no causal effect on outcome,
     only a spurious correlation through the discrete confounder season. Regression
     coverage for the union-coalescing bug `_split_into_atomic_values` fixes in
-    `_extract_disjoint_regions_for_variable` and `_extract_leaf_regions_for_variables`,
+    `disjoint_support_regions_of` and `_extract_leaf_regions_for_variables`,
     and for the cause-region weighting fix in.
 
     `_add_region_for_cause_value` (weighting by P(cause=v), not P(cause=v | stratum)
@@ -1272,7 +1272,7 @@ class CauseSpecificAdjustmentTestCase(unittest.TestCase):
 
 class SplitIntoAtomicValuesTestCase(unittest.TestCase):
     """
-    `_extract_disjoint_regions_for_variable` and `_extract_leaf_regions_for_variables`
+    `disjoint_support_regions_of` and `_extract_leaf_regions_for_variables`
     both rely on `_split_into_atomic_values` to break a discrete union value (several of
     a Symbolic variable's values, all with positive probability in one SumUnit branch)
     into its individual elements.
@@ -1351,7 +1351,7 @@ class ExtractLeafRegionsTestCase(unittest.TestCase):
 
 class ExtractDisjointRegionsTestCase(unittest.TestCase):
     """
-    _extract_disjoint_regions_for_variable is the disjoint counterpart of
+    disjoint_support_regions_of is the disjoint counterpart of
     _extract_leaf_regions_for_variable: it separates support regions coming from
     different SumUnit branches instead of collapsing them into the variable's whole
     marginal support.
@@ -1367,7 +1367,7 @@ class ExtractDisjointRegionsTestCase(unittest.TestCase):
         )
 
     def test_finds_both_branches_separately_unlike_the_marginalized_version(self):
-        disjoint_regions = self.causal_circuit._extract_disjoint_regions_for_variable(
+        disjoint_regions = self.causal_circuit.disjoint_support_regions_of(
             self.x
         )
         coarsened_regions = self.causal_circuit._extract_leaf_regions_for_variable(
@@ -1377,19 +1377,19 @@ class ExtractDisjointRegionsTestCase(unittest.TestCase):
         self.assertEqual(len(coarsened_regions), 1)
 
     def test_region_probabilities_sum_to_one(self):
-        regions = self.causal_circuit._extract_disjoint_regions_for_variable(self.x)
+        regions = self.causal_circuit.disjoint_support_regions_of(self.x)
         self.assertAlmostEqual(
             sum(region.probability for region in regions), 1.0, delta=0.01
         )
 
     def test_all_region_probabilities_are_positive(self):
-        for region in self.causal_circuit._extract_disjoint_regions_for_variable(
+        for region in self.causal_circuit.disjoint_support_regions_of(
             self.x
         ):
             self.assertGreater(region.probability, 0.0)
 
     def test_regions_are_returned_as_event_probability_pairs(self):
-        for region in self.causal_circuit._extract_disjoint_regions_for_variable(
+        for region in self.causal_circuit.disjoint_support_regions_of(
             self.x
         ):
             self.assertIsInstance(region.probability, float)
@@ -1399,7 +1399,7 @@ class ExtractDisjointRegionsTestCase(unittest.TestCase):
         # x's two branches are equal-weight (0.5 each) and non-overlapping.
         probabilities = sorted(
             region.probability
-            for region in self.causal_circuit._extract_disjoint_regions_for_variable(
+            for region in self.causal_circuit.disjoint_support_regions_of(
                 self.x
             )
         )
@@ -1413,7 +1413,7 @@ class ExtractDisjointRegionsTestCase(unittest.TestCase):
         causal_circuit = CausalCircuit.from_probabilistic_circuit(
             circuit, MarginalDeterminismTreeNode.from_causal_graph([x], [y]), [x], [y]
         )
-        disjoint_regions = causal_circuit._extract_disjoint_regions_for_variable(y)
+        disjoint_regions = causal_circuit.disjoint_support_regions_of(y)
         coarsened_regions = causal_circuit._extract_leaf_regions_for_variable(y)
         self.assertEqual(len(disjoint_regions), len(coarsened_regions))
 

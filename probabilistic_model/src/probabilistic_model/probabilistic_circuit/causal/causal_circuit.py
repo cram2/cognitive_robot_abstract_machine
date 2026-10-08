@@ -690,7 +690,7 @@ class CausalCircuit:
                 output_circuit=output_circuit,
                 root_sum_unit=root_sum_unit,
             )
-            for region in self._extract_disjoint_regions_for_variable(cause_variable)
+            for region in self.disjoint_support_regions_of(cause_variable)
             if region.probability > 0.0
         )
 
@@ -864,9 +864,7 @@ class CausalCircuit:
                 output_circuit=output_circuit,
                 root_sum_unit=root_sum_unit,
             )
-            for cause_region in self._extract_disjoint_regions_for_variable(
-                cause_variable
-            )
+            for cause_region in self.disjoint_support_regions_of(cause_variable)
             if cause_region.probability > 0.0
         )
 
@@ -905,7 +903,7 @@ class CausalCircuit:
                 regions.append(SupportRegion(region_event, float(probability)))
         return regions
 
-    def _extract_disjoint_regions_for_variable(
+    def disjoint_support_regions_of(
         self,
         variable: Variable,
         base_circuit: ProbabilisticCircuit = None,
@@ -981,8 +979,8 @@ class CausalCircuit:
     ) -> Optional[Event]:
         """
         Return the structurally disjoint support region of variable (see
-        `_extract_disjoint_regions_for_variable`) with the highest interventional
-        probability, or None if no regions are found.
+        `disjoint_support_regions_of`) with the highest interventional probability, or
+        None if no regions are found.
 
         The disjoint counterpart of `_best_region`: use this when telling one SumUnit
         branch's region apart from another's matters (for example, ranking several
@@ -997,7 +995,7 @@ class CausalCircuit:
         """
         best_probability = -1.0
         best_region: Optional[Event] = None
-        for region in self._extract_disjoint_regions_for_variable(variable):
+        for region in self.disjoint_support_regions_of(variable):
             region_probability = float(
                 interventional_circuit.probability(
                     region.event.fill_missing_variables_pure(
@@ -1018,12 +1016,12 @@ class CausalCircuit:
         Return a :class:`SupportRegion` for the joint support of variables.
 
         Decomposes each variable's value the same way
-        :meth:`_extract_disjoint_regions_for_variable` does (see
-        `_split_into_atomic_values`) before combining them, and takes the Cartesian
-        product across *variables* to enumerate every joint combination -- needed
-        because a discrete adjustment variable's own marginal support already unions
-        every value it takes with positive probability into one entry, the same
-        coalescing that method exists to undo for a single variable.
+        :meth:`disjoint_support_regions_of` does (see `_split_into_atomic_values`)
+        before combining them, and takes the Cartesian product across *variables* to
+        enumerate every joint combination -- needed because a discrete adjustment
+        variable's own marginal support already unions every value it takes with
+        positive probability into one entry, the same coalescing that method exists to
+        undo for a single variable.
 
         :param variables: Variables whose joint support regions to extract.
         :returns: List of regions, one per joint region, each with positive probability.
