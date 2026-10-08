@@ -1,139 +1,94 @@
-#!/usr/bin/env python3
+"""
+PR2 Giskard Both Arms Demo
+==========================
 
+Demonstrates dual-arm planning and execution with Giskard and CoraPlex
+for the PR2 robot.
+"""
+
+from __future__ import annotations
+
+import argparse
 import logging
-import time
+from typing import List, Tuple
+
+from coraplex.datastructures.dataclasses import Context
+from coraplex.execution_environment import (
+    ExecutionEnvironment,
+    real_robot,
+    simulated_robot,
+)
+from coraplex.plans.factories import execute_single
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+from coraplex.testing import setup_world
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.world import World
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from coraplex.testing import setup_world
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms
-from coraplex.plans.factories import sequential, execute_single
-from coraplex.motion_executor import simulated_robot
-from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.robots.pr2 import PR2
 
-import coraplex.alternative_motion_mappings.pr2_motion_mapping  # noqa — register bridge handlers
+def setup_demo_context() -> Tuple[World, PR2, Context]:
+    """
+    Load the world and construct the CoraPlex planning context for the PR2.
+    """
+    logger.info("Setting up world and PR2 model...")
+    world = setup_world()
+    pr2 = PR2.from_world(world)
+    context = Context.from_world(world)
+    return world, pr2, context
 
-print(' PR2 Giskard Both Arms Demo (Plan Locally → Execute via Bridge)')
+
+def extract_arm_joints(pr2: PR2) -> Tuple[List[str], List[str]]:
+    """
+    Extract right and left arm joint names dynamically from semantic annotations.
+    """
+    r_arm_joints = [c.name.name for c in pr2.right_arm.active_connections]
+    l_arm_joints = [c.name.name for c in pr2.left_arm.active_connections]
+    return r_arm_joints, l_arm_joints
 
 
-# ── 1. Setup world ────────────────────────────────────────────────────────────
-print('[demo] Loading world...')
-world = setup_world()
-pr2   = PR2.from_world(world)
-context = Context.from_world(world)
-base_footprint = world.get_kinematic_structure_entity_by_name("base_footprint")
-print('[demo] World ready.\n')
+def run_both_arms_motion(
+    context: Context,
+    pr2: PR2,
+    execution_env: ExecutionEnvironment = simulated_robot,
+) -> None:
+    """
+    Plan and execute dual-arm parking for the PR2 using Giskard.
+    """
+    r_joints, l_joints = extract_arm_joints(pr2)
+    logger.info("Right arm joints (%d): %s", len(r_joints), r_joints)
+    logger.info("Left arm joints (%d): %s", len(l_joints), l_joints)
 
-# ── 2. Define arm targets ─────────────────────────────────────────────────────
-steps = [
-    ("Park Both Arms", ParkArmsAction(Arms.BOTH))
-]
+    action = ParkArmsAction(arms=list(pr2.all_arms))
+    logger.info("Creating plan for: ParkArmsAction(arms=pr2.all_arms)...")
+    plan = execute_single(action, context=context).plan
 
-# Right arm joint names for PR2
-r_arm_joints = [
-    'r_shoulder_pan_joint',
-    'r_shoulder_lift_joint',
-    'r_upper_arm_roll_joint',
-    'r_elbow_flex_joint',
-    'r_forearm_roll_joint',
-    'r_wrist_flex_joint',
-    'r_wrist_roll_joint'
-]
+    logger.info(
+        "Executing plan with execution environment: %s...",
+        execution_env.execution_type.name,
+    )
+    with execution_env:
+        plan.perform()
+    logger.info("Both arms parking motion completed successfully.")
 
-# Left arm joint names for PR2
-l_arm_joints = [
-    'l_shoulder_pan_joint',
-    'l_shoulder_lift_joint',
-    'l_upper_arm_roll_joint',
-    'l_elbow_flex_joint',
-    'l_forearm_roll_joint',
-    'l_wrist_flex_joint',
-    'l_wrist_roll_joint'
-]
 
-# ── 3. Ask before executing on robot via bridge ──────────────────────────────
-print('[demo]   ROBOT EXECUTION MODE')
-print('[demo]    The PR2 BOTH arms will move to their parked positions.')
-print('[demo]    If the sim_bridge is running, this will move the robot in RViz/Gazebo.')
-print('[demo]    If the real bridge is running, this will move the physical robot.')
-answer = input('[demo]    Type "yes" to execute, or anything else to skip: ').strip().lower()
+def main() -> None:
+    parser = argparse.ArgumentParser(description="PR2 Giskard Both Arms Demo")
+    parser.add_argument(
+        "--mode",
+        choices=["sim", "real"],
+        default="sim",
+        help="Execution mode: 'sim' for local simulation, 'real' for Giskard hardware execution (default: sim)",
+    )
+    args = parser.parse_args()
 
-if answer == 'yes':
-    from coraplex.alternative_motion_mappings.pr2_motion_mapping import PR2ROS1TrajectoryTask, _find_bridge_container
-    container = _find_bridge_container()
+    execution_env = real_robot if args.mode == "real" else simulated_robot
+    logger.info("Starting PR2 Both Arms Demo in '%s' mode...", args.mode)
 
-    if not container:
-        print('[demo]  No bridge container found! Aborting.')
-    else:
-        print(f'\n[demo] Sending planned joints via bridge container ({container})...')
+    _, pr2, context = setup_demo_context()
+    run_both_arms_motion(context=context, pr2=pr2, execution_env=execution_env)
 
-        for i, (name, action_or_motion) in enumerate(steps):
-            print(f'\n[demo] ── Step {i+1}: {name} ──')
 
-            # Wrap the action/motion in a plan
-            plan = execute_single(action_or_motion, context=context).plan
-
-            # Plan in simulation — giskardpy solves arm IK locally
-            print('[demo] Planning with local giskardpy...')
-            try:
-                with simulated_robot:
-                    plan.perform()
-                print('[demo]  Planning succeeded!')
-            except Exception as e:
-                print(f'[demo]  Planning failed: {e}')
-                break
-
-            # Extract planned right arm joint positions from world state
-            r_positions = []
-            for j_name in r_arm_joints:
-                conn = world.get_connection_by_name(j_name)
-                pos = float(world.state[conn.dof.id].position)
-                r_positions.append(pos)
-
-            # Extract planned left arm joint positions from world state
-            l_positions = []
-            for j_name in l_arm_joints:
-                conn = world.get_connection_by_name(j_name)
-                pos = float(world.state[conn.dof.id].position)
-                l_positions.append(pos)
-
-            print(f'[demo]   Planned joints for right arm step {i+1}:')
-            for j_name, pos in zip(r_arm_joints, r_positions):
-                print(f'[demo]     {j_name}: {pos:.4f} rad')
-
-            print(f'[demo]   Planned joints for left arm step {i+1}:')
-            for j_name, pos in zip(l_arm_joints, l_positions):
-                print(f'[demo]     {j_name}: {pos:.4f} rad')
-
-            # Send commands to real robot via bridge (right then left for safety)
-            print('\n[demo] Executing right arm trajectory...')
-            r_task = PR2ROS1TrajectoryTask(
-                joint_names=r_arm_joints,
-                positions=r_positions,
-                duration_sec=4.0,
-                timeout_sec=20.0,
-            )
-            r_task.build()
-            r_task.on_start()
-
-            print('\n[demo] Executing left arm trajectory...')
-            l_task = PR2ROS1TrajectoryTask(
-                joint_names=l_arm_joints,
-                positions=l_positions,
-                duration_sec=4.0,
-                timeout_sec=20.0,
-            )
-            l_task.build()
-            l_task.on_start()
-
-            if i < len(steps) - 1:
-                print('[demo]  Reached target. Waiting 5 seconds before next movement...')
-                time.sleep(5)
-            else:
-                print('[demo]  Sequence finished!')
-else:
-    print('[demo] Skipped real robot execution.')
-
-print('\n══ Demo complete ══')
+if __name__ == "__main__":
+    main()
