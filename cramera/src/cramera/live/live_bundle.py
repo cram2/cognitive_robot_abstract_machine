@@ -31,6 +31,7 @@ from cramera.live.bridge import Bridge
 from cramera.world_objects import WorldObjects
 from cramera.onboard.bundle_urdf import BundledModel, BundleReport
 from cramera.onboard.world_to_urdf import UrdfDocument
+from cramera.robot_camera import CameraField, RobotCamera
 from cramera.robot_parts import RobotPartAnnotation
 
 ENVIRONMENT_MODEL_NAME = "environment"
@@ -145,20 +146,31 @@ def build_live_scene(bridge: Bridge) -> Optional[str]:
     output_directory = paths.local_scenes_directory() / paths.LIVE_SCENE_NAME
     with bridge.bundle_lock:
         signature = bridge.bundle_signature()
-        if _existing_signature(output_directory) == signature:
+        if _existing_signature(output_directory, bridge.robot) == signature:
             return paths.LIVE_SCENE_NAME
         return _write_bundle(bridge, output_directory, signature)
 
 
-def _existing_signature(output_directory: Path) -> Optional[str]:
+def _existing_signature(
+    output_directory: Path, robot: Optional[AbstractRobot]
+) -> Optional[str]:
     """
-    The signature the existing bundle was built from, or None without a readable one.
+    Read the cached signature only while its native camera metadata remains current.
 
     :param output_directory: Directory the previous bundle was written to.
+    :param robot: The current robot whose camera annotations the bundle must retain.
+    :return: The cached signature, or None for an absent or outdated bundle.
     """
     scene = GeneratedJson(output_directory / "scene.json").read()
     if not isinstance(scene, dict):
         return None
+    if robot is not None:
+        recorded_robot = scene.get("robot")
+        if not isinstance(recorded_robot, dict):
+            return None
+        cameras = [camera.to_payload() for camera in RobotCamera.of_robot(robot)]
+        if recorded_robot.get(CameraField.CAMERAS) != cameras:
+            return None
     return scene.get("bundleSignature")
 
 
@@ -244,4 +256,7 @@ def _robot_payload(robot: Optional[AbstractRobot]) -> Optional[Dict[str, Any]]:
         "baseBody": root_name.split("/", 1)[-1],
         "parts": {annotation.name: annotation.links for annotation in part_annotations},
         "partAnnotations": [annotation.to_payload() for annotation in part_annotations],
+        CameraField.CAMERAS: [
+            camera.to_payload() for camera in RobotCamera.of_robot(robot)
+        ],
     }
