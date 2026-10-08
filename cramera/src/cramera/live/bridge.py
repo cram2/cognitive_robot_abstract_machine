@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import threading
 import time
 import urllib.parse
@@ -34,6 +35,7 @@ from semantic_digital_twin.spatial_types import (
 )
 from cramera.logging_setup import get_logger
 from cramera.config import CrameraConfig
+from cramera.robot_camera import RobotCamera
 from cramera.body_geometry import NumericPose, POSE_PRECISION, rounded_pose
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -372,7 +374,7 @@ class BridgeStatus:
         payload = asdict(self)
         payload["sequenceNumber"] = payload.pop("sequence_number")
         payload["modelVersion"] = payload.pop("model_version")
-        payload["bundleSignature"] = payload.pop("bundle_signature")
+        payload[SceneField.BUNDLE_SIGNATURE] = payload.pop("bundle_signature")
         payload.pop("robot_parts")
         payload["partAnnotations"] = [
             annotation.to_payload() for annotation in self.robot_parts
@@ -866,14 +868,40 @@ class Bridge:
 
     def bundle_signature(self) -> str:
         """
-        A digest of the bundled scene's content: the identity, parentage and connection
-        type of every body the live bundle serializes, plus the robot's identity.
+        Identify the bundled body topology and the robot's current camera metadata.
 
         Deliberately excludes the overlay's mesh-named objects — a demo re-parenting a
         grasped object changes the world model but not the bundled scene, and must not
-        make the viewer reload it. State changes never touch it either.
+        make the viewer reload it. Joint and base poses do not affect the signature.
+
+        :return: The topology signature combined with the native camera descriptions.
         """
-        return self._bundle_signature
+        while True:
+            world = self.world
+            robot = self.robot
+            topology = self._bundle_signature
+            if world is None or robot is None:
+                return topology
+            with world.state.world_lock:
+                if (
+                    world is not self.world
+                    or robot is not self.robot
+                    or robot.root._world is not world
+                ):
+                    continue
+                cameras = [
+                    camera.to_payload() for camera in RobotCamera.of_robot(robot)
+                ]
+                if (
+                    world is not self.world
+                    or robot is not self.robot
+                    or topology != self._bundle_signature
+                ):
+                    continue
+                digest = hashlib.sha1(
+                    json.dumps(cameras, sort_keys=True).encode()
+                ).hexdigest()
+                return f"{topology}-{digest}"
 
     def _refresh_bundle_signature(self) -> None:
         """
