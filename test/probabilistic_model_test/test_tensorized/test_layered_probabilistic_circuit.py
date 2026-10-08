@@ -35,8 +35,8 @@ from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.set import Set
 from random_events.variable import Continuous, Integer, Symbolic
 
+from probabilistic_model.adapters.exceptions import CannotConvertError
 from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
-    CannotConvertError,
     NotExactlyOneRootError,
 )
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (

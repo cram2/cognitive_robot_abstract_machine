@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any, List, Set, TYPE_CHECKING, Type
+from typing_extensions import Any, Hashable, List, Set, TYPE_CHECKING, Type
 
 import random_events.variable
 from krrood.entity_query_language.core.variable import Variable
@@ -10,6 +10,7 @@ from krrood.exceptions import DataclassException, InputError
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
+    from krrood.entity_query_language.query.match import AttributeMatch
 
 
 @dataclass
@@ -211,4 +212,68 @@ class RelationalCircuitRegistryRequiresMatch(DataclassException):
         return (
             "Use RelationalCircuitRegistry only with distribution_of(...) (or a bare "
             "Match), not probability_of(...)/average(...)."
+        )
+
+
+@dataclass
+class AmbiguousVariableName(DataclassException):
+    """
+    Raised when several attributes of a match have the name of a variable of a
+    probabilistic model, so it is unclear which of them a sample of the variable sets.
+    """
+
+    variable: random_events.variable.Variable
+    """
+    The variable of the model.
+    """
+
+    attribute_matches: List[AttributeMatch]
+    """
+    The attributes of the match that have the name of the variable.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{len(self.attribute_matches)} attributes of the match have the name "
+            f"{self.variable.name} of a variable of the model, so a sample of the "
+            f"variable sets no single attribute."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Give every attribute of the match that the model answers its own variable "
+            "name."
+        )
+
+
+@dataclass
+class DomainElementsIndistinguishableInSamples(DataclassException):
+    """
+    Raised when two elements of the domain of a symbolic variable have hashes that a
+    sample of a probabilistic model cannot tell apart. A sample holds a hash as a float,
+    which rounds hashes larger than ``2**53``, so close hashes become the same value.
+    """
+
+    variable: random_events.variable.Variable
+    """
+    The symbolic variable.
+    """
+
+    elements: List[Hashable]
+    """
+    The elements of the domain whose hashes become the same value in a sample.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The elements {self.elements} of the domain of {self.variable.name} have "
+            f"hashes that become the same float in a sample of the model, so the "
+            f"element a sample refers to is unknown."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Give the elements hashes that differ by more than the spacing of floats at "
+            "their size, for instance values smaller than 2**53 for an integer "
+            "enumeration."
         )

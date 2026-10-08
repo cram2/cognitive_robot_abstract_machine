@@ -1,5 +1,9 @@
 import random
 import unittest
+from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit as RustworkxProbabilisticCircuit,
+)
 from enum import IntEnum
 
 import numpy as np
@@ -9,7 +13,7 @@ from sortedcontainers import SortedSet
 
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
-    ProbabilisticCircuit as JPC,
+    DifferentiableLayeredCircuit,
 )
 from probabilistic_model.learning.region_graph.region_graph import RegionGraph
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
@@ -25,6 +29,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     UnivariateContinuousLeaf,
 )
 from random_events.variable import Continuous, Symbolic
+
 
 np.random.seed(420)
 random.seed(420)
@@ -46,7 +51,9 @@ class RandomRegionGraphTestCase(unittest.TestCase):
 
     def test_as_jpc(self):
         model = self.region_graph.as_probabilistic_circuit(input_units=10, sum_units=5)
-        nx_model = model.to_rustworkx()
+        nx_model = CircuitRepresentations().convert(
+            model, RustworkxProbabilisticCircuit
+        )
         # fig = go.Figure(nx_model.plot_structure(), nx_model.plotly_layout_structure())
         # fig.show()
 
@@ -69,7 +76,9 @@ class RandomRegionGraphLearningTestCase(unittest.TestCase):
         data = jnp.array(data)
         model = self.region_graph.as_probabilistic_circuit(input_units=5, sum_units=5)
         model.fit(data, epochs=10, optimizer=optax.adamw(0.01))
-        nx_model = model.to_rustworkx()
+        nx_model = CircuitRepresentations().convert(
+            model, RustworkxProbabilisticCircuit
+        )
         for node in nx_model.nodes():
             if isinstance(node, SumUnit):
                 self.assertAlmostEqual(logsumexp(node.log_weights), 0.0)
@@ -98,9 +107,9 @@ class ClassificationTestCase(unittest.TestCase):
         self.assertEqual(model.root.number_of_nodes, 2)
         model.fit(data, labels=labels, epochs=10, optimizer=optax.adamw(0.01))
         pc = model.as_probabilistic_circuit(self.target)
-        self.assertIsInstance(pc, JPC)
+        self.assertIsInstance(pc, DifferentiableLayeredCircuit)
         self.assertEqual(pc.variables, self.features | SortedSet([self.target]))
-        nx_pc = pc.to_rustworkx()
+        nx_pc = CircuitRepresentations().convert(pc, RustworkxProbabilisticCircuit)
         self.assertTrue(nx_pc.is_decomposable())
 
         p_target = nx_pc.marginal(SortedSet([self.target]))
