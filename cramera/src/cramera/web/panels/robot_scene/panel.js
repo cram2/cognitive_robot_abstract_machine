@@ -47,10 +47,21 @@ Panels.define('robot-scene', function (root, bus) {
     '    <div id="frame-settings" class="frame-settings hidden"></div>' +
     '    <label class="lp-row"><input type="checkbox" id="lyr-labels"><span>Object labels</span></label>' +
     '    <label class="lp-row"><input type="checkbox" id="lyr-floor" checked><span>Floor shadow</span></label>' +
+    '    <label class="lp-row" title="Show the rendered scene from an annotated robot camera"><input type="checkbox" id="lyr-robot-view"><span>Robot view</span></label>' +
     '    <label class="lp-row" title="Keep the robot in view: the camera glides after it while a recording plays or a live demo runs. Off, the camera stays where you pointed it"><input type="checkbox" id="lyr-follow" checked><span>Follow robot</span></label>' +
     '    <label class="lp-row" title="Attach to a running demo whenever one is reachable — including the next run after this one ends — instead of only once per page"><input type="checkbox" id="lyr-auto-live" checked><span>Auto-attach live</span></label>' +
     '    <div class="lp-legend" id="lp-legend"></div>' +
         '  </div>' +
+    '  <section id="robot-camera" class="robot-camera" aria-label="Robot view" hidden>' +
+    '    <header class="robot-camera-head"><strong>Robot view</strong>' +
+    '      <button type="button" data-robot-camera="expand" aria-label="Enlarge robot view" aria-expanded="false">⛶</button>' +
+    '      <button type="button" data-robot-camera="close" title="Close robot view" aria-label="Close robot view">×</button>' +
+    '    </header>' +
+    '    <select data-robot-camera="source" aria-label="Robot camera"></select>' +
+    '    <div data-robot-camera="viewport" class="robot-camera-viewport" title="Double-click to enlarge or restore">' +
+    '      <div data-robot-camera="status" class="robot-camera-status" role="status"></div>' +
+    '    </div>' +
+    '  </section>' +
     '  <div id="live-indicator" class="live-indicator">● LIVE</div>' +
     '  <div id="step-caption" class="step-caption hidden"></div>' +
     '  <div class="stage-hint">drag orbit · scroll zoom · right-drag pan · click to inspect</div>' +
@@ -224,6 +235,11 @@ Panels.define('robot-scene', function (root, bus) {
   let sceneBase = null;          // static/scenes/<name>/
   let traj = null;
   const models = [];              // {name, prefix, robot, obj}
+  const robotCameraPanel = new RobotCameraPanel({
+    THREE, root: $('robot-camera'), layer: $('lyr-robot-view'),
+    renderer, scene: scene3, container, ResizeObserver,
+    invalidate: function () { needsRender = true; },
+  });
   let robotModel = null;          // the bundle's own robot entry
   const objectMeshes = {};       // mesh key ('milk.stl') -> THREE.Group
   const objectLabels = {};       // mesh key -> label sprite
@@ -597,7 +613,10 @@ Panels.define('robot-scene', function (root, bus) {
 
     sc.models.forEach(function (m) {
       makeUrdfLoader().load(sceneBase + m.urdf, function (obj) {
-        const entry = { name: m.name, prefix: m.prefix || '', robot: !!m.robot, obj: obj };
+        const entry = {
+          name: m.name, prefix: m.prefix || '', robot: !!m.robot, obj: obj,
+          cameras: m.robot && sc.robot ? sc.robot.cameras || [] : [],
+        };
         models.push(entry);
         if (m.robot) robotModel = entry;
         worldRoot.add(obj);
@@ -1537,6 +1556,8 @@ Panels.define('robot-scene', function (root, bus) {
     }
     if (!needsRender && !moved && !controls.autoRotate) return;
     renderFrame();
+    robotCameraPanel.refreshModels(models, robotModel);
+    robotCameraPanel.render();
     needsRender = false;
   }
   tick();
@@ -2294,6 +2315,7 @@ Panels.define('robot-scene', function (root, bus) {
 
   return {
     destroy: function () {
+      robotCameraPanel.destroy();
       running = false;                       // stops the requestAnimationFrame loop
       clearInterval(probeTimer);
       clearInterval(recordingProbeTimer);

@@ -64,6 +64,25 @@ The 3D panel requires WebGL. If the browser cannot create a WebGL context, open 
 viewer address in a browser with WebGL enabled; EQL and graph inspection remain
 available.
 
+## Robot view
+
+Enable **Layers → Robot view** to see the rendered scene from a robot camera.
+Choose an annotated camera from the window's menu. Drag its title bar to move it,
+drag a corner to resize it, or use **Enlarge** to fill the scene panel. **Escape**
+restores the inset; the close button or layer checkbox hides it.
+Keyboard users can focus a corner control and resize with the arrow keys.
+
+The view follows the camera's articulated link during live execution and playback.
+Camera names, root links, viewing directions, default selection and horizontal and
+vertical view angles come from native CRAM `Camera` annotations. Resizing preserves
+the complete field of view and adds margins where the window has another aspect ratio.
+
+This is a rendered view of the digital twin, not a sensor image stream. Native camera
+annotations do not specify image roll: the display uses the camera root's positive Z
+as up, or negative Y when looking along Z. Robots without camera annotations and older
+recordings without camera metadata show an availability message. New recordings retain
+their camera definitions for playback.
+
 ## Record and replay
 
 Live capture starts with the visualization backend. Stop the recording in the
