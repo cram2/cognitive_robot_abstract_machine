@@ -21,7 +21,7 @@ class PytestEnvironmentVariable(StrEnum):
     ORM_BUILD = "CRAM_ORM_BUILD"
     """
     Names when the run builds the ORM interfaces, for runs that state no ``--orm-build``
-    on their command line; absent, a run builds what is outdated.
+    on their command line; absent, a run builds what it can no longer import.
     """
 
     CONTINUOUS_INTEGRATION = "CI"

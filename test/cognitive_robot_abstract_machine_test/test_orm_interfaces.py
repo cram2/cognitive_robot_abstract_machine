@@ -4,9 +4,11 @@ Tests for building the ORM interfaces a checkout needs before it can persist obj
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -17,9 +19,10 @@ from cognitive_robot_abstract_machine import orm_interfaces
 from cognitive_robot_abstract_machine.exceptions import (
     MissingORMGeneratorError,
     OrmGenerationFailedError,
+    OrmImportFailedError,
 )
 from cognitive_robot_abstract_machine.orm_interfaces import (
-    INTERFACE_FILE_NAME,
+    InterfaceLocation,
     OrmInterface,
     REPOSITORY_ROOT,
     WORKSPACE_ORM_INTERFACES,
@@ -35,7 +38,7 @@ PACKAGE_NAMES: Tuple[str, ...] = ("upstream", "downstream")
 Packages of the checkout under test, in dependency order.
 """
 
-STALE_INTERFACE_CONTENT = "# interface of a previous run\n"
+PREVIOUS_INTERFACE_CONTENT = "# interface of a previous run\n"
 """
 Content the interfaces of the checkout hold before it is regenerated.
 """
@@ -49,8 +52,7 @@ Name of the module of a package whose classes its interface maps.
 @pytest.fixture
 def checkout(tmp_path: Path) -> Path:
     """
-    A git checkout of two packages whose interfaces hold content of a previous run,
-    beside the mapping engine every one of their generators reads.
+    A git checkout of two packages whose interfaces hold content of a previous run.
     """
     for package_name in PACKAGE_NAMES:
         package_root = tmp_path / package_name
@@ -61,15 +63,10 @@ def checkout(tmp_path: Path) -> Path:
         )
         interface = generate_orm.interface_of(package_root)
         interface.parent.mkdir(parents=True)
-        interface.write_text(STALE_INTERFACE_CONTENT, encoding="utf-8")
+        interface.write_text(PREVIOUS_INTERFACE_CONTENT, encoding="utf-8")
         shutil.copy(
             Path(mapped_module.__file__), interface.parent.parent / SOURCE_MODULE_NAME
         )
-
-    for source_folder in orm_interfaces.MAPPING_ENGINE_SOURCE_FOLDERS:
-        mapping_engine = tmp_path / source_folder
-        mapping_engine.mkdir(parents=True)
-        shutil.copy(Path(mapped_module.__file__), mapping_engine / SOURCE_MODULE_NAME)
 
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(
@@ -96,7 +93,7 @@ def tracked_interfaces(repository_root: Path) -> Set[str]:
     :return: The repository-relative paths of the tracked interfaces.
     """
     listing = subprocess.run(
-        ["git", "ls-files", "--", f"*/{INTERFACE_FILE_NAME}"],
+        ["git", "ls-files", "--", f"*/{InterfaceLocation.FILE_NAME}"],
         cwd=repository_root,
         check=True,
         capture_output=True,
@@ -238,7 +235,11 @@ def test_this_repository_ignores_every_generated_interface():
 
 def test_this_repository_ignores_a_generated_interface_outside_a_workspace_package():
     krrood_test_dataset_interface = (
-        REPOSITORY_ROOT / "test" / "krrood_test" / "dataset" / INTERFACE_FILE_NAME
+        REPOSITORY_ROOT
+        / "test"
+        / "krrood_test"
+        / "dataset"
+        / InterfaceLocation.FILE_NAME
     )
 
     assert git_ignores(REPOSITORY_ROOT, krrood_test_dataset_interface)
@@ -352,94 +353,156 @@ def test_a_build_showing_generator_output_keeps_no_bar(
         assert progress.bar is None
 
 
-# %% interfaces their sources have outrun
+# %% interfaces that no longer match their classes
+
+DATASET = Path(mapped_module.__file__).parent
+"""
+Folder holding the modules a checkout under test is built from.
+"""
+
+REMOVED_CLASS_INTERFACE = DATASET / "interface_of_a_removed_class.py"
+"""
+An interface of a package that no longer holds a class it maps.
+"""
+
+FAILING_INTERFACE = DATASET / "failing_interface.py"
+"""
+An interface that fails to import for a reason other than a stale mapping.
+"""
 
 
-def change_after_the_build(path: Path, interface: OrmInterface) -> None:
+def leave_behind(stand_in: Path, interface: OrmInterface) -> None:
     """
-    Give a file a modification time later than the interface's, as an edit made after
-    the build would.
+    Put an interface of a previous build in a package's place.
 
-    :param path: The file to mark as changed.
-    :param interface: The interface the change comes after.
+    :param stand_in: The module standing in for what a build wrote.
+    :param interface: The interface of the package it is left in.
     """
-    changed_at = interface.path.stat().st_mtime + 1
-    os.utime(path, (changed_at, changed_at))
+    shutil.copy(stand_in, interface.path)
 
 
-def test_a_freshly_built_checkout_is_current(workspace: WorkspaceOrmInterfaces):
+def test_a_freshly_built_checkout_imports(workspace: WorkspaceOrmInterfaces):
     workspace.regenerate()
 
-    assert workspace.is_outdated is False
+    assert workspace.stale_interface() is None
 
 
-def test_a_missing_interface_is_outdated(workspace: WorkspaceOrmInterfaces):
+def test_a_missing_interface_is_stale(workspace: WorkspaceOrmInterfaces):
     workspace.regenerate()
-    workspace.interfaces[-1].remove()
+    missing = workspace.interfaces[-1]
+    missing.remove()
 
-    assert workspace.interfaces[-1].is_outdated is True
-    assert workspace.is_outdated is True
+    stale = workspace.stale_interface()
+
+    assert stale.module_name == missing.module_name
+    assert stale.error_type == ModuleNotFoundError.__name__
 
 
-def test_a_changed_module_outdates_the_interface_of_its_package(
+def test_an_interface_of_a_removed_class_is_stale(workspace: WorkspaceOrmInterfaces):
+    """
+    A generated interface reaches every class it maps as an attribute of its module, so
+    one that has been renamed or removed since the build fails the import as a missing
+    attribute rather than as a missing module.
+    """
+    workspace.regenerate()
+    outrun = workspace.interfaces[0]
+    leave_behind(REMOVED_CLASS_INTERFACE, outrun)
+
+    stale = workspace.stale_interface()
+
+    assert stale.module_name == outrun.module_name
+    assert stale.error_type == AttributeError.__name__
+
+
+def test_the_first_interface_that_does_not_import_is_the_one_reported(
     workspace: WorkspaceOrmInterfaces,
 ):
     workspace.regenerate()
-    interface = workspace.interfaces[0]
+    for interface in workspace.interfaces:
+        leave_behind(REMOVED_CLASS_INTERFACE, interface)
 
-    change_after_the_build(interface.sources / SOURCE_MODULE_NAME, interface)
+    stale = workspace.stale_interface()
 
-    assert interface.is_outdated is True
-
-
-def test_a_changed_module_leaves_the_interface_of_another_package_alone(
-    workspace: WorkspaceOrmInterfaces,
-):
-    workspace.regenerate()
-    interface = workspace.interfaces[0]
-
-    change_after_the_build(interface.sources / SOURCE_MODULE_NAME, interface)
-
-    assert workspace.interfaces[-1].is_outdated is False
+    assert stale.module_name == workspace.interfaces[0].module_name
 
 
-def test_a_changed_mapping_engine_module_outdates_every_interface(
+def test_an_interface_failing_for_another_reason_reports_what_it_wrote(
     workspace: WorkspaceOrmInterfaces,
 ):
     """
-    Every generator reads the library that maps the classes, so a change to it leaves no
-    interface of the checkout current.
+    An interface failing for anything but a stale mapping is a broken checkout rather
+    than one to rebuild, so the attempt says what happened instead of answering with a
+    build.
     """
     workspace.regenerate()
-    interface = workspace.interfaces[0]
+    failing = workspace.interfaces[0]
+    leave_behind(FAILING_INTERFACE, failing)
 
-    for source_folder in interface.mapping_engine_sources:
-        change_after_the_build(source_folder / SOURCE_MODULE_NAME, interface)
+    with pytest.raises(OrmImportFailedError) as failure:
+        workspace.stale_interface()
 
-    assert all(member.is_outdated for member in workspace.interfaces)
-    assert workspace.is_outdated is True
-
-
-def test_a_changed_generator_outdates_the_interface_it_writes(
-    workspace: WorkspaceOrmInterfaces,
-):
-    workspace.regenerate()
-    interface = workspace.interfaces[0]
-
-    change_after_the_build(interface.generator, interface)
-
-    assert interface.is_outdated is True
+    assert ValueError.__name__ in failure.value.output
+    assert str(failing.path) in failure.value.output
 
 
-def test_a_missing_generator_leaves_its_interface_outdated(
+def test_the_import_attempt_stays_out_of_the_calling_interpreter(
     workspace: WorkspaceOrmInterfaces,
 ):
     """
-    A checkout that cannot build an interface is never current, so the build runs and
-    reports the missing generator rather than being skipped.
+    The interfaces are imported in an interpreter of their own, so a build following a
+    failed attempt cannot leave a stale interface behind in the one that asked for it.
     """
     workspace.regenerate()
-    interface = workspace.interfaces[0]
-    interface.generator.unlink()
 
-    assert interface.is_outdated is True
+    workspace.stale_interface()
+
+    assert [
+        interface.module_name
+        for interface in workspace.interfaces
+        if interface.module_name in sys.modules
+    ] == []
+
+
+@pytest.fixture
+def reported_staleness(caplog, monkeypatch) -> logging.Handler:
+    """
+    What a build writes about the interfaces it found stale.
+
+    ..note:: Whether the logger under test propagates to the root logger depends on the
+        logger class the ROS overlay installs, and the capturing handler sits on the root
+        logger already. Attaching it to the logger under test and turning propagation off
+        records every report exactly once, with or without the overlay.
+
+    :return: The handler holding the records, empty until a build writes one.
+    """
+    monkeypatch.setattr(orm_interfaces.logger, "propagate", False)
+    orm_interfaces.logger.addHandler(caplog.handler)
+    yield caplog.handler
+    orm_interfaces.logger.removeHandler(caplog.handler)
+
+
+def test_the_stale_interface_is_reported_through_logging(
+    workspace: WorkspaceOrmInterfaces, reported_staleness: logging.Handler
+):
+    """
+    The report explains a build the run did not ask for, so it goes to logging rather
+    than to whatever the caller has its output pointed at.
+    """
+    workspace.regenerate()
+    leave_behind(REMOVED_CLASS_INTERFACE, workspace.interfaces[0])
+
+    stale = workspace.stale_interface()
+
+    assert [record.getMessage() for record in reported_staleness.records] == [
+        stale.report()
+    ]
+
+
+def test_a_checkout_that_imports_is_reported_on_at_all(
+    workspace: WorkspaceOrmInterfaces, reported_staleness: logging.Handler
+):
+    workspace.regenerate()
+
+    workspace.stale_interface()
+
+    assert reported_staleness.records == []
