@@ -1,13 +1,22 @@
 /* %% viewpoints from native camera annotations */
 /**
- * Camera properties published by the scene bundle.
+ * Name fields from SDT PrefixedName.to_json, with an optional namespace.
+ * @typedef {object} SerializedPrefixedName
+ * @property {string} name Unprefixed native name.
+ * @property {string|null} prefix Namespace, or null/empty for an unprefixed name.
+ */
+
+/**
+ * Fields consumed from the native SDT Camera.to_json output.
  * @typedef {object} CameraDefinition
- * @property {string} name Native sensor name.
- * @property {string} link Exact exported root-link name.
- * @property {number[]} forward Viewing direction in root-local coordinates.
- * @property {number} horizontalAngle Horizontal field of view in radians.
- * @property {number} verticalAngle Vertical field of view in radians.
- * @property {boolean} default Whether the native sensor is a default camera.
+ * @property {SerializedPrefixedName} name Native sensor name and namespace.
+ * @property {object} forward_facing_axis Serialized Vector3 in the camera root's frame.
+ * @property {SerializedPrefixedName} forward_facing_axis.reference_frame_name Exact exported root-link name.
+ * @property {number[]} forward_facing_axis.data Homogeneous local direction [x, y, z, 0].
+ * @property {object} field_of_view Native perspective projection.
+ * @property {number} field_of_view.horizontal_angle Horizontal field of view in radians.
+ * @property {number} field_of_view.vertical_angle Vertical field of view in radians.
+ * @property {boolean} default_camera Whether the native sensor is a default camera.
  */
 
 /**
@@ -32,14 +41,35 @@
      * @param {CameraDefinition} definition Native camera name, root, direction and view angles.
      */
     constructor(model, definition) {
+      const name = CameraSource.formatName(definition.name);
       /** Stable identity across asynchronous reloads of the same model. */
-      this.id = encodeURIComponent(model.name) + '/' + encodeURIComponent(definition.name);
+      this.id = encodeURIComponent(model.name) + '/' + encodeURIComponent(name);
       /** Display label preserving the native camera name. */
-      this.label = model.name + ' · ' + definition.name;
+      this.label = model.name + ' · ' + name;
       /** Loaded scene node whose articulation determines the camera pose. */
-      this.link = model.obj.links[definition.link];
+      this.link = model.obj.links[CameraSource.formatName(definition.forward_facing_axis.reference_frame_name)];
       /** Published native camera parameters, retained without inferred replacements. */
       this.definition = definition;
+    }
+
+    /**
+     * Match native PrefixedName string formatting for labels and exported links.
+     * @param {SerializedPrefixedName} name Native name and optional namespace.
+     * @returns {string} Full name, separated by a slash when a prefix is present.
+     */
+    static formatName(name) {
+      return name.prefix ? name.prefix + '/' + name.name : name.name;
+    }
+
+    /**
+     * Validate a name before using nested camera metadata from the bundle.
+     * @param {unknown} name Serialized name to check.
+     * @returns {name is SerializedPrefixedName} Whether the native name fields are present.
+     */
+    static isValidName(name) {
+      if (!name || typeof name !== 'object') return false;
+      const fields = /** @type {Record<string, unknown>} */ (name);
+      return typeof fields.name === 'string' && (fields.prefix === null || typeof fields.prefix === 'string');
     }
 
     /**
@@ -50,12 +80,16 @@
     static isValidDefinition(definition) {
       if (!definition || typeof definition !== 'object') return false;
       const camera = /** @type {Record<string, unknown>} */ (definition);
-      if (typeof camera.name !== 'string' || typeof camera.link !== 'string' ||
-          typeof camera.default !== 'boolean') return false;
-      const angles = [camera.horizontalAngle, camera.verticalAngle];
+      if (!CameraSource.isValidName(camera.name) || typeof camera.default_camera !== 'boolean' ||
+          !camera.field_of_view || typeof camera.field_of_view !== 'object' ||
+          !camera.forward_facing_axis || typeof camera.forward_facing_axis !== 'object') return false;
+      const fieldOfView = /** @type {Record<string, unknown>} */ (camera.field_of_view);
+      const axis = /** @type {Record<string, unknown>} */ (camera.forward_facing_axis);
+      const angles = [fieldOfView.horizontal_angle, fieldOfView.vertical_angle];
       return angles.every(angle => typeof angle === 'number' && Number.isFinite(angle) && angle > 0 && angle < Math.PI) &&
-        Array.isArray(camera.forward) && camera.forward.length === 3 &&
-        camera.forward.every(Number.isFinite) && camera.forward.some(value => value !== 0);
+        CameraSource.isValidName(axis.reference_frame_name) &&
+        Array.isArray(axis.data) && axis.data.length === 4 && axis.data[3] === 0 &&
+        axis.data.every(Number.isFinite) && axis.data.some(value => value !== 0);
     }
 
     /**
@@ -67,9 +101,10 @@
       return models.filter(model => model.robot && model.obj && model.obj.links && Array.isArray(model.cameras))
         .sort((first, second) => first.name.localeCompare(second.name))
         .flatMap(model => model.cameras
-          .filter(definition => CameraSource.isValidDefinition(definition) && model.obj.links[definition.link])
+          .filter(definition => CameraSource.isValidDefinition(definition) &&
+            model.obj.links[CameraSource.formatName(definition.forward_facing_axis.reference_frame_name)])
           // Native default selection uses the first flagged sensor in robot order.
-          .sort((first, second) => Number(second.default) - Number(first.default))
+          .sort((first, second) => Number(second.default_camera) - Number(first.default_camera))
           .map(definition => new CameraSource(model, definition)));
     }
   }
@@ -107,8 +142,9 @@
     update(source, width, height) {
       if (!source || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false;
       const definition = source.definition;
-      const fieldOfView = definition.verticalAngle * 180 / Math.PI;
-      const aspect = Math.tan(definition.horizontalAngle / 2) / Math.tan(definition.verticalAngle / 2);
+      const fieldOfView = definition.field_of_view.vertical_angle * 180 / Math.PI;
+      const aspect = Math.tan(definition.field_of_view.horizontal_angle / 2) /
+        Math.tan(definition.field_of_view.vertical_angle / 2);
       if (this.camera.fov !== fieldOfView || this.camera.aspect !== aspect) {
         this.camera.fov = fieldOfView;
         this.camera.aspect = aspect;
@@ -117,7 +153,7 @@
       source.link.updateWorldMatrix(true, false);
       source.link.getWorldPosition(this.camera.position);
       source.link.getWorldQuaternion(this.orientation);
-      this.forward.fromArray(definition.forward).normalize();
+      this.forward.fromArray(definition.forward_facing_axis.data).normalize();
       this.camera.up.set(0, 0, 1);
       if (Math.abs(this.forward.dot(this.camera.up)) > 1 - PROJECTION.parallelTolerance) {
         this.camera.up.set(0, -1, 0);

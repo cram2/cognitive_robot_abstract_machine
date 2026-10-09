@@ -17,7 +17,6 @@ from cramera import paths
 from cramera.generated_json import GeneratedJson
 from cramera.logging_setup import get_logger
 from cramera.recording_fields import SceneField
-from cramera.robot_camera import CameraField
 
 logger = get_logger(__name__)
 
@@ -151,7 +150,7 @@ class SceneBundle:
             robot = self.scene.get(SceneField.ROBOT)
             if not isinstance(robot, dict):
                 return False
-            if not isinstance(robot.get(CameraField.CAMERAS), list):
+            if not isinstance(robot.get(SceneField.CAMERAS), list):
                 return False
         return self.scene.get(SceneField.BUNDLE_SIGNATURE) == content_digest
 

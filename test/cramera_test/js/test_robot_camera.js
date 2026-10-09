@@ -25,8 +25,10 @@ function loadRobotCamera() {
  * @returns {CameraDefinition} Camera metadata consumed by the browser module.
  */
 function cameraDefinition(link, values = {}) {
-  return {name: 'Inspection camera', link, forward: [1, 0, 0],
-    horizontalAngle: Math.PI / 2, verticalAngle: Math.PI / 3, default: false, ...values};
+  return {name: {name: 'Inspection camera', prefix: null},
+    forward_facing_axis: {reference_frame_name: {name: link, prefix: null}, data: [1, 0, 0, 0]},
+    field_of_view: {horizontal_angle: Math.PI / 2, vertical_angle: Math.PI / 3},
+    default_camera: false, ...values};
 }
 
 /** Build independently articulated links for a scene model.
@@ -40,7 +42,8 @@ function makeModel(name, cameras, robot = true) {
   object.links = {};
   for (const definition of cameras) {
     const link = new THREE.Group();
-    link.name = definition.link;
+    const referenceFrameName = definition.forward_facing_axis.reference_frame_name;
+    link.name = referenceFrameName.prefix ? referenceFrameName.prefix + '/' + referenceFrameName.name : referenceFrameName.name;
     object.links[link.name] = link;
     object.add(link);
   }
@@ -66,27 +69,50 @@ test('camera-looking names do not invent sensors for older bundles', () => {
 
 test('native default camera is offered first independently of link names', () => {
   const RobotCamera = loadRobotCamera();
-  const robot = makeModel('robot', [cameraDefinition('a'), cameraDefinition('z', {default: true})]);
+  const robot = makeModel('robot', [cameraDefinition('a'), cameraDefinition('z', {default_camera: true})]);
   assert.deepEqual(RobotCamera.sources([robot]).map(source => source.link), [robot.obj.links.z, robot.obj.links.a]);
 });
 
 test('multiple native defaults retain the robot sensor order instead of label order', () => {
   const RobotCamera = loadRobotCamera();
   const robot = makeModel('robot', [
-    cameraDefinition('first', {name: 'Zulu', default: true}),
-    cameraDefinition('second', {name: 'Alpha', default: true}),
+    cameraDefinition('first', {name: {name: 'Zulu', prefix: null}, default_camera: true}),
+    cameraDefinition('second', {name: {name: 'Alpha', prefix: null}, default_camera: true}),
   ]);
   assert.deepEqual(RobotCamera.sources([robot]).map(source => source.definition), robot.cameras);
 });
 
 test('namespaced camera roots match exact exported link names', () => {
   const RobotCamera = loadRobotCamera();
-  const robot = makeModel('robot', [cameraDefinition('second/eye')]);
+  const camera = cameraDefinition('eye');
+  camera.forward_facing_axis.reference_frame_name.prefix = 'second';
+  const robot = makeModel('robot', [camera]);
   robot.obj.links.eye = new THREE.Group();
   const source = RobotCamera.sources([robot])[0];
   assert.equal(source.link, robot.obj.links['second/eye']);
   delete robot.obj.links['second/eye'];
   assert.deepEqual(RobotCamera.sources([robot]), []);
+});
+
+test('native prefixed camera names retain their namespace in identity and label', () => {
+  const RobotCamera = loadRobotCamera();
+  const robot = makeModel('robot', [cameraDefinition('eye', {name: {name: 'inspection', prefix: 'sensors'}})]);
+  const source = RobotCamera.sources([robot])[0];
+  assert.equal(source.id, 'robot/sensors%2Finspection');
+  assert.equal(source.label, 'robot · sensors/inspection');
+});
+
+test('null and empty native prefixes both identify unprefixed cameras and links', () => {
+  const RobotCamera = loadRobotCamera();
+  for (const prefix of [null, '']) {
+    const camera = cameraDefinition('eye', {name: {name: 'inspection', prefix}});
+    camera.forward_facing_axis.reference_frame_name.prefix = prefix;
+    const robot = makeModel('robot', [camera]);
+    const source = RobotCamera.sources([robot])[0];
+    assert.equal(source.id, 'robot/inspection');
+    assert.equal(source.label, 'robot · inspection');
+    assert.equal(source.link, robot.obj.links.eye);
+  }
 });
 
 test('distinct robot models retain stable camera identities across load order', () => {
@@ -101,9 +127,16 @@ test('distinct robot models retain stable camera identities across load order', 
 
 test('unusable projection or direction metadata does not expose an unusable camera', () => {
   const RobotCamera = loadRobotCamera();
-  for (const values of [{forward: [0, 0, 0]}, {forward: [0, NaN, 1]}, {forward: [1, 0]},
-    {horizontalAngle: 0}, {horizontalAngle: Math.PI}, {verticalAngle: -1}, {verticalAngle: Infinity}]) {
-    assert.deepEqual(RobotCamera.sources([makeModel('robot', [cameraDefinition('eye', values)])]), []);
+  for (const data of [[0, 0, 0, 0], [0, NaN, 1, 0], [1, 0], [1, 0, 0, 1]]) {
+    const camera = cameraDefinition('eye');
+    camera.forward_facing_axis.data = data;
+    assert.deepEqual(RobotCamera.sources([makeModel('robot', [camera])]), []);
+  }
+  for (const angles of [{horizontal_angle: 0}, {horizontal_angle: Math.PI},
+    {vertical_angle: -1}, {vertical_angle: Infinity}]) {
+    const camera = cameraDefinition('eye');
+    Object.assign(camera.field_of_view, angles);
+    assert.deepEqual(RobotCamera.sources([makeModel('robot', [camera])]), []);
   }
 });
 
@@ -111,7 +144,16 @@ test('malformed camera descriptors do not prevent valid sources from loading', (
   const RobotCamera = loadRobotCamera();
   const robot = makeModel('robot', [cameraDefinition('eye')]);
   const valid = robot.cameras[0];
-  robot.cameras.unshift(null, {}, {...valid, name: null}, {...valid, link: 42});
+  robot.cameras.unshift(null, {},
+    ...[null, {}, 'eye', {name: 42, prefix: null}, {name: 'eye', prefix: 42}, {name: 'eye'}]
+      .map(name => ({...valid, name})),
+    ...[null, {}, 'lens', {horizontal_angle: 'wide', vertical_angle: Math.PI / 3}]
+      .map(field_of_view => ({...valid, field_of_view})),
+    ...[null, {}, 'axis', {data: null, reference_frame_name: valid.name},
+      {data: [1, 0, 0, 0], reference_frame_name: null},
+      {data: [1, 0, 0, 0], reference_frame_name: {name: 'eye', prefix: 42}}]
+      .map(forward_facing_axis => ({...valid, forward_facing_axis})),
+    {...valid, default_camera: 'true'});
   assert.deepEqual(RobotCamera.sources([robot]).map(source => source.definition), [valid]);
 });
 
@@ -127,13 +169,13 @@ test('malformed camera collections leave the scene without camera sources', () =
 // %% articulation in the viewer's rotated world
 /** A placed robot under the viewer's Z-up to Y-up world transform. */
 class ArticulatedViewpoint {
-  /** @param {Partial<CameraDefinition>} [definition] Sensor fields overridden by the case. */
-  constructor(definition = {}) {
+  /** @param {CameraDefinition} [definition] Native sensor metadata for the camera root. */
+  constructor(definition = cameraDefinition('eye')) {
     /** Root supplying the same axis conversion as the rendered world. @type {THREE.Group} */
     this.world = new THREE.Group();
     this.world.rotation.x = -Math.PI / 2;
     /** Robot model whose independent placement can change. @type {CameraModel} */
-    this.robot = makeModel('robot', [cameraDefinition('eye', definition)]);
+    this.robot = makeModel('robot', [definition]);
     this.robot.obj.position.set(3, -2, 0.5);
     /** Articulated camera root whose position and rotation can change. @type {THREE.Object3D} */
     this.head = this.robot.obj.links.eye;
@@ -170,13 +212,15 @@ test('native forward direction and field of view determine the rendered camera',
   assertVector(pose.camera.position, [3.2, 1.9, 2]);
   assertVector(pose.camera.getWorldDirection(new THREE.Vector3()), [1, 0, 0]);
   assertVector(cameraUp(pose.camera), [0, 1, 0]);
-  assert.ok(Math.abs(THREE.MathUtils.degToRad(pose.camera.fov) - scene.source.definition.verticalAngle) < 1e-10);
+  assert.ok(Math.abs(THREE.MathUtils.degToRad(pose.camera.fov) - scene.source.definition.field_of_view.vertical_angle) < 1e-10);
   const horizontalAngle = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(pose.camera.fov) / 2) * pose.camera.aspect);
-  assert.ok(Math.abs(horizontalAngle - scene.source.definition.horizontalAngle) < 1e-10);
+  assert.ok(Math.abs(horizontalAngle - scene.source.definition.field_of_view.horizontal_angle) < 1e-10);
 });
 
 test('a forward direction along local Z uses negative local Y as display up', () => {
-  const scene = new ArticulatedViewpoint({forward: [0, 0, 1]});
+  const camera = cameraDefinition('eye');
+  camera.forward_facing_axis.data = [0, 0, 1, 0];
+  const scene = new ArticulatedViewpoint(camera);
   const pose = new (loadRobotCamera().Pose)(THREE);
   pose.update(scene.source, 640, 360);
   assertVector(pose.camera.getWorldDirection(new THREE.Vector3()), [0, 1, 0]);
@@ -184,7 +228,9 @@ test('a forward direction along local Z uses negative local Y as display up', ()
 });
 
 test('arbitrary native axes are normalized without name or optical-frame assumptions', () => {
-  const scene = new ArticulatedViewpoint({forward: [2, 2, 0]});
+  const camera = cameraDefinition('eye');
+  camera.forward_facing_axis.data = [2, 2, 0, 0];
+  const scene = new ArticulatedViewpoint(camera);
   const pose = new (loadRobotCamera().Pose)(THREE);
   pose.update(scene.source, 640, 360);
   assertVector(pose.camera.getWorldDirection(new THREE.Vector3()), [Math.SQRT1_2, 0, -Math.SQRT1_2]);
@@ -212,10 +258,12 @@ test('changing camera updates projection while resizing preserves its complete i
     pose.update(scene.source, width, height);
     assert.equal(pose.camera.projectionMatrix.equals(projection), true);
   }
-  const other = new ArticulatedViewpoint({verticalAngle: Math.PI / 4});
+  const camera = cameraDefinition('eye');
+  camera.field_of_view.vertical_angle = Math.PI / 4;
+  const other = new ArticulatedViewpoint(camera);
   pose.update(other.source, 320, 180);
   assert.equal(pose.camera.projectionMatrix.equals(projection), false);
-  assert.equal(pose.camera.fov, THREE.MathUtils.radToDeg(other.source.definition.verticalAngle));
+  assert.equal(pose.camera.fov, THREE.MathUtils.radToDeg(other.source.definition.field_of_view.vertical_angle));
 });
 
 test('missing source or zero-sized viewport does not change the camera', () => {

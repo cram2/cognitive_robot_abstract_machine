@@ -27,6 +27,11 @@ class SceneField(StrEnum):
     Key for serialized robot metadata in a scene bundle.
     """
 
+    CAMERAS = "cameras"
+    """
+    Camera annotations serialized as part of the scene's robot metadata.
+    """
+
     BUNDLE_SIGNATURE = "bundleSignature"
     """
     Identity of the current bundled world geometry and robot metadata.

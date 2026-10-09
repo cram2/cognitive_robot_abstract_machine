@@ -161,9 +161,10 @@ function cameraModel(name, cameraNames = ['wide_stereo_optical_frame']) {
     object.add(link);
   }
   return {name, robot: true, obj: object,
-    cameras: cameraNames.map((name, index) => ({name, link: name, forward: [0, 0, 1],
-      horizontalAngle: 2 * Math.atan(4 / 3 * Math.tan(Math.PI / 6)),
-      verticalAngle: Math.PI / 3, default: index === 0})),
+    cameras: cameraNames.map((name, index) => ({name: {name, prefix: null},
+      forward_facing_axis: {reference_frame_name: {name, prefix: null}, data: [0, 0, 1, 0]},
+      field_of_view: {horizontal_angle: 2 * Math.atan(4 / 3 * Math.tan(Math.PI / 6)),
+        vertical_angle: Math.PI / 3}, default_camera: index === 0})),
   };
 }
 

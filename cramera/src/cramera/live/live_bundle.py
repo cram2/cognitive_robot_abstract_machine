@@ -21,7 +21,7 @@ from pathlib import Path
 
 from typing_extensions import Any, Dict, Iterable, List, Optional
 
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Camera
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -32,7 +32,6 @@ from cramera.world_objects import WorldObjects
 from cramera.onboard.bundle_urdf import BundledModel, BundleReport
 from cramera.onboard.world_to_urdf import UrdfDocument
 from cramera.recording_fields import SceneField
-from cramera.robot_camera import CameraField, RobotCamera
 from cramera.robot_parts import RobotPartAnnotation
 
 ENVIRONMENT_MODEL_NAME = "environment"
@@ -228,7 +227,11 @@ def _robot_payload(robot: Optional[AbstractRobot]) -> Optional[Dict[str, Any]]:
     if robot is None:
         return None
     with robot.root._world.state.world_lock:
-        cameras = [camera.to_payload() for camera in RobotCamera.of_robot(robot)]
+        cameras = [
+            sensor.to_json()
+            for sensor in robot.all_sensors
+            if isinstance(sensor, Camera)
+        ]
     root_name = str(robot.root.name)
     part_annotations = RobotPartAnnotation.of_robot(robot)
     return {
@@ -237,5 +240,5 @@ def _robot_payload(robot: Optional[AbstractRobot]) -> Optional[Dict[str, Any]]:
         "baseBody": root_name.split("/", 1)[-1],
         "parts": {annotation.name: annotation.links for annotation in part_annotations},
         "partAnnotations": [annotation.to_payload() for annotation in part_annotations],
-        CameraField.CAMERAS: cameras,
+        SceneField.CAMERAS: cameras,
     }

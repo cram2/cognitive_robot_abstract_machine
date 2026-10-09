@@ -74,10 +74,11 @@ Keyboard users can focus a corner control and resize with the arrow keys.
 
 The view follows the camera's articulated link during live execution and playback.
 Camera names, root links, viewing directions, default selection and horizontal and
-vertical view angles come from native CRAM `Camera` annotations. Resizing preserves
-the complete field of view and adds margins where the window has another aspect ratio.
+vertical view angles come from Semantic Digital Twin `Camera` annotations. Resizing
+preserves the complete field of view and adds margins where the window has another
+aspect ratio.
 
-This is a rendered view of the digital twin, not a sensor image stream. Native camera
+This is a rendered view of the digital twin, not a sensor image stream. Camera
 annotations do not specify image roll: the display uses the camera root's positive Z
 as up, or negative Y when looking along Z. Robots without camera annotations and older
 recordings without camera metadata show an availability message. New recordings retain

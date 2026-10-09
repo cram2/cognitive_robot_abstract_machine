@@ -28,14 +28,13 @@ from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.factories import inference
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Camera
 from semantic_digital_twin.world import World
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from cramera.logging_setup import get_logger
 from cramera.config import CrameraConfig
-from cramera.robot_camera import RobotCamera
 from cramera.body_geometry import NumericPose, POSE_PRECISION, rounded_pose
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -890,7 +889,9 @@ class Bridge:
                 ):
                     continue
                 cameras = [
-                    camera.to_payload() for camera in RobotCamera.of_robot(robot)
+                    sensor.to_json()
+                    for sensor in robot.all_sensors
+                    if isinstance(sensor, Camera)
                 ]
                 if (
                     world is not self.world

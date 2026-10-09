@@ -11,8 +11,9 @@ from copy import deepcopy
 from threading import Event
 
 import pytest
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import Any, TYPE_CHECKING
 
+from krrood.adapters.json_serializer import from_json
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
@@ -28,7 +29,6 @@ from cramera.live.live_bundle import (
 from cramera.live.recording import RecordedFrame
 from cramera.live.recording_bundle import write_recording_bundle
 from cramera.recording_fields import SceneField
-from cramera.robot_camera import CameraField, RobotCamera
 
 from .test_live_bundle import use_scratch_scenes_directory
 
@@ -52,51 +52,61 @@ def camera_robot(pr2_world_copy: World) -> PR2:
     return robot
 
 
-def test_camera_metadata_uses_native_values_and_name(camera_robot: PR2) -> None:
+def test_camera_metadata_uses_native_values_and_name(
+    camera_robot: PR2, tmp_path: Path
+) -> None:
     """
     Preserve a named sensor's identity, frame, direction and native field of view.
 
     :param camera_robot: Native robot whose camera metadata is serialized.
+    :param tmp_path: Isolated directory for the exported robot model.
     """
     camera = camera_robot.get_default_camera()
     with camera_robot._world.modify_world():
         camera.update_name(PrefixedName("inspection", prefix="sensors"))
 
-    payload = RobotCamera(camera).to_payload()
+    bundle = bundle_world_models(
+        camera_robot._world, camera_robot, tmp_path, MESH_SUBDIRECTORY
+    )
 
-    assert payload == {
-        CameraField.NAME: str(camera.name),
-        CameraField.LINK: str(camera.root.name),
-        CameraField.FORWARD: camera.forward_facing_axis.to_np()[:3].tolist(),
-        CameraField.HORIZONTAL_ANGLE: camera.field_of_view.horizontal_angle,
-        CameraField.VERTICAL_ANGLE: camera.field_of_view.vertical_angle,
-        CameraField.DEFAULT: camera.default_camera,
-    }
+    assert bundle.robot[SceneField.CAMERAS] == [camera.to_json()]
 
 
-def test_only_native_cameras_are_offered(camera_robot: PR2) -> None:
+def test_only_native_cameras_are_offered(camera_robot: PR2, tmp_path: Path) -> None:
     """
     Exclude non-camera sensors even when they belong to the robot.
 
     :param camera_robot: Native robot containing cameras and other sensor types.
+    :param tmp_path: Isolated directory for the exported robot model.
     """
-    cameras = RobotCamera.of_robot(camera_robot)
+    bundle = bundle_world_models(
+        camera_robot._world, camera_robot, tmp_path, MESH_SUBDIRECTORY
+    )
 
-    assert [entry.camera for entry in cameras] == [
-        sensor for sensor in camera_robot.all_sensors if isinstance(sensor, Camera)
+    assert bundle.robot[SceneField.CAMERAS] == [
+        sensor.to_json()
+        for sensor in camera_robot.all_sensors
+        if isinstance(sensor, Camera)
     ]
     assert any(not isinstance(sensor, Camera) for sensor in camera_robot.all_sensors)
 
 
-def test_a_robot_without_cameras_has_no_viewpoints(camera_robot: PR2) -> None:
+def test_a_robot_without_cameras_has_no_viewpoints(
+    camera_robot: PR2, tmp_path: Path
+) -> None:
     """
     Camera-like link names cannot introduce viewpoints without native annotations.
 
     :param camera_robot: Independent robot whose camera annotations can be removed.
+    :param tmp_path: Isolated directory for the exported robot model.
     """
     camera_robot.mobile_base.torso.neck.sensors.clear()
 
-    assert RobotCamera.of_robot(camera_robot) == []
+    bundle = bundle_world_models(
+        camera_robot._world, camera_robot, tmp_path, MESH_SUBDIRECTORY
+    )
+
+    assert bundle.robot[SceneField.CAMERAS] == []
 
 
 # %% live and recorded publication
@@ -129,8 +139,10 @@ def test_live_scene_publishes_camera_metadata(
     scene_directory = scenes / scene_name
     scene = json.loads((scene_directory / "scene.json").read_text())
 
-    assert scene[SceneField.ROBOT][CameraField.CAMERAS] == [
-        camera.to_payload() for camera in RobotCamera.of_robot(camera_bridge.robot)
+    assert scene[SceneField.ROBOT][SceneField.CAMERAS] == [
+        camera.to_json()
+        for camera in camera_bridge.robot.all_sensors
+        if isinstance(camera, Camera)
     ]
     robot_model = next(model for model in scene["models"] if model["robot"])
     links = {
@@ -140,8 +152,8 @@ def test_live_scene_publishes_camera_metadata(
         )
     }
     assert all(
-        camera[CameraField.LINK] in links
-        for camera in scene[SceneField.ROBOT][CameraField.CAMERAS]
+        str(from_json(camera["forward_facing_axis"]["reference_frame_name"])) in links
+        for camera in scene[SceneField.ROBOT][SceneField.CAMERAS]
     )
 
 
@@ -162,10 +174,12 @@ def test_recording_preserves_camera_metadata(
 
     recorded_scene = json.loads((tmp_path / "recording" / "scene.json").read_text())
     expected = [
-        camera.to_payload() for camera in RobotCamera.of_robot(camera_bridge.robot)
+        camera.to_json()
+        for camera in camera_bridge.robot.all_sensors
+        if isinstance(camera, Camera)
     ]
-    assert scene[SceneField.ROBOT][CameraField.CAMERAS] == expected
-    assert recorded_scene[SceneField.ROBOT][CameraField.CAMERAS] == expected
+    assert scene[SceneField.ROBOT][SceneField.CAMERAS] == expected
+    assert recorded_scene[SceneField.ROBOT][SceneField.CAMERAS] == expected
 
 
 def test_cached_live_scene_without_camera_metadata_is_rebuilt(
@@ -182,13 +196,13 @@ def test_cached_live_scene_without_camera_metadata_is_rebuilt(
     scene_name = build_live_scene(camera_bridge)
     scene_path = scenes / scene_name / "scene.json"
     scene = json.loads(scene_path.read_text())
-    cameras = scene[SceneField.ROBOT].pop(CameraField.CAMERAS)
+    cameras = scene[SceneField.ROBOT].pop(SceneField.CAMERAS)
     scene_path.write_text(json.dumps(scene))
 
     build_live_scene(camera_bridge)
 
     assert (
-        json.loads(scene_path.read_text())[SceneField.ROBOT][CameraField.CAMERAS]
+        json.loads(scene_path.read_text())[SceneField.ROBOT][SceneField.CAMERAS]
         == cameras
     )
 
@@ -211,8 +225,11 @@ def test_camera_projection_changes_refresh_the_live_bundle(
     build_live_scene(camera_bridge)
 
     scene = json.loads((scenes / scene_name / "scene.json").read_text())
-    [published] = scene[SceneField.ROBOT][CameraField.CAMERAS]
-    assert published[CameraField.VERTICAL_ANGLE] == camera.field_of_view.vertical_angle
+    [published] = scene[SceneField.ROBOT][SceneField.CAMERAS]
+    assert (
+        published["field_of_view"]["vertical_angle"]
+        == camera.field_of_view.vertical_angle
+    )
 
 
 def test_default_camera_changes_refresh_the_live_bundle(
@@ -233,8 +250,8 @@ def test_default_camera_changes_refresh_the_live_bundle(
     build_live_scene(camera_bridge)
 
     scene = json.loads((scenes / scene_name / "scene.json").read_text())
-    [published] = scene[SceneField.ROBOT][CameraField.CAMERAS]
-    assert published[CameraField.DEFAULT] == camera.default_camera
+    [published] = scene[SceneField.ROBOT][SceneField.CAMERAS]
+    assert published["default_camera"] == camera.default_camera
 
 
 def test_malformed_cached_robot_metadata_is_rebuilt(
@@ -251,14 +268,14 @@ def test_malformed_cached_robot_metadata_is_rebuilt(
     scene_name = build_live_scene(camera_bridge)
     scene_path = scenes / scene_name / "scene.json"
     scene = json.loads(scene_path.read_text())
-    cameras = scene[SceneField.ROBOT][CameraField.CAMERAS]
+    cameras = scene[SceneField.ROBOT][SceneField.CAMERAS]
     scene[SceneField.ROBOT] = []
     scene_path.write_text(json.dumps(scene))
 
     build_live_scene(camera_bridge)
 
     assert (
-        json.loads(scene_path.read_text())[SceneField.ROBOT][CameraField.CAMERAS]
+        json.loads(scene_path.read_text())[SceneField.ROBOT][SceneField.CAMERAS]
         == cameras
     )
 
@@ -295,10 +312,12 @@ def test_multiple_native_defaults_keep_the_robot_selection_order(
     scene = json.loads((scenes / scene_name / "scene.json").read_text())
     defaults = [
         camera
-        for camera in scene[SceneField.ROBOT][CameraField.CAMERAS]
-        if camera[CameraField.DEFAULT]
+        for camera in scene[SceneField.ROBOT][SceneField.CAMERAS]
+        if camera["default_camera"]
     ]
-    assert defaults[0][CameraField.LINK] == str(robot.get_default_camera().root.name)
+    assert str(
+        from_json(defaults[0]["forward_facing_axis"]["reference_frame_name"])
+    ) == str(robot.get_default_camera().root.name)
 
 
 # %% metadata changes advertised to attached viewers
@@ -469,24 +488,23 @@ def test_model_camera_metadata_holds_its_native_world_lock(
     :param tmp_path: Isolated output directory for the bundled model.
     :param monkeypatch: Checks camera serialization against a competing native reader.
     """
-    to_payload = RobotCamera.to_payload
+    to_json = Camera.to_json
 
-    def locked_camera_payload(
-        camera: RobotCamera,
-    ) -> dict[CameraField, str | float | bool | list[float]]:
+    def locked_camera_payload(camera: Camera, **kwargs: Any) -> dict[str, Any]:
         """
         Require the camera's own world to stay locked during serialization.
 
         :param camera: Camera whose native fields are about to be serialized.
+        :param kwargs: Context forwarded to the camera serializer.
         :return: The camera's ordinary serialized descriptor.
         """
         with ThreadPoolExecutor(max_workers=1) as executor:
-            assert not executor.submit(
-                can_lock_world, camera.camera.root._world
-            ).result(timeout=10)
-        return to_payload(camera)
+            assert not executor.submit(can_lock_world, camera.root._world).result(
+                timeout=10
+            )
+        return to_json(camera, **kwargs)
 
-    monkeypatch.setattr(RobotCamera, "to_payload", locked_camera_payload)
+    monkeypatch.setattr(Camera, "to_json", locked_camera_payload)
 
     bundle_world_models(
         camera_bridge.world,
