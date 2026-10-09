@@ -367,6 +367,30 @@ def test_detectors_are_ticked_once_a_tick_period(milk_in_the_apartment):
     assert ticks_while_watched <= WATCHED_FOR / TICK_PERIOD + 1
 
 
+def test_a_tick_as_long_as_its_period_is_followed_by_a_pause_as_long_as_it_took(
+    milk_in_the_apartment,
+):
+    """
+    A slow tick leaves the world to whatever changes it for as long as it held it, so
+    watching never holds the world for more than half the run.
+    """
+    world, _, _ = milk_in_the_apartment
+    slow_detector = DetectorTakingItsTime(seconds_per_tick=TICK_PERIOD)
+    counting_detector = DetectorCountingItsTicks()
+
+    with Segmind(
+        world=world,
+        detectors=[slow_detector, counting_detector],
+        tick_period=TICK_PERIOD,
+    ):
+        counting_detector.ticked.wait(TICK_TIMEOUT)
+        ticks_before = counting_detector.ticks
+        time.sleep(WATCHED_FOR)
+        ticks_while_watched = counting_detector.ticks - ticks_before
+
+    assert ticks_while_watched <= WATCHED_FOR / (2 * slow_detector.seconds_per_tick) + 1
+
+
 def test_a_body_that_stopped_as_watching_ends_is_seen_at_rest(milk_in_the_apartment):
     """
     Detecting that something came to rest takes ticks of a still world, so a run that

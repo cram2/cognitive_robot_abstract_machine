@@ -40,7 +40,8 @@ class Segmind:
     A tick holds the world's lock, so it never reads the world while another thread is
     in the middle of changing it. Ticks begin :attr:`tick_period` apart, so the share
     of the run spent watching falls as ticks get cheaper, and every tick is followed by
-    a pause, so a plan changing the world keeps going while it is watched.
+    a pause at least as long as the tick, so a plan changing the world keeps going while
+    it is watched.
     """
 
     world: World
@@ -57,7 +58,8 @@ class Segmind:
     """
     The time, in seconds, from the start of one tick to the start of the next.
 
-    A tick that takes longer is followed by :attr:`pause_between_ticks` instead.
+    A tick that takes longer than half of it is followed by a pause as long as the tick
+    took instead, so watching never holds the world for more than half the run.
     """
 
     pause_between_ticks: float = field(kw_only=True, default=0.01)
@@ -230,7 +232,7 @@ class Segmind:
             self.tick()
             held_for = time.monotonic() - started
             self.stopping.wait(
-                max(self.tick_period - held_for, self.pause_between_ticks)
+                max(self.tick_period - held_for, held_for, self.pause_between_ticks)
             )
         for _ in range(self.ticks_to_see_the_world_at_rest):
             self.tick()
