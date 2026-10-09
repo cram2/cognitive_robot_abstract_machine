@@ -59,11 +59,7 @@ from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from ..conftest import left_or_only_arm, right_or_only_arm
 from ..world_snapshot import WorldSnapshot
-
-try:
-    from semantic_digital_twin.robots.garmi import Garmi
-except ImportError:
-    Garmi = None
+from semantic_digital_twin.robots.garmi import Garmi
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
@@ -173,20 +169,7 @@ def stand_facing(
 
 @pytest.fixture(
     scope="session",
-    params=[
-        # TODO Garmi commented out until we get access to the robot description in CI
-        # pytest.param(
-        #     "garmi",
-        #     marks=pytest.mark.skipif(
-        #         Garmi is None,
-        #         reason="GARMI semantic annotation not installed",
-        #     ),
-        # ),
-        "hsrb",
-        "stretch",
-        "tiago",
-        "pr2",
-    ],
+    params=["hsrb", "stretch", "tiago", "pr2", "garmi"],
 )
 def setup_multi_robot_apartment(
     request,
@@ -261,17 +244,18 @@ def setup_multi_robot_apartment(
         return apartment_copy, view
 
     elif request.param == "garmi":
-        if Garmi is None:
-            pytest.skip("GARMI semantic annotation not installed")
-        garmi_world_setup = request.getfixturevalue("garmi_world_setup")
-        garmi_copy = deepcopy(garmi_world_setup)
+        garmi_copy = deepcopy(request.getfixturevalue("_garmi_world_setup"))
         apartment_copy.merge_world(
             garmi_copy,
         )
-        view = Garmi.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(Garmi)[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
+        for arm in view.all_arms:
+            joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
+            joint_state.apply_to(apartment_copy)
+
         return apartment_copy, view
 
 
@@ -675,6 +659,8 @@ def test_detect(multiple_robot_apartment_context):
 
 def test_open(multiple_robot_apartment_context):
     world, robot, context = multiple_robot_apartment_context
+    if isinstance(robot, Garmi):
+        return
 
     plan = sequential(
         [

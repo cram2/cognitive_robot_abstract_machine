@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import pytest
 from uuid import UUID, uuid4
 
-from typing_extensions import Dict, Iterator, List, Optional
+from typing_extensions import Callable, Dict, Iterator, List, Optional
 
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
@@ -22,8 +22,10 @@ from coraplex.plans.factories import sequential, execute_single
 from coraplex.plans.failures import (
     CandidateLimitReached,
     EmptyUnderspecified,
+    MotionViolatedCollisionAvoidance,
     PlanFailure,
 )
+from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from coraplex.plans.plan_node import ExecutionBoundaryNode, PlanNode
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_callbacks import PlanCallback
@@ -125,8 +127,13 @@ class RecordingExecutionNode(ExecutionBoundaryNode):
 
     fail_on_attempt_number: Optional[int] = field(kw_only=True, default=None)
     """
-    Raise a `PlanFailure` once the probe has recorded this many calls; never raise if
-    None.
+    Report :attr:`reported_failure` once the probe has recorded this many calls; never
+    fail if None.
+    """
+
+    reported_failure: Callable[[], Exception] = field(kw_only=True, default=PlanFailure)
+    """
+    Builds the failure a failing attempt reports.
     """
 
     def notify(self):
@@ -138,6 +145,7 @@ class RecordingExecutionNode(ExecutionBoundaryNode):
             probe_key=self.probe_key,
             dof_id=self.dof_id,
             fail_on_attempt_number=self.fail_on_attempt_number,
+            reported_failure=self.reported_failure,
         )
 
 
@@ -150,6 +158,7 @@ class RecordingExecutable(Executable):
     probe_key: UUID = field(kw_only=True)
     dof_id: UUID = field(kw_only=True)
     fail_on_attempt_number: Optional[int] = field(kw_only=True)
+    reported_failure: Callable[[], Exception] = field(kw_only=True, default=PlanFailure)
 
     def execute(self) -> None:
         probe = _registered_probes[self.probe_key]
@@ -162,7 +171,7 @@ class RecordingExecutable(Executable):
         self.context.world.state[self.dof_id].position = len(probe.calls)
         self.context.world.notify_state_change()
         if len(probe.calls) == self.fail_on_attempt_number:
-            raise PlanFailure()
+            raise self.reported_failure()
 
 
 @dataclass
@@ -176,6 +185,7 @@ class RecordingAction(ActionDescription):
     probe_key: UUID = field(kw_only=True)
     dof_id: UUID = field(kw_only=True)
     fail_on_attempt_number: Optional[int] = field(kw_only=True, default=None)
+    reported_failure: Callable[[], Exception] = field(kw_only=True, default=PlanFailure)
 
     @property
     def _action_plan(self) -> PlanNode:
@@ -184,6 +194,7 @@ class RecordingAction(ActionDescription):
                 probe_key=self.probe_key,
                 dof_id=self.dof_id,
                 fail_on_attempt_number=self.fail_on_attempt_number,
+                reported_failure=self.reported_failure,
             )
         )
 
@@ -752,3 +763,42 @@ def test_a_trial_tries_an_action_that_already_belongs_to_a_plan(debugging_contex
 
     assert trial.succeeds(action)
     trial.discard()
+
+
+# %% a candidate whose motion could not keep its clearance
+
+
+def a_collision_that_could_not_be_avoided() -> MotionViolatedCollisionAvoidance:
+    """
+    :return: The failure a motion reports when it could not keep the clearance it was
+        given.
+    """
+    return MotionViolatedCollisionAvoidance(
+        CollisionViolatedError(violated_collisions=[], thresholds=[])
+    )
+
+
+def test_a_candidate_that_cannot_keep_its_clearance_is_discarded(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    A motion that could not keep its clearance says this candidate does not work here,
+    not that the plan cannot go on, so grounding moves on to the next candidate instead
+    of the failure escaping the trial.
+    """
+    world, robot, context = apartment_world_pr2_copy_with_context
+    dof = world.degrees_of_freedom[0]
+    probe_key = register_probe()
+
+    action = a(RecordingAction)(
+        probe_key=probe_key,
+        dof_id=dof.id,
+        fail_on_attempt_number=variable_from([1, None]),
+        reported_failure=variable_from([a_collision_that_could_not_be_avoided]),
+    )
+    plan = execute_single(action_like=action, context=context).plan
+    with simulated_robot:
+        plan.perform()
+
+    assert plan.root.status == LifeCycleValues.SUCCEEDED
+    assert plan.root.current_candidate.designator.fail_on_attempt_number is None

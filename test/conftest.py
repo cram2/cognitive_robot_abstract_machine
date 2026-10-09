@@ -473,7 +473,7 @@ def supported_abstract_robots():
         UnitreeG1,
         MMPDresden,
         DAiSy,
-        # Garmi, We dont have the ROS Package yet
+        Garmi,
     ]
 
 
@@ -528,6 +528,9 @@ def world_with_urdf_factory(
     urdf_parser = URDFParser.from_file(
         file_path=robot_semantic_annotation.get_ros_file_path(),
         path_resolver=urdf_path_resolver,
+        use_visual_as_collision_backup=(
+            robot_semantic_annotation.uses_visual_as_collision_backup
+        ),
     )
     world_with_urdf = urdf_parser.parse()
     if robot_semantic_annotation is not None:

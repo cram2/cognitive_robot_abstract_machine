@@ -710,6 +710,95 @@ class CartesianPose(Parallel):
 
 
 @dataclass(eq=False, repr=False)
+class HoldPose(Task):
+    """
+    Keeps a link at the pose it had when this task started.
+
+    An invariant rather than a goal, so it neither reports progress nor has to be
+    reached for the motion around it to finish. A pose goal would instead have to
+    converge, which a link disturbed by physics or by a competing task never does, and
+    it would then read as a motion that stopped getting anywhere.
+
+    ..note:: Unlike :class:`CartesianPose`, this constrains the chain between
+        ``root_link`` and ``tip_link`` without naming a pose, because the pose to keep
+        is the one the link is already at.
+    """
+
+    root_link: KinematicStructureEntity = field(kw_only=True)
+    """Base link of the kinematic chain."""
+
+    tip_link: KinematicStructureEntity = field(kw_only=True)
+    """The link kept where it is."""
+
+    reference_linear_velocity: float = field(
+        default=CartesianPosition.default_reference_velocity, kw_only=True
+    )
+    """Unit: m/s. Normalizes the translational constraints against the others."""
+
+    reference_angular_velocity: float = field(
+        default=CartesianOrientation.default_reference_velocity, kw_only=True
+    )
+    """Unit: rad/s. Normalizes the rotational constraints against the others."""
+
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
+    """
+    Task priority relative to other tasks.
+
+    Above collision avoidance by default, because a link is held against whatever would
+    otherwise move it, and buying clearance by moving it is the motion this prevents.
+    """
+
+    _pose_to_keep: ForwardKinematicsBinding = field(init=False, repr=False)
+    """The pose the link is held at, bound when this task starts."""
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        self._pose_to_keep = ForwardKinematicsBinding(
+            name=PrefixedName("pose_to_keep", str(self.name)),
+            root=self.root_link,
+            tip=self.tip_link,
+            float_variable_data=context.float_variable_data,
+        )
+        self._pose_to_keep.bind(context.world)
+        return super().build(context)
+
+    def on_start(self, context: MotionStatechartContext):
+        self._pose_to_keep.bind(context.world)
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Constrain the chain to the pose bound when this task started.
+
+        :param context: Provides access to world model and kinematic expressions.
+        :return: The artifacts of this task, which observes true throughout, since an
+            invariant has no goal left to reach.
+        """
+        artifacts = NodeArtifacts()
+        root_T_tip = context.world.compose_forward_kinematics_expression(
+            self.root_link, self.tip_link
+        )
+        root_T_tip_when_started = self._pose_to_keep.root_T_tip
+
+        artifacts.geometry.add_point_goal_constraints(
+            frame_P_goal=root_T_tip_when_started.position,
+            frame_P_current=root_T_tip.position,
+            reference_velocity=self.reference_linear_velocity,
+            quadratic_weight=self.weight,
+            name="position",
+        )
+        artifacts.geometry.add_rotation_goal_constraints(
+            frame_R_goal=root_T_tip_when_started.rotation_matrix,
+            frame_R_current=root_T_tip.rotation_matrix,
+            reference_velocity=self.reference_angular_velocity,
+            quadratic_weight=self.weight,
+            name="orientation",
+        )
+        artifacts.observation = sm.Scalar.const_true()
+        return artifacts
+
+
+@dataclass(eq=False, repr=False)
 class CartesianPositionVelocityLimit(Task):
     """
     Limit the Cartesian (translational) velocity of a tip link relative to a root link.

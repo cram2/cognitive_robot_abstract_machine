@@ -26,6 +26,70 @@ class URDFPaths:
     pr2: str
 
 
+VISUAL_ONLY_LINK_URDF = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "dataset", "visual_only_link.urdf"
+)
+"""
+Description whose ``cover_link`` carries a visual and no collision, next to a
+``base_link`` that carries both.
+"""
+
+
+def _body_named(world, name):
+    """
+    :return: The single body of ``world`` with that name.
+    """
+    [body] = [
+        body for body in world.kinematic_structure_entities if body.name.name == name
+    ]
+    return body
+
+
+def test_link_without_collision_geometry_has_none_by_default():
+    """
+    A link that describes no collision keeps none, so a description is read as written.
+    """
+    world = URDFParser.from_file(VISUAL_ONLY_LINK_URDF).parse()
+
+    cover = _body_named(world, "cover_link")
+    assert len(cover.visual.shapes) == 1
+    assert len(cover.collision.shapes) == 0
+
+
+def test_visual_geometry_stands_in_when_a_link_has_no_collision_geometry():
+    """
+    Cosmetic links are often drawn but not described for contact, which leaves them
+    invisible to collision avoidance; the visual then stands in for the missing
+    collision geometry.
+    """
+    world = URDFParser.from_file(
+        VISUAL_ONLY_LINK_URDF, use_visual_as_collision_backup=True
+    ).parse()
+
+    cover = _body_named(world, "cover_link")
+    [collision_shape] = cover.collision.shapes
+    [visual_shape] = cover.visual.shapes
+    assert collision_shape.scale == visual_shape.scale
+    assert collision_shape is not visual_shape
+
+
+def test_visual_geometry_is_left_out_where_the_link_already_collides():
+    """
+    The visual is a stand-in, not an addition: a link that describes its own collision
+    keeps exactly that geometry.
+    """
+    as_written = URDFParser.from_file(VISUAL_ONLY_LINK_URDF).parse()
+    with_backup = URDFParser.from_file(
+        VISUAL_ONLY_LINK_URDF, use_visual_as_collision_backup=True
+    ).parse()
+
+    base_as_written = _body_named(as_written, "base_link")
+    base_with_backup = _body_named(with_backup, "base_link")
+    assert [shape.scale for shape in base_with_backup.collision.shapes] == [
+        shape.scale for shape in base_as_written.collision.shapes
+    ]
+
+
 @pytest.fixture
 def urdf_paths():
     """

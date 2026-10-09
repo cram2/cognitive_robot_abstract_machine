@@ -17,7 +17,7 @@ class ReachFraction(float, Enum):
     How far the robot stands off what it reaches for, as a fraction of the arm's length.
     """
 
-    GRASPING = 0.5
+    GRASPING = 0.6
     """
     Reaching something that stays where it is.
     """

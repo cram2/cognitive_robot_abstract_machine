@@ -137,9 +137,14 @@ class URDFParser(WorldModelParser):
         file_path: str,
         prefix: Optional[str] = None,
         path_resolver: Optional[PathResolver] = None,
+        use_visual_as_collision_backup: bool = False,
     ) -> URDFParser:
         if file_path.endswith(".xacro"):
-            return cls.from_xacro(file_path, prefix)
+            return cls.from_xacro(
+                file_path,
+                prefix,
+                use_visual_as_collision_backup=use_visual_as_collision_backup,
+            )
 
         path_resolver = path_resolver or CompositePathResolver()
 
@@ -149,7 +154,11 @@ class URDFParser(WorldModelParser):
                 # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them
                 with suppress_stdout_stderr():
                     urdf = file.read()
-        urdf_parser = cls(urdf=urdf, prefix=prefix)
+        urdf_parser = cls(
+            urdf=urdf,
+            prefix=prefix,
+            use_visual_as_collision_backup=use_visual_as_collision_backup,
+        )
         urdf_parser.path_resolver = path_resolver
         return urdf_parser
 
@@ -159,6 +168,7 @@ class URDFParser(WorldModelParser):
         xacro_path: str,
         prefix: Optional[str] = None,
         mappings: Optional[Dict[str, str]] = None,
+        use_visual_as_collision_backup: bool = False,
     ) -> URDFParser:
         """
         Creates a parser from a xacro file by expanding it to URDF.
@@ -170,11 +180,17 @@ class URDFParser(WorldModelParser):
         :param prefix: The prefix for every name used in this world.
         :param mappings: The xacro substitution arguments to apply during expansion (the
             ``arg`` values, e.g. ``{"ur_type": "ur5"}``).
+        :param use_visual_as_collision_backup: Whether a link that describes no
+            collision geometry collides with its visual geometry instead.
         :return: A parser for the world described by the expanded xacro file.
         """
         xacro_path = CompositePathResolver().resolve(xacro_path)
         urdf = process_file(xacro_path, mappings=mappings).toxml()
-        return URDFParser(urdf=urdf, prefix=prefix)
+        return URDFParser(
+            urdf=urdf,
+            prefix=prefix,
+            use_visual_as_collision_backup=use_visual_as_collision_backup,
+        )
 
     def parse(self) -> World:
         prefix = self.parsed.name
@@ -311,6 +327,8 @@ class URDFParser(WorldModelParser):
         body = Body(name=name)
         visuals = self.parse_geometry(link.visuals, body)
         collisions = self.parse_geometry(link.collisions, body)
+        if not collisions.shapes and self.use_visual_as_collision_backup:
+            collisions = self.parse_geometry(link.visuals, body)
         body.visual = visuals
         body.collision = collisions
         inertial = self.parse_inertial(link, body)

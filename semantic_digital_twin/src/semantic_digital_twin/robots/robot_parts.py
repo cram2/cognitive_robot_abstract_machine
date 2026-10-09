@@ -999,6 +999,18 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         URDF file.
         """
 
+    @classproperty
+    def uses_visual_as_collision_backup(cls) -> bool:
+        """
+        :return: Whether links of this robot's description that carry no collision
+            geometry collide with their visual geometry instead.
+
+        Override where the description leaves cosmetic parts, such as covers, drawn but
+        not described for contact, which otherwise leaves them invisible to collision
+        checking even though they bound the robot's real shape.
+        """
+        return False
+
     @classmethod
     @abstractmethod
     def _get_root_body_name(cls) -> str:

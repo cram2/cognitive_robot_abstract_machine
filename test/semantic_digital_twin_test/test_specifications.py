@@ -30,6 +30,8 @@ from semantic_digital_twin.specifications.worlds import WorldSpecification
 from krrood.ormatic.data_access_objects.helper import to_dao
 import semantic_digital_twin.orm.ormatic_interface  # registers the DAOs to_dao looks up
 
+from .test_adapters.test_mjcf import VISUAL_ONLY_GEOM_SCENE
+
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     InvalidPlaneDimensions,
@@ -40,8 +42,10 @@ from semantic_digital_twin.exceptions import (
     PartWholeFieldInAnnotationKwargs,
     UnknownPartWholeRelationshipField,
     UselessConceptError,
+    DriveVelocityLimitsOnUndrivenRobot,
 )
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.robot_parts import AbstractRobotPart
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cabinet,
@@ -291,6 +295,25 @@ def test_world_specification_from_mjcf_environment():
     ).to_domain_object()
     assert not world.is_empty()
     assert world.root is not None
+
+
+def test_world_specification_from_mjcf_keeps_visual_only_geoms_out_of_collision():
+    pytest.importorskip("mujoco")
+    world = WorldSpecification.from_mjcf(VISUAL_ONLY_GEOM_SCENE).to_domain_object()
+
+    shelf = world.get_body_by_name("shelf")
+    assert len(shelf.visual.shapes) == 1
+    assert len(shelf.collision.shapes) == 0
+
+
+def test_world_specification_from_mjcf_collides_every_geom_when_asked():
+    pytest.importorskip("mujoco")
+    world = WorldSpecification.from_mjcf(
+        VISUAL_ONLY_GEOM_SCENE, use_visual_as_collision_backup=True
+    ).to_domain_object()
+
+    shelf = world.get_body_by_name("shelf")
+    assert len(shelf.collision.shapes) == 1
 
 
 def test_world_specification_from_gazebo_environment():
@@ -551,6 +574,61 @@ def test_world_specification_with_robot():
 
     root_T_odom = world.compute_forward_kinematics(world.root, odom_body)
     np.testing.assert_allclose(root_T_odom.position.to_np()[0], 1.0)
+
+
+def test_robot_specification_applies_the_drive_velocity_limits_it_is_given():
+    translation_velocity_limits = 0.1
+    rotation_velocity_limits = 0.2
+    try:
+        world = WorldSpecification(
+            world_parser=None,
+            robots=[
+                RobotSpecification(
+                    semantic_annotation_type=PR2,
+                    drive_translation_velocity_limits=translation_velocity_limits,
+                    drive_rotation_velocity_limits=rotation_velocity_limits,
+                )
+            ],
+        ).to_domain_object()
+    except ParsingError as error:
+        pytest.skip(f"PR2 URDF not available: {error}")
+
+    drive = world.get_body_by_name("base_footprint").parent_connection
+    assert drive.x_velocity.limits.upper.velocity == translation_velocity_limits
+    assert drive.x_velocity.limits.lower.velocity == -translation_velocity_limits
+    assert drive.yaw.limits.upper.velocity == rotation_velocity_limits
+    assert drive.yaw.limits.lower.velocity == -rotation_velocity_limits
+
+
+def test_robot_specification_keeps_the_drives_own_velocity_limits_by_default():
+    drive_defaults = inspect.signature(OmniDrive.create_with_dofs).parameters
+    try:
+        world = WorldSpecification(
+            world_parser=None,
+            robots=[RobotSpecification(semantic_annotation_type=PR2)],
+        ).to_domain_object()
+    except ParsingError as error:
+        pytest.skip(f"PR2 URDF not available: {error}")
+
+    drive = world.get_body_by_name("base_footprint").parent_connection
+    assert (
+        drive.x_velocity.limits.upper.velocity
+        == drive_defaults["translation_velocity_limits"].default
+    )
+    assert (
+        drive.yaw.limits.upper.velocity
+        == drive_defaults["rotation_velocity_limits"].default
+    )
+
+
+def test_robot_specification_rejects_drive_velocity_limits_for_an_undriven_robot(
+    empty_world,
+):
+    with pytest.raises(DriveVelocityLimitsOnUndrivenRobot):
+        RobotSpecification(
+            semantic_annotation_type=MinimalRobot,
+            drive_translation_velocity_limits=0.1,
+        ).spawn(empty_world)
 
 
 def test_world_specification_from_urdf_with_robot():

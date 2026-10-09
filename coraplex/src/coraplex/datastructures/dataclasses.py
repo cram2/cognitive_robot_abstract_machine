@@ -8,6 +8,7 @@ from typing_extensions import (
     TYPE_CHECKING,
     List,
     Type,
+    TypeVar,
 )
 
 from coraplex.plans.plan_entity import PlanEntity
@@ -23,16 +24,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
     from coraplex.alternative_motion_mapping import AlternativeMotion
     from coraplex.plans.plan_transformation import PlanTransformation
-
-try:
-    import rclpy
-except ImportError as e:
-    from semantic_digital_twin.utils import mocked_rclpy
-
-    logging.warning(
-        "Could not import rclpy. This is expected if you are not using ROS. Mocking rclpy."
-    )
-    rclpy = mocked_rclpy
+    from rclpy.node import Node
 
 
 @dataclass
@@ -75,7 +67,7 @@ class Context(PlanEntity):
     The semantic robot annotation which should execute the plan.
     """
 
-    ros_node: Optional[rclpy.node.Node] = field(default=None)
+    ros_node: Optional[Node] = field(default=None)
     """
     A ROS node that should be used for communication in this plan.
     """

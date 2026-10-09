@@ -71,9 +71,11 @@ class Pointing(CartesianTask):
         root_V_pointing_axis.visualisation_frame = self.tip_link
         root_V_goal_axis.visualisation_frame = self.tip_link
 
+        tip_V_goal_axis = root_T_tip.inverse() @ root_V_goal_axis
+        tip_V_goal_axis.scale(1)
         artifacts.geometry.add_vector_goal_constraints(
-            frame_V_current=root_V_pointing_axis,
-            frame_V_goal=root_V_goal_axis,
+            frame_V_current=tip_V_goal_axis,
+            frame_V_goal=tip_V_pointing_axis,
             reference_velocity=self.max_velocity,
             quadratic_weight=self.weight,
         )
