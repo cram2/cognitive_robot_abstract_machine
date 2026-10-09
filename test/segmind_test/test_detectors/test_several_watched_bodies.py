@@ -31,7 +31,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-from ..conftest import RESTING_ON_THE_TABLE, SET_DOWN_IN_THE_TRAY
+from ..conftest import RESTING_ON_THE_TABLE
 
 TICKS_WITHOUT_ANYTHING_MOVING = 4
 """
@@ -109,8 +109,10 @@ def test_a_support_that_lasts_is_not_reported_lost_by_another_bodys_detector(
 def test_a_containment_that_lasts_is_not_reported_lost_by_another_bodys_detector(
     box_and_trays,
 ):
-    world, box, tray, _ = box_and_trays
-    _place(box, *SET_DOWN_IN_THE_TRAY)
+    world = box_and_trays.world
+    box = box_and_trays.box
+    tray = box_and_trays.tray
+    box.parent_connection.origin = box_and_trays.set_down_in_the_tray
 
     segmind_context = _ticked_while_nothing_moves(
         world, [SupportDetector, ContainmentDetector], [box, tray]

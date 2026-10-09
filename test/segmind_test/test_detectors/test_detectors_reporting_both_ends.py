@@ -36,12 +36,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-from ..conftest import (
-    LIFTED_OUT_OF_THE_TRAY,
-    RESTING_ON_THE_TABLE,
-    SET_DOWN_IN_THE_TRAY,
-    WHERE_THE_MILK_STOOD,
-)
+from ..conftest import RESTING_ON_THE_TABLE, WHERE_THE_MILK_STOOD
 
 MOVING_TICKS = 5
 """
@@ -124,17 +119,18 @@ def test_the_containment_detector_reports_gaining_and_losing_a_containment(
     Containment is looked for once an object comes to rest, so the supports it is read
     from are ticked along with it.
     """
-    world, box, _, _ = box_and_trays
+    world = box_and_trays.world
+    box = box_and_trays.box
     executor, segmind_context = _ticking(
         world, SupportDetector(), ContainmentDetector()
     )
 
-    _place(box, *SET_DOWN_IN_THE_TRAY)
+    box.parent_connection.origin = box_and_trays.set_down_in_the_tray
     executor.tick()
     assert len(_events_of(segmind_context, ContainmentEvent)) == 1
     assert _events_of(segmind_context, LossOfContainmentEvent) == []
 
-    _place(box, *LIFTED_OUT_OF_THE_TRAY)
+    box.parent_connection.origin = box_and_trays.lifted_out_of_the_tray
     executor.tick()
 
     [lost] = _events_of(segmind_context, LossOfContainmentEvent)
