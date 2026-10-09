@@ -8,13 +8,12 @@ from ..orm_interface_build import regenerate_orm_interfaces
 regenerate_orm_interfaces()
 
 
+from copy import deepcopy
 from functools import partial
 
 import pytest
 
-from semantic_digital_twin.predetermined_maps.building_floor import BuildingFloor
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world import World
 
 try:
     import rclpy
@@ -39,9 +38,9 @@ try:
     )
 except ModuleNotFoundError:
     pass
+from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 from .world_snapshot import WorldSnapshot
@@ -134,6 +133,24 @@ def coraplex_testing_session():
 
 
 # %% perception regions
+
+
+@pytest.fixture(scope="function")
+def immutable_daisy_world(daisy_world):
+    """
+    A DAiSy world, robot and context for motion-mapping tests.
+
+    Mirrors :func:`immutable_stretch_apartment_world`; the session-scoped
+    ``daisy_world`` is left untouched by restoring its state afterwards.
+    """
+    robot = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+    context = Context(daisy_world, robot)
+    state = deepcopy(daisy_world.state._data)
+
+    yield daisy_world, robot, context
+
+    daisy_world.state._data[:] = state
+    daisy_world.notify_state_change()
 
 
 @pytest.fixture

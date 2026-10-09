@@ -130,7 +130,8 @@ with simulated_robot:
 
 ## Set Gripper
 
-As the name implies, this action designator is used to open or close the gripper.
+As the name implies, this action designator is used to open or close the gripper. The gripper configuration is described
+by a gripper configuration, which the end effector of the arm builds from one of its declared states.
 
 The procedure is similar to the last time, but this time we will shorten it a bit.
 
@@ -139,11 +140,10 @@ from coraplex.execution_environment import simulated_robot
 from coraplex.robot_plans.actions.core.robot_body import SetGripperAction
 from semantic_digital_twin.datastructures.definitions import GripperState
 
-gripper = pr2.right_arm.end_effector
-motion = GripperState.OPEN
+configuration = pr2.left_arm.end_effector.default_configuration(GripperState.OPEN)
 
 with simulated_robot:
-    execute_single(SetGripperAction(gripper=gripper, motion=motion), context=context).perform()
+    execute_single(SetGripperAction(configuration=configuration), context=context).perform()
 ```
 
 ## Park Arms

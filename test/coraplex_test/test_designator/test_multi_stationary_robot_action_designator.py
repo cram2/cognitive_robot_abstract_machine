@@ -1,44 +1,41 @@
 import numpy as np
 import pytest
-from rustworkx import NoEdgeBetweenNodes
-
-from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.trajectory import PoseTrajectory
-
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import execute_single, sequential
 from coraplex.robot_plans.actions.core.pick_up import (
-    ReachAction,
     GraspingAction,
     PickUpAction,
+    ReachAction,
 )
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import (
+    FollowToolCenterPointPathAction,
     ParkArmsAction,
     SetGripperAction,
-    FollowToolCenterPointPathAction,
 )
 from coraplex.testing import _make_sine_scan_poses
+from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from krrood.entity_query_language.factories import an, entity, variable
-
+from rustworkx import NoEdgeBetweenNodes
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.daisy import DAiSy
-from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.connections import Connection6DoF
-from semantic_digital_twin.world_description.geometry import Box, Scale
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.grasping.grasp_candidates import (
     GraspCandidate,
     HasGraspCandidates,
 )
+from semantic_digital_twin.robots.daisy import DAiSy
+from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ...conftest import SAMPLING_SEED
@@ -206,7 +203,9 @@ def test_move_gripper_multi(stationary_block_context):
 
     plan = execute_single(
         SetGripperAction(
-            left_or_only_arm(context.robot).end_effector, GripperState.OPEN
+            configuration=left_or_only_arm(view).end_effector.default_configuration(
+                GripperState.OPEN
+            )
         ),
         context=context,
     ).plan
@@ -223,7 +222,9 @@ def test_move_gripper_multi(stationary_block_context):
 
     plan = execute_single(
         SetGripperAction(
-            left_or_only_arm(context.robot).end_effector, GripperState.CLOSE
+            configuration=left_or_only_arm(view).end_effector.default_configuration(
+                GripperState.CLOSE
+            )
         ),
         context=context,
     ).plan

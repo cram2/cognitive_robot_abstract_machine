@@ -2,16 +2,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any, Dict
-
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import (
+    ConditionType,
     and_,
     or_,
     variable_from,
-    ConditionType,
 )
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.reasoning.predicates import allclose
+from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
+from semantic_digital_twin.robots.robot_parts import Arm
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+)
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from typing_extensions import Any, Dict
+
 from coraplex.datastructures.dataclasses import Context
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
@@ -19,17 +28,8 @@ from coraplex.querying.predicates import GripperIsFree
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.pick_up import GraspingAction
 from coraplex.robot_plans.mixins import HasApproachesGraspPoses
-from coraplex.robot_plans.motions.container import OpeningMotion, ClosingMotion
+from coraplex.robot_plans.motions.container import ClosingMotion, OpeningMotion
 from coraplex.robot_plans.motions.gripper import MoveGripperMotion
-from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.reasoning.predicates import allclose
-from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
-from semantic_digital_twin.robots.robot_parts import Arm
-from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Handle,
-)
-from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 
 @dataclass
@@ -63,8 +63,9 @@ class OpenAction(ActionDescription):
                 ),
                 OpeningMotion(self.handle.root, self.arm),
                 MoveGripperMotion(
-                    GripperState.OPEN,
-                    self.arm.end_effector,
+                    configuration=self.arm.end_effector.default_configuration(
+                        GripperState.OPEN
+                    ),
                     allow_gripper_collision=True,
                 ),
             ]
@@ -137,8 +138,9 @@ class CloseAction(ActionDescription):
                 ),
                 ClosingMotion(self.handle.root, self.arm),
                 MoveGripperMotion(
-                    GripperState.OPEN,
-                    self.arm.end_effector,
+                    configuration=self.arm.end_effector.default_configuration(
+                        GripperState.OPEN
+                    ),
                     allow_gripper_collision=True,
                 ),
             ]

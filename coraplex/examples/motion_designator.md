@@ -86,15 +86,17 @@ with simulated_robot:
 
 ## Move Gripper
 
-Move gripper moves the gripper of an arm to one of two states. The states can be {attr}`~coraplex.datastructures.enums.GripperState.OPEN`  and {attr}`~coraplex.datastructures.enums.GripperState.CLOSE`, which open
-and close the gripper respectively.
+Move gripper moves the gripper of an arm into a configuration described by a gripper configuration. The default
+configuration of an end effector can be created for one of the states {attr}`~semantic_digital_twin.datastructures.definitions.GripperState.OPEN` and
+{attr}`~semantic_digital_twin.datastructures.definitions.GripperState.CLOSE`, which open and close the gripper respectively.
 
 ```python
 from coraplex.robot_plans.motions import MoveGripperMotion
 from coraplex.execution_environment import simulated_robot
 from semantic_digital_twin.datastructures.definitions import GripperState
 
-motion_description = MoveGripperMotion(motion=GripperState.OPEN, gripper=pr2_view.left_arm.end_effector)
+configuration = pr2_view.left_arm.end_effector.default_configuration(GripperState.OPEN)
+motion_description = MoveGripperMotion(configuration=configuration)
 
 with simulated_robot:
     execute_single(motion_description, context=context).perform()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC
-from dataclasses import dataclass
 from inspect import isabstract
 
 from typing_extensions import (
@@ -32,7 +31,6 @@ AbstractRobotType = TypeVar("AbstractRobotType", bound=AbstractRobot)
 BaseMotionType = TypeVar("BaseMotionType", bound=BaseMotion)
 
 
-@dataclass
 class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
     execution_type: ClassVar[Union[ExecutionType, Iterable[ExecutionType]]]
     """
@@ -49,7 +47,7 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
     def check_for_alternative(
         alternatives: Iterable[Type[AlternativeMotion]],
         robot_view: AbstractRobot,
-        motion: Type[BaseMotionType],
+        motion: Union[BaseMotionType, Type[BaseMotionType]],
     ) -> Optional[Type[BaseMotionType]]:
         """
         Checks if there is an alternative motion for the given robot view, motion and
@@ -58,12 +56,15 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
         :param alternatives: The alternative motion mappings to search through (e.g.
             from the context)
         :param robot_view: The robot for which the alternative motion should be found
-        :param motion: The motion class for which an alternative should be found
+        :param motion: The motion instance for which an alternative should be found, or
+            the motion class when probing before a motion is constructed (in which case
+            the :meth:`handles` check is skipped).
         :return: The alternative motion class if found, None otherwise
         """
+        motion_type = motion if isinstance(motion, type) else type(motion)
         for alternative in alternatives:
             if (
-                issubclass(alternative, motion)
+                issubclass(alternative, motion_type)
                 and alternative.original_class() == robot_view.__class__
                 and GiskardExecutable.execution_type
                 in (
@@ -72,7 +73,8 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
                     else [alternative.execution_type]
                 )
             ):
-                return alternative
+                if isinstance(motion, type) or alternative.handles(motion):
+                    return alternative
         return None
 
     @classmethod
@@ -81,9 +83,9 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
         Discover every concrete :class:`AlternativeMotion` for every robot.
 
         Importing ``coraplex.alternative_motion_mappings`` walks and imports its
-        submodules, registering their :class:`AlternativeMotion` subclasses.
-        Mainly a helper to pass to the context of a demo to make it robot agnostic with regards to the alternative
-        motion mappings.
+        submodules, registering their :class:`AlternativeMotion` subclasses. Mainly a
+        helper to pass to the context of a demo to make it robot agnostic with regards
+        to the alternative motion mappings.
 
         :return: Every concrete alternative motion known to coraplex.
         """

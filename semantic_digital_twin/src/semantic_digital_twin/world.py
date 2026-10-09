@@ -30,7 +30,6 @@ from typing_extensions import (
     Iterable,
     Iterator,
     TYPE_CHECKING,
-    get_args,
 )
 from typing_extensions import List
 from typing_extensions import Type, Set
@@ -55,13 +54,14 @@ from semantic_digital_twin.exceptions import (
     MismatchingPublishChangesAttribute,
     AtomicWorldModificationNotAtomic,
     SemanticAnnotationCircularDependencyError,
-    WorldValidationError,
     WorldIsNotATreeError,
     WorldContainsOrphanedDegreeOfFreedom,
     BrokenWorldModificationHistoryError,
     MismatchingWorld,
     InsufficientModificationHistoryError,
     InvalidRollbackVersionError,
+    WorldHasNoUniqueRootError,
+    NoControlledConnectionInChainError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
@@ -756,9 +756,8 @@ class World(HasSimulatorProperties):
             for node in self.kinematic_structure_entities
             if self.kinematic_structure.in_degree(node.index) == 0
         ]
-        assert (
-            len(possible_roots) == 1
-        ), f"A World must have exactly one root. Found {len(possible_roots)} possible roots: {possible_roots}."
+        if len(possible_roots) != 1:
+            raise WorldHasNoUniqueRootError(world=self, possible_roots=possible_roots)
 
         return possible_roots[0]
 
@@ -2262,9 +2261,8 @@ class World(HasSimulatorProperties):
             (conn for conn in reversed(chain) if conn.is_controlled),
             None,
         )
-        assert (
-            new_root is not None and new_tip is not None
-        ), f"no controlled connection in chain between {root} and {tip}"
+        if new_root is None or new_tip is None:
+            raise NoControlledConnectionInChainError(root=root, tip=tip)
 
         # if new_root is in the downward chain, we need to "flip" it by returning its child
         new_root_body = new_root.parent if new_root in upward_chain else new_root.child

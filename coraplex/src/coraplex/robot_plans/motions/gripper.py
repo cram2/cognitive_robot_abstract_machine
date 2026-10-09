@@ -1,10 +1,13 @@
-from dataclasses import dataclass, field
-from typing import Optional, List
+from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import Generic
+
+from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, Task
-from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
+from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
@@ -17,15 +20,22 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointPositionList,
     JointVelocityLimit,
 )
-from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
-from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.datastructures.robots.gripper_configuration import (
+    TGripperConfiguration,
+)
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
+
+from coraplex.datastructures.enums import (
+    MovementType,
+    WaypointsMovementType,
+)
 from coraplex.exceptions import MissingToolFrame, MissingWaypoints
 from coraplex.robot_plans.mixins import (
     CartesianVelocityLimitParameters,
@@ -33,29 +43,25 @@ from coraplex.robot_plans.mixins import (
     HasTcpGoalThresholds,
 )
 from coraplex.robot_plans.motions.base import BaseMotion
-from coraplex.datastructures.enums import (
-    MovementType,
-    WaypointsMovementType,
-)
 
 
 @dataclass
-class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
+class MoveGripperMotion(
+    BaseMotion,
+    Generic[TGripperConfiguration],
+    SubClassSafeGeneric,
+    GripperStallToleranceParameters,
+):
     """
-    Opens or closes the gripper.
-    """
-
-    motion: GripperState
-    """
-    Motion that should be performed, either 'open' or 'close'.
-    """
-
-    gripper: EndEffector
-    """
-    The gripper that should be moved.
+    Moves a gripper into the configuration it describes.
     """
 
-    allow_gripper_collision: Optional[bool] = None
+    configuration: TGripperConfiguration
+    """
+    The gripper configuration to command.
+    """
+
+    allow_gripper_collision: bool | None = None
     """
     If the gripper is allowed to collide with something.
     """
@@ -65,8 +71,13 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
 
     @property
     def _motion_chart(self):
-        name = "OpenGripper" if self.motion == GripperState.OPEN else "CloseGripper"
-        goal_state = self.gripper.get_joint_state_by_type(self.motion)
+        """
+        :return: The chart driving the gripper's connections to the joint state the
+            configuration commands, with the velocity limit and collision rules the
+            configuration and parameters ask for.
+        """
+        goal_state = self.configuration.joint_state
+        name = goal_state.name.name
         joint_task = JointPositionList(goal_state=goal_state, name=name)
 
         done_node = joint_task
@@ -86,21 +97,47 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
                 [joint_task, stall_monitor], minimum_success=1, name=name
             )
 
-        accompanying_nodes: List[MotionStatechartNode] = []
-        if self.finger_velocity is not None:
-            accompanying_nodes.append(
+        nodes = [done_node]
+
+        finger_velocity = self.configuration.finger_velocity
+        if finger_velocity is not None:
+            nodes.append(
                 JointVelocityLimit(
                     connections=list(goal_state.connections),
-                    max_velocity=self.finger_velocity,
+                    max_velocity=finger_velocity,
                 )
             )
+
         if self.allow_gripper_collision:
-            accompanying_nodes.extend(
-                self._only_allow_gripper_collision_rules(self.gripper)
+            nodes.extend(
+                self._only_allow_gripper_collision_rules(
+                    self.configuration.end_effector
+                )
             )
-        if not accompanying_nodes:
-            return done_node
-        return Parallel([done_node, *accompanying_nodes], name=name)
+
+        if len(nodes) == 1:
+            return nodes[0]
+        return Parallel(nodes, name=name)
+
+    @classmethod
+    def handles(cls, motion: MoveGripperMotion) -> bool:
+        """
+        Whether this alternative can be built from the given motion's configuration.
+
+        :param motion: The motion whose configuration is checked.
+        :return: True if the motion's configuration is an instance of the configuration
+            type this alternative is bound to. Also True when this class binds no
+            concrete configuration type.
+        """
+        bound_configuration_type = cls.get_generic_type_parameters()
+        if not bound_configuration_type:
+            return True
+        configuration_type = bound_configuration_type[0]
+        if not isinstance(configuration_type, type):
+            # The generic parameter is still an unresolved type variable, so this class
+            # binds no concrete configuration type it could check against.
+            return True
+        return isinstance(motion.configuration, configuration_type)
 
 
 @dataclass
@@ -121,12 +158,12 @@ class MoveToolCenterPointMotion(
     Arm with the TCP that should be moved to the target.
     """
 
-    allow_gripper_collision: Optional[bool] = None
+    allow_gripper_collision: bool | None = None
     """
     If the gripper can collide with something.
     """
 
-    movement_type: Optional[MovementType] = MovementType.CARTESIAN
+    movement_type: MovementType | None = MovementType.CARTESIAN
     """
     The type of movement that should be performed.
     """
@@ -134,7 +171,7 @@ class MoveToolCenterPointMotion(
     def perform(self):
         return
 
-    def _velocity_limit_nodes(self, root: Body, tip: Body) -> List[Task]:
+    def _velocity_limit_nodes(self, root: Body, tip: Body) -> list[Task]:
         """
         :return: The :class:`CartesianPositionVelocityLimit`/
             :class:`CartesianRotationVelocityLimit` nodes requested via
@@ -190,7 +227,7 @@ class MoveToolCenterPointMotion(
                 translation_threshold=self.resolved_position_threshold(),
                 orientation_threshold=self.resolved_orientation_threshold(),
             )
-        accompanying_nodes: List[MotionStatechartNode] = list(
+        accompanying_nodes: list[MotionStatechartNode] = list(
             self._velocity_limit_nodes(root, tip)
         )
         if self.allow_gripper_collision:
@@ -208,7 +245,7 @@ class MoveTCPWaypointsMotion(BaseMotion, HasTcpGoalThresholds):
     Moves the Tool center point (TCP) of the robot.
     """
 
-    waypoints: List[Pose]
+    waypoints: list[Pose]
     """
     Waypoints the TCP should move along.
     """
@@ -218,7 +255,7 @@ class MoveTCPWaypointsMotion(BaseMotion, HasTcpGoalThresholds):
     Arm with the TCP that should be moved to the target.
     """
 
-    allow_gripper_collision: Optional[bool] = None
+    allow_gripper_collision: bool | None = None
     """
     If the gripper can collide with something.
     """
@@ -264,7 +301,7 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion, HasTcpGoalThresholds):
     given plane alignments.
     """
 
-    waypoints: List[Point3]
+    waypoints: list[Point3]
     """
     Waypoints the TCP should move along.
     """
@@ -274,17 +311,17 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion, HasTcpGoalThresholds):
     Arm with the TCP that should be moved along the waypoints.
     """
 
-    alignment_pairs: List[AlignmentPair] = field(default_factory=list)
+    alignment_pairs: list[AlignmentPair] = field(default_factory=list)
     """
     Normal pairs kept aligned during the motion.
     """
 
-    allow_gripper_collision: Optional[bool] = None
+    allow_gripper_collision: bool | None = None
     """
     If the gripper can collide with something.
     """
 
-    tip: Optional[Body] = None
+    tip: Body | None = None
     """
     The body that should follow the waypoints.
 

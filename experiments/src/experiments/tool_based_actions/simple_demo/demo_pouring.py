@@ -67,7 +67,11 @@ def main() -> None:
 
     plan = sequential(
         [
-            SetGripperAction(pr2.right_arm.end_effector, GripperState.CLOSE),
+            SetGripperAction(
+                configuration=pr2.right_arm.end_effector.default_configuration(
+                    GripperState.CLOSE
+                )
+            ),
             ParkArmsAction(pr2.all_arms),
             MoveTorsoAction(TorsoState.HIGH),
             NavigateAction(

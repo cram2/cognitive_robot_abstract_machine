@@ -18,18 +18,19 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.plans.factories import execute_single
-from coraplex.robot_plans.actions.base import ActionDescription, DescriptionType
+from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.mixins import HasMaxJointVelocity, HasTcpGoalThresholds
 from coraplex.robot_plans.motions.gripper import (
     MoveGripperMotion,
     MoveTCPWaypointsMotion,
 )
 from coraplex.robot_plans.motions.robot_body import MoveJointsMotion
-from coraplex.validation.goal_validator import create_multiple_joint_goal_validator
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
-    GripperState,
     StaticJointState,
+)
+from semantic_digital_twin.datastructures.robots.gripper_configuration import (
+    GripperConfiguration,
 )
 
 
@@ -70,24 +71,26 @@ class MoveTorsoAction(ActionDescription):
 @dataclass
 class SetGripperAction(ActionDescription):
     """
-    Set the gripper state of the robot.
+    Sets a gripper to the configuration it describes.
     """
 
-    gripper: EndEffector
+    configuration: GripperConfiguration
     """
-    The gripper that should be set.
-    """
-
-    motion: GripperState
-    """
-    The motion that should be set on the gripper.
+    The gripper configuration to reach.
     """
 
     @property
     def _action_plan(self) -> PlanNode:
-        return execute_single(
-            MoveGripperMotion(gripper=self.gripper, motion=self.motion)
-        )
+        return execute_single(MoveGripperMotion(configuration=self.configuration))
+
+    @staticmethod
+    def post_condition(
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        """
+        The gripper's target joint state needs to be achieved.
+        """
+        return variable_from(kwargs["configuration"].joint_state).is_achieved()
 
 
 @dataclass
