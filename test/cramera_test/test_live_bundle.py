@@ -252,6 +252,23 @@ class TestBuildLiveScene:
 
         assert not marker.exists()
 
+    def test_cache_reuse_does_not_read_trajectory_data(self, monkeypatch, tmp_path):
+        """
+        Live model reuse depends on scene metadata, not a recorded trajectory.
+        """
+        scenes = use_scratch_scenes_directory(monkeypatch, tmp_path)
+        bridge = attached_bridge()
+        build_live_scene(bridge)
+        directory = scenes / paths.LIVE_SCENE_NAME
+        marker = directory / "marker"
+        marker.touch()
+        scene = scene_payload(scenes)
+        scene["trajectory"] = 42
+        (directory / "scene.json").write_text(json.dumps(scene))
+
+        assert build_live_scene(bridge) == paths.LIVE_SCENE_NAME
+        assert marker.exists()
+
 
 # %% concurrent builds
 

@@ -26,7 +26,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from cramera import paths
-from cramera.generated_json import GeneratedJson
+from cramera.knowledge.scene_bundle import SceneBundle
 from cramera.live.bridge import Bridge
 from cramera.world_objects import WorldObjects
 from cramera.onboard.bundle_urdf import BundledModel, BundleReport
@@ -147,31 +147,10 @@ def build_live_scene(bridge: Bridge) -> Optional[str]:
     output_directory = paths.local_scenes_directory() / paths.LIVE_SCENE_NAME
     with bridge.bundle_lock:
         signature = bridge.bundle_signature()
-        if _existing_signature(output_directory, bridge.robot) == signature:
+        cached = SceneBundle.of_directory(output_directory, include_trajectory=False)
+        if cached.matches_live_content(signature, has_robot=bridge.robot is not None):
             return paths.LIVE_SCENE_NAME
         return _write_bundle(bridge, output_directory, signature)
-
-
-def _existing_signature(
-    output_directory: Path, robot: Optional[AbstractRobot]
-) -> Optional[str]:
-    """
-    Read the cached signature when robot camera metadata has a valid container.
-
-    :param output_directory: Directory the previous bundle was written to.
-    :param robot: The current robot whose camera metadata must be present.
-    :return: The cached signature, or None for an absent or incomplete bundle.
-    """
-    scene = GeneratedJson(output_directory / "scene.json").read()
-    if not isinstance(scene, dict):
-        return None
-    if robot is not None:
-        recorded_robot = scene.get(SceneField.ROBOT)
-        if not isinstance(recorded_robot, dict):
-            return None
-        if not isinstance(recorded_robot.get(CameraField.CAMERAS), list):
-            return None
-    return scene.get(SceneField.BUNDLE_SIGNATURE)
 
 
 def _write_bundle(bridge: Bridge, output_directory: Path, signature: str) -> str:
