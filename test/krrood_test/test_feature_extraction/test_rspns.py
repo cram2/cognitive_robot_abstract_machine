@@ -22,10 +22,12 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     InvalidMonteCarloSampleCountError,
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
     GroundingMode,
     InstanceMixture,
+)
+from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (

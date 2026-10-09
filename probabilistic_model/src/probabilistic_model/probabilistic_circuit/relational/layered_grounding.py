@@ -24,6 +24,10 @@ from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized i
     RustworkxCircuitToLayeredCircuitConverter,
 )
 from probabilistic_model.distributions.helper import make_dirac
+from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
+    ExchangeablePartGrounder,
+    InstanceMixture,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
@@ -59,7 +63,6 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import Match
     from probabilistic_model.probabilistic_circuit.relational.rspn import (
         ExchangeableDistributionTemplate,
-        InstanceMixture,
     )
 
 
@@ -421,3 +424,70 @@ class LayeredExchangeablePart:
             children.append(child_nodes[mounting_index])
         for layer, nodes, children in nodes_per_layer.values():
             layer.attach_child_layer(attached, np.array(nodes), np.array(children))
+
+
+# %% weighing the instances at the class circuit
+
+
+@dataclass
+class LayeredExchangeablePartGrounder(
+    ExchangeablePartGrounder[LayeredExchangeablePart]
+):
+    """
+    Grounds one exchangeable part into the layers of its instances, to be attached to
+    the layered class circuit.
+    """
+
+    def single_instance(self) -> LayeredExchangeablePart:
+        return LayeredExchangeablePart(
+            self.instances(
+                [self.determined_statistics], NoRetainedLatents(SortedSet())
+            ),
+            self.product_nodes_to_extend,
+        )
+
+    def sampled_mixture(self, mixture: InstanceMixture) -> LayeredExchangeablePart:
+        return self.mixed_part(
+            mixture, SampledLatents(self.undetermined_latents, mixture.assignments)
+        )
+
+    def partition_mixture(
+        self, mixture: InstanceMixture, branches: List[Unit]
+    ) -> LayeredExchangeablePart:
+        return self.mixed_part(
+            mixture, PartitionBranches(self.undetermined_latents, branches)
+        )
+
+    def mixed_part(
+        self, mixture: InstanceMixture, retained_latents: RetainedLatents
+    ) -> LayeredExchangeablePart:
+        """
+        :param mixture: The assignments of the undetermined statistics, with their
+            weights at every mounting node.
+        :param retained_latents: How the instances keep the undetermined statistics.
+        :return: The part as one instance per assignment, mixed at every mounting node.
+        """
+        assignments = [
+            {**self.determined_statistics, **assignment}
+            for assignment in mixture.assignments
+        ]
+        return LayeredExchangeablePart(
+            self.instances(assignments, retained_latents),
+            self.product_nodes_to_extend,
+            mixture,
+        )
+
+    def instances(
+        self,
+        assignments: List[Dict[Variable, Any]],
+        retained_latents: RetainedLatents,
+    ) -> LayeredExchangeableInstances:
+        """
+        :param assignments: The values of every aggregation statistic, one assignment
+            per instance.
+        :param retained_latents: How the instances keep the undetermined statistics.
+        :return: The instances of the part.
+        """
+        return LayeredExchangeableInstances(
+            self.template, self.query_parts, assignments, retained_latents
+        )
