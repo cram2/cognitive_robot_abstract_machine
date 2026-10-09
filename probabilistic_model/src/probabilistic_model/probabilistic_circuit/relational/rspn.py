@@ -37,6 +37,7 @@ from probabilistic_model.learning.learning_method import LearningMethod
 from probabilistic_model.learning.jpt.variables import (
     infer_variables_from_dataframe,
 )
+from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
     ClassCircuitGroundingFailedError,
@@ -107,7 +108,7 @@ class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
     """
 
     def _ground_part_circuit(
-        self, part: Match, aggregation_statistics: dict[Variable, Any], index: int = 0
+        self, part: Match, aggregation_statistics: PartialPointType, index: int = 0
     ) -> ProbabilisticCircuit:
         """
         Ground and prepare the circuit for a single exchangeable part.
@@ -161,7 +162,7 @@ class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
         return type(variable)(f"{prefix}.{variable.name}", domain=variable.domain)
 
     def ground(
-        self, parts_to_ground: list[Match], aggregation_statistics: dict[Variable, Any]
+        self, parts_to_ground: list[Match], aggregation_statistics: PartialPointType
     ) -> ProbabilisticCircuit:
         """
         Build a product circuit by grounding each exchangeable part independently.
@@ -246,7 +247,7 @@ class RustworkxExchangeablePartGrounder(ExchangeablePartGrounder[ProbabilisticCi
             )
         return self.circuit
 
-    def _mount_instance(self, aggregation_statistics: dict[Variable, Any]) -> Unit:
+    def _mount_instance(self, aggregation_statistics: PartialPointType) -> Unit:
         """
         Ground one exchangeable instance and mount it into the class circuit.
 
@@ -258,7 +259,7 @@ class RustworkxExchangeablePartGrounder(ExchangeablePartGrounder[ProbabilisticCi
         return node_index_map[grounded.root.index]
 
     def _mount_instance_with_retained_latents(
-        self, assignment: dict[Variable, Any]
+        self, assignment: PartialPointType
     ) -> Unit:
         """
         Ground one exchangeable instance and retain its sampled latents as variables.
@@ -557,7 +558,7 @@ class RelationalProbabilisticCircuit:
     def _condition_class_circuit(
         self,
         circuit: ProbabilisticCircuit,
-        aggregation_statistics: dict[Variable, Any],
+        aggregation_statistics: PartialPointType,
         latent_variables: list[Variable],
     ) -> tuple[ProbabilisticCircuit, list[ProductUnit]]:
         """
@@ -587,7 +588,7 @@ class RelationalProbabilisticCircuit:
 
     @staticmethod
     def _can_condition_on(
-        circuit: ProbabilisticCircuit, aggregation_statistics: dict[Variable, Any]
+        circuit: ProbabilisticCircuit, aggregation_statistics: PartialPointType
     ) -> bool:
         """
         :param circuit: The current working copy of the class circuit.

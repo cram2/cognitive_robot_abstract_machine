@@ -16,6 +16,7 @@ import numpy as np
 from sortedcontainers import SortedSet
 from typing_extensions import TYPE_CHECKING, Any, Callable, Generic, Optional, TypeVar
 
+from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     InvalidMonteCarloSampleCountError,
     UndeterminedLatentsNotModeledError,
@@ -49,31 +50,20 @@ What a grounder turns the instances of one exchangeable part into.
 
 class GroundingMode(enum.IntEnum):
     """
-    Selects how ``RelationalProbabilisticCircuit.ground`` represents an exchangeable
-    relation's aggregation latents that a query leaves undetermined.
-
-    Undetermined latents are always retained as variables of the grounded circuit --
-    never integrated out -- so any caller that only wants the query's own variables
-    marginalizes the ones it does not need afterward, as a postprocessing step, rather
-    than grounding deciding that for it.
+    How a grounded circuit represents the aggregation statistics a query leaves
+    undetermined. The statistics stay variables of the grounded circuit.
     """
 
     SAMPLED = enum.auto()
     """
-    Retain each undetermined latent as a point-valued variable at its Monte-Carlo
-    sampled value.
-
-    Default behaviour.
+    One instance per distinct Monte-Carlo sample of the statistics, carrying the
+    sampled values as point masses.
     """
 
     EXACT = enum.auto()
     """
-    Retain undetermined latents by enumerating the fitted circuit's own exact, disjoint
-    partition over them instead of sampling.
-
-    Reproducible across calls and covers the whole domain the model learned about,
-    unlike :attr:`SAMPLED`. Falls back to :attr:`SAMPLED`, with a logged warning, when
-    the fitted circuit's partition over the undetermined latents is not itself disjoint.
+    One instance per branch of the fitted partition over the statistics, carrying the
+    branch.
     """
 
 
@@ -84,7 +74,7 @@ class InstanceMixture:
     instance per distinct assignment of the undetermined latents, weighted per node.
     """
 
-    assignments: list[dict[Variable, Any]]
+    assignments: list[PartialPointType]
     """
     The distinct assignments of the undetermined latents, one instance each.
     """
@@ -98,8 +88,8 @@ class InstanceMixture:
     @classmethod
     def of_node_local_assignments(
         cls,
-        node_local_assignments: list[tuple[list[dict[Variable, Any]], list[float]]],
-        key_of: Callable[[dict[Variable, Any]], tuple[Any, ...]],
+        node_local_assignments: list[tuple[list[PartialPointType], list[float]]],
+        key_of: Callable[[PartialPointType], tuple[Any, ...]],
     ) -> InstanceMixture:
         """
         :param node_local_assignments: Per mounting node, the assignments it mixes and
@@ -108,7 +98,7 @@ class InstanceMixture:
         :return: The mixture over the distinct assignments of all nodes.
         """
         index_of_key: dict[tuple[Any, ...], int] = {}
-        assignments: list[dict[Variable, Any]] = []
+        assignments: list[PartialPointType] = []
         for node_assignments, _ in node_local_assignments:
             for assignment in node_assignments:
                 key = key_of(assignment)
@@ -154,7 +144,7 @@ class ExchangeablePartGrounder(ABC, Generic[GroundedPart]):
     The query parts, one per child object in the relation.
     """
 
-    determined_statistics: dict[Variable, Any]
+    determined_statistics: PartialPointType
     """
     Aggregation statistics determinable from the query.
     """
@@ -247,7 +237,7 @@ class ExchangeablePartGrounder(ABC, Generic[GroundedPart]):
             node_local_assignments, self._assignment_key
         )
 
-    def _assignment_key(self, assignment: dict[Variable, Any]) -> tuple[Any, ...]:
+    def _assignment_key(self, assignment: PartialPointType) -> tuple[Any, ...]:
         """
         :param assignment: Values of the undetermined latents.
         :return: The values in the latents' sorted order, to tell assignments apart.
@@ -314,7 +304,7 @@ class ExchangeablePartGrounder(ABC, Generic[GroundedPart]):
 
     def _sample_undetermined_latents(
         self, product_node: Optional[ProductUnit] = None
-    ) -> list[dict[Variable, Any]]:
+    ) -> list[PartialPointType]:
         """
         Draw the distinct values of the undetermined latents to integrate over.
 
@@ -354,7 +344,7 @@ class ExchangeablePartGrounder(ABC, Generic[GroundedPart]):
     def _node_local_latent_log_likelihoods(
         product_node: ProductUnit,
         undetermined_latents: SortedSet[Variable],
-        latent_assignments: list[dict[Variable, Any]],
+        latent_assignments: list[PartialPointType],
     ) -> list[float]:
         """
         Log-likelihoods of latent assignments local to a mounting product node.
@@ -381,8 +371,8 @@ class ExchangeablePartGrounder(ABC, Generic[GroundedPart]):
         ]
 
     def _node_local_assignments(
-        self, product_node: ProductUnit, sampled_assignments: list[dict[Variable, Any]]
-    ) -> tuple[list[dict[Variable, Any]], list[float]]:
+        self, product_node: ProductUnit, sampled_assignments: list[PartialPointType]
+    ) -> tuple[list[PartialPointType], list[float]]:
         """
         The latent assignments one mounting node integrates over, with their node-local
         log-likelihoods.
@@ -473,7 +463,7 @@ class ExchangeablePartGrounder(ABC, Generic[GroundedPart]):
     @staticmethod
     def _representative_value(
         latent_branch: Unit, undetermined_latents: SortedSet[Variable]
-    ) -> dict[Variable, Any]:
+    ) -> PartialPointType:
         """
         Extract one concrete point per undetermined latent from a partition branch.
 

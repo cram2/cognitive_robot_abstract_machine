@@ -17,13 +17,14 @@ from functools import cached_property
 
 import numpy as np
 from sortedcontainers import SortedSet
-from typing_extensions import TYPE_CHECKING, Any, Dict, List, Optional
+from typing_extensions import TYPE_CHECKING, Dict, List, Optional
 
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     ConvertedCircuit,
     RustworkxCircuitToLayeredCircuitConverter,
 )
 from probabilistic_model.distributions.helper import make_dirac
+from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
     InstanceMixture,
@@ -133,7 +134,7 @@ class SampledLatents(RetainedLatents):
     Every instance carries the sampled values it was grounded on, as point masses.
     """
 
-    assignments: List[Dict[Variable, Any]] = field(default_factory=list)
+    assignments: List[PartialPointType] = field(default_factory=list)
     """
     The sampled values of every instance.
     """
@@ -210,7 +211,7 @@ class LayeredExchangeableInstances:
     The query parts, one per child object of the relation.
     """
 
-    assignments: List[Dict[Variable, Any]]
+    assignments: List[PartialPointType]
     """
     The values of every aggregation statistic, one assignment per instance.
     """
@@ -286,7 +287,7 @@ class LayeredExchangeableInstances:
         stacked.layer.normalize()
         return stacked
 
-    def layer_in(self, variables: SortedSet[Variable]) -> ProductLayer:
+    def instance_layer(self, variables: SortedSet[Variable]) -> ProductLayer:
         """
         :param variables: The variables of the grounded circuit.
         :return: The layer of instances, one node per assignment.
@@ -397,7 +398,7 @@ class LayeredExchangeablePart:
         :param variables: The variables of the grounded circuit, which the class circuit
             already refers to.
         """
-        instance_layer = self.instances.layer_in(variables)
+        instance_layer = self.instances.instance_layer(variables)
         number_of_mounting_nodes = len(self.mounting_nodes)
         if self.mixture is None:
             attached = instance_layer
@@ -479,7 +480,7 @@ class LayeredExchangeablePartGrounder(
 
     def instances(
         self,
-        assignments: List[Dict[Variable, Any]],
+        assignments: List[PartialPointType],
         retained_latents: RetainedLatents,
     ) -> LayeredExchangeableInstances:
         """
