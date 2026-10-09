@@ -212,25 +212,3 @@ class AmbiguousVariablePathError(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Use a longer, more specific suffix of the variable's full name."
-
-
-@dataclass
-class NestedExchangeablePartsNotLayeredError(DataclassException):
-    """
-    Raised when a relational circuit is grounded into a layered circuit although the
-    template of one of its exchangeable relations has exchangeable relations of its own.
-    """
-
-    class_: Type
-    """
-    The class the template models.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"The template of {self.class_.__name__} has exchangeable relations of its "
-            f"own, which grounding into a layered circuit does not support yet."
-        )
-
-    def suggest_correction(self) -> str:
-        return "Ground this circuit with RelationalProbabilisticCircuit.ground instead."

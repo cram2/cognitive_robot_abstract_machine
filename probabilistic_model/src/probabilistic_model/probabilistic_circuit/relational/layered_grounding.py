@@ -12,7 +12,8 @@ built one instance and one child object at a time.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from functools import cached_property
 
 import numpy as np
 from sortedcontainers import SortedSet
@@ -23,13 +24,13 @@ from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized i
     RustworkxCircuitToLayeredCircuitConverter,
 )
 from probabilistic_model.distributions.helper import make_dirac
-from probabilistic_model.probabilistic_circuit.relational.exceptions import (
-    NestedExchangeablePartsNotLayeredError,
-)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
     Unit,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    NodeIndices,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
@@ -76,12 +77,12 @@ class InstanceFactor:
     The child layer.
     """
 
-    instances: np.ndarray
+    instances: NodeIndices
     """
     The instances that multiply a node of the child layer.
     """
 
-    nodes: np.ndarray
+    nodes: NodeIndices
     """
     The node of the child layer every one of ``instances`` multiplies.
     """
@@ -216,50 +217,51 @@ class LayeredExchangeableInstances:
     How the instances keep the statistics the query leaves undetermined.
     """
 
-    def __post_init__(self):
-        if self.template.template_distribution.exchangeable_distribution_templates:
-            raise NestedExchangeablePartsNotLayeredError(
-                self.template.template_distribution.class_
+    @cached_property
+    def circuits_of_parts(self) -> List[LayeredProbabilisticCircuit]:
+        """
+        :return: The template of every child object, before conditioning on the
+            aggregation statistics. Without exchangeable relations of its own, the
+            template is the same for every child object, and the child objects share
+            one circuit. Otherwise every child object grounds the template for its own
+            query part.
+        """
+        template_distribution = self.template.template_distribution
+        if not template_distribution.exchangeable_distribution_templates:
+            circuit = RustworkxCircuitToLayeredCircuitConverter.convert(
+                template_distribution.class_probabilistic_circuit
             )
+            return [circuit] * len(self.query_parts)
+        return [template_distribution.ground_layered(part) for part in self.query_parts]
 
     @property
     def variables(self) -> SortedSet[Variable]:
         """
         :return: The variables the instances add to the grounded circuit.
         """
-        template_variables = (
-            self.template.template_distribution.class_probabilistic_circuit.variables
-        )
         result = SortedSet(self.retained_latents.variables)
-        for index, part in enumerate(self.query_parts):
+        for index, (part, circuit) in enumerate(
+            zip(self.query_parts, self.circuits_of_parts)
+        ):
             prefix = self.template._prefix_for_part(part, index)
             result.update(
-                self.renamed(variable, prefix)
-                for variable in template_variables
+                self.template.variable_of_part(variable, prefix)
+                for variable in circuit.variables
                 if variable not in self.template.latent_variables
             )
         return result
 
-    @staticmethod
-    def renamed(variable: Variable, prefix: str) -> Variable:
+    def conditioned_template(
+        self, circuit: LayeredProbabilisticCircuit
+    ) -> StackedLayer:
         """
-        :param variable: A variable of the template.
-        :param prefix: The namespace of one child object.
-        :return: The variable of that child object.
-        """
-        return type(variable)(f"{prefix}.{variable.name}", domain=variable.domain)
+        Condition the template of a child object on every assignment, remove the
+        aggregation statistics and stack the results.
 
-    def conditioned_template(self) -> tuple[StackedLayer, SortedSet[Variable]]:
-        """
-        Condition the template on every assignment, remove the aggregation statistics
-        and stack the results.
-
+        :param circuit: The template of the child object.
         :return: The stacked templates, with node ``i`` of the root belonging to the
-            ``i``-th assignment, and the variables their layers refer to.
+            ``i``-th assignment, over the variables of ``circuit``.
         """
-        circuit = RustworkxCircuitToLayeredCircuitConverter.convert(
-            self.template.template_distribution.class_probabilistic_circuit
-        )
         kept = np.array(
             [
                 variable not in self.template.latent_variables
@@ -279,36 +281,43 @@ class LayeredExchangeableInstances:
             copies.append(source.marginal(kept))
         stacked = AlignedCopiesStacker().stack(copies)
         stacked.layer.normalize()
-        return stacked, circuit.variables
+        return stacked
 
     def layer_in(self, variables: SortedSet[Variable]) -> ProductLayer:
         """
         :param variables: The variables of the grounded circuit.
         :return: The layer of instances, one node per assignment.
         """
-        stacked, template_variables = self.conditioned_template()
         number_of_instances = len(self.assignments)
         instances = np.arange(number_of_instances)
-        root_of_instance = stacked.nodes_of_copy(
-            instances, np.zeros(number_of_instances, dtype=np.int64)
-        )
+        stacked_of_circuit: Dict[int, StackedLayer] = {}
 
         factors = []
-        for index, part in enumerate(self.query_parts):
+        for index, (part, circuit) in enumerate(
+            zip(self.query_parts, self.circuits_of_parts)
+        ):
+            if id(circuit) not in stacked_of_circuit:
+                stacked_of_circuit[id(circuit)] = self.conditioned_template(circuit)
+            stacked = stacked_of_circuit[id(circuit)]
             prefix = self.template._prefix_for_part(part, index)
             remap = np.array(
                 [
                     (
                         -1
                         if variable in self.template.latent_variables
-                        else variables.index(self.renamed(variable, prefix))
+                        else variables.index(
+                            self.template.variable_of_part(variable, prefix)
+                        )
                     )
-                    for variable in template_variables
+                    for variable in circuit.variables
                 ],
                 dtype=np.int64,
             )
             child_object = stacked.layer.__deepcopy__({})
             child_object.remap_variables(remap)
+            root_of_instance = stacked.nodes_of_copy(
+                instances, np.zeros(number_of_instances, dtype=np.int64)
+            )
             factors.append(InstanceFactor(child_object, instances, root_of_instance))
         factors.extend(self.retained_latents.factors_in(variables, number_of_instances))
 
@@ -352,6 +361,30 @@ class LayeredExchangeablePart:
     The weights of the instances at every mounting node, or ``None`` when there is only
     one instance, which every mounting node multiplies.
     """
+
+    def without_removed_mounting_nodes(
+        self, circuit: ProbabilisticCircuit
+    ) -> LayeredExchangeablePart:
+        """
+        :param circuit: The class circuit after conditioning on the statistics of every
+            exchangeable relation.
+        :return: The part without the mounting nodes that conditioning on the statistics
+            of a later relation removed from the circuit, since nothing multiplies them
+            anymore.
+        """
+        units_of_circuit = {id(unit) for unit in circuit.nodes()}
+        kept = np.array(
+            [id(unit) in units_of_circuit for unit in self.mounting_nodes], dtype=bool
+        )
+        mixture = (
+            None
+            if self.mixture is None
+            else replace(self.mixture, log_weights=self.mixture.log_weights[kept])
+        )
+        mounting_nodes = [
+            unit for unit, is_kept in zip(self.mounting_nodes, kept) if is_kept
+        ]
+        return LayeredExchangeablePart(self.instances, mounting_nodes, mixture)
 
     def attach_to(self, converted: ConvertedCircuit, variables: SortedSet[Variable]):
         """

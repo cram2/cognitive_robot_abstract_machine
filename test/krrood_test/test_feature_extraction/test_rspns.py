@@ -7,6 +7,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 from sortedcontainers import SortedSet
+from typing_extensions import Any
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.entity_query_language.factories import a, an
@@ -19,15 +20,9 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
     InvalidMonteCarloSampleCountError,
-    NestedExchangeablePartsNotLayeredError,
-)
-from probabilistic_model.probabilistic_circuit.relational.layered_grounding import (
-    LayeredExchangeableInstances,
-    NoRetainedLatents,
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
-    ExchangeableDistributionTemplate,
     ExchangeablePartGrounder,
     GroundingMode,
     InstanceMixture,
@@ -53,6 +48,7 @@ from ..dataset.example_classes import (
     SceneObject,
     SceneObjectType,
     SceneRoom,
+    TestExParts,
 )
 
 
@@ -841,6 +837,144 @@ def test_partition_disjointly_false_for_overlapping_branches():
     )
 
 
+# %% exchangeable relations of exchangeable relations
+
+
+def _room(x: float, object_types: list[SceneObjectType]) -> SceneRoom:
+    return SceneRoom(
+        position=KRROODPosition(x=x, y=1.0, z=0.0),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
+        objects=[SceneObject(type=object_type) for object_type in object_types],
+    )
+
+
+@pytest.fixture
+def nested_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
+    """
+    A circuit over scenes whose rooms are an exchangeable relation with an exchangeable
+    relation of their own, the objects of every room.
+    """
+    table, chair = SceneObjectType.TABLE, SceneObjectType.CHAIR
+    scenes = [
+        TestExParts(
+            objects=[SceneObject(type=table)],
+            rooms=[_room(1.0, [table, chair]), _room(2.0, [chair, chair, chair])],
+        ),
+        TestExParts(
+            objects=[SceneObject(type=chair), SceneObject(type=chair)],
+            rooms=[
+                _room(3.0, [table]),
+                _room(4.0, [table, chair, chair]),
+                _room(5.0, [chair]),
+            ],
+        ),
+        TestExParts(
+            objects=[SceneObject(type=table), SceneObject(type=chair)],
+            rooms=[_room(2.5, [table, table, chair])],
+        ),
+    ]
+    return RelationalProbabilisticCircuit(TestExParts).fit(scenes)
+
+
+def _room_query(object_types: list) -> Any:
+    return a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[a(SceneObject)(type=object_type) for object_type in object_types],
+    )
+
+
+@pytest.fixture
+def nested_query_with_determined_room_statistics():
+    """
+    A scene whose rooms list the type of every one of their objects, so the query
+    determines the aggregation statistics of every room.
+    """
+    table, chair = SceneObjectType.TABLE, SceneObjectType.CHAIR
+    query = a(TestExParts)(
+        objects=[a(SceneObject)(type=table), a(SceneObject)(type=chair)],
+        rooms=[_room_query([table, chair]), _room_query([chair, chair, table])],
+    )
+    query.resolve()
+    return query
+
+
+@pytest.fixture
+def nested_query_with_undetermined_room_statistics():
+    """
+    A scene with one room whose object types are left open, so grounding that room
+    retains its aggregation statistics.
+    """
+    query = a(TestExParts)(
+        objects=[a(SceneObject)(type=SceneObjectType.TABLE)],
+        rooms=[_room_query([SceneObjectType.CHAIR]), _room_query([..., ...])],
+    )
+    query.resolve()
+    return query
+
+
+def test_room_template_models_the_aggregation_statistics_of_its_objects(
+    nested_relational_probabilistic_circuit,
+):
+    room_circuit = (
+        nested_relational_probabilistic_circuit.exchangeable_distribution_templates[
+            "rooms"
+        ].template_distribution
+    )
+    object_template = room_circuit.exchangeable_distribution_templates["objects"]
+    assert set(object_template.latent_variables) <= set(
+        room_circuit.class_probabilistic_circuit.variables
+    )
+
+
+def test_ground_nested_relations_is_valid(
+    nested_relational_probabilistic_circuit,
+    nested_query_with_determined_room_statistics,
+):
+    grounded = nested_relational_probabilistic_circuit.ground(
+        nested_query_with_determined_room_statistics
+    )
+    assert grounded.is_valid()
+
+
+def test_ground_keeps_a_relation_whose_successor_has_impossible_statistics(
+    nested_relational_probabilistic_circuit,
+    nested_query_with_determined_room_statistics,
+):
+    """
+    No scene with a table and a chair as objects has two rooms, so the class circuit
+    deems the statistics of the rooms impossible after conditioning on those of the
+    objects.
+
+    Grounding the rooms must still keep the grounded objects.
+    """
+    grounded = nested_relational_probabilistic_circuit.ground(
+        nested_query_with_determined_room_statistics
+    )
+    object_type_names = {
+        f"{object_part._variable_}.type"
+        for object_part in nested_query_with_determined_room_statistics._kwargs_[
+            "objects"
+        ]
+    }
+    assert object_type_names <= {variable.name for variable in grounded.variables}
+
+
+def test_ground_names_the_objects_of_every_room_by_their_query_path(
+    nested_relational_probabilistic_circuit,
+    nested_query_with_determined_room_statistics,
+):
+    grounded = nested_relational_probabilistic_circuit.ground(
+        nested_query_with_determined_room_statistics
+    )
+    object_type_names = {
+        f"{object_part._variable_}.type"
+        for room_part in nested_query_with_determined_room_statistics._kwargs_["rooms"]
+        for object_part in room_part._kwargs_["objects"]
+    }
+    assert object_type_names <= {variable.name for variable in grounded.variables}
+
+
 # %% grounding into a layered circuit
 
 
@@ -931,18 +1065,45 @@ def test_layered_grounding_of_a_query_that_determines_every_statistic_is_the_gro
     assert_same_distribution(grounded, layered)
 
 
-def test_layered_grounding_rejects_a_template_with_exchangeable_relations_of_its_own():
-    nested_template = ExchangeableDistributionTemplate(
-        RelationalProbabilisticCircuit(SceneRoom)
+def test_layered_grounding_of_nested_relations_is_the_grounding(
+    nested_relational_probabilistic_circuit,
+    nested_query_with_determined_room_statistics,
+):
+    model = nested_relational_probabilistic_circuit
+    grounded = model.ground(nested_query_with_determined_room_statistics)
+    layered = model.ground_layered(nested_query_with_determined_room_statistics)
+    assert_same_distribution(grounded, layered)
+
+
+def test_layered_grounding_of_nested_relations_with_sampled_latents_is_the_grounding(
+    nested_relational_probabilistic_circuit,
+    nested_query_with_undetermined_room_statistics,
+):
+    model = nested_relational_probabilistic_circuit
+    np.random.seed(0)
+    grounded = model.ground(nested_query_with_undetermined_room_statistics)
+    np.random.seed(0)
+    layered = model.ground_layered(nested_query_with_undetermined_room_statistics)
+    assert_same_distribution(grounded, layered)
+
+
+def test_layered_grounding_leaves_out_branches_a_later_relation_rules_out(
+    nested_relational_probabilistic_circuit,
+):
+    """
+    Conditioning on the statistics of the rooms removes branches of the class circuit
+    that the objects were already weighed at.
+    """
+    chair, table = SceneObjectType.CHAIR, SceneObjectType.TABLE
+    query = a(TestExParts)(
+        objects=[a(SceneObject)(type=chair)],
+        rooms=[_room_query([chair, chair]), _room_query([table])],
     )
-    template = ExchangeableDistributionTemplate(
-        RelationalProbabilisticCircuit(
-            SceneRoom,
-            exchangeable_distribution_templates={"objects": nested_template},
-        )
-    )
-    with pytest.raises(NestedExchangeablePartsNotLayeredError):
-        LayeredExchangeableInstances(template, [], [], NoRetainedLatents(SortedSet()))
+    query.resolve()
+    model = nested_relational_probabilistic_circuit
+    grounded = model.ground(query)
+    layered = model.ground_layered(query)
+    assert_same_distribution(grounded, layered)
 
 
 def test_instance_mixture_gives_every_distinct_assignment_one_instance():

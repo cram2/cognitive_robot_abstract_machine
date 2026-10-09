@@ -169,10 +169,30 @@ class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
         ]
         part_circuit.restrict_to_variables_in_place(non_latent_variables)
         prefix = self._prefix_for_part(part, index)
-        part_circuit.rename_variables_with_prefix(prefix, self.latent_variables)
+        part_circuit.update_variables(
+            {
+                variable: self.variable_of_part(variable, prefix)
+                for variable in part_circuit.variables
+            }
+        )
         if len(part_circuit.nodes()) == 0:
             raise PartCircuitGroundingFailedError(self.template_distribution.class_)
         return part_circuit
+
+    def variable_of_part(self, variable: Variable, prefix: str) -> Variable:
+        """
+        :param variable: A variable of the template grounded for one part.
+        :param prefix: The namespace of that part.
+        :return: The variable under the namespace of the part, or the variable itself
+            if it belongs to an exchangeable relation of the template, whose grounding
+            already names it by its full query path.
+        """
+        if (
+            variable
+            not in self.template_distribution.class_probabilistic_circuit.variables
+        ):
+            return variable
+        return type(variable)(f"{prefix}.{variable.name}", domain=variable.domain)
 
     def ground(
         self, parts_to_ground: list[Match], aggregation_statistics: dict[Variable, Any]
@@ -812,9 +832,20 @@ class RelationalProbabilisticCircuit:
             for child in getattr(instance, exchangeable_part):
                 child_features = child_feature_extractor.apply_mapping(child)
                 rows.append(aggregation_row + child_features)
+        child_aggregation_features = {
+            id(feature)
+            for features in child_feature_extractor.exchangeable_features.values()
+            for feature in features
+        }
+        # the child's own aggregation statistics keep the name the latent variables of
+        # its exchangeable templates are given, so grounding the child can find them
         child_column_names = [
-            f.get_clean_name_from_mapped_variable()
-            for f in child_feature_extractor.features
+            (
+                feature._name_
+                if id(feature) in child_aggregation_features
+                else feature.get_clean_name_from_mapped_variable()
+            )
+            for feature in child_feature_extractor.features
         ]
         return pd.DataFrame(columns=aggregation_names + child_column_names, data=rows)
 
@@ -932,6 +963,9 @@ class RelationalProbabilisticCircuit:
         Condition the class circuit on aggregation statistics, keeping its structure so
         that its leaf products stay the mounting points.
 
+        Statistics the circuit deems impossible leave it as it is, together with what
+        the exchangeable parts grounded before have attached to it.
+
         :param circuit: The current working copy of the class circuit.
         :param aggregation_statistics: Observed aggregation values to condition on.
         :param latent_variables: Variables that link the class circuit to the
@@ -939,18 +973,36 @@ class RelationalProbabilisticCircuit:
         :return: The conditioned circuit and the product nodes that will be extended
             with the grounded exchangeable distribution.
         """
-        if aggregation_statistics:
-            conditioning_result, _ = circuit.log_conditional_in_place(
+        if self._can_condition_on(circuit, aggregation_statistics):
+            circuit.log_conditional_in_place(
                 aggregation_statistics, preserve_structure=True
             )
-            if conditioning_result is None:
-                circuit = self.class_probabilistic_circuit.__deepcopy__()
         if len(circuit.nodes()) == 0:
             raise ClassCircuitGroundingFailedError(self.class_)
         product_nodes_to_extend = find_lowest_product_nodes_that_model_variables(
             circuit, SortedSet(latent_variables)
         )
         return circuit, product_nodes_to_extend
+
+    @staticmethod
+    def _can_condition_on(
+        circuit: ProbabilisticCircuit, aggregation_statistics: dict[Variable, Any]
+    ) -> bool:
+        """
+        :param circuit: The current working copy of the class circuit.
+        :param aggregation_statistics: Observed aggregation values.
+        :return: Whether there are values and the circuit deems them possible, which
+            conditioning the circuit itself only tells after destroying it.
+        """
+        if not aggregation_statistics:
+            return False
+        statistics_circuit = circuit.marginal(aggregation_statistics)
+        if statistics_circuit is None:
+            return True
+        conditioned, _ = statistics_circuit.log_conditional_in_place(
+            aggregation_statistics
+        )
+        return conditioned is not None
 
     def ground(
         self,
@@ -1011,8 +1063,6 @@ class RelationalProbabilisticCircuit:
             undetermined. See :class:`GroundingMode`.
         :return: A layered circuit over all variables implied by the query.
         :raises CircuitNotFittedError: If ``ground_layered`` is called before ``fit``.
-        :raises NestedExchangeablePartsNotLayeredError: If the template of an
-            exchangeable relation has exchangeable relations of its own.
         """
         if self.class_probabilistic_circuit is None:
             raise CircuitNotFittedError(self.class_)
@@ -1028,6 +1078,7 @@ class RelationalProbabilisticCircuit:
             )
             circuit = grounder.circuit
             parts.append(self._layered_exchangeable_part(grounder, grounding_mode))
+        parts = [part.without_removed_mounting_nodes(circuit) for part in parts]
 
         converted = RustworkxCircuitToLayeredCircuitConverter.convert_with_layers(
             circuit
