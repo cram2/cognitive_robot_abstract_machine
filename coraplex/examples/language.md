@@ -65,9 +65,9 @@ We will start with a simple example that uses an action designator for moving th
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
-navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+navigate = NavigateAction(target_location=Pose2D(1, 1, reference_frame=world.root))
 park = ParkArmsAction(pr2.all_arms)
 
 plan = sequential([navigate, park], context=context).plan
@@ -103,9 +103,9 @@ Besides the described difference in behaviour this language expression can be us
 from coraplex.plans.factories import try_in_order
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
-navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+navigate = NavigateAction(target_location=Pose2D(1, 1, reference_frame=world.root))
 park = ParkArmsAction(pr2.all_arms)
 
 plan = try_in_order([navigate, park], context=context).plan
@@ -127,9 +127,9 @@ Using the parallel expressions works like Sequential and TryInOrder.
 from coraplex.plans.factories import parallel
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
-navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+navigate = NavigateAction(target_location=Pose2D(1, 1, reference_frame=world.root))
 park = ParkArmsAction(pr2.all_arms)
 
 plan = parallel([navigate, park], context=context).plan
@@ -149,9 +149,9 @@ TryAll can be used like any other language expression.
 from coraplex.plans.factories import try_all
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
-navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+navigate = NavigateAction(target_location=Pose2D(1, 1, reference_frame=world.root))
 park = ParkArmsAction(pr2.all_arms)
 
 plan = try_all([navigate, park], context=context).plan
@@ -170,11 +170,11 @@ from coraplex.plans.factories import parallel, sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
-navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+navigate = NavigateAction(target_location=Pose2D(1, 1, reference_frame=world.root))
 park = ParkArmsAction(pr2.all_arms)
-move_torso = MoveTorsoAction(TorsoState.HIGH)
+move_torso = MoveTorsoAction(torso_state=TorsoState.HIGH)
 
 plan = parallel([navigate, sequential([park, move_torso])], context=context).plan
 
@@ -235,14 +235,14 @@ the whole plan.
 from coraplex.plans.factories import code, try_all
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.plans.failures import PlanFailure
-from semantic_digital_twin.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
 
 def code_test():
     raise PlanFailure
 
 
-navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+navigate = NavigateAction(target_location=Pose2D(1, 1, reference_frame=world.root))
 code_func = code(code_test, context=context)
 
 plan = try_all([navigate, code_func], context=context).plan
@@ -266,8 +266,8 @@ from coraplex.plans.factories import repeat
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
 
-move_torso_up = MoveTorsoAction(TorsoState.HIGH)
-move_torso_down = MoveTorsoAction(TorsoState.LOW)
+move_torso_up = MoveTorsoAction(torso_state=TorsoState.HIGH)
+move_torso_down = MoveTorsoAction(torso_state=TorsoState.LOW)
 
 plan = repeat([move_torso_up, move_torso_down], maximum_repetitions=3, context=context).plan
 
@@ -300,8 +300,8 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from giskardpy.motion_statechart.monitors.payload_monitors import CountSimulationTimeSeconds
 from semantic_digital_twin.datastructures.definitions import TorsoState
 
-move_torso_up = MoveTorsoAction(TorsoState.HIGH)
-move_torso_down = MoveTorsoAction(TorsoState.LOW)
+move_torso_up = MoveTorsoAction(torso_state=TorsoState.HIGH)
+move_torso_down = MoveTorsoAction(torso_state=TorsoState.LOW)
 
 plan = cancel_when(
     [repeat([move_torso_up, move_torso_down], maximum_repetitions=3)],
@@ -325,8 +325,8 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from giskardpy.motion_statechart.monitors.payload_monitors import CountSimulationTimeSeconds
 from semantic_digital_twin.datastructures.definitions import TorsoState
 
-move_torso_up = MoveTorsoAction(TorsoState.HIGH)
-move_torso_down = MoveTorsoAction(TorsoState.LOW)
+move_torso_up = MoveTorsoAction(torso_state=TorsoState.HIGH)
+move_torso_down = MoveTorsoAction(torso_state=TorsoState.LOW)
 
 plan = pause_until(
     [repeat([move_torso_up, move_torso_down], maximum_repetitions=3)],

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
+from semantic_digital_twin.grasping.grasp_candidates import CanBeGrasped
 
 
 @dataclass(eq=False)
@@ -20,9 +20,7 @@ class NaturalLanguageDescription(HasRootBody):
 
 
 @dataclass(eq=False)
-class NaturalLanguageWithTypeDescription(
-    NaturalLanguageDescription, HasGraspCandidates
-):
+class NaturalLanguageWithTypeDescription(NaturalLanguageDescription, CanBeGrasped):
     """
     A natural language description of a Sage10k object including the type information of the object.
 

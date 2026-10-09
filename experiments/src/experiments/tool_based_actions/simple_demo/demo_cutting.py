@@ -6,7 +6,7 @@ on its right gripper.
 import logging
 
 from experiments.tool_based_actions.simple_demo.demo_world import (
-    BASE_POSITION_XYZ,
+    BASE_POSITION_XY,
     BREAD_COLOR,
     CUT_MOUNT,
     TARGET_POSITION_XYZ,
@@ -19,7 +19,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     CuttingKnife,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import CuttingTechnique
@@ -69,11 +69,13 @@ def main() -> None:
 
     plan = sequential(
         [
-            SetGripperAction(pr2.right_arm.end_effector, GripperState.CLOSE),
+            SetGripperAction(
+                end_effector=pr2.right_arm.end_effector, motion=GripperState.CLOSE
+            ),
             ParkArmsAction(pr2.all_arms),
-            MoveTorsoAction(TorsoState.HIGH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                Pose.from_xyz_rpy(*BASE_POSITION_XYZ, reference_frame=world.root)
+                target_location=Pose2D(*BASE_POSITION_XY, reference_frame=world.root)
             ),
             CuttingAction(
                 object_to_cut=bread_body,

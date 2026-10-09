@@ -43,12 +43,12 @@ from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.grasping.grasp_candidates import (
     GraspCandidate,
-    HasGraspCandidates,
+    CanBeGrasped,
 )
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 
 if TYPE_CHECKING:
     from coraplex.datastructures.dataclasses import Context
@@ -96,7 +96,7 @@ class DetectBeforeGrasp(InsertionTransformation[ReachAction]):
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
         reach = cast(ReachAction, plan_node.action)
         return [
-            LookAtAction(self.final_approach(plan_node).motion.target),
+            LookAtAction(target=self.final_approach(plan_node).motion.target),
             DetectAction(
                 DetectionTechnique.TYPES,
                 object_sem_annotation=type(reach.grasp.graspable),
@@ -163,7 +163,7 @@ class DrawerOpening(
         open_the_drawer = a(MoveAndOpenAction)(
             navigate=a(NavigateAction)(
                 target_location=variable(
-                    Pose,
+                    Pose2D,
                     domain=ReachabilityLocation(
                         handle_pose, arm, ReachFraction.ACCESSING, context=context
                     ),
@@ -206,7 +206,7 @@ class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
             nodes.extend(self.opening_nodes(drawer, pick_up.arm, pick_up.context))
         drive_to_the_object = a(NavigateAction)(
             target_location=variable(
-                Pose,
+                Pose2D,
                 # A location samples its poses only once the drive is grounded, by
                 # which time the drawers this rewrite opens stand open.
                 domain=ReachabilityLocation(
@@ -226,7 +226,7 @@ class PickUpTarget:
     The object a pick-up takes hold of, and the arm it takes hold with.
     """
 
-    graspable: HasGraspCandidates
+    graspable: CanBeGrasped
     """
     The object that is picked up.
     """

@@ -20,7 +20,7 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 
 # ---- Occupancy locations tests ----
 
@@ -426,7 +426,7 @@ def test_sample_to_pose(pr2_apartment_context):
 
     assert pose.position.x == 1.6
     assert pose.position.y == 2.2
-    assert pose.position.z == 0
+    assert isinstance(pose, Pose2D)
 
 
 def test_sample_highest_first(pr2_apartment_context):
@@ -530,10 +530,10 @@ def _stand_off_distances(
     """
     :return: How far the first ``count`` candidates stand from the map's origin.
     """
-    origin = costmap.origin.position.to_np()[:3]
+    origin = costmap.origin.position.to_np()[:2]
     return np.array(
         [
-            float(np.linalg.norm(pose.position.to_np()[:3] - origin))
+            float(np.linalg.norm(pose.position.to_np()[:2] - origin))
             for pose in islice(
                 costmap.sample(costmap.number_of_samples, seed),
                 count,
@@ -637,7 +637,7 @@ def test_a_sampled_candidate_faces_the_maps_origin(pr2_apartment_context):
     assert len(sampled) == 5
     for candidate in sampled:
         facing = RotationMatrix.from_quaternion(candidate.quaternion) @ Vector3.X()
-        to_origin = ring.origin.position - candidate.position
+        to_origin = ring.origin.position - candidate.pose.position
         assert float(facing.angle_between(to_origin)) == pytest.approx(0, abs=1e-6)
 
 

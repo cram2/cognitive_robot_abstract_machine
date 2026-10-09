@@ -11,7 +11,11 @@ from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveManipulatorAction
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses, HasTcpGoalThresholds
+from coraplex.robot_plans.mixins import (
+    GraspApproachParameters,
+    GoalThresholdParameters,
+    EndEffectorParameter,
+)
 from coraplex.robot_plans.motions.misc import DetectingMotion
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -23,7 +27,6 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Point3,
     Pose2D,
 )
-from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Region,
@@ -130,7 +133,12 @@ class DetectAction(ActionDescription):
 
 
 @dataclass
-class MoveToReach(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThresholds):
+class MoveToReach(
+    ActionDescription,
+    EndEffectorParameter,
+    GraspApproachParameters,
+    GoalThresholdParameters,
+):
     """
     Let the robot move to a position facing the target and reach with a end_effector.
     """
@@ -152,19 +160,16 @@ class MoveToReach(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThreshol
     The grasp frame the end effector is to reach.
     """
 
-    end_effector: EndEffector
-    """
-    The end effector that should reach it.
-    """
-
     @property
     def _action_plan(self) -> PlanNode:
         return sequential(
             [
-                NavigateAction(self.standing_pose),
+                NavigateAction(target_location=self.standing_pose),
                 MoveManipulatorAction(
-                    self.end_effector.tool_frame_goal(self.reference_T_grasp),
-                    self.end_effector,
+                    target_pose=self.end_effector.tool_frame_goal(
+                        self.reference_T_grasp
+                    ),
+                    end_effector=self.end_effector,
                     allow_gripper_collision=False,
                     position_threshold=self.position_threshold,
                     orientation_threshold=self.orientation_threshold,
@@ -173,7 +178,7 @@ class MoveToReach(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThreshol
         )
 
     @property
-    def standing_pose(self) -> Pose:
+    def standing_pose(self) -> Pose2D:
         """
         Calculates the pose where the robot should stand to reach the target.
 
@@ -199,9 +204,4 @@ class MoveToReach(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThreshol
         )
         reference_T_robot = reference_T_target @ target_T_robot
         world_T_robot = self.world.transform(reference_T_robot.pose, self.world.root)
-        return Pose.from_xyz_rpy(
-            x=world_T_robot.x,
-            y=world_T_robot.y,
-            yaw=world_T_robot.yaw,
-            reference_frame=self.world.root,
-        )
+        return Pose2D.from_pose(world_T_robot)

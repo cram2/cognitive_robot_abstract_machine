@@ -73,7 +73,7 @@ from semantic_digital_twin.world_description.geometry import VolumetricBoundingB
 def test_parse_simple_action(pr2_apartment_context):
     world, view, context = pr2_apartment_context
 
-    plan = execute_single(MoveTorsoAction(TorsoState.HIGH), context=context)
+    plan = execute_single(MoveTorsoAction(torso_state=TorsoState.HIGH), context=context)
 
     plan.notify()
 
@@ -108,7 +108,10 @@ def test_sequential_plan_nests_a_goal_per_plan_node(pr2_apartment_context):
     world, view, context = pr2_apartment_context
 
     plan = sequential(
-        [MoveTorsoAction(TorsoState.LOW), MoveTorsoAction(TorsoState.HIGH)],
+        [
+            MoveTorsoAction(torso_state=TorsoState.LOW),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+        ],
         context=context,
     )
     plan.notify()
@@ -165,7 +168,7 @@ def test_pause_monitor_pauses_the_children_goal(pr2_apartment_context, rclpy_nod
     monitor = ConstFalseNode(name="never")
 
     plan = pause_while(
-        [MoveTorsoAction(TorsoState.HIGH)], monitor=monitor, context=context
+        [MoveTorsoAction(torso_state=TorsoState.HIGH)], monitor=monitor, context=context
     )
     executable = _parse_and_compile(plan, world, context)
 
@@ -188,7 +191,7 @@ def test_pause_until_monitor_pauses_the_children_goal(
     monitor = ConstFalseNode(name="never")
 
     plan = pause_until(
-        [MoveTorsoAction(TorsoState.HIGH)], monitor=monitor, context=context
+        [MoveTorsoAction(torso_state=TorsoState.HIGH)], monitor=monitor, context=context
     )
     executable = _parse_and_compile(plan, world, context)
 
@@ -205,7 +208,7 @@ def test_cancel_monitor_ends_the_children_goal(pr2_apartment_context, rclpy_node
     monitor = ConstFalseNode(name="never")
 
     plan = cancel_when(
-        [MoveTorsoAction(TorsoState.HIGH)], monitor=monitor, context=context
+        [MoveTorsoAction(torso_state=TorsoState.HIGH)], monitor=monitor, context=context
     )
     executable = _parse_and_compile(plan, world, context)
 
@@ -228,7 +231,7 @@ def test_cancel_monitor_ends_the_motion_when_the_monitor_fires(
     monitor = ConstFalseNode(name="never")
 
     plan = cancel_when(
-        [MoveTorsoAction(TorsoState.HIGH)], monitor=monitor, context=context
+        [MoveTorsoAction(torso_state=TorsoState.HIGH)], monitor=monitor, context=context
     )
     executable = _parse_and_compile(plan, world, context)
 
@@ -253,9 +256,10 @@ def test_monitored_subtree_nested_in_a_sequence_compiles(
 
     plan = sequential(
         [
-            MoveTorsoAction(TorsoState.LOW),
+            MoveTorsoAction(torso_state=TorsoState.LOW),
             cancel_when(
-                [MoveTorsoAction(TorsoState.HIGH)], monitor=ConstFalseNode(name="never")
+                [MoveTorsoAction(torso_state=TorsoState.HIGH)],
+                monitor=ConstFalseNode(name="never"),
             ),
         ],
         context=context,
@@ -279,7 +283,9 @@ def test_repeat_node_wraps_its_children_in_a_repeating_goal(
     world, view, context = pr2_apartment_context
 
     plan = repeat(
-        [MoveTorsoAction(TorsoState.HIGH)], maximum_repetitions=3, context=context
+        [MoveTorsoAction(torso_state=TorsoState.HIGH)],
+        maximum_repetitions=3,
+        context=context,
     )
     executable = _parse_and_compile(plan, world, context)
 
@@ -329,7 +335,7 @@ def test_parse_pick_up(pr2_apartment_context):
 
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan = execute_single(
-        PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
+        PickUpAction(grasp=milk.grasp_candidates()[0], arm=context.robot.right_arm),
         context=context,
     )
 
@@ -355,7 +361,7 @@ def test_parse_pick_up_merges_motions_around_model_change(pr2_apartment_context)
 
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan = execute_single(
-        PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
+        PickUpAction(grasp=milk.grasp_candidates()[0], arm=context.robot.right_arm),
         context=context,
     )
 
@@ -419,10 +425,10 @@ def test_parse_pick_place(pr2_apartment_context):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan = sequential(
         [
-            PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
+            PickUpAction(grasp=milk.grasp_candidates()[0], arm=context.robot.right_arm),
             PlaceAction(
-                milk,
-                Pose(reference_frame=world.root),
+                object_designator=milk,
+                target_location=Pose(reference_frame=world.root),
             ),
         ],
         context=context,
@@ -444,7 +450,7 @@ def test_parse_transport_plan(pr2_apartment_context, rclpy_node):
 
     plan = sequential(
         [
-            MoveTorsoAction(TorsoState.HIGH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             ParkArmsAction(context.robot.all_arms),
             TransportAction.from_graspable_by_closest_grasps(
                 world.get_semantic_annotations_by_type(Milk)[0],
@@ -492,14 +498,14 @@ def test_execution_boundary_splits_the_merged_motion_chart(pr2_apartment_context
     plan = sequential(
         [
             MoveToolCenterPointMotion(
-                Pose(reference_frame=world.root), context.robot.left_arm
+                Pose(reference_frame=world.root), arm=context.robot.left_arm
             ),
             MoveToolCenterPointMotion(
-                Pose(reference_frame=world.root), context.robot.right_arm
+                Pose(reference_frame=world.root), arm=context.robot.right_arm
             ),
             BoundaryNode(),
             MoveToolCenterPointMotion(
-                Pose(reference_frame=world.root), context.robot.left_arm
+                Pose(reference_frame=world.root), arm=context.robot.left_arm
             ),
         ],
         context=context,
@@ -544,11 +550,11 @@ def test_detecting_motion_merges_with_the_motions_around_it(pr2_apartment_contex
     plan = sequential(
         [
             MoveToolCenterPointMotion(
-                Pose(reference_frame=world.root), context.robot.left_arm
+                Pose(reference_frame=world.root), arm=context.robot.left_arm
             ),
             DetectingMotion(query=query),
             MoveToolCenterPointMotion(
-                Pose(reference_frame=world.root), context.robot.right_arm
+                Pose(reference_frame=world.root), arm=context.robot.right_arm
             ),
         ],
         context=context,
@@ -637,8 +643,8 @@ def test_detect_before_grasp_transformation_applies(pr2_apartment_context):
 
     plan = execute_single(
         PickUpAction(
-            world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
-            context.robot.right_arm,
+            grasp=world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
+            arm=context.robot.right_arm,
         ),
         context=context,
     )
@@ -665,8 +671,8 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(pr2_apartment_c
 
     plan = execute_single(
         PickUpAction(
-            milk.grasp_candidates()[0],
-            context.robot.right_arm,
+            grasp=milk.grasp_candidates()[0],
+            arm=context.robot.right_arm,
         ),
         context=context,
     )

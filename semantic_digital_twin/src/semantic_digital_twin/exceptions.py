@@ -30,7 +30,7 @@ if TYPE_CHECKING:
         HasRootBody,
         HasSupportingSurface,
     )
-    from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
+    from semantic_digital_twin.grasping.grasp_candidates import CanBeGrasped
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         AbstractRobotPart,
@@ -2043,7 +2043,7 @@ class NoGraspGeometry(UsageError):
     shape to derive them from.
     """
 
-    graspable: HasGraspCandidates
+    graspable: CanBeGrasped
     """
     The annotation whose grasps were asked for.
     """

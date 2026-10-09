@@ -150,22 +150,26 @@ plan = sequential(
         # Stack Box 2
         ParkArmsAction(tracy.all_arms),
         PickUpAction(
-            GraspCandidate(box2_annotation, Pose.from_xyz_rpy(pitch=np.pi/2, reference_frame=box2_annotation.root)),
-            tracy.left_arm,
+            grasp=GraspCandidate(box2_annotation, Pose.from_xyz_rpy(pitch=np.pi/2, reference_frame=box2_annotation.root)),
+            arm=tracy.left_arm,
         ),
         PlaceAction(
-            box2_annotation,
-            Pose.from_xyz_rpy(0.8, 0.0, 1.02, yaw=0, reference_frame=world.root),
+            object_designator=box2_annotation,
+            target_location=Pose.from_xyz_rpy(
+                0.8, 0.0, 1.02, yaw=0, reference_frame=world.root
+            ),
         ),
         # Stack Box 3
         ParkArmsAction(tracy.all_arms),
         PickUpAction(
-            GraspCandidate(box3_annotation, Pose.from_xyz_rpy(pitch=np.pi/2, reference_frame=box3_annotation.root)),
-            tracy.right_arm,
+            grasp=GraspCandidate(box3_annotation, Pose.from_xyz_rpy(pitch=np.pi/2, reference_frame=box3_annotation.root)),
+            arm=tracy.right_arm,
         ),
         PlaceAction(
-            box3_annotation,
-            Pose.from_xyz_rpy(0.8, 0.0, 1.12, yaw=0, reference_frame=world.root),
+            object_designator=box3_annotation,
+            target_location=Pose.from_xyz_rpy(
+                0.8, 0.0, 1.12, yaw=0, reference_frame=world.root
+            ),
         ),
     ],
     context=context,

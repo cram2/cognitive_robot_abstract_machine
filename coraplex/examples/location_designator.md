@@ -61,7 +61,7 @@ from semantic_digital_twin.datastructures.definitions import TorsoState
 
 with simulated_robot:
     sequential([ParkArmsAction(pr2_view.all_arms),
-                MoveTorsoAction(TorsoState.HIGH)], context=context).perform()
+                MoveTorsoAction(torso_state=TorsoState.HIGH)], context=context).perform()
 
 ```
 
@@ -76,7 +76,7 @@ location = ReachabilityLocation(
     context=context,
 )
 
-plan = execute_single(NavigateAction(location.ground()), context=context)
+plan = execute_single(NavigateAction(target_location=location.ground()), context=context)
 
 with simulated_robot:
     plan.perform()
@@ -132,7 +132,7 @@ location = VisibilityLocation(
     Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
 )
 
-plan = execute_single(NavigateAction(location.ground()), context=context)
+plan = execute_single(NavigateAction(target_location=location.ground()), context=context)
 
 with simulated_robot:
     plan.perform()
@@ -167,10 +167,11 @@ of them.
 
 ```python
 from krrood.entity_query_language.factories import a, variable
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
 navigate = a(NavigateAction)(
     target_location=variable(
-        Pose,
+        Pose2D,
         domain=ReachabilityLocation(
             Pose(reference_frame=world.get_body_by_name("milk.stl")),
             pr2_view.left_arm,

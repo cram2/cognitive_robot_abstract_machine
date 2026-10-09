@@ -21,10 +21,11 @@ from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.mixins import (
-    HasApproachesGraspPoses,
-    HasGraspDetectionThreshold,
-    HasTcpGoalThresholds,
+    GraspApproachParameters,
+    GraspableObjectParameter,
     PlaceTuningParameters,
+    PlacementTargetParameter,
+    GoalThresholdParameters,
 )
 from coraplex.robot_plans.motions.gripper import (
     MoveGripperMotion,
@@ -34,32 +35,20 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
 from semantic_digital_twin.robots.robot_parts import Arm
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.grasping.grasp_candidates import (
-    GraspCandidate,
-    HasGraspCandidates,
-)
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 
 
 @dataclass
 class PlaceAction(
     ActionDescription,
-    HasApproachesGraspPoses,
+    GraspableObjectParameter,
+    PlacementTargetParameter,
+    GoalThresholdParameters,
+    GraspApproachParameters,
     PlaceTuningParameters,
-    HasGraspDetectionThreshold,
-    HasTcpGoalThresholds,
 ):
     """
     Places an object at a position with the arm that holds it.
-    """
-
-    object_designator: HasGraspCandidates
-    """
-    The annotation of the object that should be placed.
-    """
-    target_location: Pose
-    """
-    Pose in the world at which the object should be placed.
     """
 
     grasp_release_threshold: float = field(default=0.1, kw_only=True)
@@ -82,7 +71,7 @@ class PlaceAction(
             [
                 MoveToolCenterPointMotion(
                     poses.retreat,
-                    arm,
+                    arm=arm,
                     allow_gripper_collision=True,
                     max_linear_velocity=self.transport_linear_velocity,
                     position_threshold=self.position_threshold,
@@ -90,15 +79,15 @@ class PlaceAction(
                 ),
                 MoveToolCenterPointMotion(
                     poses.grasp,
-                    arm,
+                    arm=arm,
                     allow_gripper_collision=True,
                     max_linear_velocity=self.placing_linear_velocity,
                     position_threshold=self.position_threshold,
                     orientation_threshold=self.orientation_threshold,
                 ),
                 MoveGripperMotion(
-                    GripperState.OPEN,
-                    arm.end_effector,
+                    motion=GripperState.OPEN,
+                    end_effector=arm.end_effector,
                     allow_gripper_collision=True,
                     finger_velocity=self.release_opening_velocity,
                 ),
@@ -107,7 +96,7 @@ class PlaceAction(
                 ),
                 MoveToolCenterPointMotion(
                     poses.pre_grasp,
-                    arm,
+                    arm=arm,
                     max_linear_velocity=self.retract_linear_velocity,
                     position_threshold=self.position_threshold,
                     orientation_threshold=self.orientation_threshold,

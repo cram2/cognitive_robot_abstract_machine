@@ -33,7 +33,7 @@ class GraspCandidate:
     how a grasp stays independent of the robot performing it.
     """
 
-    graspable: HasGraspCandidates
+    graspable: CanBeGrasped
     """
     The annotation of the object offering this grasp.
     """
@@ -55,7 +55,7 @@ class GraspCandidate:
             )
 
     @classmethod
-    def from_body_origin(cls, graspable: HasGraspCandidates) -> GraspCandidate:
+    def from_body_origin(cls, graspable: CanBeGrasped) -> GraspCandidate:
         """
         The grasp that takes an object at the origin of its own body.
 
@@ -83,7 +83,7 @@ class GraspCandidate:
 
 
 @dataclass(eq=False)
-class HasGraspCandidates(HasRootBody):
+class CanBeGrasped(HasRootBody):
     """
     A mixin class for semantic annotations that can say where they may be grasped.
 

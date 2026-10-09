@@ -20,7 +20,9 @@ def test_native_motion_recording_retains_completed_chart(pr2_apartment_context) 
     A real torso motion records its final native chart and releases its observers.
     """
     world, robot, context = pr2_apartment_context
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context).plan
+    plan = sequential(
+        [MoveTorsoAction(torso_state=TorsoState.HIGH)], context=context
+    ).plan
     bridge = Bridge()
     bridge.attach(world)
     bridge.begin_plan(plan)

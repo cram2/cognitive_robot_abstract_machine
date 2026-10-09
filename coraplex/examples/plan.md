@@ -45,8 +45,9 @@ from coraplex.robot_plans import *
 from coraplex.plans.factories import *
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
-navigate = NavigateAction(Pose.from_xyz_quaternion(1, 1, 0, reference_frame=world.root))
+navigate = NavigateAction(target_location=Pose2D(1, 1, reference_frame=world.root))
 park = ParkArmsAction(pr2.all_arms)
 
 plan = sequential([navigate, park], context=context).plan

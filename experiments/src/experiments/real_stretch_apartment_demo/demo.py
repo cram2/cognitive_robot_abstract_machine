@@ -63,7 +63,7 @@ from semantic_digital_twin.predefined_maps.apartment_environment import (
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import CheezeIt
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 
 CEREAL_NAME = "cheeze_it.obj"
@@ -172,19 +172,25 @@ class StretchApartmentDemonstration(RobotDemonstration):
         plan = sequential(
             [
                 ParkArmsAction(context.robot.all_arms),
-                SetGripperAction(arm.end_effector, motion=GripperState.CLOSE),
+                SetGripperAction(
+                    end_effector=arm.end_effector, motion=GripperState.CLOSE
+                ),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
-                        1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
+                    target_location=Pose2D(
+                        1.2, 1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=shelf_layer_body)),
+                LookAtAction(
+                    target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                ),
                 a(NavigateAction)(
-                    target_location=Pose.from_xyz_rpy(
-                        0.8, 0.6, 0, yaw=-np.pi / 2, reference_frame=world.root
+                    target_location=Pose2D(
+                        0.8, 0.6, yaw=-np.pi / 2, reference_frame=world.root
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=shelf_layer_body)),
+                LookAtAction(
+                    target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                ),
                 DetectAction(
                     DetectionTechnique.TYPES,
                     object_sem_annotation=CheezeIt,
@@ -192,13 +198,13 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     accept_first_if_multiple=True,
                 ),
                 PickUpAction(
-                    cereal.grasp_candidates()[0],
-                    arm,
+                    grasp=cereal.grasp_candidates()[0],
+                    arm=arm,
                 ),
                 ParkArmsAction(context.robot.all_arms),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
-                        0.8, 0, 0, yaw=np.pi, reference_frame=bedside_table_body
+                    target_location=Pose2D(
+                        0.8, 0, yaw=np.pi, reference_frame=bedside_table_body
                     )
                 ),
                 PlaceAction(
@@ -211,19 +217,25 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     ),
                 ),
                 ParkArmsAction(context.robot.all_arms),
-                SetGripperAction(arm.end_effector, motion=GripperState.CLOSE),
+                SetGripperAction(
+                    end_effector=arm.end_effector, motion=GripperState.CLOSE
+                ),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
-                        1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
+                    target_location=Pose2D(
+                        1.2, 1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=shelf_layer_body)),
+                LookAtAction(
+                    target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                ),
                 a(NavigateAction)(
-                    target_location=Pose.from_xyz_rpy(
-                        0.8, 0, 0, yaw=np.pi, reference_frame=bedside_table_body
+                    target_location=Pose2D(
+                        0.8, 0, yaw=np.pi, reference_frame=bedside_table_body
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=bedside_table_body)),
+                LookAtAction(
+                    target=Pose.from_xyz_rpy(reference_frame=bedside_table_body)
+                ),
                 DetectAction(
                     DetectionTechnique.TYPES,
                     object_sem_annotation=CheezeIt,
@@ -236,8 +248,8 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 ParkArmsAction(context.robot.all_arms),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
-                        0.8, 0.6, 0, yaw=-np.pi / 2, reference_frame=world.root
+                    target_location=Pose2D(
+                        0.8, 0.6, yaw=-np.pi / 2, reference_frame=world.root
                     )
                 ),
                 a(PlaceAction)(
@@ -245,7 +257,9 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     target_location=CEREAL_SHELF_LAYER_T_CEREAL.pose,
                 ),
                 ParkArmsAction(context.robot.all_arms),
-                SetGripperAction(arm.end_effector, motion=GripperState.CLOSE),
+                SetGripperAction(
+                    end_effector=arm.end_effector, motion=GripperState.CLOSE
+                ),
             ],
             context=context,
         )

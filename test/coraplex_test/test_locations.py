@@ -17,7 +17,7 @@ from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -33,7 +33,7 @@ class RecordsHowItWasSampled(Location):
     Yields one candidate and records the terms it sampled with.
     """
 
-    pose: Pose
+    pose: Pose2D
     """
     The single candidate to yield.
     """
@@ -43,7 +43,7 @@ class RecordsHowItWasSampled(Location):
     One entry per call: the number of samples and the seed it sampled with.
     """
 
-    def candidates(self) -> Iterator[Pose]:
+    def candidates(self) -> Iterator[Pose2D]:
         self.sampled_with.append((self.number_of_samples, self.seed))
         return iter([self.pose])
 
@@ -85,8 +85,8 @@ def single_robot_world(_single_robot_world_setup):
     return world, robot, Context(world, robot)
 
 
-def _candidate(world: World) -> Pose:
-    return Pose.from_xyz_rpy(1.3, 2.0, 0.0, yaw=0.25, reference_frame=world.root)
+def _candidate(world: World) -> Pose2D:
+    return Pose2D(1.3, 2.0, yaw=0.25, reference_frame=world.root)
 
 
 # %% a location samples its candidates on its own terms
@@ -190,7 +190,7 @@ How many of the standing poses a reachability location offers are checked.
 """
 
 
-def _horizontal_distance(pose: Pose, target: Pose) -> float:
+def _horizontal_distance(pose: Pose2D, target: Pose) -> float:
     """
     :return: How far `pose` stands from `target` along the floor.
     """
@@ -463,3 +463,17 @@ def test_a_visibility_location_offers_poses_facing_its_target(single_robot_world
         heading = pose.rotation_matrix.to_np()[:2, 0]
         offset = target.position.to_np()[:2] - pose.position.to_np()[:2]
         np.testing.assert_allclose(heading, offset / np.linalg.norm(offset), atol=1e-6)
+
+
+def test_a_reachability_location_offers_planar_standing_poses(single_robot_world):
+    """
+    A standing pose is a spot on the floor, so the location offers it without a height
+    or tilt.
+    """
+    world, robot, context = single_robot_world
+    target = Pose.from_xyz_rpy(
+        *REACHABILITY_TARGET_POSITION, reference_frame=world.root
+    )
+    location = ReachabilityLocation(target, context.robot.right_arm, context=context)
+
+    assert isinstance(location.ground(), Pose2D)

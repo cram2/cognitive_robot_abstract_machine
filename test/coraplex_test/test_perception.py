@@ -434,7 +434,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
     )
 
     plan = execute_single(
-        PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
+        PickUpAction(grasp=milk.grasp_candidates()[0], arm=context.robot.right_arm),
         context=context,
     )
     plan.notify()

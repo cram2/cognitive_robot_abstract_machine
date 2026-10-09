@@ -1103,6 +1103,20 @@ class Point(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
     def y(self, value: sm.ScalarData):
         self[1] = value
 
+    @property
+    @abstractmethod
+    def generic_vector(self) -> sm.Vector:
+        """
+        :return: The coordinates of this point as a vector without spatial semantics.
+        """
+
+    def euclidean_distance(self, other: Self) -> sm.Scalar:
+        """
+        :param other: A point of the same dimension, in the same reference frame as self.
+        :return: The straight-line distance between this point and ``other``.
+        """
+        return self.generic_vector.euclidean_distance(other.generic_vector)
+
 
 @dataclass(eq=False, init=False, repr=False)
 class Point3(Point):
@@ -1338,9 +1352,6 @@ class Point3(Point):
         """
         return sm.Vector.from_casadi_sx(copy(self.casadi_sx[:3]))
 
-    def euclidean_distance(self, other: Self) -> sm.Scalar:
-        return self.generic_vector.euclidean_distance(other.generic_vector)
-
 
 @dataclass(eq=False, init=False, repr=False)
 class Point2(Point):
@@ -1410,6 +1421,13 @@ class Point2(Point):
         :param z: The z-coordinate the resulting point should have. Defaults to 0.
         """
         return Point3(self.x, self.y, z, reference_frame=self.reference_frame)
+
+    @property
+    def generic_vector(self) -> sm.Vector:
+        """
+        :return: The coordinates of this point as a vector without spatial semantics.
+        """
+        return sm.Vector.from_casadi_sx(copy(self.casadi_sx))
 
     @classmethod
     def from_point3(

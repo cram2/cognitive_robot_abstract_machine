@@ -32,7 +32,7 @@ from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from semantic_digital_twin.robots.robot_parts import Arm
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -200,8 +200,8 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
     action = a(NavigateAction)(
         target_location=variable_from(
             [
-                Pose.from_xyz_quaternion(1, -1, 0, reference_frame=world.root),
-                Pose.from_xyz_quaternion(2, -1, 0, reference_frame=world.root),
+                Pose2D(1, -1, reference_frame=world.root),
+                Pose2D(2, -1, reference_frame=world.root),
             ]
         ),
     )
@@ -231,12 +231,9 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
     world, robot, context = apartment_world_pr2_copy_with_context
     context.query_backend = ProbabilisticBackend()
     action = a(NavigateAction)(
-        target_location=a(Pose.from_xyz_rpy)(
+        target_location=a(Pose2D)(
             x=...,
             y=...,
-            z=0.0,
-            roll=0.0,
-            pitch=0.0,
             yaw=0.0,
             reference_frame=context.robot.root,
         ),
@@ -263,12 +260,8 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
                 target_location=(
                     target_locations := variable_from(
                         [
-                            Pose.from_xyz_quaternion(
-                                1, 0, 0, reference_frame=world.root
-                            ),
-                            Pose.from_xyz_quaternion(
-                                2, 0, 0, reference_frame=world.root
-                            ),
+                            Pose2D(1, 0, reference_frame=world.root),
+                            Pose2D(2, 0, reference_frame=world.root),
                         ]
                     )
                 ),
@@ -745,8 +738,8 @@ def test_a_trial_tries_an_action_that_already_belongs_to_a_plan(debugging_contex
     the run publishes through, which a trial must not try to copy.
     """
     world, robot, context = debugging_context
-    stand_where_it_is = robot.root.global_pose
-    action = NavigateAction(stand_where_it_is)
+    stand_where_it_is = Pose2D.from_pose(robot.root.global_pose)
+    action = NavigateAction(target_location=stand_where_it_is)
     sequential([action], context)
     trial = ActionTrial(context=context)
 

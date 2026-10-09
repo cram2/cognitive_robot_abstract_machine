@@ -43,14 +43,12 @@ def test_get_bound_variables(pr2_apartment_context):
 
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     grasp = milk.grasp_candidates()[0]
-    pick_action = PickUpAction(grasp, context.robot.left_arm)
+    pick_action = PickUpAction(grasp=grasp, arm=context.robot.left_arm)
 
     bound_variables = pick_action._create_variables()
 
     assert len(bound_variables) == 14
     assert list(bound_variables.keys()) == [
-        "position_threshold",
-        "orientation_threshold",
         "grasp_detection_threshold",
         "pre_approach_linear_velocity",
         "final_approach_linear_velocity",
@@ -60,8 +58,10 @@ def test_get_bound_variables(pr2_apartment_context):
         "object_friction",
         "approach_clearance",
         "retreat_distance",
-        "grasp",
+        "position_threshold",
+        "orientation_threshold",
         "arm",
+        "grasp",
         "tolerate_grasp_stall",
     ]
     assert list(bound_variables["arm"]._domain_) == [context.robot.left_arm]
@@ -76,7 +76,9 @@ def test_pick_up_pre_condition_leaves_reaching_to_the_attempt(pr2_apartment_cont
     """
     world, view, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_action = PickUpAction(milk.grasp_candidates()[0], context.robot.left_arm)
+    pick_action = PickUpAction(
+        grasp=milk.grasp_candidates()[0], arm=context.robot.left_arm
+    )
     sequential([pick_action], context)
 
     assert _construct_and_evaluate_condition(pick_action, pick_action.pre_condition)
@@ -85,7 +87,9 @@ def test_pick_up_pre_condition_leaves_reaching_to_the_attempt(pr2_apartment_cont
 def test_pick_up_pre_condition_needs_a_free_gripper(pr2_apartment_context):
     world, view, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_action = PickUpAction(milk.grasp_candidates()[0], context.robot.left_arm)
+    pick_action = PickUpAction(
+        grasp=milk.grasp_candidates()[0], arm=context.robot.left_arm
+    )
     view.root.parent_connection.origin = LEFT_ARM_REACHES_THE_MILK_FROM
     plan = sequential([pick_action], context)
     pre_condition = pick_action.pre_condition(
@@ -108,7 +112,9 @@ def test_pick_up_post_condition_needs_the_object_itself_in_the_gripper(
     """
     world, view, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_action = PickUpAction(milk.grasp_candidates()[0], context.robot.left_arm)
+    pick_action = PickUpAction(
+        grasp=milk.grasp_candidates()[0], arm=context.robot.left_arm
+    )
     sequential([pick_action], context)
     with world.modify_world():
         world.add_connection(
@@ -128,7 +134,9 @@ def test_pick_up_post_condition_needs_the_object_itself_in_the_gripper(
 def test_pick_up_post_condition(pr2_apartment_context):
     world, view, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_action = PickUpAction(milk.grasp_candidates()[0], context.robot.left_arm)
+    pick_action = PickUpAction(
+        grasp=milk.grasp_candidates()[0], arm=context.robot.left_arm
+    )
     view.root.parent_connection.origin = LEFT_ARM_REACHES_THE_MILK_FROM
 
     plan = sequential([pick_action], context)

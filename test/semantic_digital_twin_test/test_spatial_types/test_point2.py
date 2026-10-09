@@ -130,3 +130,13 @@ class TestPoint2Hash:
         p1 = Point2(x=1.0, y=2.0)
         p2 = Point2(x=1.0, y=2.1)
         assert hash(p1) != hash(p2)
+
+
+class TestPoint2EuclideanDistance:
+    def test_generic_vector_holds_the_coordinates(self):
+        p2 = Point2(x=1.0, y=2.0)
+        assert p2.generic_vector.to_np().flatten().tolist() == pytest.approx([1.0, 2.0])
+
+    def test_distance_between_two_points(self):
+        distance = Point2(x=0.0, y=0.0).euclidean_distance(Point2(x=3.0, y=4.0))
+        assert distance.to_np() == pytest.approx(5.0)

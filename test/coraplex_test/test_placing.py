@@ -60,7 +60,7 @@ def test_place_derives_the_grasp_from_the_live_tool_frame_transform(pr2_holding_
     """
     world, robot, milk = pr2_holding_milk
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, yaw=np.pi / 4, reference_frame=world.root)
-    place = PlaceAction(milk, target)
+    place = PlaceAction(object_designator=milk, target_location=target)
     sequential([place], context=Context(world, robot, sampling_seed=SAMPLING_SEED))
 
     end_effector = robot.left_arm.end_effector
@@ -83,7 +83,7 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
     """
     world, robot, milk = pr2_holding_milk
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    place = PlaceAction(milk, target)
+    place = PlaceAction(object_designator=milk, target_location=target)
     sequential([place], context=Context(world, robot, sampling_seed=SAMPLING_SEED))
     grasp = place._grasp_on_the_held_object()
     poses = place.grasp_pose_sequence(
@@ -119,8 +119,8 @@ def test_place_uses_the_grasp_its_pick_up_will_take(pr2_apartment_context):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
 
-    pick_up = PickUpAction(milk.grasp_candidates()[0], context.robot.left_arm)
-    place = PlaceAction(milk, target)
+    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=context.robot.left_arm)
+    place = PlaceAction(object_designator=milk, target_location=target)
     sequential([pick_up, place], context=context)
 
     np.testing.assert_allclose(
@@ -138,7 +138,7 @@ def test_a_place_of_an_object_nothing_holds_is_refused(pr2_apartment_context):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
 
-    place = PlaceAction(milk, target)
+    place = PlaceAction(object_designator=milk, target_location=target)
     sequential([place], context=context)
 
     with pytest.raises(ObjectIsNotHeld):
@@ -164,7 +164,7 @@ def _arms_moved_by(place: PlaceAction) -> set[Arm]:
 def test_place_takes_the_arm_that_holds_the_object(pr2_holding_milk):
     world, robot, milk = pr2_holding_milk
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    place = PlaceAction(milk, target)
+    place = PlaceAction(object_designator=milk, target_location=target)
     sequential([place], context=Context(world, robot, sampling_seed=SAMPLING_SEED))
 
     assert _arms_moved_by(place) == {robot.left_arm}
@@ -178,8 +178,8 @@ def test_place_takes_the_arm_its_pick_up_will_use(pr2_apartment_context):
     world, robot, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    pick_up = PickUpAction(milk.grasp_candidates()[0], robot.right_arm)
-    place = PlaceAction(milk, target)
+    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.right_arm)
+    place = PlaceAction(object_designator=milk, target_location=target)
     sequential([pick_up, place], context=context)
 
     assert _arms_moved_by(place) == {robot.right_arm}

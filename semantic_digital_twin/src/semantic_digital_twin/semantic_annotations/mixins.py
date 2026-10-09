@@ -778,6 +778,65 @@ class HasSupportingSurface(IsStorageSpace):
         :return: The supporting surface region, or None if no suitable region could be
             found.
         """
+        faces = self._supporting_faces(
+            upward_threshold, clearance_threshold, min_surface_area
+        )
+        if faces is None:
+            return None
+
+        # --- Build the region ---
+        # The region is placed where the surface was found, relative to the root's
+        # origin, so that it lies on top of the root wherever that origin is
+        vertices = faces.vertices
+        self_P_supporting_surface = vertices.mean(axis=0)
+        points_3d = [
+            Point3(
+                x,
+                y,
+                z,
+                reference_frame=self.root,
+            )
+            for x, y, z in vertices - self_P_supporting_surface
+        ]
+        supporting_surface = Region.from_3d_points(
+            name=PrefixedName(
+                f"{self.root.name.name}_supporting_surface_region",
+                self.root.name.prefix,
+            ),
+            points_3d=points_3d,
+        )
+
+        x, y, z = self_P_supporting_surface
+        self_C_supporting_surface = FixedConnection(
+            parent=self.root,
+            child=supporting_surface,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=x, y=y, z=z, reference_frame=self.root
+            ),
+        )
+        self._world.add_region(supporting_surface)
+        self._world.add_connection(self_C_supporting_surface)
+        self.add_supporting_surface(supporting_surface)
+        return supporting_surface
+
+    def _supporting_faces(
+        self,
+        upward_threshold: float,
+        clearance_threshold: float,
+        min_surface_area: float,
+    ) -> Optional[trimesh.Trimesh]:
+        """
+        The faces of this annotation's root that things can be placed on: facing upward,
+        large enough, and with room above them.
+
+        :param upward_threshold: The threshold for the face normal to be considered
+            upward-facing.
+        :param clearance_threshold: The threshold for the vertical clearance above the
+            surface.
+        :param min_surface_area: The minimum area for a surface to be considered a
+            supporting surface.
+        :return: The faces, in the root's frame, or None if there are none.
+        """
         mesh = self.root.combined_mesh
         if mesh is None:
             return None
@@ -823,42 +882,7 @@ class HasSupportingSurface(IsStorageSpace):
         if not clear_mask.any():
             return None
 
-        candidates_filtered = candidates.submesh([clear_mask], append=True)
-
-        # --- Build the region ---
-        # The region is placed where the surface was found, relative to the root's
-        # origin, so that it lies on top of the root wherever that origin is
-        vertices = candidates_filtered.vertices
-        self_P_supporting_surface = vertices.mean(axis=0)
-        points_3d = [
-            Point3(
-                x,
-                y,
-                z,
-                reference_frame=self.root,
-            )
-            for x, y, z in vertices - self_P_supporting_surface
-        ]
-        supporting_surface = Region.from_3d_points(
-            name=PrefixedName(
-                f"{self.root.name.name}_supporting_surface_region",
-                self.root.name.prefix,
-            ),
-            points_3d=points_3d,
-        )
-
-        x, y, z = self_P_supporting_surface
-        self_C_supporting_surface = FixedConnection(
-            parent=self.root,
-            child=supporting_surface,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=x, y=y, z=z, reference_frame=self.root
-            ),
-        )
-        self._world.add_region(supporting_surface)
-        self._world.add_connection(self_C_supporting_surface)
-        self.add_supporting_surface(supporting_surface)
-        return supporting_surface
+        return candidates.submesh([clear_mask], append=True)
 
     def infer_objects_on_surface(self):
         """
@@ -893,6 +917,25 @@ class HasSupportingSurface(IsStorageSpace):
             region, self.root, enable_unsafe_inside_world_block=True
         )
         self.supporting_surface = region
+
+    def require_supporting_surface(self) -> Region:
+        """
+        The surface things are placed on, calculated from this annotation's geometry
+        when none is attached yet.
+
+        ..warning:: Calculating the surface adds it to the world, resulting in model
+            updates being published if the synchronizer is running.
+
+        :raises NoSupportingSurfaceError: If no surface is attached and none can be
+            derived from this annotation's geometry.
+        :return: The supporting surface.
+        """
+        if self.supporting_surface is not None:
+            return self.supporting_surface
+        with self._world.modify_world():
+            if self.calculate_supporting_surface() is None:
+                raise NoSupportingSurfaceError(self)
+        return self.supporting_surface
 
     def sample_points_from_surface(
         self,
@@ -1157,13 +1200,12 @@ class HasSupportingSurface(IsStorageSpace):
         )
 
         world = self._world
-        if self.supporting_surface is None:
-            with world.modify_world():
-                if self.calculate_supporting_surface() is None:
-                    raise NoSupportingSurfaceError(self)
+        supporting_surface = self.require_supporting_surface()
 
-        origin = HomogeneousTransformationMatrix(reference_frame=self.root)
-        surface_box = self.supporting_surface.area.as_bounding_box_collection_at_origin(
+        # The surface's own frame lies on its top, so the free space and the paths
+        # through it are expressed relative to what the robot stands on.
+        origin = HomogeneousTransformationMatrix(reference_frame=supporting_surface)
+        surface_box = supporting_surface.area.as_bounding_box_collection_at_origin(
             origin
         ).bounding_box()
 
@@ -1180,7 +1222,7 @@ class HasSupportingSurface(IsStorageSpace):
                     origin,
                 )
             ],
-            self.root,
+            supporting_surface,
         )
 
         semantic_obstacle_annotation = SemanticEnvironmentAnnotation(

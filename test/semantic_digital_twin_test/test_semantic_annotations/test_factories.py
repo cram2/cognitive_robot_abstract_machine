@@ -1,4 +1,5 @@
 import unittest
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -34,6 +35,7 @@ from semantic_digital_twin.semantic_annotations.part_whole import (
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoubleDoor,
     Elevator,
+    FirstFloor,
     Floor,
     GroundFloor,
     Cup,
@@ -663,7 +665,12 @@ class TestFactories(unittest.TestCase):
             world.root
         ).bounding_box()
         np.testing.assert_allclose(
-            [surface_box.min_x, surface_box.max_x, surface_box.min_y, surface_box.max_y],
+            [
+                surface_box.min_x,
+                surface_box.max_x,
+                surface_box.min_y,
+                surface_box.max_y,
+            ],
             [table_box.min_x, table_box.max_x, table_box.min_y, table_box.max_y],
             atol=1e-9,
         )
@@ -1511,3 +1518,63 @@ def test_elevator_without_a_movable_joint_cannot_drive():
 
     with pytest.raises(MissingMovableJointError):
         elevator.drive_to_floor(ground_floor)
+
+
+# %% an elevator's cabin floor
+
+CABIN_SCALE = Scale(2, 2, 2)
+"""
+Outer size of the test elevator's cabin.
+"""
+
+CABIN_WALL_THICKNESS = 0.05
+"""
+Thickness of the test elevator cabin's walls, floor and roof.
+"""
+
+
+def test_an_elevator_supports_what_stands_on_its_cabin_floor():
+    """
+    What rides an elevator stands on the cabin's floor, not on its roof, so the
+    supporting surface lies on the inside bottom of the cabin.
+    """
+    world = _world_with_root()
+    with world.modify_world():
+        elevator = Elevator.get_annotation_specification(
+            "elevator",
+            Elevator.get_default_root_kinematic_structure_entity_specification(
+                scale=CABIN_SCALE, wall_thickness=CABIN_WALL_THICKNESS
+            ),
+        ).spawn(world)
+
+    with world.modify_world():
+        surface = elevator.calculate_supporting_surface()
+
+    elevator_T_surface = world.transform(surface.global_pose, elevator.root)
+    assert float(elevator_T_surface.z) == pytest.approx(
+        -(CABIN_SCALE.z - CABIN_WALL_THICKNESS) / 2
+    )
+
+
+def test_an_elevator_stops_with_its_cabin_floor_flush_with_the_level(
+    multi_story_building,
+):
+    """
+    Something rolls in and out of the cabin only if the cabin's floor is level with the
+    floor it stops at.
+    """
+    world = deepcopy(multi_story_building)
+    elevator = world.get_semantic_annotations_by_type(Elevator)[0]
+    first_floor = world.get_semantic_annotations_by_type(FirstFloor)[0]
+
+    elevator.drive_to_floor(first_floor)
+    world.notify_state_change()
+
+    cabin_floor = elevator.require_supporting_surface()
+    assert float(cabin_floor.global_pose.z) == pytest.approx(
+        float(first_floor.floor_plane[0].z)
+    )
+
+
+if __name__ == "__main__":
+    unittest.main()

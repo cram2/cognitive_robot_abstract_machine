@@ -25,9 +25,7 @@ from coraplex.querying.predicates import (
 )
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.mixins import (
-    HasApproachesGraspPoses,
-    HasGraspDetectionThreshold,
-    HasTcpGoalThresholds,
+    GraspParameters,
     PickUpTuningParameters,
     ReachTuningParameters,
 )
@@ -37,55 +35,18 @@ from coraplex.robot_plans.motions.gripper import (
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
-from semantic_digital_twin.robots.robot_parts import Arm
-from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class HasGraspChoice:
-    """
-    Adds to an action the grasp it takes hold by.
-
-    Shared by every action that closes a gripper on something. The grasp names the
-    object it is on, so that is not asked for separately.
-    """
-
-    grasp: GraspCandidate
-    """
-    The grasp to take hold by.
-
-    One of the object's own
-    :meth:`~semantic_digital_twin.grasping.grasp_candidates.HasGraspCandidates.grasp_candidates`.
-    """
-
-    arm: Arm
-    """
-    The arm that should be used.
-    """
-
-
-@dataclass
 class ReachAction(
     ActionDescription,
-    HasApproachesGraspPoses,
+    GraspParameters,
     ReachTuningParameters,
-    HasGraspDetectionThreshold,
-    HasTcpGoalThresholds,
 ):
     """
     Let the robot reach a specific pose.
-    """
-
-    arm: Arm
-    """
-    The arm that should be used for pick up.
-    """
-
-    grasp: GraspCandidate
-    """
-    The grasp the tool frame should reach, which also names the object it is on.
     """
 
     reverse_reach_order: bool = False
@@ -109,7 +70,7 @@ class ReachAction(
         children = [
             MoveToolCenterPointMotion(
                 pre_pose,
-                self.arm,
+                arm=self.arm,
                 allow_gripper_collision=True,
                 max_linear_velocity=self.pre_approach_linear_velocity,
                 position_threshold=self.position_threshold,
@@ -119,13 +80,13 @@ class ReachAction(
         if self.open_gripper_at_pre_pose:
             children.append(
                 MoveGripperMotion(
-                    motion=GripperState.OPEN, gripper=self.arm.end_effector
+                    motion=GripperState.OPEN, end_effector=self.arm.end_effector
                 )
             )
         children.append(
             MoveToolCenterPointMotion(
                 poses.grasp,
-                self.arm,
+                arm=self.arm,
                 allow_gripper_collision=True,
                 max_linear_velocity=self.final_approach_linear_velocity,
                 position_threshold=self.position_threshold,
@@ -158,11 +119,8 @@ class ReachAction(
 @dataclass
 class PickUpAction(
     ActionDescription,
-    HasGraspChoice,
-    HasApproachesGraspPoses,
+    GraspParameters,
     PickUpTuningParameters,
-    HasGraspDetectionThreshold,
-    HasTcpGoalThresholds,
 ):
     """
     Let the robot pick up an object: take hold of it and lift it clear of its support.
@@ -219,7 +177,7 @@ class PickUpAction(
                 self._grasp_attempt_plan(),
                 MoveToolCenterPointMotion(
                     lift_to_pose,
-                    self.arm,
+                    arm=self.arm,
                     allow_gripper_collision=True,
                     movement_type=MovementType.TRANSLATION,
                     max_linear_velocity=self.lift_linear_velocity,
@@ -260,11 +218,8 @@ class PickUpAction(
 @dataclass
 class GraspingAction(
     ActionDescription,
-    HasGraspChoice,
-    HasApproachesGraspPoses,
+    GraspParameters,
     PickUpTuningParameters,
-    HasGraspDetectionThreshold,
-    HasTcpGoalThresholds,
 ):
     """
     Let the robot take hold of an object: reach onto a grasp and close on it.
@@ -297,7 +252,7 @@ class GraspingAction(
                 ),
                 MoveGripperMotion(
                     motion=GripperState.CLOSE,
-                    gripper=self.arm.end_effector,
+                    end_effector=self.arm.end_effector,
                     allow_gripper_collision=True,
                     finger_velocity=self.grasp_closing_velocity,
                     stall_minimum_time=self.grasp_stall_minimum_time,

@@ -337,7 +337,7 @@ class BulletWorldDemonstration(RobotDemonstration):
         return sequential(
             [
                 ParkArmsAction(context.robot.all_arms),
-                MoveTorsoAction(TorsoState.HIGH),
+                MoveTorsoAction(torso_state=TorsoState.HIGH),
                 TransportAction.from_graspable_by_closest_grasps(
                     self.milk.annotation_in(world),
                     self.milk.target_location(world),

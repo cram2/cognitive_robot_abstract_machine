@@ -11,7 +11,6 @@ from typing_extensions import Any, List, Optional, Tuple, Union
 
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
-from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -37,7 +36,10 @@ from coraplex.plans.failures import MotionMadeNoProgress
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
-from coraplex.robot_plans.mixins import HasTcpGoalThresholds
+from coraplex.robot_plans.mixins import (
+    ArmGoalParameters,
+    ToolParameter,
+)
 from coraplex.robot_plans.actions.composite.tool_paths import (
     ToolPath,
     ToolPathSegment,
@@ -99,20 +101,10 @@ class FullBodyControlledAction(ActionDescription, ABC):
 
 
 @dataclass(kw_only=True)
-class ToolMotionAction(FullBodyControlledAction, ABC, HasTcpGoalThresholds):
+class ToolMotionAction(FullBodyControlledAction, ArmGoalParameters, ToolParameter, ABC):
     """
     An action that moves a tool along a sampled tool path while keeping the tool aligned
     with its target.
-    """
-
-    arm: Arm
-    """
-    The arm holding the tool.
-    """
-
-    tool: Tool
-    """
-    The tool that performs the motion.
     """
 
     pointer_stride: int = 1
@@ -392,7 +384,7 @@ class WipingAction(ToolMotionAction):
 
 
 @dataclass(kw_only=True)
-class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
+class PouringAction(FullBodyControlledAction, ArmGoalParameters):
     """
     Pour from a held source container into a target container by tilting the source next
     to the target's rim.
@@ -406,11 +398,6 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
     source_container: Tool
     """
     The held container that is poured from.
-    """
-
-    arm: Arm
-    """
-    The arm holding the source container.
     """
 
     tilt_angle: float = 1.85
@@ -587,7 +574,7 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
             [
                 MoveToolCenterPointMotion(
                     pre_pour_pose,
-                    self.arm,
+                    arm=self.arm,
                     allow_gripper_collision=True,
                     movement_type=MovementType.CARTESIAN,
                     position_threshold=self.position_threshold,
@@ -595,7 +582,7 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
                 ),
                 MoveToolCenterPointMotion(
                     pour_pose,
-                    self.arm,
+                    arm=self.arm,
                     allow_gripper_collision=True,
                     movement_type=MovementType.CARTESIAN,
                     position_threshold=self.position_threshold,

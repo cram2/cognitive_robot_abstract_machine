@@ -105,7 +105,7 @@ For the path that we provide here the first value is skipped as that is equal to
 print('move along path to goal pose...')
 from coraplex.datastructures.enums import WaypointsMovementType
 with real_robot:
-    MoveTCPWaypointsMotion(path[1:], robot.right_arm, movement_type=WaypointsMovementType.ENFORCE_ORIENTATION_FINAL_POINT, allow_gripper_collision=False).perform()
+    MoveTCPWaypointsMotion(path[1:], arm=robot.right_arm, movement_type=WaypointsMovementType.ENFORCE_ORIENTATION_FINAL_POINT, allow_gripper_collision=False).perform()
 ```
 
 Alternatively, before executing the planned path with the MoveTCPWaypointsMotion Designator the path could be further improved by postprocessing the output from the GCS path finding algorithm.
@@ -137,5 +137,5 @@ print(len(new_path))
 ```python
 print('move along path to goal pose...')
 with real_robot:
-    MoveTCPWaypointsMotion(filter_path(path), robot.right_arm).perform()
+    MoveTCPWaypointsMotion(filter_path(path), arm=robot.right_arm).perform()
 ```

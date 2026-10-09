@@ -37,12 +37,8 @@ from krrood.parametrization.model_registries import (
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.orm.model import (
-    Point3Mapping,
-    QuaternionMapping,
-    PoseMapping,
-)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 from semantic_digital_twin.robots.pr2 import PR2Joint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
@@ -152,8 +148,8 @@ def test_simplify_keeps_designators_with_different_parameters():
     type *and* the same parameters; differing parameters must be preserved.
     """
     plan = Plan()
-    parent = ActionNode(designator=MoveTorsoAction(TorsoState.HIGH))
-    different_child = ActionNode(designator=MoveTorsoAction(TorsoState.LOW))
+    parent = ActionNode(designator=MoveTorsoAction(torso_state=TorsoState.HIGH))
+    different_child = ActionNode(designator=MoveTorsoAction(torso_state=TorsoState.LOW))
     plan.add_node(parent)
     plan.add_edge(parent, different_child)
 
@@ -161,7 +157,7 @@ def test_simplify_keeps_designators_with_different_parameters():
 
     assert different_child in parent.children
 
-    equal_child = ActionNode(designator=MoveTorsoAction(TorsoState.HIGH))
+    equal_child = ActionNode(designator=MoveTorsoAction(torso_state=TorsoState.HIGH))
     plan.add_edge(parent, equal_child)
     parent.simplify()
 
@@ -526,7 +522,7 @@ def test_pause_plan(pr2_apartment_context):
     code_node = code(function=lambda: None)
     code_node.code = lambda: pause_plan(code_node)
     sleep_node = code(lambda: node_sleep())
-    robot_plan = sequential([sleep_node, MoveTorsoAction(TorsoState.HIGH)])
+    robot_plan = sequential([sleep_node, MoveTorsoAction(torso_state=TorsoState.HIGH)])
     plan = parallel([code_node, robot_plan], context=context).plan
     with simulated_robot:
         plan.perform()
@@ -553,7 +549,10 @@ def test_sequence_runs_all_motions(pr2_apartment_context):
     world, robot_view, context = pr2_apartment_context
 
     plan = sequential(
-        [MoveTorsoAction(TorsoState.LOW), MoveTorsoAction(TorsoState.HIGH)],
+        [
+            MoveTorsoAction(torso_state=TorsoState.LOW),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+        ],
         context=context,
     ).plan
     with simulated_robot:
@@ -571,10 +570,8 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     world, robot_view, context = apartment_world_pr2_copy_with_context
     context.evaluate_conditions = False
 
-    target_location = a(PoseMapping.from_point_mapping_quaternion_mapping)(
-        position=a(Point3Mapping)(x=..., y=..., z=0.0, reference_frame=None),
-        orientation=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
-        reference_frame=variable_from([robot_view.root]),
+    target_location = a(Pose2D)(
+        x=..., y=..., yaw=0.0, reference_frame=variable_from([robot_view.root])
     )
 
     navigate_action = a(NavigateAction)(
@@ -587,7 +584,9 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     )
 
     # resolved_navigate = next(pm_backend.evaluate(navigate_action))
-    plan = sequential([MoveTorsoAction(TorsoState.LOW), navigate_action], context).plan
+    plan = sequential(
+        [MoveTorsoAction(torso_state=TorsoState.LOW), navigate_action], context
+    ).plan
 
     with simulated_robot:
         plan.perform()
@@ -646,7 +645,7 @@ def test_conditions_reference_surviving_action_node_after_merge(pr2_apartment_co
     world, robot_view, context = pr2_apartment_context
 
     plan = sequential(
-        [MoveTorsoAction(TorsoState.HIGH)],
+        [MoveTorsoAction(torso_state=TorsoState.HIGH)],
         context=context,
     ).plan
     with simulated_robot:
@@ -678,7 +677,7 @@ def test_motion_order_pick_up(pr2_apartment_context):
 
     root = sequential(
         [
-            PickUpAction(milk.grasp_candidates()[0], context.robot.left_arm),
+            PickUpAction(grasp=milk.grasp_candidates()[0], arm=context.robot.left_arm),
         ],
         context,
     )
@@ -732,8 +731,10 @@ def test_motion_order_place(pr2_apartment_context):
     root = sequential(
         [
             PlaceAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+                object_designator=world.get_semantic_annotations_by_type(Milk)[0],
+                target_location=Pose.from_xyz_rpy(
+                    0.8, -1.9, 0.7, reference_frame=world.root
+                ),
             ),
         ],
         context,
@@ -787,7 +788,7 @@ def test_node_expansion(pr2_apartment_context):
 
 def test_expand_move_torso(pr2_apartment_context):
     world, view, context = pr2_apartment_context
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context)
+    plan = sequential([MoveTorsoAction(torso_state=TorsoState.HIGH)], context=context)
 
     plan.notify()
 
@@ -802,8 +803,8 @@ def test_context_back_reference(pr2_apartment_context):
 
     plan = sequential(
         [
-            MoveTorsoAction(TorsoState.HIGH),
-            PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+            PickUpAction(grasp=milk.grasp_candidates()[0], arm=context.robot.right_arm),
         ],
         context=context,
     )
@@ -820,7 +821,7 @@ def test_action_nodes_unequal(pr2_apartment_context):
     plan = sequential(
         [
             ParkArmsAction([context.robot.left_arm]),
-            PickUpAction(milk.grasp_candidates()[0], context.robot.left_arm),
+            PickUpAction(grasp=milk.grasp_candidates()[0], arm=context.robot.left_arm),
         ],
         context=context,
     )
@@ -877,7 +878,7 @@ def test_a_designator_node_reports_the_parameters_of_its_designator():
     A designator node adds the parameters its designator was built with as a section of
     its own.
     """
-    action = MoveTorsoAction(TorsoState.HIGH)
+    action = MoveTorsoAction(torso_state=TorsoState.HIGH)
     node = ActionNode(designator=action)
 
     designator_section = node.node_info.sections[-1]
@@ -893,7 +894,7 @@ def test_a_node_is_labelled_by_the_designator_it_manages():
     """
     A designator node is drawn as its designator, not as the node class managing it.
     """
-    node = ActionNode(designator=MoveTorsoAction(TorsoState.HIGH))
+    node = ActionNode(designator=MoveTorsoAction(torso_state=TorsoState.HIGH))
 
     assert node.node_label == MoveTorsoAction.__name__
 

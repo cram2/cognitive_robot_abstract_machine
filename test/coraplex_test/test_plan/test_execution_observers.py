@@ -256,7 +256,9 @@ def test_aborting_does_not_overwrite_a_completed_motion(tracked_motion) -> None:
 def test_native_motion_reports_boundaries_and_ticks(pr2_apartment_context) -> None:
     """A real native torso plan reports its exact motion nodes and finished chart."""
     world, robot, context = pr2_apartment_context
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context).plan
+    plan = sequential(
+        [MoveTorsoAction(torso_state=TorsoState.HIGH)], context=context
+    ).plan
     recorder = ExecutionRecorder(plan=plan)
     plan.node_callbacks.append(recorder)
 
@@ -565,7 +567,7 @@ def test_parallel_plan_preserves_unexpected_child_error() -> None:
 def test_direct_motion_reports_one_pair_of_boundaries(pr2_apartment_context) -> None:
     """Directly performing a motion shares its boundary with native history."""
     world, robot, context = pr2_apartment_context
-    root = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context)
+    root = sequential([MoveTorsoAction(torso_state=TorsoState.HIGH)], context=context)
     root.notify()
     node = next(node for node in root.plan.all_nodes if isinstance(node, MotionNode))
     recorder = ExecutionRecorder(plan=root.plan)
@@ -654,7 +656,7 @@ def test_end_observer_does_not_replace_execution_error(monkeypatch) -> None:
 def test_direct_motion_observer_receives_native_history(pr2_apartment_context) -> None:
     """The first motion start exposes the bound chart for native subscriptions."""
     world, robot, context = pr2_apartment_context
-    root = sequential([MoveTorsoAction(TorsoState.HIGH)], context=context)
+    root = sequential([MoveTorsoAction(torso_state=TorsoState.HIGH)], context=context)
     root.notify()
     node = next(node for node in root.plan.all_nodes if isinstance(node, MotionNode))
     recorder = ExecutionRecorder(plan=root.plan)
@@ -829,7 +831,9 @@ def test_parallel_plan_reports_failed_native_verdict(
 
 
 # %% node-owned execution scopes
-def test_direct_attachment_reports_one_pair_of_boundaries(pr2_apartment_context) -> None:
+def test_direct_attachment_reports_one_pair_of_boundaries(
+    pr2_apartment_context,
+) -> None:
     world, robot, context = pr2_apartment_context
     attachment = ReAttachNode(
         body=world.get_body_by_name("milk.stl"), new_parent=robot.root

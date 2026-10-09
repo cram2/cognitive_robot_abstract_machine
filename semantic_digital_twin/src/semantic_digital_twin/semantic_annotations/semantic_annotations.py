@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Iterable, Iterator, Optional, Self, Tuple, TYPE_CHECKING, Union
 
 import numpy as np
+import trimesh
 from typing_extensions import List
 
 from krrood.ormatic.utils import classproperty
@@ -43,7 +44,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 )
 from semantic_digital_twin.grasping.grasp_candidates import (
     GraspCandidate,
-    HasGraspCandidates,
+    CanBeGrasped,
     RimWallSection,
 )
 from semantic_digital_twin.spatial_types import (
@@ -89,7 +90,7 @@ class Furniture(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class Handle(HasGraspCandidates):
+class Handle(CanBeGrasped):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
@@ -546,17 +547,51 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
                 raise MissingMovableJointError(door)
             door.movable_joint.position = door.movable_joint.dof.limits.lower.position
 
+    def _supporting_faces(
+        self,
+        upward_threshold: float,
+        clearance_threshold: float,
+        min_surface_area: float,
+    ) -> Optional[trimesh.Trimesh]:
+        """
+        The cabin's floor, which a rider stands on, rather than its roof: of the faces
+        things could be placed on, those directly below the cabin's centre.
+        """
+        faces = super()._supporting_faces(
+            upward_threshold, clearance_threshold, min_surface_area
+        )
+        if faces is None:
+            return None
+        below_centre, _, _ = self.root.combined_mesh.ray.intersects_location(
+            ray_origins=[[0.0, 0.0, 0.0]], ray_directions=[[0.0, 0.0, -1.0]]
+        )
+        if len(below_centre) == 0:
+            return None
+        floor_height = below_centre[:, 2].max()
+        on_floor = np.isclose(
+            faces.triangles_center[:, 2],
+            floor_height,
+            atol=1e-6,
+        )
+        if not on_floor.any():
+            return None
+        return faces.submesh([np.nonzero(on_floor)[0]], append=True)
+
     def drive_position_for_floor(self, floor: Level) -> float:
         """
-        The drive position at which the elevator serves the given floor.
+        The drive position at which the elevator serves the given floor: the cabin's
+        floor is flush with the level's floor, so a rider rolls straight in and out.
 
-        The half height accounts for the case body's origin sitting at its ground rather
-        than at its centre.
+        The drive moves the cabin along the world's z-axis, so the position is the
+        current one shifted by the height between the two floors.
 
         :param floor: The floor the elevator should serve.
         :return: The position to drive the elevator's joint to.
         """
-        return float(floor.floor_plane[0].z)
+        cabin_floor_height = float(self.require_supporting_surface().global_pose.z)
+        return float(self.movable_joint.position) + (
+            float(floor.floor_plane[0].z) - cabin_floor_height
+        )
 
     def drive_to_floor(self, floor: Level):
         """
@@ -838,21 +873,21 @@ class Wall(HasApertures):
 
 
 @dataclass(eq=False)
-class Container(HasGraspCandidates):
+class Container(CanBeGrasped):
     """
     An object that holds contents and has an opening they go in and out through.
     """
 
 
 @dataclass(eq=False)
-class Cookware(HasGraspCandidates):
+class Cookware(CanBeGrasped):
     """
     An object used to cook with.
     """
 
 
 @dataclass(eq=False)
-class Tableware(HasGraspCandidates):
+class Tableware(CanBeGrasped):
     """
     An object a table is set with for a meal.
     """
@@ -866,7 +901,7 @@ class Bottle(Container):
 
 
 @dataclass(eq=False)
-class Statue(HasGraspCandidates): ...
+class Statue(CanBeGrasped): ...
 
 
 @dataclass(eq=False)
@@ -1029,7 +1064,7 @@ class Bowl(HasSupportingSurface, Container, Tableware, IsPerceivable):
 
 # Food Items
 @dataclass(eq=False)
-class Food(HasGraspCandidates):
+class Food(CanBeGrasped):
     """
     A Group class for Food.
     """
@@ -1308,7 +1343,7 @@ class WallDecor(Decor):
 
 
 @dataclass(eq=False)
-class Cloth(HasGraspCandidates): ...
+class Cloth(CanBeGrasped): ...
 
 
 @dataclass(eq=False)
@@ -1366,7 +1401,7 @@ class Vase(Container):
 
 
 @dataclass(eq=False)
-class Book(HasGraspCandidates):
+class Book(CanBeGrasped):
     """
     A book.
     """
@@ -1437,21 +1472,21 @@ class Spoon(Cutlery, IsPerceivable): ...
 
 
 @dataclass(eq=False)
-class Pencil(HasGraspCandidates):
+class Pencil(CanBeGrasped):
     """
     A pencil.
     """
 
 
 @dataclass(eq=False)
-class Pen(HasGraspCandidates):
+class Pen(CanBeGrasped):
     """
     A pen.
     """
 
 
 @dataclass(eq=False)
-class Baseball(HasGraspCandidates):
+class Baseball(CanBeGrasped):
     """
     A baseball.
     """
@@ -1500,7 +1535,7 @@ class Human(Agent):
 
 
 @dataclass(eq=False)
-class Parcel(HasGraspCandidates):
+class Parcel(CanBeGrasped):
     """
     A parcel, as handled in a warehouse.
     """
@@ -1636,7 +1671,7 @@ class Cooktop(HasRootBody):
 
 
 @dataclass(eq=False)
-class Tool(HasGraspCandidates, ABC):
+class Tool(CanBeGrasped, ABC):
     """
     A tool that is held by a robot's end effector to act on other bodies.
     """

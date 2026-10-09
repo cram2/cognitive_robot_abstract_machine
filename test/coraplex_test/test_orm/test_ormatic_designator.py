@@ -18,7 +18,7 @@ from coraplex.robot_plans.actions.composite.transporting import (
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 
@@ -29,11 +29,9 @@ def simple_plan(pr2_apartment_context):
     plan = sequential(
         [
             NavigateAction(
-                Pose.from_xyz_quaternion(
-                    1.6, 1.9, 0, 0, 0, 0, 1, reference_frame=world.root
-                ),
+                target_location=Pose2D(1.6, 1.9, reference_frame=world.root),
             ),
-            MoveTorsoAction(TorsoState.HIGH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             ParkArmsAction(context.robot.all_arms),
         ],
         context=context,
@@ -99,16 +97,12 @@ def complex_plan(pr2_apartment_context):
     plan = execute_single(
         TransportAction(
             pick_up=MoveAndPickUpAction.from_standing_position(
-                standing_position=Pose.from_xyz_rpy(
-                    1.63, 1.98, 0.0, reference_frame=world.root
-                ),
+                standing_position=Pose2D(1.63, 1.98, reference_frame=world.root),
                 grasp=milk.grasp_candidates()[0],
                 arm=context.robot.left_arm,
             ),
             place=MoveAndPlaceAction.from_standing_position(
-                standing_position=Pose.from_xyz_rpy(
-                    1.8, 2.54, 0.0, reference_frame=world.root
-                ),
+                standing_position=Pose2D(1.8, 2.54, reference_frame=world.root),
                 target_location=Pose.from_xyz_quaternion(
                     2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
                 ),

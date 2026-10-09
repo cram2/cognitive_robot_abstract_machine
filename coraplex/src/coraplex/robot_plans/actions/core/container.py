@@ -18,36 +18,26 @@ from coraplex.plans.plan_node import PlanNode
 from coraplex.querying.predicates import GripperIsFree
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.pick_up import GraspingAction
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses
+from coraplex.robot_plans.mixins import (
+    HandleOperationParameters,
+    GraspApproachParameters,
+)
 from coraplex.robot_plans.motions.container import OpeningMotion, ClosingMotion
 from coraplex.robot_plans.motions.gripper import MoveGripperMotion
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
-from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Handle,
-)
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 
 @dataclass
-class OpenAction(ActionDescription):
+class OpenAction(ActionDescription, HandleOperationParameters):
     """
     Opens a container like object.
     """
 
-    handle: Handle
-    """
-    The handle of the container that should be opened.
-    """
-    arm: Arm
-    """
-    Arm that should be used for opening the container.
-    """
-
-    approach_clearance: float = HasApproachesGraspPoses.approach_clearance
+    approach_clearance: float = GraspApproachParameters.approach_clearance
     """
     The gap in meters between the handle and the gripper before it closes on it.
     """
@@ -57,14 +47,14 @@ class OpenAction(ActionDescription):
         return sequential(
             [
                 GraspingAction(
-                    GraspCandidate.from_body_origin(self.handle),
-                    self.arm,
+                    grasp=GraspCandidate.from_body_origin(self.handle),
+                    arm=self.arm,
                     approach_clearance=self.approach_clearance,
                 ),
-                OpeningMotion(self.handle.root, self.arm),
+                OpeningMotion(self.handle.root, arm=self.arm),
                 MoveGripperMotion(
-                    GripperState.OPEN,
-                    self.arm.end_effector,
+                    motion=GripperState.OPEN,
+                    end_effector=self.arm.end_effector,
                     allow_gripper_collision=True,
                 ),
             ]
@@ -106,22 +96,12 @@ class OpenAction(ActionDescription):
 
 
 @dataclass
-class CloseAction(ActionDescription):
+class CloseAction(ActionDescription, HandleOperationParameters):
     """
     Closes a container like object.
     """
 
-    handle: Handle
-    """
-    The handle of the container that should be closed.
-    """
-
-    arm: Arm
-    """
-    Arm that should be used for closing.
-    """
-
-    approach_clearance: float = HasApproachesGraspPoses.approach_clearance
+    approach_clearance: float = GraspApproachParameters.approach_clearance
     """
     The gap in meters between the handle and the gripper before it closes on it.
     """
@@ -131,14 +111,14 @@ class CloseAction(ActionDescription):
         return sequential(
             [
                 GraspingAction(
-                    GraspCandidate.from_body_origin(self.handle),
-                    self.arm,
+                    grasp=GraspCandidate.from_body_origin(self.handle),
+                    arm=self.arm,
                     approach_clearance=self.approach_clearance,
                 ),
-                ClosingMotion(self.handle.root, self.arm),
+                ClosingMotion(self.handle.root, arm=self.arm),
                 MoveGripperMotion(
-                    GripperState.OPEN,
-                    self.arm.end_effector,
+                    motion=GripperState.OPEN,
+                    end_effector=self.arm.end_effector,
                     allow_gripper_collision=True,
                 ),
             ]

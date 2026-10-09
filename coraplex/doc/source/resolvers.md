@@ -14,7 +14,8 @@ adapt to objects that moved, a torso that was already raised, or an object alrea
 
 ## Location designators
 
-Location designators are resolved into 6D poses by the locations in {mod}`coraplex.locations`. A
+Location designators are resolved into standing poses on the floor
+({class}`~semantic_digital_twin.spatial_types.spatial_types.Pose2D`) by the locations in {mod}`coraplex.locations`. A
 {class}`~coraplex.locations.base.Location` is sampled from a costmap (see {doc}`costmap`) for criteria such as reach
 distance, visibility and occupancy. The locations in {mod}`coraplex.locations.locations`, such as
 {class}`~coraplex.locations.locations.ReachabilityLocation`, build that costmap from the world as it is when they are

@@ -17,7 +17,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 )
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     Body,
@@ -173,7 +173,7 @@ class IsAmongTheClosestGraspsTo(Predicate):
     The grasp that is asked about.
     """
 
-    standing_position: Pose
+    standing_position: Pose2D
     """
     Where the robot stands while taking the grasp.
     """
@@ -194,9 +194,9 @@ class IsAmongTheClosestGraspsTo(Predicate):
         world = self.grasp.graspable.root._world
 
         # Transform to np for speed, as this is called a lot
-        world_P_standing = world.transform(self.standing_position, world.root).to_np()[
-            :, 3
-        ]
+        world_P_standing = world.transform(
+            self.standing_position.pose, world.root
+        ).position.to_np()
         world_T_object = self.grasp.graspable.root.global_transform.to_np()
 
         position = next(

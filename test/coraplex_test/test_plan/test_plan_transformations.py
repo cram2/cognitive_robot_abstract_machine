@@ -57,7 +57,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 
 from .test_graph_parsing import detect_actions_of, reach_action
@@ -110,8 +110,12 @@ class MoveGrippersBeforeTorsoMotion(InsertionTransformation[MoveTorsoAction]):
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
         return [
-            MoveGripperMotion(GripperState.OPEN, left_gripper(plan_node)),
-            MoveGripperMotion(GripperState.CLOSE, right_gripper(plan_node)),
+            MoveGripperMotion(
+                motion=GripperState.OPEN, end_effector=left_gripper(plan_node)
+            ),
+            MoveGripperMotion(
+                motion=GripperState.CLOSE, end_effector=right_gripper(plan_node)
+            ),
         ]
 
 
@@ -167,7 +171,11 @@ class MoveGripperLastInTheReachBody(InsertionTransformation[ReachAction]):
         return body
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.CLOSE, right_gripper(plan_node))]
+        return [
+            MoveGripperMotion(
+                motion=GripperState.CLOSE, end_effector=right_gripper(plan_node)
+            )
+        ]
 
 
 def motions_of(plan_node: PlanNode) -> List[MotionNode]:
@@ -218,7 +226,11 @@ class MoveGripperBeforeEveryAction(InsertionTransformation[ActionNode]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.CLOSE, right_gripper(plan_node))]
+        return [
+            MoveGripperMotion(
+                motion=GripperState.CLOSE, end_effector=right_gripper(plan_node)
+            )
+        ]
 
 
 @dataclass
@@ -231,7 +243,11 @@ class TransformationWithoutPosition(InsertionTransformation[MoveTorsoAction]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.OPEN, left_gripper(plan_node))]
+        return [
+            MoveGripperMotion(
+                motion=GripperState.OPEN, end_effector=left_gripper(plan_node)
+            )
+        ]
 
 
 @dataclass
@@ -277,7 +293,7 @@ def test_a_transformation_bound_to_an_unmatchable_type_is_rejected(
     carry, so a type that is neither leaves no rule to select by.
     """
     world, view, context = pr2_apartment_context
-    node = execute_single(MoveTorsoAction(TorsoState.HIGH), context=context)
+    node = execute_single(MoveTorsoAction(torso_state=TorsoState.HIGH), context=context)
 
     with pytest.raises(CannotMatchOnType):
         TransformationOnAnUnmatchableType().matches_node(node)
@@ -327,7 +343,11 @@ class MoveGripperBeforeHighTorso(InsertionTransformation[MoveTorsoAction]):
         return motion_of(plan_node)
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.OPEN, left_gripper(plan_node))]
+        return [
+            MoveGripperMotion(
+                motion=GripperState.OPEN, end_effector=left_gripper(plan_node)
+            )
+        ]
 
 
 def test_a_transformation_the_case_needs_is_applied(pr2_apartment_context):
@@ -337,7 +357,7 @@ def test_a_transformation_the_case_needs_is_applied(pr2_apartment_context):
     world, view, context = pr2_apartment_context
     context.plan_transformations.append(MoveGripperBeforeHighTorso())
 
-    plan = execute_single(MoveTorsoAction(TorsoState.HIGH), context=context)
+    plan = execute_single(MoveTorsoAction(torso_state=TorsoState.HIGH), context=context)
     plan.notify()
 
     assert [type(motion.designator) for motion in motions_of(plan)] == [
@@ -354,7 +374,7 @@ def test_a_transformation_the_case_does_not_need_is_skipped(pr2_apartment_contex
     world, view, context = pr2_apartment_context
     context.plan_transformations.append(MoveGripperBeforeHighTorso())
 
-    plan = execute_single(MoveTorsoAction(TorsoState.LOW), context=context)
+    plan = execute_single(MoveTorsoAction(torso_state=TorsoState.LOW), context=context)
     plan.notify()
 
     assert [type(motion.designator) for motion in motions_of(plan)] == [
@@ -373,7 +393,8 @@ def test_a_transformation_bound_to_a_node_type_reaches_every_action(
     context.plan_transformations.append(MoveGripperBeforeEveryAction())
 
     plan = sequential(
-        [MoveTorsoAction(TorsoState.HIGH), ParkArmsAction(view.all_arms)], context
+        [MoveTorsoAction(torso_state=TorsoState.HIGH), ParkArmsAction(view.all_arms)],
+        context,
     )
     plan.notify()
 
@@ -395,7 +416,8 @@ def test_a_transformation_bound_to_a_designator_type_selects_the_nodes_carrying_
     world, view, context = pr2_apartment_context
     transformation = MoveGrippersBeforeTorsoMotion()
     plan = sequential(
-        [MoveTorsoAction(TorsoState.HIGH), ParkArmsAction(view.all_arms)], context
+        [MoveTorsoAction(torso_state=TorsoState.HIGH), ParkArmsAction(view.all_arms)],
+        context,
     )
     torso, parking = plan.children
 
@@ -413,7 +435,7 @@ def test_a_transformation_bound_to_a_node_type_selects_the_nodes_of_that_type(
     """
     world, view, context = pr2_apartment_context
     transformation = MoveGripperBeforeEveryAction()
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context)
+    plan = sequential([MoveTorsoAction(torso_state=TorsoState.HIGH)], context)
     [torso] = plan.children
 
     assert transformation.matched_type is ActionNode
@@ -438,7 +460,11 @@ class MoveGripperBeforeJointMotion(InsertionTransformation[MoveJointsMotion]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: MotionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.CLOSE, right_gripper(plan_node))]
+        return [
+            MoveGripperMotion(
+                motion=GripperState.CLOSE, end_effector=right_gripper(plan_node)
+            )
+        ]
 
 
 def test_a_transformation_bound_to_a_motion_type_selects_the_motion_node(
@@ -450,7 +476,7 @@ def test_a_transformation_bound_to_a_motion_type_selects_the_motion_node(
     it belongs to.
     """
     world, view, context = pr2_apartment_context
-    node = execute_single(MoveTorsoAction(TorsoState.HIGH), context=context)
+    node = execute_single(MoveTorsoAction(torso_state=TorsoState.HIGH), context=context)
     node.notify()
     transformation = MoveGripperBeforeJointMotion()
 
@@ -470,7 +496,7 @@ def test_a_transformation_inserts_its_nodes_before_the_anchor(pr2_apartment_cont
     world, view, context = pr2_apartment_context
     context.plan_transformations.append(MoveGrippersBeforeTorsoMotion())
 
-    plan = execute_single(MoveTorsoAction(TorsoState.HIGH), context=context)
+    plan = execute_single(MoveTorsoAction(torso_state=TorsoState.HIGH), context=context)
     plan.notify()
 
     motions = motions_of(plan)
@@ -479,7 +505,7 @@ def test_a_transformation_inserts_its_nodes_before_the_anchor(pr2_apartment_cont
         MoveGripperMotion,
         MoveJointsMotion,
     ]
-    assert [motion.designator.gripper for motion in motions[:2]] == [
+    assert [motion.designator.end_effector for motion in motions[:2]] == [
         view.left_arm.end_effector,
         view.right_arm.end_effector,
     ]
@@ -493,7 +519,7 @@ def test_a_transformation_inserts_its_nodes_after_the_anchor(pr2_apartment_conte
     world, view, context = pr2_apartment_context
     context.plan_transformations.append(MoveGrippersAfterTorsoMotion())
 
-    plan = execute_single(MoveTorsoAction(TorsoState.HIGH), context=context)
+    plan = execute_single(MoveTorsoAction(torso_state=TorsoState.HIGH), context=context)
     plan.notify()
 
     motions = motions_of(plan)
@@ -502,7 +528,7 @@ def test_a_transformation_inserts_its_nodes_after_the_anchor(pr2_apartment_conte
         MoveGripperMotion,
         MoveGripperMotion,
     ]
-    assert [motion.designator.gripper for motion in motions[1:]] == [
+    assert [motion.designator.end_effector for motion in motions[1:]] == [
         view.left_arm.end_effector,
         view.right_arm.end_effector,
     ]
@@ -556,7 +582,7 @@ def test_an_inserted_action_is_expanded(pr2_apartment_context):
     world, view, context = pr2_apartment_context
     context.plan_transformations.append(ParkArmsBeforeTorsoMotion())
 
-    plan = execute_single(MoveTorsoAction(TorsoState.HIGH), context=context)
+    plan = execute_single(MoveTorsoAction(torso_state=TorsoState.HIGH), context=context)
     plan.notify()
 
     [park] = [
@@ -628,7 +654,7 @@ def test_a_transformation_on_reaches_also_fires_inside_a_pick_up(pr2_apartment_c
     context.plan_transformations.append(DetectBeforeGrasp())
 
     plan = execute_single(
-        PickUpAction(milk.grasp_candidates()[0], view.right_arm),
+        PickUpAction(grasp=milk.grasp_candidates()[0], arm=view.right_arm),
         context=context,
     )
     plan.notify()
@@ -677,7 +703,7 @@ def pick_up_action(annotation, arm: Arm) -> PickUpAction:
     :param arm: The arm to pick it up with.
     :return: A pick-up of the object by the first grasp it offers.
     """
-    return PickUpAction(annotation.grasp_candidates()[0], arm)
+    return PickUpAction(grasp=annotation.grasp_candidates()[0], arm=arm)
 
 
 def handle_opened_by(opening: Match) -> Handle:
@@ -833,7 +859,7 @@ def test_the_drawer_is_opened_before_a_move_and_pick_up_rather_than_inside_it(
     context.plan_transformations.append(OpenDrawerBeforeMoveAndPickUp())
 
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose(reference_frame=world.root),
+        standing_position=Pose2D(reference_frame=world.root),
         grasp=spoon.grasp_candidates()[0],
         arm=view.right_arm,
     )
@@ -1093,9 +1119,10 @@ def test_a_move_and_pick_up_whose_grasps_are_on_several_objects_is_opened_per_ca
 
     standing_pose = Pose(reference_frame=world.root)
     move_and_pick_up = a(MoveAndPickUpAction)(
-        navigate=NavigateAction(standing_pose),
+        navigate=NavigateAction(target_location=Pose2D.from_pose(standing_pose)),
         face_and_look_at=FaceAndLookAtAction(
-            face_at=FaceAtAction(standing_pose), look_at=LookAtAction(standing_pose)
+            face_at=FaceAtAction(target=standing_pose),
+            look_at=LookAtAction(target=standing_pose),
         ),
         pick_up=a(PickUpAction)(
             grasp=variable(
@@ -1119,7 +1146,7 @@ def test_a_move_and_pick_up_of_an_object_in_no_drawer_is_left_alone(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     context.plan_transformations.append(OpenDrawerBeforeMoveAndPickUp())
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose(reference_frame=world.root),
+        standing_position=Pose2D(reference_frame=world.root),
         grasp=milk.grasp_candidates()[0],
         arm=view.right_arm,
     )
@@ -1211,7 +1238,11 @@ class MoveLeftGripperBeforeTorso(InsertionTransformation[MoveTorsoAction]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.OPEN, left_gripper(plan_node))]
+        return [
+            MoveGripperMotion(
+                motion=GripperState.OPEN, end_effector=left_gripper(plan_node)
+            )
+        ]
 
 
 @dataclass
@@ -1221,7 +1252,11 @@ class MoveRightGripperBeforeTorso(MoveLeftGripperBeforeTorso):
     """
 
     def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [MoveGripperMotion(GripperState.CLOSE, right_gripper(plan_node))]
+        return [
+            MoveGripperMotion(
+                motion=GripperState.CLOSE, end_effector=right_gripper(plan_node)
+            )
+        ]
 
 
 def warnings_of(caplog) -> List[str]:
@@ -1248,7 +1283,7 @@ def test_two_transformations_applied_to_one_node_are_reported(
         [MoveLeftGripperBeforeTorso(), MoveRightGripperBeforeTorso()]
     )
 
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context)
+    plan = sequential([MoveTorsoAction(torso_state=TorsoState.HIGH)], context)
     [torso] = [node for node in plan.children if isinstance(node, ActionNode)]
     with caplog.at_level(logging.WARNING, logger=plan_logger.name):
         plan.notify()
@@ -1267,10 +1302,10 @@ def test_the_transformations_that_collide_are_still_applied(pr2_apartment_contex
         [MoveLeftGripperBeforeTorso(), MoveRightGripperBeforeTorso()]
     )
 
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context)
+    plan = sequential([MoveTorsoAction(torso_state=TorsoState.HIGH)], context)
     plan.notify()
 
-    assert [motion.designator.gripper for motion in motions_of(plan)] == [
+    assert [motion.designator.end_effector for motion in motions_of(plan)] == [
         view.left_arm.end_effector,
         view.right_arm.end_effector,
     ]
@@ -1288,7 +1323,7 @@ def test_a_transformation_the_case_does_not_need_is_no_collision(
         [MoveLeftGripperBeforeTorso(), MoveGripperBeforeHighTorso()]
     )
 
-    plan = sequential([MoveTorsoAction(TorsoState.LOW)], context)
+    plan = sequential([MoveTorsoAction(torso_state=TorsoState.LOW)], context)
     [torso] = [node for node in plan.children if isinstance(node, ActionNode)]
     with caplog.at_level(logging.WARNING, logger=plan_logger.name):
         plan.notify()

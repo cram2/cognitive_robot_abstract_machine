@@ -28,9 +28,9 @@ TARGET_POSITION_XYZ = (2.4, 2.2, 1.0)
 Position of the manipulated object on the apartment kitchen counter.
 """
 
-BASE_POSITION_XYZ = (1.85, 2.2, 0.0)
+BASE_POSITION_XY = (1.85, 2.2)
 """
-Base position in front of the kitchen counter, facing the target.
+Base position on the floor in front of the kitchen counter, facing the target.
 """
 
 CUT_MOUNT = {"z": 0.08, "pitch": -math.pi / 2}

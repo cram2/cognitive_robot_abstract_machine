@@ -4,7 +4,7 @@ whisk mounted on its right gripper.
 """
 
 from experiments.tool_based_actions.simple_demo.demo_world import (
-    BASE_POSITION_XYZ,
+    BASE_POSITION_XY,
     BOWL_COLOR,
     MIX_MOUNT,
     TARGET_POSITION_XYZ,
@@ -17,7 +17,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Whisk,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.execution_environment import simulated_robot
@@ -62,11 +62,13 @@ def main() -> None:
 
     plan = sequential(
         [
-            SetGripperAction(pr2.right_arm.end_effector, GripperState.CLOSE),
+            SetGripperAction(
+                end_effector=pr2.right_arm.end_effector, motion=GripperState.CLOSE
+            ),
             ParkArmsAction(pr2.all_arms),
-            MoveTorsoAction(TorsoState.HIGH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                Pose.from_xyz_rpy(*BASE_POSITION_XYZ, reference_frame=world.root)
+                target_location=Pose2D(*BASE_POSITION_XY, reference_frame=world.root)
             ),
             MixingAction(container=bowl_body, arm=pr2.right_arm, tool=whisk),
         ],

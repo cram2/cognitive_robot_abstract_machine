@@ -980,6 +980,10 @@ def multi_story_building(_elevator_world_setup):
     with world.modify_world():
         add_level(GroundFloor, "Ground Floor", 1.5)
         add_level(FirstFloor, "First Floor", 4.5)
+    # The elevator waits at the ground floor, its cabin floor aligned with the level's.
+    world.get_semantic_annotations_by_type(Elevator)[0].drive_to_floor(
+        world.get_semantic_annotations_by_type(GroundFloor)[0]
+    )
     return world
 
 

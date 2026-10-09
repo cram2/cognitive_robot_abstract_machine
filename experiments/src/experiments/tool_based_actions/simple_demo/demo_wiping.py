@@ -4,14 +4,14 @@ on its right gripper.
 """
 
 from experiments.tool_based_actions.simple_demo.demo_world import (
-    BASE_POSITION_XYZ,
+    BASE_POSITION_XY,
     TARGET_POSITION_XYZ,
     attach_sponge,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Sponge
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.execution_environment import simulated_robot
@@ -46,11 +46,13 @@ def main() -> None:
 
     plan = sequential(
         [
-            SetGripperAction(pr2.right_arm.end_effector, GripperState.CLOSE),
+            SetGripperAction(
+                end_effector=pr2.right_arm.end_effector, motion=GripperState.CLOSE
+            ),
             ParkArmsAction(pr2.all_arms),
-            MoveTorsoAction(TorsoState.HIGH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                Pose.from_xyz_rpy(*BASE_POSITION_XYZ, reference_frame=world.root)
+                target_location=Pose2D(*BASE_POSITION_XY, reference_frame=world.root)
             ),
             WipingAction(
                 arm=pr2.right_arm,

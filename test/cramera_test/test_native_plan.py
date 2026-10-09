@@ -94,7 +94,7 @@ def test_designator_description_uses_native_parameter_verbalization(
     """
     [robot] = pr2_world_copy.get_semantic_annotations_by_type(PR2)
     gripper = robot.all_arms[gripper_index].end_effector
-    action = SetGripperAction(gripper=gripper, motion=GripperState.CLOSE)
+    action = SetGripperAction(end_effector=gripper, motion=GripperState.CLOSE)
     plan = Plan()
     plan.add_node(ActionNode(designator=action))
     bridge = Bridge()
@@ -146,7 +146,7 @@ def test_gripper_state_enum_is_not_mistaken_for_a_target_body(
     plan.add_node(
         ActionNode(
             designator=SetGripperAction(
-                gripper=robot.all_arms[0].end_effector, motion=motion
+                end_effector=robot.all_arms[0].end_effector, motion=motion
             )
         )
     )

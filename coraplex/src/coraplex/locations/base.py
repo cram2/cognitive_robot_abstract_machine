@@ -5,14 +5,14 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Iterator, Iterable, Optional
 
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
 
 @dataclass
-class Location(Iterable[Pose], ABC):
+class Location(Iterable[Pose2D], ABC):
     """
-    A region of poses the robot can be sent to, iterated as the pose candidates sampled
-    from it.
+    A region of the floor the robot's base can be sent to, iterated as the standing pose
+    candidates sampled from it.
     """
 
     number_of_samples: int = field(default=2000, kw_only=True)
@@ -26,7 +26,7 @@ class Location(Iterable[Pose], ABC):
     """
 
     @abstractmethod
-    def candidates(self) -> Iterator[Pose]:
+    def candidates(self) -> Iterator[Pose2D]:
         """
         Sample pose candidates from this location, :attr:`number_of_samples` of them
         from :attr:`seed`.
@@ -34,13 +34,13 @@ class Location(Iterable[Pose], ABC):
         :return: The pose candidates, in the order they should be tried.
         """
 
-    def ground(self) -> Pose:
+    def ground(self) -> Pose2D:
         """
         :return: The first pose candidate of this location.
         """
         return next(iter(self))
 
-    def __iter__(self) -> Iterator[Pose]:
+    def __iter__(self) -> Iterator[Pose2D]:
         """
         :return: The candidates of this location.
 

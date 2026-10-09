@@ -77,7 +77,7 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -870,7 +870,7 @@ class MobileBase(
         """
         return RotationMatrix.from_vectors(x=self.forward_axis, z=Vector3.Z())
 
-    def pose_facing(self, heading: Pose) -> Pose:
+    def pose_facing(self, heading: Pose | Pose2D) -> Pose:
         """
         The base pose whose :attr:`forward_axis` points along ``heading``.
 
@@ -878,9 +878,10 @@ class MobileBase(
         its x-axis, so the same heading serves bases modelled with different axes. Its
         position is kept as it is.
         """
+        reference_T_heading = heading.homogeneous_matrix
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            heading.position,
-            heading.rotation_matrix @ self.base_R_front.inverse(),
+            reference_T_heading.position,
+            reference_T_heading.rotation_matrix @ self.base_R_front.inverse(),
             reference_frame=heading.reference_frame,
         ).pose
 

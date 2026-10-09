@@ -21,7 +21,7 @@ from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, MobileBase
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D, Vector3
 from semantic_digital_twin.world import World
 
 # %% the forward axes the declared robots use
@@ -216,6 +216,26 @@ def test_the_position_is_the_headings_own(robot_type: Type[AbstractRobot]):
         base_pose.position.to_np(), heading.position.to_np(), atol=1e-9
     )
     assert base_pose.reference_frame is heading.reference_frame
+
+
+@pytest.mark.parametrize(
+    "robot_type", ROBOTS_WITH_DISTINCT_FORWARD_AXES, ids=robot_name
+)
+def test_a_planar_heading_places_the_base_as_its_pose_does(
+    robot_type: Type[AbstractRobot],
+):
+    """
+    A heading given as a spot on the floor places the base where the same heading as a
+    full pose does.
+    """
+    mobile_base = spawn(robot_type)
+    heading = Pose2D(1.3, 2.0, yaw=0.3, reference_frame=mobile_base.root._world.root)
+
+    np.testing.assert_allclose(
+        mobile_base.pose_facing(heading).to_np(),
+        mobile_base.pose_facing(heading.pose).to_np(),
+        atol=1e-9,
+    )
 
 
 # %% the heading a base stands at is read back off its pose

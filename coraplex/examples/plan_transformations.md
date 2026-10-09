@@ -59,7 +59,7 @@ plan is built by `notify`, which expands the whole plan without executing it.
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose2D
 
 milk = world.get_semantic_annotations_by_type(Milk)[0]
 grasp = milk.grasp_candidates()[0]
@@ -106,7 +106,7 @@ reach that `PickUpAction` builds. Nothing has to be passed down to it:
 ```python
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 
-pick_up = execute_single(PickUpAction(grasp, pr2.right_arm), context=context)
+pick_up = execute_single(PickUpAction(grasp=grasp, arm=pr2.right_arm), context=context)
 pick_up.notify()
 
 show(pick_up)
@@ -172,7 +172,7 @@ context.plan_transformations = [OpenDrawerBeforePickUp()]
 spoon_annotation = world.get_semantic_annotations_by_type(Spoon)[0]
 
 pick_up = sequential(
-    [PickUpAction(spoon_annotation.grasp_candidates()[0], pr2.right_arm)], context
+    [PickUpAction(grasp=spoon_annotation.grasp_candidates()[0], arm=pr2.right_arm)], context
 )
 pick_up.notify()
 
@@ -184,7 +184,7 @@ drive are grounded when they are run, and the parking was expanded in turn. The 
 open, so the same registration leaves its pick-up alone:
 
 ```python
-milk_pick_up = sequential([PickUpAction(grasp, pr2.right_arm)], context)
+milk_pick_up = sequential([PickUpAction(grasp=grasp, arm=pr2.right_arm)], context)
 milk_pick_up.notify()
 
 show(milk_pick_up)
@@ -244,7 +244,7 @@ class ParkArmsBeforeNavigating(InsertionTransformation[NavigateAction]):
 context.plan_transformations = [ParkArmsBeforeNavigating()]
 
 navigate = execute_single(
-    NavigateAction(Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root)),
+    NavigateAction(target_location=Pose2D(1.5, 2.4, reference_frame=world.root)),
     context=context,
 )
 navigate.notify()
@@ -283,7 +283,7 @@ class ParkArmsAfterNavigating(ParkArmsBeforeNavigating):
 context.plan_transformations = [ParkArmsAfterNavigating()]
 
 navigate = execute_single(
-    NavigateAction(Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root)),
+    NavigateAction(target_location=Pose2D(1.5, 2.4, reference_frame=world.root)),
     context=context,
 )
 navigate.notify()
@@ -296,6 +296,9 @@ case asks, and is only asked about the nodes it matches. Here the arms are only 
 drives that actually take the robot somewhere:
 
 ```python
+from semantic_digital_twin.spatial_types.spatial_types import Point2
+
+
 @dataclass
 class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
     """
@@ -311,16 +314,15 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
     def is_applicable(self, plan_node: PlanNode) -> bool:
         navigate = plan_node.designator
         target = navigate.world.transform(navigate.target_location, navigate.world.root)
-        distance = navigate.robot.root.global_pose.position.euclidean_distance(
-            target.position
-        )
+        robot_position = Point2.from_pose(navigate.robot.root.global_pose)
+        distance = robot_position.euclidean_distance(target.position)
         return float(distance) > self.minimum_distance
 ```
 
 ```python
 context.plan_transformations = [ParkArmsBeforeLongDrives()]
 
-navigate = execute_single(NavigateAction(pr2.root.global_pose), context=context)
+navigate = execute_single(NavigateAction(target_location=Pose2D.from_pose(pr2.root.global_pose)), context=context)
 navigate.notify()
 
 show(navigate)

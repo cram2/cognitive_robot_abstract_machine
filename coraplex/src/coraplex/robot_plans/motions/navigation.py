@@ -12,6 +12,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
 )
 from giskardpy.motion_statechart.tasks.pointing import Pointing
+from coraplex.robot_plans.mixins import NavigationTargetParameter
 from coraplex.robot_plans.motions.base import BaseMotion
 from semantic_digital_twin.spatial_types.spatial_types import (
     Point3,
@@ -21,14 +22,9 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 
 
 @dataclass
-class MoveMotion(BaseMotion):
+class MoveMotion(BaseMotion, NavigationTargetParameter):
     """
     Moves the robot to a designated location.
-    """
-
-    target: Pose
-    """
-    Location to which the robot should be moved
     """
 
     def perform(self):
@@ -38,14 +34,14 @@ class MoveMotion(BaseMotion):
     def _motion_chart(self):
         return (
             SetOdometry(
-                base_pose=self.target.homogeneous_matrix,
+                base_pose=self.target_location.homogeneous_matrix,
                 odom_connection=self.robot.root.parent_connection,
             )
             if GiskardExecutable.execution_type == ExecutionType.SIMULATED
             else CartesianPose(
                 root_link=self.world.root,
                 tip_link=self.robot.root,
-                goal_pose=self.target,
+                goal_pose=self.target_location.pose,
             )
         )
 

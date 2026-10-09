@@ -15,7 +15,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 from ..conftest import SAMPLING_SEED
@@ -41,7 +41,11 @@ def test_ref_chain_after_copy_with_execute(pr2_apartment_context):
     )
 
     plan = sequential(
-        [NavigateAction(Pose.from_xyz_rpy(1, -1, 0, reference_frame=copy_world.root))],
+        [
+            NavigateAction(
+                target_location=Pose2D(1, -1, reference_frame=copy_world.root)
+            )
+        ],
         copy_context,
     )
 
@@ -71,7 +75,9 @@ def test_ref_chain_after_copy_with_execute_complex_plan(pr2_apartment_context):
         copy_robot.right_arm,
         copy_context,
     )
-    plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], copy_context)
+    plan = sequential(
+        [MoveTorsoAction(torso_state=TorsoState.HIGH), description], copy_context
+    )
     with simulated_robot:
         plan.perform()
 

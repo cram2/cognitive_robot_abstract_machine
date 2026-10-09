@@ -50,8 +50,8 @@ from giskardpy.motion_statechart.tasks.pointing import Pointing
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import Point3, Quaternion
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types import Point3
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from ..conftest import left_or_only_arm
 
 try:
@@ -81,20 +81,18 @@ def test_pick_up_motion(pr2_apartment_context):
     test_world = deepcopy(world)
     milk = test_world.get_semantic_annotations_by_type(Milk)[0]
     test_context = Context.from_world(test_world)
-    pick_up = PickUpAction(milk.grasp_candidates()[0], test_context.robot.left_arm)
+    pick_up = PickUpAction(
+        grasp=milk.grasp_candidates()[0], arm=test_context.robot.left_arm
+    )
 
     root = sequential(
         children=[
             ActionNode(
                 designator=NavigateAction(
-                    Pose(
-                        Point3.from_iterable([1.7, 1.5, 0]),
-                        Quaternion.from_iterable([0, 0, 0, 1]),
-                        test_world.root,
-                    ),
+                    target_location=Pose2D(1.7, 1.5, reference_frame=test_world.root),
                 )
             ),
-            MoveTorsoAction(TorsoState.HIGH),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             pick_up,
         ],
         context=test_context,
@@ -123,7 +121,7 @@ def test_pick_up_motion(pr2_apartment_context):
 def test_move_motion_chart(pr2_apartment_context):
     world, view, context = pr2_apartment_context
     motion = MoveMotion(
-        Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+        target_location=Pose2D(1, 1, yaw=0.5, reference_frame=world.root)
     )
     plan = execute_single(
         motion,
@@ -132,8 +130,9 @@ def test_move_motion_chart(pr2_apartment_context):
 
     msc = motion.motion_chart
 
-    assert msc
-    np.testing.assert_equal(msc.goal_pose.position.to_np(), np.array([1, 1, 1, 1]))
+    np.testing.assert_allclose(
+        msc.goal_pose.to_np(), motion.target_location.pose.to_np()
+    )
 
 
 def test_move_tool_center_point_motion_uses_tight_threshold(pr2_apartment_context):
@@ -147,7 +146,9 @@ def test_move_tool_center_point_motion_uses_tight_threshold(pr2_apartment_contex
     target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
 
     cartesian_motion = MoveToolCenterPointMotion(
-        target, left_or_only_arm(context.robot), movement_type=MovementType.CARTESIAN
+        target,
+        arm=left_or_only_arm(context.robot),
+        movement_type=MovementType.CARTESIAN,
     )
     execute_single(cartesian_motion, context=context)
     assert isinstance(cartesian_motion.motion_chart, CartesianPose)
@@ -157,7 +158,9 @@ def test_move_tool_center_point_motion_uses_tight_threshold(pr2_apartment_contex
     )
 
     translation_motion = MoveToolCenterPointMotion(
-        target, left_or_only_arm(context.robot), movement_type=MovementType.TRANSLATION
+        target,
+        arm=left_or_only_arm(context.robot),
+        movement_type=MovementType.TRANSLATION,
     )
     execute_single(translation_motion, context=context)
     assert (
@@ -176,7 +179,7 @@ def test_move_tcp_waypoints_motion_forwards_thresholds(pr2_apartment_context):
 
     motion = MoveTCPWaypointsMotion(
         waypoints,
-        left_or_only_arm(context.robot),
+        arm=left_or_only_arm(context.robot),
         position_threshold=0.001,
         orientation_threshold=0.05,
     )
@@ -200,7 +203,7 @@ def test_move_tcp_waypoints_motion_uses_giskard_defaults_when_unset(
     world, view, context = pr2_apartment_context
     waypoints = [Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)]
 
-    motion = MoveTCPWaypointsMotion(waypoints, left_or_only_arm(context.robot))
+    motion = MoveTCPWaypointsMotion(waypoints, arm=left_or_only_arm(context.robot))
     execute_single(motion, context=context)
 
     nodes = motion.motion_chart.nodes
@@ -226,7 +229,7 @@ def test_move_tcp_waypoints_aligned_motion_forwards_position_threshold(
     waypoints = [Point3.from_iterable([1, 1, 1])]
 
     motion = MoveTCPWaypointsAlignedMotion(
-        waypoints, left_or_only_arm(context.robot), position_threshold=0.001
+        waypoints, arm=left_or_only_arm(context.robot), position_threshold=0.001
     )
     execute_single(motion, context=context)
 
@@ -251,7 +254,9 @@ def test_move_tool_center_point_motion_without_max_velocity_returns_bare_task(
     target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
 
     motion = MoveToolCenterPointMotion(
-        target, left_or_only_arm(context.robot), movement_type=MovementType.CARTESIAN
+        target,
+        arm=left_or_only_arm(context.robot),
+        movement_type=MovementType.CARTESIAN,
     )
     execute_single(motion, context=context)
     assert isinstance(motion.motion_chart, CartesianPose)
@@ -272,7 +277,7 @@ def test_move_tool_center_point_motion_max_linear_velocity_adds_real_limit(
 
     motion = MoveToolCenterPointMotion(
         target,
-        left_or_only_arm(context.robot),
+        arm=left_or_only_arm(context.robot),
         movement_type=MovementType.CARTESIAN,
         max_linear_velocity=0.05,
     )
@@ -302,7 +307,7 @@ def test_move_tool_center_point_motion_max_angular_velocity_adds_real_limit(
 
     motion = MoveToolCenterPointMotion(
         target,
-        left_or_only_arm(context.robot),
+        arm=left_or_only_arm(context.robot),
         movement_type=MovementType.CARTESIAN,
         max_angular_velocity=0.2,
     )
@@ -327,7 +332,7 @@ def test_move_gripper_motion_finger_velocity_adds_real_limit(pr2_apartment_conte
 
     close_motion = MoveGripperMotion(
         motion=GripperState.CLOSE,
-        gripper=left_or_only_arm(context.robot).end_effector,
+        end_effector=left_or_only_arm(context.robot).end_effector,
         finger_velocity=0.03,
     )
     execute_single(close_motion, context=context)
@@ -355,7 +360,7 @@ def test_move_gripper_motion_tolerate_stall_and_finger_velocity_combine(
 
     close_motion = MoveGripperMotion(
         motion=GripperState.CLOSE,
-        gripper=left_or_only_arm(context.robot).end_effector,
+        end_effector=left_or_only_arm(context.robot).end_effector,
         tolerate_stall=True,
         finger_velocity=0.03,
     )
@@ -386,13 +391,15 @@ def test_move_gripper_motion_tolerate_stall_defaults_to_false(pr2_apartment_cont
     world, view, context = pr2_apartment_context
 
     close_motion = MoveGripperMotion(
-        motion=GripperState.CLOSE, gripper=left_or_only_arm(context.robot).end_effector
+        motion=GripperState.CLOSE,
+        end_effector=left_or_only_arm(context.robot).end_effector,
     )
     execute_single(close_motion, context=context)
     assert isinstance(close_motion.motion_chart, JointPositionList)
 
     open_motion = MoveGripperMotion(
-        motion=GripperState.OPEN, gripper=left_or_only_arm(context.robot).end_effector
+        motion=GripperState.OPEN,
+        end_effector=left_or_only_arm(context.robot).end_effector,
     )
     execute_single(open_motion, context=context)
     assert isinstance(open_motion.motion_chart, JointPositionList)
@@ -412,7 +419,7 @@ def test_move_gripper_motion_tolerate_stall_can_be_explicitly_enabled(
 
     close_motion = MoveGripperMotion(
         motion=GripperState.CLOSE,
-        gripper=left_or_only_arm(context.robot).end_effector,
+        end_effector=left_or_only_arm(context.robot).end_effector,
         tolerate_stall=True,
     )
     execute_single(close_motion, context=context)
@@ -453,7 +460,9 @@ def test_pick_up_action_close_motion_stall_tolerance_defaults_to_false(
     """
     world, view, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(milk.grasp_candidates()[0], left_or_only_arm(context.robot))
+    pick_up = PickUpAction(
+        grasp=milk.grasp_candidates()[0], arm=left_or_only_arm(context.robot)
+    )
     sequential([pick_up], context=context)
 
     assert _close_motion_of(pick_up).tolerate_stall is False
@@ -470,8 +479,8 @@ def test_pick_up_action_close_motion_tolerates_stall_when_enabled(
     world, view, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(
-        milk.grasp_candidates()[0],
-        left_or_only_arm(context.robot),
+        grasp=milk.grasp_candidates()[0],
+        arm=left_or_only_arm(context.robot),
         tolerate_grasp_stall=True,
     )
     sequential([pick_up], context=context)
@@ -488,7 +497,9 @@ def test_pick_up_action_velocity_fields_default_to_none(pr2_apartment_context):
     """
     world, view, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(milk.grasp_candidates()[0], left_or_only_arm(context.robot))
+    pick_up = PickUpAction(
+        grasp=milk.grasp_candidates()[0], arm=left_or_only_arm(context.robot)
+    )
 
     assert pick_up.pre_approach_linear_velocity is None
     assert pick_up.final_approach_linear_velocity is None
@@ -508,7 +519,8 @@ def test_place_action_velocity_fields_default_to_none(pr2_apartment_context):
     target_location = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
 
     place = PlaceAction(
-        world.get_semantic_annotations_by_type(Milk)[0], target_location
+        object_designator=world.get_semantic_annotations_by_type(Milk)[0],
+        target_location=target_location,
     )
 
     assert place.placing_linear_velocity is None
@@ -545,7 +557,7 @@ def test_move_tool_center_point_motion_frees_the_manipulator_it_reaches_with(
 
     motion = MoveToolCenterPointMotion(
         target,
-        left_or_only_arm(context.robot),
+        arm=left_or_only_arm(context.robot),
         movement_type=MovementType.CARTESIAN,
         allow_gripper_collision=True,
     )
@@ -571,7 +583,7 @@ def test_move_tool_center_point_motion_frees_what_the_manipulator_grasps_later(
 
     motion = MoveToolCenterPointMotion(
         Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root),
-        left_or_only_arm(context.robot),
+        arm=left_or_only_arm(context.robot),
         movement_type=MovementType.CARTESIAN,
         allow_gripper_collision=True,
     )
@@ -597,7 +609,9 @@ def test_move_tool_center_point_motion_keeps_the_manipulator_clear_by_default(
     target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
 
     motion = MoveToolCenterPointMotion(
-        target, left_or_only_arm(context.robot), movement_type=MovementType.CARTESIAN
+        target,
+        arm=left_or_only_arm(context.robot),
+        movement_type=MovementType.CARTESIAN,
     )
     execute_single(motion, context=context)
 
@@ -614,7 +628,7 @@ def test_move_gripper_motion_frees_the_fingers_it_closes(pr2_apartment_context):
 
     close_motion = MoveGripperMotion(
         motion=GripperState.CLOSE,
-        gripper=left_or_only_arm(context.robot).end_effector,
+        end_effector=left_or_only_arm(context.robot).end_effector,
         allow_gripper_collision=True,
     )
     execute_single(close_motion, context=context)
@@ -633,7 +647,8 @@ def test_move_gripper_motion_keeps_the_fingers_clear_by_default(pr2_apartment_co
     world, view, context = pr2_apartment_context
 
     close_motion = MoveGripperMotion(
-        motion=GripperState.CLOSE, gripper=left_or_only_arm(context.robot).end_effector
+        motion=GripperState.CLOSE,
+        end_effector=left_or_only_arm(context.robot).end_effector,
     )
     execute_single(close_motion, context=context)
 
@@ -647,8 +662,8 @@ def test_pick_up_action_closes_the_gripper_on_what_it_grasps(pr2_apartment_conte
     """
     world, view, context = pr2_apartment_context
     pick_up = PickUpAction(
-        world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
-        left_or_only_arm(context.robot),
+        grasp=world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
+        arm=left_or_only_arm(context.robot),
     )
     sequential([pick_up], context=context)
 
@@ -674,7 +689,7 @@ def test_place_action_lets_the_carried_object_touch_what_it_lands_on(
             milk.root, view.left_arm.end_effector.tool_frame
         )
 
-    place = PlaceAction(milk, target_location)
+    place = PlaceAction(object_designator=milk, target_location=target_location)
     sequential([place], context=context)
     plan = place._action_plan.plan
 
@@ -693,9 +708,7 @@ def test_place_action_lets_the_carried_object_touch_what_it_lands_on(
 def test_alternative_mapping(hsr_apartment_world):
     world, view, context = hsr_apartment_world
     context.alternative_motion_mappings = [HSRBMoveMotion]
-    move_motion = MoveMotion(
-        Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
-    )
+    move_motion = MoveMotion(target_location=Pose2D(1, 1, reference_frame=world.root))
 
     plan = execute_single(move_motion, context=context)
 
@@ -805,7 +818,7 @@ def test_stretch_base_motion_follows_the_execution_environment(
     """
     world, robot, context = stretch_apartment_context
     context.alternative_motion_mappings = [StretchMoveSim, StretchMoveReal]
-    motion = MoveMotion(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
+    motion = MoveMotion(target_location=Pose2D(1, 1, reference_frame=world.root))
     execute_single(motion, context=context)
 
     with real_robot:
@@ -901,7 +914,7 @@ def test_grasping_action_frees_the_gripper_for_its_whole_approach(
     world, view, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     grasping = GraspingAction(
-        GraspCandidate.from_body_origin(milk), left_or_only_arm(context.robot)
+        grasp=GraspCandidate.from_body_origin(milk), arm=left_or_only_arm(context.robot)
     )
     sequential([grasping], context=context)
 

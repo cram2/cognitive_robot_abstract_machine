@@ -149,7 +149,8 @@ The candidates are drawn as follows:
   cell is sampled from first.
 * The samples are shared out among the segments in proportion to their summed ratings.
 * Within a segment, cells are drawn at random, weighted by their rating, and no cell is drawn twice.
-* Every candidate is a pose in the world frame, at the position of its cell, facing the costmap's origin.
+* Every candidate is a planar pose ({class}`~semantic_digital_twin.spatial_types.spatial_types.Pose2D`) in the world
+  frame, at the position of its cell, facing the costmap's origin.
 
 The same seed always draws the same candidates from the same costmap; a seed of `None` draws different ones each time.
 

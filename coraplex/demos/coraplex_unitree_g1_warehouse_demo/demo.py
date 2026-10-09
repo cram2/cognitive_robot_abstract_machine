@@ -28,7 +28,7 @@ from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Parcel
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Scale
 
@@ -110,17 +110,16 @@ def build_world() -> World:
     return world
 
 
-def standing_pose_in_front_of(pose: Pose, world: World) -> Pose:
+def standing_pose_in_front_of(pose: Pose, world: World) -> Pose2D:
     """
     :param pose: The pose the robot should approach from its FRONT-facing side.
     :param world: The world the pose is expressed in.
     :return: The pose the robot stands in to reach that pose with a FRONT grasp.
     """
     yaw = float(pose.yaw)
-    return Pose.from_xyz_rpy(
+    return Pose2D(
         pose.x - STANDING_DISTANCE * np.cos(yaw),
         pose.y - STANDING_DISTANCE * np.sin(yaw),
-        PELVIS_HEIGHT_ABOVE_FLOOR,
         yaw=yaw,
         reference_frame=world.root,
     )
@@ -156,15 +155,21 @@ def build_plan(
     return sequential(
         [
             ParkArmsAction(robot.all_arms),
-            NavigateAction(standing_pose_in_front_of(source, world)),
-            PickUpAction(GraspCandidate.from_body_origin(parcel), robot.torso.left_arm),
+            NavigateAction(target_location=standing_pose_in_front_of(source, world)),
+            PickUpAction(
+                grasp=GraspCandidate.from_body_origin(parcel), arm=robot.torso.left_arm
+            ),
             ParkArmsAction(robot.all_arms),
             straighten_torso(robot),
-            NavigateAction(Pose.from_xyz_rpy(yaw=turn, reference_frame=robot.root)),
-            NavigateAction(standing_pose_in_front_of(destination, world)),
+            NavigateAction(
+                target_location=Pose2D(yaw=turn, reference_frame=robot.root)
+            ),
+            NavigateAction(
+                target_location=standing_pose_in_front_of(destination, world)
+            ),
             PlaceAction(
-                parcel,
-                Pose(
+                object_designator=parcel,
+                target_location=Pose(
                     destination.position,
                     destination.quaternion,
                     reference_frame=world.root,

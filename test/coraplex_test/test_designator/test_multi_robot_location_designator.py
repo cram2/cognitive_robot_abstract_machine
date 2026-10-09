@@ -16,7 +16,7 @@ from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveS
 from coraplex.datastructures.dataclasses import Context
 
 from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
@@ -158,7 +158,7 @@ def multiple_robot_simple_apartment_context(
     snapshot.restore()
 
 
-def _floor_distance(pose: Pose, body) -> float:
+def _floor_distance(pose: Pose2D, body) -> float:
     """
     :return: How far `pose` stands from `body` along the floor.
     """
@@ -166,7 +166,7 @@ def _floor_distance(pose: Pose, body) -> float:
     return float(np.linalg.norm(offset))
 
 
-def _assert_faces(pose: Pose, body) -> None:
+def _assert_faces(pose: Pose2D, body) -> None:
     """
     Assert that a robot standing at `pose` has `body` straight ahead.
     """
@@ -181,7 +181,10 @@ def test_new_reachability_location_body(
     world, robot, context = multiple_robot_simple_apartment_context
 
     plan = sequential(
-        [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
+        [
+            ParkArmsAction(context.robot.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+        ],
         context,
     )
     with simulated_robot:
@@ -206,7 +209,10 @@ def test_visibility_location_pose(multiple_robot_simple_apartment_context):
     world, robot, context = multiple_robot_simple_apartment_context
 
     plan = sequential(
-        [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
+        [
+            ParkArmsAction(context.robot.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+        ],
         context,
     )
     with simulated_robot:
@@ -228,7 +234,10 @@ def test_visibility_location_body(multiple_robot_simple_apartment_context):
     world, robot, context = multiple_robot_simple_apartment_context
 
     plan = sequential(
-        [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
+        [
+            ParkArmsAction(context.robot.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+        ],
         context,
     )
     with simulated_robot:

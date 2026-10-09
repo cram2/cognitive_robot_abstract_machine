@@ -287,7 +287,7 @@ def test_a_robot_keeps_moving_while_it_holds_a_body(_tiago_world_setup, holds_a_
             )
             world.add_connection(FixedConnection(parent=tool_frame, child=held_body))
     plan = execute_single(
-        MoveTorsoAction(TorsoState.HIGH), context=Context(world, tiago)
+        MoveTorsoAction(torso_state=TorsoState.HIGH), context=Context(world, tiago)
     )
 
     with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
