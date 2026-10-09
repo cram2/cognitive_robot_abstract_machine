@@ -32,7 +32,10 @@ import numpy as np
 from krrood.entity_query_language.factories import entity, variable, in_, the
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Slider, Dresser
+from semantic_digital_twin.specifications.connections import (
+    PrismaticConnectionSpecification,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale, Box, Color
@@ -50,6 +53,9 @@ with world.modify_world():
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
+        parent_connection_specification=PrismaticConnectionSpecification(
+            axis=Vector3.X()
+        ),
     )
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
@@ -57,16 +63,6 @@ with world.modify_world():
         world=world,
     )
     drawer.add(handle)
-
-    slider = Slider.create_with_new_body_in_world(
-        name="drawer_slider",
-        world_root_T_self=HomogeneousTransformationMatrix(),
-        world=world,
-        parent_connection_specification=Slider.parent_connection_specification(
-            axis=Vector3.X()
-        ),
-    )
-    drawer.add(slider)
 
     dresser = Dresser.create_with_new_body_in_world(
         name="dresser",
@@ -94,7 +90,7 @@ drawer = the(
 We can update the drawer's state by altering the free variables position of its prismatic connection to the dresser.
 
 ```{code-cell} ipython3
-drawer.root.parent_connection.position = 0.1
+drawer.movable_joint.position = 0.1
 rt = RayTracer(world)
 rt.update_scene()
 rt.scene.show("jupyter")

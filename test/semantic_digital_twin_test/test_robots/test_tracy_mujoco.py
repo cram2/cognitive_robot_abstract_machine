@@ -13,7 +13,7 @@ from ...pytest_environment import runs_in_continuous_integration
 
 from semantic_digital_twin.adapters.multi_sim import MujocoBuilder, MujocoSim
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.api import RobotSpecification
+from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy, TracyJoint

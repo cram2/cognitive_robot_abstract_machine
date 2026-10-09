@@ -7,11 +7,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
-from semantic_digital_twin.api import BodySpecification
+from semantic_digital_twin.specifications.connections import (
+    RevoluteConnectionSpecification,
+)
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Handle,
-    Hinge,
     Shelf,
     ShelfLayer,
     SideTable,
@@ -20,27 +24,25 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wardrobe,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import Scale
 
-WARDROBE_DOOR_VELOCITY_LIMIT = np.pi / 2
-"""
-Angular velocity limit of a wardrobe door in rad/s.
-
-Taken from the ``wardrobe_door_*_joint`` limits of the apartment's own URDF, which
-describes the same wardrobe this map spawns from meshes.
-"""
-
-
 @dataclass
 class ApartmentEnvironment:
     """
     The furniture of the apartment: a shelf, a wall, a bedside table, a sofa, the
     apartment's wall meshes and a two-leaf wardrobe.
+    """
+
+    wardrobe_door_velocity_limit: float = np.pi / 2
+    """
+    Angular velocity limit of a wardrobe door in rad/s.
+
+    Taken from the ``wardrobe_door_*_joint`` limits of the apartment's own URDF, which
+    describes the same wardrobe this map spawns from meshes.
     """
 
     def get_world(self) -> World:
@@ -202,6 +204,14 @@ class ApartmentEnvironment:
                         -0.3246, door_y
                     ),
                 ),
+                parent_connection_specification=RevoluteConnectionSpecification(
+                    axis=Vector3.Z(),
+                    dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                        lower_position=min(0.0, opening_angle),
+                        upper_position=max(0.0, opening_angle),
+                        maximum_speed=self.wardrobe_door_velocity_limit,
+                    ),
+                ),
                 part_specifications={
                     "handle": Handle.get_annotation_specification(
                         f"wardrobe_door_handle_{side}",
@@ -210,23 +220,6 @@ class ApartmentEnvironment:
                             self.mesh_path("wardrobe_door_handle.dae"),
                             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 -0.032089, handle_y, 0.973703
-                            ),
-                        ),
-                    ),
-                    "mechanical_joint": Hinge.get_annotation_specification(
-                        f"wardrobe_hinge_{side}",
-                        Hinge.get_default_root_kinematic_structure_entity_specification(),
-                        parent_connection_specification=Hinge.parent_connection_specification(
-                            axis=Vector3.Z(),
-                            dof_limits=DegreeOfFreedomLimits(
-                                lower=DerivativeMap[float](
-                                    position=min(0.0, opening_angle),
-                                    velocity=-WARDROBE_DOOR_VELOCITY_LIMIT,
-                                ),
-                                upper=DerivativeMap[float](
-                                    position=max(0.0, opening_angle),
-                                    velocity=WARDROBE_DOOR_VELOCITY_LIMIT,
-                                ),
                             ),
                         ),
                     ),

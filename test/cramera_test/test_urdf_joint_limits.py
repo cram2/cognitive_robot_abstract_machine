@@ -12,7 +12,6 @@ from urdf_parser_py.urdf import URDF
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
@@ -38,9 +37,8 @@ def joint_world() -> World:
     child = Body(name=PrefixedName("child"))
     degree = DegreeOfFreedom(
         name=PrefixedName("slider"),
-        limits=DegreeOfFreedomLimits(
-            lower=DerivativeMap(position=-0.5, velocity=-0.2),
-            upper=DerivativeMap(position=1.5, velocity=0.2),
+        limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=-0.5, upper_position=1.5, maximum_speed=0.2
         ),
     )
     with world.modify_world():

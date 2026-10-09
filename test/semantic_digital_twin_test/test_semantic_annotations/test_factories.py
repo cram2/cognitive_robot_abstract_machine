@@ -10,13 +10,13 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     CannotBeAPartOf,
     AmbiguousPart,
-    MechanicalJointAlreadyMounted,
     UnknownPartWholeRelationshipField,
 )
 from semantic_digital_twin.exceptions import (
     InvalidPlaneDimensions,
     InvalidHingeActiveAxis,
     InvalidConnectionLimits,
+    MissingMovableJointError,
     MissingSemanticAnnotationError,
     MismatchingWorld,
 )
@@ -35,6 +35,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoubleDoor,
     Elevator,
     Floor,
+    GroundFloor,
     Cup,
     Cabinet,
 )
@@ -43,13 +44,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Drawer,
     Wall,
-    Hinge,
     Fridge,
-    Slider,
-    ScrewMechanism,
     BottleCap,
+    DoorWithType,
     Aperture,
-    MechanicalJoint,
     Table,
     Milk,
     Cereal,
@@ -63,7 +61,6 @@ from semantic_digital_twin.spatial_types import (
     Point3,
 )
 from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -86,10 +83,13 @@ from semantic_digital_twin.world_description.shape_collection import (
     ShapeCollection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.api import (
-    SemanticAnnotationWithRootSpecification,
+from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
     RevoluteConnectionSpecification,
+    ScrewConnectionSpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
 )
 
 
@@ -117,38 +117,31 @@ class TestFactories(unittest.TestCase):
             world.root, queried_handle.root.parent_kinematic_structure_entity
         )
 
-    def test_basic_has_body_factory(self):
+    def test_active_has_body_factory(self):
         world = World.create_with_root_body("root")
         with world.modify_world():
-            returned_hinge = Hinge.create_with_new_body_in_world(
-                name="hinge",
+            returned_door = Door.create_with_new_body_in_world(
+                name="door",
                 world=world,
-                parent_connection_specification=Hinge.parent_connection_specification(
+                parent_connection_specification=RevoluteConnectionSpecification(
                     axis=Vector3.Z()
                 ),
             )
-            returned_slider = Slider.create_with_new_body_in_world(
-                name="slider",
+            returned_drawer = Drawer.create_with_new_body_in_world(
+                name="drawer",
                 world=world,
-                parent_connection_specification=Slider.parent_connection_specification(
+                parent_connection_specification=PrismaticConnectionSpecification(
                     axis=Vector3.X()
                 ),
             )
-        semantic_hinge_annotations = world.get_semantic_annotations_by_type(Hinge)
-        self.assertEqual(len(semantic_hinge_annotations), 1)
-
-        queried_hinge: Hinge = semantic_hinge_annotations[0]
-        self.assertEqual(returned_hinge, queried_hinge)
-        self.assertEqual(
-            world.root, queried_hinge.root.parent_kinematic_structure_entity
-        )
-        semantic_slider_annotations = world.get_semantic_annotations_by_type(Slider)
-        self.assertEqual(len(semantic_slider_annotations), 1)
-        queried_slider: Slider = semantic_slider_annotations[0]
-        self.assertEqual(returned_slider, queried_slider)
-        self.assertEqual(
-            world.root, queried_slider.root.parent_kinematic_structure_entity
-        )
+        [queried_door] = world.get_semantic_annotations_by_type(Door)
+        self.assertEqual(returned_door, queried_door)
+        self.assertEqual(world.root, queried_door.movable_joint.parent)
+        self.assertIsInstance(queried_door.movable_joint, RevoluteConnection)
+        [queried_drawer] = world.get_semantic_annotations_by_type(Drawer)
+        self.assertEqual(returned_drawer, queried_drawer)
+        self.assertEqual(world.root, queried_drawer.movable_joint.parent)
+        self.assertIsInstance(queried_drawer.movable_joint, PrismaticConnection)
 
     def test_door_factory(self):
         world = World.create_with_root_body("root")
@@ -170,6 +163,15 @@ class TestFactories(unittest.TestCase):
             world.root, queried_door.root.parent_kinematic_structure_entity
         )
 
+    def test_door_fixed_to_its_parent_has_no_joint(self):
+        world = World.create_with_root_body("root")
+        with world.modify_world():
+            door = Door.create_with_new_body_in_world(
+                name="door", scale=Scale(0.03, 1, 2), world=world
+            )
+        assert isinstance(door.root.parent_connection, FixedConnection)
+        assert door.movable_joint is None
+
     def test_door_factory_invalid(self):
         world = World.create_with_root_body("root")
         with world.modify_world():
@@ -187,79 +189,40 @@ class TestFactories(unittest.TestCase):
                     world=world,
                 )
 
-    def test_has_hinge_factory(self):
+    def test_door_on_hinge_factory(self):
         world = World.create_with_root_body("root")
-        root = world.root
         with world.modify_world():
             door = Door.create_with_new_body_in_world(
-                name="door", scale=Scale(0.03, 1, 2), world=world
-            )
-            hinge = Hinge.create_with_new_body_in_world(
-                name="hinge",
+                name="door",
+                scale=Scale(0.03, 1, 2),
                 world=world,
-                parent_connection_specification=Hinge.parent_connection_specification(
+                parent_connection_specification=RevoluteConnectionSpecification(
                     axis=Vector3.Z()
                 ),
             )
-        assert len(world.kinematic_structure_entities) == 4
-        assert isinstance(hinge.root.parent_connection, RevoluteConnection)
-        assert root == hinge.root.parent_kinematic_structure_entity
-        assert root == door.root.parent_kinematic_structure_entity
-        with world.modify_world():
-            door.add(hinge)
-        assert isinstance(hinge.root.parent_connection, RevoluteConnection)
-        assert door.root.parent_kinematic_structure_entity == hinge.root
-        assert door.mechanical_joint == hinge
+        assert set(world.kinematic_structure_entities) == {
+            world.root,
+            door.root,
+            door.entry_way.root,
+        }
+        assert isinstance(door.movable_joint, RevoluteConnection)
+        assert door.movable_joint.parent == world.root
 
-    def test_screw_joint_factory(self):
-        world = World()
-        root = Body(name=PrefixedName("root"))
+    def test_bottle_cap_on_screw_factory(self):
+        world = World.create_with_root_body("root")
         screw_pitch = 0.005
-        with world.modify_world():
-            world.add_body(root)
-        with world.modify_world():
-            screw_joint = ScrewMechanism.create_with_new_body_in_world(
-                name="screw_joint",
-                world=world,
-                parent_connection_specification=ScrewMechanism.parent_connection_specification(
-                    axis=Vector3.Z(), screw_pitch=screw_pitch
-                ),
-            )
-        connection = screw_joint.root.parent_connection
-        assert isinstance(connection, ScrewConnection)
-        assert connection.screw_pitch == screw_pitch
-        assert screw_joint.screw_pitch == screw_pitch
-        assert root == screw_joint.root.parent_kinematic_structure_entity
-
-    def test_bottle_cap_mount_screw_joint(self):
-        world = World()
-        root = Body(name=PrefixedName("root"))
-        screw_pitch = 0.005
-        with world.modify_world():
-            world.add_body(root)
         with world.modify_world():
             bottle_cap = BottleCap.create_with_new_body_in_world(
                 name="bottle_cap",
                 world=world,
                 scale=Scale(0.03, 0.03, 0.02),
-            )
-            screw_joint = ScrewMechanism.create_with_new_body_in_world(
-                name="screw_joint",
-                world=world,
-                parent_connection_specification=ScrewMechanism.parent_connection_specification(
+                parent_connection_specification=ScrewConnectionSpecification(
                     axis=Vector3.Z(), screw_pitch=screw_pitch
                 ),
             )
-        with world.modify_world():
-            bottle_cap.add(screw_joint)
-
-        connection = screw_joint.root.parent_connection
-        assert isinstance(connection, ScrewConnection)
-        # The mount re-parents the joint; the screw pitch must survive the connection copy.
-        assert connection.screw_pitch == screw_pitch
-        assert bottle_cap.root.parent_kinematic_structure_entity == screw_joint.root
-        assert isinstance(bottle_cap.root.parent_connection, FixedConnection)
-        assert bottle_cap.mechanical_joint == screw_joint
+        assert isinstance(bottle_cap.movable_joint, ScrewConnection)
+        assert bottle_cap.movable_joint.screw_pitch == screw_pitch
+        assert bottle_cap.movable_joint.parent == world.root
 
     def test_has_handle_factory(self):
         world = World.create_with_root_body("root")
@@ -324,28 +287,20 @@ class TestFactories(unittest.TestCase):
         assert drawer.hole_direction.reference_frame is drawer.root
         np.testing.assert_allclose(drawer.hole_direction.to_np()[:3], [0, 0, 1])
 
-    def test_has_slider_factory(self):
+    def test_drawer_on_rails_factory(self):
         world = World.create_with_root_body("root")
         with world.modify_world():
             drawer = Drawer.create_with_new_body_in_world(
                 name="drawer",
                 scale=Scale(0.2, 0.3, 0.2),
                 world=world,
-            )
-            slider = Slider.create_with_new_body_in_world(
-                name="slider",
-                world=world,
-                parent_connection_specification=Slider.parent_connection_specification(
+                parent_connection_specification=PrismaticConnectionSpecification(
                     axis=Vector3.X()
                 ),
             )
-        assert len(world.kinematic_structure_entities) == 3
-        with world.modify_world():
-            drawer.add(slider)
-
-        assert drawer.root.parent_kinematic_structure_entity == slider.root
-        assert isinstance(slider.root.parent_connection, PrismaticConnection)
-        assert drawer.mechanical_joint == slider
+        assert set(world.kinematic_structure_entities) == {world.root, drawer.root}
+        assert isinstance(drawer.movable_joint, PrismaticConnection)
+        assert drawer.movable_joint.parent == world.root
 
     def test_has_drawer_factory(self):
         world = World.create_with_root_body("root")
@@ -468,12 +423,12 @@ class TestFactories(unittest.TestCase):
             )
         return world, door
 
-    def test_calculate_world_T_hinge_no_handle(self):
+    def test_door_movable_joint_needs_a_handle(self):
         world, door = self._setup_door()
         with self.assertRaises(MissingSemanticAnnotationError):
-            door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
+            door.calculate_self_T_movable_joint(Vector3.Z())
 
-    def test_calculate_world_T_hinge_vertical(self):
+    def test_door_movable_joint_is_on_the_vertical_edge_opposite_the_handle(self):
         world, door = self._setup_door()
         # Add handle at y=0.4 (right side of door center)
         with world.modify_world():
@@ -486,12 +441,11 @@ class TestFactories(unittest.TestCase):
 
         # Test Z-axis rotation (vertical hinge)
         # handle is at y=0.4, door width is 1.0. Hinge should be at opposite side: y=-0.5
-        world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
-        expected_T_hinge = (
-            door.root.global_transform
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.5)
+        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Z())
+        np.testing.assert_allclose(
+            door_T_hinge.to_np(),
+            HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.5).to_np(),
         )
-        self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
         world, door = self._setup_door()
         # Add handle at y=-0.4 (left side of door center)
@@ -503,14 +457,69 @@ class TestFactories(unittest.TestCase):
             )
             door.add(handle)
 
-        world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
-        expected_T_hinge = (
-            door.root.global_transform
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Z())
+        np.testing.assert_allclose(
+            door_T_hinge.to_np(),
+            HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5).to_np(),
         )
-        self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
-    def test_calculate_world_T_hinge_horizontal(self):
+    def test_door_movable_joint_is_on_the_same_edge_for_an_axis_of_either_sign(self):
+        world, door = self._setup_door()
+        with world.modify_world():
+            handle = Handle.create_with_new_body_in_world(
+                name="handle",
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.4),
+            )
+            door.add(handle)
+
+        np.testing.assert_allclose(
+            door.calculate_self_T_movable_joint(Vector3.NEGATIVE_Z()).to_np(),
+            door.calculate_self_T_movable_joint(Vector3.Z()).to_np(),
+        )
+
+    def test_door_mounts_on_a_hinge_opposite_its_handle(self):
+        world, door = self._setup_door()
+        with world.modify_world():
+            handle = Handle.create_with_new_body_in_world(
+                name="handle",
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.4),
+            )
+            door.add(handle)
+        world_T_door = door.root.global_transform
+        world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(Vector3.Z())
+        limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=0.0, upper_position=np.pi / 2
+        )
+
+        specification = RevoluteConnectionSpecification(
+            axis=Vector3.Z(), dof_limits=limits
+        )
+
+        joint = door.mount_on_movable_joint(specification)
+
+        assert joint is door.movable_joint
+        assert isinstance(joint, RevoluteConnection)
+        assert joint.dof.limits.upper.position == limits.upper.position
+        assert specification.connection_T_child is None
+        np.testing.assert_allclose(
+            door.root.global_transform.to_np(), world_T_door.to_np(), atol=1e-12
+        )
+        joint.position = np.pi / 2
+        world.notify_state_change()
+        np.testing.assert_allclose(
+            door.root.global_transform.to_np(),
+            (
+                world_T_hinge
+                @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 2)
+                @ world_T_hinge.inverse()
+                @ world_T_door
+            ).to_np(),
+            atol=1e-12,
+        )
+
+    def test_door_movable_joint_is_on_the_horizontal_edge_opposite_the_handle(self):
         world, door = self._setup_door()
         # Add handle
         with world.modify_world():
@@ -525,12 +534,11 @@ class TestFactories(unittest.TestCase):
 
         # Test Y-axis rotation (horizontal hinge)
         # handle z=0. Hinge should be at z=1.0 (opposite of default sign 1 if z=0)
-        world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Y())
-        expected_T_hinge = (
-            door.root.global_transform
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0)
+        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Y())
+        np.testing.assert_allclose(
+            door_T_hinge.to_np(),
+            HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0).to_np(),
         )
-        self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
         world, door = self._setup_door()
         # Add handle
@@ -548,14 +556,13 @@ class TestFactories(unittest.TestCase):
         handle.root.parent_connection.parent_T_connection_expression = (
             HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5)
         )
-        world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Y())
-        expected_T_hinge = (
-            door.root.global_transform
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(z=-1.0)
+        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Y())
+        np.testing.assert_allclose(
+            door_T_hinge.to_np(),
+            HomogeneousTransformationMatrix.from_xyz_rpy(z=-1.0).to_np(),
         )
-        self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
-    def test_calculate_world_T_hinge_invalid_axis(self):
+    def test_door_movable_joint_rejects_an_axis_off_the_door_plane(self):
         world, door = self._setup_door()
         with world.modify_world():
             handle = Handle.create_with_new_body_in_world(
@@ -564,7 +571,7 @@ class TestFactories(unittest.TestCase):
             )
             door.add(handle)
         with self.assertRaises(InvalidHingeActiveAxis):
-            door.calculate_world_T_hinge_based_on_handle(Vector3(1, 1, 0))
+            door.calculate_self_T_movable_joint(Vector3(1, 1, 0))
 
     def test_calculate_supporting_surface(self):
         world = World.create_with_root_body("root")
@@ -900,19 +907,17 @@ class TestFactories(unittest.TestCase):
     def test_create_with_connection_limits(self):
         world = World()
         root = Body(name=PrefixedName("root"))
-        lower = DerivativeMap[float]()
-        lower.position = -0.5
-        upper = DerivativeMap[float]()
-        upper.position = 0.5
-        limits = DegreeOfFreedomLimits(lower=lower, upper=upper)
+        limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=-0.5, upper_position=0.5
+        )
 
         with world.modify_world():
             world.add_body(root)
         with world.modify_world():
-            Hinge.create_with_new_body_in_world(
-                name="hinge",
+            Door.create_with_new_body_in_world(
+                name="door",
                 world=world,
-                parent_connection_specification=Hinge.parent_connection_specification(
+                parent_connection_specification=RevoluteConnectionSpecification(
                     dof_limits=limits, axis=Vector3.Z()
                 ),
             )
@@ -923,17 +928,15 @@ class TestFactories(unittest.TestCase):
 
     def test_create_with_invalid_connection_limits(self):
         world = World.create_with_root_body("root")
-        lower = DerivativeMap[float]()
-        lower.position = 0.5
-        upper = DerivativeMap[float]()
-        upper.position = -0.5
-        limits = DegreeOfFreedomLimits(lower=lower, upper=upper)
+        limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=0.5, upper_position=-0.5
+        )
 
         with self.assertRaises(InvalidConnectionLimits), world.modify_world():
-            Hinge.create_with_new_body_in_world(
-                name="hinge",
+            Door.create_with_new_body_in_world(
+                name="door",
                 world=world,
-                parent_connection_specification=Hinge.parent_connection_specification(
+                parent_connection_specification=RevoluteConnectionSpecification(
                     dof_limits=limits, axis=Vector3.Z()
                 ),
             )
@@ -1185,14 +1188,15 @@ class _AnnotationWithOverlappingPartWholeRelationshipFields(
 ):
     """
     Throwaway whole whose two part-whole relationship fields have overlapping element
-    types (``Hinge`` is a subclass of ``MechanicalJoint``), so a ``Hinge`` matches both.
+    types (``DoorWithType`` is a subclass of ``Door``), so a ``DoorWithType`` matches
+    both.
     """
 
-    joint: Optional[MechanicalJoint] = field(
+    door: Optional[Door] = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
-    specific_joint: Optional[Hinge] = field(
+    typed_door: Optional[DoorWithType] = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
@@ -1217,52 +1221,6 @@ def test_add_routes_handle_as_child():
 
     assert door.handle == handle
     assert door.root == handle.root.parent_kinematic_structure_entity
-
-
-def test_add_routes_hinge_by_reparenting_self():
-    """
-    Add(hinge) re-parents the door under the hinge (Hinge._mount_strategy).
-    """
-    world = _world_with_root()
-    with world.modify_world():
-        door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
-        )
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
-        )
-        door.add(hinge)
-
-    assert door.mechanical_joint == hinge
-    assert door.root.parent_kinematic_structure_entity == hinge.root
-    assert isinstance(hinge.root.parent_connection, RevoluteConnection)
-
-
-def test_add_routes_slider_by_reparenting_self():
-    """
-    Add(slider) re-parents the drawer under the slider (Slider._mount_strategy).
-    """
-    world = _world_with_root()
-    with world.modify_world():
-        drawer = Drawer.create_with_new_body_in_world(
-            name="drawer", scale=Scale(0.2, 0.3, 0.2), world=world
-        )
-        slider = Slider.create_with_new_body_in_world(
-            name="slider",
-            world=world,
-            parent_connection_specification=Slider.parent_connection_specification(
-                axis=Vector3.X()
-            ),
-        )
-        drawer.add(slider)
-
-    assert drawer.mechanical_joint == slider
-    assert drawer.root.parent_kinematic_structure_entity == slider.root
-    assert isinstance(slider.root.parent_connection, PrismaticConnection)
 
 
 def test_add_routes_plural_drawer_and_door():
@@ -1364,7 +1322,7 @@ def test_add_rejects_unsupported_part_type():
             name="door", scale=Scale(0.03, 1, 2), world=world
         )
         drawer = Drawer.create_with_new_body_in_world(name="drawer", world=world)
-        # A Door has handle/hinge part-whole relationship fields but no drawer field.
+        # A Door has handle/entry way part-whole relationship fields but no drawer field.
         with pytest.raises(CannotBeAPartOf):
             door.add(drawer)
 
@@ -1379,16 +1337,12 @@ def test_add_raises_on_ambiguous_part():
         whole = _AnnotationWithOverlappingPartWholeRelationshipFields.create_with_new_body_in_world(
             name="whole", world=world
         )
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
+        typed_door = DoorWithType.create_with_new_body_in_world(
+            name="typed_door", scale=Scale(0.03, 1, 2), world=world
         )
-        # A Hinge is both a MechanicalJoint (joint field) and a Hinge (specific_joint field).
+        # A DoorWithType is both a Door (door field) and a DoorWithType (typed_door field).
         with pytest.raises(AmbiguousPart):
-            whole.add(hinge)
+            whole.add(typed_door)
 
 
 def test_add_field_name_resolves_ambiguity_to_base_field():
@@ -1401,16 +1355,12 @@ def test_add_field_name_resolves_ambiguity_to_base_field():
         whole = _AnnotationWithOverlappingPartWholeRelationshipFields.create_with_new_body_in_world(
             name="whole", world=world
         )
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
+        typed_door = DoorWithType.create_with_new_body_in_world(
+            name="typed_door", scale=Scale(0.03, 1, 2), world=world
         )
-        whole.add(hinge, field_name="joint")
-    assert whole.joint is hinge
-    assert whole.specific_joint is None
+        whole.add(typed_door, field_name="door")
+    assert whole.door is typed_door
+    assert whole.typed_door is None
 
 
 def test_add_field_name_resolves_ambiguity_to_specific_field():
@@ -1422,16 +1372,12 @@ def test_add_field_name_resolves_ambiguity_to_specific_field():
         whole = _AnnotationWithOverlappingPartWholeRelationshipFields.create_with_new_body_in_world(
             name="whole", world=world
         )
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
+        typed_door = DoorWithType.create_with_new_body_in_world(
+            name="typed_door", scale=Scale(0.03, 1, 2), world=world
         )
-        whole.add(hinge, field_name="specific_joint")
-    assert whole.specific_joint is hinge
-    assert whole.joint is None
+        whole.add(typed_door, field_name="typed_door")
+    assert whole.typed_door is typed_door
+    assert whole.door is None
 
 
 def test_add_unknown_field_name_raises():
@@ -1443,15 +1389,11 @@ def test_add_unknown_field_name_raises():
         whole = _AnnotationWithOverlappingPartWholeRelationshipFields.create_with_new_body_in_world(
             name="whole", world=world
         )
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
+        typed_door = DoorWithType.create_with_new_body_in_world(
+            name="typed_door", scale=Scale(0.03, 1, 2), world=world
         )
         with pytest.raises(UnknownPartWholeRelationshipField):
-            whole.add(hinge, field_name="not_a_field")
+            whole.add(typed_door, field_name="not_a_field")
 
 
 def test_add_field_name_with_mismatching_type_raises():
@@ -1464,9 +1406,9 @@ def test_add_field_name_with_mismatching_type_raises():
             name="door", scale=Scale(0.03, 1, 2), world=world
         )
         handle = Handle.create_with_new_body_in_world(name="handle", world=world)
-        # 'mechanical_joint' is a real part-whole field of Door, but a Handle is not a MechanicalJoint.
+        # 'entry_way' is a real part-whole field of Door, but a Handle is not an EntryWay.
         with pytest.raises(CannotBeAPartOf):
-            door.add(handle, field_name="mechanical_joint")
+            door.add(handle, field_name="entry_way")
 
 
 def test_containment_only_annotation_has_no_add():
@@ -1478,308 +1420,94 @@ def test_containment_only_annotation_has_no_add():
     assert hasattr(Table, "add_object")
 
 
-def test_mechanical_joint_mount_splices_under_whole_parent():
-    """
-    When the whole already sits under a non-root parent, mounting a mechanical joint
-    splices the joint between the whole and that parent (parent -> joint -> whole): the
-    whole's ancestry is preserved and the joint keeps its active (revolute) connection,
-    now anchored at the whole's parent.
-    """
+# %% movable joints
+# A part that moves relative to its whole says where its joint sits, so it can be mounted
+# on one, and refuses to be moved while nothing moves it.
+
+
+@pytest.mark.parametrize(
+    "annotation_type, scale",
+    [
+        (Drawer, Scale(0.4, 0.5, 0.6)),
+        (Elevator, Scale(2, 2, 2)),
+        (BottleCap, Scale(0.02, 0.04, 0.04)),
+    ],
+)
+def test_movable_joint_of_a_part_that_slides_or_screws_sits_at_its_origin(
+    annotation_type, scale
+):
     world = _world_with_root()
     with world.modify_world():
-        fridge = Fridge.create_with_new_body_in_world(
-            name="fridge", world=world, scale=Scale(1, 1, 2.0)
+        part = annotation_type.create_with_new_body_in_world(
+            name="part", world=world, scale=scale
+        )
+
+    np.testing.assert_allclose(
+        part.calculate_self_T_movable_joint(Vector3.X()).to_np(),
+        HomogeneousTransformationMatrix().to_np(),
+    )
+
+
+def test_drawer_mounts_on_its_movable_joint_where_it_stands():
+    world = _world_with_root()
+    with world.modify_world():
+        drawer = Drawer.create_with_new_body_in_world(
+            name="drawer",
+            world=world,
+            scale=Scale(0.4, 0.5, 0.6),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=1, yaw=0.3
+            ),
+        )
+    world_T_drawer = drawer.root.global_transform
+
+    joint = drawer.mount_on_movable_joint(
+        PrismaticConnectionSpecification(axis=Vector3.X())
+    )
+
+    assert joint is drawer.movable_joint
+    assert isinstance(joint, PrismaticConnection)
+    np.testing.assert_allclose(
+        drawer.root.global_transform.to_np(), world_T_drawer.to_np(), atol=1e-12
+    )
+
+
+def test_drawer_without_a_movable_joint_has_no_opening_ratio():
+    world = _world_with_root()
+    with world.modify_world():
+        drawer = Drawer.create_with_new_body_in_world(
+            name="drawer", world=world, scale=Scale(0.4, 0.5, 0.6)
+        )
+
+    with pytest.raises(MissingMovableJointError):
+        drawer.opening_ratio
+
+
+@pytest.mark.parametrize("operate_doors", [Elevator.open, Elevator.close])
+def test_elevator_doors_without_a_movable_joint_cannot_be_operated(operate_doors):
+    world = _world_with_root()
+    with world.modify_world():
+        elevator = Elevator.create_with_new_body_in_world(
+            name="elevator", world=world, scale=Scale(2, 2, 2)
         )
         door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
+            name="door", world=world, scale=Scale(0.05, 1, 2)
         )
-        # Place the door inside the fridge first, so its parent is the fridge (not the world root).
-        fridge.add(door)
-        assert door.root.parent_kinematic_structure_entity == fridge.root
+        elevator.add(door)
 
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
-        )
-        door.add(hinge)
-
-    # Spliced topology: fridge -> hinge -> door.
-    assert door.root.parent_kinematic_structure_entity == hinge.root
-    assert hinge.root.parent_kinematic_structure_entity == fridge.root
-    # The joint kept its active connection (it was not collapsed to a FixedConnection).
-    assert isinstance(hinge.root.parent_connection, RevoluteConnection)
-
-    # The fridge is still upstream of the door (its parent was not dropped).
-    ancestors = []
-    entity = door.root.parent_kinematic_structure_entity
-    while entity is not None and entity != world.root:
-        ancestors.append(entity)
-        entity = entity.parent_kinematic_structure_entity
-    assert fridge.root in ancestors
+    with pytest.raises(MissingMovableJointError):
+        operate_doors(elevator)
 
 
-def test_mechanical_joint_mount_reuses_existing_direct_active_connection():
-    """
-    When the whole is already wired straight to its parent with the same connection
-    type the joint provides (e.g. a URDF door hinged directly to its cabinet, with no
-    hinge body in between), mounting the joint discards that now-redundant connection
-    instead of stacking a second active one: the joint's own active connection is
-    anchored between the parent and the joint, the whole is attached to the joint
-    with a fixed connection, and the world reclaims the discarded connection's degree
-    of freedom instead of leaving it orphaned.
-    """
+def test_elevator_without_a_movable_joint_cannot_drive():
     world = _world_with_root()
     with world.modify_world():
-        fridge = Fridge.create_with_new_body_in_world(
-            name="fridge", world=world, scale=Scale(1, 1, 2.0)
+        elevator = Elevator.create_with_new_body_in_world(
+            name="elevator", world=world, scale=Scale(2, 2, 2)
         )
-        door = Door.get_annotation_specification(
-            "door",
-            Door.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(0.03, 1, 2)
-            ),
-            parent_connection_specification=RevoluteConnectionSpecification(
-                axis=Vector3.Z()
-            ),
-        ).spawn(world, parent=fridge.root)
-        assert isinstance(door.root.parent_connection, RevoluteConnection)
-        discarded_dof = door.root.parent_connection.raw_dof
-
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
+        ground_floor = GroundFloor.create_with_new_region_in_world(
+            name="ground_floor", world=world, scale=Scale(4, 4, 0.1)
         )
-        door.add(hinge)
 
-    # Spliced topology: fridge -> hinge -> door, with a single active connection.
-    assert door.mechanical_joint == hinge
-    assert door.root.parent_kinematic_structure_entity == hinge.root
-    assert hinge.root.parent_kinematic_structure_entity == fridge.root
-    assert isinstance(hinge.root.parent_connection, RevoluteConnection)
-    assert isinstance(door.root.parent_connection, FixedConnection)
-    # The world reclaims the discarded connection's degree of freedom on its own.
-    assert discarded_dof not in world.degrees_of_freedom
-    assert world.validate()
-
-
-def test_door_create_default_mechanical_joint_inserts_hinge_for_bare_revolute_connection():
-    """
-    A door hinged straight to its parent (no hinge body in between, as with a URDF door)
-    gets a Hinge inserted by ``create_default_mechanical_joint()``, carrying over the
-    original connection's axis, multiplier, offset and limits.
-    """
-    world = _world_with_root()
-    lower = DerivativeMap[float]()
-    lower.position = -1.0
-    upper = DerivativeMap[float]()
-    upper.position = 1.0
-    limits = DegreeOfFreedomLimits(lower=lower, upper=upper)
-
-    with world.modify_world():
-        fridge = Fridge.create_with_new_body_in_world(
-            name="fridge", world=world, scale=Scale(1, 1, 2.0)
-        )
-        door = Door.get_annotation_specification(
-            "door",
-            Door.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(0.03, 1, 2)
-            ),
-            parent_connection_specification=RevoluteConnectionSpecification(
-                axis=Vector3.X(), multiplier=2.0, offset=0.1, dof_limits=limits
-            ),
-        ).spawn(world, parent=fridge.root)
-
-    # As with a URDF-loaded world, the door already exists (and its forward
-    # kinematics are settled) by the time create_default_mechanical_joint inspects
-    # its global pose.
-    with world.modify_world():
-        door.create_default_mechanical_joint()
-
-    hinge = door.mechanical_joint
-    assert isinstance(hinge, Hinge)
-    assert door.root.parent_kinematic_structure_entity == hinge.root
-    assert hinge.root.parent_kinematic_structure_entity == fridge.root
-    hinge_connection = hinge.root.parent_connection
-    assert isinstance(hinge_connection, RevoluteConnection)
-    assert isinstance(door.root.parent_connection, FixedConnection)
-    np.testing.assert_allclose(hinge_connection.axis.to_np(), Vector3.X().to_np())
-    assert hinge_connection.multiplier == 2.0
-    assert hinge_connection.offset == 0.1
-    assert hinge_connection.raw_dof.limits.lower.position == -1.0
-    assert hinge_connection.raw_dof.limits.upper.position == 1.0
-    # The original direct connection's degree of freedom does not linger as an orphan.
-    assert world.validate()
-    # The hinge body sits exactly at the door's origin and carries no collision.
-    assert len(hinge.root.collision) == 0
-
-
-def test_drawer_create_default_mechanical_joint_inserts_slider_for_bare_prismatic_connection():
-    """
-    A drawer slid straight onto its cabinet (no slider body in between, as with a URDF
-    drawer) gets a Slider inserted by ``create_default_mechanical_joint()``, carrying
-    over the original connection's axis, multiplier, offset and limits.
-    """
-    world = _world_with_root()
-    lower = DerivativeMap[float]()
-    lower.position = 0.0
-    upper = DerivativeMap[float]()
-    upper.position = 0.3
-    limits = DegreeOfFreedomLimits(lower=lower, upper=upper)
-
-    with world.modify_world():
-        fridge = Fridge.create_with_new_body_in_world(
-            name="fridge", world=world, scale=Scale(1, 1, 2.0)
-        )
-        drawer = Drawer.get_annotation_specification(
-            "drawer",
-            Drawer.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(0.2, 0.3, 0.2)
-            ),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.X(), multiplier=1.0, offset=0.0, dof_limits=limits
-            ),
-        ).spawn(world, parent=fridge.root)
-
-    with world.modify_world():
-        drawer.create_default_mechanical_joint()
-
-    slider = drawer.mechanical_joint
-    assert isinstance(slider, Slider)
-    assert drawer.root.parent_kinematic_structure_entity == slider.root
-    assert slider.root.parent_kinematic_structure_entity == fridge.root
-    slider_connection = slider.root.parent_connection
-    assert isinstance(slider_connection, PrismaticConnection)
-    assert isinstance(drawer.root.parent_connection, FixedConnection)
-    np.testing.assert_allclose(slider_connection.axis.to_np(), Vector3.X().to_np())
-    assert slider_connection.raw_dof.limits.lower.position == 0.0
-    assert slider_connection.raw_dof.limits.upper.position == 0.3
-    assert world.validate()
-
-
-def test_a_drawer_on_a_slider_stands_as_far_open_as_its_slider_has_travelled():
-    """
-    A drawer carried by a slider is fixed to it, so how far the drawer stands open is
-    read from the slider's travel.
-    """
-    world = _world_with_root()
-    lower = DerivativeMap[float]()
-    lower.position = 0.0
-    upper = DerivativeMap[float]()
-    upper.position = 0.3
-    limits = DegreeOfFreedomLimits(lower=lower, upper=upper)
-
-    with world.modify_world():
-        fridge = Fridge.create_with_new_body_in_world(
-            name="fridge", world=world, scale=Scale(1, 1, 2.0)
-        )
-        drawer = Drawer.get_annotation_specification(
-            "drawer",
-            Drawer.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(0.2, 0.3, 0.2)
-            ),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.X(), multiplier=1.0, offset=0.0, dof_limits=limits
-            ),
-        ).spawn(world, parent=fridge.root)
-    with world.modify_world():
-        drawer.create_default_mechanical_joint()
-
-    slider_connection = drawer.mechanical_joint.root.parent_connection
-    slider_connection.position = upper.position
-    world.notify_state_change()
-
-    assert drawer.opening_ratio == 1
-
-
-def test_create_default_mechanical_joint_is_a_noop_when_a_joint_already_exists():
-    """
-    ``create_default_mechanical_joint`` does nothing for a door that already has a
-    mechanical joint.
-    """
-    world = _world_with_root()
-    with world.modify_world():
-        door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
-        )
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
-        )
-        door.add(hinge)
-        door.create_default_mechanical_joint()
-
-    assert door.mechanical_joint == hinge
-
-
-def test_create_default_mechanical_joint_is_a_noop_for_a_fixed_parent_connection():
-    """
-    ``create_default_mechanical_joint`` does nothing for a door mounted with a fixed
-    connection (the normal case built through the factories), leaving it without a
-    mechanical joint.
-    """
-    world = _world_with_root()
-    with world.modify_world():
-        door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
-        )
-        door.create_default_mechanical_joint()
-
-    assert door.mechanical_joint is None
-
-
-def test_mechanical_joint_mount_onto_same_whole_is_idempotent():
-    """
-    Mounting the same joint onto the whole it already connects is a no-op (no self-loop,
-    no error).
-    """
-    world = _world_with_root()
-    with world.modify_world():
-        door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
-        )
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
-        )
-        door.add(hinge)
-        door.add(hinge)
-
-    assert door.mechanical_joint == hinge
-    assert door.root.parent_kinematic_structure_entity == hinge.root
-
-
-def test_mechanical_joint_cannot_be_mounted_onto_a_second_whole():
-    """
-    A joint already connecting one whole rejects being mounted onto a different whole.
-    """
-    world = _world_with_root()
-    with world.modify_world():
-        door1 = Door.create_with_new_body_in_world(
-            name="door1", scale=Scale(0.03, 1, 2), world=world
-        )
-        door2 = Door.create_with_new_body_in_world(
-            name="door2", scale=Scale(0.03, 1, 2), world=world
-        )
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
-        )
-        door1.add(hinge)
-        with pytest.raises(MechanicalJointAlreadyMounted):
-            door2.add(hinge)
-
-
-if __name__ == "__main__":
-    unittest.main()
+    with pytest.raises(MissingMovableJointError):
+        elevator.drive_to_floor(ground_floor)

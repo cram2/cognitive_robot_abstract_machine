@@ -40,13 +40,17 @@ Used Concepts:
 
 ## Composing built-in annotations with `add`
 
-Let's build a dresser whose drawer has a handle and a slider. We use the factories
+Let's build a dresser whose drawer has a handle and slides on rails. We use the factories
 (`create_with_new_body_in_world`) to quickly spawn each part with geometry, then wire them
-together with `add`.
+together with `add`. The rails are no part of their own: they are the prismatic connection the
+drawer hangs from, which `drawer.movable_joint` returns.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Slider, Dresser
+from semantic_digital_twin.specifications.connections import (
+    PrismaticConnectionSpecification,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world import World
@@ -65,33 +69,28 @@ with world.modify_world():
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
+        parent_connection_specification=PrismaticConnectionSpecification(
+            axis=Vector3.X()
+        ),
     )
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
         world=world,
     )
-    slider = Slider.create_with_new_body_in_world(
-        name="drawer_slider",
-        world_root_T_self=HomogeneousTransformationMatrix(),
-        world=world,
-        parent_connection_specification=Slider.parent_connection_specification(
-            axis=Vector3.X()
-        ),
-    )
 
-    # One method, routed by type: handle -> drawer.handle, slider -> drawer.mechanical_joint
+    # One method, routed by type: handle -> drawer.handle
     drawer.add(handle)
-    drawer.add(slider)
     # drawer -> dresser.drawers (a list field, so it is appended)
     dresser.add(drawer)
 
 # add routed each part to the field whose element type it matches.
 assert drawer.handle is handle
-assert drawer.mechanical_joint is slider
 assert drawer in dresser.drawers
+# Mounting the drawer kept the rails it slides on, now anchored at the dresser.
+assert drawer.movable_joint.parent is dresser.root
 print("drawer.handle:", drawer.handle)
-print("drawer.mechanical_joint:", drawer.mechanical_joint)
+print("drawer.movable_joint:", drawer.movable_joint)
 print("dresser.drawers:", dresser.drawers)
 
 rt = RayTracer(world)
@@ -105,7 +104,7 @@ exactly one part-whole relationship field of its target.
 ## Part-whole relationship fields for your own annotations
 
 Part kinds the library already models come with ready-made mixins — `HasHandle`, `HasDrawers`,
-`HasDoors`, `HasApertures`, `HasMechanicalJoint`, `HasLegs`, `HasSink`. Inheriting the mixin
+`HasDoors`, `HasApertures`, `HasLegs`, `HasSink`. Inheriting the mixin
 gives your annotation the field, its metadata, and the `add` routing for free; do not re-declare
 such a field yourself. Only a part kind that no mixin covers needs its own field, declared with
 `field(metadata=IsPartWholeRelationship().as_dict())`. That marker in the field's metadata — not

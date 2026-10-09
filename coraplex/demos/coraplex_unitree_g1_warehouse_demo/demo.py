@@ -20,11 +20,11 @@ from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.testing import start_visualization
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    RobotSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Parcel

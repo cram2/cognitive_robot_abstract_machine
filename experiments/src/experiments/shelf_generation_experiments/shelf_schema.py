@@ -12,7 +12,7 @@ from experiments.shelf_generation_experiments.utils import (
     ObjectType,
     MeshTypeMatcher,
 )
-from semantic_digital_twin.api import SpawnSpecification
+from semantic_digital_twin.specifications.base import SpawnSpecification
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,

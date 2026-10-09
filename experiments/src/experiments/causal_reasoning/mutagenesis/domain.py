@@ -154,6 +154,19 @@ class MutagenesisMoleculeAggregations(AggregationStatistic[MutagenesisMolecule])
     """
 
     @aggregation_statistic("atoms")
+    def atom_count(self) -> int:
+        """
+        Count of atoms, whatever their element: the size of the molecule.
+
+        A larger molecule holds more of every kind of atom and bond and is more often
+        mutagenic, so its size confounds every question about one of the other counts.
+        """
+        [result] = entity(
+            count_range(variable(MutagenesisAtom, self.instance.atoms).element)
+        ).tolist()
+        return result
+
+    @aggregation_statistic("atoms")
     def chlorine_count(self) -> int:
         """
         Count of chlorine atoms.

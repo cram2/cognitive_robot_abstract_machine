@@ -95,13 +95,13 @@ questions = [
       ],
     },
     {
-      "question": "What happens when a mechanical joint part (e.g. a Slider) is mounted on a Drawer?",
+      "question": "What happens to a drawer's prismatic connection when the drawer is added to a Dresser?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "It is stored on the drawer's mechanical_joint field and carries the drawer's motion", "correct": True},
+        {"answer": "The drawer keeps sliding on it, now anchored at the dresser, and drawer.movable_joint still returns it", "correct": True},
+        {"answer": "It is replaced by a fixed connection, so the drawer can no longer move", "correct": False},
         {"answer": "It is stored in the drawer's handle field", "correct": False},
-        {"answer": "It replaces the drawer's root body", "correct": False},
-        {"answer": "It is rejected because joints are not parts", "correct": False}
+        {"answer": "It is rejected because connections are not parts", "correct": False}
       ],
     }
 ]

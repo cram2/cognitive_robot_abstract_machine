@@ -32,7 +32,6 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
-    DerivativeMap,
 )
 from semantic_digital_twin.world_description.contact import ContactParameters
 from semantic_digital_twin.world_description.geometry import (
@@ -636,8 +635,8 @@ def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
         world.add_body(mirrored_knuckle)
         degree_of_freedom = DegreeOfFreedom(
             name=PrefixedName("knuckle_joint"),
-            limits=DegreeOfFreedomLimits(
-                DerivativeMap(position=0.0), DerivativeMap(position=0.8)
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=0.0, upper_position=0.8
             ),
         )
         world.add_degree_of_freedom(degree_of_freedom)

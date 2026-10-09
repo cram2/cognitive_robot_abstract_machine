@@ -1594,6 +1594,20 @@ def test_add_entity_with_duplicate_name(world_setup):
         world.add_connection(connection)
 
 
+def test_limits_from_position_range_and_speed_bound_the_velocity_in_both_directions():
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+        lower_position=-0.2, upper_position=1.5, maximum_speed=0.7
+    )
+    assert limits.lower == DerivativeMap(position=-0.2, velocity=-0.7)
+    assert limits.upper == DerivativeMap(position=1.5, velocity=0.7)
+
+
+def test_limits_from_position_range_and_speed_leave_omitted_bounds_unbounded():
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=0.7)
+    assert limits.lower == DerivativeMap(velocity=-0.7)
+    assert limits.upper == DerivativeMap(velocity=0.7)
+
+
 def test_overwrite_dof_limits(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     connection: PrismaticConnection = world.get_connections_by_type(
@@ -2521,10 +2535,7 @@ def test_robot_velocity_limit_setup_does_not_touch_environment_joints():
     robot_link = _make_box_body("robot_link")
     drawer_body = _make_box_body("drawer_body")
 
-    env_limits = DegreeOfFreedomLimits(
-        lower=DerivativeMap(None, -10.0, None, None),
-        upper=DerivativeMap(None, 10.0, None, None),
-    )
+    env_limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=10.0)
     with world.modify_world():
         for b in [root, robot_base, robot_link, drawer_body]:
             world.add_kinematic_structure_entity(b)

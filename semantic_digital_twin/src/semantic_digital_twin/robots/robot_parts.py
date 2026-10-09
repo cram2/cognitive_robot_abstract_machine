@@ -110,9 +110,9 @@ if TYPE_CHECKING:
     from rclpy.node import Node
 
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.api import (
+    from semantic_digital_twin.specifications.connections import ConnectionSpecification
+    from semantic_digital_twin.specifications.kinematic_structure_entities import (
         BodySpecification,
-        ConnectionSpecification,
     )
 else:
     World = Any

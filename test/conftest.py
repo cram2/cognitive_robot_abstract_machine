@@ -7,18 +7,18 @@ from dataclasses import dataclass, field
 import numpy as np
 import pytest
 
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     ActiveConnection1DOFSpecification,
+    PrismaticConnectionSpecification,
 )
-from semantic_digital_twin.predetermined_maps.building_floor import BuildingFloor
+from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
 from semantic_digital_twin.callbacks.callback import Callback
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     HasRootKinematicStructureEntity,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -66,7 +66,7 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
-from semantic_digital_twin.predetermined_maps.apartment_environment import (
+from semantic_digital_twin.predefined_maps.apartment_environment import (
     ApartmentEnvironment,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -94,9 +94,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Handle,
     Elevator,
-    Slider,
     Door,
-    Hinge,
     Floor,
     GroundFloor,
     FirstFloor,
@@ -750,67 +748,33 @@ def _elevator_world_setup():
             Elevator.get_default_root_kinematic_structure_entity_specification(
                 scale=Scale(2, 2, 2), wall_thickness=0.05
             ),
-        ).spawn(world)
-
-        vertical_drive = Slider.get_annotation_specification(
-            f"{name.name}_drive",
-            Slider.get_default_root_kinematic_structure_entity_specification(),
-            parent_connection_specification=Slider.parent_connection_specification(
+            parent_connection_specification=PrismaticConnectionSpecification(
                 axis=Vector3.Z(),
-                dof_limits=DegreeOfFreedomLimits(
-                    lower=DerivativeMap(velocity=-1.0),
-                    upper=DerivativeMap(velocity=1.0),
+                dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                    maximum_speed=1.0
                 ),
             ),
         ).spawn(world)
-        elevator.add(vertical_drive)
 
         door_scale = Scale(wall_thickness, scale.y / 2, scale.z)
-        door1 = Door.create_with_new_body_in_world(
-            name=f"{name.name}_door0",
-            world=world,
-            world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                Point3(-scale.x / 2, -scale.y / 4, 0),
-                reference_frame=world.root,
-            ),
-            scale=door_scale,
-        )
-        door2 = Door.create_with_new_body_in_world(
-            name=f"{name.name}_door1",
-            world=world,
-            world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                Point3(-scale.x / 2, scale.y / 4, 0),
-                reference_frame=world.root,
-            ),
-            scale=door_scale,
-        )
-
-        elevator.add(door1)
-        elevator.add(door2)
-
         door_travel = door_scale.y
-        door_slider_configs = (
-            (
-                door1,
-                DerivativeMap(position=0.0),
-                DerivativeMap(position=door_travel),
-            ),
-            (
-                door2,
-                DerivativeMap(position=0.0),
-                DerivativeMap(position=door_travel),
-            ),
-        )
-        for i, (current_door, lower, upper) in enumerate(door_slider_configs):
-            door_slider = Slider.get_annotation_specification(
-                f"{name.name}_door{i}_drive",
-                Slider.get_default_root_kinematic_structure_entity_specification(),
-                parent_connection_specification=Slider.parent_connection_specification(
-                    axis=(Vector3.Y() * ((-1) ** (i + 1))),
-                    dof_limits=DegreeOfFreedomLimits(lower=lower, upper=upper),
+        for i, door_y in enumerate((-scale.y / 4, scale.y / 4)):
+            door = Door.create_with_new_body_in_world(
+                name=f"{name.name}_door{i}",
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                    Point3(-scale.x / 2, door_y, 0),
+                    reference_frame=world.root,
                 ),
-            ).spawn(world)
-            current_door.add(door_slider)
+                parent_connection_specification=PrismaticConnectionSpecification(
+                    axis=(Vector3.Y() * ((-1) ** (i + 1))),
+                    dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                        lower_position=0.0, upper_position=door_travel
+                    ),
+                ),
+                scale=door_scale,
+            )
+            elevator.add(door)
 
         world.add_semantic_annotation(elevator)
     return world

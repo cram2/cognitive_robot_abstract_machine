@@ -33,12 +33,14 @@ from krrood.entity_query_language.factories import (
     entity,
     variable,
 )
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    RobotSpecification,
-    SemanticAnnotationWithRootSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
 from segmind.detectors.coarse_event_detector_nodes import (
     PickUpDetector,

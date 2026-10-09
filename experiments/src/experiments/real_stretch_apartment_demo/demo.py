@@ -50,14 +50,14 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.robot_plans.plan_transformations import DetectBeforeGrasp
 from krrood.entity_query_language.factories import a
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.connections import Connection6DoFSpecification
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    Connection6DoFSpecification,
-    RobotSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.predetermined_maps.apartment_environment import (
+from semantic_digital_twin.predefined_maps.apartment_environment import (
     ApartmentEnvironment,
 )
 from semantic_digital_twin.robots.stretch import Stretch

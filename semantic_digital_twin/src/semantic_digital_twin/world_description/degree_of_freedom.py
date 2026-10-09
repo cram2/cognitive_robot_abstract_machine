@@ -131,6 +131,33 @@ class DegreeOfFreedomLimits(Generic[T]):
         self.lower = self.lower or DerivativeMap()
         self.upper = self.upper or DerivativeMap()
 
+    @classmethod
+    def from_position_range_and_speed(
+        cls,
+        lower_position: T | None = None,
+        upper_position: T | None = None,
+        maximum_speed: T | None = None,
+    ) -> Self:
+        """
+        Create limits that keep the position between the two bounds and the velocity within
+        the maximum speed in either direction.
+
+        :param lower_position: The lowest position allowed, or ``None`` for no lower
+            bound.
+        :param upper_position: The highest position allowed, or ``None`` for no upper
+            bound.
+        :param maximum_speed: The largest absolute velocity allowed, which bounds the
+            velocity in both directions, or ``None`` for no velocity bound.
+        :return: The limits with every other derivative left unbounded.
+        """
+        return cls(
+            lower=DerivativeMap(
+                position=lower_position,
+                velocity=None if maximum_speed is None else -maximum_speed,
+            ),
+            upper=DerivativeMap(position=upper_position, velocity=maximum_speed),
+        )
+
     def __deepcopy__(self, memo):
         return DegreeOfFreedomLimits(
             lower=deepcopy(self.lower), upper=deepcopy(self.upper)

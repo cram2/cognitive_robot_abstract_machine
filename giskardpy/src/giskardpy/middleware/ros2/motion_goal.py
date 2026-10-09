@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 from typing_extensions import Self
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
-from semantic_digital_twin.adapters.ros.messages import StreamPosition
+from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 
@@ -29,6 +29,16 @@ class MotionGoal(SubclassJSONSerializer):
     The motion statechart to execute, as json.
     """
 
+    client: MetaData = field(kw_only=True)
+    """
+    Who is waiting for this goal.
+
+    Giskard watches that client while the motion runs and stops the robot once it is
+    gone, so the goal has to say who it belongs to. The action itself cannot tell: rclpy
+    hands the server the sequence number of the request, not the participant that sent
+    it.
+    """
+
     required_position: Optional[StreamPosition] = field(default=None, kw_only=True)
     """
     The position in the client's stream that the world has to contain before the motion
@@ -42,6 +52,7 @@ class MotionGoal(SubclassJSONSerializer):
     def for_motion_statechart(
         cls,
         motion_statechart: MotionStatechart,
+        client: MetaData,
         required_position: Optional[StreamPosition] = None,
     ) -> MotionGoal:
         """
@@ -49,6 +60,7 @@ class MotionGoal(SubclassJSONSerializer):
         """
         return cls(
             motion_statechart_json_data=motion_statechart.to_json(),
+            client=client,
             required_position=required_position,
         )
 
@@ -56,6 +68,7 @@ class MotionGoal(SubclassJSONSerializer):
         return {
             **super().to_json(**kwargs),
             "motion_statechart": self.motion_statechart_json_data,
+            "client": to_json(self.client),
             "required_position": (
                 None
                 if self.required_position is None
@@ -71,6 +84,7 @@ class MotionGoal(SubclassJSONSerializer):
         required_position = data.get("required_position")
         return cls(
             motion_statechart_json_data=data["motion_statechart"],
+            client=from_json(data["client"]),
             required_position=(
                 None if required_position is None else from_json(required_position)
             ),

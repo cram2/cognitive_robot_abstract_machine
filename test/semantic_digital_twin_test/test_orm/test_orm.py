@@ -30,10 +30,13 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.specifications.connections import (
+    RevoluteConnectionSpecification,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Drawer,
+    Door,
+    EntryWay,
     Handle,
-    Slider,
 )
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
@@ -186,43 +189,35 @@ def test_part_whole_relationship_field_survives_deepcopy():
     for copy_function in copy_functions:
         world = World.create_with_root_body("root")
         with world.modify_world():
-            drawer = Drawer.create_with_new_body_in_world(
-                name="drawer", scale=Scale(0.2, 0.3, 0.2), world=world
+            door = Door.create_with_new_body_in_world(
+                name="door", scale=Scale(0.03, 1, 2), world=world
             )
             handle = Handle.create_with_new_body_in_world(name="handle", world=world)
-            slider = Slider.create_with_new_body_in_world(
-                name="slider",
-                world=world,
-                parent_connection_specification=Slider.parent_connection_specification(
-                    axis=Vector3.X()
-                ),
-            )
-            drawer.add(handle)
-            drawer.add(slider)
+            door.add(handle)
 
         # The marker is present on the source class before persisting.
-        assert _is_part_whole_relationship(Drawer, "handle")
-        assert _is_part_whole_relationship(Drawer, "mechanical_joint")
+        assert _is_part_whole_relationship(Door, "handle")
+        assert _is_part_whole_relationship(Door, "entry_way")
 
-        copied_drawer = copy_function(drawer)
+        copied_door = copy_function(door)
 
-        # The reconstructed object is a real Drawer, so its fields still carry the marker.
-        assert isinstance(copied_drawer, Drawer)
-        assert _is_part_whole_relationship(type(copied_drawer), "handle")
-        assert _is_part_whole_relationship(type(copied_drawer), "mechanical_joint")
+        # The reconstructed object is a real Door, so its fields still carry the marker.
+        assert isinstance(copied_door, Door)
+        assert _is_part_whole_relationship(type(copied_door), "handle")
+        assert _is_part_whole_relationship(type(copied_door), "entry_way")
 
         # The marked-field discovery still resolves the same part-whole relationship fields.
         discovered = {
             spec.field.name
-            for spec in WrappedClass(type(copied_drawer)).fields_with_metadata(
+            for spec in WrappedClass(type(copied_door)).fields_with_metadata(
                 IsPartWholeRelationship
             )
         }
-        assert {"handle", "mechanical_joint"} <= discovered
+        assert {"handle", "entry_way"} <= discovered
 
         # The field values themselves survived the round trip.
-        assert isinstance(copied_drawer.handle, Handle)
-        assert isinstance(copied_drawer.mechanical_joint, Slider)
+        assert isinstance(copied_door.handle, Handle)
+        assert isinstance(copied_door.entry_way, EntryWay)
 
 
 @pytest.fixture
@@ -266,49 +261,69 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
 
     Reconstructing an annotation from its DAO must therefore yield an instance whose
     type still carries the marker, the marked-field discovery must still find it, and
-    the field *values* (handle, mechanical_joint) must survive the round trip.
+    the field *values* (handle, entry_way) must survive the round trip.
     """
     world = World.create_with_root_body("root")
     with world.modify_world():
-        drawer = Drawer.create_with_new_body_in_world(
-            name="drawer", scale=Scale(0.2, 0.3, 0.2), world=world
+        door = Door.create_with_new_body_in_world(
+            name="door", scale=Scale(0.03, 1, 2), world=world
         )
         handle = Handle.create_with_new_body_in_world(name="handle", world=world)
-        slider = Slider.create_with_new_body_in_world(
-            name="slider",
-            world=world,
-            parent_connection_specification=Slider.parent_connection_specification(
-                axis=Vector3.X()
-            ),
-        )
-        drawer.add(handle)
-        drawer.add(slider)
+        door.add(handle)
 
     # The marker is present on the source class before persisting.
-    assert _is_part_whole_relationship(Drawer, "handle")
-    assert _is_part_whole_relationship(Drawer, "mechanical_joint")
+    assert _is_part_whole_relationship(Door, "handle")
+    assert _is_part_whole_relationship(Door, "entry_way")
 
     world_dao: WorldMappingDAO = to_dao(world)
     session.add(world_dao)
     session.commit()
 
     reconstructed: World = session.scalar(select(WorldMappingDAO)).from_dao()
-    [reconstructed_drawer] = reconstructed.get_semantic_annotations_by_type(Drawer)
+    [reconstructed_door] = reconstructed.get_semantic_annotations_by_type(Door)
 
-    # The reconstructed object is a real Drawer, so its fields still carry the marker.
-    assert isinstance(reconstructed_drawer, Drawer)
-    assert _is_part_whole_relationship(type(reconstructed_drawer), "handle")
-    assert _is_part_whole_relationship(type(reconstructed_drawer), "mechanical_joint")
+    # The reconstructed object is a real Door, so its fields still carry the marker.
+    assert isinstance(reconstructed_door, Door)
+    assert _is_part_whole_relationship(type(reconstructed_door), "handle")
+    assert _is_part_whole_relationship(type(reconstructed_door), "entry_way")
 
     # The marked-field discovery still resolves the same part-whole relationship fields.
     discovered = {
         spec.field.name
-        for spec in WrappedClass(type(reconstructed_drawer)).fields_with_metadata(
+        for spec in WrappedClass(type(reconstructed_door)).fields_with_metadata(
             IsPartWholeRelationship
         )
     }
-    assert {"handle", "mechanical_joint"} <= discovered
+    assert {"handle", "entry_way"} <= discovered
 
     # The field values themselves survived the round trip.
-    assert isinstance(reconstructed_drawer.handle, Handle)
-    assert isinstance(reconstructed_drawer.mechanical_joint, Slider)
+    assert isinstance(reconstructed_door.handle, Handle)
+    assert isinstance(reconstructed_door.entry_way, EntryWay)
+
+
+def test_door_swings_about_its_hinge_after_orm_round_trip(session):
+    """
+    A door whose origin sits away from its hinge must still swing about the hinge once
+    reconstructed, so the offset of the door from its joint has to be persisted.
+    """
+    hinge_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+    world = World.create_with_root_body("root")
+    with world.modify_world():
+        Door.create_with_new_body_in_world(
+            name="door",
+            scale=Scale(0.03, 1, 2),
+            world=world,
+            parent_connection_specification=RevoluteConnectionSpecification(
+                axis=Vector3.Z(), connection_T_child=hinge_T_door
+            ),
+        )
+
+    session.add(to_dao(world))
+    session.commit()
+    reconstructed: World = session.scalar(select(WorldMappingDAO)).from_dao()
+    [reconstructed_door] = reconstructed.get_semantic_annotations_by_type(Door)
+
+    np.testing.assert_allclose(
+        reconstructed_door.movable_joint.connection_T_child_expression.to_np(),
+        hinge_T_door.to_np(),
+    )

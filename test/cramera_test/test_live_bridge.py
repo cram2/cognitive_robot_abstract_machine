@@ -23,7 +23,6 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -305,8 +304,8 @@ def make_hinged_door() -> Tuple[World, RevoluteConnection]:
     door = Body(name=PrefixedName("fridge_door"))
     hinge = DegreeOfFreedom(
         name=PrefixedName("fridge_door_joint", prefix="kitchen"),
-        limits=DegreeOfFreedomLimits(
-            lower=DerivativeMap(position=0.0), upper=DerivativeMap(position=1.57)
+        limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=0.0, upper_position=1.57
         ),
     )
     with world.modify_world():

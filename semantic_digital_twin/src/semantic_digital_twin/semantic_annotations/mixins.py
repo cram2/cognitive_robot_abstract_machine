@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
+import dataclasses
 from dataclasses import dataclass, field
 from typing import Tuple
 
@@ -11,7 +12,6 @@ from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood.utils import recursive_subclasses
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.rx.helper import (
@@ -37,14 +37,18 @@ from typing_extensions import (
     TypeVar,
 )
 
-from semantic_digital_twin.api import (
-    BodySpecification,
+from semantic_digital_twin.specifications.connections import (
+    ActiveConnection1DOFSpecification,
     ConnectionSpecification,
-    FixedConnectionSpecification,
-    PartSpecificationBinding,
+)
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
     RegionSpecification,
-    SemanticAnnotationWithRootSpecification,
     KinematicStructureEntitySpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    PartSpecificationBinding,
+    SemanticAnnotationWithRootSpecification,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -65,6 +69,7 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
+    ActiveConnection1DOF,
 )
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
@@ -92,7 +97,6 @@ if TYPE_CHECKING:
         Door,
         Handle,
         Aperture,
-        MechanicalJoint,
         Leg,
         Sink,
         ShelfLayer,
@@ -184,30 +188,6 @@ class HasRootKinematicStructureEntity(
         return hash((self.__class__, self.root))
 
     @classmethod
-    def parent_connection_specification(cls) -> ConnectionSpecification:
-        """
-        Build the connection that attaches this annotation's root entity to its parent.
-
-        Annotation types whose connection takes parameters override this with their own
-        concrete signature, so callers get the parameters that family actually uses and
-        nothing else (e.g. :meth:`Slider.parent_connection_specification` takes an
-        ``axis``, this one takes none).
-
-        :meth:`get_annotation_specification` calls this to fill in the connection
-        when the caller supplies none. To parameterize it, call this method yourself and
-        hand the result to that factory.
-
-        .. warning:: Every override must stay callable with no arguments, since that is
-            how the default is resolved. Add parameters only with defaults.
-
-        .. note:: Currently always fixed, except for sliders and hinges. This may change
-            in the future, so override where needed.
-
-        :return: A freshly built connection specification.
-        """
-        return FixedConnectionSpecification()
-
-    @classmethod
     @abstractmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
@@ -259,8 +239,7 @@ class HasRootKinematicStructureEntity(
         :param name: The name of the annotation and its root entity.
         :param root_specification: The specification of the annotation's root entity.
         :param parent_connection_specification: Connection attaching the root to its
-            parent. When omitted, :meth:`parent_connection_specification` supplies this
-            type's default.
+            parent. When omitted, the root is fixed to its parent.
         :param annotation_kwargs: Inert keyword arguments for the annotation
             constructor.
         :param part_specifications: Nested annotation parts keyed by part-whole
@@ -311,9 +290,9 @@ class HasRootKinematicStructureEntity(
         """
         Realize the relationship between this annotation (as a part) and the
         ``main_has_root_body_annotation`` (the whole) in the kinematic structure. The
-        default is to become a kinematic child of the whole; parts with a different
-        strategy (e.g. mechanical joints that re-parent the whole, apertures that cut
-        it) override this.
+        default is to become a kinematic child of the whole, keeping the connection
+        the part hangs from; parts with a different strategy (e.g. apertures that cut
+        the whole) override this.
 
         :param main_has_root_body_annotation: The annotation (the whole) this one is
             being added to as a part.
@@ -367,7 +346,7 @@ class HasRootBody(HasRootKinematicStructureEntity[Body]):
         :param world: The world to add the annotation and body to.
         :param world_root_T_self: The initial pose of the body in the world root frame.
         :param parent_connection_specification: Connection attaching the body to the
-            world root. When omitted, this type's default parent connection applies.
+            world root. When omitted, the entity is fixed to the world root.
         :param scale: The scale used to generate the geometry of the body. When omitted,
             the type's default geometry scale applies.
         :return: The created semantic annotation instance.
@@ -438,7 +417,7 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region]):
         :param world_root_T_self: The initial pose of the region in the world root
             frame.
         :param parent_connection_specification: Connection attaching the region to the
-            world root. When omitted, this type's default parent connection applies.
+            world root. When omitted, the entity is fixed to the world root.
         :param scale: The scale used to generate the region area geometry.
         :return: The created semantic annotation instance.
         """
@@ -572,111 +551,59 @@ class HasApertures(HasRootBody, PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasMechanicalJoint(HasRootBody, PartWholeRelationship):
+class HasMovableJoint(HasRootBody, ABC):
     """
-    A mixin class for semantic annotations that have mechanical joints.
-    """
-
-    mechanical_joint: Optional[MechanicalJoint] = field(
-        default=None,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The mechanical joint of the semantic annotation.
+    A mixin class for semantic annotations whose root moves relative to its parent, such
+    as a door on its hinge or a drawer on its rails.
     """
 
-    def _mount_strategy(
-        self,
-        main_has_root_body_annotation: HasRootBody,
-        relationship: IsPartWholeRelationship,
-    ) -> None:
+    @property
+    def movable_joint(self) -> ActiveConnection1DOF | None:
         """
-        Mount this annotation onto the whole through its mechanical joint, so the joint
-        keeps carrying it.
+        The connection the root hangs from, which moves the annotation relative to its
+        parent.
 
-        Moving this annotation on its own would pull it out from under its joint and
-        leave a door or drawer rigidly attached to the whole, unable to move.
-
-        :param main_has_root_body_annotation: The annotation (the whole) this one is
-            being added to as a part.
-        :param relationship: The metadata of the part-whole relationship field being
-            mounted into, describing how the mount affects the whole.
+        ``None`` while the root cannot move, such as a door fixed to its parent before
+        it is mounted on a hinge.
         """
-        if (
-            self.mechanical_joint is None
-            or self.root.parent_kinematic_structure_entity
-            is not self.mechanical_joint.root
-        ):
-            super()._mount_strategy(main_has_root_body_annotation, relationship)
-            return
-
-        main_has_root_body_annotation._world.move_branch(
-            self.mechanical_joint.root,
-            main_has_root_body_annotation.root,
-            enable_unsafe_inside_world_block=True,
+        parent_connection = self.root.parent_connection
+        return (
+            parent_connection
+            if isinstance(parent_connection, ActiveConnection1DOF)
+            else None
         )
 
-    def _kinematic_structure_entities(
-        self, visited: Set[int]
-    ) -> list[KinematicStructureEntity]:
-        if id(self) in visited:
-            return []
-        visited.add(id(self))
-        kinematic_structure_entities = (
-            self._world.get_kinematic_structure_entities_of_branch(self.root)
-        )
-        if self.mechanical_joint is not None:
-            kinematic_structure_entities.append(self.mechanical_joint.root)
-        return kinematic_structure_entities
-
-    def create_default_mechanical_joint(self) -> None:
+    @abstractmethod
+    def calculate_self_T_movable_joint(
+        self, axis: Vector3
+    ) -> HomogeneousTransformationMatrix:
         """
-        Give this annotation a mechanical joint matching how its root is already wired
-        to its parent, when no mechanical joint carries it yet.
+        Calculate where the joint that moves this annotation sits, relative to its root.
 
-        Formats like URDF often attach a door or drawer to its cabinet with a bare
-        active connection (e.g. revolute for a door, prismatic for a drawer) and no
-        dedicated joint body. This looks up the :class:`MechanicalJoint` subclass whose
-        :meth:`~MechanicalJoint.parent_connection_specification` connection type matches
-        :attr:`~KinematicStructureEntity.parent_connection` and inserts one of that kind,
-        carrying over the axis, multiplier, offset and limits of the existing
-        connection, so :attr:`mechanical_joint` reflects the joint that already moves
-        it. Does nothing when the connection matches no known joint type (e.g. a fixed
-        connection).
+        :param axis: The axis the joint moves along or about, in the root frame.
+        :return: The pose of the joint frame in the root frame.
         """
-        if self.mechanical_joint is not None:
-            return
-        # Deferred import: MechanicalJoint's module imports this one.
-        from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-            MechanicalJoint,
-        )
 
-        connection = self.root.parent_connection
-        mechanical_joint_type = next(
-            (
-                candidate
-                for candidate in recursive_subclasses(MechanicalJoint)
-                if isinstance(
-                    connection,
-                    candidate.parent_connection_specification().connection_type,
-                )
-            ),
-            None,
+    def mount_on_movable_joint(
+        self, connection_specification: ActiveConnection1DOFSpecification
+    ) -> ActiveConnection1DOF:
+        """
+        Replace the connection the root hangs from with one built from
+        ``connection_specification``, placed where
+        :meth:`calculate_self_T_movable_joint` puts the joint, keeping the annotation
+        where it is.
+
+        :param connection_specification: The joint to mount on. Its own
+            ``connection_T_child`` is ignored, and the specification is left unchanged.
+        :return: The connection the root now hangs from.
+        """
+        placed_specification = dataclasses.replace(
+            connection_specification,
+            connection_T_child=self.calculate_self_T_movable_joint(
+                connection_specification.axis
+            ).inverse(),
         )
-        if mechanical_joint_type is None:
-            return
-        joint = mechanical_joint_type.create_with_new_body_in_world(
-            name=f"{self.root.name.name}_{mechanical_joint_type.__name__.lower()}",
-            world=self._world,
-            world_root_T_self=self.root.global_transform,
-            parent_connection_specification=mechanical_joint_type.parent_connection_specification(
-                axis=connection.axis,
-                multiplier=connection.multiplier,
-                offset=connection.offset,
-                dof_limits=connection.raw_dof.limits,
-            ),
-        )
-        self.add(joint)
+        return placed_specification.reconnect(self._world, self.root)
 
 
 @dataclass(eq=False)

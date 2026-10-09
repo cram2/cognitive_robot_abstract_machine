@@ -10,7 +10,8 @@ from coraplex.datastructures.dataclasses import Context
 from coraplex.locations.base import Location
 from coraplex.locations.costmaps import RingCostmap
 from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
-from semantic_digital_twin.api import RobotSpecification, WorldSpecification
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2

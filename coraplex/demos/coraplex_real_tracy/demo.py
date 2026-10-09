@@ -175,5 +175,6 @@ try:
     with ExecutionEnvironment(execution_type=execition_mode, collision_avoidance=False):
         plan.perform()
 finally:
+    rclpy.shutdown()
     os.killpg(os.getpgid(giskard_process.pid), signal.SIGTERM)
     giskard_process.wait()

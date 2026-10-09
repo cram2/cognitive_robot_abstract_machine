@@ -1,134 +1,156 @@
 # Code Quality Rules
 
-## Avoid Behaviour
-- Avoid using global variables
-- Avoid accessing any ormatic_interface.py files. if there are issues regarding the ormatic interface run the script `scripts/regenerate_all_orm.py`. If it does not fix the issue, consider consulting the developer.
-- ormatic_interface.py files are generated, never written, so the repository ignores them instead of tracking them (see the rule in `.gitignore`): the test suite builds them for its runs, and a local checkout builds them with `scripts/regenerate_all_orm.py`. Never track one again - git refuses to overwrite a tracked path a checkout has generated its own copy of, which is what used to make every branch switch fail.
-- Avoid using mutable objects as default arguments
-- If you are unsure why something was done or why specific numbers were chosen, ask the developer instead of inventing the reason and writing it as a comment.
-- Never comment on or modify pull requests on the upstream `cram2/cognitive_robot_abstract_machine` repository. You may only do so when working in a fork and the user has explicitly allowed it - either through existing personal notes/instructions, or by asking the user first and having them accept.
+## Applying These Rules
+- Existing code that breaks these rules stays as it is unless a change touches it or the user asks for the cleanup. When you modify a function or class, bring that function or class in line with these rules as part of the change, and leave code the change does not otherwise modify alone. If the cleanup renames a method and so changes the API, ask the user first
+- When a rule seems wrong for the case at hand - a failing test that is itself wrong, an exception that has to be caught, a value that genuinely has to live at module level - ask the user before departing from it; never decide the exception on your own
+
+## Ask the Developer
+- When you are unsure why something was done or why a specific number was chosen, ask; never invent a reason and write it down as a comment
+- When a method is never used outside of tests, ask whether it can be removed
+- When regenerating the ORM interfaces does not fix an ORM problem, ask
+- Before adding a new dependency, ask
+
+## Generated ORM Interfaces
+- `ormatic_interface.py` files are generated, never written, and git-ignored (see `.gitignore`). Never edit them, and never read them to debug an ORM problem; regenerate them with `scripts/regenerate_all_orm.py` instead
+- The test suite builds them for its runs; a local checkout builds them with `scripts/regenerate_all_orm.py`
+- Never track one again: git refuses to overwrite a tracked path a checkout has generated its own copy of, which makes every branch switch fail
 
 ## Testing
-- If you need to run tests, execute them with pytest
-- Reuse existing fixtures found in conftest.py
-- Always use a test-driven development approach. For example for bugs, always prove a bug by adding a meaningful, failing test first, before then fixing it
-- When fixing failing tests, never modify the test itself
-- All new features and fixes must be covered by tests
-- Name test classes (and the mimic classes used by tests) after the pattern or behaviour they exercise, not after the concrete external class they happen to stand in for
-- Make assertions as specific as possible: when the correct expected value can be determined, assert equality to that value rather than only a weaker check such as not-None or not-empty
-- Assert against the definition rather than a copy of it: compare to the enum member, the named constant, or the value read from the fixture the code under test consumed. Where a type distinguishes the case, assert the type - a distinct exception class or enum member - instead of matching on message text. A literal retyped into the test is a second copy of the thing the test exists to check, and it keeps passing when the original changes
-- Keep each test focused on the one behaviour it names: assert exactly the values that behaviour determines, and do not also pin down incidental output a change unrelated to that behaviour could alter (for example, an unrelated wording tweak to an error message a test isn't about). Prefer deriving an expected value from the same production code that computes it (e.g. by calling the lower-level function under test and reusing its result) over hardcoding a second literal copy of output another test already asserts exactly — a hardcoded copy duplicates coverage and turns one wording change into two unrelated test failures. Tests should be separable and independent, each failing only for its own reason.
-- CI safety: All added tests must be part of the CI suite, but only need to execute there if they can run without live external calls or missing credentials — tests requiring unavailable credentials must be skipped (or removed if new), not left to break the pipeline.
-- Credentials: Any test requiring credentials to run in CI must be pre-approved by the user and have those credentials available in CI; otherwise it must be skipped there.
-- No inline snippets: Code snippets must live in separate files with the correct file type, imported or read into the test rather than embedded as strings.
-- Mock over live calls: Tests for code depending on external APIs should mock those APIs instead of calling them live, except when an API call is needed to download a dataset required for other tests to run.
-- Live API tests: You may add tests that hit external APIs directly, but they must have skip conditions so they don't run in CI, and must be paired with an equivalent mock-based test that does run in CI.
+
+### Writing Tests
+- Write tests with pytest: plain test functions or classes, pytest fixtures, `pytest.raises` and plain `assert`; never `unittest.TestCase` or its assertion methods
+- Reuse the existing fixtures in `conftest.py`
+- Work test-driven: prove a bug with a meaningful, failing test before fixing it. Every new feature and fix is covered by tests
+- When fixing a failing test, never modify the test itself
+- Name test classes, and the mimic classes tests use, after the pattern or behaviour they exercise, not after the external class they stand in for
+- Keep code snippets in separate files of the correct type and import or read them into the test; never embed them as strings
+
+### Assertions
+- Assert equality to the expected value whenever it can be determined, never only a weaker check such as not-None or not-empty
+- Assert against the definition, not a retyped copy of it: the enum member, the `classproperty`, or the value from the fixture the code under test consumed. Where a type distinguishes the case - a distinct exception class, an enum member - assert the type instead of matching message text. A retyped literal keeps passing when the original changes
+- Each test checks the one behaviour it names and fails only for its own reason: assert exactly the values that behaviour determines, not incidental output such as the wording of an error message the test is not about. Where another test already asserts a value exactly, derive the expected value from the production code that computes it instead of hardcoding a second copy. Tests are independent of each other
+
+### External Services and CI
+- Every added test is part of the CI suite. A test that needs live external calls or credentials CI does not have is skipped there (or removed, if new) so it cannot break the pipeline
+- A test that needs credentials in CI must be approved by the user and have those credentials available in CI; otherwise it is skipped there
+- Mock external APIs; call one live only to download a dataset other tests need
+- A test that calls an external API live must have a skip condition so it does not run in CI, and must be paired with an equivalent mocked test that does
+
+### Running Tests
+- Run tests with pytest
+- Never run the whole test suite in one invocation: run one package or a few test directories at a time, and wait for each run to finish before starting the next
+- Make sure a test run can never exhaust the machine's working memory: check the free memory before starting, cap the run's memory so the run is killed rather than the machine, and account for other test runs already going on the same machine
+- Pass `--orm-build never`, and regenerate the ORM interfaces explicitly with `scripts/regenerate_all_orm.py` when a change needs it
 
 ## Code Style
-- Divide a file into logical sections with `# %% <short description>` comment headers (e.g. `# %% same-noun disambiguation`), not decorative box-drawing dividers. Applies to source files as well as test files
-- Create classes instead of using too many primitives. If a return type is always repeated, consider whether a dedicated class or type alias would convey more meaningful information
-- Minimize duplication of code. Avoid placing methods in catch-all files like `utils.py`: prefer moving them onto a sensible class that owns the behaviour
-- Comments must be meaningful and adhere to DRY; remove redundant or restating comments
-- Do not wrap attribute access in try-except blocks
-- Always access attributes via ".", never via getattr
-- Use existing packages whenever possible
 - Always use dataclasses
+- Divide every file, source and test, into sections with `# %% <short description>` headers (e.g. `# %% same-noun disambiguation`), never decorative box-drawing dividers
+- A group of primitives that travels together, or a return type that keeps being repeated, becomes a dataclass
+- Never duplicate code. Never put methods in a catch-all module such as `utils.py`; move them onto the class that owns the behaviour
+- Access attributes with `.`, never with `getattr`, and never wrap attribute access in try-except
+- Never use mutable objects as default arguments
+- Never reimplement what the codebase or an existing dependency already provides. When searching for it, never cut off the output of grep or other searches; narrow the search instead
 
 ### Naming
-- Names must be technically correct, simple and descriptive, in that order. Correct first: a name that describes the thing inaccurately is worse than a vague one, because a reader who trusts it stops reading. Then the simplest wording that stays correct
-- Minimize jargon. Prefer the plain word every reader already knows over the specialist, metaphorical or in-house one, and reserve a technical term for where it is genuinely the precise word - not as shorthand between the people who happen to have been in the discussion. Jargon is a lookup the reader has to perform, and it is only worth it when the plain wording would be wrong
-- Do not use abbreviations in variable names, methods, classes, or any other identifiers
-- Use short but descriptive names: a name says *what* a thing is or does, never *how* it does it or *when* it runs
-- Name the thing, not the layer or mechanism it is built on
-- Avoid generic words that would fit anything. Use the plain technical word for what the thing actually is
-- A name whose meaning has to be looked up elsewhere is the wrong name. Do not adopt another system's vocabulary as an identifier of ours; name the thing for what it is here, and if the foreign shape still needs explaining, explain it in the docstring rather than encoding it in the name
-- Methods are verb phrases for what they do; classes and attributes are noun phrases for what they are. A field is named for its subject, not for the shape of the value it happens to hold
-- One operation, one name, throughout a module: a second name for the same operation reads as a second operation. Where callers depend on that shared name, formalize it - a base class or a protocol declaring the method - rather than leaving it a convention every class is trusted to have followed; a convention breaks only once something happens to call the one class that spelled it differently
-- Name an enum member for the situation it means, not for the function it dispatches to or the wording it renders - the implementation moves and the member should not have to
-- Do not repeat the enclosing type's name in its members, and do not repeat the same word twice within one name
+- Names are technically correct, simple and descriptive, in that order. An inaccurate name is worse than a vague one, because a reader who trusts it stops reading
+- A name stays correct and understandable when read on its own, without its class or a keyword argument next to it - after `value = instance.attribute`, in a log line, in a traceback, or when passed on positionally. A `Pipe` field `size` says nothing once it leaves the class; `inner_diameter` does. A generic word that would fit anything never passes this test
+- Use the plain word every reader already knows. Use a specialist, metaphorical or in-house term only where it is genuinely the precise word, never as shorthand between the people who were in the discussion
 - Where the domain or file format already has a word for something, use that word
-- Never take an identifier the language or something already in scope binds - `Enum` reserves `name`, a parameter called `field` shadows `dataclasses.field`, and a method is shadowed by a field of the same name. These fail at runtime or silently, not at import
-- A rename is finished only when every reader of the old name reads the new one, docstrings and comments included, and the tests pass. A mechanical rename across a file is exactly where a method and a field converge on one name
-- When no honest specific name exists, suspect the code rather than your vocabulary. A thing that can only be described vaguely usually has no single subject - it is a container holding whatever its caller passed, or a function doing two jobs - and the fix is to remove it, not to keep hunting for a better word
+- Never abbreviate an identifier
+- A name says *what* a thing is or does - never *how* it does it, *when* it runs, or the layer or mechanism it is built on. Keep it short
+- A name whose meaning has to be looked up elsewhere is wrong. Never adopt another system's vocabulary as an identifier of ours: name the thing for what it is here, and explain a foreign shape in the docstring
+- Methods are verb phrases for what they do; classes and attributes are noun phrases for what they are. Name a field for its subject, not for the shape of its value
+- One operation has one name throughout a module. Where callers depend on that name, declare it in a base class instead of leaving it a convention each class is trusted to follow
+- Name an enum member for the situation it means, not for the function it dispatches to or the text it renders
+- Never repeat the enclosing type's name in its members, or the same word twice within one name
+- Never take an identifier the language or something in scope already binds: `Enum` reserves `name`, a parameter `field` shadows `dataclasses.field`, a field shadows a method of the same name. These fail at runtime or silently, not at import
+- A rename is finished only when every reader of the old name, docstrings and comments included, uses the new one and the tests pass. A mechanical rename across a file is exactly where a method and a field converge on one name
+- When no honest specific name exists, suspect the code, not your vocabulary: a thing that can only be described vaguely usually has no single subject (a container for whatever its caller passed, a function doing two jobs). Remove it instead of hunting for a better word
 
 ## Imports
-- Imports should always be absolute
-- Exception: within tests, importing another test module (for example a shared mimic or fixture from the test datasets) must use a relative import
-- Imports should always be global (top of module), except in very special cases (for example ORM interface imports)
-- Use stdlib type hints where possible, and for others use typing_extensions instead of typing
-- Whenever you would wrap types in strings for deferred resolution, use `from __future__ import annotations` instead.
-- use TYPE_CHECKING guard for type-only imports
-- `krrood` must stay self-contained: never import from another workspace package into `krrood` (this includes its tests under `test/krrood_test`). The only permitted exceptions are `random_events` and `probabilistic_model`, because `krrood`'s own source already depends on them. In particular, do not import from `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo`, or `experiments` inside `krrood`.
-- When a `krrood` test needs to exercise behaviour that another package triggers, mimic the relevant classes and patterns inside the `krrood` test datasets (`test/krrood_test/dataset`) and test against those mimics. Keep the test in `krrood`; do not move it to another package and do not depend on another package to reproduce the scenario.
-- Mimic classes in the `krrood` test datasets must never import directly from another workspace package either; the only packages they may import from are the ones `krrood`'s source already imports (`random_events`, `probabilistic_model`) plus `krrood` itself.
+- Imports are absolute. Exception: a test imports another test module (a shared mimic or fixture from the test datasets) relatively
+- Imports go at the top of the module; fix an import cycle by restructuring the modules, never with a local import. If an ORM import creates a cycle, ask the user if a local import is fine.
+- Guard type-only imports with `TYPE_CHECKING`
+
+### krrood Isolation
+- `krrood`, including its tests under `test/krrood_test`, never imports another workspace package - in particular not `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or `experiments`. The only exceptions are `random_events` and `probabilistic_model`, which `krrood`'s source already depends on
+- When a `krrood` test needs behaviour another package triggers, mimic the relevant classes and patterns in `test/krrood_test/dataset` and test against the mimics. Keep the test in `krrood` and do not depend on another package to reproduce the scenario
+- Those mimic classes import only `krrood`, `random_events` and `probabilistic_model`
 
 ## Design Principles
-- Focus on strictly object oriented design
-- Always apply the SOLID principles of object-oriented programming
-  - Single Responsibility: Each class/method does one thing. If a method has cyclomatic complexity in the hundreds, refactor.
-  - Open/Closed: The code should be open for extension, but closed for modification.
-  - Liskov Substitution: Subtypes must be substitutable for their base types without breaking behaviour.
-  - Interface Segregation: Prefer many small interfaces over one large one.
-  - Dependency Inversion: Depend on abstractions, not concrete implementations.
-- Code should be modular and decoupled
-- Create meaningful custom exceptions
+- Use strictly object-oriented design and always apply the SOLID principles:
+  - Single Responsibility: each class and method does one thing. If a method has cyclomatic complexity in the hundreds, refactor
+  - Open/Closed: open for extension, closed for modification
+  - Liskov Substitution: subtypes are substitutable for their base types without breaking behaviour
+  - Interface Segregation: many small interfaces over one large one. An interface is an explicit superclass or mixin, never a `Protocol`
+  - Dependency Inversion: depend on abstractions, not concrete implementations
+- Keep code modular and decoupled
 - Eliminate YAGNI smells
 - Make interfaces hard to misuse
-- Reduce nesting and reduce complexity:
-  - The main branch of a function should hold the main output with the biggest compute; alternative outputs should be realized via guard clauses beforehand
-  - When dealing with nested if statements and branching methods, use guard clauses to reduce nesting by inverting conditions and returning early
-- Dont use try except blocks, programs in illegal states should raise appropriate exceptions.
-- Prefer structured data over bare strings, hardcoded values, and meaningless numbers. This is the default, not a preference to weigh: reach for the structured form first and justify the literal, never the other way round.
-  - Never hardcode a string that names a fixed thing - a payload key, a state, a label, a filename, an environment variable, a command flag, a status. Give it a `StrEnum` member and use that. A value spelled in two places has no single source to rename, and nothing fails when the two drift apart.
-  - When the members are more than text - paths, numbers - give them values of that type rather than strings, and prefer that over a `StrEnum`. Mix the type into the enum where Python supports it (`IntEnum`, `StrEnum`); `Path` does not support it, because pathlib builds every derived path through the enum's own member lookup, so a path enum is a plain `Enum` whose values are `Path`s.
-  - Replace a magic number with a named constant or an enum member. A bare literal that carries meaning is unreadable where it is used and unsearchable everywhere else.
-  - For JSON our own classes round-trip, reuse `krrood.adapters.json_serializer.SubclassJSONSerializer` rather than hand-writing `to_json`/`from_json` - it already resolves the concrete subclass from the stored type name.
-  - For data whose shape someone else controls - an API response, a configuration file - that serializer does not apply, since the payload carries no type of ours. Mirror the structure in dataclasses instead and parse into them the same way, with a `from_json` classmethod doing the reading, so the field names and the access path into the payload are written once rather than at every use site.
-  - Replace a tuple whose positions carry meaning with a dataclass, or with an enum when the positions are a fixed set of alternatives rather than fields, so the parts are named rather than counted.
-  - Keep a long literal document - a query, a template, a schema - in a file of its own type and read it in, rather than embedding it as a string.
-- If there are methods that are never used outside of tests, consult the developer if they can be removed.
+
+### Methods
+- Every method hides what actually runs from the reader, so extract one only when its abstraction is worth more than reading the executed code in place
+- Keep every statement in a method on the same level of abstraction: a method either strings together named steps or carries out one step's detail, never both
+- Never write a method that only forwards to or renames another call. A one-line method is allowed only when it implements an abstract method or a `classproperty`, caches its result, or removes duplication - and in the last case, first try to abstract the duplicated code itself
+- A method with a single caller must earn its place under these rules; otherwise inline it
+- Reduce nesting and complexity with guard clauses: handle alternative outputs first by inverting conditions and returning early, so the main branch holds the main output and the biggest compute. A single level of abstraction never justifies deep nesting; split the method instead
+
+### Errors
+- Never use try-except; a program in an illegal state raises an appropriate exception
+- Create meaningful custom exceptions as dataclasses subclassing `krrood.exceptions.DataclassException`, implementing its `error_message` and `suggest_correction`
+- Put each exception in the `exceptions.py` closest to the code that raises it:
+  - An exception raised only within one subpackage goes in that subpackage's `exceptions.py`; create the file if the subpackage has none
+  - An exception raised across several subpackages goes in the `exceptions.py` of their nearest common package
+- Never use `assert` outside tests: Python drops it when run with `-O`, so the check silently disappears. Raise a custom exception instead
+
+### Constants and Class-Level Values
+- Never use global variables, module-level constants or `ClassVar`. Instead:
+  - A fixed set of related values is a module-level enum
+  - A default a caller may want to change is a parameter of the method that uses it if only that method does, otherwise a dataclass field with that default. For example, a `Heater` takes `target_temperature: float = 20.0` as a field instead of declaring `DEFAULT_TARGET_TEMPERATURE: ClassVar[float] = 20.0`
+  - A constant that belongs to a class is a `classproperty` (use the one `krrood` provides)
+  - `ClassVar` is allowed only for state that explicitly has to be shared and mutable across every instance of a class. This almost never applies
+
+### Structured Data
+- Structured data is the default over bare strings, hardcoded values and meaningless numbers: reach for the structured form first and justify the literal, never the other way round
+- A string that names a fixed thing - a payload key, a state, a label, a filename, an environment variable, a command flag, a status - is a `StrEnum` member. A value spelled in two places has no single source to rename, and nothing fails when the two drift apart
+- When the values are more than text - paths, numbers - give the enum values of that type, mixing the type in where Python supports it (`IntEnum`, `StrEnum`). `Path` cannot be mixed in, because pathlib builds every derived path through the enum's own member lookup, so a path enum is a plain `Enum` whose values are `Path`s
+- A magic number becomes an enum member, a field default or a `classproperty`; a bare literal that carries meaning is unreadable where it is used and unsearchable everywhere else
+- JSON that our own classes round-trip goes through `krrood.adapters.json_serializer`: use `DataclassJSONSerializer` wherever it can (de)serialize the class; where a class needs more, subclass `SubclassJSONSerializer` and build on `DataclassJSONSerializer.to_json`/`from_json`. Never hand-write field-by-field `to_json`/`from_json`
+- Data whose shape someone else controls - an API response, a configuration file - is mirrored in dataclasses and parsed by a `from_json` classmethod, so the field names and the access path into the payload are written once
+- A tuple whose positions carry meaning becomes a dataclass, or an enum when the positions are a fixed set of alternatives rather than fields
+- A long literal document - a query, a template, a schema - lives in a file of its own type and is read in, never embedded as a string
 
 ## Type Hints
-- Classes and methods should always have accurate type hints (including `Any`) where applicable
-- When a family of classes each declares the type it handles, carry that type as a bound
-  generic parameter, not as a `ClassVar`: inherit `Generic[T]` plus
-  `krrood.patterns.subclass_safe_generic.SubClassSafeGeneric`, have each member bind it
-  (`class MemberOfFamily(Family[ConcreteType])`), and read it back through
-  `SubClassSafeGeneric`'s own helpers rather than re-deriving it. The binding is then part
-  of the type signature instead of a separate attribute that can disagree with it.
-  Note `SubClassSafeGeneric` is a non-frozen dataclass, so members cannot be
-  `@dataclass(frozen=True)`.
+- Every parameter and return value has an accurate type hint, `Any` and `-> None` included
+- Use builtin generics and `X | None` (`list[int]`, `Pose | None`), never `typing.List`, `Dict`, `Optional` or `Union`; import every other typing construct from `typing_extensions`, never from `typing`
+- Use `from __future__ import annotations` instead of wrapping types in strings
+- Generic classes inherit `Generic[...]` and then `krrood.patterns.subclass_safe_generic.SubClassSafeGeneric`, which narrows field types when a subclass binds a parameter. Read a bound type with `get_type_of_generic_parameter`, never via `__orig_bases__`. Such classes cannot be frozen dataclasses
+- When each class in a family declares the type it handles, carry that type as a bound generic parameter, not a `ClassVar`, so it is part of the signature and cannot disagree with a separate attribute: bind it in each member (`class MemberOfFamily(Family[ConcreteType])`)
 
 ## Documentation
-- Classes and methods should always have meaningful, non-trivial documentation
-- Every field/attribute must be documented with its own docstring placed directly below the field, not described in the class docstring
-- Write docstrings in ReStructuredText format
-- Write docstrings that explain what the function does and not how it does it
-- Keep docstrings short and concise
-- Use Sphinx directives (for example `..note::`, `..warning::`, and `:func:`) where appropriate
-- Do not use all-caps words for emphasis in docstrings or comments; use RST emphasis (`*word*`) if emphasis is genuinely needed
-- Do not create type information for docstrings (type hints already convey this)
-- Do not name a function/class's current callers or consumers in its own docstring (e.g. "used by
-  X and Y"); document what it does and its contract, not who happens to use it today — that
-  reference goes stale the moment a caller changes and misleads a future reader into thinking the
-  list is exhaustive or load-bearing
-- Docstrings must be short and to the point: state what the code does, not a conversation about
-  it. Do not compare against a rejected/alternative design, narrate the review or implementation
-  history, or explain what would happen under a hypothetical design that was not chosen
-- Do not use ALL-CAPS words for emphasis in docstrings or comments; use RST emphasis (`*word*`)
-  instead. This does not apply to genuine identifiers, acronyms, or enum/constant names (e.g.
-  `UUID`, `WHERE`, `Definiteness.DEFINITE`)
+- Every class and method has meaningful, non-trivial documentation in reStructuredText. Every field has its own docstring directly below it, not a description in the class docstring
+- An override that keeps its base contract has no docstring and inherits the base one. One that changes the contract documents only the difference and references the overridden method with `:meth:`
+- A docstring states what the code does and its contract, short and to the point. It never contains:
+  - how the code does it
+  - the ways a caller can supply a value (for example, that it may also be given as a query instead of a concrete object)
+  - the current callers or consumers ("used by X and Y") - that goes stale and reads as exhaustive
+  - justification of design decisions, comparison with rejected or hypothetical designs, or review and implementation history
+  - type information - the type hints carry it
+- Keep docstrings and comments short and never write walls of text. Comments are meaningful and DRY; remove comments that restate the code
+- Reference code with Sphinx roles (`:func:`, `:class:`, `:attr:`, `:meth:`), never with plain backticks, and use directives such as `.. note::` and `.. warning::` for notes and warnings
+- Never use all-caps words for emphasis in docstrings or comments; use RST emphasis (`*word*`). Genuine identifiers, acronyms and enum/constant names (`UUID`, `WHERE`, `Definiteness.DEFINITE`) are exempt
 - Always run `scripts/format_docstrings.py` (black + docformatter) on modified files
 
 ## Domain-Specific Conventions
-- When dealing with spatial types and connections, adhere to the style guide documented in `semantic_digital_twin/doc/style_guide.md`
+- For spatial types and connections, follow `semantic_digital_twin/doc/style_guide.md`
 
 ## Version Control
-- Commits must be authored in the name of the human user running the tool, using their own configured git `user.name` and `user.email`. Never author or amend a commit as an assistant/agent identity.
-- Do not attribute authorship or co-authorship to an assistant: no `Co-Authored-By:` trailer for Claude or any assistant, and no `noreply@anthropic.com` (or similar) as author or committer. The commit's authorship reflects the person responsible for it.
-- It is fine — and encouraged — to acknowledge assistant help in the commit message body with a short plain line, for example `Made with AI assistance`. Do NOT add any info mentioning the particular model or the AI service. Keep it a note, not an author/co-author trailer.
-- This applies to every contributor and every tool.
+- Author commits as the human user running the tool, with their own configured git `user.name` and `user.email`. Never author or amend a commit as an assistant, and never credit one as author or co-author: no `Co-Authored-By:` trailer for an assistant, no `noreply@anthropic.com` or similar as author or committer
+- A short plain line in the commit message body acknowledging assistant help, such as `Made with AI assistance`, is encouraged. Never name the model or the AI service
+- These rules apply to every contributor and every tool
+- Never push to the upstream `cram2/cognitive_robot_abstract_machine` repository - no branch, no tag, whatever the reason. Push only to your fork; work reaches upstream only through a pull request opened from the fork. Before any push, read the full, untruncated `git remote -v` output and confirm the target remote is the fork
+- Never comment on or modify pull requests on the upstream repository, unless you work in a fork and the user has explicitly allowed it - through existing personal notes or instructions, or by accepting when you ask
 
 ## Misc
-- If you find a package that could be replaced by a more powerful one, let us know
-- Always use the Python interpreter that is set as the current project interpreter for running tests and commands
+- Always use the project's configured Python interpreter for tests and commands
+- If a package could be replaced by a more powerful one, tell us

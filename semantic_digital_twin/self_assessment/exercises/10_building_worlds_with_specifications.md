@@ -33,13 +33,17 @@ import os
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.api import (
-    BodySpecification,
+from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
-    RobotSpecification,
-    SemanticAnnotationWithRootSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Milk
 from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3

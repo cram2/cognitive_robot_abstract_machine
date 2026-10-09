@@ -9,11 +9,13 @@ from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import execute_single
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
 from krrood.entity_query_language.backends import ProbabilisticBackend
+from semantic_digital_twin.specifications.connections import (
+    RevoluteConnectionSpecification,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
     Door,
     Handle,
-    Hinge,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
@@ -63,21 +65,15 @@ def wall_door_handle_world():
         handle.root.visual.dye_shapes(Color(R=0.8, G=0.8, B=0.1))
         door.add(handle)
 
-    world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
-    with world.modify_world():
-        hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
-            world=world,
-            world_root_T_self=world_T_hinge,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z(),
-                dof_limits=DegreeOfFreedomLimits(
-                    lower=DerivativeMap(position=0.0, velocity=0.0),
-                    upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
-                ),
+    door.mount_on_movable_joint(
+        RevoluteConnectionSpecification(
+            axis=Vector3.Z(),
+            dof_limits=DegreeOfFreedomLimits(
+                lower=DerivativeMap(position=0.0, velocity=0.0),
+                upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
             ),
         )
-        door.add(hinge)
+    )
 
     return world, wall, door, handle
 
@@ -98,6 +94,4 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     with simulated_robot:
         execute_single(Sage10kOpenDoor(door), context=context).perform()
 
-    assert np.isclose(
-        door.mechanical_joint.root.parent_connection.position, np.pi / 2, atol=2e-2
-    )
+    assert np.isclose(door.movable_joint.position, np.pi / 2, atol=2e-2)

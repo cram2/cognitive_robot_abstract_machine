@@ -5,12 +5,13 @@ Exceptions raised while executing a trajectory on a robot.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Type
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
     SetupException,
 )
+from semantic_digital_twin.adapters.ros.messages import MetaData
 
 
 @dataclass
@@ -82,6 +83,50 @@ class ExecutionCanceledException(ExecutionException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class ClientDisconnectedError(ExecutionException):
+    """
+    Raised when the client that sent the running goal disconnected.
+
+    Nobody is waiting for the motion any more, so it is stopped instead of being run to
+    its end.
+    """
+
+    print_stack_trace: bool = field(default=False, kw_only=True)
+
+    client: MetaData
+    """
+    The client that sent the goal and is now gone.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The client '{self.client.node_name}' (process {self.client.process_id}) "
+            f"that sent this goal is gone."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Restart the client and send the goal again."
+
+
+@dataclass
+class NoWatchedClientError(GiskardException):
+    """
+    Raised when a presence check is asked about a client while it watches none.
+    """
+
+    check_type: Type
+    """
+    The check that was asked.
+    """
+
+    def error_message(self) -> str:
+        return f"'{self.check_type.__name__}' is not watching a client."
+
+    def suggest_correction(self) -> str:
+        return "Only ask a check about a client that it started watching."
 
 
 @dataclass
@@ -331,3 +376,24 @@ class FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(FollowJointTrajectoryError):
     """
     Raised when the action server reports a goal tolerance violation.
     """
+
+@dataclass
+class MotionServerThreadStillRunningError(GiskardException):
+    """
+    Raised when a motion server's background thread does not stop in time.
+    """
+
+    timeout: float
+    """
+    Seconds :meth:`~giskardpy.middleware.ros2.motion_server.MotionServer.stop` waited
+    before giving up on the thread.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The motion server's background thread did not stop within "
+            f"{self.timeout} seconds."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Check whether a goal is stuck or the idle loop is blocked."

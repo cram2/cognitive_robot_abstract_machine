@@ -4,7 +4,9 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from semantic_digital_twin.api import RevoluteConnectionSpecification
+from semantic_digital_twin.specifications.connections import (
+    RevoluteConnectionSpecification,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Floor,

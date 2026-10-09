@@ -17,7 +17,6 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.soft_connections import (
     PiecewiseConstantCurvatureConnection,
     CosseratRodConnection,
@@ -228,9 +227,8 @@ class SoftTrunk(SemanticAnnotation):
             )
 
             prev_body = root_body
-            limits = DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=-10.0, velocity=-10.0),
-                upper=DerivativeMap(position=10.0, velocity=10.0),
+            limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
             )
 
             for section_index, section in enumerate(sections):
@@ -334,13 +332,11 @@ class SoftTrunk(SemanticAnnotation):
             )
 
             prev_body = root_body
-            strain_limits = DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=-10.0, velocity=-10.0),
-                upper=DerivativeMap(position=10.0, velocity=10.0),
+            strain_limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
             )
-            extension_limits = DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=0.1, velocity=-10.0),
-                upper=DerivativeMap(position=3.0, velocity=10.0),
+            extension_limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=0.1, upper_position=3.0, maximum_speed=10.0
             )
 
             for section_index, section in enumerate(sections):
