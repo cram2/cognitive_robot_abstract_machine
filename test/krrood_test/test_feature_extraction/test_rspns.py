@@ -915,6 +915,38 @@ def nested_query_with_undetermined_room_statistics():
     return query
 
 
+@pytest.fixture
+def nested_query_with_rooms_of_one_shape():
+    """
+    A scene whose first two rooms have the same objects in a different order, so their
+    queries have the same shape, and whose third room has other objects.
+    """
+    table, chair = SceneObjectType.TABLE, SceneObjectType.CHAIR
+    query = a(TestExParts)(
+        objects=[a(SceneObject)(type=table)],
+        rooms=[
+            _room_query([table, chair]),
+            _room_query([chair, table]),
+            _room_query([chair, chair, table]),
+        ],
+    )
+    query.resolve()
+    return query
+
+
+@pytest.fixture
+def nested_query_with_undetermined_rooms_of_one_shape():
+    """
+    A scene with two rooms whose object types are left open.
+    """
+    query = a(TestExParts)(
+        objects=[a(SceneObject)(type=SceneObjectType.TABLE)],
+        rooms=[_room_query([..., ...]), _room_query([..., ...])],
+    )
+    query.resolve()
+    return query
+
+
 def test_room_template_models_the_aggregation_statistics_of_its_objects(
     nested_relational_probabilistic_circuit,
 ):
@@ -972,6 +1004,45 @@ def test_ground_names_the_objects_of_every_room_by_their_query_path(
     object_type_names = {
         f"{object_part._variable_}.type"
         for room_part in nested_query_with_determined_room_statistics._kwargs_["rooms"]
+        for object_part in room_part._kwargs_["objects"]
+    }
+    assert object_type_names <= {variable.name for variable in grounded.variables}
+
+
+def test_rooms_of_one_shape_share_their_grounding(
+    nested_relational_probabilistic_circuit, nested_query_with_rooms_of_one_shape
+):
+    template = (
+        nested_relational_probabilistic_circuit.exchangeable_distribution_templates[
+            "rooms"
+        ]
+    )
+    room_parts = nested_query_with_rooms_of_one_shape._kwargs_["rooms"]
+    grounded = template.grounded_templates_of_parts(
+        room_parts, template.template_distribution.ground
+    )
+    prefixes = [
+        template._prefix_for_part(part, index) for index, part in enumerate(room_parts)
+    ]
+    assert grounded[0].circuit is grounded[1].circuit
+    assert grounded[2].circuit is not grounded[0].circuit
+    assert [part.grounded_prefix for part in grounded] == [
+        prefixes[0],
+        prefixes[0],
+        prefixes[2],
+    ]
+    assert [part.prefix for part in grounded] == prefixes
+
+
+def test_rooms_of_one_shape_name_their_objects_by_their_own_query_path(
+    nested_relational_probabilistic_circuit, nested_query_with_rooms_of_one_shape
+):
+    grounded = nested_relational_probabilistic_circuit.ground(
+        nested_query_with_rooms_of_one_shape
+    )
+    object_type_names = {
+        f"{object_part._variable_}.type"
+        for room_part in nested_query_with_rooms_of_one_shape._kwargs_["rooms"]
         for object_part in room_part._kwargs_["objects"]
     }
     assert object_type_names <= {variable.name for variable in grounded.variables}
@@ -1086,6 +1157,27 @@ def test_layered_grounding_of_nested_relations_with_sampled_latents_is_the_groun
     grounded = model.ground(nested_query_with_undetermined_room_statistics)
     np.random.seed(0)
     layered = model.ground_layered(nested_query_with_undetermined_room_statistics)
+    assert_same_distribution(grounded, layered)
+
+
+def test_layered_grounding_of_rooms_of_one_shape_is_the_grounding(
+    nested_relational_probabilistic_circuit, nested_query_with_rooms_of_one_shape
+):
+    model = nested_relational_probabilistic_circuit
+    grounded = model.ground(nested_query_with_rooms_of_one_shape)
+    layered = model.ground_layered(nested_query_with_rooms_of_one_shape)
+    assert_same_distribution(grounded, layered)
+
+
+def test_layered_grounding_of_undetermined_rooms_of_one_shape_is_the_grounding(
+    nested_relational_probabilistic_circuit,
+    nested_query_with_undetermined_rooms_of_one_shape,
+):
+    model = nested_relational_probabilistic_circuit
+    np.random.seed(0)
+    grounded = model.ground(nested_query_with_undetermined_rooms_of_one_shape)
+    np.random.seed(0)
+    layered = model.ground_layered(nested_query_with_undetermined_rooms_of_one_shape)
     assert_same_distribution(grounded, layered)
 
 

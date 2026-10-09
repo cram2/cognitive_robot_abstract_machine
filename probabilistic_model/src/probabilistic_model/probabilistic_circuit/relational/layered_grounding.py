@@ -27,6 +27,7 @@ from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
+    GroundedPartTemplate,
     InstanceMixture,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -61,7 +62,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 from random_events.variable import Variable
 
 if TYPE_CHECKING:
-    from krrood.entity_query_language.query.match import Match
     from probabilistic_model.probabilistic_circuit.relational.rspn import (
         ExchangeableDistributionTemplate,
     )
@@ -206,9 +206,9 @@ class LayeredExchangeableInstances:
     The fitted template of the relation.
     """
 
-    query_parts: List[Match]
+    parts: List[GroundedPartTemplate[LayeredProbabilisticCircuit]]
     """
-    The query parts, one per child object of the relation.
+    The grounded template of every child object of the relation.
     """
 
     assignments: List[PartialPointType]
@@ -221,36 +221,16 @@ class LayeredExchangeableInstances:
     How the instances keep the statistics the query leaves undetermined.
     """
 
-    @cached_property
-    def circuits_of_parts(self) -> List[LayeredProbabilisticCircuit]:
-        """
-        :return: The template of every child object, before conditioning on the
-            aggregation statistics. Without exchangeable relations of its own, the
-            template is the same for every child object, and the child objects share
-            one circuit. Otherwise every child object grounds the template for its own
-            query part.
-        """
-        template_distribution = self.template.template_distribution
-        if not template_distribution.exchangeable_distribution_templates:
-            circuit = RustworkxCircuitToLayeredCircuitConverter.convert(
-                template_distribution.class_probabilistic_circuit
-            )
-            return [circuit] * len(self.query_parts)
-        return [template_distribution.ground_layered(part) for part in self.query_parts]
-
     @property
     def variables(self) -> SortedSet[Variable]:
         """
         :return: The variables the instances add to the grounded circuit.
         """
         result = SortedSet(self.retained_latents.variables)
-        for index, (part, circuit) in enumerate(
-            zip(self.query_parts, self.circuits_of_parts)
-        ):
-            prefix = self.template._prefix_for_part(part, index)
+        for part in self.parts:
             result.update(
-                self.template.variable_of_part(variable, prefix)
-                for variable in circuit.variables
+                self.template.variable_of_part(variable, part)
+                for variable in part.circuit.variables
                 if variable not in self.template.latent_variables
             )
         return result
@@ -297,20 +277,18 @@ class LayeredExchangeableInstances:
         stacked_of_circuit: Dict[int, StackedLayer] = {}
 
         factors = []
-        for index, (part, circuit) in enumerate(
-            zip(self.query_parts, self.circuits_of_parts)
-        ):
+        for part in self.parts:
+            circuit = part.circuit
             if id(circuit) not in stacked_of_circuit:
                 stacked_of_circuit[id(circuit)] = self.conditioned_template(circuit)
             stacked = stacked_of_circuit[id(circuit)]
-            prefix = self.template._prefix_for_part(part, index)
             remap = np.array(
                 [
                     (
                         -1
                         if variable in self.template.latent_variables
                         else variables.index(
-                            self.template.variable_of_part(variable, prefix)
+                            self.template.variable_of_part(variable, part)
                         )
                     )
                     for variable in circuit.variables
@@ -439,6 +417,15 @@ class LayeredExchangeablePartGrounder(
     the layered class circuit.
     """
 
+    @cached_property
+    def part_templates(self) -> List[GroundedPartTemplate[LayeredProbabilisticCircuit]]:
+        """
+        :return: The grounded template of every child object.
+        """
+        return self.template.grounded_templates_of_parts(
+            self.query_parts, self.template.template_distribution.ground_layered
+        )
+
     def single_instance(self) -> LayeredExchangeablePart:
         return LayeredExchangeablePart(
             self.instances(
@@ -490,5 +477,5 @@ class LayeredExchangeablePartGrounder(
         :return: The instances of the part.
         """
         return LayeredExchangeableInstances(
-            self.template, self.query_parts, assignments, retained_latents
+            self.template, self.part_templates, assignments, retained_latents
         )

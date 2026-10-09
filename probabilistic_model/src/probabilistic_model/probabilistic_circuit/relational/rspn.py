@@ -14,10 +14,17 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass, field
 
-import numpy as np
 import pandas as pd
 from sortedcontainers import SortedSet
-from typing_extensions import TYPE_CHECKING, Any, Optional, Type, TypeVar
+from typing_extensions import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Hashable,
+    Optional,
+    Type,
+    TypeVar,
+)
 
 from krrood.ormatic.data_access_objects.dao import (
     DataAccessObjectSchema,
@@ -31,7 +38,6 @@ from krrood.parametrization.feature_extraction.feature_extractor import FeatureE
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import Match
-from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import LearningMethod
 from probabilistic_model.learning.jpt.variables import (
@@ -45,14 +51,18 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
 )
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
+    GroundedCircuit,
+    GroundedPartTemplate,
     GroundingMode,
-    InstanceMixture,
 )
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
 from probabilistic_model.probabilistic_circuit.relational.layered_grounding import (
     LayeredExchangeablePartGrounder,
+)
+from probabilistic_model.probabilistic_circuit.relational.rustworkx_grounding import (
+    RustworkxExchangeablePartGrounder,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
@@ -66,9 +76,6 @@ from probabilistic_model.probabilistic_circuit.relational.template import (
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
-    SumUnit,
-    Unit,
-    leaf,
 )
 from random_events.interval import Interval
 from random_events.variable import Variable
@@ -107,59 +114,48 @@ class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
     conditioning but are not part of the final grounded distribution.
     """
 
-    def _ground_part_circuit(
-        self, part: Match, aggregation_statistics: PartialPointType, index: int = 0
-    ) -> ProbabilisticCircuit:
+    def grounded_templates_of_parts(
+        self, parts: list[Match], ground: Callable[[Match], GroundedCircuit]
+    ) -> list[GroundedPartTemplate[GroundedCircuit]]:
         """
-        Ground and prepare the circuit for a single exchangeable part.
+        :param parts: The query parts, one per child object of the relation.
+        :param ground: Grounds the template for one query part.
+        :return: The grounded template of every part. Parts whose queries have the same
+            shape share one grounding.
+        """
+        groundings: dict[Hashable, tuple[GroundedCircuit, str]] = {}
+        result = []
+        for index, part in enumerate(parts):
+            prefix = self._prefix_for_part(part, index)
+            shape = self.template_distribution.query_shape(part)
+            if shape not in groundings:
+                groundings[shape] = (ground(part), prefix)
+            circuit, grounded_prefix = groundings[shape]
+            result.append(GroundedPartTemplate(circuit, grounded_prefix, prefix))
+        return result
 
-        Conditions the template circuit on ``aggregation_statistics``, marginalizes away
-        the latent variables, renames surviving variables with the part's prefix, and
-        reindexes the graph for safe mounting.
-
-        :param part: The query part being grounded.
-        :param aggregation_statistics: Observed aggregation values to condition on.
-        :param index: Position of this part in its parent list; used as fallback prefix
-            when ``part`` does not carry a symbolic variable.
-        :return: A self-contained circuit ready to be mounted into the parent.
+    def variable_of_part(
+        self, variable: Variable, part: GroundedPartTemplate[Any]
+    ) -> Variable:
         """
-        part_circuit = self.template_distribution.ground(part)
-        conditioning_result, _ = part_circuit.log_conditional_in_place(
-            aggregation_statistics, preserve_structure=True
-        )
-        if conditioning_result is None:
-            part_circuit = self.template_distribution.ground(part)
-        non_latent_variables = [
-            variable
-            for variable in part_circuit.variables
-            if variable not in self.latent_variables
-        ]
-        part_circuit.restrict_to_variables_in_place(non_latent_variables)
-        prefix = self._prefix_for_part(part, index)
-        part_circuit.update_variables(
-            {
-                variable: self.variable_of_part(variable, prefix)
-                for variable in part_circuit.variables
-            }
-        )
-        if len(part_circuit.nodes()) == 0:
-            raise PartCircuitGroundingFailedError(self.template_distribution.class_)
-        return part_circuit
-
-    def variable_of_part(self, variable: Variable, prefix: str) -> Variable:
+        :param variable: A variable of the grounded template of a part.
+        :param part: The grounded template of the part.
+        :return: The variable of the part. A variable of the template's class circuit
+            is put under the namespace of the part. A variable of an exchangeable
+            relation of the template, which its grounding names by its full query path,
+            is moved from the namespace the template was grounded for to that of the
+            part.
         """
-        :param variable: A variable of the template grounded for one part.
-        :param prefix: The namespace of that part.
-        :return: The variable under the namespace of the part, or the variable itself
-            if it belongs to an exchangeable relation of the template, whose grounding
-            already names it by its full query path.
-        """
-        if (
-            variable
-            not in self.template_distribution.class_probabilistic_circuit.variables
-        ):
+        if variable in self.template_distribution.class_probabilistic_circuit.variables:
+            return type(variable)(
+                f"{part.prefix}.{variable.name}", domain=variable.domain
+            )
+        if part.prefix == part.grounded_prefix:
             return variable
-        return type(variable)(f"{prefix}.{variable.name}", domain=variable.domain)
+        return type(variable)(
+            part.prefix + variable.name[len(part.grounded_prefix) :],
+            domain=variable.domain,
+        )
 
     def ground(
         self, parts_to_ground: list[Match], aggregation_statistics: PartialPointType
@@ -172,148 +168,69 @@ class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
             parts.
         :return: A product circuit over the grounded distributions of all parts.
         """
-        result = ProbabilisticCircuit()
-        root = ProductUnit(probabilistic_circuit=result)
-        for index, part in enumerate(parts_to_ground):
-            part_circuit = self._ground_part_circuit(
-                part, aggregation_statistics, index
-            )
-            root.add_subcircuit(self._mount_part(result, part_circuit))
-        return result
+        return self.ground_instance(
+            self.grounded_templates_of_parts(
+                parts_to_ground, self.template_distribution.ground
+            ),
+            aggregation_statistics,
+        )
 
-
-@dataclass
-class RustworkxExchangeablePartGrounder(ExchangeablePartGrounder[ProbabilisticCircuit]):
-    """
-    Grounds one exchangeable part by mounting its instances into the rustworkx class
-    circuit.
-    """
-
-    def single_instance(self) -> ProbabilisticCircuit:
-        """
-        :return: The class circuit, with the instance mounted once and shared as a
-            child of every mounting node.
-        """
-        instance_root = self._mount_instance(self.determined_statistics)
-        for product_node in self.product_nodes_to_extend:
-            product_node.add_subcircuit(instance_root)
-        return self.circuit
-
-    def sampled_mixture(self, mixture: InstanceMixture) -> ProbabilisticCircuit:
-        """
-        :param mixture: The sampled assignments of the undetermined statistics, with
-            their weights at every mounting node.
-        :return: The class circuit, with every mounting node multiplying its own
-            normalized sum unit over the instances.
-        """
-        instance_roots = [
-            self._mount_instance_with_retained_latents(assignment)
-            for assignment in mixture.assignments
-        ]
-        for product_node, log_weights in zip(
-            self.product_nodes_to_extend, mixture.log_weights
-        ):
-            self._attach_mixture_to_node(
-                product_node, instance_roots, log_weights.tolist()
-            )
-        return self.circuit
-
-    def partition_mixture(
-        self, mixture: InstanceMixture, branches: list[Unit]
+    def ground_instance(
+        self,
+        parts: list[GroundedPartTemplate[ProbabilisticCircuit]],
+        aggregation_statistics: PartialPointType,
     ) -> ProbabilisticCircuit:
         """
-        :param mixture: A representative assignment of every branch, with the weights
-            of the branches at every mounting node.
-        :param branches: The branches of the partition.
-        :return: The class circuit, with every mounting node multiplying its own
-            normalized sum unit over the instances, each mounted beside its branch.
+        :param parts: The grounded template of every part.
+        :param aggregation_statistics: Observed aggregation values shared across all
+            parts.
+        :return: A product circuit over the conditioned templates of all parts.
         """
-        mounted_roots = []
-        for assignment, latent_branch in zip(mixture.assignments, branches):
-            instance_root = self._mount_instance(
-                {**self.determined_statistics, **assignment}
+        result = ProbabilisticCircuit()
+        root = ProductUnit(probabilistic_circuit=result)
+        for part in parts:
+            root.add_subcircuit(
+                self._mount_part(
+                    result, self._conditioned_part(part, aggregation_statistics)
+                )
             )
-            branch_root = ProductUnit(probabilistic_circuit=self.circuit)
-            branch_root.add_subcircuit(instance_root)
-            mounted_branch_nodes = self.circuit.mount(latent_branch)
-            branch_root.add_subcircuit(mounted_branch_nodes[latent_branch.index])
-            mounted_roots.append(branch_root)
+        return result
 
-        for product_node, log_weights in zip(
-            self.product_nodes_to_extend, mixture.log_weights
-        ):
-            self._attach_mixture_to_node(
-                product_node, mounted_roots, log_weights.tolist()
-            )
-        return self.circuit
-
-    def _mount_instance(self, aggregation_statistics: PartialPointType) -> Unit:
-        """
-        Ground one exchangeable instance and mount it into the class circuit.
-
-        :param aggregation_statistics: Statistics to condition the instance on.
-        :return: The root of the mounted instance, owned by ``circuit``.
-        """
-        grounded = self.template.ground(self.query_parts, aggregation_statistics)
-        node_index_map = self.circuit.mount(grounded.root)
-        return node_index_map[grounded.root.index]
-
-    def _mount_instance_with_retained_latents(
-        self, assignment: PartialPointType
-    ) -> Unit:
-        """
-        Ground one exchangeable instance and retain its sampled latents as variables.
-
-        Same grounding as :meth:`_mount_instance`, but each variable in
-        ``undetermined_latents`` is additionally mounted as a point-valued sibling leaf
-        at its sampled value, instead of leaving it to be marginalized away. Distinct
-        sampled values produce disjoint singleton supports by construction, so the
-        resulting mixture stays support-deterministic on the retained latents.
-
-        :param assignment: The sampled values of ``undetermined_latents`` for this
-            instance.
-        :return: The root of a product uniting the mounted instance with a point leaf
-            per retained latent, owned by ``circuit``.
-        """
-        instance_root = self._mount_instance(
-            {**self.determined_statistics, **assignment}
-        )
-        wrapper = ProductUnit(probabilistic_circuit=self.circuit)
-        wrapper.add_subcircuit(instance_root)
-        for variable in self.undetermined_latents:
-            wrapper.add_subcircuit(
-                leaf(make_dirac(variable, assignment[variable]), self.circuit)
-            )
-        return wrapper
-
-    def _attach_mixture_to_node(
+    def _conditioned_part(
         self,
-        product_node: ProductUnit,
-        instance_roots: list[Unit],
-        log_weights: list[float],
-    ) -> None:
+        part: GroundedPartTemplate[ProbabilisticCircuit],
+        aggregation_statistics: PartialPointType,
+    ) -> ProbabilisticCircuit:
         """
-        Attach a normalized sum unit over exchangeable instances to one node.
+        Condition a copy of the grounded template of a part on
+        ``aggregation_statistics`` and remove the latent variables.
 
-        Instances whose node-local likelihood is zero are skipped; at least one has a
-        positive one, since :meth:`_node_local_assignments` draws a node's own samples
-        otherwise. The instances are already mounted in ``circuit`` and shared across
-        all mounting nodes; only the weighted sum-unit edges differ per node.
-
-        :param product_node: The mounting product node to extend.
-        :param instance_roots: The roots of the mounted exchangeable instances.
-        :param log_weights: The node-local log-likelihood weight of each instance.
+        :param part: The grounded template of the part.
+        :param aggregation_statistics: Observed aggregation values to condition on.
+        :return: A self-contained circuit over the variables of the part, ready to be
+            mounted into the parent.
         """
-        weighted_instances = [
-            (instance_root, log_weight)
-            for instance_root, log_weight in zip(instance_roots, log_weights)
-            if log_weight > -np.inf
+        part_circuit = part.circuit.__deepcopy__()
+        conditioning_result, _ = part_circuit.log_conditional_in_place(
+            aggregation_statistics, preserve_structure=True
+        )
+        if conditioning_result is None:
+            part_circuit = part.circuit.__deepcopy__()
+        non_latent_variables = [
+            variable
+            for variable in part_circuit.variables
+            if variable not in self.latent_variables
         ]
-        sum_unit = SumUnit(probabilistic_circuit=self.circuit)
-        product_node.add_subcircuit(sum_unit)
-        for instance_root, log_weight in weighted_instances:
-            sum_unit.add_subcircuit(instance_root, log_weight)
-        sum_unit.normalize()
+        part_circuit.restrict_to_variables_in_place(non_latent_variables)
+        part_circuit.update_variables(
+            {
+                variable: self.variable_of_part(variable, part)
+                for variable in part_circuit.variables
+            }
+        )
+        if len(part_circuit.nodes()) == 0:
+            raise PartCircuitGroundingFailedError(self.template_distribution.class_)
+        return part_circuit
 
 
 @dataclass
@@ -605,6 +522,31 @@ class RelationalProbabilisticCircuit:
             aggregation_statistics
         )
         return conditioned is not None
+
+    def query_shape(self, query: Match) -> Hashable:
+        """
+        :param query: A query this circuit is grounded for.
+        :return: What the structure of the grounding depends on: the aggregation
+            statistics and query parts of every exchangeable relation. Queries of the
+            same shape are grounded into circuits that differ only in the names of their
+            variables and, for sampled statistics, in the samples.
+        """
+        instance = query.construct_instance()
+        return tuple(
+            (
+                exchangeable_part_name,
+                frozenset(
+                    compute_aggregation_statistics(
+                        instance, exchangeable_part_name, template.latent_variables
+                    ).items()
+                ),
+                tuple(
+                    template.template_distribution.query_shape(part)
+                    for part in query._kwargs_[exchangeable_part_name]
+                ),
+            )
+            for exchangeable_part_name, template in self.exchangeable_distribution_templates.items()
+        )
 
     def ground(
         self,

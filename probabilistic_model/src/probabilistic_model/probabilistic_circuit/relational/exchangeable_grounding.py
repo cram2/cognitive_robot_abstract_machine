@@ -47,6 +47,11 @@ GroundedPart = TypeVar("GroundedPart")
 What a grounder turns the instances of one exchangeable part into.
 """
 
+GroundedCircuit = TypeVar("GroundedCircuit")
+"""
+The circuit a template is grounded into.
+"""
+
 
 class GroundingMode(enum.IntEnum):
     """
@@ -64,6 +69,29 @@ class GroundingMode(enum.IntEnum):
     """
     One instance per branch of the fitted partition over the statistics, carrying the
     branch.
+    """
+
+
+@dataclass
+class GroundedPartTemplate(Generic[GroundedCircuit]):
+    """
+    The template of one child object, grounded for the query part of a child object
+    whose query has the same shape.
+    """
+
+    circuit: GroundedCircuit
+    """
+    The grounded template, shared by every child object of the same shape.
+    """
+
+    grounded_prefix: str
+    """
+    The namespace of the child object the template was grounded for.
+    """
+
+    prefix: str
+    """
+    The namespace of the child object.
     """
 
 
