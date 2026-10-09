@@ -40,7 +40,9 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import StrEnum
+from enum import Enum, StrEnum
+from functools import cache
+from itertools import combinations
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -61,6 +63,97 @@ This module's logger, which is also what its command prints through.
 
 MAXIMUM_DEPENDENCY_STACK_LEVEL = 4
 """Same-track dependency chains deeper than this wrap back to indent level 0."""
+
+
+@dataclass(frozen=True)
+class HideableStatus:
+    """An item status the dashboard hides by default, behind its own sidebar
+    checkbox."""
+
+    status: ItemStatus
+    """The status the checkbox governs."""
+
+    toggle_label: str
+    """The checkbox's label."""
+
+    @property
+    def page_css_class(self) -> str:
+        """The class the page carries while this status is hidden."""
+        return f"hide-{self.status.value}"
+
+    @property
+    def toggle_element_id(self) -> str:
+        """The checkbox's ``id`` attribute."""
+        return f"show-{self.status.value}-toggle"
+
+
+class DefaultHiddenStatus(HideableStatus, Enum):
+    """Every status hidden by default, in the order its checkbox appears. Both
+    mean there is nothing to act on: a done item has landed, and a deferred one
+    is intentionally paused or superseded."""
+
+    DONE = (ItemStatus.DONE, "Show done / merged items")
+    DEFERRED = (ItemStatus.DEFERRED, "Show deferred items")
+
+
+@dataclass(frozen=True)
+class VisibilityFilter:
+    """One combination of statuses the page can have hidden at once.
+
+    The page carries one class per hidden status, so plain CSS picks each
+    item's matching indent level and wrap arrow the moment a checkbox is
+    ticked, with nothing re-rendered."""
+
+    hidden: tuple[HideableStatus, ...]
+    """The statuses hidden in this combination, in :class:`DefaultHiddenStatus`
+    order; empty when everything shows."""
+
+    @classmethod
+    @cache
+    def every_combination(cls) -> tuple[VisibilityFilter, ...]:
+        """Every state the sidebar's checkboxes can put the page in, shortest
+        first, so a filter always precedes the ones hiding a superset of it.
+        Computed once."""
+        return tuple(
+            cls(combination)
+            for size in range(len(DefaultHiddenStatus) + 1)
+            for combination in combinations(DefaultHiddenStatus, size)
+        )
+
+    @property
+    def hidden_statuses(self) -> frozenset[ItemStatus]:
+        """The statuses this filter hides."""
+        return frozenset(hideable.status for hideable in self.hidden)
+
+    @property
+    def name(self) -> str:
+        """A stable identifier for this combination, used to key its CSS."""
+        if not self.hidden:
+            return "show-all"
+        return "hide-" + "-".join(hideable.status.value for hideable in self.hidden)
+
+    @property
+    def page_selector(self) -> str:
+        """The selector matching a page that hides at least these statuses -
+        the more it hides, the more specific it is, so the cascade alone
+        resolves which of two applicable rules wins."""
+        return "".join(f".{hideable.page_css_class}" for hideable in self.hidden)
+
+    @property
+    def indent_variable_name(self) -> str:
+        """The CSS custom property holding an item's indent level under this
+        filter."""
+        return f"--indent-level-{self.name}"
+
+    @property
+    def wrap_arrow_css_class(self) -> str:
+        """The class marking the wrap-around arrow that belongs to this
+        filter."""
+        return f"wrap-arrow-{self.name}"
+
+    def hides_more_than(self, other: VisibilityFilter) -> bool:
+        """Whether this filter hides everything ``other`` does, and more."""
+        return other.hidden_statuses < self.hidden_statuses
 
 
 class LiveState(StrEnum):
@@ -932,20 +1025,10 @@ class DashboardSummary:
         }
 
 
-@dataclass
-class StackedItem:
-    """One item's position within its track's dependency stack, for the
-    ``item_card`` template macro to render.
-
-    Carries two independent indent computations - as normally shown, and as
-    shown once done items are hidden - so the page can switch between them
-    client-side (see ``hide-done`` in dashboard.html) without a re-render:
-    a done dependency, once hidden, no longer visually justifies indenting
-    its dependents, so they dedent as if they had no dependency on it at
-    all rather than merely one level shallower."""
-
-    item: Item
-    """The item itself."""
+@dataclass(frozen=True)
+class StackPosition:
+    """Where one item sits in its track's dependency stack, under one
+    :class:`VisibilityFilter`."""
 
     indent_level: int
     """How deeply nested this item is under its same-track dependency chain,
@@ -955,22 +1038,33 @@ class StackedItem:
     """The item this one visually continues from, if the chain wrapped back
     to indent level 0 past the cap; ``None`` otherwise."""
 
-    indent_level_with_done_hidden: int
-    """:attr:`indent_level`, recomputed as if every ``done`` item in the
-    same-track dependency chain weren't a dependency at all."""
 
-    wrap_parent_with_done_hidden: Item | None
-    """:attr:`wrap_parent`, recomputed the same way - never itself a
-    ``done`` item, since a done wrap-parent would be invisible in that view."""
+@dataclass
+class StackedItem:
+    """One item's position within its track's dependency stack, for the
+    ``item_card`` template macro to render.
+
+    Carries an independent position per :class:`VisibilityFilter`, so the
+    page can switch between them client-side without a re-render: a hidden
+    dependency no longer visually justifies indenting its dependents, so
+    they dedent as if they had no dependency on it at all rather than merely
+    one level shallower."""
+
+    item: Item
+    """The item itself."""
+
+    positions: dict[VisibilityFilter, StackPosition]
+    """This item's place in the stack under each filter."""
 
     @property
     def indent_style(self) -> str:
-        """The card's ``style`` attribute value: both indent levels as CSS
-        custom properties, so plain CSS (keyed off the page's ``hide-done``
-        class) picks whichever applies without any per-toggle re-render."""
-        return (
-            f"--indent-level: {self.indent_level}; "
-            f"--indent-level-hidden-done: {self.indent_level_with_done_hidden};"
+        """The card's ``style`` attribute value: every filter's indent level
+        as a CSS custom property, so plain CSS (keyed off the page's hidden-
+        status classes) picks whichever applies without any per-toggle
+        re-render."""
+        return " ".join(
+            f"{visibility_filter.indent_variable_name}: {position.indent_level};"
+            for visibility_filter, position in self.positions.items()
         )
 
 
@@ -1065,6 +1159,8 @@ class DashboardRenderer:
             roadmap_html=render_markdown_to_html(self.roadmap_text),
             waves=self._build_wave_sections(),
             available_models=AVAILABLE_MODELS,
+            hideable_statuses=DefaultHiddenStatus,
+            visibility_filters=VisibilityFilter.every_combination(),
         )
 
         summary = DashboardSummary(
@@ -1323,11 +1419,8 @@ class DashboardRenderer:
     @staticmethod
     def _build_track_stack(track_items: list[Item]) -> list[StackedItem]:
         """Order a track's items into a dependency stack (same-track
-        depends_on only), assign an indent level per item capped at
-        :data:`MAXIMUM_DEPENDENCY_STACK_LEVEL`, wrapping back to level 0
-        (with a reference back to the real parent) past the cap. Also
-        computes each item's indent as it would be with done items hidden -
-        see :class:`StackedItem`."""
+        depends_on only) and give each one a :class:`StackPosition` per
+        :class:`VisibilityFilter` - see :class:`StackedItem`."""
         items_by_identifier = {item.identifier: item for item in track_items}
 
         def same_track_parent(item: Item) -> Item | None:
@@ -1347,54 +1440,52 @@ class DashboardRenderer:
             else:
                 children_by_parent.setdefault(parent.identifier, []).append(item)
 
-        visible_stack_cache: dict[str, tuple[int, Item | None]] = {}
+        position_cache: dict[tuple[str, VisibilityFilter], StackPosition] = {}
 
-        def visible_stack_position(item: Item) -> tuple[int, Item | None]:
-            """This item's indent level and wrap-parent once ``done`` items
-            are excluded from the same-track dependency chain entirely - a
-            done dependency is treated exactly as if it weren't a
-            dependency at all, so its dependents dedent back to level 0
-            rather than merely one level shallower."""
-            if item.identifier in visible_stack_cache:
-                return visible_stack_cache[item.identifier]
+        def stack_position(
+            item: Item, visibility_filter: VisibilityFilter
+        ) -> StackPosition:
+            """This item's indent level and wrap-parent once the filter's
+            statuses are excluded from the same-track dependency chain
+            entirely - a hidden dependency is treated exactly as if it
+            weren't a dependency at all, so its dependents dedent back to
+            level 0 rather than merely one level shallower. Past
+            :data:`MAXIMUM_DEPENDENCY_STACK_LEVEL` the chain wraps back to
+            level 0, and only the item that wraps carries a wrap-parent."""
+            cache_key = (item.identifier, visibility_filter)
+            if cache_key in position_cache:
+                return position_cache[cache_key]
             parent = same_track_parent(item)
-            if parent is None or parent.status is ItemStatus.DONE:
-                result = (0, None)
+            if parent is None or parent.status in visibility_filter.hidden_statuses:
+                position = StackPosition(indent_level=0, wrap_parent=None)
             else:
-                parent_level, parent_wrap_parent = visible_stack_position(parent)
-                next_level = parent_level + 1
+                next_level = stack_position(parent, visibility_filter).indent_level + 1
                 if next_level > MAXIMUM_DEPENDENCY_STACK_LEVEL:
-                    result = (0, parent)
+                    position = StackPosition(indent_level=0, wrap_parent=parent)
                 else:
-                    result = (next_level, parent_wrap_parent)
-            visible_stack_cache[item.identifier] = result
-            return result
+                    position = StackPosition(indent_level=next_level, wrap_parent=None)
+            position_cache[cache_key] = position
+            return position
 
         stacked_items: list[StackedItem] = []
 
-        def walk(item: Item, level: int, wrap_parent: Item | None) -> None:
+        def walk(item: Item) -> None:
             """Depth-first-visit one item and its same-track dependents,
             appending a :class:`StackedItem` per visit."""
-            next_level = level + 1
-            wrap_for_children = None
-            if next_level > MAXIMUM_DEPENDENCY_STACK_LEVEL:
-                next_level = 0
-                wrap_for_children = item
-            visible_level, visible_wrap_parent = visible_stack_position(item)
             stacked_items.append(
                 StackedItem(
                     item=item,
-                    indent_level=level,
-                    wrap_parent=wrap_parent,
-                    indent_level_with_done_hidden=visible_level,
-                    wrap_parent_with_done_hidden=visible_wrap_parent,
+                    positions={
+                        visibility_filter: stack_position(item, visibility_filter)
+                        for visibility_filter in VisibilityFilter.every_combination()
+                    },
                 )
             )
             for child in children_by_parent.get(item.identifier, []):
-                walk(child, next_level, wrap_for_children)
+                walk(child)
 
         for root in roots:
-            walk(root, 0, None)
+            walk(root)
 
         return stacked_items
 

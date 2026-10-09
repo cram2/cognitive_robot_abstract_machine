@@ -263,7 +263,7 @@
   .stat-num { font-weight: 700; font-size: 1.05rem; }
   .stat-label { font-size: 0.74rem; color: var(--text-muted); }
 
-  .done-toggle {
+  .visibility-toggle {
     display: flex;
     align-items: center;
     gap: 0.45rem;
@@ -272,7 +272,8 @@
     color: var(--text-muted);
     cursor: pointer;
   }
-  .done-toggle input { accent-color: var(--accent); cursor: pointer; }
+  .visibility-toggle + .visibility-toggle { margin-top: 0.35rem; }
+  .visibility-toggle input { accent-color: var(--accent); cursor: pointer; }
 
   .alert-banner {
     border-radius: 8px;
@@ -398,22 +399,33 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
-    margin-left: calc(var(--indent-level, 0) * 1.75rem);
   }
-  .page.hide-done .item {
-    margin-left: calc(var(--indent-level-hidden-done, 0) * 1.75rem);
-  }
-  .page.hide-done .item.status-done { display: none; }
+  {% for hideable in hideable_statuses %}
+  .page.{{ hideable.page_css_class }} .item.status-{{ hideable.status.value }} { display: none; }
+  {% endfor %}
+
+  /* One indent level and one wrap-around arrow per visibility filter, all
+     rendered up front and selected here by how many statuses the page is
+     hiding - the more a filter hides, the more classes its selector needs,
+     so the cascade alone resolves which applies. An arrow is suppressed
+     under every filter hiding more than its own, where a different arrow
+     (or none) is the right one. */
+  {% for visibility_filter in visibility_filters %}
+  .page{{ visibility_filter.page_selector }} .item { margin-left: calc(var({{ visibility_filter.indent_variable_name }}, 0) * 1.75rem); }
+  .page{{ visibility_filter.page_selector }} .{{ visibility_filter.wrap_arrow_css_class }} { display: block; }
+  {% for wider in visibility_filters if wider.hides_more_than(visibility_filter) %}
+  .page{{ wider.page_selector }} .{{ visibility_filter.wrap_arrow_css_class }} { display: none; }
+  {% endfor %}
+  {% endfor %}
+
   .wrap-arrow {
+    display: none;
     font-size: 0.72rem;
     color: var(--accent-strong);
     background: var(--accent-tint);
     padding: 0.3rem 0.75rem;
     border-bottom: 1px solid var(--border);
   }
-  .wrap-arrow.wrap-arrow-hidden-done { display: none; }
-  .page.hide-done .wrap-arrow.wrap-arrow-all { display: none; }
-  .page.hide-done .wrap-arrow.wrap-arrow-hidden-done { display: block; }
   .wrap-parent-title { color: var(--text-muted); }
   .item-row { display: flex; }
   .item-spine { width: 4px; flex-shrink: 0; background: var(--status-notstarted); }
@@ -632,12 +644,9 @@
 {% macro item_card(stacked) %}
 {% set item = stacked.item %}
     <article id="item-{{ item.identifier }}" class="item {{ item.status_and_drift_css_class }}" style="{{ stacked.indent_style }}">
-      {% if stacked.wrap_parent %}
-      <div class="wrap-arrow wrap-arrow-all">◄ continues from <span class="mono">{{ stacked.wrap_parent.identifier }}</span> <span class="wrap-parent-title">({{ stacked.wrap_parent.title }})</span></div>
-      {% endif %}
-      {% if stacked.wrap_parent_with_done_hidden %}
-      <div class="wrap-arrow wrap-arrow-hidden-done">◄ continues from <span class="mono">{{ stacked.wrap_parent_with_done_hidden.identifier }}</span> <span class="wrap-parent-title">({{ stacked.wrap_parent_with_done_hidden.title }})</span></div>
-      {% endif %}
+      {% for visibility_filter, position in stacked.positions.items() if position.wrap_parent %}
+      <div class="wrap-arrow {{ visibility_filter.wrap_arrow_css_class }}">◄ continues from <span class="mono">{{ position.wrap_parent.identifier }}</span> <span class="wrap-parent-title">({{ position.wrap_parent.title }})</span></div>
+      {% endfor %}
       <div class="item-row">
         <div class="item-spine"></div>
         <div class="item-body">
@@ -693,7 +702,7 @@
     </article>
 {% endmacro %}
 
-<div class="page hide-done" id="plan-dashboard-page">
+<div class="page{% for hideable in hideable_statuses %} {{ hideable.page_css_class }}{% endfor %}" id="plan-dashboard-page">
   <header class="masthead">
     <p class="eyebrow">Plan Dashboard</p>
     <h1>{{ title }}</h1>
@@ -742,10 +751,12 @@
           <div class="stat"><span class="stat-num">{{ status_counts[status] }}</span><span class="stat-label">{{ status.value | capitalize }}</span></div>
           {% endfor %}
         </div>
-        <label class="done-toggle">
-          <input type="checkbox" id="show-done-toggle" onchange="document.getElementById('plan-dashboard-page').classList.toggle('hide-done', !this.checked)">
-          Show done / merged items
+        {% for hideable in hideable_statuses %}
+        <label class="visibility-toggle">
+          <input type="checkbox" id="{{ hideable.toggle_element_id }}" onchange="document.getElementById('plan-dashboard-page').classList.toggle('{{ hideable.page_css_class }}', !this.checked)">
+          {{ hideable.toggle_label }}
         </label>
+        {% endfor %}
         {% if drift_items %}
         <div class="alert-banner drift-banner">
           <strong>{{ drift_items | length }} drift flag(s)</strong>

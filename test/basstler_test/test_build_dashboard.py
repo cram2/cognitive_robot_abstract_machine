@@ -15,8 +15,10 @@ import yaml
 from basstler.build_dashboard import (
     AVAILABLE_MODELS,
     DashboardRenderer,
+    DefaultHiddenStatus,
     DependencyCycle,
     DuplicateItemId,
+    HideableStatus,
     InvalidBlockers,
     InvalidDependsOn,
     InvalidManifestRoot,
@@ -33,12 +35,14 @@ from basstler.build_dashboard import (
     PullRequestRecord,
     PullRequestsByRepository,
     PullRequestState,
+    StackPosition,
     StackedItem,
     Track,
     UnknownDependency,
     UnknownStatus,
     UnknownTrack,
     UnknownWave,
+    VisibilityFilter,
     Wave,
     classify_live_state,
     load_pull_requests_by_repository,
@@ -84,6 +88,39 @@ def minimal_plan(**overrides: Any) -> dict[str, Any]:
     }
     plan.update(overrides)
     return plan
+
+
+def visibility_filter(*hidden: ItemStatus) -> VisibilityFilter:
+    """
+    The one filter among :meth:`VisibilityFilter.every_combination` hiding exactly
+    ``hidden``.
+
+    :param hidden: The statuses that filter hides; none for the show-everything filter.
+    """
+    wanted = frozenset(hidden)
+    return next(
+        candidate
+        for candidate in VisibilityFilter.every_combination()
+        if candidate.hidden_statuses == wanted
+    )
+
+
+def position_of(
+    stacked_items: list[StackedItem], identifier: str, *hidden: ItemStatus
+) -> StackPosition:
+    """
+    One item's place in its track's stack, under the filter hiding exactly ``hidden``.
+
+    :param stacked_items: The whole track's stack, as built by the renderer.
+    :param identifier: The item to look up.
+    :param hidden: The statuses hidden in the view being asserted about.
+    """
+    stacked = next(
+        candidate
+        for candidate in stacked_items
+        if candidate.item.identifier == identifier
+    )
+    return stacked.positions[visibility_filter(*hidden)]
 
 
 # %% validate_plan
@@ -500,15 +537,20 @@ def test_is_ready_for_dependent_review_false_when_there_is_no_pull_request():
     assert not fresh_item.is_ready_for_dependent_review()
 
 
-def test_stacked_item_indent_style_exposes_both_indent_levels_as_css_variables():
+def test_stacked_item_indent_style_exposes_one_indent_level_per_visibility_filter():
     stacked = StackedItem(
         item=Item(title="A", branch="a", track="track-1", status=ItemStatus.DONE),
-        indent_level=2,
-        wrap_parent=None,
-        indent_level_with_done_hidden=0,
-        wrap_parent_with_done_hidden=None,
+        positions={
+            visibility_filter(): StackPosition(indent_level=2, wrap_parent=None),
+            visibility_filter(ItemStatus.DONE): StackPosition(
+                indent_level=0, wrap_parent=None
+            ),
+        },
     )
-    assert stacked.indent_style == "--indent-level: 2; --indent-level-hidden-done: 0;"
+    assert (
+        stacked.indent_style
+        == "--indent-level-show-all: 2; --indent-level-hide-done: 0;"
+    )
 
 
 def test_plan_repository_url():
@@ -1388,8 +1430,11 @@ def test_track_stack_wraps_past_the_maximum_level():
         )
     renderer = make_renderer(items)
     stacked_items = renderer._build_track_stack(items)
-    assert [stacked.indent_level for stacked in stacked_items] == [0, 1, 2, 3, 4, 0]
-    assert stacked_items[-1].wrap_parent.identifier == "item-4"
+    assert [
+        position_of(stacked_items, f"item-{index}").indent_level
+        for index in range(chain_length)
+    ] == [0, 1, 2, 3, 4, 0]
+    assert position_of(stacked_items, "item-5").wrap_parent.identifier == "item-4"
 
 
 def test_track_stack_does_not_wrap_within_the_maximum_level():
@@ -1404,38 +1449,165 @@ def test_track_stack_does_not_wrap_within_the_maximum_level():
         )
     renderer = make_renderer(items)
     stacked_items = renderer._build_track_stack(items)
-    assert all(stacked.wrap_parent is None for stacked in stacked_items)
+    assert all(
+        position_of(stacked_items, stacked.item.identifier).wrap_parent is None
+        for stacked in stacked_items
+    )
 
 
-# %% DashboardRenderer - dependency stacking / hidden-done dedent
+def test_only_the_item_that_wraps_carries_a_wrap_parent():
+    # The chain wraps at item-5, which continues from item-4. item-6 sits one
+    # level in under item-5 and continues from nothing: it is on screen
+    # directly beneath the parent it is indented under, so an arrow pointing
+    # back at item-4 would name an item it does not hang off.
+    chain_length = MAXIMUM_DEPENDENCY_STACK_LEVEL + 3
+    items = [item("item-0", ItemStatus.NOT_STARTED)]
+    for index in range(1, chain_length):
+        items.append(
+            item(
+                f"item-{index}",
+                ItemStatus.NOT_STARTED,
+                depends_on=[f"item-{index - 1}"],
+            )
+        )
+    renderer = make_renderer(items)
+    stacked_items = renderer._build_track_stack(items)
+    assert position_of(stacked_items, "item-6").indent_level == 1
+    assert position_of(stacked_items, "item-6").wrap_parent is None
 
 
-def test_hidden_done_indent_dedents_a_dependent_of_a_done_item_to_zero():
+# %% hideable statuses / visibility filters
+
+
+def test_every_hideable_status_is_one_a_manifest_item_can_carry():
+    assert all(hideable.status in set(ItemStatus) for hideable in DefaultHiddenStatus)
+
+
+def test_done_and_deferred_are_the_hideable_statuses():
+    assert [hideable.status for hideable in DefaultHiddenStatus] == [
+        ItemStatus.DONE,
+        ItemStatus.DEFERRED,
+    ]
+
+
+def test_default_hidden_statuses_are_hideable_statuses():
+    assert all(isinstance(member, HideableStatus) for member in DefaultHiddenStatus)
+
+
+def test_every_combination_is_computed_once():
+    assert VisibilityFilter.every_combination() is VisibilityFilter.every_combination()
+
+
+def test_visibility_filters_cover_every_combination_of_hideable_statuses():
+    every_status = {hideable.status for hideable in DefaultHiddenStatus}
+    assert [
+        candidate.hidden_statuses for candidate in VisibilityFilter.every_combination()
+    ] == [
+        frozenset(),
+        frozenset({ItemStatus.DONE}),
+        frozenset({ItemStatus.DEFERRED}),
+        frozenset(every_status),
+    ]
+
+
+def test_visibility_filter_names_the_statuses_it_hides():
+    assert visibility_filter().name == "show-all"
+    assert visibility_filter(ItemStatus.DONE).name == "hide-done"
+    assert (
+        visibility_filter(ItemStatus.DONE, ItemStatus.DEFERRED).name
+        == "hide-done-deferred"
+    )
+
+
+def test_visibility_filter_page_selector_carries_a_class_per_hidden_status():
+    assert visibility_filter().page_selector == ""
+    assert (
+        visibility_filter(ItemStatus.DONE, ItemStatus.DEFERRED).page_selector
+        == ".hide-done.hide-deferred"
+    )
+
+
+def test_visibility_filter_hides_more_than_one_hiding_a_subset():
+    both = visibility_filter(ItemStatus.DONE, ItemStatus.DEFERRED)
+    assert both.hides_more_than(visibility_filter(ItemStatus.DONE))
+    assert not visibility_filter(ItemStatus.DONE).hides_more_than(both)
+    assert not both.hides_more_than(both)
+
+
+def test_hideable_status_page_class_and_toggle_identifier_follow_the_status():
+    deferred = next(
+        hideable
+        for hideable in DefaultHiddenStatus
+        if hideable.status is ItemStatus.DEFERRED
+    )
+    assert deferred.page_css_class == "hide-deferred"
+    assert deferred.toggle_element_id == "show-deferred-toggle"
+
+
+# %% DashboardRenderer - dependency stacking / hidden-status dedent
+
+
+def test_hidden_status_indent_dedents_a_dependent_of_a_hidden_item_to_zero():
     items = [
         item("a", ItemStatus.DONE),
         item("b", ItemStatus.NOT_STARTED, depends_on=["a"]),
     ]
     renderer = make_renderer(items)
     stacked_items = renderer._build_track_stack(items)
-    stacked_b = next(s for s in stacked_items if s.item.identifier == "b")
-    assert stacked_b.indent_level == 1
-    assert stacked_b.indent_level_with_done_hidden == 0
-    assert stacked_b.wrap_parent_with_done_hidden is None
+    assert position_of(stacked_items, "b").indent_level == 1
+    assert position_of(stacked_items, "b", ItemStatus.DONE).indent_level == 0
+    assert position_of(stacked_items, "b", ItemStatus.DONE).wrap_parent is None
 
 
-def test_hidden_done_indent_unaffected_when_dependency_is_not_done():
+def test_hidden_status_indent_dedents_a_dependent_of_a_deferred_item_to_zero():
+    items = [
+        item("a", ItemStatus.DEFERRED),
+        item("b", ItemStatus.NOT_STARTED, depends_on=["a"]),
+    ]
+    renderer = make_renderer(items)
+    stacked_items = renderer._build_track_stack(items)
+    assert position_of(stacked_items, "b").indent_level == 1
+    assert position_of(stacked_items, "b", ItemStatus.DEFERRED).indent_level == 0
+
+
+def test_hidden_status_indent_unaffected_when_the_dependency_stays_visible():
     items = [
         item("a", ItemStatus.IN_PROGRESS),
         item("b", ItemStatus.NOT_STARTED, depends_on=["a"]),
     ]
     renderer = make_renderer(items)
     stacked_items = renderer._build_track_stack(items)
-    stacked_b = next(s for s in stacked_items if s.item.identifier == "b")
-    assert stacked_b.indent_level == 1
-    assert stacked_b.indent_level_with_done_hidden == 1
+    assert position_of(stacked_items, "b").indent_level == 1
+    assert position_of(stacked_items, "b", ItemStatus.DONE).indent_level == 1
 
 
-def test_hidden_done_indent_only_dedents_the_immediate_done_dependency():
+def test_hiding_done_leaves_a_deferred_dependency_indenting_its_dependents():
+    # Each checkbox governs only its own status: with deferred still shown, b
+    # is on screen, so c stays indented under it.
+    items = [
+        item("a", ItemStatus.DEFERRED),
+        item("b", ItemStatus.NOT_STARTED, depends_on=["a"]),
+    ]
+    renderer = make_renderer(items)
+    stacked_items = renderer._build_track_stack(items)
+    assert position_of(stacked_items, "b", ItemStatus.DONE).indent_level == 1
+
+
+def test_hiding_both_statuses_dedents_past_a_done_and_a_deferred_dependency():
+    items = [
+        item("a", ItemStatus.DONE),
+        item("b", ItemStatus.NOT_STARTED, depends_on=["a"]),
+        item("c", ItemStatus.DEFERRED),
+        item("d", ItemStatus.NOT_STARTED, depends_on=["c"]),
+    ]
+    renderer = make_renderer(items)
+    stacked_items = renderer._build_track_stack(items)
+    both = (ItemStatus.DONE, ItemStatus.DEFERRED)
+    assert position_of(stacked_items, "b", *both).indent_level == 0
+    assert position_of(stacked_items, "d", *both).indent_level == 0
+
+
+def test_hidden_status_indent_only_dedents_the_immediate_hidden_dependency():
     # c depends on b (in progress), b depends on a (done). Hiding a only
     # removes b's own dependency on it - c still indents under the still-
     # visible b, one level, not zero.
@@ -1446,34 +1618,36 @@ def test_hidden_done_indent_only_dedents_the_immediate_done_dependency():
     ]
     renderer = make_renderer(items)
     stacked_items = renderer._build_track_stack(items)
-    stacked_b = next(s for s in stacked_items if s.item.identifier == "b")
-    stacked_c = next(s for s in stacked_items if s.item.identifier == "c")
-    assert stacked_b.indent_level_with_done_hidden == 0
-    assert stacked_c.indent_level_with_done_hidden == 1
+    assert position_of(stacked_items, "b", ItemStatus.DONE).indent_level == 0
+    assert position_of(stacked_items, "c", ItemStatus.DONE).indent_level == 1
 
 
-def test_hidden_done_indent_skips_a_chain_of_done_dependencies():
+def test_hidden_status_indent_skips_a_chain_of_hidden_dependencies():
     items = [
         item("a", ItemStatus.DONE),
-        item("b", ItemStatus.DONE, depends_on=["a"]),
+        item("b", ItemStatus.DEFERRED, depends_on=["a"]),
         item("c", ItemStatus.NOT_STARTED, depends_on=["b"]),
     ]
     renderer = make_renderer(items)
     stacked_items = renderer._build_track_stack(items)
-    stacked_c = next(s for s in stacked_items if s.item.identifier == "c")
-    assert stacked_c.indent_level == 2
-    assert stacked_c.indent_level_with_done_hidden == 0
+    assert position_of(stacked_items, "c").indent_level == 2
+    assert (
+        position_of(
+            stacked_items, "c", ItemStatus.DONE, ItemStatus.DEFERRED
+        ).indent_level
+        == 0
+    )
 
 
-def test_hidden_done_wrap_parent_is_never_a_done_item():
-    # A chain of dependencies just long enough to wrap once the two done
+def test_hidden_status_wrap_parent_is_never_a_hidden_item():
+    # A chain of dependencies just long enough to wrap once the two hidden
     # items at its base are hidden: after hiding, c is the effective root
     # (level 0), d=1, e=2, f=3, g=4, h wraps back to 0 continuing from g -
-    # never from a done item, even though the full (unhidden) chain would
-    # wrap earlier and reference a different, done, parent.
+    # never from a hidden item, even though the full (unhidden) chain would
+    # wrap earlier and reference a different, hidden, parent.
     items = [
         item("a", ItemStatus.DONE),
-        item("b", ItemStatus.DONE, depends_on=["a"]),
+        item("b", ItemStatus.DEFERRED, depends_on=["a"]),
         item("c", ItemStatus.NOT_STARTED, depends_on=["b"]),
         item("d", ItemStatus.NOT_STARTED, depends_on=["c"]),
         item("e", ItemStatus.NOT_STARTED, depends_on=["d"]),
@@ -1483,9 +1657,9 @@ def test_hidden_done_wrap_parent_is_never_a_done_item():
     ]
     renderer = make_renderer(items)
     stacked_items = renderer._build_track_stack(items)
-    stacked_h = next(s for s in stacked_items if s.item.identifier == "h")
-    assert stacked_h.indent_level_with_done_hidden == 0
-    assert stacked_h.wrap_parent_with_done_hidden.identifier == "g"
+    both = (ItemStatus.DONE, ItemStatus.DEFERRED)
+    assert position_of(stacked_items, "h", *both).indent_level == 0
+    assert position_of(stacked_items, "h", *both).wrap_parent.identifier == "g"
 
 
 # %% end-to-end wave/track/item wiring
@@ -1742,7 +1916,7 @@ def test_render_omits_action_button_for_a_done_item():
     assert 'data-action-command="' not in output
 
 
-def test_render_hides_done_items_by_default_with_a_sidebar_toggle():
+def test_render_hides_every_hideable_status_by_default_with_a_sidebar_toggle():
     plan = Plan(
         id="test-plan",
         title="Test Plan",
@@ -1757,8 +1931,31 @@ def test_render_hides_done_items_by_default_with_a_sidebar_toggle():
     )
     output, _ = renderer.render()
     assert 'id="plan-dashboard-page"' in output
-    assert 'class="page hide-done"' in output
-    assert 'id="show-done-toggle"' in output
+    assert 'class="page hide-done hide-deferred"' in output
+    for hideable in DefaultHiddenStatus:
+        assert f'id="{hideable.toggle_element_id}"' in output
+        assert hideable.toggle_label in output
+
+
+def test_render_hides_every_hideable_status_behind_its_own_page_class():
+    plan = Plan(
+        id="test-plan",
+        title="Test Plan",
+        description="desc",
+        default_repository="owner/repo",
+        waves=[Wave(id="wave-1", name="Wave One")],
+        tracks=[Track(id="track-1", name="Track One", wave="wave-1")],
+        items=[item("a", ItemStatus.DEFERRED)],
+    )
+    renderer = DashboardRenderer(
+        plan=plan, roadmap_text="", pull_requests_by_repository={}, tracking_url=None
+    )
+    output, _ = renderer.render()
+    for hideable in DefaultHiddenStatus:
+        assert (
+            f".page.{hideable.page_css_class} .item.status-{hideable.status.value}"
+            " { display: none; }" in output
+        )
 
 
 def test_render_offers_every_model_option_in_each_action_buttons_dropdown():
@@ -1782,7 +1979,7 @@ def test_render_offers_every_model_option_in_each_action_buttons_dropdown():
     assert 'class="model-select"' not in output
 
 
-def test_render_exposes_both_indent_levels_as_css_variables_on_the_item():
+def test_render_exposes_an_indent_level_per_visibility_filter_on_the_item():
     plan = Plan(
         id="test-plan",
         title="Test Plan",
@@ -1791,7 +1988,7 @@ def test_render_exposes_both_indent_levels_as_css_variables_on_the_item():
         waves=[Wave(id="wave-1", name="Wave One")],
         tracks=[Track(id="track-1", name="Track One", wave="wave-1")],
         items=[
-            item("a", ItemStatus.DONE),
+            item("a", ItemStatus.DEFERRED),
             item("b", ItemStatus.NOT_STARTED, depends_on=["a"]),
         ],
     )
@@ -1799,7 +1996,63 @@ def test_render_exposes_both_indent_levels_as_css_variables_on_the_item():
         plan=plan, roadmap_text="", pull_requests_by_repository={}, tracking_url=None
     )
     output, _ = renderer.render()
-    assert "--indent-level: 1; --indent-level-hidden-done: 0;" in output
+    assert (
+        "--indent-level-show-all: 1; --indent-level-hide-done: 1;"
+        " --indent-level-hide-deferred: 0; --indent-level-hide-done-deferred: 0;"
+        in output
+    )
+
+
+def test_render_picks_each_visibility_filters_indent_level_by_page_class():
+    plan = Plan(
+        id="test-plan",
+        title="Test Plan",
+        description="desc",
+        default_repository="owner/repo",
+        waves=[Wave(id="wave-1", name="Wave One")],
+        tracks=[Track(id="track-1", name="Track One", wave="wave-1")],
+        items=[item("a", ItemStatus.NOT_STARTED)],
+    )
+    renderer = DashboardRenderer(
+        plan=plan, roadmap_text="", pull_requests_by_repository={}, tracking_url=None
+    )
+    output, _ = renderer.render()
+    for candidate in VisibilityFilter.every_combination():
+        assert (
+            f".page{candidate.page_selector} .item {{ margin-left:"
+            f" calc(var({candidate.indent_variable_name}, 0) * 1.75rem); }}" in output
+        )
+
+
+def test_render_marks_each_wrap_arrow_with_the_filter_it_belongs_to():
+    # A chain one longer than the cap, entirely of not-started items: no
+    # filter hides any of them, so the wrapped item carries one arrow per
+    # filter and each is tagged with the filter that shows it.
+    chain_length = MAXIMUM_DEPENDENCY_STACK_LEVEL + 2
+    items = [item("item-0", ItemStatus.NOT_STARTED)]
+    for index in range(1, chain_length):
+        items.append(
+            item(
+                f"item-{index}",
+                ItemStatus.NOT_STARTED,
+                depends_on=[f"item-{index - 1}"],
+            )
+        )
+    plan = Plan(
+        id="test-plan",
+        title="Test Plan",
+        description="desc",
+        default_repository="owner/repo",
+        waves=[Wave(id="wave-1", name="Wave One")],
+        tracks=[Track(id="track-1", name="Track One", wave="wave-1")],
+        items=items,
+    )
+    renderer = DashboardRenderer(
+        plan=plan, roadmap_text="", pull_requests_by_repository={}, tracking_url=None
+    )
+    output, _ = renderer.render()
+    for candidate in VisibilityFilter.every_combination():
+        assert f'class="wrap-arrow {candidate.wrap_arrow_css_class}"' in output
 
 
 def test_render_shows_dependency_chip_with_dependency_title_as_tooltip():
