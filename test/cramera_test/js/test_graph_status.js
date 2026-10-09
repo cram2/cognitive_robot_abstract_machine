@@ -75,7 +75,10 @@ function makeCanvasStub() {
 
 function evaluateGraphJs() {
   global.document = {
-    createElement() { return { className: '', innerHTML: '' }; },
+    createElement() {
+      return { className: '', innerHTML: '', children: [], appendChild(child) { this.children.push(child); } };
+    },
+    createTextNode(text) { return { textContent: text }; },
   };
   global.window = {};
   // the real gesture module, so the wheel handling under test is the one that ships
@@ -93,16 +96,25 @@ function loadGraphJs(canvas) {
   return graph;
 }
 
+// Deliberately unlike the production palette: rendering must obey the payload.
+const PLAN_STYLES = {
+  RUNNING: { color: '#123456', width: 19, label: 'in progress from server', show_label: true },
+  SUCCEEDED: { color: '#345678', width: 13, label: 'finished from server', show_label: true },
+  NOT_STARTED: { color: '#56789a', width: 6, label: 'pending from server', show_label: false, dashes: [2, 6] },
+  FAILED: { color: '#789abc', width: 19, label: 'failure from server', show_label: true },
+};
+
 function planFixture(Graph) {
   Graph.build({
     key: 'plan',
     layout: 'hier',
     arrows: true,
     statusLegend: true,
+    statusStyles: PLAN_STYLES, statusOrder: Object.keys(PLAN_STYLES),
     nodes: [
       { id: 'p0', label: 'Sequential', group: 'other', status: 'SUCCEEDED' },
       { id: 'p1', label: 'Transport', group: 'event', status: 'RUNNING' },
-      { id: 'p2', label: 'MoveTCP', group: 'robot', status: 'CREATED' },
+      { id: 'p2', label: 'MoveTCP', group: 'robot', status: 'NOT_STARTED' },
       { id: 'p3', label: 'Place', group: 'event', status: 'FAILED' },
       { id: 'p4', label: 'plain', group: 'plan' },
     ],
@@ -116,6 +128,42 @@ function planFixture(Graph) {
 
 const node = (id) => lastData.nodes.get(id);
 
+test('the payload controls lifecycle rings, labels, legends and later live updates', function () {
+  const Graph = loadGraphJs();
+  const legend = makeLegendStub();
+  Graph.attach(makeCanvasStub(), legend);
+  const styles = {
+    RUNNING: { color: '#123456', width: 19, label: 'server running label', show_label: true, dashes: [2, 3] },
+    NEW_STATUS: { color: '#654321', width: 11, label: 'new server status', show_label: true, dashes: false },
+  };
+  Graph.build({
+    nodes: [{ id: 'step', label: 'Step', group: 'action', status: 'RUNNING' }],
+    edges: [], statusLegend: true, statusStyles: styles, statusOrder: ['NEW_STATUS', 'RUNNING'],
+  });
+  assert.strictEqual(node('step').color.border, styles.RUNNING.color);
+  assert.strictEqual(node('step').label, 'Step\n' + styles.RUNNING.label);
+  assert.strictEqual(node('step').borderWidth, styles.RUNNING.width);
+  assert.deepStrictEqual(node('step').shapeProperties.borderDashes, styles.RUNNING.dashes);
+  assert.strictEqual(legend.rows[0].children[0].textContent, styles.NEW_STATUS.label);
+  assert.match(legend.rows[0].innerHTML, new RegExp(styles.NEW_STATUS.color));
+  assert.strictEqual(Graph.setStatuses({ step: 'NEW_STATUS' }), true);
+  assert.strictEqual(node('step').color.border, styles.NEW_STATUS.color);
+  assert.strictEqual(node('step').label, 'Step\n' + styles.NEW_STATUS.label);
+});
+
+test('a status legend renders the supplied label as text', function () {
+  const Graph = loadGraphJs();
+  const legend = makeLegendStub();
+  Graph.attach(makeCanvasStub(), legend);
+  const label = '<img src=x onerror=alert(1)> & failed';
+  Graph.build({
+    nodes: [], edges: [], statusLegend: true, statusOrder: ['RUNNING'],
+    statusStyles: { RUNNING: { color: '#123456', label: label } },
+  });
+  assert.doesNotMatch(legend.rows[0].innerHTML, /<img/);
+  assert.strictEqual(legend.rows[0].children[0].textContent, label);
+});
+
 // %% the panel owns the DOM
 test('building before attach is refused', function () {
   const Graph = evaluateGraphJs();
@@ -128,13 +176,14 @@ test('building before attach is refused', function () {
 test('status renders as a coloured ring + status word', function () {
   const Graph = loadGraphJs();
   planFixture(Graph);
-  assert.strictEqual(node('p1').color.border, '#ffb648');            // running: amber
-  assert.strictEqual(node('p1').label, 'Transport\nrunning');
-  assert.strictEqual(node('p0').color.border, '#4bd38a');            // succeeded: green
-  assert.strictEqual(node('p3').color.border, '#ff6b8b');            // failed: red
-  assert.ok(node('p1').borderWidth > node('p2').borderWidth);        // active > created
+  assert.strictEqual(node('p1').color.border, PLAN_STYLES.RUNNING.color);
+  assert.strictEqual(node('p1').label, 'Transport\n' + PLAN_STYLES.RUNNING.label);
+  assert.strictEqual(node('p0').color.border, PLAN_STYLES.SUCCEEDED.color);
+  assert.strictEqual(node('p3').color.border, PLAN_STYLES.FAILED.color);
+  assert.ok(node('p1').borderWidth > node('p2').borderWidth);        // active > pending
   assert.strictEqual(node('p1').borderWidthSelected, node('p1').borderWidth);
-  assert.ok(Array.isArray(node('p2').shapeProperties.borderDashes)); // created: dashed
+  assert.ok(Array.isArray(node('p2').shapeProperties.borderDashes)); // pending: dashed
+  assert.strictEqual(node('p2').label, 'MoveTCP');                   // pending status stays out of node label
   assert.strictEqual(node('p4').color, undefined);                   // no status: group style
 });
 
@@ -149,8 +198,8 @@ test('setStatuses re-colours in place and rebuilds labels from the base', functi
   const Graph = loadGraphJs();
   planFixture(Graph);
   assert.strictEqual(Graph.setStatuses({ p2: 'RUNNING', p1: 'SUCCEEDED' }), true);
-  assert.strictEqual(node('p2').label, 'MoveTCP\nrunning');
-  assert.strictEqual(node('p1').label, 'Transport\nsucceeded');      // not appended twice
+  assert.strictEqual(node('p2').label, 'MoveTCP\n' + PLAN_STYLES.RUNNING.label);
+  assert.strictEqual(node('p1').label, 'Transport\n' + PLAN_STYLES.SUCCEEDED.label); // not appended twice
 });
 
 test('setStatuses reports unknown ids so the caller rebuilds', function () {
@@ -223,7 +272,9 @@ test('a view that names its statuses gets a legend of those and no others', func
   const Graph = evaluateGraphJs();
   const legend = makeLegendStub();
   transformFixture(Graph, legend);
-  const rendered = legend.rows.map(function (row) { return row.innerHTML; }).join(' ');
+  const rendered = legend.rows.map(function (row) {
+    return row.innerHTML + row.children.map(child => child.textContent).join('');
+  }).join(' ');
   assert.match(rendered, /moving now/);
   assert.doesNotMatch(rendered, /succeeded/);
 });
@@ -292,7 +343,7 @@ test('statechart transition kinds get distinct edge styles', function () {
     key: 'chart', layout: 'hier', arrows: true,
     nodes: [
       { id: 's0', label: 'Goal', group: 'motion_goal', status: 'RUNNING' },
-      { id: 's1', label: 'Move', group: 'robot', status: 'DONE' },
+      { id: 's1', label: 'Move', group: 'robot', status: 'SUCCEEDED' },
     ],
     edges: [
       { from: 's0', to: 's1', kind: 'START' },

@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 import pytest
 import rclpy
-from typing_extensions import Generator, List, Tuple
+from typing_extensions import Generator, Tuple
 
 from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
@@ -15,25 +15,15 @@ from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
 from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
 from coraplex.datastructures.dataclasses import Context
 
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.locations.base import DeferredLocation
-from coraplex.locations.factories import (
-    reachability_location,
-    visibility_location,
-    giskard_reachability_location,
-)
-from krrood.entity_query_language.factories import variable
+from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
-from coraplex.view_manager import ViewManager
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from ..conftest import right_or_only_arm
+from ..world_snapshot import WorldSnapshot
 
 try:
     from semantic_digital_twin.robots.garmi import Garmi
@@ -43,16 +33,12 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Drawer,
-    Handle,
-)
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
 
-from ..world_snapshot import WorldSnapshot
+from ...conftest import SAMPLING_SEED
 
 # The alternative motion mappings that should be available to the plans in this test module.
 # Resolution filters by robot type and execution type, so passing the full set is always safe.
@@ -164,77 +150,29 @@ def multiple_robot_simple_apartment_context(
     world, view = setup_multi_robot_simple_apartment
     snapshot = WorldSnapshot.capture(world)
     yield world, view, Context(
-        world, view, alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS
+        world,
+        view,
+        alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS,
+        sampling_seed=SAMPLING_SEED,
     )
     snapshot.restore()
 
 
-def test_deferred_location_factory_runs_at_execution_not_construction():
-    """A :class:`DeferredLocation` must not build its :class:`Location` until the EQL
-    variable domain is actually consumed.
-
-    ``variable`` wraps the domain in :func:`filter`, whose builtin implementation calls
-    :func:`iter` on its argument at construction time. An eagerly-iterating
-    ``DeferredLocation`` would therefore run the factory while the plan is being parsed,
-    reintroducing the stale-pose bug.
+def _floor_distance(pose: Pose, body) -> float:
     """
-    factory_calls = []
-
-    def build_poses() -> List[Pose]:
-        factory_calls.append(True)
-        return [Pose.from_xyz_rpy(0.0, 0.0, 0.0)]
-
-    domain_variable = variable(Pose, domain=DeferredLocation(build_poses))
-
-    assert factory_calls == []
-
-    next(iter(domain_variable._re_enterable_domain_generator_), None)
-
-    assert factory_calls == [True]
-
-
-def test_deferred_location_reflects_state_changed_after_construction():
+    :return: How far `pose` stands from `body` along the floor.
     """
-    The deferred factory observes the world state as it is when the location is
-    consumed, not as it was when the underspecified action was constructed.
+    offset = body.global_pose.position.to_np()[:2] - pose.position.to_np()[:2]
+    return float(np.linalg.norm(offset))
+
+
+def _assert_faces(pose: Pose, body) -> None:
     """
-    observed_positions = []
-    moving_pose = {"value": Pose.from_xyz_rpy(0.0, 0.0, 0.0)}
-
-    def build_poses() -> List[Pose]:
-        observed_positions.append(moving_pose["value"].to_position().to_list())
-        return [moving_pose["value"]]
-
-    domain_variable = variable(Pose, domain=DeferredLocation(build_poses))
-
-    moving_pose["value"] = Pose.from_xyz_rpy(3.1, 2.2, 0.95)
-
-    next(iter(domain_variable._re_enterable_domain_generator_), None)
-
-    assert observed_positions == [[3.1, 2.2, 0.95, 1.0]]
-
-
-def test_new_reachability_location_pose(
-    multiple_robot_simple_apartment_context, rclpy_node
-):
-    world, robot, context = multiple_robot_simple_apartment_context
-
-    plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
-        context,
-    )
-    with simulated_robot:
-        plan.perform()
-
-        world.notify_state_change()
-
-        location = reachability_location(
-            world.get_body_by_name("milk.stl").global_pose, context, Arms.RIGHT
-        )
-
-        pose = next(iter(location))
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
+    Assert that a robot standing at `pose` has `body` straight ahead.
+    """
+    offset = body.global_pose.position.to_np()[:2] - pose.position.to_np()[:2]
+    heading = pose.rotation_matrix.to_np()[:2, 0]
+    np.testing.assert_allclose(heading, offset / np.linalg.norm(offset), atol=0.05)
 
 
 def test_new_reachability_location_body(
@@ -243,7 +181,7 @@ def test_new_reachability_location_body(
     world, robot, context = multiple_robot_simple_apartment_context
 
     plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
+        [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
     with simulated_robot:
@@ -251,47 +189,24 @@ def test_new_reachability_location_body(
 
         world.notify_state_change()
 
-        location = reachability_location(
-            world.get_body_by_name("milk.stl"), context, Arms.RIGHT
+        arm = right_or_only_arm(context.robot)
+        milk = world.get_body_by_name("milk.stl")
+        location = ReachabilityLocation(
+            Pose(reference_frame=milk), arm, context=context
         )
 
         pose = next(iter(location))
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
 
-
-def test_merge_reachability_location(multiple_robot_simple_apartment_context):
-    world, robot, context = multiple_robot_simple_apartment_context
-
-    plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
-        context,
-    )
-    with simulated_robot:
-        plan.perform()
-
-        world.notify_state_change()
-
-        location_body = reachability_location(
-            world.get_body_by_name("milk.stl"), context, Arms.RIGHT
-        )
-
-        location_pose = reachability_location(
-            world.get_body_by_name("milk.stl").global_pose, context, Arms.RIGHT
-        )
-
-        merged_location = location_body & location_pose
-        pose = next(iter(merged_location))
-
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
+    assert pose.reference_frame is world.root
+    assert _floor_distance(pose, milk) <= float(arm.approximate_length())
+    _assert_faces(pose, milk)
 
 
 def test_visibility_location_pose(multiple_robot_simple_apartment_context):
     world, robot, context = multiple_robot_simple_apartment_context
 
     plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
+        [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
     with simulated_robot:
@@ -299,21 +214,21 @@ def test_visibility_location_pose(multiple_robot_simple_apartment_context):
 
         world.notify_state_change()
 
-        location = visibility_location(
-            world.get_body_by_name("milk.stl").global_pose, context
+        location = VisibilityLocation(
+            world.get_body_by_name("milk.stl").global_pose, context=context
         )
 
         pose = next(iter(location))
 
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
+    assert pose.reference_frame is world.root
+    _assert_faces(pose, world.get_body_by_name("milk.stl"))
 
 
 def test_visibility_location_body(multiple_robot_simple_apartment_context):
     world, robot, context = multiple_robot_simple_apartment_context
 
     plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
+        [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
     with simulated_robot:
@@ -321,72 +236,11 @@ def test_visibility_location_body(multiple_robot_simple_apartment_context):
 
         world.notify_state_change()
 
-        location = visibility_location(world.get_body_by_name("milk.stl"), context)
-
-        pose = next(iter(location))
-
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
-
-
-def test_visibility_reachability_merge(multiple_robot_simple_apartment_context):
-    world, robot, context = multiple_robot_simple_apartment_context
-
-    plan = sequential(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
-        context,
-    )
-
-    with simulated_robot:
-        plan.perform()
-
-        world.notify_state_change()
-
-        location_vis = visibility_location(world.get_body_by_name("milk.stl"), context)
-
-        next(iter(location_vis))
-
-        location_reach = reachability_location(
-            world.get_body_by_name("milk.stl"), context, Arms.RIGHT
-        )
-
-        location = location_vis & location_reach
-
-        pose = next(iter(location))
-
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
-
-
-
-def test_giskard_location_pose(multiple_robot_simple_apartment_context):
-    world, robot, context = multiple_robot_simple_apartment_context
-    plan = sequential(
-        [
-            ParkArmsAction(Arms.BOTH),
-            MoveTorsoAction(TorsoState.HIGH),
-        ],
-        context,
-    )
-
-    with simulated_robot:
-        plan.perform()
-
-        world.notify_state_change()
-
-        location = giskard_reachability_location(
-            world.get_body_by_name("milk.stl"),
-            context,
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                ViewManager.get_end_effector_view(Arms.RIGHT, robot),
-            ),
+        location = VisibilityLocation(
+            Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
         )
 
         pose = next(iter(location))
 
-    assert len(pose.to_position().to_list()) == 4
-    assert len(pose.to_quaternion().to_list()) == 4
-
+    assert pose.reference_frame is world.root
+    _assert_faces(pose, world.get_body_by_name("milk.stl"))

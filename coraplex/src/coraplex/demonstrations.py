@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import threading
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
-from typing_extensions import ClassVar, List, Type
+from typing_extensions import List, Type
 
 from coraplex.alternative_motion_mapping import AlternativeMotion
 from coraplex.datastructures.dataclasses import Context
@@ -145,7 +146,7 @@ class RobotDemonstration(ABC):
     The robot this demonstration uses.
     """
 
-    ros_node_name: ClassVar[str] = "robot_demonstration"
+    ros_node_name: str = "robot_demonstration"
     """
     Name of the node a real run registers.
     """
@@ -158,6 +159,18 @@ class RobotDemonstration(ABC):
     collision_avoidance: bool = False
     """
     Whether collision avoidance is added to every motion state chart of this run.
+    """
+
+    event_segmentation: bool = True
+    """
+    Whether the events of this run are segmented while the plan is performed, as
+    :meth:`segment_events` describes.
+    """
+
+    debug: bool = False
+    """
+    Whether the plan runs in debug mode, logging debug messages and publishing every
+    copy of the world a candidate is tried in.
     """
 
     repetitions: int = 1
@@ -202,7 +215,8 @@ class RobotDemonstration(ABC):
     @abstractmethod
     def build_context(self, world: World) -> Context:
         """
-        Build the plan context, resolving the robot in ``world``.
+        Build the plan context, resolving the robot in ``world``, in debug mode when
+        :attr:`debug` is set.
         """
 
     @abstractmethod
@@ -210,6 +224,17 @@ class RobotDemonstration(ABC):
         """
         Build the plan this demonstration performs.
         """
+
+    def segment_events(self, world: World) -> AbstractContextManager:
+        """
+        Segment what happens in ``world`` into events while the plan is performed.
+
+        Segments nothing unless a demonstration says what it wants detected.
+
+        :param world: The world the plan is performed in.
+        :return: A context manager that segments the events while it is entered.
+        """
+        return nullcontext()
 
     @property
     def ros_node(self) -> Node | None:
@@ -262,13 +287,19 @@ class RobotDemonstration(ABC):
             if not self.is_scene_populated(world):
                 self.populate_scene(world)
             for _ in range(self.repetitions):
-                plan = self.build_plan(self.build_context(world))
+                context = self.build_context(world)
+                plan = self.build_plan(context)
                 if self.visualization is not None:
                     self.visualization.attach_plan(plan)
+                event_segmentation = (
+                    self.segment_events(world)
+                    if self.event_segmentation
+                    else nullcontext()
+                )
                 with ExecutionEnvironment(
                     execution_type=self.execution_type,
                     collision_avoidance=self.collision_avoidance,
-                ):
+                ), event_segmentation:
                     plan.perform()
         finally:
             self.tear_down()

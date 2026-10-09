@@ -147,8 +147,8 @@ class NavigateActionServerTask(
         root_p_goal = context.world.transform(
             target_frame=context.world.root, spatial_object=self.target_pose
         )
-        position = root_p_goal.to_position().to_np()
-        orientation = root_p_goal.to_quaternion().to_np()
+        position = root_p_goal.position.to_np()
+        orientation = root_p_goal.quaternion.to_np()
         pose_stamped = ROSPoseStamped(
             header=Header(frame_id="map"),
             pose=ROSPose(
@@ -175,11 +175,11 @@ class NavigateActionServerTask(
             context.world.root, self.base_link
         )
 
-        position_error = root_T_goal.to_position().euclidean_distance(
-            root_T_current.to_position()
+        position_error = root_T_goal.position.euclidean_distance(
+            root_T_current.position
         )
-        rotation_error = root_T_goal.to_rotation_matrix().rotational_distance(
-            root_T_current.to_rotation_matrix()
+        rotation_error = root_T_goal.rotation_matrix.rotational_distance(
+            root_T_current.rotation_matrix
         )
 
         artifacts.observation = sm.trinary_logic_and(

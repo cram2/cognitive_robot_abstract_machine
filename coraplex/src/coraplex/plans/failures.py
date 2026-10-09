@@ -1,18 +1,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from typing_extensions import TYPE_CHECKING
 
+from giskardpy.motion_statechart.exceptions import (
+    CollisionViolatedError,
+    NoProgressError,
+)
 from krrood.exceptions import DataclassException
-from coraplex.datastructures.enums import Arms
-from semantic_digital_twin.robots.robot_parts import EndEffector
+from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     from coraplex.validation.goal_validator import MultiJointPositionGoalValidator
     from coraplex.language import LanguageNode
+    from coraplex.plans.underspecified import UnderspecifiedNode
     from semantic_digital_twin.datastructures.definitions import StaticJointState
 
 
@@ -30,11 +35,120 @@ class PlanFailure(DataclassException):
         return ""
 
 
+# %% what a plan can recover from
+
+
+@dataclass
+class MotionMadeNoProgress(PlanFailure):
+    """
+    Raised when a motion stopped approaching its goal.
+
+    The chart cancels itself with a
+    :class:`~giskardpy.motion_statechart.exceptions.NoProgressError`, which says this
+    attempt did not work rather than that the plan cannot go on. Wrapping it where it
+    crosses into a plan is what lets a plan choose an alternative by catching
+    :class:`PlanFailure` alone.
+    """
+
+    no_progress: NoProgressError
+    """
+    The stall the motion reported, which names the tasks that stopped converging.
+    """
+
+    def error_message(self) -> str:
+        return self.no_progress.error_message()
+
+    def suggest_correction(self) -> str:
+        return self.no_progress.suggest_correction()
+
+
+@dataclass
+class MotionExceededSimulationTimeLimit(PlanFailure):
+    """
+    Raised when a simulated motion ran for longer than any motion is allowed to.
+
+    The chart's stall monitor ends a motion that stopped approaching its goal, but one
+    that keeps creeping towards it, or that is held and so never counts as stalled, would
+    tick forever without this limit.
+    """
+
+    time_limit: timedelta
+    """
+    The simulated time the motion was allowed.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The motion did not end within {self.time_limit.total_seconds()} s of "
+            f"simulated time."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that every goal of the motion can be reached and that nothing holds "
+            "the chart, or raise GiskardExecutable.simulation_time_limit for a motion "
+            "that is meant to take this long."
+        )
+
+
+@dataclass
+class MotionViolatedCollisionAvoidance(PlanFailure):
+    """
+    Raised when a motion brought bodies closer to each other than collision avoidance
+    allows.
+
+    Like :class:`MotionMadeNoProgress`, this says the attempt did not work from where it
+    started rather than that the plan cannot go on, so a plan can try another candidate
+    by catching :class:`PlanFailure` alone.
+    """
+
+    violation: CollisionViolatedError
+    """
+    The violation the motion reported, which names the body pairs that came too close.
+    """
+
+    def error_message(self) -> str:
+        return self.violation.error_message()
+
+    def suggest_correction(self) -> str:
+        return self.violation.suggest_correction()
+
+
 @dataclass
 class EmptyUnderspecified(PlanFailure):
     """
     Raised when a plan is empty.
     """
+
+
+@dataclass
+class CandidateLimitReached(EmptyUnderspecified):
+    """
+    Raised when an underspecified step has tried as many candidates as it may without
+    one of them succeeding.
+    """
+
+    node: UnderspecifiedNode
+    """
+    The step that gave up.
+    """
+
+    candidate_limit: int
+    """
+    How many candidates it was allowed to try.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.node} tried {self.candidate_limit} candidates without one of them "
+            f"succeeding."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Allow more candidates, through the step's own limit or the context's "
+            "candidates_to_try, or check whether any candidate can succeed at all."
+        )
 
 
 @dataclass
@@ -169,7 +283,7 @@ class BodyUnfetchable(PlanFailure):
     The body that cannot be fetched.
     """
 
-    arm: Arms
+    arm: Arm
     """
     The arm from which the body cannot be fetched.
     """

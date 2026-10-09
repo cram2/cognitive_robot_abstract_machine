@@ -31,6 +31,7 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
 from semantic_digital_twin.testing import StateChangeCounter
 from semantic_digital_twin.world import (
     ResetStateContextManager,
+    WorldEntityRebinding,
     WorldModelUpdateContextManager,
     WorldStateBatchContextManager,
 )
@@ -41,6 +42,7 @@ ignore_classes = {
     ResetStateContextManager,
     WorldModelUpdateContextManager,
     WorldStateBatchContextManager,
+    WorldEntityRebinding,
     StateChangeCounter,
     ForwardKinematicsManager,
     MeshFileStorage,

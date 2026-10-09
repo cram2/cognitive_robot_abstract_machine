@@ -27,7 +27,9 @@ from typing_extensions import (
     Tuple,
 )
 
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute, IndexByValue
+from krrood.entity_query_language.query.match import AbstractMatchExpression
 from krrood.entity_query_language._monitoring import monitored
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.base import (
@@ -38,7 +40,7 @@ from krrood.ormatic.data_access_objects.from_dao import (
     FromDataAccessObjectState,
 )
 from krrood.ormatic.data_access_objects.helper import (
-    get_dao_class,
+    get_data_access_object_class,
     to_dao,
     clear_dao_lookup_caches,
 )
@@ -46,6 +48,7 @@ from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.exceptions import (
     NoGenericError,
     NoDAOFoundDuringParsingError,
+    QueryCannotBePersisted,
 )
 from krrood.ormatic.utils import is_data_column, _get_type_hints_cached
 
@@ -547,7 +550,9 @@ class DataAccessObject(HasGeneric[T]):
         :param state: The conversion state.
         :param register: Whether to register the result in the memo.
         :return: The converted DAO instance.
+        :raises QueryCannotBePersisted: If the object is an entity query language query.
         """
+        cls._refuse_queries(source_object)
         state = state or ToDataAccessObjectState()
 
         # Phase 1: Resolution - Check memo and apply alternative mappings
@@ -574,6 +579,15 @@ class DataAccessObject(HasGeneric[T]):
             cls._process_to_dao_queue(state)
 
         return result
+
+    @staticmethod
+    def _refuse_queries(source_object: Any) -> None:
+        """
+        :param source_object: An object that is to be stored.
+        :raises QueryCannotBePersisted: If the object is an entity query language query.
+        """
+        if isinstance(source_object, (AbstractMatchExpression, SymbolicExpression)):
+            raise QueryCannotBePersisted(source_object)
 
     @classmethod
     def _process_to_dao_queue(cls, state: ToDataAccessObjectState) -> None:
@@ -801,7 +815,9 @@ class DataAccessObject(HasGeneric[T]):
         :param state: The conversion state.
         :param expected_type: The expected domain type of the field being filled.
         :return: The corresponding DAO instance.
+        :raises QueryCannotBePersisted: If the object is an entity query language query.
         """
+        self._refuse_queries(source_object)
         expected_type = getattr(source_object, "__orig_class__", None) or expected_type
 
         # Check if already built
@@ -809,7 +825,7 @@ class DataAccessObject(HasGeneric[T]):
         if existing is not None:
             return existing
 
-        dao_clazz = get_dao_class(type(source_object), expected_type)
+        dao_clazz = get_data_access_object_class(type(source_object), expected_type)
         if dao_clazz is None:
             raise NoDAOFoundDuringParsingError(source_object, type(self), None)
 

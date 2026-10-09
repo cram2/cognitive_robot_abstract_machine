@@ -16,7 +16,7 @@ import pandas as pd
 from random_events.interval import SimpleInterval
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
-from typing_extensions import Any, Callable, List
+from typing_extensions import Any, Callable, List, Self
 
 from experiments.experiment_definitions import (
     ExperimentResult,
@@ -25,6 +25,11 @@ from experiments.experiment_definitions import (
     TypstRenderer,
     Unit,
 )
+from krrood.entity_query_language.backends import (
+    EntityQueryLanguageGenerativeBackend,
+)
+from krrood.entity_query_language.factories import a, variable_from
+from krrood.exceptions import DataclassException
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
@@ -37,14 +42,11 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RustworkxProbabilisticCircuit,
 )
 
-NUMBERS_OF_SIMPLE_SETS = (5, 10, 25, 50, 100)
-LARGEST_NUMBER_OF_SIMPLE_SETS = NUMBERS_OF_SIMPLE_SETS[-1]
-
 
 class BenchmarkStage(enum.Enum):
     """
     Whether a query benchmark ran on the original circuit or on the circuit truncated to
-    :data:`LARGEST_NUMBER_OF_SIMPLE_SETS` simple sets.
+    the most simple sets.
     """
 
     BEFORE_TRUNCATION = "before truncation"
@@ -100,6 +102,29 @@ class CorrelatedNormalTreeFactory:
             annotated_variables=variables,
             min_samples_per_leaf=self.min_samples_per_leaf,
         ).fit(frame)
+
+
+@dataclass
+class StaircaseTruncation:
+    """
+    Truncating a circuit to a staircase of disjoint boxes.
+    """
+
+    number_of_simple_sets: int
+    """
+    How many disjoint boxes the staircase is made of.
+    """
+
+    @classmethod
+    def variants(cls) -> List[Self]:
+        """
+        :return: The truncations the benchmark measures, from the fewest simple sets to
+            the most.
+        """
+        truncations = a(cls)(number_of_simple_sets=variable_from([5, 10, 25, 50, 100]))
+        return list(
+            truncations.evaluate(backend=EntityQueryLanguageGenerativeBackend())
+        )
 
 
 def staircase_of_boxes(
@@ -178,6 +203,67 @@ class TimedCall:
         )
 
 
+@dataclass
+class CircuitsDisagreeError(DataclassException):
+    """
+    Raised when the two circuits a benchmark compares answer the same query differently.
+    """
+
+    query: str
+    """
+    The query both circuits answered.
+    """
+
+    largest_difference: float
+    """
+    The largest absolute difference between the two answers.
+    """
+
+    absolute_tolerance: float
+    """
+    The absolute difference that was allowed.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The answers of the two circuits to the query '{self.query}' differ by up "
+            f"to {self.largest_difference}, which is more than the allowed absolute "
+            f"difference of {self.absolute_tolerance}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that the layered circuit was converted from the rustworkx circuit "
+            "it is compared to and that both were given the same query."
+        )
+
+
+def raise_if_answers_disagree(
+    query: str,
+    rustworkx_answer: Any,
+    layered_answer: Any,
+    absolute_tolerance: float = 1e-8,
+):
+    """
+    Make sure a measurement compares two circuits that still answer alike.
+
+    :param query: The query both circuits answered.
+    :param rustworkx_answer: The answer of the rustworkx circuit.
+    :param layered_answer: The answer of the layered circuit.
+    :param absolute_tolerance: The absolute difference allowed between the answers.
+    :raises CircuitsDisagreeError: If the answers differ by more than the tolerance.
+    """
+    if np.allclose(rustworkx_answer, layered_answer, atol=absolute_tolerance):
+        return
+    raise CircuitsDisagreeError(
+        query=query,
+        largest_difference=float(
+            np.max(np.abs(np.asarray(rustworkx_answer) - np.asarray(layered_answer)))
+        ),
+        absolute_tolerance=absolute_tolerance,
+    )
+
+
 def speedup_of(
     rustworkx_duration: MeanAndStandardDeviation,
     layered_duration: MeanAndStandardDeviation,
@@ -198,8 +284,8 @@ class QueryDurationResult(ExperimentResult):
 
     stage: BenchmarkStage
     """
-    Whether this query ran on the original circuit or the one truncated to
-    :data:`LARGEST_NUMBER_OF_SIMPLE_SETS` simple sets.
+    Whether this query ran on the original circuit or the one truncated to the most
+    simple sets.
     """
 
     query: str
@@ -266,11 +352,10 @@ def measure_query_durations(
         samples = rustworkx_circuit.sample(amount)
         rustworkx_call = TimedCall.of(lambda: rustworkx_circuit.log_likelihood(samples))
         layered_call = TimedCall.of(lambda: layered.log_likelihood(samples))
-        assert np.allclose(rustworkx_call.result, layered_call.result)
+        query = f"log_likelihood, {amount} events"
+        raise_if_answers_disagree(query, rustworkx_call.result, layered_call.result)
         results.append(
-            QueryDurationResult.of(
-                stage, f"log_likelihood, {amount} events", rustworkx_call, layered_call
-            )
+            QueryDurationResult.of(stage, query, rustworkx_call, layered_call)
         )
 
     for amount in (1000, 10000):
@@ -352,24 +437,33 @@ class TruncationScaling:
 
     rustworkx_truncated: RustworkxProbabilisticCircuit
     """
-    The rustworkx circuit truncated to :data:`LARGEST_NUMBER_OF_SIMPLE_SETS` simple sets.
+    The rustworkx circuit truncated to the most simple sets.
     """
 
     layered_truncated: LayeredProbabilisticCircuit
     """
-    The layered circuit truncated to :data:`LARGEST_NUMBER_OF_SIMPLE_SETS` simple sets.
+    The layered circuit truncated to the most simple sets.
     """
+
+    @property
+    def largest_number_of_simple_sets(self) -> int:
+        """
+        :return: The most simple sets the circuits were truncated to.
+        """
+        return max(result.number_of_simple_sets for result in self.results)
 
 
 def measure_truncation_scaling(
     rustworkx_circuit: RustworkxProbabilisticCircuit,
     layered: LayeredProbabilisticCircuit,
+    truncations: List[StaircaseTruncation],
 ) -> TruncationScaling:
     """
-    Measure truncating both circuits to a staircase of disjoint boxes of growing size.
+    Measure truncating both circuits to staircases of disjoint boxes.
 
     :param rustworkx_circuit: The rustworkx circuit.
     :param layered: The layered circuit it was converted from.
+    :param truncations: The staircases to truncate to.
     :return: The measurements and the circuits truncated to the most simple sets.
     """
     bounding_box = rustworkx_circuit.support.bounding_box()
@@ -379,13 +473,15 @@ def measure_truncation_scaling(
     largest_rustworkx_truncated = None
     largest_layered_truncated = None
 
-    for number_of_boxes in NUMBERS_OF_SIMPLE_SETS:
+    largest = max(truncations, key=lambda truncation: truncation.number_of_simple_sets)
+
+    for truncation in truncations:
         event = staircase_of_boxes(
             first,
             second,
             bounding_box[first].simple_sets[0],
             bounding_box[second].simple_sets[0],
-            number_of_boxes,
+            truncation.number_of_simple_sets,
         )
 
         rustworkx_call = TimedCall.of(
@@ -394,9 +490,13 @@ def measure_truncation_scaling(
         layered_call = TimedCall.of(lambda: layered.truncated(event.__deepcopy__()))
         rustworkx_truncated, rustworkx_probability = rustworkx_call.result
         layered_truncated, layered_probability = layered_call.result
-        assert np.isclose(rustworkx_probability, layered_probability)
+        raise_if_answers_disagree(
+            f"truncation to {truncation.number_of_simple_sets} simple sets",
+            rustworkx_probability,
+            layered_probability,
+        )
 
-        if number_of_boxes == LARGEST_NUMBER_OF_SIMPLE_SETS:
+        if truncation is largest:
             largest_rustworkx_truncated = rustworkx_truncated
             largest_layered_truncated = layered_truncated
 
@@ -448,9 +548,10 @@ def measure_conditioning(
     rustworkx_circuit: JointProbabilityTree, layered: LayeredProbabilisticCircuit
 ) -> List[ConditioningResult]:
     """
-    Measure conditioning on points that fix a growing number of variables. The
-    probability is checked against the marginal likelihood, since rustworkx reports a
-    wrong one for circuits with shared subcircuits.
+    Measure conditioning on points that fix a growing number of variables.
+
+    The probability is checked against the marginal likelihood, since rustworkx reports
+    a wrong one for circuits with shared subcircuits.
 
     :param rustworkx_circuit: The rustworkx circuit.
     :param layered: The layered circuit it was converted from.
@@ -461,11 +562,13 @@ def measure_conditioning(
     results = []
 
     for number_of_conditioned in range(1, len(variables) + 1):
-        point = {variables[i]: sample[i] for i in range(number_of_conditioned)}
+        point = {
+            variables[index]: sample[index] for index in range(number_of_conditioned)
+        }
         conditioned_variables = list(point.keys())
 
         marginal_check = layered.marginal(conditioned_variables)
-        row = np.array([[point[v] for v in conditioned_variables]])
+        row = np.array([[point[variable] for variable in conditioned_variables]])
         expected_log_probability = float(marginal_check.log_likelihood(row)[0])
 
         rustworkx_call = TimedCall.of(
@@ -476,7 +579,11 @@ def measure_conditioning(
             lambda: layered.__deepcopy__().log_conditional_in_place(point), repeats=5
         )
         _, layered_log_probability = layered_call.result
-        assert np.isclose(expected_log_probability, layered_log_probability)
+        raise_if_answers_disagree(
+            f"conditioning on {number_of_conditioned} variables",
+            expected_log_probability,
+            layered_log_probability,
+        )
 
         results.append(
             ConditioningResult(
@@ -507,7 +614,9 @@ def main():
     )
     print()
 
-    scaling = measure_truncation_scaling(rustworkx_circuit, layered)
+    scaling = measure_truncation_scaling(
+        rustworkx_circuit, layered, StaircaseTruncation.variants()
+    )
     print(
         TypstRenderer(ExperimentsTable(scaling.results)).render_figure(
             "Truncating the circuit to a staircase of disjoint boxes with a growing "
@@ -527,7 +636,7 @@ def main():
     print(
         TypstRenderer(after_table).render_figure(
             f"Query durations on the circuit truncated to "
-            f"{LARGEST_NUMBER_OF_SIMPLE_SETS} simple sets "
+            f"{scaling.largest_number_of_simple_sets} simple sets "
             f"({scaling.layered_truncated.number_of_nodes} nodes)."
         )
     )

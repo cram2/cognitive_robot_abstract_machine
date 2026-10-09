@@ -9,7 +9,12 @@ import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
+from semantic_digital_twin.spatial_types import (
+    AxisAngle,
+    Point3,
+    Vector3,
+    RotationMatrix,
+)
 
 
 @dataclass
@@ -145,10 +150,10 @@ class GeometricConstraintBuilder:
         # avoid singularity
         # the sign determines in which direction the robot moves when in singularity.
         # -0.0001 preserves the old behavior from before this goal was refactored
-        hack = RotationMatrix.from_axis_angle(Vector3.Z(), -0.0001)
+        hack = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), -0.0001))
         frame_R_current = frame_R_current.dot(hack)
-        q_actual = frame_R_current.to_quaternion()
-        q_goal = frame_R_goal.to_quaternion()
+        q_actual = frame_R_current.quaternion
+        q_goal = frame_R_goal.quaternion
         q_goal = sm.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
         q_error = q_actual.diff(q_goal)
 
@@ -209,8 +214,8 @@ class GeometricConstraintBuilder:
             should depend on active dofs.
         :param max_velocity: rad/s
         """
-        root_Q_tipCurrent = frame_R_current.to_quaternion()
-        angle_error = root_Q_tipCurrent.to_axis_angle()[1]
+        root_Q_tipCurrent = frame_R_current.quaternion
+        angle_error = root_Q_tipCurrent.axis_angle.angle
         self.collection.add_velocity_constraint(
             upper_velocity_limit=max_velocity,
             lower_velocity_limit=-max_velocity,

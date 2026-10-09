@@ -4,8 +4,6 @@ from rustworkx import NoEdgeBetweenNodes
 
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.datastructures.trajectory import PoseTrajectory
 
 from coraplex.execution_environment import simulated_robot
@@ -22,7 +20,6 @@ from coraplex.robot_plans.actions.core.robot_body import (
     FollowToolCenterPointPathAction,
 )
 from coraplex.testing import _make_sine_scan_poses
-from coraplex.view_manager import ViewManager
 from krrood.entity_query_language.factories import an, entity, variable
 
 from semantic_digital_twin.datastructures.definitions import (
@@ -37,10 +34,15 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.grasping.grasp_candidates import (
+    GraspCandidate,
+    HasGraspCandidates,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
+from ...conftest import SAMPLING_SEED
+from ..conftest import left_or_only_arm, right_or_only_arm
 from ..world_snapshot import WorldSnapshot
 
 
@@ -104,11 +106,13 @@ def robot_setup(request):
 
         # The boxes stand in for any graspable object; the plans only need an annotation
         # to name them by, not a particular kind of object.
-        world.add_semantic_annotations([HasRootBody(root=box1), HasRootBody(root=box2)])
+        world.add_semantic_annotations(
+            [HasGraspCandidates(root=box1), HasGraspCandidates(root=box2)]
+        )
     return world, request.param[1]
 
 
-def graspable_annotation(world: World, body: Body) -> HasRootBody:
+def graspable_annotation(world: World, body: Body) -> HasGraspCandidates:
     """
     The annotation naming ``body`` for the actions that take one rather than a body.
 
@@ -119,7 +123,7 @@ def graspable_annotation(world: World, body: Body) -> HasRootBody:
     return an(
         entity(
             semantic_annotation := variable(
-                HasRootBody, domain=world.semantic_annotations
+                HasGraspCandidates, domain=world.semantic_annotations
             )
         ).where(semantic_annotation.root == body)
     ).first()
@@ -134,21 +138,21 @@ def stationary_block_context(robot_setup):
     block_world, robot_class = robot_setup
     snapshot = WorldSnapshot.capture(block_world)
     view = block_world.get_semantic_annotations_by_type(robot_class)[0]
-    yield block_world, view, Context(block_world, view)
+    yield block_world, view, Context(block_world, view, sampling_seed=SAMPLING_SEED)
     snapshot.restore()
 
 
 def test_park_arms_multi(stationary_block_context):
     world, view, context = stationary_block_context
 
-    description = ParkArmsAction(Arms.BOTH)
+    description = ParkArmsAction(context.robot.all_arms)
     plan = execute_single(description, context=context).plan
     with simulated_robot:
         plan.perform()
 
     joints = []
     states = []
-    for arm in view.get_arms():
+    for arm in view.all_arms:
         joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)
@@ -164,27 +168,19 @@ def test_park_arms_multi(stationary_block_context):
 
 def test_reach_action_multi(stationary_block_context):
     world, view, context = stationary_block_context
-    left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
+    left_arm = left_or_only_arm(context.robot)
 
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.TOP,
-        left_arm.end_effector,
-    )
     box_body = world.get_body_by_name("box1")
     box = graspable_annotation(world, box_body)
     position = box_body.global_pose.position.to_np()
+    grasp_pose = Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box_body)
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(context.robot.all_arms),
             ReachAction(
-                target_pose=Pose(
-                    Point3.from_iterable(position), reference_frame=world.root
-                ),
-                object_designator=box,
-                arm=Arms.LEFT,
-                grasp_description=grasp_description,
+                grasp=GraspCandidate(box, grasp_pose),
+                arm=left_or_only_arm(context.robot),
             ),
         ],
         context=context,
@@ -194,10 +190,10 @@ def test_reach_action_multi(stationary_block_context):
         plan.perform()
 
     end_effector_pose = left_arm.end_effector.tool_frame.global_transform
-    end_effector_position = end_effector_pose.to_position().to_np()
-    end_effector_orientation = end_effector_pose.to_quaternion().to_np()
+    end_effector_position = end_effector_pose.position.to_np()
+    end_effector_orientation = end_effector_pose.quaternion.to_np()
 
-    target_orientation = grasp_description.grasp_orientation()
+    target_orientation = left_arm.end_effector.tool_frame_goal(grasp_pose).quaternion
 
     assert end_effector_position[:3] == pytest.approx(position[:3], abs=0.01)
     compare_orientations(
@@ -209,13 +205,16 @@ def test_move_gripper_multi(stationary_block_context):
     world, view, context = stationary_block_context
 
     plan = execute_single(
-        SetGripperAction(Arms.LEFT, GripperState.OPEN), context=context
+        SetGripperAction(
+            left_or_only_arm(context.robot).end_effector, GripperState.OPEN
+        ),
+        context=context,
     ).plan
 
     with simulated_robot:
         plan.perform()
 
-    arm = view.get_arms()[0]
+    arm = view.all_arms[0]
     open_state = arm.end_effector.get_joint_state_by_type(GripperState.OPEN)
     close_state = arm.end_effector.get_joint_state_by_type(GripperState.CLOSE)
 
@@ -223,7 +222,10 @@ def test_move_gripper_multi(stationary_block_context):
         assert connection.position == pytest.approx(target, abs=0.01)
 
     plan = execute_single(
-        SetGripperAction(Arms.LEFT, GripperState.CLOSE), context=context
+        SetGripperAction(
+            left_or_only_arm(context.robot).end_effector, GripperState.CLOSE
+        ),
+        context=context,
     ).plan
 
     with simulated_robot:
@@ -235,44 +237,42 @@ def test_move_gripper_multi(stationary_block_context):
 
 def test_grasping(stationary_block_context):
     world, robot_view, context = stationary_block_context
-    left_arm = ViewManager.get_arm_view(Arms.LEFT, robot_view)
+    left_arm = left_or_only_arm(context.robot)
 
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.TOP,
-        left_arm.end_effector,
-    )
+    box_body = world.get_body_by_name("box1")
     description = GraspingAction(
-        world.get_body_by_name("box1"), Arms.LEFT, grasp_description
+        GraspCandidate(
+            graspable_annotation(world, box_body),
+            Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box_body),
+        ),
+        left_or_only_arm(context.robot),
     )
     plan = sequential(
-        [ParkArmsAction(Arms.BOTH), description],
+        [ParkArmsAction(context.robot.all_arms), description],
         context=context,
     ).plan
     with simulated_robot:
         plan.perform()
-    dist = np.linalg.norm(
-        world.get_body_by_name("box1").global_transform.to_np()[3, :3]
+
+    # The grasp sits at the box's own origin, so that is where the tool frame ends up.
+    assert np.allclose(
+        box_body.global_pose.position.to_np(),
+        left_arm.end_effector.tool_frame.global_pose.position.to_np(),
+        atol=0.01,
     )
-    assert dist < 0.01
 
 
 def test_pick_up_multi(stationary_block_context):
     world, view, context = stationary_block_context
 
-    left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.TOP,
-        left_arm.end_effector,
-    )
+    left_arm = left_or_only_arm(context.robot)
+    box_body = world.get_body_by_name("box1")
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(context.robot.all_arms),
             PickUpAction(
-                graspable_annotation(world, world.get_body_by_name("box1")),
-                Arms.LEFT,
-                grasp_description,
+                graspable_annotation(world, box_body).grasp_candidates()[0],
+                left_or_only_arm(context.robot),
             ),
         ],
         context=context,
@@ -306,25 +306,19 @@ def place_position(robot_setup) -> Point3:
 def test_place_multi(stationary_block_context, place_position):
     world, view, context = stationary_block_context
 
-    left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.TOP,
-        left_arm.end_effector,
-    )
+    left_arm = left_or_only_arm(context.robot)
+    box_body = world.get_body_by_name("box1")
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(context.robot.all_arms),
             PickUpAction(
-                graspable_annotation(world, world.get_body_by_name("box1")),
-                Arms.LEFT,
-                grasp_description,
+                graspable_annotation(world, box_body).grasp_candidates()[0],
+                left_or_only_arm(context.robot),
             ),
             PlaceAction(
-                world.get_body_by_name("box1"),
+                graspable_annotation(world, box_body),
                 Pose(place_position, reference_frame=world.root),
-                Arms.LEFT,
             ),
         ],
         context=context,
@@ -339,7 +333,7 @@ def test_place_multi(stationary_block_context, place_position):
             world.get_body_by_name("box1"),
         )
     box_body = world.get_body_by_name("box1")
-    milk_position = box_body.global_transform.to_position().to_np()
+    milk_position = box_body.global_transform.position.to_np()
 
     assert milk_position[:3] == pytest.approx(place_position.to_list()[:3], abs=0.01)
     plan.validate()
@@ -358,20 +352,22 @@ def anchor_position(robot_setup) -> Point3:
 
 def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_position):
     world, view, context = stationary_block_context
-    right_arm = ViewManager.get_arm_view(Arms.RIGHT, view)
+    right_arm = right_or_only_arm(context.robot)
     anchor = Pose(anchor_position, reference_frame=world.root)
-    anchor_T = anchor.to_homogeneous_matrix()
+    anchor_T = anchor.homogeneous_matrix
     offset_T = HomogeneousTransformationMatrix.from_xyz_axis_angle(
         z=-0.03,
         axis=(0, 1, 0),
         angle=np.pi / 2,
         reference_frame=world.root,
     )
-    target_pose = (anchor_T @ offset_T).to_pose()
+    target_pose = (anchor_T @ offset_T).pose
     waypoints = PoseTrajectory(_make_sine_scan_poses(target_pose, lane_axis="z"))
 
     plan = execute_single(
-        FollowToolCenterPointPathAction(target_locations=waypoints, arm=Arms.RIGHT),
+        FollowToolCenterPointPathAction(
+            target_locations=waypoints, arm=right_or_only_arm(context.robot)
+        ),
         context=context,
     )
     with simulated_robot:
@@ -380,5 +376,5 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
     tip_pose = right_arm.end_effector.tool_frame.global_transform
     expected = waypoints.poses[-1]
 
-    assert np.allclose(tip_pose.to_position(), expected.to_position(), atol=0.01)
-    assert np.allclose(tip_pose.to_quaternion(), expected.to_quaternion(), atol=0.01)
+    assert np.allclose(tip_pose.position, expected.position, atol=0.01)
+    assert np.allclose(tip_pose.quaternion, expected.quaternion, atol=0.01)

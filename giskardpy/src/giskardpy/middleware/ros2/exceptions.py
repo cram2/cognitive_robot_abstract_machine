@@ -4,15 +4,13 @@ Exceptions raised while executing a trajectory on a robot.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Type
+from dataclasses import dataclass, field
+from typing import List
 
 from giskardpy.data_types.exceptions import (
-    DontPrintStackTrace,
     GiskardException,
     SetupException,
 )
-from semantic_digital_twin.world_description.world_entity import Connection
 
 
 @dataclass
@@ -67,6 +65,8 @@ class ExecutionCanceledException(ExecutionException):
     Raised when the execution of a goal is canceled.
     """
 
+    print_stack_trace: bool = field(default=False, kw_only=True)
+
     action_server_name: str
     """
     The name of the action server whose goal was canceled.
@@ -85,7 +85,7 @@ class ExecutionCanceledException(ExecutionException):
 
 
 @dataclass
-class WorldModelModifiedDuringMotionError(ExecutionException, DontPrintStackTrace):
+class WorldModelModifiedDuringMotionError(ExecutionException):
     """
     Raised when another process modified the world model while a motion was running.
 
@@ -95,6 +95,8 @@ class WorldModelModifiedDuringMotionError(ExecutionException, DontPrintStackTrac
     again.
     """
 
+    print_stack_trace: bool = field(default=False, kw_only=True)
+
     def error_message(self) -> str:
         return "The world model was modified by another process during the motion."
 
@@ -103,13 +105,15 @@ class WorldModelModifiedDuringMotionError(ExecutionException, DontPrintStackTrac
 
 
 @dataclass
-class RequiredWorldUpdateNotReceivedError(ExecutionException, DontPrintStackTrace):
+class RequiredWorldUpdateNotReceivedError(ExecutionException):
     """
     Raised when a goal names a change of the client's world that never arrived.
 
     The goal refers to a world the client already changed, so executing it against the
     world Giskard has would act on something else than what was asked for.
     """
+
+    print_stack_trace: bool = field(default=False, kw_only=True)
 
     publisher_name: str
     """
@@ -145,13 +149,15 @@ class RequiredWorldUpdateNotReceivedError(ExecutionException, DontPrintStackTrac
 
 
 @dataclass
-class GiskardWorldUpdateNotReceivedError(ExecutionException, DontPrintStackTrace):
+class GiskardWorldUpdateNotReceivedError(ExecutionException):
     """
     Raised when the changes Giskard made during a goal never reached the client.
 
     Reading the world of the client after such a goal would show a world that Giskard
     has already moved on from.
     """
+
+    print_stack_trace: bool = field(default=False, kw_only=True)
 
     awaited_sequence_number: int
     """
@@ -325,79 +331,3 @@ class FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(FollowJointTrajectoryError):
     """
     Raised when the action server reports a goal tolerance violation.
     """
-
-
-@dataclass
-class AlreadyTrackedByTfFrameError(SetupException):
-    """
-    Raised when a connection is registered for tf tracking a second time.
-    """
-
-    connection_name: str
-    """
-    The name of the connection that is already tracked.
-    """
-
-    tf_parent_frame: str
-    """
-    The tf parent frame the connection is already tracked with.
-    """
-
-    tf_child_frame: str
-    """
-    The tf child frame the connection is already tracked with.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Connection '{self.connection_name}' is already tracked with a tf frame: "
-            f"'{self.tf_parent_frame}'<-'{self.tf_child_frame}'"
-        )
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class UnboundMessageTypeError(SetupException):
-    """
-    Raised when a topic synchronizer does not name the type of its messages.
-    """
-
-    synchronizer_type: Type
-    """
-    The synchronizer whose message type is unknown.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"'{self.synchronizer_type.__name__}' does not name the type of the "
-            f"messages it reads."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            f"Declare it in the bases of '{self.synchronizer_type.__name__}', as in "
-            f"'TopicInputSynchronizer[Odometry]'."
-        )
-
-
-@dataclass
-class ConnectionCannotBeTrackedByTfFrameError(SetupException):
-    """
-    Raised when a connection without 6 degrees of freedom is registered for tf tracking.
-    """
-
-    connection: Connection
-    """
-    The connection that cannot be tracked.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Can only sync Connection6DoF with tf, but '{str(self.connection.name)}' is of "
-            f"type '{type(self.connection).__name__}'."
-        )
-
-    def suggest_correction(self) -> str:
-        return ""

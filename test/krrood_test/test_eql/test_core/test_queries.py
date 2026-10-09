@@ -759,6 +759,21 @@ def test_predicate_taking_one_variable_attribute_twice():
     assert query.tolist() == []
 
 
+def test_predicate_taking_one_variable_attribute_twice_keeps_what_satisfies_it():
+    """
+    An attribute filling two arguments of a predicate is compared with itself, so a
+    predicate every value satisfies against itself keeps every candidate.
+    """
+    values = [0.0, 1.0, 2.0]
+    positions = [KRROODPosition(x, x, 0.0) for x in values]
+    position = variable(KRROODPosition, positions)
+    query = entity(position).where(
+        IsGreaterThanByMargin(position.x, position.x, margin=-1.0)
+    )
+
+    assert query.tolist() == positions
+
+
 def test_predicate_argument_left_out_takes_its_default():
     """
     A predicate argument the query does not pass takes the predicate's default.

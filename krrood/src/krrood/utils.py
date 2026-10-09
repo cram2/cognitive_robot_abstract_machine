@@ -19,6 +19,7 @@ from typing import Union, Any
 
 from typing_extensions import (
     Dict,
+    Iterator,
     get_origin,
     get_args,
 )
@@ -493,7 +494,7 @@ def get_scope_from_imports(
 
     scope: Dict[str, Any] = {}
 
-    for node in ast.walk(parsed_tree):
+    for node in module_level_imports(parsed_tree):
         if isinstance(node, ast.Import):
             _handle_import_node(node, scope, package_name)
         elif isinstance(node, ast.ImportFrom):
@@ -505,6 +506,26 @@ def get_scope_from_imports(
             )
 
     return scope
+
+
+def module_level_imports(node: ast.AST) -> Iterator[ast.Import | ast.ImportFrom]:
+    """
+    Yield the import statements that bind names in the module namespace.
+
+    Imports inside functions, lambdas and class bodies are skipped, since the names they
+    bind are local to that body.
+
+    :param node: The node whose statements are searched.
+    :return: The module-level import statements, including those nested in compound
+        statements such as ``if TYPE_CHECKING:`` or ``try``.
+    """
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.Import, ast.ImportFrom)):
+            yield child
+        elif not isinstance(
+            child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+        ):
+            yield from module_level_imports(child)
 
 
 def get_and_import_module(
@@ -657,13 +678,17 @@ def _handle_import_from_node(
     """
     Process a from-import node and update the provided scope mapping.
 
-    A statement whose module cannot be imported contributes no names and is skipped,
-    just as a name missing from an imported module is: the scope is built for
+    A statement whose module cannot be imported, because it is missing or only partially
+    initialized in a circular import, contributes no names and is skipped, just as a
+    name missing from an imported module is: the scope is built for
     best-effort name resolution, so one statement that cannot be bound must not cost
     the caller every other name in the file.
 
     ..note:: A module a generator is about to write, such as an ORM interface, is
         absent for exactly as long as that generator runs.
+
+    ..note:: A ``TYPE_CHECKING`` import never runs at runtime, so it may target a module
+        that imports this file back.
 
     :param node: The from-import node to process.
     :param scope: The scope mapping to update.
@@ -694,7 +719,7 @@ def _handle_import_from_node(
             module = get_and_import_module(
                 f"{resolved_package_name}.{resolved_module_name}", None
             )
-    except ModuleNotFoundError as error:
+    except ImportError as error:
         for alias in node.names:
             _log_unresolvable_import_once(
                 resolved_module_name, alias.name, file_path, str(error)

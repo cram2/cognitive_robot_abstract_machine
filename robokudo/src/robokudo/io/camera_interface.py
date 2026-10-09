@@ -307,13 +307,13 @@ class ROSCameraInterface(CameraInterface):
         )
 
         translation = (
-            np.asarray(camera_to_world_transform.to_position().to_np())
+            np.asarray(camera_to_world_transform.position.to_np())
             .reshape(-1)[:3]
             .astype(float)
             .tolist()
         )
         rotation = (
-            np.asarray(camera_to_world_transform.to_quaternion().to_np())
+            np.asarray(camera_to_world_transform.quaternion.to_np())
             .reshape(-1)[:4]
             .astype(float)
             .tolist()

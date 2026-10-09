@@ -424,9 +424,8 @@ class ProbabilisticBackend(GenerativeBackend):
 
         # create new objects with the values from the samples, and reject those
         # contradicting a value the model does not cover, such as a property's
-        instances = (
-            parameters.construct_instance_from_model_sample(truncated.variables, sample)
-            for sample in samples
+        instances = parameters.construct_instances_from_model_samples(
+            truncated.variables, samples
         )
         yield from expression._select_satisfying_(instances)._evaluate_natively_()
 

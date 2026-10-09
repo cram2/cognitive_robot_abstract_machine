@@ -20,8 +20,6 @@ from giskardpy.motion_statechart.data_types import (
 from giskardpy.motion_statechart.exceptions import GoalPointsReferenceFrameMismatchError
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.error_signals import (
-    SampledErrorSignal,
-    SymbolicErrorSignal,
     joint_position_and_velocity_variables,
     time_derivative_from_joint_motion,
 )
@@ -171,7 +169,7 @@ class CartesianPosition(CartesianTask):
         # Get current tip position in root frame
         root_P_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
 
         # Add constraints to move tip towards goal
         artifacts.geometry.add_point_goal_constraints(
@@ -185,9 +183,7 @@ class CartesianPosition(CartesianTask):
             artifacts, goal=root_P_goal, current=root_P_current
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            root_P_goal.euclidean_distance(root_P_current)
-        )
+        artifacts.error = root_P_goal.euclidean_distance(root_P_current)
         return artifacts
 
 
@@ -283,7 +279,7 @@ class CartesianPositionTrajectory(CartesianTask):
         # Get current tip position in root frame
         root_P_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
 
         # Add constraints to move tip towards goal
         artifacts.geometry.add_point_goal_constraints(
@@ -298,7 +294,7 @@ class CartesianPositionTrajectory(CartesianTask):
         )
 
         self.compile_current_point_on_tick(context)
-        artifacts.error = SampledErrorSignal(self.remaining_distance)
+        artifacts.error = self.remaining_distance
         return artifacts
 
     def _init_remaining_distance(self, float_variable_data: FloatVariableData) -> None:
@@ -349,7 +345,7 @@ class CartesianPositionTrajectory(CartesianTask):
         goal_reference_frame_T_tip = (
             self.root_T_goal_reference_frame.inverse() @ root_T_tip
         )
-        goal_reference_frame_P_tip = goal_reference_frame_T_tip.to_position()[:-1]
+        goal_reference_frame_P_tip = goal_reference_frame_T_tip.position[:-1]
         self._compiled_goal_reference_frame_P_tip = goal_reference_frame_P_tip.compile(
             parameters=VariableParameters.from_lists(
                 context.world.state.position_float_variables,
@@ -527,10 +523,10 @@ class CartesianPositionStraight(CartesianTask):
         """
         artifacts = NodeArtifacts()
         root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
-        root_P_line_start = self._line_start_binding.root_T_tip.to_position()
+        root_P_line_start = self._line_start_binding.root_T_tip.position
         root_P_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
 
         root_V_line = root_P_goal - root_P_line_start
         # scale normalizes in place, so the length has to be read before it
@@ -568,9 +564,7 @@ class CartesianPositionStraight(CartesianTask):
             artifacts, goal=root_P_goal, current=root_P_tip
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            root_P_goal.euclidean_distance(root_P_tip)
-        )
+        artifacts.error = root_P_goal.euclidean_distance(root_P_tip)
         return artifacts
 
 
@@ -616,7 +610,7 @@ class CartesianOrientation(CartesianTask):
         root_T_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        root_R_current = root_T_current.to_rotation_matrix()
+        root_R_current = root_T_current.rotation_matrix
 
         # Add constraints to rotate tip towards goal
         artifacts.geometry.add_rotation_goal_constraints(
@@ -630,9 +624,7 @@ class CartesianOrientation(CartesianTask):
             artifacts, goal=root_R_goal, current=root_R_current
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            sm.abs(root_R_current.rotational_distance(root_R_goal))
-        )
+        artifacts.error = sm.abs(root_R_current.rotational_distance(root_R_goal))
         return artifacts
 
 
@@ -697,7 +689,7 @@ class CartesianPose(Parallel):
                 name=f"{self.name}/position",
                 root_link=self.root_link,
                 tip_link=self.tip_link,
-                goal_point=self.goal_pose.to_position(),
+                goal_point=self.goal_pose.position,
                 reference_velocity=self.reference_linear_velocity,
                 threshold=self.translation_threshold,
                 weight=self.weight,
@@ -707,7 +699,7 @@ class CartesianPose(Parallel):
                 name=f"{self.name}/orientation",
                 root_link=self.root_link,
                 tip_link=self.tip_link,
-                goal_orientation=self.goal_pose.to_rotation_matrix(),
+                goal_orientation=self.goal_pose.rotation_matrix,
                 reference_velocity=self.reference_angular_velocity,
                 threshold=self.orientation_threshold,
                 weight=self.weight,
@@ -763,7 +755,7 @@ class CartesianPositionVelocityLimit(Task):
         artifacts = NodeArtifacts()
         root_P_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
+        ).position
         artifacts.geometry.add_translational_velocity_limit(
             frame_P_current=root_P_tip,
             max_velocity=self.max_linear_velocity,
@@ -821,7 +813,7 @@ class CartesianRotationVelocityLimit(Task):
 
         root_R_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_rotation_matrix()
+        ).rotation_matrix
 
         artifacts.geometry.add_rotational_velocity_limit(
             frame_R_current=root_R_tip,
@@ -829,7 +821,7 @@ class CartesianRotationVelocityLimit(Task):
             quadratic_weight=self.weight,
         )
 
-        _, angle = root_R_tip.to_axis_angle()
+        angle = root_R_tip.axis_angle.angle
         angle_dot = time_derivative_from_joint_motion(angle)
 
         artifacts.observation = sm.abs(angle_dot) <= self.max_angular_velocity

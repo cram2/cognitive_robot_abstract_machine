@@ -4,9 +4,10 @@ The unit a query source offers the EQL runner: one named, typed set of objects.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 
-from typing_extensions import Any, List, Optional, Type
+from typing_extensions import Any, Type
 
 
 @dataclass(frozen=True)
@@ -28,12 +29,9 @@ class QueryDomain:
     Type of the objects the variable ranges over; also in scope under its class name.
     """
 
-    objects: Optional[List[Any]] = None
+    objects: Iterable[Any] = field(default_factory=list)
     """
-    The objects themselves, or None when the answer does not come from this process.
+    The objects available to in-memory queries, empty by default.
 
-    Read whenever a query runs rather than copied, so a source that keeps appending to
-    this list is queried against its current contents. A domain answered from a database
-    names no objects here: what the variable ranges over is decided by the query's own
-    evaluation (see :class:`~cramera.knowledge.queryable_knowledge.QueryEvaluation`).
+    A re-iterable collection supplies current values on each query.
     """

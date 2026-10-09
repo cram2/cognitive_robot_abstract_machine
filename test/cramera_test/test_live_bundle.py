@@ -42,10 +42,12 @@ class RobotWithSubtree:
         default_factory=lambda: ArmPart(bodies=[NamedBody("robot/arm_link")])
     )
 
-    def get_arms(self):
+    @property
+    def all_arms(self):
         return [self.arm]
 
-    def get_sensors(self) -> list[PartWithBodies]:
+    @property
+    def all_sensors(self) -> list[PartWithBodies]:
         return []
 
     def get_left_arm_if_specified(self):

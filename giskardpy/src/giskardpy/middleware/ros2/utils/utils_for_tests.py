@@ -55,13 +55,13 @@ def compare_poses(
     :param decimal: Number of decimal places the two have to agree on.
     """
     compare_points(
-        actual_point=actual_pose.to_position(),
-        desired_point=desired_pose.to_position(),
+        actual_point=actual_pose.position,
+        desired_point=desired_pose.position,
         decimal=decimal,
     )
     compare_orientations(
-        actual_orientation=actual_pose.to_quaternion(),
-        desired_orientation=desired_pose.to_quaternion(),
+        actual_orientation=actual_pose.quaternion,
+        desired_orientation=desired_pose.quaternion,
         decimal=decimal,
     )
 

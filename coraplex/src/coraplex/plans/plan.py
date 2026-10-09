@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from coraplex.datastructures.dataclasses import Context
     from coraplex.plans.designator import Designator
     from coraplex.plans.plan_transformation import PlanTransformation
+    from coraplex.plans.underspecified import ActionTrial
 
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,12 @@ class Plan:
     node_callbacks: List[PlanCallback] = field(default_factory=list)
     """
     A list of callbacks that are called when a node is started or ended.
+    """
+
+    action_trial: Optional[ActionTrial] = field(default=None, init=False, repr=False)
+    """
+    The trial the underspecified nodes of this plan try their candidates in, shared so
+    that they use one copy of the world, and released once the plan has run.
     """
 
     plan_graph: rx.PyDiGraph[PlanNode] = field(
@@ -307,8 +314,7 @@ class Plan:
         return [
             transformation
             for transformation in self.plan_transformations
-            if transformation.matches_node(node)
-            and transformation.is_applicable(node)
+            if transformation.matches_node(node) and transformation.is_applicable(node)
         ]
 
     def apply_plan_transformations(self, node: PlanNode):
@@ -354,8 +360,14 @@ class Plan:
 
         :param node: The completed node.
         """
-        for callback in self.node_callbacks:
-            callback.on_end(node)
+        try:
+            for callback in self.node_callbacks:
+                callback.on_end(node)
+        finally:
+            # Released even when an observer fails, so the trial's copy of the world
+            # and its publishing do not outlive the plan.
+            if node.parent is None and self.action_trial is not None:
+                self.action_trial.discard()
 
     def re_perform(self):
         for child in self.root.descendants:

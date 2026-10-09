@@ -45,7 +45,7 @@ def verify_scene(world: World, scene: Sage10kScene):
 
             body = matching_bodies[0]
 
-            global_position = body.global_pose.to_position()
+            global_position = body.global_pose.position
             assert np.isclose(global_position.x, obj.position.x)
             assert np.isclose(global_position.y, obj.position.y)
             assert np.isclose(global_position.z, obj.position.z)

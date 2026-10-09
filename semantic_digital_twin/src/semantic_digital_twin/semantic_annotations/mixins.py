@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Tuple
 
@@ -899,6 +899,10 @@ class HasSupportingSurface(IsStorageSpace):
         candidates_filtered = candidates.submesh([clear_mask], append=True)
 
         # --- Build the region ---
+        # The region is placed where the surface was found, relative to the root's
+        # origin, so that it lies on top of the root wherever that origin is
+        vertices = candidates_filtered.vertices
+        self_P_supporting_surface = vertices.mean(axis=0)
         points_3d = [
             Point3(
                 x,
@@ -906,7 +910,7 @@ class HasSupportingSurface(IsStorageSpace):
                 z,
                 reference_frame=self.root,
             )
-            for x, y, z in candidates_filtered.vertices
+            for x, y, z in vertices - self_P_supporting_surface
         ]
         supporting_surface = Region.from_3d_points(
             name=PrefixedName(
@@ -916,12 +920,12 @@ class HasSupportingSurface(IsStorageSpace):
             points_3d=points_3d,
         )
 
-        supporting_surface_z_position = self.root.collision.scale.z / 2
+        x, y, z = self_P_supporting_surface
         self_C_supporting_surface = FixedConnection(
             parent=self.root,
             child=supporting_surface,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                z=supporting_surface_z_position, reference_frame=self.root
+                x=x, y=y, z=z, reference_frame=self.root
             ),
         )
         self._world.add_region(supporting_surface)

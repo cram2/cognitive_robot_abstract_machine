@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 
 from krrood.entity_query_language.factories import variable
-from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
 )
@@ -296,7 +295,7 @@ def test_fit_stratifies_the_class_circuit_by_the_given_variable(many_chair_count
             variables=[chair_count_variable._name_], method=JointProbabilityTree()
         ),
     )
-    model.fit([to_dao(room) for room in many_chair_count_rooms])
+    model.fit(many_chair_count_rooms)
     resolved_chair_count = next(
         v
         for v in model.class_probabilistic_circuit.variables
@@ -338,7 +337,7 @@ def test_verify_support_determinism_survives_a_stratified_partitions_own_further
         ),
     )
     relational_causal_circuit = RelationalCausalCircuit()
-    model.fit([to_dao(room) for room in many_chair_count_rooms])
+    model.fit(many_chair_count_rooms)
 
     np.random.seed(0)
     grounded = model.ground(correlated_room_query, grounding_mode=GroundingMode.SAMPLED)
@@ -386,7 +385,7 @@ def test_fit_stratifies_the_class_circuit_by_every_given_variable(
             method=JointProbabilityTree(),
         ),
     )
-    model.fit([to_dao(room) for room in many_chair_count_rooms])
+    model.fit(many_chair_count_rooms)
     joint_values = {
         (
             SceneRoomAggregations(instance=room).chair_count(),
@@ -416,7 +415,7 @@ def test_fit_stratifies_an_exchangeable_parts_template_by_the_given_variable(
             )
         },
     )
-    model.fit([to_dao(room) for room in many_chair_count_rooms])
+    model.fit(many_chair_count_rooms)
     object_types = {
         scene_object.type
         for room in many_chair_count_rooms
@@ -450,7 +449,7 @@ def test_plain_fit_honours_the_minimum_samples_per_leaf(many_chair_count_rooms):
             min_samples_per_leaf=len(many_chair_count_rooms)
         ),
     )
-    model.fit([to_dao(room) for room in many_chair_count_rooms])
+    model.fit(many_chair_count_rooms)
 
     assert _tree_leaf_count(model.class_probabilistic_circuit.root) == 1
 
@@ -468,7 +467,7 @@ def test_stratified_fit_honours_the_minimum_samples_per_leaf(many_chair_count_ro
             method=JointProbabilityTree(min_samples_per_leaf=20),
         ),
     )
-    model.fit([to_dao(room) for room in many_chair_count_rooms])
+    model.fit(many_chair_count_rooms)
 
     partitions = model.class_probabilistic_circuit.root.subcircuits
     assert [_tree_leaf_count(partition) for partition in partitions] == [1, 1]
@@ -484,7 +483,7 @@ def test_minimum_samples_per_leaf_reaches_an_exchangeable_parts_template(
             "objects": JointProbabilityTree(min_samples_per_leaf=object_count)
         },
     )
-    model.fit([to_dao(room) for room in many_chair_count_rooms])
+    model.fit(many_chair_count_rooms)
 
     template_circuit = model.exchangeable_distribution_templates[
         "objects"
@@ -513,7 +512,7 @@ def test_sampled_grounding_gives_every_stratum_its_own_latent_value(
         ),
     )
     relational_causal_circuit = RelationalCausalCircuit()
-    model.fit([to_dao(room) for room in many_chair_count_rooms])
+    model.fit(many_chair_count_rooms)
 
     np.random.seed(0)
     grounded = model.ground(correlated_room_query, grounding_mode=GroundingMode.SAMPLED)
@@ -568,7 +567,7 @@ def _part_attribute_causal_circuit(rooms, correlated_room_query) -> CausalCircui
             )
         },
     )
-    model.fit([to_dao(room) for room in rooms])
+    model.fit(rooms)
 
     np.random.seed(0)
     grounded = model.ground(correlated_room_query, grounding_mode=GroundingMode.SAMPLED)

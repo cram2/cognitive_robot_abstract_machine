@@ -12,6 +12,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from semantic_digital_twin.world import World
+
 from krrood.entity_query_language.evaluable import Evaluable
 from krrood.exceptions import DataclassException
 from typing_extensions import Any, Dict, List
@@ -139,3 +141,17 @@ class QueryableKnowledge:
     Further names a question about it may use, such as the vocabulary its values are
     recorded in.
     """
+
+    @classmethod
+    def of_world(cls, world: World) -> QueryableKnowledge:
+        """
+        Expose a native world's current state without copying its contents.
+
+        :param world: The world whose objects and relationships queries inspect.
+        :return: Current-state knowledge retaining the supplied world.
+        """
+        return cls(
+            scope=QueryScope.CURRENT_STATE,
+            domains=[],
+            extra_names={World.__name__.lower(): world},
+        )

@@ -170,17 +170,17 @@ class PR2Tester(GiskardTester):
     @property
     def l_gripper_annotation(self) -> EndEffector:
         return next(
-            sa
-            for sa in self.robot.get_end_effectors()
-            if "left" in str(sa.name).lower()
+            end_effector
+            for end_effector in self.robot.all_end_effectors
+            if "left" in str(end_effector.name).lower()
         )
 
     @property
     def r_gripper_annotation(self) -> EndEffector:
         return next(
-            sa
-            for sa in self.robot.get_end_effectors()
-            if "right" in str(sa.name).lower()
+            end_effector
+            for end_effector in self.robot.all_end_effectors
+            if "right" in str(end_effector.name).lower()
         )
 
     def get_l_gripper_links(self) -> Set[Body]:
@@ -510,7 +510,7 @@ class TestConstraints:
             tip=kitchen_setup.api.world.get_kinematic_structure_entity_by_name(
                 "iai_fridge_door_handle"
             ),
-        ).to_position()
+        ).position
 
         msc = MotionStatechart()
         msc.add_node(
@@ -1165,8 +1165,8 @@ class TestCollisionAvoidanceGoals:
             compare_points(
                 actual_point=server_world.compute_forward_kinematics(
                     server_r_tip, body
-                ).to_position(),
-                desired_point=pose.to_position(),
+                ).position,
+                desired_point=pose.position,
                 decimal=4,
             )
 
@@ -1325,7 +1325,7 @@ class TestCollisionAvoidanceGoals:
 
         bar_axis = Vector3.Z(reference_frame=kitchen_setup.map)
 
-        bar_center = milk_pose.to_position()
+        bar_center = milk_pose.position
 
         tip_grasp_axis = Vector3.Z(reference_frame=kitchen_setup.left_tip)
         kitchen_setup.api.motion_goals.add_grasp_bar(
@@ -1470,12 +1470,12 @@ class TestCollisionAvoidanceGoals:
             reference_frame=drawer,
         )
         l_goal_above_bowl = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=bowl_pose.to_position() + Vector3(z=0.2),
+            point=bowl_pose.position + Vector3(z=0.2),
             rotation_matrix=grasp_from_above,
             reference_frame=drawer,
         )
         l_goal_at_bowl = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=bowl_pose.to_position(),
+            point=bowl_pose.position,
             rotation_matrix=grasp_from_above,
             reference_frame=drawer,
         )
@@ -1490,12 +1490,12 @@ class TestCollisionAvoidanceGoals:
 
         # grasp cup
         r_goal_above_cup = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=cup_pose.to_position() + Vector3(z=0.2),
+            point=cup_pose.position + Vector3(z=0.2),
             rotation_matrix=grasp_from_above,
             reference_frame=drawer,
         )
         r_goal_at_cup = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=cup_pose.to_position(),
+            point=cup_pose.position,
             rotation_matrix=grasp_from_above,
             reference_frame=drawer,
         )
@@ -1669,7 +1669,7 @@ class TestWeightScaling:
         kinect_optical_frame = giskard.api.world.get_kinematic_structure_entity_by_name(
             "head_mount_kinect_rgb_optical_frame"
         )
-        goal_point = goal_pose.to_position()
+        goal_point = goal_pose.position
         pointing_axis = Vector3.Z(reference_frame=kinect_optical_frame)
         giskard.api.motion_goals.add_pointing(
             goal_point, kinect_optical_frame, pointing_axis, giskard.map
@@ -1687,7 +1687,7 @@ class TestWeightScaling:
         giskard.api.motion_goals.add_base_arm_weight_scaling(
             root_link=giskard.map,
             tip_link=giskard.left_tip,
-            tip_goal=goal_pose.to_position(),
+            tip_goal=goal_pose.position,
             gain=100000,
             arm_joints=[
                 PR2Joint.TORSO_LIFT,

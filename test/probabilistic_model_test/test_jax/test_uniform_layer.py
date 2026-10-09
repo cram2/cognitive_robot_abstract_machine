@@ -11,12 +11,14 @@ from probabilistic_model.probabilistic_circuit.jax.utils import (
 from random_events.interval import SimpleInterval, Bound
 from random_events.variable import Continuous
 
-from probabilistic_model.probabilistic_circuit.jax.uniform_layer import UniformLayer
+from probabilistic_model.probabilistic_circuit.jax.uniform_layer import (
+    DifferentiableUniformLayer,
+)
 
 
 class UniformLayerTestCaste(unittest.TestCase):
     x = Continuous("x")
-    p_x = UniformLayer(0, jnp.array([[0, 1], [1, 3]]))
+    p_x = DifferentiableUniformLayer(0, jnp.array([[0, 1], [1, 3]]))
     key = jax.random.PRNGKey(69)
 
     def test_log_likelihood(self):
@@ -40,7 +42,7 @@ class UniformLayerTestCaste(unittest.TestCase):
         intervals = jnp.vstack(
             [simple_interval_to_open_array(i) for i in [ioo, ioc, ico, icc]]
         )
-        p_x = UniformLayer(0, intervals)
+        p_x = DifferentiableUniformLayer(0, intervals)
 
         data = jnp.array([[0.0], [1.0]]).astype(float)
         ll = jnp.exp(p_x.log_likelihood_of_nodes(data))
@@ -50,6 +52,6 @@ class UniformLayerTestCaste(unittest.TestCase):
     def test_to_json(self):
         data = self.p_x.to_json()
         json.dumps(data)
-        p_x = UniformLayer.from_json(data)
+        p_x = DifferentiableUniformLayer.from_json(data)
 
         self.assertTrue(jnp.allclose(self.p_x.interval, p_x.interval))

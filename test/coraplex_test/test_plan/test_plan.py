@@ -10,33 +10,26 @@ from krrood.rustworkx_utils.graph_visualizer_base import (
 )
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import (
-    ApproachDirection,
-    InsertionPosition,
-    NodeDetail,
-    VerticalAlignment,
-    Arms,
-)
-from coraplex.datastructures.grasp import GraspDescription
+from coraplex.datastructures.enums import InsertionPosition, NodeDetail
 from coraplex.execution_environment import simulated_robot
 from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.factories import code, sequential, parallel, execute_single
-from coraplex.exceptions import CannotInsertBesideRoot
+from coraplex.exceptions import CannotInsertBesideRoot, NodeNotInPlanTree
 from coraplex.plans.failures import EmptyUnderspecified, PlanFailure
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import PlanNode, ActionNode
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
-from coraplex.robot_plans.actions.core.pick_up import PickUpAction
+from coraplex.plans.attachment_nodes import ReAttachNode
+from coraplex.robot_plans.actions.core.pick_up import GraspingAction, PickUpAction
+from coraplex.robot_plans.motions.gripper import MoveToolCenterPointMotion
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     variable_from,
     a,
-    an,
-    variable,
 )
 from krrood.parametrization.model_registries import (
     FullyFactorizedRegistry,
@@ -48,9 +41,6 @@ from semantic_digital_twin.orm.model import (
     Point3Mapping,
     QuaternionMapping,
     PoseMapping,
-)
-from semantic_digital_twin.robots.robot_parts import (
-    EndEffector,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.robots.pr2 import PR2Joint
@@ -476,6 +466,41 @@ def test_get_previous_nodes():
     assert node1.right_siblings == [node3]
 
 
+def test_previous_nodes_follow_the_tree_not_the_order_nodes_were_added():
+    """
+    A plan is expanded as it goes, so the children of an earlier node can be added after
+    a later node already is.
+
+    Previous still means earlier in the tree.
+    """
+    root = PlanNode()
+    first = PlanNode()
+    second = PlanNode()
+    child_of_first = PlanNode()
+
+    plan = Plan()
+    plan.add_edge(root, first)
+    plan.add_edge(root, second)
+    plan.add_edge(first, child_of_first)
+
+    assert second.previous_nodes == [root, first, child_of_first]
+
+
+def test_a_node_outside_the_tree_has_no_previous_nodes_to_name():
+    """
+    A node its plan's root does not lead to has no place in the tree's order, so asking
+    what comes before it is a mistake rather than a question about every node.
+    """
+    root = PlanNode()
+    plan = Plan()
+    plan.add_edge(root, PlanNode())
+    stray = PlanNode()
+    stray.plan = plan
+
+    with pytest.raises(NodeNotInPlanTree):
+        stray.previous_nodes
+
+
 # ---- Tests interacting with simulated robot/world ----
 
 
@@ -578,30 +603,22 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
 
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
-    milk_variable = variable_from([milk])
+    grasp_variable = variable_from(milk.grasp_candidates())
 
     pick_up_description = a(PickUpAction)(
-        object_designator=milk_variable,
-        arm=...,
-        grasp_description=a(GraspDescription)(
-            approach_direction=...,
-            vertical_alignment=...,
-            rotate_gripper=...,
-            manipulation_offset=0.05,
-            end_effector=variable(EndEffector, world.semantic_annotations),
-        ),
+        grasp=grasp_variable,
+        arm=variable_from(context.robot.all_arms),
+        approach_clearance=0.05,
     )
 
     parameters = UnderspecifiedParameters(pick_up_description)
 
-    [end_effector_offset] = [
-        v
-        for v in parameters.variables.values()
-        if v.name.endswith("manipulation_offset")
+    [approach_clearance] = [
+        v for v in parameters.variables.values() if v.name.endswith("clearance")
     ]
 
     assert (
-        parameters.conditioning_assignments_from_literal_values[end_effector_offset]
+        parameters.conditioning_assignments_from_literal_values[approach_clearance]
         == 0.05
     )
 
@@ -647,12 +664,7 @@ def test_conditions_reference_surviving_action_node_after_merge(pr2_apartment_co
 def test_motion_order_pick_up(pr2_apartment_context):
     world, robot_view, context = pr2_apartment_context
 
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        robot_view.left_arm.end_effector,
-    )
-
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1, -2, 0.6, reference_frame=world.root
@@ -666,11 +678,7 @@ def test_motion_order_pick_up(pr2_apartment_context):
 
     root = sequential(
         [
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                grasp_description,
-            ),
+            PickUpAction(milk.grasp_candidates()[0], context.robot.left_arm),
         ],
         context,
     )
@@ -705,7 +713,7 @@ def test_motion_order_place(pr2_apartment_context):
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = world.get_body_by_name(
         "l_gripper_tool_frame"
-    ).global_pose.to_homogeneous_matrix()
+    ).global_pose.homogeneous_matrix
 
     with world.modify_world():
 
@@ -724,9 +732,8 @@ def test_motion_order_place(pr2_apartment_context):
     root = sequential(
         [
             PlaceAction(
-                world.get_body_by_name("milk.stl"),
+                world.get_semantic_annotations_by_type(Milk)[0],
                 Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
-                Arms.LEFT,
             ),
         ],
         context,
@@ -757,19 +764,10 @@ def test_motion_order_place(pr2_apartment_context):
 
 def test_node_expansion(pr2_apartment_context):
     world, view, context = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = sequential(
-        [
-            PickUpAction(
-                object_designator=world.get_semantic_annotations_by_type(Milk)[0],
-                arm=Arms.RIGHT,
-                grasp_description=GraspDescription(
-                    ApproachDirection.FRONT,
-                    vertical_alignment=VerticalAlignment.NoAlignment,
-                    end_effector=view.right_arm.end_effector,
-                ),
-            )
-        ],
+        [PickUpAction(grasp=milk.grasp_candidates()[0], arm=context.robot.right_arm)],
         context=context,
     )
 
@@ -778,7 +776,13 @@ def test_node_expansion(pr2_apartment_context):
 
     expanded_children = pick_node.children
     assert len(expanded_children) == 3
-    assert len(expanded_children[1].children) == 4
+
+    # A pick-up takes hold of the object, tells the world the object now hangs off the
+    # gripper, and lifts it; the reach and the closing gripper belong to the grasp.
+    grasp, reattach, lift = expanded_children[1].children
+    assert isinstance(grasp.designator, GraspingAction)
+    assert isinstance(reattach, ReAttachNode)
+    assert isinstance(lift.designator, MoveToolCenterPointMotion)
 
 
 def test_expand_move_torso(pr2_apartment_context):
@@ -794,19 +798,12 @@ def test_expand_move_torso(pr2_apartment_context):
 
 def test_context_back_reference(pr2_apartment_context):
     world, view, context = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = sequential(
         [
             MoveTorsoAction(TorsoState.HIGH),
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.RIGHT,
-                GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
-            ),
+            PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
         ],
         context=context,
     )
@@ -818,19 +815,12 @@ def test_context_back_reference(pr2_apartment_context):
 
 def test_action_nodes_unequal(pr2_apartment_context):
     world, view, context = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = sequential(
         [
-            ParkArmsAction(Arms.LEFT),
-            PickUpAction(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Arms.LEFT,
-                GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    view.right_arm.end_effector,
-                ),
-            ),
+            ParkArmsAction([context.robot.left_arm]),
+            PickUpAction(milk.grasp_candidates()[0], context.robot.left_arm),
         ],
         context=context,
     )
@@ -887,14 +877,14 @@ def test_a_designator_node_reports_the_parameters_of_its_designator():
     A designator node adds the parameters its designator was built with as a section of
     its own.
     """
-    action = ParkArmsAction(Arms.LEFT)
+    action = MoveTorsoAction(TorsoState.HIGH)
     node = ActionNode(designator=action)
 
     designator_section = node.node_info.sections[-1]
 
     assert designator_section.heading == NodeDetail.DESIGNATOR_PARAMETER
     assert designator_section.entries == {
-        NodeDetail.DESIGNATOR_TYPE: ParkArmsAction.__name__,
+        NodeDetail.DESIGNATOR_TYPE: MoveTorsoAction.__name__,
         **action.designator_parameter,
     }
 
@@ -903,9 +893,9 @@ def test_a_node_is_labelled_by_the_designator_it_manages():
     """
     A designator node is drawn as its designator, not as the node class managing it.
     """
-    node = ActionNode(designator=ParkArmsAction(Arms.LEFT))
+    node = ActionNode(designator=MoveTorsoAction(TorsoState.HIGH))
 
-    assert node.node_label == ParkArmsAction.__name__
+    assert node.node_label == MoveTorsoAction.__name__
 
 
 def test_the_details_of_a_node_are_drawn_as_lines():

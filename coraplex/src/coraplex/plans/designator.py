@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import sys
-from dataclasses import dataclass, field, Field, fields
+from dataclasses import dataclass, field, Field
 from typing import TYPE_CHECKING, Dict
 
-from typing_extensions import Optional, List, Any, get_type_hints
+from typing_extensions import Optional, List, Any
 
+from krrood.class_diagrams.attribute_introspector import (
+    DataclassOnlyIntrospector,
+)
+from krrood.ormatic.utils import classproperty
 from coraplex.exceptions import ContextIsUnavailable
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
@@ -53,33 +56,17 @@ class Designator:
     def context(self) -> Context:
         return self.plan.context
 
-    @classmethod
-    @property
+    @classproperty
     def fields(cls) -> List[Field]:
         """
-        The fields of this action, returns only the fields defined in the class and not
-        inherit fields of parents.
+        The parameters of this designator: the fields a caller constructs it with.
 
-        :return: The fields of this action
+        :return: The fields of this designator.
         """
-        self_fields = list(fields(cls))
-        [self_fields.remove(parent_field) for parent_field in fields(Designator)]
-        type_hints = cls.get_type_hints()
-        for field in self_fields:
-            field.type = type_hints[field.name]
-        return self_fields
+        return [
+            discovered.field for discovered in DataclassOnlyIntrospector().discover(cls)
+        ]
 
     @property
     def designator_parameter(self) -> Dict[str, Any]:
         return {f.name: getattr(self, f.name) for f in self.fields}
-
-    @classmethod
-    def get_type_hints(cls) -> Dict[str, Any]:
-        """
-        Returns the type hints of the __init__ method of this designator_description
-        description.
-
-        :return:
-        """
-        global_namespace = sys.modules[cls.__module__].__dict__
-        return get_type_hints(cls.__init__, globalns=global_namespace)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import enum
 import itertools
 import math
 from dataclasses import dataclass, field
@@ -12,7 +11,7 @@ from scipy.special import logsumexp
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.sigma_algebra import AbstractCompositeSet, AbstractSimpleSet
-from random_events.variable import Variable
+from random_events.variable import Variable, compatible_types
 from tabulate import tabulate
 
 
@@ -919,15 +918,15 @@ class CausalCircuit:
         sets, rather than marginalizing down to variable alone first: marginalizing
         first would coalesce separate SumUnit branches into one region, which
         `backdoor_adjustment` cannot use since it builds one ProductUnit per region
-        here, pairing each region's own cause branch with its own effect branch.
-        Support determinism (see `verify_support_determinism`) guarantees these
-        branches are genuinely disjoint, so the regions returned here correspond to
-        actual circuit branches rather than an arbitrary decomposition.
+        here, pairing each region's own cause branch with its own effect branch. Support
+        determinism (see `verify_support_determinism`) guarantees these branches are
+        genuinely disjoint, so the regions returned here correspond to actual circuit
+        branches rather than an arbitrary decomposition.
 
-        A discrete (:class:`~random_events.set.Set`) query variable needs one further
-        step: a single branch can itself mix several of the variable's values, so
-        `_split_into_atomic_values` splits that union into one region per value before
-        grouping.
+        A single branch can itself hold several of the variable's ranges or values, so
+        `_split_into_atomic_values` splits each branch's value into its elements and the
+        regions are grouped by element. A range two branches both hold is then one
+        region carrying the probability of both, not one region per branch.
 
         :param variable: The Variable whose disjoint support regions to extract.
         :param base_circuit: Circuit to query. Defaults to self.probabilistic_circuit.
@@ -956,29 +955,22 @@ class CausalCircuit:
 
     @staticmethod
     def _split_into_atomic_values(
-        value: Union[AbstractCompositeSet, int, float, bool, enum.Enum],
-    ) -> List[
-        Union[AbstractCompositeSet, AbstractSimpleSet, int, float, bool, enum.Enum]
-    ]:
+        value: Union[AbstractCompositeSet, *compatible_types],
+    ) -> List[Union[AbstractSimpleSet, *compatible_types]]:
         """
-        Split *value* into its individual elements if it is a union of more than one
-        (several disjoint ranges for a :class:`~random_events.interval.Interval` --
-        which both :class:`~random_events.variable.Continuous` and
-        :class:`~random_events.variable.Integer` use as their domain -- or several
-        values for a discrete :class:`~random_events.set.Set`), otherwise return it
-        unchanged.
+        Split *value* into the elements it holds: the disjoint ranges of an
+        :class:`~random_events.interval.Interval` or the values of a
+        :class:`~random_events.set.Set`.
 
-        *value* is only ever composite (and thus splittable) when the branch it came
-        from mixes several ranges or values with positive probability; a branch whose
-        leaf is a single deterministic point instead yields one of
-        :data:`~random_events.variable.compatible_types` directly, which has no
-        `simple_sets` to split.
+        A composite set holding a single element is split the same way, so a range
+        written on its own and the same range written inside a union come back as one
+        element and count as one region. A value read off a deterministic leaf, one of
+        :data:`~random_events.variable.compatible_types`, is returned as it is.
 
         :param value: A single support value read off a joint support's simple set.
-        :returns: The union's elements, or ``[value]`` if *value* is not a multi-element
-            union.
+        :returns: The elements of *value*.
         """
-        if isinstance(value, AbstractCompositeSet) and len(value.simple_sets) > 1:
+        if isinstance(value, AbstractCompositeSet):
             return list(value.simple_sets)
         return [value]
 

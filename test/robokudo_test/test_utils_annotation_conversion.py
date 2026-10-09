@@ -247,7 +247,7 @@ class TestUtilsAnnotationConversion(object):
 
     def test_pose_2_od_converter_convert_in_world(self, cas_with_tf: CAS):
         camera_to_world_quat = (
-            cas_with_tf.camera_to_world_transform.to_quaternion().to_list()
+            cas_with_tf.camera_to_world_transform.quaternion.to_list()
         )
         kinect_camera_info = cas_with_tf.get(CASViews.CAMERA_INFO)
 
@@ -292,7 +292,7 @@ class TestUtilsAnnotationConversion(object):
 
     def test_position_2_od_converter_convert(self, cas_with_tf: CAS):
         camera_to_world_quat = (
-            cas_with_tf.camera_to_world_transform.to_quaternion().to_list()
+            cas_with_tf.camera_to_world_transform.quaternion.to_list()
         )
 
         od = ObjectDesignator()
@@ -327,7 +327,7 @@ class TestUtilsAnnotationConversion(object):
 
     def test_stamped_position_2_od_converter_convert(self, cas_with_tf: CAS):
         camera_to_world_quat = (
-            cas_with_tf.camera_to_world_transform.to_quaternion().to_list()
+            cas_with_tf.camera_to_world_transform.quaternion.to_list()
         )
         od = ObjectDesignator()
 

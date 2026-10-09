@@ -22,10 +22,10 @@ from sortedcontainers import SortedSet
 from typing_extensions import TYPE_CHECKING, Any, Callable, Optional, Type
 
 from krrood.ormatic.data_access_objects.dao import (
-    DataAccessObject,
     DataAccessObjectSchema,
     get_dao_schema,
 )
+from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 from krrood.parametrization.feature_extraction.aggregations import (
     compute_aggregation_statistics,
 )
@@ -761,7 +761,7 @@ class RelationalProbabilisticCircuit:
     @staticmethod
     def _build_class_dataframe(
         feature_extractor: FeatureExtractor,
-        instances: list[DataAccessObject],
+        instances: list[Any],
         dataframe_from_parent: Optional[pd.DataFrame],
     ) -> pd.DataFrame:
         """
@@ -783,7 +783,7 @@ class RelationalProbabilisticCircuit:
     def _build_child_joint_dataframe(
         self,
         exchangeable_part: str,
-        instances: list[DataAccessObject],
+        instances: list[Any],
         aggregation_indices: list[int],
         aggregation_names: list[str],
         child_feature_extractor: FeatureExtractor,
@@ -809,10 +809,8 @@ class RelationalProbabilisticCircuit:
         for instance in instances:
             feature_vector = self.feature_extractor.apply_mapping(instance)
             aggregation_row = [feature_vector[index] for index in aggregation_indices]
-            for association in getattr(instance, exchangeable_part):
-                child_features = child_feature_extractor.apply_mapping(
-                    association.target
-                )
+            for child in getattr(instance, exchangeable_part):
+                child_features = child_feature_extractor.apply_mapping(child)
                 rows.append(aggregation_row + child_features)
         child_column_names = [
             f.get_clean_name_from_mapped_variable()
@@ -823,7 +821,7 @@ class RelationalProbabilisticCircuit:
     def _fit_exchangeable_part(
         self,
         exchangeable_part: str,
-        instances: list[DataAccessObject],
+        instances: list[Any],
     ) -> ExchangeableDistributionTemplate:
         """
         Fit an ``ExchangeableDistributionTemplate`` for one exchangeable part.
@@ -852,13 +850,12 @@ class RelationalProbabilisticCircuit:
         ]
         aggregation_names = [function._name_ for function in aggregation_functions]
 
-        child_instances = [
-            association.target
-            for association in itertools.chain.from_iterable(
+        child_instances = list(
+            itertools.chain.from_iterable(
                 getattr(instance, exchangeable_part) for instance in instances
             )
-        ]
-        child_type = type(getattr(instances[0], exchangeable_part)[0].target)
+        )
+        child_type = type(child_instances[0])
         child_feature_extractor = FeatureExtractor.from_instances(child_instances)
         child_dataframe = self._build_child_joint_dataframe(
             exchangeable_part,
@@ -888,18 +885,18 @@ class RelationalProbabilisticCircuit:
 
     def fit(
         self,
-        instances: list[DataAccessObject],
+        instances: list[Any],
         dataframe_from_parent: Optional[pd.DataFrame] = None,
     ):
         """
-        Fit the relational probabilistic circuit from a list of DAO instances.
+        Fit the relational probabilistic circuit from a list of domain objects.
 
         Builds a ``FeatureExtractor``, fits the class-level circuit on the class-level
         features with :attr:`learning_method`, and then recursively fits one
         ``ExchangeableDistributionTemplate`` per exchangeable part discovered in the
         schema.
 
-        :param instances: Training instances; all must share the same DAO class.
+        :param instances: Training instances; all must be of the same class.
         :param dataframe_from_parent: Pre-built dataframe supplied by a parent
             ``_fit_exchangeable_part`` call. When provided, feature extraction and
             preprocessing are skipped.
@@ -913,7 +910,9 @@ class RelationalProbabilisticCircuit:
         self.class_probabilistic_circuit = self.learning_method.fit(
             class_dataframe, variables
         )
-        self.schema_information = get_dao_schema(type(instances[0]))
+        self.schema_information = get_dao_schema(
+            get_data_access_object_class(type(instances[0]))
+        )
         for collection_relationship in self.schema_information.collection_relationships:
             exchangeable_part = collection_relationship.key
             if exchangeable_part not in self.feature_extractor.exchangeable_features:

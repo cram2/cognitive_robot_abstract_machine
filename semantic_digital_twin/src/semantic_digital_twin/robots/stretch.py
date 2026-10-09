@@ -7,9 +7,11 @@ from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
 
+import numpy as np
 from typing_extensions import Self, List
 
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     SelfCollisionMatrixRule,
@@ -22,8 +24,10 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasNeck,
+    HasLidar,
     HasOneArm,
     HasTorso,
     HasMobileBase,
@@ -39,11 +43,23 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     EndEffector,
 )
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connections import DifferentialDrive
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+
+class StretchTopic(StrEnum):
+    """
+    Topics the Stretch publishes the state of its parts on, where it does not follow the
+    conventional name.
+    """
+
+    ODOMETRY = "odom"
+    """
+    The topic the mobile base reports its odometry on.
+    """
 
 
 class StretchJoint(StrEnum):
@@ -145,6 +161,14 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -156,7 +180,6 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "link_grasp_center"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
@@ -202,6 +225,10 @@ class StretchCameraColor(Camera):
     def setup_joint_states(self) -> List[JointState]:
         return []
 
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.root)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -210,7 +237,6 @@ class StretchCameraColor(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "camera_color_optical_frame"
             ),
-            forward_facing_axis=Vector3.Z(),
             minimal_height=1.322,
             maximal_height=1.322,
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
@@ -227,6 +253,10 @@ class StretchCameraDepth(Camera):
     def setup_joint_states(self) -> List[JointState]:
         return []
 
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.root)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -235,7 +265,6 @@ class StretchCameraDepth(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "camera_depth_optical_frame"
             ),
-            forward_facing_axis=Vector3.Z(),
             minimal_height=1.307,
             maximal_height=1.307,
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
@@ -251,6 +280,10 @@ class StretchCameraInfra1(Camera):
     def setup_joint_states(self) -> List[JointState]:
         return []
 
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.root)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -259,7 +292,6 @@ class StretchCameraInfra1(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "camera_infra1_optical_frame"
             ),
-            forward_facing_axis=Vector3.Z(),
             minimal_height=1.307,
             maximal_height=1.307,
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
@@ -275,6 +307,10 @@ class StretchCameraInfra2(Camera):
     def setup_joint_states(self) -> List[JointState]:
         return []
 
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.root)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -283,7 +319,6 @@ class StretchCameraInfra2(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "camera_infra2_optical_frame"
             ),
-            forward_facing_axis=Vector3.Z(),
             minimal_height=1.257,
             maximal_height=1.257,
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
@@ -357,7 +392,43 @@ class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
 
 
 @dataclass(eq=False)
-class StretchMobileBase(MobileBase[DifferentialDrive], HasTorso[StretchTorso]):
+class StretchBaseLidar(Lidar):
+    """
+    The RPLIDAR scanner sweeping the whole floor around the Stretch's base.
+
+    ..note:: The sweep closes a full circle, so its last beam stops one increment short
+        of its first rather than repeating it.
+    """
+
+    @classmethod
+    def with_source(
+        cls, robot_root: KinematicStructureEntity, source: LidarSource
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "laser"),
+            scan_pattern=ScanPattern(
+                minimum_angle=-np.pi,
+                maximum_angle=np.pi,
+                angle_increment=0.005823156330734491,
+                minimum_range=0.05,
+                maximum_range=12.0,
+            ),
+            source=source,
+        )
+
+
+@dataclass(eq=False)
+class StretchMobileBase(
+    MobileBase[DifferentialDrive],
+    HasTorso[StretchTorso],
+    HasLidar[StretchBaseLidar],
+):
+    @classproperty
+    def topic_name(cls) -> str:
+        """
+        The topic the Stretch publishes the pose of its base on.
+        """
+        return StretchTopic.ODOMETRY
 
     full_body_controlled: bool = field(default=True, kw_only=True)
 

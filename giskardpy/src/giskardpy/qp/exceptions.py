@@ -4,15 +4,20 @@ Exceptions raised while building and solving the quadratic program.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import timedelta
 
 from typing_extensions import TYPE_CHECKING, Type
 
-from giskardpy.data_types.exceptions import GiskardException, DontPrintStackTrace
+from giskardpy.data_types.exceptions import (
+    GiskardException,
+    SetupException,
+)
 
 if TYPE_CHECKING:
     from giskardpy.qp.constraint import GiskardConstraint
     from giskardpy.qp.qp_data import QPData
+    from semantic_digital_twin.spatial_types.derivatives import Derivatives
 
 
 @dataclass
@@ -77,79 +82,133 @@ class QuadraticObjectiveUnsupportedError(QPSolverException):
 
 
 @dataclass
-class VelocityLimitUnreachableException(QPSolverException):
+class PredictionHorizonTooShortError(SetupException):
     """
-    Raised when a degree of freedom cannot reach its velocity limit within the
-    prediction horizon.
-    """
-
-    degree_of_freedom_name: str
-    """
-    The name of the degree of freedom that cannot reach its velocity limit.
-    """
-
-    velocity_limit: float
-    """
-    The velocity limit that cannot be reached.
+    Raised when the prediction horizon of the QP controller is shorter than the
+    configuration requires.
     """
 
     prediction_horizon: int
     """
-    The prediction horizon used by the QP controller.
+    The prediction horizon of the QP controller.
     """
 
-    jerk_limit: float
+    minimum_prediction_horizon: int
     """
-    The jerk limit of the degree of freedom.
-    """
-
-    model_predictive_control_time_step: float
-    """
-    The time step of the model predictive controller.
+    The shortest prediction horizon the configuration allows.
     """
 
-    max_reachable_velocity: float
+
+@dataclass
+class PredictionHorizonTooShortForDerivativeError(PredictionHorizonTooShortError):
     """
-    The maximum velocity that is reachable given the limits and prediction horizon.
+    Raised when the explicitly set prediction horizon has too few steps to integrate the
+    highest derivative the QP optimizes.
+    """
+
+    max_derivative: Derivatives
+    """
+    The highest derivative the QP optimizes.
     """
 
     def error_message(self) -> str:
         return (
-            f'Free variable "{self.degree_of_freedom_name}" can\'t reach velocity limit of '
-            f'"{self.velocity_limit}". Maximum reachable with prediction horizon = '
-            f'"{self.prediction_horizon}", jerk limit = "{self.jerk_limit}" and dt = '
-            f'"{self.model_predictive_control_time_step}" is "{self.max_reachable_velocity}".'
+            f"Optimizing up to {self.max_derivative.name} needs a prediction horizon of "
+            f"at least {self.minimum_prediction_horizon}, but it is "
+            f"{self.prediction_horizon}."
         )
 
     def suggest_correction(self) -> str:
-        return ""
+        return (
+            f"Raise prediction_horizon to at least {self.minimum_prediction_horizon}, "
+            f"or leave it unset so it is derived from braking_time."
+        )
 
 
 @dataclass
-class OutOfJointLimitsException(InfeasibleException):
+class BrakingExceedsHorizonError(PredictionHorizonTooShortError):
     """
-    Raised when a degree of freedom is outside its position limits and cannot recover.
+    Raised when a braking from the velocity limit to rest does not fit into the
+    prediction horizon, which every plan must end at rest within.
+    """
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Raise prediction_horizon to at least {self.minimum_prediction_horizon}, "
+            f"or leave it unset so it is derived from braking_time."
+        )
+
+
+@dataclass
+class BrakingTimeExceedsHorizonError(BrakingExceedsHorizonError):
+    """
+    Raised when the configured braking time needs more steps than the explicitly set
+    prediction horizon provides.
+    """
+
+    braking_time: timedelta
+    """
+    The configured braking time.
+    """
+
+    time_step: timedelta
+    """
+    The duration of one step of the prediction horizon.
     """
 
     def error_message(self) -> str:
-        return "A degree of freedom is outside its position limits and cannot recover."
+        return (
+            f"A braking time of {self.braking_time.total_seconds()} s at a time step of "
+            f"{self.time_step.total_seconds()} s "
+            f"needs a prediction horizon of at least {self.minimum_prediction_horizon}, "
+            f"but it is {self.prediction_horizon}."
+        )
 
 
 @dataclass
-class HardConstraintsViolatedException(InfeasibleException):
+class DegreeOfFreedomBrakingExceedsHorizonError(BrakingExceedsHorizonError):
     """
-    Raised when hard constraints cannot be satisfied.
+    Raised when the jerk limit of a degree of freedom is too low to brake from its
+    velocity limit to rest within the prediction horizon.
+    """
+
+    degree_of_freedom_name: str
+    """
+    The name of the degree of freedom whose braking does not fit.
+    """
+
+    velocity_limit: float
+    """
+    The velocity limit the degree of freedom brakes from.
+    """
+
+    jerk_limit: float
+    """
+    The jerk limit the degree of freedom brakes with.
     """
 
     def error_message(self) -> str:
-        return "Hard constraints cannot be satisfied."
+        return (
+            f'Degree of freedom "{self.degree_of_freedom_name}" cannot brake from its '
+            f"velocity limit {self.velocity_limit} with jerk limit {self.jerk_limit} "
+            f"within a prediction horizon of {self.prediction_horizon}; it needs at "
+            f"least {self.minimum_prediction_horizon}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Set prediction_horizon to at least {self.minimum_prediction_horizon}, or "
+            f"raise the jerk or acceleration limit of the degree of freedom."
+        )
 
 
 @dataclass
-class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
+class EmptyProblemException(InfeasibleException):
     """
     Raised when the QP problem has no free variables.
     """
+
+    print_stack_trace: bool = field(default=False, kw_only=True)
 
     def error_message(self) -> str:
         return "Empty QP problem."

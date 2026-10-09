@@ -652,8 +652,10 @@ def test_a_spatial_type_over_a_variable_survives_a_json_round_trip(
 def test_a_transformation_over_a_variable_keeps_its_child_frame():
     reference_frame = Body(name=PrefixedName("reference"))
     child_frame = Body(name=PrefixedName("child"))
+    # the transformation does not keep its variable alive, so the test has to
+    variable = FloatVariable(name="muh")
     transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
-        FloatVariable(name="muh"),
+        variable,
         reference_frame=reference_frame,
         child_frame=child_frame,
     )

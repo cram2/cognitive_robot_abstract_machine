@@ -129,7 +129,7 @@ class TestSoftTrunk:
 
         # Validate distance
         fk = world.compute_forward_kinematics_np(world.root, trunk.arms[0].tip)
-        dist_error = np.linalg.norm(fk[:3, 3] - target.to_position().to_np()[:3])
+        dist_error = np.linalg.norm(fk[:3, 3] - target.position.to_np()[:3])
         assert dist_error < 0.03
 
     def test_soft_trunk_semantic_annotation(self):

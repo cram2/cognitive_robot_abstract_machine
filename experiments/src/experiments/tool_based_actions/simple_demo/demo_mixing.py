@@ -20,7 +20,6 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.composite.tool_based import MixingAction
@@ -52,9 +51,7 @@ def main() -> None:
     pr2 = PR2.from_world(world)
     context = Context(world=world, robot=pr2, _debug=False, ros_node=None)
 
-    whisk_body = attach_tool(
-        world, pr2, Arms.RIGHT, parse_object("whisk.stl"), MIX_MOUNT
-    )
+    whisk_body = attach_tool(world, pr2.right_arm, parse_object("whisk.stl"), MIX_MOUNT)
     bowl_body = world.get_body_by_name("bowl.stl")
 
     whisk = Whisk(root=whisk_body)
@@ -65,13 +62,13 @@ def main() -> None:
 
     plan = sequential(
         [
-            SetGripperAction(Arms.RIGHT, GripperState.CLOSE),
-            ParkArmsAction(Arms.BOTH),
+            SetGripperAction(pr2.right_arm.end_effector, GripperState.CLOSE),
+            ParkArmsAction(pr2.all_arms),
             MoveTorsoAction(TorsoState.HIGH),
             NavigateAction(
                 Pose.from_xyz_rpy(*BASE_POSITION_XYZ, reference_frame=world.root)
             ),
-            MixingAction(container=bowl_body, arm=Arms.RIGHT, tool=whisk),
+            MixingAction(container=bowl_body, arm=pr2.right_arm, tool=whisk),
         ],
         context=context,
     ).plan
