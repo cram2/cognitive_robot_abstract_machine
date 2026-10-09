@@ -1,6 +1,6 @@
 """
-Grounding a relational probabilistic circuit into a rustworkx circuit, by mounting the
-instances of its exchangeable relations into the class circuit.
+Grounding a relational probabilistic circuit fitted as rustworkx circuits, by mounting
+the instances of its exchangeable relations into the class circuit.
 """
 
 from __future__ import annotations
@@ -18,6 +18,9 @@ from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding
     InstanceMixture,
     PartitionMixture,
     RelationalGrounding,
+)
+from probabilistic_model.probabilistic_circuit.relational.helper import (
+    find_lowest_product_nodes_that_model_variables,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -80,14 +83,14 @@ class PartitionBranches(RetainedLatents):
     on.
     """
 
-    branches: List[Unit] = field(default_factory=list)
+    branches: List[ProbabilisticCircuit] = field(default_factory=list)
     """
     The branch of every instance.
     """
 
     def factors_of(self, instance: int, circuit: ProbabilisticCircuit) -> List[Unit]:
-        branch = self.branches[instance]
-        return [circuit.mount(branch)[branch.index]]
+        root = self.branches[instance].root
+        return [circuit.mount(root)[root.index]]
 
 
 # %% mounting the instances into the class circuit
@@ -95,38 +98,76 @@ class PartitionBranches(RetainedLatents):
 
 @dataclass
 class RustworkxExchangeablePartGrounder(
-    ExchangeablePartGrounder[ProbabilisticCircuit, ProbabilisticCircuit]
+    ExchangeablePartGrounder[ProbabilisticCircuit, ProductUnit]
 ):
     """
     Grounds one exchangeable part by mounting its instances into the rustworkx class
     circuit.
     """
 
-    def single_instance(self) -> ProbabilisticCircuit:
+    def condition_class_circuit(self):
+        statistics = self.determined_statistics
+        if not statistics:
+            return
+        statistics_circuit = self.circuit.marginal(statistics)
+        if statistics_circuit is not None:
+            conditioned, _ = statistics_circuit.log_conditional_in_place(statistics)
+            if conditioned is None:
+                return
+        self.circuit.log_conditional_in_place(statistics, preserve_structure=True)
+
+    def mounting_nodes(self) -> List[ProductUnit]:
+        return find_lowest_product_nodes_that_model_variables(
+            self.circuit, SortedSet(self.template.latent_variables)
+        )
+
+    def circuit_below(self, node: ProductUnit) -> ProbabilisticCircuit:
+        result = ProbabilisticCircuit()
+        result.mount(node)
+        return result
+
+    def remove_undetermined_latents(self):
+        self.circuit.restrict_to_variables_in_place(
+            SortedSet(self.circuit.variables) - self.undetermined_latents
+        )
+
+    @staticmethod
+    def partition_branches(
+        proposal: ProbabilisticCircuit,
+    ) -> List[ProbabilisticCircuit]:
+        root = proposal.root
+        if not isinstance(root, SumUnit):
+            return []
+        branches = []
+        for subcircuit in root.subcircuits:
+            branch = ProbabilisticCircuit()
+            branch.mount(subcircuit)
+            branches.append(branch)
+        return branches
+
+    def single_instance(self):
         instance_root = self.mounted_instance(self.determined_statistics)
         for product_node in self.product_nodes_to_extend:
             product_node.add_subcircuit(instance_root)
-        return self.circuit
 
-    def sampled_mixture(self, mixture: InstanceMixture) -> ProbabilisticCircuit:
-        return self.mixed_part(
+    def sampled_mixture(self, mixture: InstanceMixture):
+        self.mixed_part(
             mixture, SampledLatents(self.undetermined_latents, mixture.assignments)
         )
 
-    def partition_mixture(self, mixture: PartitionMixture) -> ProbabilisticCircuit:
-        return self.mixed_part(
+    def partition_mixture(self, mixture: PartitionMixture[ProbabilisticCircuit]):
+        self.mixed_part(
             mixture, PartitionBranches(self.undetermined_latents, mixture.branches)
         )
 
-    def mixed_part(
-        self, mixture: InstanceMixture, retained_latents: RetainedLatents
-    ) -> ProbabilisticCircuit:
+    def mixed_part(self, mixture: InstanceMixture, retained_latents: RetainedLatents):
         """
+        Make every mounting node multiply its own normalized sum unit over the
+        instances.
+
         :param mixture: The assignments of the undetermined statistics, with their
             weights at every mounting node.
         :param retained_latents: How the instances keep the undetermined statistics.
-        :return: The class circuit, with every mounting node multiplying its own
-            normalized sum unit over the instances.
         """
         instance_roots = []
         for instance, assignment in enumerate(mixture.assignments):
@@ -143,7 +184,6 @@ class RustworkxExchangeablePartGrounder(
             self._attach_mixture_to_node(
                 product_node, instance_roots, log_weights.tolist()
             )
-        return self.circuit
 
     def mounted_instance(self, aggregation_statistics: PartialPointType) -> Unit:
         """
@@ -190,18 +230,11 @@ class RustworkxExchangeablePartGrounder(
 
 
 @dataclass
-class RustworkxGrounding(
-    RelationalGrounding[ProbabilisticCircuit, ProbabilisticCircuit]
-):
+class RustworkxGrounding(RelationalGrounding[ProbabilisticCircuit]):
     """
-    Grounds a relational probabilistic circuit into a rustworkx circuit.
+    Grounds a relational probabilistic circuit fitted as rustworkx circuits.
     """
 
     @property
     def part_grounder_type(self) -> Type[RustworkxExchangeablePartGrounder]:
         return RustworkxExchangeablePartGrounder
-
-    def grounded_circuit(
-        self, circuit: ProbabilisticCircuit, parts: List[ProbabilisticCircuit]
-    ) -> ProbabilisticCircuit:
-        return circuit

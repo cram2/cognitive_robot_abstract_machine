@@ -45,6 +45,14 @@ class QueryCache:
     The result of every query evaluated so far, per layer.
     """
 
+    def result_of(self, query: Callable, layer: Any) -> Any:
+        """
+        :param query: A memoized query of a layer type, such as ``ProductLayer.marginal``.
+        :param layer: A layer the query was evaluated for in this pass.
+        :return: What the query returned for the layer.
+        """
+        return self.results[QueryCacheKey(query.__wrapped__, id(layer))]
+
 
 def memoized(method: Callable) -> Callable:
     """

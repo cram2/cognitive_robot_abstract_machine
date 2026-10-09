@@ -37,18 +37,23 @@ from krrood.parametrization.feature_extraction.feature_extractor import FeatureE
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import Match
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.learning_method import LearningMethod
+from probabilistic_model.learning.learning_method import (
+    LayeredLearning,
+    LearningMethod,
+)
 from probabilistic_model.learning.jpt.variables import (
     infer_variables_from_dataframe,
 )
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
+    MixedCircuitTypesError,
     PartCircuitGroundingFailedError,
 )
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
-    GroundedCircuit,
+    Circuit,
     GroundedPartTemplate,
     GroundingMode,
+    RelationalGrounding,
 )
 from probabilistic_model.probabilistic_circuit.relational.layered_grounding import (
     LayeredGrounding,
@@ -86,15 +91,15 @@ class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
     """
 
     def grounded_templates_of_parts(
-        self, parts: list[Match], ground: Callable[[Match], GroundedCircuit]
-    ) -> list[GroundedPartTemplate[GroundedCircuit]]:
+        self, parts: list[Match], ground: Callable[[Match], Circuit]
+    ) -> list[GroundedPartTemplate[Circuit]]:
         """
         :param parts: The query parts, one per child object of the relation.
         :param ground: Grounds the template for one query part.
         :return: The grounded template of every part. Parts whose queries have the same
             shape share one grounding.
         """
-        groundings: dict[Hashable, tuple[GroundedCircuit, str]] = {}
+        groundings: dict[Hashable, tuple[Circuit, str]] = {}
         result = []
         for index, part in enumerate(parts):
             prefix = self._prefix_for_part(part, index)
@@ -215,10 +220,15 @@ class RelationalProbabilisticCircuit:
     The domain class whose instances this distribution models.
     """
 
-    class_probabilistic_circuit: Optional[ProbabilisticCircuit] = None
+    class_probabilistic_circuit: Optional[
+        ProbabilisticCircuit | LayeredProbabilisticCircuit
+    ] = None
     """
     The fitted joint distribution over the class's scalar attributes and aggregation
     statistics, populated by ``fit``.
+
+    Its type is the one :attr:`learning_method` fits, and the class circuits of all
+    exchangeable templates have the same type.
     """
 
     exchangeable_distribution_templates: dict[str, ExchangeableDistributionTemplate] = (
@@ -240,6 +250,9 @@ class RelationalProbabilisticCircuit:
     learning_method: LearningMethod = field(default_factory=JointProbabilityTree)
     """
     What the class-level circuit is fitted with.
+
+    A :class:`~probabilistic_model.learning.learning_method.LayeredLearning` fits the
+    relational circuit as layered circuits.
     """
 
     part_learning_methods: dict[str, LearningMethod] = field(default_factory=dict)
@@ -248,7 +261,8 @@ class RelationalProbabilisticCircuit:
     with.
 
     A part absent from the mapping is fitted with a plain
-    :class:`~probabilistic_model.learning.jpt.jpt.JointProbabilityTree`.
+    :class:`~probabilistic_model.learning.jpt.jpt.JointProbabilityTree`, as a layered
+    circuit if :attr:`learning_method` fits layered circuits.
     """
 
     schema_information: Optional[DataAccessObjectSchema] = field(
@@ -393,16 +407,35 @@ class RelationalProbabilisticCircuit:
         template = ExchangeableDistributionTemplate(
             RelationalProbabilisticCircuit(
                 child_type,
-                learning_method=self.part_learning_methods.get(
-                    exchangeable_part, JointProbabilityTree()
-                ),
+                learning_method=self._part_learning_method(exchangeable_part),
             ),
             latent_variables,
         )
         template.template_distribution.fit(
             child_instances, dataframe_from_parent=child_dataframe
         )
+        part_circuit_type = type(
+            template.template_distribution.class_probabilistic_circuit
+        )
+        if part_circuit_type is not type(self.class_probabilistic_circuit):
+            raise MixedCircuitTypesError(
+                self.class_,
+                exchangeable_part,
+                type(self.class_probabilistic_circuit),
+                part_circuit_type,
+            )
         return template
+
+    def _part_learning_method(self, exchangeable_part: str) -> LearningMethod:
+        """
+        :param exchangeable_part: Field name of the exchangeable relation.
+        :return: What the template of the relation is fitted with.
+        """
+        if exchangeable_part in self.part_learning_methods:
+            return self.part_learning_methods[exchangeable_part]
+        if isinstance(self.learning_method, LayeredLearning):
+            return LayeredLearning(JointProbabilityTree())
+        return JointProbabilityTree()
 
     def fit(
         self,
@@ -472,36 +505,29 @@ class RelationalProbabilisticCircuit:
         self,
         query: Match,
         grounding_mode: GroundingMode = GroundingMode.SAMPLED,
-    ) -> ProbabilisticCircuit:
+    ) -> ProbabilisticCircuit | LayeredProbabilisticCircuit:
         """
-        Ground the relational circuit for a specific query into a rustworkx circuit.
+        Ground the relational circuit for a specific query, in the circuit type it was
+        fitted in.
 
         :param query: An underspecified, resolved query instance whose structure
             determines which parts are grounded and how many child objects each
             exchangeable relation contains.
         :param grounding_mode: How to treat aggregation latents the query leaves
             undetermined. See :class:`GroundingMode`.
-        :return: A concrete ``ProbabilisticCircuit`` over all variables implied by the
-            query.
+        :return: A circuit over all variables implied by the query.
         :raises CircuitNotFittedError: If ``ground`` is called before ``fit``.
         """
-        return RustworkxGrounding(self, grounding_mode).ground(query)
+        return self.grounding(grounding_mode).ground(query)
 
-    def ground_layered(
-        self,
-        query: Match,
-        grounding_mode: GroundingMode = GroundingMode.SAMPLED,
-    ) -> LayeredProbabilisticCircuit:
+    def grounding(
+        self, grounding_mode: GroundingMode = GroundingMode.SAMPLED
+    ) -> RelationalGrounding:
         """
-        Ground the relational circuit for a specific query into a layered circuit, with
-        the distribution :meth:`ground` creates.
-
-        :param query: An underspecified, resolved query instance whose structure
-            determines which parts are grounded and how many child objects each
-            exchangeable relation contains.
-        :param grounding_mode: How to treat aggregation latents the query leaves
-            undetermined. See :class:`GroundingMode`.
-        :return: A layered circuit over all variables implied by the query.
-        :raises CircuitNotFittedError: If ``ground_layered`` is called before ``fit``.
+        :param grounding_mode: How to treat aggregation latents a query leaves
+            undetermined.
+        :return: What grounds this circuit in the circuit type it was fitted in.
         """
-        return LayeredGrounding(self, grounding_mode).ground(query)
+        if isinstance(self.class_probabilistic_circuit, LayeredProbabilisticCircuit):
+            return LayeredGrounding(self, grounding_mode)
+        return RustworkxGrounding(self, grounding_mode)

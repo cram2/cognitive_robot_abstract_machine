@@ -20,21 +20,23 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
     InvalidMonteCarloSampleCountError,
+    MixedCircuitTypesError,
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
     GroundingMode,
     InstanceMixture,
-    RelationalGrounding,
     WeightedAssignments,
 )
 from probabilistic_model.probabilistic_circuit.relational.layered_grounding import (
     LayeredGrounding,
 )
 from probabilistic_model.probabilistic_circuit.relational.rustworkx_grounding import (
+    RustworkxExchangeablePartGrounder,
     RustworkxGrounding,
 )
+from probabilistic_model.learning.learning_method import LayeredLearning
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
@@ -89,6 +91,13 @@ def relational_probabilistic_circuit(scenario):
     model = RelationalProbabilisticCircuit(SceneRoom)
     model.fit([room, room2])
     return model
+
+
+@pytest.fixture
+def layered_relational_probabilistic_circuit(scenario):
+    return RelationalProbabilisticCircuit(
+        SceneRoom, learning_method=LayeredLearning(JointProbabilityTree())
+    ).fit(list(scenario))
 
 
 @pytest.fixture
@@ -225,23 +234,7 @@ def test_non_positive_sample_count_raises_when_integration_needed(
         relational_probabilistic_circuit.ground(room_query_4)
 
 
-@pytest.fixture
-def relational_probabilistic_circuit_with_ambiguous_total_count_4():
-    """
-    Two rooms share ``total_count() == 4`` but split it differently between chairs and
-    tables (3 chairs/1 table vs.
-
-    2 chairs/2 tables), so conditioning on 4 objects still
-    leaves genuine ambiguity between two distinct ``(chair_count, table_count)``
-    aggregate values for :func:`test_monte_carlo_sample_count_controls_mixture_size` to
-    discover -- ``relational_probabilistic_circuit``'s own two rooms have distinct ``total_count()`` values (3 and
-    4), so conditioning on 4 objects there pins the aggregates down to a single value
-    regardless of sample count.
-
-    Both rooms are fitted into one leaf (``min_samples_per_leaf=2``): grounding draws a
-    leaf's own samples whenever the shared ones miss its values, so an ambiguity has to
-    sit within one leaf for the sample count to decide how much of it is discovered.
-    """
+def _rooms_with_ambiguous_total_count_4() -> list[SceneRoom]:
     three_chairs_one_table = SceneRoom(
         position=KRROODPosition(x=4.0, y=3.0, z=0.0),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
@@ -262,11 +255,39 @@ def relational_probabilistic_circuit_with_ambiguous_total_count_4():
             SceneObject(type=SceneObjectType.CHAIR),
         ],
     )
+    return [three_chairs_one_table, two_chairs_two_tables]
+
+
+@pytest.fixture
+def relational_probabilistic_circuit_with_ambiguous_total_count_4():
+    """
+    Two rooms share ``total_count() == 4`` but split it differently between chairs and
+    tables (3 chairs/1 table vs.
+
+    2 chairs/2 tables), so conditioning on 4 objects still
+    leaves genuine ambiguity between two distinct ``(chair_count, table_count)``
+    aggregate values for :func:`test_monte_carlo_sample_count_controls_mixture_size` to
+    discover -- ``relational_probabilistic_circuit``'s own two rooms have distinct ``total_count()`` values (3 and
+    4), so conditioning on 4 objects there pins the aggregates down to a single value
+    regardless of sample count.
+
+    Both rooms are fitted into one leaf (``min_samples_per_leaf=2``): grounding draws a
+    leaf's own samples whenever the shared ones miss its values, so an ambiguity has to
+    sit within one leaf for the sample count to decide how much of it is discovered.
+    """
     model = RelationalProbabilisticCircuit(
         SceneRoom, learning_method=JointProbabilityTree(min_samples_per_leaf=2)
     )
-    model.fit([three_chairs_one_table, two_chairs_two_tables])
+    model.fit(_rooms_with_ambiguous_total_count_4())
     return model
+
+
+@pytest.fixture
+def layered_relational_probabilistic_circuit_with_ambiguous_total_count_4():
+    return RelationalProbabilisticCircuit(
+        SceneRoom,
+        learning_method=LayeredLearning(JointProbabilityTree(min_samples_per_leaf=2)),
+    ).fit(_rooms_with_ambiguous_total_count_4())
 
 
 def test_monte_carlo_sample_count_controls_mixture_size(
@@ -631,15 +652,27 @@ def _room_with_chair_count(
     )
 
 
-@pytest.fixture
-def correlated_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
+def _correlated_rooms() -> list[SceneRoom]:
     random_generator = np.random.default_rng(0)
-    rooms = [_room_with_chair_count(random_generator, 1) for _ in range(20)] + [
+    return [_room_with_chair_count(random_generator, 1) for _ in range(20)] + [
         _room_with_chair_count(random_generator, 3) for _ in range(20)
     ]
+
+
+@pytest.fixture
+def correlated_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
     model = RelationalProbabilisticCircuit(SceneRoom)
-    model.fit(rooms)
+    model.fit(_correlated_rooms())
     return model
+
+
+@pytest.fixture
+def layered_correlated_relational_probabilistic_circuit() -> (
+    RelationalProbabilisticCircuit
+):
+    return RelationalProbabilisticCircuit(
+        SceneRoom, learning_method=LayeredLearning(JointProbabilityTree())
+    ).fit(_correlated_rooms())
 
 
 @pytest.fixture
@@ -731,7 +764,7 @@ def test_representative_value_returns_a_point_not_a_region():
     branch = _integer_leaf(variable, {2: 0.5, 3: 0.5}, circuit)
 
     representative_value = ExchangeablePartGrounder._representative_value(
-        branch, SortedSet([variable])
+        circuit, SortedSet([variable])
     )
 
     assert representative_value == {variable: 2.0}
@@ -782,14 +815,16 @@ def test_node_local_branch_log_probabilities_reflect_each_nodes_own_correlation(
     region_one = SimpleEvent.from_data({chair_count: 1}).as_composite_set()
     region_three = SimpleEvent.from_data({chair_count: 3}).as_composite_set()
 
-    weights_for_node_favoring_one = (
-        ExchangeablePartGrounder._node_local_branch_log_probabilities(
-            node_favoring_one, SortedSet([chair_count]), [region_one, region_three]
-        )
+    weights_for_node_favoring_one = ExchangeablePartGrounder._branch_log_probabilities(
+        _circuit_below(node_favoring_one),
+        SortedSet([chair_count]),
+        [region_one, region_three],
     )
     weights_for_node_favoring_three = (
-        ExchangeablePartGrounder._node_local_branch_log_probabilities(
-            node_favoring_three, SortedSet([chair_count]), [region_one, region_three]
+        ExchangeablePartGrounder._branch_log_probabilities(
+            _circuit_below(node_favoring_three),
+            SortedSet([chair_count]),
+            [region_one, region_three],
         )
     )
 
@@ -798,6 +833,19 @@ def test_node_local_branch_log_probabilities_reflect_each_nodes_own_correlation(
 
 
 # %% ExchangeablePartGrounder._undetermined_latents_partition_disjointly
+
+
+def _circuit_below(node: ProductUnit) -> ProbabilisticCircuit:
+    result = ProbabilisticCircuit()
+    result.mount(node)
+    return result
+
+
+def _partitions_disjointly(circuit: ProbabilisticCircuit) -> bool:
+    branches = RustworkxExchangeablePartGrounder.partition_branches(circuit)
+    return ExchangeablePartGrounder._undetermined_latents_partition_disjointly(
+        [branch.support for branch in branches]
+    )
 
 
 def _integer_leaf(variable, probabilities, circuit):
@@ -820,9 +868,7 @@ def test_partition_disjointly_false_for_a_single_branch():
     variable = Integer("value")
     circuit = ProbabilisticCircuit()
     _integer_leaf(variable, {1: 1.0}, circuit)
-    assert not ExchangeablePartGrounder._undetermined_latents_partition_disjointly(
-        circuit
-    )
+    assert not _partitions_disjointly(circuit)
 
 
 def test_partition_disjointly_true_for_disjoint_branches():
@@ -832,7 +878,7 @@ def test_partition_disjointly_true_for_disjoint_branches():
     root.add_subcircuit(_integer_leaf(variable, {1: 1.0}, circuit), 0.0)
     root.add_subcircuit(_integer_leaf(variable, {2: 1.0}, circuit), 0.0)
     root.normalize()
-    assert ExchangeablePartGrounder._undetermined_latents_partition_disjointly(circuit)
+    assert _partitions_disjointly(circuit)
 
 
 def test_partition_disjointly_false_for_overlapping_branches():
@@ -842,9 +888,7 @@ def test_partition_disjointly_false_for_overlapping_branches():
     root.add_subcircuit(_integer_leaf(variable, {1: 0.5, 2: 0.5}, circuit), 0.0)
     root.add_subcircuit(_integer_leaf(variable, {2: 0.5, 3: 0.5}, circuit), 0.0)
     root.normalize()
-    assert not ExchangeablePartGrounder._undetermined_latents_partition_disjointly(
-        circuit
-    )
+    assert not _partitions_disjointly(circuit)
 
 
 # %% exchangeable relations of exchangeable relations
@@ -858,14 +902,13 @@ def _room(x: float, object_types: list[SceneObjectType]) -> SceneRoom:
     )
 
 
-@pytest.fixture
-def nested_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
+def _nested_scenes() -> list[TestExParts]:
     """
-    A circuit over scenes whose rooms are an exchangeable relation with an exchangeable
-    relation of their own, the objects of every room.
+    Scenes whose rooms are an exchangeable relation with an exchangeable relation of
+    their own, the objects of every room.
     """
     table, chair = SceneObjectType.TABLE, SceneObjectType.CHAIR
-    scenes = [
+    return [
         TestExParts(
             objects=[SceneObject(type=table)],
             rooms=[_room(1.0, [table, chair]), _room(2.0, [chair, chair, chair])],
@@ -883,7 +926,18 @@ def nested_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
             rooms=[_room(2.5, [table, table, chair])],
         ),
     ]
-    return RelationalProbabilisticCircuit(TestExParts).fit(scenes)
+
+
+@pytest.fixture
+def nested_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
+    return RelationalProbabilisticCircuit(TestExParts).fit(_nested_scenes())
+
+
+@pytest.fixture
+def layered_nested_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
+    return RelationalProbabilisticCircuit(
+        TestExParts, learning_method=LayeredLearning(JointProbabilityTree())
+    ).fit(_nested_scenes())
 
 
 def _room_query(object_types: list) -> Any:
@@ -1106,30 +1160,69 @@ def assert_same_distribution(
     )
 
 
+def ground_with_the_same_samples(
+    model: RelationalProbabilisticCircuit,
+    layered_model: RelationalProbabilisticCircuit,
+    query: Any,
+    grounding_mode: GroundingMode = GroundingMode.SAMPLED,
+) -> tuple[ProbabilisticCircuit, LayeredProbabilisticCircuit]:
+    """
+    Ground a model and its layered twin, the twin with the samples of the undetermined
+    statistics that grounding the model drew, since the two circuit types sample
+    differently.
+    """
+    drawn = []
+    sample = ExchangeablePartGrounder._sample_undetermined_latents
+
+    def recording_sample(grounder, node=None):
+        drawn.append(sample(grounder, node))
+        return drawn[-1]
+
+    with patch.object(
+        ExchangeablePartGrounder, "_sample_undetermined_latents", recording_sample
+    ):
+        grounded = model.ground(query, grounding_mode=grounding_mode)
+    replayed = iter(drawn)
+    with patch.object(
+        ExchangeablePartGrounder,
+        "_sample_undetermined_latents",
+        lambda grounder, node=None: next(replayed),
+    ):
+        layered = layered_model.ground(query, grounding_mode=grounding_mode)
+    assert next(replayed, None) is None
+    return grounded, layered
+
+
 def test_layered_grounding_with_sampled_latents_is_the_grounding(
-    relational_probabilistic_circuit_with_ambiguous_total_count_4, room_query_4
+    relational_probabilistic_circuit_with_ambiguous_total_count_4,
+    layered_relational_probabilistic_circuit_with_ambiguous_total_count_4,
+    room_query_4,
 ):
-    model = relational_probabilistic_circuit_with_ambiguous_total_count_4
-    np.random.seed(0)
-    grounded = model.ground(room_query_4, grounding_mode=GroundingMode.SAMPLED)
-    np.random.seed(0)
-    layered = model.ground_layered(room_query_4, grounding_mode=GroundingMode.SAMPLED)
-    assert_same_distribution(grounded, layered)
+    assert_same_distribution(
+        *ground_with_the_same_samples(
+            relational_probabilistic_circuit_with_ambiguous_total_count_4,
+            layered_relational_probabilistic_circuit_with_ambiguous_total_count_4,
+            room_query_4,
+        )
+    )
 
 
 def test_layered_grounding_over_the_exact_partition_is_the_grounding(
-    correlated_relational_probabilistic_circuit, correlated_room_query
+    correlated_relational_probabilistic_circuit,
+    layered_correlated_relational_probabilistic_circuit,
+    correlated_room_query,
 ):
-    model = correlated_relational_probabilistic_circuit
-    grounded = model.ground(correlated_room_query, grounding_mode=GroundingMode.EXACT)
-    layered = model.ground_layered(
+    grounded = correlated_relational_probabilistic_circuit.ground(
+        correlated_room_query, grounding_mode=GroundingMode.EXACT
+    )
+    layered = layered_correlated_relational_probabilistic_circuit.ground(
         correlated_room_query, grounding_mode=GroundingMode.EXACT
     )
     assert_same_distribution(grounded, layered)
 
 
 def test_layered_grounding_of_a_query_that_determines_every_statistic_is_the_grounding(
-    relational_probabilistic_circuit,
+    relational_probabilistic_circuit, layered_relational_probabilistic_circuit
 ):
     query = a(SceneRoom)(
         position=a(KRROODPosition)(x=..., y=..., z=...),
@@ -1142,59 +1235,88 @@ def test_layered_grounding_of_a_query_that_determines_every_statistic_is_the_gro
     )
     query.resolve()
     grounded = relational_probabilistic_circuit.ground(query)
-    layered = relational_probabilistic_circuit.ground_layered(query)
+    layered = layered_relational_probabilistic_circuit.ground(query)
     assert_same_distribution(grounded, layered)
 
 
 def test_layered_grounding_of_nested_relations_is_the_grounding(
     nested_relational_probabilistic_circuit,
+    layered_nested_relational_probabilistic_circuit,
     nested_query_with_determined_room_statistics,
 ):
-    model = nested_relational_probabilistic_circuit
-    grounded = model.ground(nested_query_with_determined_room_statistics)
-    layered = model.ground_layered(nested_query_with_determined_room_statistics)
+    grounded = nested_relational_probabilistic_circuit.ground(
+        nested_query_with_determined_room_statistics
+    )
+    layered = layered_nested_relational_probabilistic_circuit.ground(
+        nested_query_with_determined_room_statistics
+    )
     assert_same_distribution(grounded, layered)
 
 
 def test_layered_grounding_of_nested_relations_with_sampled_latents_is_the_grounding(
     nested_relational_probabilistic_circuit,
+    layered_nested_relational_probabilistic_circuit,
     nested_query_with_undetermined_room_statistics,
 ):
-    model = nested_relational_probabilistic_circuit
-    np.random.seed(0)
-    grounded = model.ground(nested_query_with_undetermined_room_statistics)
-    np.random.seed(0)
-    layered = model.ground_layered(nested_query_with_undetermined_room_statistics)
-    assert_same_distribution(grounded, layered)
+    assert_same_distribution(
+        *ground_with_the_same_samples(
+            nested_relational_probabilistic_circuit,
+            layered_nested_relational_probabilistic_circuit,
+            nested_query_with_undetermined_room_statistics,
+        )
+    )
+
+
+def test_layered_grounding_of_nested_relations_over_the_exact_partition_is_the_grounding(
+    nested_relational_probabilistic_circuit,
+    layered_nested_relational_probabilistic_circuit,
+    nested_query_with_undetermined_room_statistics,
+):
+    assert_same_distribution(
+        *ground_with_the_same_samples(
+            nested_relational_probabilistic_circuit,
+            layered_nested_relational_probabilistic_circuit,
+            nested_query_with_undetermined_room_statistics,
+            GroundingMode.EXACT,
+        )
+    )
 
 
 def test_layered_grounding_of_rooms_of_one_shape_is_the_grounding(
-    nested_relational_probabilistic_circuit, nested_query_with_rooms_of_one_shape
+    nested_relational_probabilistic_circuit,
+    layered_nested_relational_probabilistic_circuit,
+    nested_query_with_rooms_of_one_shape,
 ):
-    model = nested_relational_probabilistic_circuit
-    grounded = model.ground(nested_query_with_rooms_of_one_shape)
-    layered = model.ground_layered(nested_query_with_rooms_of_one_shape)
+    grounded = nested_relational_probabilistic_circuit.ground(
+        nested_query_with_rooms_of_one_shape
+    )
+    layered = layered_nested_relational_probabilistic_circuit.ground(
+        nested_query_with_rooms_of_one_shape
+    )
     assert_same_distribution(grounded, layered)
 
 
 def test_layered_grounding_of_undetermined_rooms_of_one_shape_is_the_grounding(
     nested_relational_probabilistic_circuit,
+    layered_nested_relational_probabilistic_circuit,
     nested_query_with_undetermined_rooms_of_one_shape,
 ):
-    model = nested_relational_probabilistic_circuit
-    np.random.seed(0)
-    grounded = model.ground(nested_query_with_undetermined_rooms_of_one_shape)
-    np.random.seed(0)
-    layered = model.ground_layered(nested_query_with_undetermined_rooms_of_one_shape)
-    assert_same_distribution(grounded, layered)
+    assert_same_distribution(
+        *ground_with_the_same_samples(
+            nested_relational_probabilistic_circuit,
+            layered_nested_relational_probabilistic_circuit,
+            nested_query_with_undetermined_rooms_of_one_shape,
+        )
+    )
 
 
 def test_layered_grounding_leaves_out_branches_a_later_relation_rules_out(
     nested_relational_probabilistic_circuit,
+    layered_nested_relational_probabilistic_circuit,
 ):
     """
     Conditioning on the statistics of the rooms removes branches of the class circuit
-    that the objects were already weighed at.
+    that the objects were already mounted at.
     """
     chair, table = SceneObjectType.CHAIR, SceneObjectType.TABLE
     query = a(TestExParts)(
@@ -1202,9 +1324,8 @@ def test_layered_grounding_leaves_out_branches_a_later_relation_rules_out(
         rooms=[_room_query([chair, chair]), _room_query([table])],
     )
     query.resolve()
-    model = nested_relational_probabilistic_circuit
-    grounded = model.ground(query)
-    layered = model.ground_layered(query)
+    grounded = nested_relational_probabilistic_circuit.ground(query)
+    layered = layered_nested_relational_probabilistic_circuit.ground(query)
     assert_same_distribution(grounded, layered)
 
 
@@ -1224,18 +1345,52 @@ def test_instance_mixture_gives_every_distinct_assignment_one_instance():
     )
 
 
-def test_rustworkx_and_layered_grounding_are_relational_groundings(
-    nested_relational_probabilistic_circuit, nested_query_with_rooms_of_one_shape
+def test_layered_learning_fits_every_class_circuit_as_a_layered_circuit(
+    layered_nested_relational_probabilistic_circuit,
 ):
-    model = nested_relational_probabilistic_circuit
-    rustworkx_grounding = RustworkxGrounding(model)
-    layered_grounding = LayeredGrounding(model)
-    assert isinstance(rustworkx_grounding, RelationalGrounding)
-    assert isinstance(layered_grounding, RelationalGrounding)
-    assert_same_distribution(
-        rustworkx_grounding.ground(nested_query_with_rooms_of_one_shape),
-        layered_grounding.ground(nested_query_with_rooms_of_one_shape),
+    rooms = layered_nested_relational_probabilistic_circuit.exchangeable_distribution_templates[
+        "rooms"
+    ].template_distribution
+    objects_of_rooms = rooms.exchangeable_distribution_templates[
+        "objects"
+    ].template_distribution
+    for model in [
+        layered_nested_relational_probabilistic_circuit,
+        rooms,
+        objects_of_rooms,
+    ]:
+        assert isinstance(
+            model.class_probabilistic_circuit, LayeredProbabilisticCircuit
+        )
+
+
+def test_a_relational_circuit_is_grounded_in_the_circuit_type_it_was_fitted_in(
+    nested_relational_probabilistic_circuit,
+    layered_nested_relational_probabilistic_circuit,
+    nested_query_with_rooms_of_one_shape,
+):
+    assert isinstance(
+        nested_relational_probabilistic_circuit.grounding(), RustworkxGrounding
     )
+    assert isinstance(
+        layered_nested_relational_probabilistic_circuit.grounding(), LayeredGrounding
+    )
+    assert isinstance(
+        layered_nested_relational_probabilistic_circuit.ground(
+            nested_query_with_rooms_of_one_shape
+        ),
+        LayeredProbabilisticCircuit,
+    )
+
+
+def test_fitting_parts_in_another_circuit_type_raises():
+    model = RelationalProbabilisticCircuit(
+        TestExParts,
+        learning_method=LayeredLearning(JointProbabilityTree()),
+        part_learning_methods={"rooms": JointProbabilityTree()},
+    )
+    with pytest.raises(MixedCircuitTypesError):
+        model.fit(_nested_scenes())
 
 
 def test_nested_relations_are_grounded_in_the_grounding_mode_of_the_parent(
