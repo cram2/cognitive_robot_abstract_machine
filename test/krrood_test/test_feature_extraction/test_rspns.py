@@ -26,6 +26,14 @@ from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding
     ExchangeablePartGrounder,
     GroundingMode,
     InstanceMixture,
+    RelationalGrounding,
+    WeightedAssignments,
+)
+from probabilistic_model.probabilistic_circuit.relational.layered_grounding import (
+    LayeredGrounding,
+)
+from probabilistic_model.probabilistic_circuit.relational.rustworkx_grounding import (
+    RustworkxGrounding,
 )
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
@@ -1204,10 +1212,51 @@ def test_instance_mixture_gives_every_distinct_assignment_one_instance():
     variable = Integer("value")
     first, second, third = {variable: 1}, {variable: 2}, {variable: 3}
     mixture = InstanceMixture.of_node_local_assignments(
-        [([first, second], [-1.0, -2.0]), ([second, third], [-3.0, -4.0])],
-        lambda assignment: (assignment[variable],),
+        [
+            WeightedAssignments([first, second], [-1.0, -2.0]),
+            WeightedAssignments([second, third], [-3.0, -4.0]),
+        ],
+        SortedSet([variable]),
     )
     assert mixture.assignments == [first, second, third]
     np.testing.assert_array_equal(
         mixture.log_weights, [[-1.0, -2.0, -np.inf], [-np.inf, -3.0, -4.0]]
     )
+
+
+def test_rustworkx_and_layered_grounding_are_relational_groundings(
+    nested_relational_probabilistic_circuit, nested_query_with_rooms_of_one_shape
+):
+    model = nested_relational_probabilistic_circuit
+    rustworkx_grounding = RustworkxGrounding(model)
+    layered_grounding = LayeredGrounding(model)
+    assert isinstance(rustworkx_grounding, RelationalGrounding)
+    assert isinstance(layered_grounding, RelationalGrounding)
+    assert_same_distribution(
+        rustworkx_grounding.ground(nested_query_with_rooms_of_one_shape),
+        layered_grounding.ground(nested_query_with_rooms_of_one_shape),
+    )
+
+
+def test_nested_relations_are_grounded_in_the_grounding_mode_of_the_parent(
+    nested_relational_probabilistic_circuit,
+    nested_query_with_undetermined_room_statistics,
+):
+    """
+    The objects of a room whose object types are left open are grounded in the mode the
+    scene is grounded in.
+    """
+    grounding_modes = []
+    ground_part = ExchangeablePartGrounder.ground
+
+    def recording_ground(grounder, grounding_mode):
+        grounding_modes.append(grounding_mode)
+        return ground_part(grounder, grounding_mode)
+
+    with patch.object(ExchangeablePartGrounder, "ground", recording_ground):
+        nested_relational_probabilistic_circuit.ground(
+            nested_query_with_undetermined_room_statistics,
+            grounding_mode=GroundingMode.EXACT,
+        )
+    assert len(grounding_modes) > 2
+    assert set(grounding_modes) == {GroundingMode.EXACT}

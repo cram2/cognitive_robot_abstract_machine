@@ -1,23 +1,23 @@
 """
-Grounding the exchangeable relations of a relational probabilistic circuit by mounting
-their instances into the rustworkx class circuit.
+Grounding a relational probabilistic circuit into a rustworkx circuit, by mounting the
+instances of its exchangeable relations into the class circuit.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import cached_property
 
 import numpy as np
 from sortedcontainers import SortedSet
-from typing_extensions import List
+from typing_extensions import List, Type
 
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
-    GroundedPartTemplate,
     InstanceMixture,
+    PartitionMixture,
+    RelationalGrounding,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -94,20 +94,13 @@ class PartitionBranches(RetainedLatents):
 
 
 @dataclass
-class RustworkxExchangeablePartGrounder(ExchangeablePartGrounder[ProbabilisticCircuit]):
+class RustworkxExchangeablePartGrounder(
+    ExchangeablePartGrounder[ProbabilisticCircuit, ProbabilisticCircuit]
+):
     """
     Grounds one exchangeable part by mounting its instances into the rustworkx class
     circuit.
     """
-
-    @cached_property
-    def part_templates(self) -> List[GroundedPartTemplate[ProbabilisticCircuit]]:
-        """
-        :return: The grounded template of every child object.
-        """
-        return self.template.grounded_templates_of_parts(
-            self.query_parts, self.template.template_distribution.ground
-        )
 
     def single_instance(self) -> ProbabilisticCircuit:
         instance_root = self.mounted_instance(self.determined_statistics)
@@ -120,11 +113,9 @@ class RustworkxExchangeablePartGrounder(ExchangeablePartGrounder[ProbabilisticCi
             mixture, SampledLatents(self.undetermined_latents, mixture.assignments)
         )
 
-    def partition_mixture(
-        self, mixture: InstanceMixture, branches: List[Unit]
-    ) -> ProbabilisticCircuit:
+    def partition_mixture(self, mixture: PartitionMixture) -> ProbabilisticCircuit:
         return self.mixed_part(
-            mixture, PartitionBranches(self.undetermined_latents, branches)
+            mixture, PartitionBranches(self.undetermined_latents, mixture.branches)
         )
 
     def mixed_part(
@@ -193,3 +184,24 @@ class RustworkxExchangeablePartGrounder(ExchangeablePartGrounder[ProbabilisticCi
         for instance_root, log_weight in weighted_instances:
             sum_unit.add_subcircuit(instance_root, log_weight)
         sum_unit.normalize()
+
+
+# %% grounding a relational circuit
+
+
+@dataclass
+class RustworkxGrounding(
+    RelationalGrounding[ProbabilisticCircuit, ProbabilisticCircuit]
+):
+    """
+    Grounds a relational probabilistic circuit into a rustworkx circuit.
+    """
+
+    @property
+    def part_grounder_type(self) -> Type[RustworkxExchangeablePartGrounder]:
+        return RustworkxExchangeablePartGrounder
+
+    def grounded_circuit(
+        self, circuit: ProbabilisticCircuit, parts: List[ProbabilisticCircuit]
+    ) -> ProbabilisticCircuit:
+        return circuit

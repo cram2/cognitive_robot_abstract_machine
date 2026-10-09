@@ -15,7 +15,6 @@ import itertools
 from dataclasses import dataclass, field
 
 import pandas as pd
-from sortedcontainers import SortedSet
 from typing_extensions import (
     TYPE_CHECKING,
     Any,
@@ -23,7 +22,6 @@ from typing_extensions import (
     Hashable,
     Optional,
     Type,
-    TypeVar,
 )
 
 from krrood.ormatic.data_access_objects.dao import (
@@ -45,30 +43,21 @@ from probabilistic_model.learning.jpt.variables import (
 )
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
-    CircuitNotFittedError,
-    ClassCircuitGroundingFailedError,
     PartCircuitGroundingFailedError,
 )
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
-    ExchangeablePartGrounder,
     GroundedCircuit,
     GroundedPartTemplate,
     GroundingMode,
 )
-from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
-    RustworkxCircuitToLayeredCircuitConverter,
-)
 from probabilistic_model.probabilistic_circuit.relational.layered_grounding import (
-    LayeredExchangeablePartGrounder,
+    LayeredGrounding,
 )
 from probabilistic_model.probabilistic_circuit.relational.rustworkx_grounding import (
-    RustworkxExchangeablePartGrounder,
+    RustworkxGrounding,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
-)
-from probabilistic_model.probabilistic_circuit.relational.helper import (
-    find_lowest_product_nodes_that_model_variables,
 )
 from probabilistic_model.probabilistic_circuit.relational.template import (
     RelationalDistributionTemplate,
@@ -77,25 +66,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
 )
-from random_events.interval import Interval
 from random_events.variable import Variable
-
-Grounder = TypeVar("Grounder", bound=ExchangeablePartGrounder)
-
-
-def _is_concrete_statistic(variable: Variable, value: Any) -> bool:
-    """
-    Decide whether an aggregation value pins its variable to a single point.
-
-    :param variable: The latent variable the value belongs to.
-    :param value: The observed aggregation value, either a concrete point or a range.
-    :return:``True`` if the value designates exactly one element of the variable's
-        domain.
-    """
-    composite = variable.make_value(value)
-    if isinstance(composite, Interval):
-        return composite.is_singleton()
-    return len(composite.simple_sets) == 1
 
 
 @dataclass
@@ -472,57 +443,6 @@ class RelationalProbabilisticCircuit:
             )
         return self
 
-    def _condition_class_circuit(
-        self,
-        circuit: ProbabilisticCircuit,
-        aggregation_statistics: PartialPointType,
-        latent_variables: list[Variable],
-    ) -> tuple[ProbabilisticCircuit, list[ProductUnit]]:
-        """
-        Condition the class circuit on aggregation statistics, keeping its structure so
-        that its leaf products stay the mounting points.
-
-        Statistics the circuit deems impossible leave it as it is, together with what
-        the exchangeable parts grounded before have attached to it.
-
-        :param circuit: The current working copy of the class circuit.
-        :param aggregation_statistics: Observed aggregation values to condition on.
-        :param latent_variables: Variables that link the class circuit to the
-            exchangeable distribution template.
-        :return: The conditioned circuit and the product nodes that will be extended
-            with the grounded exchangeable distribution.
-        """
-        if self._can_condition_on(circuit, aggregation_statistics):
-            circuit.log_conditional_in_place(
-                aggregation_statistics, preserve_structure=True
-            )
-        if len(circuit.nodes()) == 0:
-            raise ClassCircuitGroundingFailedError(self.class_)
-        product_nodes_to_extend = find_lowest_product_nodes_that_model_variables(
-            circuit, SortedSet(latent_variables)
-        )
-        return circuit, product_nodes_to_extend
-
-    @staticmethod
-    def _can_condition_on(
-        circuit: ProbabilisticCircuit, aggregation_statistics: PartialPointType
-    ) -> bool:
-        """
-        :param circuit: The current working copy of the class circuit.
-        :param aggregation_statistics: Observed aggregation values.
-        :return: Whether there are values and the circuit deems them possible, which
-            conditioning the circuit itself only tells after destroying it.
-        """
-        if not aggregation_statistics:
-            return False
-        statistics_circuit = circuit.marginal(aggregation_statistics)
-        if statistics_circuit is None:
-            return True
-        conditioned, _ = statistics_circuit.log_conditional_in_place(
-            aggregation_statistics
-        )
-        return conditioned is not None
-
     def query_shape(self, query: Match) -> Hashable:
         """
         :param query: A query this circuit is grounded for.
@@ -554,11 +474,7 @@ class RelationalProbabilisticCircuit:
         grounding_mode: GroundingMode = GroundingMode.SAMPLED,
     ) -> ProbabilisticCircuit:
         """
-        Ground the relational circuit for a specific query.
-
-        Starting from a deep copy of ``class_probabilistic_circuit``, each exchangeable
-        part's template is grounded for the objects specified in the query and attached
-        to the conditioning product nodes of the class circuit.
+        Ground the relational circuit for a specific query into a rustworkx circuit.
 
         :param query: An underspecified, resolved query instance whose structure
             determines which parts are grounded and how many child objects each
@@ -569,24 +485,7 @@ class RelationalProbabilisticCircuit:
             query.
         :raises CircuitNotFittedError: If ``ground`` is called before ``fit``.
         """
-        if self.class_probabilistic_circuit is None:
-            raise CircuitNotFittedError(self.class_)
-        circuit = self.class_probabilistic_circuit.__deepcopy__()
-        instance = query.construct_instance()
-        for (
-            exchangeable_part_name,
-            template,
-        ) in self.exchangeable_distribution_templates.items():
-            grounder = self._exchangeable_part_grounder(
-                RustworkxExchangeablePartGrounder,
-                circuit,
-                exchangeable_part_name,
-                template,
-                query,
-                instance,
-            )
-            circuit = grounder.ground(grounding_mode)
-        return circuit
+        return RustworkxGrounding(self, grounding_mode).ground(query)
 
     def ground_layered(
         self,
@@ -594,12 +493,8 @@ class RelationalProbabilisticCircuit:
         grounding_mode: GroundingMode = GroundingMode.SAMPLED,
     ) -> LayeredProbabilisticCircuit:
         """
-        Ground the relational circuit for a specific query into a layered circuit.
-
-        The grounded distribution is the one :meth:`ground` creates. The instances of an
-        exchangeable relation are the fitted template conditioned on different
-        aggregation statistics, which only changes its weights, so they are built as one
-        stack of layers rather than one circuit per instance and child object.
+        Ground the relational circuit for a specific query into a layered circuit, with
+        the distribution :meth:`ground` creates.
 
         :param query: An underspecified, resolved query instance whose structure
             determines which parts are grounded and how many child objects each
@@ -609,82 +504,4 @@ class RelationalProbabilisticCircuit:
         :return: A layered circuit over all variables implied by the query.
         :raises CircuitNotFittedError: If ``ground_layered`` is called before ``fit``.
         """
-        if self.class_probabilistic_circuit is None:
-            raise CircuitNotFittedError(self.class_)
-        circuit = self.class_probabilistic_circuit.__deepcopy__()
-        instance = query.construct_instance()
-        parts = []
-        for (
-            exchangeable_part_name,
-            template,
-        ) in self.exchangeable_distribution_templates.items():
-            grounder = self._exchangeable_part_grounder(
-                LayeredExchangeablePartGrounder,
-                circuit,
-                exchangeable_part_name,
-                template,
-                query,
-                instance,
-            )
-            circuit = grounder.circuit
-            parts.append(grounder.ground(grounding_mode))
-        parts = [part.without_removed_mounting_nodes(circuit) for part in parts]
-
-        converted = RustworkxCircuitToLayeredCircuitConverter.convert_with_layers(
-            circuit
-        )
-        variables = SortedSet(converted.circuit.variables)
-        for part in parts:
-            variables.update(part.instances.variables)
-        converted.circuit.restore_variables(variables)
-        for part in parts:
-            part.attach_to(converted, variables)
-        converted.circuit.reset_scopes()
-        return converted.circuit
-
-    def _exchangeable_part_grounder(
-        self,
-        grounder_type: Type[Grounder],
-        circuit: ProbabilisticCircuit,
-        exchangeable_part_name: str,
-        template: ExchangeableDistributionTemplate,
-        query: Match,
-        instance: Any,
-    ) -> Grounder:
-        """
-        Condition the class circuit on the aggregation statistics of one exchangeable
-        part that the query determines, and collect what grounding the part needs.
-
-        :param grounder_type: What grounds the part.
-        :param circuit: The current working copy of the class circuit.
-        :param exchangeable_part_name: Field name of the exchangeable relation.
-        :param template: The fitted template for this relation.
-        :param query: The grounding query.
-        :param instance: The concrete instance constructed from the query.
-        :return: The grounder of the part, holding the conditioned class circuit.
-        """
-        aggregation_statistics = compute_aggregation_statistics(
-            instance, exchangeable_part_name, template.latent_variables
-        )
-        determined_statistics = {
-            variable: value
-            for variable, value in aggregation_statistics.items()
-            if _is_concrete_statistic(variable, value)
-        }
-        undetermined_latents = SortedSet(
-            variable
-            for variable in template.latent_variables
-            if variable not in determined_statistics
-        )
-        circuit, product_nodes_to_extend = self._condition_class_circuit(
-            circuit, determined_statistics, template.latent_variables
-        )
-        return grounder_type(
-            circuit=circuit,
-            product_nodes_to_extend=product_nodes_to_extend,
-            template=template,
-            query_parts=query._kwargs_[exchangeable_part_name],
-            determined_statistics=determined_statistics,
-            undetermined_latents=undetermined_latents,
-            monte_carlo_sample_count=self.monte_carlo_sample_count,
-        )
+        return LayeredGrounding(self, grounding_mode).ground(query)

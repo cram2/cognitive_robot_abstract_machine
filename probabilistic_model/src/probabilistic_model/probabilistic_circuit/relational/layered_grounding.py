@@ -1,6 +1,6 @@
 """
-Grounding the exchangeable relations of a relational probabilistic circuit into layers
-of a layered circuit.
+Grounding a relational probabilistic circuit into a layered circuit, with the
+exchangeable relations as layers.
 
 The instances of one relation all come from the same fitted template, conditioned on
 different values of the aggregation statistics. Conditioning a circuit on a point keeps
@@ -13,11 +13,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
-from functools import cached_property
 
 import numpy as np
 from sortedcontainers import SortedSet
-from typing_extensions import TYPE_CHECKING, Dict, List, Optional
+from typing_extensions import TYPE_CHECKING, Dict, List, Optional, Type
 
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     ConvertedCircuit,
@@ -29,6 +28,8 @@ from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding
     ExchangeablePartGrounder,
     GroundedPartTemplate,
     InstanceMixture,
+    PartitionMixture,
+    RelationalGrounding,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -410,21 +411,12 @@ class LayeredExchangeablePart:
 
 @dataclass
 class LayeredExchangeablePartGrounder(
-    ExchangeablePartGrounder[LayeredExchangeablePart]
+    ExchangeablePartGrounder[LayeredProbabilisticCircuit, LayeredExchangeablePart]
 ):
     """
     Grounds one exchangeable part into the layers of its instances, to be attached to
     the layered class circuit.
     """
-
-    @cached_property
-    def part_templates(self) -> List[GroundedPartTemplate[LayeredProbabilisticCircuit]]:
-        """
-        :return: The grounded template of every child object.
-        """
-        return self.template.grounded_templates_of_parts(
-            self.query_parts, self.template.template_distribution.ground_layered
-        )
 
     def single_instance(self) -> LayeredExchangeablePart:
         return LayeredExchangeablePart(
@@ -439,11 +431,9 @@ class LayeredExchangeablePartGrounder(
             mixture, SampledLatents(self.undetermined_latents, mixture.assignments)
         )
 
-    def partition_mixture(
-        self, mixture: InstanceMixture, branches: List[Unit]
-    ) -> LayeredExchangeablePart:
+    def partition_mixture(self, mixture: PartitionMixture) -> LayeredExchangeablePart:
         return self.mixed_part(
-            mixture, PartitionBranches(self.undetermined_latents, branches)
+            mixture, PartitionBranches(self.undetermined_latents, mixture.branches)
         )
 
     def mixed_part(
@@ -479,3 +469,39 @@ class LayeredExchangeablePartGrounder(
         return LayeredExchangeableInstances(
             self.template, self.part_templates, assignments, retained_latents
         )
+
+
+# %% grounding a relational circuit
+
+
+@dataclass
+class LayeredGrounding(
+    RelationalGrounding[LayeredProbabilisticCircuit, LayeredExchangeablePart]
+):
+    """
+    Grounds a relational probabilistic circuit into a layered circuit.
+
+    The instances of an exchangeable relation are the fitted template conditioned on
+    different aggregation statistics, which only changes its weights, so they are built
+    as one stack of layers rather than one circuit per instance and child object.
+    """
+
+    @property
+    def part_grounder_type(self) -> Type[LayeredExchangeablePartGrounder]:
+        return LayeredExchangeablePartGrounder
+
+    def grounded_circuit(
+        self, circuit: ProbabilisticCircuit, parts: List[LayeredExchangeablePart]
+    ) -> LayeredProbabilisticCircuit:
+        parts = [part.without_removed_mounting_nodes(circuit) for part in parts]
+        converted = RustworkxCircuitToLayeredCircuitConverter.convert_with_layers(
+            circuit
+        )
+        variables = SortedSet(converted.circuit.variables)
+        for part in parts:
+            variables.update(part.instances.variables)
+        converted.circuit.restore_variables(variables)
+        for part in parts:
+            part.attach_to(converted, variables)
+        converted.circuit.reset_scopes()
+        return converted.circuit

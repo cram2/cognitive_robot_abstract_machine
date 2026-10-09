@@ -27,8 +27,10 @@ from experiments.causal_reasoning.mutagenesis.dataset import (
     is_mutagenesis_dataset_reachable,
     synthetic_mutagenesis_molecules,
 )
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
+)
+from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
 
