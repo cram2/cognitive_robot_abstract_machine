@@ -39,7 +39,7 @@ class ActionTrial:
     the copy was taken are not carried over.
 
     Trials never publish to a synchronizer, always run as
-    :attr:`~coraplex.datastructures.enums.ExecutionType.SIMULATED`, and always evaluate
+    :attr:`~coraplex.datastructures.enums.ExecutionType.KINEMATICALLY_SIMULATED`, and always evaluate
     pre- and postconditions. While the context is debugging, the copy is shown in RViz
     under its own frame prefix and marker topic.
     """
@@ -118,7 +118,7 @@ class ActionTrial:
         with (
             world.reset_state_context(),
             ExecutionEnvironment(
-                ExecutionType.SIMULATED,
+                ExecutionType.KINEMATICALLY_SIMULATED,
                 collision_avoidance=GiskardExecutable.collision_avoidance,
             ),
         ):

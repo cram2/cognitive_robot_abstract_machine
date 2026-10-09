@@ -42,7 +42,7 @@ designators are leafs.
 If you are performing a plan with a simulated robot, you need a BulletWorld.
 
 ```python
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.testing import setup_world
 from coraplex.datastructures.dataclasses import Context
 from semantic_digital_twin.robots.pr2 import PR2
@@ -83,11 +83,11 @@ As you can see there is the root node which is the language expression and then 
 designators. When executing this plan the Sequential node will try to execute the NavigateAction and if that is finished
 without any error the ParkArmsAction will be executed.
 
-The plan can be executed by wrapping it inside a ```with simulated_robot``` environment and calling perform on the
+The plan can be executed by wrapping it inside a ```with kinematically_simulated_robot``` environment and calling perform on the
 plan.
 
 ```python
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -110,7 +110,7 @@ park = ParkArmsAction(pr2.all_arms)
 
 plan = try_in_order([navigate, park], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -134,7 +134,7 @@ park = ParkArmsAction(pr2.all_arms)
 
 plan = parallel([navigate, park], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -156,7 +156,7 @@ park = ParkArmsAction(pr2.all_arms)
 
 plan = try_all([navigate, park], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -178,7 +178,7 @@ move_torso = MoveTorsoAction(TorsoState.HIGH)
 
 plan = parallel([navigate, sequential([park, move_torso])], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -212,7 +212,7 @@ code_func = code(code_test, context=context)
 
 plan = parallel([park, code_lambda, code_func], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -247,7 +247,7 @@ code_func = code(code_test, context=context)
 
 plan = try_all([navigate, code_func], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 
 print(plan.root.status)
@@ -271,7 +271,7 @@ move_torso_down = MoveTorsoAction(TorsoState.LOW)
 
 plan = repeat([move_torso_up, move_torso_down], maximum_repetitions=3, context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -310,7 +310,7 @@ plan = cancel_when(
 ).plan
 
 try:
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 except PlanCancelled as cancelled:
     print(cancelled)
@@ -334,7 +334,7 @@ plan = pause_until(
     context=context,
 ).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 This will hold the wrapped plan for the first 2 seconds of simulation time before letting it run.

@@ -3,7 +3,7 @@ from krrood.entity_query_language.factories import (
     evaluate_condition,
 )
 from coraplex.exceptions import ConditionNotSatisfied
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.querying.predicates import GripperIsFree, ToolFrameIsAtGrasp
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -94,7 +94,7 @@ def test_pick_up_pre_condition_needs_a_free_gripper(pr2_apartment_context):
     assert pre_condition._name_ == GripperIsFree.__name__
     assert evaluate_condition(pre_condition)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert not evaluate_condition(pre_condition)
@@ -135,7 +135,7 @@ def test_pick_up_post_condition(pr2_apartment_context):
 
     assert _construct_and_evaluate_condition(pick_action, pick_action.pre_condition)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert world.get_body_by_name(

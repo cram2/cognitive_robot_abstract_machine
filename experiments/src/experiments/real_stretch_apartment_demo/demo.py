@@ -254,7 +254,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
 
 
 def main(
-    execution_type: ExecutionType = ExecutionType.SIMULATED, repetitions: int = 1
+    execution_type: ExecutionType = ExecutionType.KINEMATICALLY_SIMULATED, repetitions: int = 1
 ) -> None:
     """
     Run the demonstration.

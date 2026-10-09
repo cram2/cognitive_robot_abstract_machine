@@ -54,12 +54,12 @@ We use the milk as the target. The torso of the PR2 is raised first, since other
 the countertop.
 
 ```python
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import execute_single, sequential
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
 
-with simulated_robot:
+with kinematically_simulated_robot:
     sequential([ParkArmsAction(pr2_view.all_arms),
                 MoveTorsoAction(TorsoState.HIGH)], context=context).perform()
 
@@ -78,7 +78,7 @@ location = ReachabilityLocation(
 
 plan = execute_single(NavigateAction(location.ground()), context=context)
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 
 pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
@@ -134,7 +134,7 @@ location = VisibilityLocation(
 
 plan = execute_single(NavigateAction(location.ground()), context=context)
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 
 pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
@@ -179,7 +179,7 @@ navigate = a(NavigateAction)(
     )
 )
 
-with simulated_robot:
+with kinematically_simulated_robot:
     sequential([navigate], context=context).perform()
 
 pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix

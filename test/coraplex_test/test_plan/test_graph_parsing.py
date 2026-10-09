@@ -6,7 +6,7 @@ from typing_extensions import List
 from coraplex.datastructures.enums import (
     DetectionTechnique,
 )
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.perception import PerceptionQuery
 from coraplex.plans.executables import (
     Executable,
@@ -147,7 +147,7 @@ def _parse_and_compile(plan, world, context):
     """
     plan.notify()
     executable = plan.parse()
-    with simulated_robot:
+    with kinematically_simulated_robot:
         executable.prepare_for_execution()
     executor = Ros2Executor(
         context=MotionStatechartContext(world=world), ros_node=context.ros_node
@@ -320,7 +320,7 @@ def test_merge_motions(pr2_apartment_context, rclpy_node):
     assert executable.pre_condition_node
     assert executable.post_condition_node
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         executable.execute()
 
 
@@ -459,7 +459,7 @@ def test_parse_transport_plan(pr2_apartment_context, rclpy_node):
     plan.notify()
     exec = plan.parse()
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         exec.execute()
 
 

@@ -5,7 +5,7 @@ import pytest
 
 import experiments.orm.ormatic_interface  # type: ignore
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import execute_single
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
 from krrood.entity_query_language.backends import ProbabilisticBackend
@@ -91,7 +91,7 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
 
     context = Context.from_world(world, query_backend=ProbabilisticBackend())
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         execute_single(Sage10kOpenDoor(door), context=context).perform()
 
     assert np.isclose(door.movable_joint.position, np.pi / 2, atol=2e-2)

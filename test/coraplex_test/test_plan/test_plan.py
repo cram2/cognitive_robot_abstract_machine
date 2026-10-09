@@ -11,7 +11,7 @@ from krrood.rustworkx_utils.graph_visualizer_base import (
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import InsertionPosition, NodeDetail
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.executables import GiskardExecutable
@@ -528,7 +528,7 @@ def test_pause_plan(pr2_apartment_context):
     sleep_node = code(lambda: node_sleep())
     robot_plan = sequential([sleep_node, MoveTorsoAction(TorsoState.HIGH)])
     plan = parallel([code_node, robot_plan], context=context).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert world.state[
@@ -556,7 +556,7 @@ def test_sequence_runs_all_motions(pr2_apartment_context):
         [MoveTorsoAction(TorsoState.LOW), MoveTorsoAction(TorsoState.HIGH)],
         context=context,
     ).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert _torso_position(world) == pytest.approx(0.3, abs=0.05)
@@ -589,7 +589,7 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     # resolved_navigate = next(pm_backend.evaluate(navigate_action))
     plan = sequential([MoveTorsoAction(TorsoState.LOW), navigate_action], context).plan
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     underspecified = plan.root.children[1]
@@ -628,7 +628,7 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
 
     plan = execute_single(pick_up_description, context)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         try:
             plan.perform()
         except EmptyUnderspecified:
@@ -649,7 +649,7 @@ def test_conditions_reference_surviving_action_node_after_merge(pr2_apartment_co
         [MoveTorsoAction(TorsoState.HIGH)],
         context=context,
     ).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     live_node_indices = {node.index for node in [plan.root, *plan.root.descendants]}
@@ -691,7 +691,7 @@ def test_motion_order_pick_up(pr2_apartment_context):
     original_execute = GiskardExecutable.execute
     GiskardExecutable.execute = exec_wrapper
     try:
-        with simulated_robot:
+        with kinematically_simulated_robot:
             root.perform()
     finally:
         GiskardExecutable.execute = original_execute
@@ -747,7 +747,7 @@ def test_motion_order_place(pr2_apartment_context):
     original_execute = GiskardExecutable.execute
     GiskardExecutable.execute = exec_wrapper
     try:
-        with simulated_robot:
+        with kinematically_simulated_robot:
             root.perform()
     finally:
         GiskardExecutable.execute = original_execute

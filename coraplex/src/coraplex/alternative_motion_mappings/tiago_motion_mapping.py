@@ -10,7 +10,7 @@ class TiagoMoveSim(MoveMotion, AlternativeMotion[Tiago]):
     Uses a diff drive goal for the tiago base.
     """
 
-    execution_type = ExecutionType.SIMULATED
+    execution_type = ExecutionType.KINEMATICALLY_SIMULATED
 
     def perform(self):
         return

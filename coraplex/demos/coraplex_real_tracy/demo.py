@@ -61,7 +61,7 @@ if execition_mode == ExecutionType.REAL:
     world = fetch_world_from_service(node=node, timeout_seconds=300)
 
     WorldSynchronizer(_world=world, node=node)
-elif execition_mode == ExecutionType.SIMULATED:
+elif execition_mode == ExecutionType.KINEMATICALLY_SIMULATED:
     world = URDFParser.from_file(Tracy.get_ros_file_path()).parse()
     Tracy.from_world(world)
     VizMarkerPublisher(_world=world, node=node)

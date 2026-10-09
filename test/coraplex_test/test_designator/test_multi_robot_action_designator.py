@@ -21,7 +21,7 @@ from coraplex.datastructures.enums import (
 )
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.exceptions import NoFloorBelowRobot
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.plan_transformations import OpenDrawerBeforeMoveAndPickUp
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
@@ -303,7 +303,7 @@ def multiple_robot_apartment_context(
 def test_move_torso_multi(multiple_robot_apartment_context):
     world, view, context = multiple_robot_apartment_context
     plan = execute_single(MoveTorsoAction(TorsoState.HIGH), context=context)
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     joint_state = view.get_torso().get_joint_state_by_type(TorsoState.HIGH)
@@ -323,7 +323,7 @@ def test_navigate_multi(multiple_robot_apartment_context, rclpy_node):
         context=context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     robot_base_position = view.root.global_transform.position.to_np()
@@ -346,7 +346,7 @@ def test_move_gripper_multi(multiple_robot_apartment_context):
         context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     arm = view.all_arms[0]
@@ -363,7 +363,7 @@ def test_move_gripper_multi(multiple_robot_apartment_context):
         context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     for connection, target in close_state.items():
@@ -375,7 +375,7 @@ def test_park_arms_multi(multiple_robot_apartment_context):
     description = ParkArmsAction(context.robot.all_arms)
     plan = execute_single(description, context)
     assert description.arms == context.robot.all_arms
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     joints = []
@@ -421,7 +421,7 @@ def test_reach_action_multi(multiple_robot_apartment_context):
         context=context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     end_effector_pose = left_arm.end_effector.tool_frame.global_transform
@@ -488,7 +488,7 @@ def test_follow_tcp_path_multi(multiple_robot_apartment_context):
         ],
         context,
     )
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     tip_pose = left_arm.end_effector.tool_frame.global_transform
@@ -522,7 +522,7 @@ def test_grasping(multiple_robot_apartment_context):
         ],
         context,
     )
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     # The grasp is the milk's own origin, so that is where the tool frame ends up.
@@ -558,7 +558,7 @@ def test_pick_up_multi(multiple_robot_apartment_context, rclpy_node):
         context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         root.perform()
 
     assert (
@@ -607,7 +607,7 @@ def test_place_multi(multiple_robot_apartment_context):
         context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         root.perform()
 
     with pytest.raises(NoEdgeBetweenNodes):
@@ -635,7 +635,7 @@ def test_look_at(multiple_robot_apartment_context):
     )
 
     plan = execute_single(description, context)
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
 
@@ -657,7 +657,7 @@ def test_detect(multiple_robot_apartment_context):
         object_sem_annotation=Milk,
     )
     plan = execute_single(description, context)
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     # Detection returns no value; it writes what it saw into the world by moving the
@@ -694,7 +694,7 @@ def test_open(multiple_robot_apartment_context):
         ],
         context,
     )
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
     assert world.get_connection_by_name(
         "cabinet10_drawer_middle_joint"
@@ -727,7 +727,7 @@ def test_close(multiple_robot_apartment_context, rclpy_node):
         ],
         context,
     )
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
     assert world.get_connection_by_name(
         "cabinet10_drawer_middle_joint"
@@ -737,7 +737,7 @@ def test_close(multiple_robot_apartment_context, rclpy_node):
 def test_facing(multiple_robot_apartment_context):
     world, robot, context = multiple_robot_apartment_context
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         milk_pose = world.get_body_by_name("milk.stl").global_pose
         plan = execute_single(FaceAtAction(milk_pose), context)
         plan.perform()
@@ -769,7 +769,7 @@ def test_transport(multiple_robot_apartment_context, rclpy_node):
         context,
     )
     plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], context)
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
     milk_position = world.get_body_by_name("milk.stl").global_transform.to_np()[:3, 3]
     dist = np.linalg.norm(milk_position - np.array([3.1, 2.2, 0.95]))
@@ -790,7 +790,7 @@ def test_move_to_reach(multiple_robot_apartment_context, rclpy_node):
     )
 
     plan = execute_single(move_to_reach, context=context)
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
 
@@ -816,7 +816,7 @@ def test_transport_open_container(multiple_robot_apartment_context, rclpy_node):
         ],
         context,
     )
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
     spoon_position = world.get_body_by_name("spoon.stl").global_pose
     np.testing.assert_allclose(spoon_position, target_pose, atol=0.02)
@@ -839,7 +839,7 @@ def test_multi_robot_gcs_navigation(multiple_robot_apartment_context, rclpy_node
         context=context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     robot_base_position = robot.global_transform.position.to_np().flatten()
@@ -1069,7 +1069,7 @@ def test_elevator_navigation(multiple_robot_apartment_context, rclpy_node):
     # The operator watches every model change of the shared world, so it has to stop
     # before the next test runs on it, whether or not the ride succeeds.
     try:
-        with simulated_robot:
+        with kinematically_simulated_robot:
             plan.perform()
     finally:
         operator.stop()

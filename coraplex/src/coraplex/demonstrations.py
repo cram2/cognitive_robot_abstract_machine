@@ -151,7 +151,7 @@ class RobotDemonstration(ABC):
     Name of the node a real run registers.
     """
 
-    execution_type: ExecutionType = ExecutionType.SIMULATED
+    execution_type: ExecutionType = ExecutionType.KINEMATICALLY_SIMULATED
     """
     Whether the plan drives the real robot or a simulated one.
     """

@@ -25,7 +25,7 @@ from rclpy.executors import SingleThreadedExecutor
 
 from experiments.sage_10k.demos import Sage10kAbstractDemoHSRB
 from krrood.utils import recursive_subclasses
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -55,7 +55,7 @@ def run_demo(demo: Sage10kAbstractDemoHSRB):
 
     viz_marker_publisher = VizMarkerPublisher(_world=demo.world, node=node)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         demo.plan.perform()
 
     viz_marker_publisher.stop()

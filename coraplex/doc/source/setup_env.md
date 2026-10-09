@@ -154,7 +154,7 @@ apartment, a milk bottle and the PR2 robot into a single semantic digital twin w
 from semantic_digital_twin.robots.pr2 import PR2
 from coraplex.testing import setup_world
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 
 world = setup_world()
 robot = PR2.from_world(world)

@@ -6,7 +6,7 @@ import coraplex.alternative_motion_mappings.stretch_motion_mapping  # type: igno
 import coraplex.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.exceptions import QueryCannotBePersisted
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.plans.plan import Plan
@@ -45,7 +45,7 @@ def simple_plan(pr2_apartment_context):
 def test_plan_serialization(coraplex_testing_session, simple_plan):
     session = coraplex_testing_session
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         simple_plan.perform()
 
     dao = to_dao(simple_plan)
@@ -69,7 +69,7 @@ def test_plan_serialization(coraplex_testing_session, simple_plan):
 
 def test_replay_simple_plan(coraplex_testing_session, simple_plan):
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         simple_plan.perform()
 
     session = coraplex_testing_session
@@ -124,7 +124,7 @@ def complex_plan(pr2_apartment_context):
 @pytest.mark.skip("Execution Data is not recorded right now")
 def test_execution_data_of_complex_plan(coraplex_testing_session, complex_plan):
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         complex_plan.perform()
 
     session = coraplex_testing_session
@@ -149,7 +149,7 @@ def test_replay_complex_plan_from_db(coraplex_testing_session, complex_plan):
     """
     A performed plan holding a transport is persisted and recreated from the database.
     """
-    with simulated_robot:
+    with kinematically_simulated_robot:
         complex_plan.perform()
 
     complex_plan.initial_world = None

@@ -362,7 +362,7 @@ class BulletWorldDemonstration(RobotDemonstration):
 
 
 def main(
-    execution_type: ExecutionType = ExecutionType.SIMULATED,
+    execution_type: ExecutionType = ExecutionType.KINEMATICALLY_SIMULATED,
     collision_avoidance: bool = True,
     event_segmentation: bool = True,
     debug: bool = False,

@@ -2,7 +2,7 @@
 Native motion execution preserves its final state in a Cramera recording.
 """
 
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import MotionNode
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
@@ -32,7 +32,7 @@ def test_native_motion_recording_retains_completed_chart(pr2_apartment_context) 
     plan.node_callbacks.append(callback)
 
     try:
-        with simulated_robot:
+        with kinematically_simulated_robot:
             plan.perform()
 
         frames = recording.stop()

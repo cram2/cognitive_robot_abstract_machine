@@ -40,23 +40,30 @@ managers. Entering an environment sets the class-level `execution_type` and `col
 nested safely.
 
 ```python
-from coraplex.execution_environment import simulated_robot, real_robot
+from coraplex.execution_environment import kinematically_simulated_robot, real_robot
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 
 with real_robot:
     plan.perform()
 ```
 
-Four pre-built environments are provided in {mod}`coraplex.execution_environment`: `simulated_robot`, `real_robot`,
-`semi_real_robot` and `no_execution`. The execution type itself is the {class}`~coraplex.datastructures.enums.ExecutionType`
-enum (`SIMULATED`, `REAL`, `SEMI_REAL`, `NO_EXECUTION`).
+Four pre-built environments are provided in {mod}`coraplex.execution_environment`: `kinematically_simulated_robot`, `real_robot`,
+`semi_real_robot` and `no_execution`. Running against a physics engine takes
+{class}`~coraplex.execution_environment.PhysicallySimulatedRobot` instead, which is given the simulation to run in rather
+than being ready-made. The execution type itself is the {class}`~coraplex.datastructures.enums.ExecutionType`
+enum (`KINEMATICALLY_SIMULATED`, `PHYSICALLY_SIMULATED`, `REAL`, `SEMI_REAL`, `NO_EXECUTION`).
+
+The two simulated types differ in what moves the robot. Kinematically, a joint simply arrives wherever it was commanded
+and a picked object is attached to the gripper. Physically, the commands become the set points of the robot's own servos
+and the physics advances one control period between them, so a joint arrives only as well as it is driven there and an
+object is held by friction alone -- a poor grasp drops it.
 
 Collision avoidance can be toggled per environment:
 
 ```python
-with simulated_robot(collision_avoidance=True):
+with kinematically_simulated_robot(collision_avoidance=True):
     plan.perform()
 ```
 
@@ -64,10 +71,16 @@ with simulated_robot(collision_avoidance=True):
 
 {meth}`~coraplex.plans.executables.GiskardExecutable.execute` dispatches on the active execution type:
 
-- `SIMULATED`: the chart is compiled and ticked against the world of the context until it reports an end motion. A
-  motion that stops approaching its goal gives up and raises
+- `KINEMATICALLY_SIMULATED`: the chart is compiled and ticked against the world of the context until it reports an end
+  motion. A motion that stops approaching its goal gives up and raises
   {class}`~giskardpy.motion_statechart.exceptions.NoProgressError`, naming the tasks that stalled; one that keeps
   converging is never cut off for taking many ticks.
+- `PHYSICALLY_SIMULATED`: the same chart is ticked, but each cycle's command reaches the simulated servos as their set
+  point and the physics steps one control period before the next cycle, so the motion is reached as hard as the servos
+  manage. The controller runs faster here than it does kinematically, and a motion that outlasts
+  {attr}`~coraplex.plans.executables.GiskardExecutable.simulation_time_limit` raises
+  {class}`~coraplex.plans.failures.MotionExceededSimulationTimeLimit`. Nothing is attached to the gripper, so whether a
+  picked object comes along is decided by the grasp.
 - `REAL`: the chart is sent to giskard via the `GiskardWrapper` while a watcher thread monitors for interrupts.
 - `NO_EXECUTION`: the chart is built but not run, which is useful for inspecting or validating a plan.
 

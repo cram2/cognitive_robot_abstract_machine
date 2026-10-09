@@ -46,7 +46,7 @@ it takes the milk by and with which arm. A step that is still an EQL query, as t
 
 ```python
 from coraplex.robot_plans import *
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.robot_plans.actions.composite.transporting import (
     MoveAndPickUpAction,
     MoveAndPlaceAction,
@@ -80,7 +80,7 @@ description = TransportAction(
 )
 plan = sequential([MoveTorsoAction(TorsoState.HIGH),
                    description], context=context).plan
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 

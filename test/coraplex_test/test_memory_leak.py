@@ -5,7 +5,7 @@ import objgraph
 
 from coraplex.datastructures.dataclasses import Context
 
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -45,7 +45,7 @@ def test_ref_chain_after_copy_with_execute(pr2_apartment_context):
         copy_context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     gc.collect()
@@ -72,7 +72,7 @@ def test_ref_chain_after_copy_with_execute_complex_plan(pr2_apartment_context):
         copy_context,
     )
     plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], copy_context)
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     gc.collect()

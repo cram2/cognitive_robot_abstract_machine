@@ -21,7 +21,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProductUnit,
 )
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.plans.failures import (
     PlanFailure,
@@ -120,7 +120,7 @@ class TrainingEnvironment(ABC):
                 node=rclpy.create_node("test_node"),
             )
 
-        with simulated_robot:
+        with kinematically_simulated_robot:
             try:
                 plan.perform()
             except EmptyUnderspecified:

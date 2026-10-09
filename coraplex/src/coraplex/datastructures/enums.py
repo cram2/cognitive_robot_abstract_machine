@@ -101,13 +101,49 @@ class FindBodyInRegionMethod(Enum):
 
 class ExecutionType(Enum):
     """
-    Enum for Execution Process Module types.
+    What carries out the motions of a plan, which decides both how a motion is performed
+    and how a query about the world may be answered.
     """
 
     REAL = auto()
-    SIMULATED = auto()
+    """
+    Performed by the robot itself, by handing the motion state chart to giskard.
+    """
+
+    KINEMATICALLY_SIMULATED = auto()
+    """
+    Performed against a world the robot is moved through kinematically, where reaching
+    a goal may be answered by writing the pose it was reached at into the world.
+
+    Nothing pushes back: a joint arrives wherever it was commanded and an object is held
+    by being attached to the gripper.
+    """
+
+    PHYSICALLY_SIMULATED = auto()
+    """
+    Performed against a physically simulated world, where the robot's joints are driven
+    to a goal by its servos and an object is held by friction alone.
+
+    Apart from :attr:`KINEMATICALLY_SIMULATED`, since a motion that may be answered by
+    writing the robot's own pose into the world cannot be answered that way here: see
+    :class:`~coraplex.robot_plans.motions.navigation.MoveMotion`.
+    """
+
     SEMI_REAL = auto()
+    """
+    Perceived from the real world while the motions are only simulated.
+
+    .. warning:: No execution path answers this type:
+        :meth:`~coraplex.plans.executables.GiskardExecutable.execute` raises
+        :class:`~coraplex.exceptions.UnknownExecutionType` for a plan that holds any
+        motion.
+    """
+
     NO_EXECUTION = auto()
+    """
+    Not performed at all: the motion state chart is built but never run, which leaves a
+    plan to be inspected rather than carried out.
+    """
 
 
 class VisualizationBackend(StrEnum):

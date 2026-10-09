@@ -11,7 +11,7 @@ from typing_extensions import Callable, List, Type
 from krrood.entity_query_language.factories import a, variable
 from krrood.entity_query_language.query.match import Match
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.locations.locations import ReachabilityLocation
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import ActionNode
@@ -870,7 +870,7 @@ def test_facing_after_navigating_turns_where_the_robot_was_sent(pr2_apartment_co
         [NavigateAction(_standing_pose(world)), FaceAtAction(target)], context
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     np.testing.assert_allclose(
@@ -894,7 +894,7 @@ def test_facing_a_target_given_relative_to_a_body_turns_towards_that_body(
         context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     _assert_base_faces(robot, milk.global_pose.position)
@@ -913,7 +913,7 @@ def test_facing_and_looking_at_a_target_turns_the_base_and_the_camera_towards_it
         context,
     )
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     _assert_base_faces(robot, target.position)

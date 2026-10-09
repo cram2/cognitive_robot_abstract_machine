@@ -156,9 +156,9 @@ runnable plan.
 To execute the plan, we need to determine if it should be run in simulation or on a real robot and then call perform.
 
 ```python
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
