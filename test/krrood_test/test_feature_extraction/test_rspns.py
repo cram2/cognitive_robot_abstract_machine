@@ -60,7 +60,9 @@ from ..dataset.example_classes import (
     SceneObject,
     SceneObjectType,
     SceneRoom,
-    TestExParts,
+    SceneBuilding,
+    SceneFloor,
+    SceneWithExchangeableParts,
 )
 
 
@@ -902,18 +904,18 @@ def _room(x: float, object_types: list[SceneObjectType]) -> SceneRoom:
     )
 
 
-def _nested_scenes() -> list[TestExParts]:
+def _nested_scenes() -> list[SceneWithExchangeableParts]:
     """
     Scenes whose rooms are an exchangeable relation with an exchangeable relation of
     their own, the objects of every room.
     """
     table, chair = SceneObjectType.TABLE, SceneObjectType.CHAIR
     return [
-        TestExParts(
+        SceneWithExchangeableParts(
             objects=[SceneObject(type=table)],
             rooms=[_room(1.0, [table, chair]), _room(2.0, [chair, chair, chair])],
         ),
-        TestExParts(
+        SceneWithExchangeableParts(
             objects=[SceneObject(type=chair), SceneObject(type=chair)],
             rooms=[
                 _room(3.0, [table]),
@@ -921,7 +923,7 @@ def _nested_scenes() -> list[TestExParts]:
                 _room(5.0, [chair]),
             ],
         ),
-        TestExParts(
+        SceneWithExchangeableParts(
             objects=[SceneObject(type=table), SceneObject(type=chair)],
             rooms=[_room(2.5, [table, table, chair])],
         ),
@@ -930,13 +932,16 @@ def _nested_scenes() -> list[TestExParts]:
 
 @pytest.fixture
 def nested_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
-    return RelationalProbabilisticCircuit(TestExParts).fit(_nested_scenes())
+    return RelationalProbabilisticCircuit(SceneWithExchangeableParts).fit(
+        _nested_scenes()
+    )
 
 
 @pytest.fixture
 def layered_nested_relational_probabilistic_circuit() -> RelationalProbabilisticCircuit:
     return RelationalProbabilisticCircuit(
-        TestExParts, learning_method=LayeredLearning(JointProbabilityTree())
+        SceneWithExchangeableParts,
+        learning_method=LayeredLearning(JointProbabilityTree()),
     ).fit(_nested_scenes())
 
 
@@ -955,7 +960,7 @@ def nested_query_with_determined_room_statistics():
     determines the aggregation statistics of every room.
     """
     table, chair = SceneObjectType.TABLE, SceneObjectType.CHAIR
-    query = a(TestExParts)(
+    query = a(SceneWithExchangeableParts)(
         objects=[a(SceneObject)(type=table), a(SceneObject)(type=chair)],
         rooms=[_room_query([table, chair]), _room_query([chair, chair, table])],
     )
@@ -969,7 +974,7 @@ def nested_query_with_undetermined_room_statistics():
     A scene with one room whose object types are left open, so grounding that room
     retains its aggregation statistics.
     """
-    query = a(TestExParts)(
+    query = a(SceneWithExchangeableParts)(
         objects=[a(SceneObject)(type=SceneObjectType.TABLE)],
         rooms=[_room_query([SceneObjectType.CHAIR]), _room_query([..., ...])],
     )
@@ -984,7 +989,7 @@ def nested_query_with_rooms_of_one_shape():
     queries have the same shape, and whose third room has other objects.
     """
     table, chair = SceneObjectType.TABLE, SceneObjectType.CHAIR
-    query = a(TestExParts)(
+    query = a(SceneWithExchangeableParts)(
         objects=[a(SceneObject)(type=table)],
         rooms=[
             _room_query([table, chair]),
@@ -1001,7 +1006,7 @@ def nested_query_with_undetermined_rooms_of_one_shape():
     """
     A scene with two rooms whose object types are left open.
     """
-    query = a(TestExParts)(
+    query = a(SceneWithExchangeableParts)(
         objects=[a(SceneObject)(type=SceneObjectType.TABLE)],
         rooms=[_room_query([..., ...]), _room_query([..., ...])],
     )
@@ -1319,7 +1324,7 @@ def test_layered_grounding_leaves_out_branches_a_later_relation_rules_out(
     that the objects were already mounted at.
     """
     chair, table = SceneObjectType.CHAIR, SceneObjectType.TABLE
-    query = a(TestExParts)(
+    query = a(SceneWithExchangeableParts)(
         objects=[a(SceneObject)(type=chair)],
         rooms=[_room_query([chair, chair]), _room_query([table])],
     )
@@ -1385,7 +1390,7 @@ def test_a_relational_circuit_is_grounded_in_the_circuit_type_it_was_fitted_in(
 
 def test_fitting_parts_in_another_circuit_type_raises():
     model = RelationalProbabilisticCircuit(
-        TestExParts,
+        SceneWithExchangeableParts,
         learning_method=LayeredLearning(JointProbabilityTree()),
         part_learning_methods={"rooms": JointProbabilityTree()},
     )
@@ -1415,3 +1420,60 @@ def test_nested_relations_are_grounded_in_the_grounding_mode_of_the_parent(
         )
     assert len(grounding_modes) > 2
     assert set(grounding_modes) == {GroundingMode.EXACT}
+
+
+# %% three levels of exchangeable relations
+
+
+def _buildings() -> list[SceneBuilding]:
+    """
+    Buildings whose floors hold rooms that hold objects.
+    """
+    return [
+        SceneBuilding(
+            floors=[
+                SceneFloor(
+                    rooms=[
+                        _room(float(room), [SceneObjectType.CHAIR] * (2 + floor))
+                        for room in range(2)
+                    ]
+                )
+                for floor in range(2)
+            ]
+        )
+        for _ in range(4)
+    ]
+
+
+def _building_query(objects_per_room_per_floor: list[list[int]]) -> Any:
+    query = a(SceneBuilding)(
+        floors=[
+            a(SceneFloor)(
+                rooms=[_room_query([...] * objects) for objects in objects_per_room]
+            )
+            for objects_per_room in objects_per_room_per_floor
+        ]
+    )
+    query.resolve()
+    return query
+
+
+@pytest.mark.parametrize("grounding_mode", list(GroundingMode))
+@pytest.mark.parametrize(
+    "objects_per_room_per_floor", [[[2, 2], [2, 2]], [[1], [3, 2, 1]]]
+)
+def test_layered_grounding_of_three_levels_of_relations_is_the_grounding(
+    objects_per_room_per_floor, grounding_mode
+):
+    model = RelationalProbabilisticCircuit(SceneBuilding).fit(_buildings())
+    layered_model = RelationalProbabilisticCircuit(
+        SceneBuilding, learning_method=LayeredLearning(JointProbabilityTree())
+    ).fit(_buildings())
+    assert_same_distribution(
+        *ground_with_the_same_samples(
+            model,
+            layered_model,
+            _building_query(objects_per_room_per_floor),
+            grounding_mode,
+        )
+    )
