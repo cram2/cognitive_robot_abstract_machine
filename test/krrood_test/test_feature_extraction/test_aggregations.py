@@ -25,9 +25,9 @@ from ..dataset.example_classes import (
     KRROODPosition,
     KRROODOrientation,
     SceneObjectType,
-    TestExParts,
+    SceneWithExchangeableParts,
     SceneRoomAggregations,
-    TestExPartsAggregations,
+    SceneWithExchangeablePartsAggregations,
 )
 
 
@@ -91,11 +91,11 @@ def test_multiple_exchangeable_parts():
         orientation=KRROODOrientation(0, 0, 0, 1),
         objects=[obj1],
     )
-    test_ex_parts = TestExParts(objects=[obj1, obj2], rooms=[room, room2])
+    scene = SceneWithExchangeableParts(objects=[obj1, obj2], rooms=[room, room2])
 
-    extractor = FeatureExtractor.from_instances([test_ex_parts])
+    extractor = FeatureExtractor.from_instances([scene])
     assert len([f for f in extractor.features if isinstance(f, Call)]) == 4
-    assert extractor.apply_mapping(test_ex_parts) == [1, 1, 2, 2]
+    assert extractor.apply_mapping(scene) == [1, 1, 2, 2]
 
 
 def test_aggregation_count_values(example_scenario):
@@ -207,7 +207,7 @@ def test_own_registry_contains_only_directly_defined_methods():
 
 def test_aggregation_class_discovered_for_concrete_subclasses():
     assert get_aggregation_class(SceneRoom) is not None
-    assert get_aggregation_class(TestExParts) is not None
+    assert get_aggregation_class(SceneWithExchangeableParts) is not None
 
 
 def test_feature_extraction_over_empty_exchangeable_part_does_not_raise():
@@ -239,13 +239,15 @@ def test_scene_room_aggregations_exposes_correct_feature_names_for_objects_field
     assert feature_names == {"chair_count", "table_count", "total_count"}
 
 
-def test_test_ex_parts_aggregations_exposes_correct_feature_names_for_objects_field():
+def test_scene_with_exchangeable_parts_aggregations_exposes_correct_feature_names_for_objects_field():
     """
-    TestExPartsAggregations must inherit all three statistics from
+    SceneWithExchangeablePartsAggregations must inherit all three statistics from
     SceneObjectAggregationBase for the 'objects' field.
     """
-    test_ex_parts = TestExParts(objects=[], rooms=[])
-    instance = TestExPartsAggregations(instance=test_ex_parts, field_name="objects")
+    scene = SceneWithExchangeableParts(objects=[], rooms=[])
+    instance = SceneWithExchangeablePartsAggregations(
+        instance=scene, field_name="objects"
+    )
     feature_names = {feature.__name__ for feature in instance.aggregation_features}
     assert feature_names == {"chair_count", "table_count", "total_count"}
 
@@ -266,14 +268,16 @@ def test_base_class_statistics_are_not_duplicated_in_scene_room_aggregations():
     assert len(feature_names) == len(set(feature_names))
 
 
-def test_base_class_statistics_are_not_duplicated_in_test_ex_parts_aggregations():
+def test_base_class_statistics_are_not_duplicated_in_scene_with_exchangeable_parts_aggregations():
     """
     Each statistic from SceneObjectAggregationBase should appear exactly once in
-    TestExPartsAggregations.aggregation_features — no duplicates via multiple
-    inheritance paths.
+    SceneWithExchangeablePartsAggregations.aggregation_features — no duplicates via
+    multiple inheritance paths.
     """
-    test_ex_parts = TestExParts(objects=[], rooms=[])
-    instance = TestExPartsAggregations(instance=test_ex_parts, field_name="objects")
+    scene = SceneWithExchangeableParts(objects=[], rooms=[])
+    instance = SceneWithExchangeablePartsAggregations(
+        instance=scene, field_name="objects"
+    )
     feature_names = [feature.__name__ for feature in instance.aggregation_features]
     assert len(feature_names) == len(set(feature_names))
 
@@ -281,7 +285,7 @@ def test_base_class_statistics_are_not_duplicated_in_test_ex_parts_aggregations(
 def test_scene_room_aggregations_has_no_features_for_rooms_field():
     """
     SceneRoomAggregations owns no 'rooms' statistics — that field belongs only to
-    TestExPartsAggregations.
+    SceneWithExchangeablePartsAggregations.
     """
     room = SceneRoom(
         position=KRROODPosition(0, 0, 0),
@@ -292,13 +296,15 @@ def test_scene_room_aggregations_has_no_features_for_rooms_field():
     assert instance.aggregation_features == []
 
 
-def test_test_ex_parts_aggregations_exposes_room_count_for_rooms_field():
+def test_scene_with_exchangeable_parts_aggregations_exposes_room_count_for_rooms_field():
     """
-    TestExPartsAggregations must expose exactly the 'room_count' statistic for the
-    'rooms' field.
+    SceneWithExchangeablePartsAggregations must expose exactly the 'room_count'
+    statistic for the 'rooms' field.
     """
-    test_ex_parts = TestExParts(objects=[], rooms=[])
-    instance = TestExPartsAggregations(instance=test_ex_parts, field_name="rooms")
+    scene = SceneWithExchangeableParts(objects=[], rooms=[])
+    instance = SceneWithExchangeablePartsAggregations(
+        instance=scene, field_name="rooms"
+    )
     feature_names = {feature.__name__ for feature in instance.aggregation_features}
     assert feature_names == {"room_count"}
 
@@ -311,14 +317,18 @@ def test_get_aggregation_class_returns_scene_room_aggregations_for_scene_room():
     assert get_aggregation_class(SceneRoom) is SceneRoomAggregations
 
 
-def test_get_aggregation_class_returns_test_ex_parts_aggregations_for_test_ex_parts():
+def test_get_aggregation_class_returns_scene_with_exchangeable_parts_aggregations_for_scene_with_exchangeable_parts():
     """
-    The registry must resolve TestExParts to TestExPartsAggregations specifically.
+    The registry must resolve SceneWithExchangeableParts to
+    SceneWithExchangeablePartsAggregations specifically.
     """
-    assert get_aggregation_class(TestExParts) is TestExPartsAggregations
+    assert (
+        get_aggregation_class(SceneWithExchangeableParts)
+        is SceneWithExchangeablePartsAggregations
+    )
 
 
-def test_base_class_objects_aggregation_produces_same_values_for_test_ex_parts_as_for_scene_room(
+def test_base_class_objects_aggregation_produces_same_values_for_scene_with_exchangeable_parts_as_for_scene_room(
     example_scenario,
 ):
     """
@@ -327,20 +337,20 @@ def test_base_class_objects_aggregation_produces_same_values_for_test_ex_parts_a
     same 'objects' list.
     """
     room = example_scenario
-    test_ex_parts = TestExParts(objects=room.objects, rooms=[])
+    scene = SceneWithExchangeableParts(objects=room.objects, rooms=[])
 
     room_aggregation = SceneRoomAggregations(instance=room, field_name="objects")
-    test_ex_parts_aggregation = TestExPartsAggregations(
-        instance=test_ex_parts, field_name="objects"
+    scene_aggregation = SceneWithExchangeablePartsAggregations(
+        instance=scene, field_name="objects"
     )
 
-    assert room_aggregation.apply_mapping() == test_ex_parts_aggregation.apply_mapping()
+    assert room_aggregation.apply_mapping() == scene_aggregation.apply_mapping()
 
 
 def test_room_count_computes_correct_number_of_rooms():
     """
-    The room_count statistic defined on TestExPartsAggregations must return the exact
-    number of SceneRoom instances in the 'rooms' field.
+    The room_count statistic defined on SceneWithExchangeablePartsAggregations must
+    return the exact number of SceneRoom instances in the 'rooms' field.
     """
     room1 = SceneRoom(
         position=KRROODPosition(0, 0, 0),
@@ -352,8 +362,10 @@ def test_room_count_computes_correct_number_of_rooms():
         orientation=KRROODOrientation(0, 0, 0, 1),
         objects=[],
     )
-    test_ex_parts = TestExParts(objects=[], rooms=[room1, room2])
-    instance = TestExPartsAggregations(instance=test_ex_parts, field_name="rooms")
+    scene = SceneWithExchangeableParts(objects=[], rooms=[room1, room2])
+    instance = SceneWithExchangeablePartsAggregations(
+        instance=scene, field_name="rooms"
+    )
     [room_count] = instance.apply_mapping().values()
     assert room_count == 2
 

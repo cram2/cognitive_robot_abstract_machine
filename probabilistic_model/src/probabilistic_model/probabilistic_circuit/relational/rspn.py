@@ -318,9 +318,12 @@ class RelationalProbabilisticCircuit:
 
         Each row corresponds to one child object and contains the parent instance's
         aggregation values followed by all child features (including nested unique-part
-        attributes). Column names are the access-path names produced by
+        attributes). Attribute columns are named by the access-path names produced by
         :meth:`~krrood.entity_query_language.core.mapped_variable.MappedVariable.get_clean_name_from_mapped_variable`
         so that, after part-prefix renaming, they align with the krrood access-path convention.
+        The child's own aggregation statistics are named by their ``_name_`` instead, the
+        name the template of the part nested below the child uses for them as latent
+        variables.
 
         :param exchangeable_part: Field name of the one-to-many relation on each instance.
         :param instances: Training instances from which rows are generated.
@@ -336,17 +339,11 @@ class RelationalProbabilisticCircuit:
             for child in getattr(instance, exchangeable_part):
                 child_features = child_feature_extractor.apply_mapping(child)
                 rows.append(aggregation_row + child_features)
-        child_aggregation_features = {
-            id(feature)
-            for features in child_feature_extractor.exchangeable_features.values()
-            for feature in features
-        }
-        # the child's own aggregation statistics keep the name the latent variables of
-        # its exchangeable templates are given, so grounding the child can find them
+        child_aggregation_features = child_feature_extractor.aggregation_features
         child_column_names = [
             (
                 feature._name_
-                if id(feature) in child_aggregation_features
+                if feature in child_aggregation_features
                 else feature.get_clean_name_from_mapped_variable()
             )
             for feature in child_feature_extractor.features

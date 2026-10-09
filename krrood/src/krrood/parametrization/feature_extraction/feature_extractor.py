@@ -79,6 +79,13 @@ class FeatureExtractor:
         """
         return self.extracted_features.exchangeable_features
 
+    @property
+    def aggregation_features(self) -> set[MappedVariable]:
+        """
+        :return: The aggregation variables of all exchangeable parts, flattened into one set.
+        """
+        return set(itertools.chain.from_iterable(self.exchangeable_features.values()))
+
     @classmethod
     def from_instances(cls, instances: list[Any]) -> FeatureExtractor:
         """
@@ -305,11 +312,7 @@ class FeatureExtractor:
         :param instance: The instance to extract features from.
         :return: A list of mapped values.
         """
-        aggregation_features = {
-            aggregation
-            for aggregations in self.exchangeable_features.values()
-            for aggregation in aggregations
-        }
+        aggregation_features = self.aggregation_features
         result = []
         aggregation_cls = get_aggregation_class(type(instance))
         aggregation_instance = (

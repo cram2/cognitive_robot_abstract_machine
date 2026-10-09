@@ -136,6 +136,15 @@ def test_apply_mapping_with_aggregations(scenario):
     assert mapping[10] == 3  # total count
 
 
+def test_aggregation_features_flatten_the_features_of_every_exchangeable_part(
+    scenario,
+):
+    room, room2, feature_extractor = scenario
+    assert feature_extractor.aggregation_features == set(
+        feature_extractor.exchangeable_features["objects"]
+    )
+
+
 def test_dataframe_preprocessing(scenario):
     room, room2, feature_extractor = scenario
     dataframe = feature_extractor.create_dataframe([room, room2])
