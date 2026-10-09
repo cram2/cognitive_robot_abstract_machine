@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable
 
 import pytest
 
 from krrood.code_generation.exceptions import FunctionMissingAnnotationsError
 from krrood.code_generation.function_case import FunctionCaseGenerator
+
+
+@dataclass
+class GeneratedSourcePoint:
+    """
+    A type an annotation can only name through an import, unlike a builtin.
+    """
+
+    x: float
+    """Position along the first axis."""
 
 
 def _make_module_level_distance() -> Callable:
@@ -191,3 +202,28 @@ class TestGeneratedSourceOutputField:
 
     def test_output_field_has_return_type(self, distance_source: str) -> None:
         assert "_output: float" in distance_source
+
+
+class TestGeneratedSourceIsValidPython:
+    """
+    The emitted source parses, whether or not any annotation needs an import.
+    """
+
+    def test_builtin_annotations_only(self, distance_source: str) -> None:
+        """
+        A function annotated with builtins alone leaves nothing to import.
+        """
+        compile(distance_source, "<generated>", "exec")
+
+    def test_annotation_needing_an_import(self) -> None:
+        """
+        A function annotated with a custom type puts that import in the source.
+        """
+
+        def measure(point: GeneratedSourcePoint) -> GeneratedSourcePoint:
+            return point
+
+        measure.__module__ = "my.module"
+        source = FunctionCaseGenerator().generate(measure)
+        assert GeneratedSourcePoint.__name__ in source
+        compile(source, "<generated>", "exec")
