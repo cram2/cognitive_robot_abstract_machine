@@ -107,15 +107,16 @@ def test_a_support_that_lasts_is_not_reported_lost_by_another_bodys_detector(
 
 
 def test_a_containment_that_lasts_is_not_reported_lost_by_another_bodys_detector(
-    milk_in_the_apartment,
+    box_and_trays,
 ):
-    world, milk, box = milk_in_the_apartment
-    box_x, box_y, box_z = box.global_pose.position.to_np()[:3]
-    _place(milk, box_x, box_y, box_z)
+    world = box_and_trays.world
+    box = box_and_trays.box
+    tray = box_and_trays.tray
+    box.parent_connection.origin = box_and_trays.set_down_in_the_tray
 
     segmind_context = _ticked_while_nothing_moves(
-        world, [ContainmentDetector], [milk, box]
+        world, [SupportDetector, ContainmentDetector], [box, tray]
     )
 
-    assert len(_events_of(segmind_context, ContainmentEvent, milk)) == 1
-    assert _events_of(segmind_context, LossOfContainmentEvent, milk) == []
+    assert len(_events_of(segmind_context, ContainmentEvent, box)) == 1
+    assert _events_of(segmind_context, LossOfContainmentEvent, box) == []
