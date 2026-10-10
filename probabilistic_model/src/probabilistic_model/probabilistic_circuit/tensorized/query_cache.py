@@ -47,7 +47,8 @@ class QueryCache:
 
     def result_of(self, query: Callable, layer: Any) -> Any:
         """
-        :param query: A memoized query of a layer type, such as ``ProductLayer.marginal``.
+        :param query: A memoized query of a layer type, such as
+            :meth:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer.ProductLayer.marginal`.
         :param layer: A layer the query was evaluated for in this pass.
         :return: What the query returned for the layer.
         """

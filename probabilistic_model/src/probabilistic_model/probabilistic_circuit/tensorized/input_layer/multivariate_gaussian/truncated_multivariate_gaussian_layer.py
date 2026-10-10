@@ -187,6 +187,20 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             ),
         )
 
+    def has_equal_parameters(self, other: Self) -> bool:
+        return (
+            super().has_equal_parameters(other)
+            and np.array_equal(
+                self.hyperrectangles.interval, other.hyperrectangles.interval
+            )
+            and np.array_equal(
+                self.hyperrectangles.bounds, other.hyperrectangles.bounds
+            )
+            and np.array_equal(
+                self.log_normalizing_constant, other.log_normalizing_constant
+            )
+        )
+
     # %% queries
 
     @memoized

@@ -301,6 +301,15 @@ class DiscreteLayer(InputLayer, ABC):
             table_type.concatenate([table_type.of(layer.table) for layer in layers])
         )
 
+    def has_equal_parameters(self, other: Self) -> bool:
+        """
+        Like :meth:`LeafLayer.has_equal_parameters`, but tables stored in different
+        types count as different, whatever they hold.
+        """
+        return type(self.table) is type(
+            other.table
+        ) and self.table.has_equal_probabilities(other.table)
+
     def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
         indices = self.table.sample_state_indices(nodes)
         return np.where(

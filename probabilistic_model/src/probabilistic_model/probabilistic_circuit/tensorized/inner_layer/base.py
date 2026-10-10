@@ -550,7 +550,7 @@ class Layer(SubclassJSONSerializer, ABC):
     @classmethod
     @abstractmethod
     def stacked(
-        cls, copies: List[Self], stacked_child_layers: List[StackedLayer]
+        cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
     ) -> StackedLayer:
         """
         Join the copies of this layer from aligned copies of a layer graph into one
@@ -639,7 +639,7 @@ class InnerLayer(Layer, ABC):
 
     @classmethod
     def stacked(
-        cls, copies: List[Self], stacked_child_layers: List[StackedLayer]
+        cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
     ) -> StackedLayer:
         return StackedLayer.of_inner_layer_copies(copies, stacked_child_layers)
 
@@ -657,7 +657,7 @@ class InnerLayer(Layer, ABC):
 
     @abstractmethod
     def with_edges(
-        self, child_layers: List[Layer], edges: InnerLayerEdges, copies: List[Self]
+        self, child_layers: list[Layer], edges: InnerLayerEdges, copies: list[Self]
     ) -> Self:
         """
         :param child_layers: The child layers of the new layer.
@@ -683,3 +683,47 @@ class InnerLayer(Layer, ABC):
         :return: Yields every edge of :attr:`inner_layer_edges` one by one.
         """
         return iter(self.inner_layer_edges)
+
+
+@dataclass(eq=False, repr=False)
+class LeafLayer(Layer, ABC):
+    """
+    Abstract base class for the layers without child layers, which hold the input
+    distributions of a layered circuit.
+    """
+
+    @property
+    def child_layers(self) -> list[Layer]:
+        """
+        :return: An empty list. A leaf layer has no child layers.
+        """
+        return []
+
+    @classmethod
+    def stacked(
+        cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
+    ) -> StackedLayer:
+        return StackedLayer.of_leaf_layer_copies(copies)
+
+    @classmethod
+    @abstractmethod
+    def concatenate(cls, layers: list[Self]) -> Self:
+        """
+        Join layers of this type over the same variables into one layer, the nodes of
+        ``layers[k]`` as one contiguous block.
+
+        Only layers that were truncated from the same layer are concatenated, which is
+        why the parameters that all nodes share may be taken from the first one.
+
+        :param layers: The layers to join.
+        :return: The joined layer.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def has_equal_parameters(self, other: Self) -> bool:
+        """
+        :param other: A layer that :meth:`concatenate` may join with this one.
+        :return: Whether every node of both layers has the same parameters.
+        """
+        raise NotImplementedError

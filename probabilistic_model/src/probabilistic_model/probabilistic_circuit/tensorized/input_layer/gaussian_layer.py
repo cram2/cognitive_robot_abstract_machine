@@ -65,6 +65,15 @@ class HasLocationAndScale:
         if non_positive.any():
             raise NonPositiveScaleError(self.scale[non_positive])
 
+    def has_equal_parameters(self, other: Self) -> bool:
+        """
+        :param other: A layer that :meth:`LeafLayer.concatenate` may join with this one.
+        :return: Whether every node of both layers has the same location and scale.
+        """
+        return np.array_equal(self.location, other.location) and np.array_equal(
+            self.scale, other.scale
+        )
+
 
 @dataclass(eq=False, repr=False)
 class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
@@ -242,6 +251,11 @@ class TruncatedGaussianLayer(HasLocationAndScale, ContinuousLayerWithFiniteSuppo
     def validate_own(self):
         HasLocationAndScale.validate_own(self)
         ContinuousLayerWithFiniteSupport.validate_own(self)
+
+    def has_equal_parameters(self, other: Self) -> bool:
+        return HasLocationAndScale.has_equal_parameters(
+            self, other
+        ) and ContinuousLayerWithFiniteSupport.has_equal_parameters(self, other)
 
     @property
     def number_of_own_parameters(self) -> int:
