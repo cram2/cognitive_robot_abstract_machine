@@ -118,6 +118,13 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
         """
         return self.root.all_layers()
 
+    def reset_scopes(self):
+        """
+        Drop the cached scope of every layer, after layers got new child layers.
+        """
+        for layer in self.layers:
+            layer.reset_variables()
+
     def validate(self):
         """
         Check that the parameter arrays of every layer have consistent shapes.
@@ -520,11 +527,30 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
             :func:`~probabilistic_model.distributions.helper.make_dirac` creates it.
         :return: The input layer with one node that holds the distribution.
         """
-        if isinstance(distribution, SymbolicDistribution):
-            return SymbolicLayer.from_distributions(variable_index, [distribution])
-        if isinstance(distribution, IntegerDistribution):
-            return IntegerLayer.from_distributions(variable_index, [distribution])
-        return DiracDeltaLayer.from_distributions(variable_index, [distribution])
+        return LayeredProbabilisticCircuit.point_masses_layer(
+            variable_index, [distribution]
+        )
+
+    @staticmethod
+    def point_masses_layer(
+        variable_index: int, distributions: List[UnivariateDistribution]
+    ) -> InputLayer:
+        """
+        The layer of several point masses on one variable, of the kind
+        :meth:`point_mass_layer` creates.
+
+        :param variable_index: The index of the variable of the distributions.
+        :param distributions: Distributions of one type that each put all of their mass
+            on one value, as :func:`~probabilistic_model.distributions.helper.make_dirac`
+            creates them.
+        :return: The input layer with one node per distribution.
+        """
+        first = distributions[0]
+        if isinstance(first, SymbolicDistribution):
+            return SymbolicLayer.from_distributions(variable_index, distributions)
+        if isinstance(first, IntegerDistribution):
+            return IntegerLayer.from_distributions(variable_index, distributions)
+        return DiracDeltaLayer.from_distributions(variable_index, distributions)
 
     def restore_variables(self, variables: SortedSet):
         """

@@ -39,6 +39,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base impor
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.stacked_copies import (
+    StackedLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
     QueryCache,
     memoized,
@@ -128,6 +131,12 @@ class InputLayer(Layer, ABC):
         :return: The reduced layer.
         """
         raise NotImplementedError
+
+    @classmethod
+    def stacked(
+        cls, copies: List[Self], stacked_child_layers: List[StackedLayer]
+    ) -> StackedLayer:
+        return StackedLayer.of_input_layer_copies(copies)
 
     @classmethod
     @abstractmethod
