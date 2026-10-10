@@ -2,30 +2,25 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import ClassVar
 
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.ros2_nodes.griplink import (
-    GriplinkAction,
     GriplinkFlexActionServerTask,
     GriplinkPresetActionServerTask,
 )
 from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
-from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
-    GriplinkFlexConfiguration,
-    GriplinkPresetConfiguration,
     TGripperConfiguration,
 )
-from semantic_digital_twin.robots.daisy import (
-    DAiSy,
-    DAiSyLeftGripper,
-    DAiSyRightGripper,
+from semantic_digital_twin.robots.daisy import DAiSy
+from semantic_digital_twin.robots.griplink_gripper import (
+    GriplinkEndpoint,
+    GriplinkFlexConfiguration,
+    GriplinkPresetConfiguration,
 )
-from semantic_digital_twin.robots.robot_parts import EndEffector
 
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.exceptions import NoGriplinkEndpoint
@@ -36,27 +31,6 @@ from coraplex.robot_plans.motions.base import AlternativeMotion
 logger = logging.getLogger(__name__)
 
 
-# %% griplink endpoint resolution
-
-
-@dataclass(frozen=True)
-class GriplinkEndpoint:
-    """
-    A griplink action server endpoint a single gripper is reached on.
-    """
-
-    action_topic: str
-    """
-    ROS action topic the griplink server for one gripper listens on.
-    """
-
-    message_type: type[GriplinkAction]
-    """
-    Griplink action this endpoint's server executes (``Grip``/``Release``/
-    ``Flexgrip``/``Flexrelease``).
-    """
-
-
 # %% DAiSy griplink motions
 @dataclass
 class DAiSyGripperMotion(MoveGripperMotion[TGripperConfiguration]):
@@ -64,8 +38,8 @@ class DAiSyGripperMotion(MoveGripperMotion[TGripperConfiguration]):
     Moves a griplink gripper of real DAiSy on its griplink action server, or commands a
     joint position goal for semi-real and simulated execution.
 
-    Concrete motions are alternative motions for DAiSy and declare the griplink
-    endpoints of the states they command.
+    Concrete motions are alternative motions for DAiSy and read the griplink endpoints
+    the gripper's semantic annotation declares.
     """
 
     execution_type: tuple[ExecutionType, ...] = (
@@ -80,13 +54,12 @@ class DAiSyGripperMotion(MoveGripperMotion[TGripperConfiguration]):
     fall back to the joint position goal the configuration describes.
     """
 
-    _griplink_endpoints: ClassVar[
-        Mapping[type[EndEffector], Mapping[GripperState, GriplinkEndpoint]]
-    ]
+    _commanded_actions: ClassVar[frozenset[type]]
     """
-    Griplink endpoints the griplink server of each DAiSy gripper listens on, by the
-    state the endpoint commands; concrete motions declare the table for the states they
-    command.
+    Griplink actions this motion's task builds goals for.
+
+    The gripper declares an endpoint for every state it serves, so the endpoint lookup
+    accepts only endpoints whose action this motion executes.
     """
 
     def perform(self):
@@ -95,7 +68,6 @@ class DAiSyGripperMotion(MoveGripperMotion[TGripperConfiguration]):
         motion chart.
         """
         logger.info(f"Performing action {self.__class__.__name__}")
-        return
 
     @property
     def _motion_chart(self) -> MotionStatechartNode:
@@ -116,13 +88,13 @@ class DAiSyGripperMotion(MoveGripperMotion[TGripperConfiguration]):
         """
         :return: The endpoint the griplink server for this motion's gripper and state
             listens on.
-        :raises NoGriplinkEndpoint: If the gripper or state has no endpoint in
-            :attr:`_griplink_endpoints`.
+        :raises NoGriplinkEndpoint: If the gripper declares no endpoint for the state
+            this motion commands, or the endpoint's action is not one this motion
+            executes.
         """
         state_type = self.configuration.joint_state.state_type
-        gripper_type = type(self.configuration.end_effector)
-        endpoint = self._griplink_endpoints.get(gripper_type, {}).get(state_type)
-        if endpoint is None:
+        endpoint = self.configuration.end_effector.griplink_endpoint(state_type)
+        if endpoint is None or endpoint.message_type not in self._commanded_actions:
             raise NoGriplinkEndpoint(
                 end_effector=self.configuration.end_effector, state_type=state_type
             )
@@ -148,24 +120,7 @@ class DAiSyGripMotion(
     real DAiSy, or a joint position goal for semi-real execution.
     """
 
-    _griplink_endpoints = {
-        DAiSyLeftGripper: {
-            GripperState.OPEN: GriplinkEndpoint(
-                action_topic="/left_gripper/release", message_type=Release
-            ),
-            GripperState.CLOSE: GriplinkEndpoint(
-                action_topic="/left_gripper/grip", message_type=Grip
-            ),
-        },
-        DAiSyRightGripper: {
-            GripperState.OPEN: GriplinkEndpoint(
-                action_topic="/right_gripper/release", message_type=Release
-            ),
-            GripperState.CLOSE: GriplinkEndpoint(
-                action_topic="/right_gripper/grip", message_type=Grip
-            ),
-        },
-    }
+    _commanded_actions = frozenset((Grip, Release))
 
     @property
     def _action_server_task(self) -> GriplinkPresetActionServerTask:
@@ -190,24 +145,7 @@ class DAiSyFlexGripMotion(
     joint position goal for semi-real execution.
     """
 
-    _griplink_endpoints = {
-        DAiSyLeftGripper: {
-            GripperState.FLEXCLOSE: GriplinkEndpoint(
-                action_topic="/left_gripper/flexgrip", message_type=Flexgrip
-            ),
-            GripperState.FLEXOPEN: GriplinkEndpoint(
-                action_topic="/left_gripper/flexrelease", message_type=Flexrelease
-            ),
-        },
-        DAiSyRightGripper: {
-            GripperState.FLEXCLOSE: GriplinkEndpoint(
-                action_topic="/right_gripper/flexgrip", message_type=Flexgrip
-            ),
-            GripperState.FLEXOPEN: GriplinkEndpoint(
-                action_topic="/right_gripper/flexrelease", message_type=Flexrelease
-            ),
-        },
-    }
+    _commanded_actions = frozenset((Flexgrip, Flexrelease))
 
     @property
     def _action_server_task(self) -> GriplinkFlexActionServerTask:
@@ -221,6 +159,6 @@ class DAiSyFlexGripMotion(
             message_type=endpoint.message_type,
             grip_position=self.configuration.grip_position,
             grip_force=self.configuration.grip_force,
-            grip_speed=self.configuration.grip_speed,
+            grip_velocity=self.configuration.grip_velocity,
             grip_acceleration=self.configuration.grip_acceleration,
         )

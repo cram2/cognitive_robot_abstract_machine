@@ -1,32 +1,32 @@
 from __future__ import annotations
 
 import os
-from abc import ABC
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
-from typing import Self, List
-from typing_extensions import Optional
+from typing import ClassVar, Self
+
+from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
 
 from semantic_digital_twin.collision_checking.collision_rules import (
-    SelfCollisionMatrixRule,
+    AvoidCollisionBetweenGroups,
     AvoidExternalCollisions,
     AvoidSelfCollisions,
-    AvoidCollisionBetweenGroups,
+    SelfCollisionMatrixRule,
 )
 from semantic_digital_twin.datastructures.definitions import (
-    StaticJointState,
     GripperState,
+    StaticJointState,
 )
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.datastructures.robots.gripper_configuration import (
-    GripperConfiguration,
-    GriplinkFlexConfiguration,
-    GriplinkPresetConfiguration,
-)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.griplink_gripper import (
+    GriplinkEndpoint,
+    GriplinkGripper,
+)
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasLeftRightArm,
     HasTwoFingers,
@@ -34,9 +34,9 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
+    Camera,
     EndEffector,
     Finger,
-    Camera,
 )
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import (
@@ -76,7 +76,7 @@ class DAiSyLeftGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -98,7 +98,7 @@ class DAiSyLeftGripperRightFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -120,7 +120,7 @@ class DAiSyRightGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -142,7 +142,7 @@ class DAiSyRightGripperRightFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -160,56 +160,32 @@ class DAiSyRightGripperRightFinger(Finger):
 
 
 @dataclass(eq=False)
-class GriplinkGripper(EndEffector, ABC):
-    """
-    An `WEISS WPG gripper <https://weiss-robotics.com/servo-electric/wpg-series/>`_ driven by the Griplink interface.
-
-    Builds griplink-specific configurations so generic actions and demos produce robot-
-    appropriate configurations without naming the robot.
-    """
-
-    def default_configuration(
-        self,
-        state_type: GripperState,
-        finger_velocity: Optional[float] = None,
-    ) -> GripperConfiguration:
-        """
-        Build the griplink configuration for a state this gripper declares.
-
-        Preset states (``OPEN``/``CLOSE``) build a
-        :class:`~semantic_digital_twin.datastructures.robots.gripper_configuration.GriplinkPresetConfiguration`,
-        flex states (``FLEXOPEN``/``FLEXCLOSE``) a
-        :class:`~semantic_digital_twin.datastructures.robots.gripper_configuration.GriplinkFlexConfiguration`.
-
-        :param state_type: The state type to build the configuration for.
-        :param finger_velocity: Optional maximum finger joint velocity (in m/s) to
-            enforce during the motion.
-        :return: The griplink configuration for that state type, or the configuration
-            the base implementation builds for state types a griplink controller does
-            not command.
-        """
-        if state_type in (GripperState.OPEN, GripperState.CLOSE):
-            configuration = GriplinkPresetConfiguration.from_state_type(
-                self, state_type
-            )
-        elif state_type in (GripperState.FLEXOPEN, GripperState.FLEXCLOSE):
-            configuration = GriplinkFlexConfiguration.from_state_type(self, state_type)
-        else:
-            return super().default_configuration(state_type, finger_velocity)
-        if finger_velocity is not None:
-            configuration.finger_velocity = finger_velocity
-        return configuration
-
-
-@dataclass(eq=False)
 class DAiSyLeftGripper(
     GriplinkGripper,
     HasTwoFingers[DAiSyLeftGripperLeftFinger, DAiSyLeftGripperRightFinger],
 ):
+    griplink_endpoints: ClassVar[Mapping[GripperState, GriplinkEndpoint]] = {
+        GripperState.OPEN: GriplinkEndpoint(
+            action_topic="/left_gripper/release", message_type=Release
+        ),
+        GripperState.CLOSE: GriplinkEndpoint(
+            action_topic="/left_gripper/grip", message_type=Grip
+        ),
+        GripperState.FLEXCLOSE: GriplinkEndpoint(
+            action_topic="/left_gripper/flexgrip", message_type=Flexgrip
+        ),
+        GripperState.FLEXOPEN: GriplinkEndpoint(
+            action_topic="/left_gripper/flexrelease", message_type=Flexrelease
+        ),
+    }
+    """
+    Griplink action server endpoints of the left gripper, by the state each commands.
+    """
+
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         left_gripper_joints = [
             self._world.get_connection_by_name(DAiSyJoint.LEFT_GRIPPER_FINGER),
         ]
@@ -261,10 +237,28 @@ class DAiSyRightGripper(
     GriplinkGripper,
     HasTwoFingers[DAiSyRightGripperLeftFinger, DAiSyRightGripperRightFinger],
 ):
+    griplink_endpoints: ClassVar[Mapping[GripperState, GriplinkEndpoint]] = {
+        GripperState.OPEN: GriplinkEndpoint(
+            action_topic="/right_gripper/release", message_type=Release
+        ),
+        GripperState.CLOSE: GriplinkEndpoint(
+            action_topic="/right_gripper/grip", message_type=Grip
+        ),
+        GripperState.FLEXCLOSE: GriplinkEndpoint(
+            action_topic="/right_gripper/flexgrip", message_type=Flexgrip
+        ),
+        GripperState.FLEXOPEN: GriplinkEndpoint(
+            action_topic="/right_gripper/flexrelease", message_type=Flexrelease
+        ),
+    }
+    """
+    Griplink action server endpoints of the right gripper, by the state each commands.
+    """
+
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         right_gripper_joints = [
             self._world.get_connection_by_name(DAiSyJoint.RIGHT_GRIPPER_FINGER),
         ]
@@ -310,7 +304,7 @@ class DAiSyLeftArm(Arm[DAiSyLeftGripper]):
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
             name=PrefixedName("left_arm_park", prefix=self.name.name),
@@ -350,7 +344,7 @@ class DAiSyRightArm(Arm[DAiSyRightGripper]):
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
             name=PrefixedName("right_arm_park", prefix=self.name.name),
@@ -395,7 +389,7 @@ class DAiSyCamera(Camera):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @property
@@ -444,6 +438,12 @@ class DAiSy(AbstractRobot, HasLeftRightArm[DAiSyLeftArm, DAiSyRightArm]):
             SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
         )
 
+        forearm_gripper_collision_body_pairs = [
+            ("left_forearm_link", "left_gripper_wrist_collision_cylinder_link"),
+            ("right_forearm_link", "right_gripper_wrist_collision_cylinder_link"),
+            ("right_forearm_link", "right_gripper_side_cylinder_link"),
+            ("right_forearm_link", "left_gripper_side_cylinder_link"),
+        ]
         self._world.collision_manager.extend_default_rules(
             [
                 AvoidExternalCollisions(
@@ -454,41 +454,14 @@ class DAiSy(AbstractRobot, HasLeftRightArm[DAiSyLeftArm, DAiSyRightArm]):
                     violated_distance=0.0,
                     robot=self,
                 ),
-                AvoidCollisionBetweenGroups(
-                    buffer_zone_distance=0.015,
-                    violated_distance=0.0,
-                    body_group_a=[self._world.get_body_by_name("left_forearm_link")],
-                    body_group_b=[
-                        self._world.get_body_by_name(
-                            "left_gripper_wrist_collision_cylinder_link"
-                        )
-                    ],
-                ),
-                AvoidCollisionBetweenGroups(
-                    buffer_zone_distance=0.015,
-                    violated_distance=0.0,
-                    body_group_a=[self._world.get_body_by_name("right_forearm_link")],
-                    body_group_b=[
-                        self._world.get_body_by_name(
-                            "right_gripper_wrist_collision_cylinder_link"
-                        )
-                    ],
-                ),
-                AvoidCollisionBetweenGroups(
-                    buffer_zone_distance=0.015,
-                    violated_distance=0.0,
-                    body_group_a=[self._world.get_body_by_name("right_forearm_link")],
-                    body_group_b=[
-                        self._world.get_body_by_name("right_gripper_side_cylinder_link")
-                    ],
-                ),
-                AvoidCollisionBetweenGroups(
-                    buffer_zone_distance=0.015,
-                    violated_distance=0.0,
-                    body_group_a=[self._world.get_body_by_name("right_forearm_link")],
-                    body_group_b=[
-                        self._world.get_body_by_name("left_gripper_side_cylinder_link")
-                    ],
+                *(
+                    AvoidCollisionBetweenGroups(
+                        buffer_zone_distance=0.015,
+                        violated_distance=0.0,
+                        body_group_a=[self._world.get_body_by_name(forearm_name)],
+                        body_group_b=[self._world.get_body_by_name(gripper_name)],
+                    )
+                    for forearm_name, gripper_name in forearm_gripper_collision_body_pairs
                 ),
             ]
         )

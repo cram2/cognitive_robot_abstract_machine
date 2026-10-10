@@ -1,26 +1,21 @@
 from __future__ import annotations
 
 from abc import ABC
+from collections.abc import Iterable
 from inspect import isabstract
-
-from typing_extensions import (
-    TypeVar,
-    ClassVar,
-    TYPE_CHECKING,
-    List,
-    Optional,
-    Type,
-    Iterable,
-    Union,
-)
+from typing import TYPE_CHECKING, ClassVar
 
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.ormatic.data_access_objects.base import HasGeneric
 from krrood.ormatic.utils import classes_of_package
 from krrood.utils import recursive_subclasses
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from typing_extensions import (
+    TypeVar,
+)
+
 from .datastructures.enums import ExecutionType
 from .plans.executables import GiskardExecutable
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 if TYPE_CHECKING:
     from .robot_plans import BaseMotion
@@ -32,7 +27,7 @@ BaseMotionType = TypeVar("BaseMotionType", bound=BaseMotion)
 
 
 class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
-    execution_type: ClassVar[Union[ExecutionType, Iterable[ExecutionType]]]
+    execution_type: ClassVar[ExecutionType | Iterable[ExecutionType]]
     """
     Execution type(s) for which this alternative motion applies.
 
@@ -45,10 +40,10 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
 
     @staticmethod
     def check_for_alternative(
-        alternatives: Iterable[Type[AlternativeMotion]],
+        alternatives: Iterable[type[AlternativeMotion]],
         robot_view: AbstractRobot,
-        motion: Union[BaseMotionType, Type[BaseMotionType]],
-    ) -> Optional[Type[BaseMotionType]]:
+        motion: BaseMotionType,
+    ) -> type[BaseMotionType] | None:
         """
         Checks if there is an alternative motion for the given robot view, motion and
         execution type among the provided alternatives.
@@ -56,12 +51,10 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
         :param alternatives: The alternative motion mappings to search through (e.g.
             from the context)
         :param robot_view: The robot for which the alternative motion should be found
-        :param motion: The motion instance for which an alternative should be found, or
-            the motion class when probing before a motion is constructed (in which case
-            the :meth:`handles` check is skipped).
+        :param motion: The motion instance for which an alternative should be found
         :return: The alternative motion class if found, None otherwise
         """
-        motion_type = motion if isinstance(motion, type) else type(motion)
+        motion_type = type(motion)
         for alternative in alternatives:
             if (
                 issubclass(alternative, motion_type)
@@ -72,13 +65,13 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
                     if isinstance(alternative.execution_type, list_like_classes)
                     else [alternative.execution_type]
                 )
+                and alternative.handles(motion)
             ):
-                if isinstance(motion, type) or alternative.handles(motion):
-                    return alternative
+                return alternative
         return None
 
     @classmethod
-    def discover_all(cls) -> List[Type[AlternativeMotion]]:
+    def discover_all(cls) -> list[type[AlternativeMotion]]:
         """
         Discover every concrete :class:`AlternativeMotion` for every robot.
 

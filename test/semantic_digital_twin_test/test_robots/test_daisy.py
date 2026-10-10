@@ -1,9 +1,9 @@
 from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.datastructures.robots.gripper_configuration import (
+from semantic_digital_twin.robots.daisy import DAiSy
+from semantic_digital_twin.robots.griplink_gripper import (
     GriplinkFlexConfiguration,
     GriplinkPresetConfiguration,
 )
-from semantic_digital_twin.robots.daisy import DAiSy
 
 
 def test_daisy_grippers_build_griplink_configurations(daisy_world):

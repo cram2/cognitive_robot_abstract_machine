@@ -4,11 +4,10 @@ import numpy as np
 import pytest
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
-    MAXIMUM_OPENING_WIDTH_MM,
-    GriplinkFlexConfiguration,
     GripperStateConfiguration,
 )
 from semantic_digital_twin.exceptions import ConnectionsOutsideEndEffector
+from semantic_digital_twin.robots.griplink_gripper import GriplinkFlexConfiguration
 from semantic_digital_twin.robots.daisy import DAiSy
 
 # %% GripperStateConfiguration
@@ -75,7 +74,9 @@ def test_flex_configuration_interpolates_between_the_declared_states(daisy_world
         end_effector, GripperState.FLEXCLOSE, grip_position=60
     )
 
-    fraction = (MAXIMUM_OPENING_WIDTH_MM - 60) / MAXIMUM_OPENING_WIDTH_MM
+    fraction = (
+        GriplinkFlexConfiguration.maximum_opening_width_mm - 60
+    ) / GriplinkFlexConfiguration.maximum_opening_width_mm
     close_targets = dict(close_state.items())
     expected = [
         open_target + fraction * (close_targets[connection] - open_target)

@@ -49,12 +49,12 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
 )
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
-from semantic_digital_twin.datastructures.robots.gripper_configuration import (
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.robots.griplink_gripper import (
     GriplinkFlexConfiguration,
     GriplinkGripPreset,
     GriplinkPresetConfiguration,
 )
-from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import Point3, Quaternion
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -1248,7 +1248,7 @@ class TestDAiSyGripperConfigurationRouting:
             GripperState.FLEXCLOSE,
             grip_position=60,
             grip_force=100,
-            grip_speed=50,
+            grip_velocity=50,
             grip_acceleration=2000,
         )
         motion = self._motion_through_dispatch(immutable_daisy_world, configuration)
@@ -1258,7 +1258,7 @@ class TestDAiSyGripperConfigurationRouting:
         assert isinstance(task, GriplinkFlexActionServerTask)
         assert task.grip_position == configuration.grip_position
         assert task.grip_force == configuration.grip_force
-        assert task.grip_speed == configuration.grip_speed
+        assert task.grip_velocity == configuration.grip_velocity
         assert task.grip_acceleration == configuration.grip_acceleration
 
     def test_flexrelease_motion_forwards_position_speed_acceleration(
@@ -1270,7 +1270,7 @@ class TestDAiSyGripperConfigurationRouting:
             end_effector,
             GripperState.FLEXOPEN,
             grip_position=30,
-            grip_speed=80,
+            grip_velocity=80,
             grip_acceleration=1500,
         )
         motion = self._motion_through_dispatch(immutable_daisy_world, configuration)
@@ -1279,5 +1279,5 @@ class TestDAiSyGripperConfigurationRouting:
         task = chart.nodes[0]
         assert isinstance(task, GriplinkFlexActionServerTask)
         assert task.grip_position == configuration.grip_position
-        assert task.grip_speed == configuration.grip_speed
+        assert task.grip_velocity == configuration.grip_velocity
         assert task.grip_acceleration == configuration.grip_acceleration

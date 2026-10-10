@@ -6,13 +6,12 @@ from enum import IntEnum
 from typing import Protocol
 
 from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
+from semantic_digital_twin.robots.griplink_gripper import GriplinkGripPreset
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
+from giskardpy.motion_statechart.exceptions import UnknownGriplinkActionError
 from giskardpy.motion_statechart.ros2_nodes.ros_tasks import ActionServerTask
-from semantic_digital_twin.datastructures.robots.gripper_configuration import (
-    GriplinkGripPreset,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -159,14 +158,15 @@ class GriplinkPresetActionServerTask(GriplinkActionServerTask):
 
         :param context: The motion statechart context the task runs in.
         :return: None; the goal is stored for :meth:`on_start` to send.
-        :raises ValueError: If the task was built for neither ``Grip`` nor ``Release``.
+        :raises UnknownGriplinkActionError: If the task was built for neither ``Grip``
+            nor ``Release``.
         """
         if self.message_type is Grip:
             goal_type = Grip.Goal
         elif self.message_type is Release:
             goal_type = Release.Goal
         else:
-            raise ValueError(f"Unknown message type: {self.message_type}")
+            raise UnknownGriplinkActionError(message_type=self.message_type)
         self._msg = goal_type(
             port=0,
             index=self.grip_preset.value,
@@ -180,31 +180,31 @@ class GriplinkFlexActionServerTask(GriplinkActionServerTask):
     commanded opening width (``Flexgrip``) or flex release from it (``Flexrelease``).
     """
 
-    grip_position: int | None = None
+    grip_position: float | None = None
     """
-    Opening width of the gripper in mm [-5..120].
+    Opening width of the gripper in mm [-5..120], rounded to one decimal.
 
     Converted to µm when building the goal message.
     """
 
-    grip_force: int | None = None
+    grip_force: float | None = None
     """
-    Force the gripper applies to the object in N [30..300].
+    Force the gripper applies to the object in N [30..300], rounded to one decimal.
 
     Converted to mN when building the Flexgrip goal message; ``Flexrelease`` has no
     force goal.
     """
 
-    grip_speed: int | None = None
+    grip_velocity: float | None = None
     """
-    Motion speed of the gripper in mm/s [5..350].
+    Motion velocity of the gripper in mm/s [5..350], rounded to one decimal.
 
     Converted to µm/s when building the goal message.
     """
 
-    grip_acceleration: int | None = None
+    grip_acceleration: float | None = None
     """
-    Motion acceleration of the gripper in mm/s² [100..4000].
+    Motion acceleration of the gripper in mm/s² [100..4000], rounded to one decimal.
 
     Converted to µm/s² when building the goal message.
     """
@@ -216,34 +216,44 @@ class GriplinkFlexActionServerTask(GriplinkActionServerTask):
 
         :param context: The motion statechart context the task runs in.
         :return: None; the goal is stored for :meth:`on_start` to send.
-        :raises ValueError: If the task was built for neither ``Flexgrip`` nor
-            ``Flexrelease``.
+        :raises UnknownGriplinkActionError: If the task was built for neither
+            ``Flexgrip`` nor ``Flexrelease``.
         """
         if self.message_type is Flexgrip:
             position = 0 if self.grip_position is None else self.grip_position
             force = 90 if self.grip_force is None else self.grip_force
-            speed = 150 if self.grip_speed is None else self.grip_speed
+            velocity = 150 if self.grip_velocity is None else self.grip_velocity
             acceleration = (
                 600 if self.grip_acceleration is None else self.grip_acceleration
             )
             self._msg = Flexgrip.Goal(
                 port=0,
-                position=position * 1000,
-                force=force * 1000,
-                speed=speed * 1000,
-                acceleration=acceleration * 1000,
+                position=self._to_micrometres(position),
+                force=self._to_micrometres(force),
+                speed=self._to_micrometres(velocity),
+                acceleration=self._to_micrometres(acceleration),
             )
         elif self.message_type is Flexrelease:
             position = 120 if self.grip_position is None else self.grip_position
-            speed = 250 if self.grip_speed is None else self.grip_speed
+            velocity = 250 if self.grip_velocity is None else self.grip_velocity
             acceleration = (
                 2000 if self.grip_acceleration is None else self.grip_acceleration
             )
             self._msg = Flexrelease.Goal(
                 port=0,
-                position=position * 1000,
-                speed=speed * 1000,
-                acceleration=acceleration * 1000,
+                position=self._to_micrometres(position),
+                speed=self._to_micrometres(velocity),
+                acceleration=self._to_micrometres(acceleration),
             )
         else:
-            raise ValueError(f"Unknown message type: {self.message_type}")
+            raise UnknownGriplinkActionError(message_type=self.message_type)
+
+    @staticmethod
+    def _to_micrometres(value: float) -> int:
+        """
+        :param value: A gripper parameter in millimetres, newtons or the per-second
+            derivations of them, rounded to one decimal.
+        :return: The value the griplink controller expects, in the matching µm-scaled
+            integer unit.
+        """
+        return round(value * 1000)
