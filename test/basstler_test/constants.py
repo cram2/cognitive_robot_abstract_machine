@@ -113,14 +113,17 @@ class SkillDirectory(PathEnumeration):
     does not name it.
     """
 
-    PLAN_DASHBOARD = ProjectLocation.CLAUDE_CODE_DIRECTORY / "skills" / "plan-dashboard"
+    DIRECTORY = ProjectLocation.CLAUDE_CODE_DIRECTORY / "skills"
+    """
+    The directory holding every skill.
+    """
+
+    PLAN_DASHBOARD = DIRECTORY / "plan-dashboard"
     """
     The dashboard skill: its instructions, its worked example and its shell entry point.
     """
 
-    STACKED_PULL_REQUEST_MAINTENANCE = (
-        ProjectLocation.CLAUDE_CODE_DIRECTORY / "skills" / "stacked-pr-maintenance"
-    )
+    STACKED_PULL_REQUEST_MAINTENANCE = DIRECTORY / "stacked-pr-maintenance"
     """
     The maintenance pass's own instructions.
     """

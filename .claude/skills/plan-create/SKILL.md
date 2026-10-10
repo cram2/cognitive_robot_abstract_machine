@@ -21,13 +21,13 @@ rigor a careful session would: draft, validate, cross-check live state,
 confirm judgment calls with the user, then bootstrap and publish. It never
 takes a shortcut a hand-written manifest wouldn't also have to clear.
 
-## 0. Check the setup is in place, and offer it if not
+## 0. Check the setup is in place, and run it if not
 
 Everything below writes to the personal-notes branch, which the user may not
 have set up yet. Follow
 `.claude/skills/setup-personal-notes/prerequisite-check.md` before step 1:
-run the check, and if it reports anything missing, offer `/setup-personal-notes`
-rather than failing partway through drafting a plan.
+run the check, and if it reports anything missing, run `/setup-personal-notes`
+without asking first, rather than failing partway through drafting a plan.
 
 ## 1. Establish the plan id and refuse to silently overwrite
 

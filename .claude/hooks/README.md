@@ -36,7 +36,8 @@ Every run prints a summary of what it found and wrote, so a session never has to
 
 It is safe to re-run: on a clone that's already set up it reports what it found and asks nothing.
 You don't have to run it first either — `/plan-create`, `/plan-dashboard`, `/plan-item-kickoff`,
-`/plan-item-resolve` and `/add-plan-item` each offer it if something is missing.
+`/plan-item-resolve` and `/add-plan-item` each run it for you if something is missing, without
+stopping to ask.
 
 To do the same by hand:
 

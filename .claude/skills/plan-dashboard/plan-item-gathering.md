@@ -10,13 +10,13 @@ needs: `plan-item-kickoff` reads landed siblings for the pattern to follow;
 `plan-item-resolve` reads the item's pull request state and the tracking
 issue's discussion. Neither should re-derive anything on this page.
 
-## Check the setup is in place, and offer it if not
+## Check the setup is in place, and run it if not
 
 The item's manifest entry and roadmap live on the personal-notes branch,
 which the user may not have set up yet. Follow
 `.claude/skills/setup-personal-notes/prerequisite-check.md` first: run the
-check, and if it reports anything missing, offer `/setup-personal-notes`
-rather than failing later on a branch that isn't there.
+check, and if it reports anything missing, run `/setup-personal-notes`
+without asking first, rather than failing later on a branch that isn't there.
 
 ## Resolve the item
 

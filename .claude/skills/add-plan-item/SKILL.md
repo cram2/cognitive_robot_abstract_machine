@@ -19,13 +19,13 @@ There are exactly four outcomes, and step 5 picks one:
 4. **No item at all** — work small enough that tracking it costs more than it
    returns.
 
-## 0. Check the setup is in place, and offer it if not
+## 0. Check the setup is in place, and run it if not
 
 Every plan's manifest lives on the personal-notes branch, which the user may not
 have set up yet. Follow
 `.claude/skills/setup-personal-notes/prerequisite-check.md` before step 1: run
-the check, and if it reports anything missing, offer `/setup-personal-notes`
-rather than failing on a branch that isn't there.
+the check, and if it reports anything missing, run `/setup-personal-notes`
+without asking first, rather than failing on a branch that isn't there.
 
 ## 1. Pin down what the work actually touches
 

@@ -34,14 +34,15 @@ corrected automatically, in the manifest itself, every run — see step 2;
 everything else stays a flag for a human to interpret, since GitHub's state
 alone can't tell you *why* an item is blocked, deferred, or still open.
 
-## 0. Check the setup is in place, and offer it if not
+## 0. Check the setup is in place, and run it if not
 
 Every step below reads the personal-notes branch and runs scripts that need
 the dependencies `${BASSTLER_PYPROJECT_FILE}` declares — neither of which a user who
 hasn't done the one-time setup has. Follow
 `.claude/skills/setup-personal-notes/prerequisite-check.md` before step 1: run
-the check, and if it reports anything missing, offer `/setup-personal-notes`
-rather than failing later on a missing branch or an `ImportError`.
+the check, and if it reports anything missing, run `/setup-personal-notes`
+without asking first, rather than failing later on a missing branch or an
+`ImportError`.
 
 ## 1. Resolve mode and fetch the plan data
 
