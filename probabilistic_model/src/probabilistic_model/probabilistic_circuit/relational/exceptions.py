@@ -55,6 +55,47 @@ class ClassCircuitGroundingFailedError(DataclassException):
 
 
 @dataclass
+class MixedCircuitTypesError(DataclassException):
+    """
+    Raised when the template of an exchangeable relation is fitted in another circuit
+    type than the class circuit, which grounding cannot combine.
+    """
+
+    class_: Type
+    """
+    The domain class whose relational circuit was fitted.
+    """
+
+    exchangeable_part: str
+    """
+    Field name of the exchangeable relation.
+    """
+
+    class_circuit_type: Type
+    """
+    The type of the class circuit.
+    """
+
+    part_circuit_type: Type
+    """
+    The type of the class circuit of the template.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The relational circuit for {self.class_.__name__} is fitted as "
+            f"{self.class_circuit_type.__name__}, but the template of "
+            f"{self.exchangeable_part!r} as {self.part_circuit_type.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Fit the class circuit and every part with learning methods that return "
+            "the same circuit type."
+        )
+
+
+@dataclass
 class PartCircuitGroundingFailedError(DataclassException):
     """
     Raised when grounding one exchangeable part leaves its circuit with no nodes at all.

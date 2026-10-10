@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import Type
+from typing_extensions import Tuple, Type
 
 from krrood.exceptions import DataclassException
 
@@ -72,3 +72,34 @@ class NonPositiveScaleError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Give every node a positive scale."
+
+
+@dataclass
+class CopiesNotAlignedError(DataclassException, ValueError):
+    """
+    Exception raised when copies of a layer graph that are to be stacked differ in their
+    structure.
+    """
+
+    layer_types: Tuple[Type, ...]
+    """
+    The type of the layer at the same position in every copy.
+    """
+
+    numbers_of_nodes: Tuple[int, ...]
+    """
+    The number of nodes of the layer at the same position in every copy.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The copies have layers of types "
+            f"{[layer_type.__name__ for layer_type in self.layer_types]} with "
+            f"{list(self.numbers_of_nodes)} nodes at the same position."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Only stack copies that a structural pass made from the same layer graph "
+            "without pruning it."
+        )
