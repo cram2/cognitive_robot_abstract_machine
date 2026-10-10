@@ -100,6 +100,11 @@ class DiracDeltaLayer(AbstractContinuousLayer):
             layers[0].tolerance,
         )
 
+    def has_equal_parameters(self, other: Self) -> bool:
+        return np.array_equal(self.location, other.location) and np.array_equal(
+            self.density_cap, other.density_cap
+        )
+
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:

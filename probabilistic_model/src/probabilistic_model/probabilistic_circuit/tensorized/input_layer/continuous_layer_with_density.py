@@ -298,6 +298,11 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayerWithDensity, ABC):
             np.concatenate([layer.bounds for layer in layers]),
         )
 
+    def has_equal_parameters(self, other: Self) -> bool:
+        return np.array_equal(self.interval, other.interval) and np.array_equal(
+            self.bounds, other.bounds
+        )
+
     def apply_translation_own(self, translation: VariableValues):
         self.interval = self.interval + translation[self.variable]
 

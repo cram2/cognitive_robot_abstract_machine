@@ -35,7 +35,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
+    Layer,
+    LeafLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
 )
@@ -50,7 +53,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 
 
 @dataclass(eq=False, repr=False)
-class InputLayer(Layer, ABC):
+class InputLayer(LeafLayer, ABC):
     """
     Abstract base class for the input layers of a layered circuit.
 
@@ -63,13 +66,6 @@ class InputLayer(Layer, ABC):
     """
     The index of the variable of this layer.
     """
-
-    @property
-    def child_layers(self) -> List[Layer]:
-        """
-        :return: An empty list. An input layer is a leaf of the layer graph.
-        """
-        return []
 
     @property
     def variables(self) -> VariableIndices:
@@ -126,21 +122,6 @@ class InputLayer(Layer, ABC):
 
         :param mask: A boolean mask over the nodes of this layer.
         :return: The reduced layer.
-        """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def concatenate(cls, layers: List[Self]) -> Self:
-        """
-        Join layers of this type over the same variable into one layer.
-
-        The nodes keep the order of the layers, so the nodes of ``layers[k]`` occupy one
-        contiguous block. Only layers that were truncated from the same layer are
-        concatenated, which is why the shared parameters may be taken from the first one.
-
-        :param layers: The layers to join.
-        :return: The joined layer.
         """
         raise NotImplementedError
 

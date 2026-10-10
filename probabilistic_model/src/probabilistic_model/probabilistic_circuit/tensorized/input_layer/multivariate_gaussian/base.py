@@ -29,7 +29,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
+    Layer,
+    LeafLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer import (
     ProductLayer,
 )
@@ -59,7 +62,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 
 
 @dataclass(eq=False, repr=False)
-class AbstractMultivariateGaussianLayer(Layer, ABC):
+class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
     """
     Abstract base class for the input layers of Gaussians over several continuous
     variables at once.
@@ -82,13 +85,6 @@ class AbstractMultivariateGaussianLayer(Layer, ABC):
     """
     The covariance matrix of every node.
     """
-
-    @property
-    def child_layers(self) -> List[Layer]:
-        """
-        :return: An empty list. An input layer is a leaf of the layer graph.
-        """
-        return []
 
     @property
     def variables(self) -> VariableIndices:
@@ -217,17 +213,10 @@ class AbstractMultivariateGaussianLayer(Layer, ABC):
         """
         raise NotImplementedError
 
-    @classmethod
-    @abstractmethod
-    def concatenate(cls, layers: List[Self]) -> Self:
-        """
-        Join layers of this type over the same variables into one layer, the nodes of
-        ``layers[k]`` as one contiguous block.
-
-        :param layers: The layers to join.
-        :return: The joined layer.
-        """
-        raise NotImplementedError
+    def has_equal_parameters(self, other: Self) -> bool:
+        return np.array_equal(self.mean, other.mean) and np.array_equal(
+            self.covariance.lower_triangles, other.covariance.lower_triangles
+        )
 
     # %% queries
 

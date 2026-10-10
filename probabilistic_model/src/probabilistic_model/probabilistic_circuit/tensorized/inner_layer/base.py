@@ -43,6 +43,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.layer_with_depth impor
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.stacked_copies import (
+    StackedLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
     QueryCache,
     memoized,
@@ -537,6 +540,28 @@ class Layer(SubclassJSONSerializer, ABC):
     def __deepcopy__(self, memo=None) -> Layer:
         raise NotImplementedError
 
+    def reset_variables(self):
+        """
+        Drop the cached scope of this layer so that it is recomputed on the next access.
+
+        A layer that caches no scope has nothing to drop.
+        """
+
+    @classmethod
+    @abstractmethod
+    def stacked(
+        cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
+    ) -> StackedLayer:
+        """
+        Join the copies of this layer from aligned copies of a layer graph into one
+        layer.
+
+        :param copies: The copies of this layer, one per copy of the graph.
+        :param stacked_child_layers: The stacked copies of every child layer.
+        :return: The copies as one layer.
+        """
+        raise NotImplementedError
+
     def __repr__(self):
         return f"{self.__class__.__name__}({self.number_of_nodes})"
 
@@ -602,9 +627,6 @@ class InnerLayer(Layer, ABC):
     """
 
     def reset_variables(self):
-        """
-        Drop the cached scope of this layer so that it is recomputed on the next access.
-        """
         self._variables_cache = None
 
     @memoized
@@ -614,6 +636,38 @@ class InnerLayer(Layer, ABC):
         for child_layer in self.child_layers:
             child_layer.remap_variables(remap, cache=cache)
         self.reset_variables()
+
+    @classmethod
+    def stacked(
+        cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
+    ) -> StackedLayer:
+        return StackedLayer.of_inner_layer_copies(copies, stacked_child_layers)
+
+    def has_equal_edges(self, other: Self) -> bool:
+        """
+        :param other: A layer of the same type and shape.
+        :return: Whether both layers have the same edges, with the same weights.
+        """
+        own, others = self.inner_layer_edges, other.inner_layer_edges
+        return (
+            np.array_equal(own.nodes, others.nodes)
+            and np.array_equal(own.child_layer_indices, others.child_layer_indices)
+            and np.array_equal(own.child_nodes, others.child_nodes)
+        )
+
+    @abstractmethod
+    def with_edges(
+        self, child_layers: list[Layer], edges: InnerLayerEdges, copies: list[Self]
+    ) -> Self:
+        """
+        :param child_layers: The child layers of the new layer.
+        :param edges: The edges of the new layer, those of every copy as one block in
+            the order of ``copies``.
+        :param copies: The layers whose edges are joined, this one among them, which
+            give the weights of the edges.
+        :return: A layer of this type with these edges and one block of nodes per copy.
+        """
+        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -629,3 +683,47 @@ class InnerLayer(Layer, ABC):
         :return: Yields every edge of :attr:`inner_layer_edges` one by one.
         """
         return iter(self.inner_layer_edges)
+
+
+@dataclass(eq=False, repr=False)
+class LeafLayer(Layer, ABC):
+    """
+    Abstract base class for the layers without child layers, which hold the input
+    distributions of a layered circuit.
+    """
+
+    @property
+    def child_layers(self) -> list[Layer]:
+        """
+        :return: An empty list. A leaf layer has no child layers.
+        """
+        return []
+
+    @classmethod
+    def stacked(
+        cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
+    ) -> StackedLayer:
+        return StackedLayer.of_leaf_layer_copies(copies)
+
+    @classmethod
+    @abstractmethod
+    def concatenate(cls, layers: list[Self]) -> Self:
+        """
+        Join layers of this type over the same variables into one layer, the nodes of
+        ``layers[k]`` as one contiguous block.
+
+        Only layers that were truncated from the same layer are concatenated, which is
+        why the parameters that all nodes share may be taken from the first one.
+
+        :param layers: The layers to join.
+        :return: The joined layer.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def has_equal_parameters(self, other: Self) -> bool:
+        """
+        :param other: A layer that :meth:`concatenate` may join with this one.
+        :return: Whether every node of both layers has the same parameters.
+        """
+        raise NotImplementedError
