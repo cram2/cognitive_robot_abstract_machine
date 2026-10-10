@@ -80,3 +80,5 @@ simulated_robot = ExecutionEnvironment(ExecutionType.SIMULATED)
 real_robot = ExecutionEnvironment(ExecutionType.REAL)
 semi_real_robot = ExecutionEnvironment(ExecutionType.SEMI_REAL)
 no_execution = ExecutionEnvironment(ExecutionType.NO_EXECUTION)
+bridge_robot = ExecutionEnvironment(ExecutionType.BRIDGE)
+
