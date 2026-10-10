@@ -37,7 +37,8 @@ dependencies = [
     "krrood",
     "semantic_digital_twin",
     "transformers",
-    "faiss-cpu"
+    "faiss-cpu",
+    "ultralytics"
 ]
 
 [project.urls]
