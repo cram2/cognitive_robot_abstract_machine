@@ -8,6 +8,10 @@ changes. World updates capture the current chart alongside each pose, and plan
 completion preserves the final chart observation. History subscriptions end with
 their plan or visualization session.
 
+The optional Robot view renders the same scene from native camera annotations,
+following their articulated links and field of view. Live and recorded scene bundles
+retain this metadata; the feature does not capture or publish sensor images.
+
 ## Deferred features
 
 | Feature | Deferred implementation |
