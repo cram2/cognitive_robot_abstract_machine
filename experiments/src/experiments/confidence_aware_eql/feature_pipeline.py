@@ -13,6 +13,7 @@ import enum
 from dataclasses import dataclass, field
 
 import pandas as pd
+from krrood.entity_query_language.factories import variable
 from krrood.parametrization.feature_extraction.aggregations import (
     AggregationStatistic,
     aggregation_statistic,
@@ -20,7 +21,7 @@ from krrood.parametrization.feature_extraction.aggregations import (
 from semantic_digital_twin.world_description.geometry import Mesh, Shape
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
-from typing_extensions import Any, ClassVar, List
+from typing_extensions import Any
 
 # %% object classes
 
@@ -60,7 +61,7 @@ class ObjectClass(enum.StrEnum):
 class ObjectShape:
     """The collision geometry of one object, as the shapes it is built from."""
 
-    shapes: List[Shape] = field(default_factory=list)
+    shapes: list[Shape] = field(default_factory=list)
     """The shapes making up the object's collision geometry."""
 
     @classmethod
@@ -77,34 +78,30 @@ class ObjectShape:
 class ObjectShapeAggregations(AggregationStatistic[ObjectShape]):
     """Statistics describing the collision geometry of an :class:`ObjectShape`."""
 
-    aggregated_field: ClassVar[str] = f"{ObjectShape.__name__}.shapes"
-    """Path of the field these statistics aggregate over."""
-
-    @aggregation_statistic(aggregated_field)
+    @aggregation_statistic(variable(ObjectShape).shapes)
     def volume(self) -> float:
         """The volume the object's collision geometry encloses.
 
-        A mesh that is not watertight encloses no well-defined volume and is left out
-        of the sum rather than raising, since a real object is commonly built from
-        several convex pieces and only some of them need to be watertight for the
-        total to stay meaningful.
+        Meshes that are not watertight enclose no well-defined volume and are left out
+        of the sum, since an object is often several convex pieces of which only some
+        are.
 
         :return: The total volume in cubic meters, ``0.0`` if no shape is watertight.
         """
         return sum(
             shape.volume
-            for shape in self.instance.shapes
+            for shape in self.shapes
             if isinstance(shape, Mesh) and shape.mesh.is_watertight
         )
 
-    @aggregation_statistic(aggregated_field)
+    @aggregation_statistic(variable(ObjectShape).shapes)
     def aspect_ratio(self) -> float:
         """How tall the object stands relative to how wide it spreads.
 
         :return: The collision geometry's vertical extent divided by the greater of
             its two horizontal extents.
         """
-        minimum, maximum = ShapeCollection(self.instance.shapes).combined_mesh.bounds
+        minimum, maximum = ShapeCollection(self.shapes).combined_mesh.bounds
         horizontal_extent = maximum[:2] - minimum[:2]
         vertical_extent = maximum[2] - minimum[2]
         return float(vertical_extent / max(horizontal_extent))
@@ -133,11 +130,11 @@ class Feature(enum.StrEnum):
 # %% extraction
 
 
-def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
+def extract_feature_dataframe(objects: list[Any]) -> pd.DataFrame:
     """Extract every :class:`Feature` from each object.
 
-    The geometric features are read from each object's own collision geometry, which
-    a data access object does not carry.
+    The class names the object; the geometric features describe the shapes its
+    collision geometry is built from, measured by :class:`ObjectShapeAggregations`.
 
     :param objects: The semantic objects whose features are extracted.
     :return: One row per object, with a column per feature.
@@ -147,8 +144,8 @@ def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
             {
                 Feature.CLASS: ObjectClass(type(instance).__name__),
                 **ObjectShapeAggregations(
-                    instance=ObjectShape.from_annotation(instance),
-                    field_name=ObjectShapeAggregations.aggregated_field,
+                    role_taker=ObjectShape.from_annotation(instance),
+                    field_name="shapes",
                 ).apply_mapping(),
             }
             for instance in objects

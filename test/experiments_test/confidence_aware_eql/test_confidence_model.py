@@ -37,7 +37,6 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
 )
-from typing_extensions import List, Type
 
 # %% stand-in objects
 
@@ -58,7 +57,7 @@ POT_MESHES = ("bread.stl", "big-knife.stl", "whisk.stl")
 
 
 def annotated_object(
-    annotation_class: Type[SemanticAnnotation], name: str, mesh_file: str
+    annotation_class: type[SemanticAnnotation], name: str, mesh_file: str
 ) -> SemanticAnnotation:
     """Build an object of ``annotation_class`` whose collision geometry is one mesh."""
     body = Body(name=PrefixedName(name))
@@ -67,7 +66,7 @@ def annotated_object(
 
 
 @pytest.fixture(scope="module")
-def cups() -> List[SemanticAnnotation]:
+def cups() -> list[SemanticAnnotation]:
     """The familiar instances of the first class."""
     return [
         annotated_object(Cup, f"cup_{index}", mesh_file)
@@ -76,7 +75,7 @@ def cups() -> List[SemanticAnnotation]:
 
 
 @pytest.fixture(scope="module")
-def pots() -> List[SemanticAnnotation]:
+def pots() -> list[SemanticAnnotation]:
     """The familiar instances of the second class."""
     return [
         annotated_object(Pot, f"pot_{index}", mesh_file)
@@ -106,8 +105,9 @@ def test_geometric_features_are_the_aggregation_statistics(cups):
     """Every feature but the class is a statistic the aggregation class declares."""
     statistics = {
         statistic.__name__
+        for aggregated_field in ObjectShapeAggregations.aggregation_registry
         for statistic in ObjectShapeAggregations.aggregation_features_of_field(
-            ObjectShapeAggregations.aggregated_field
+            aggregated_field
         )
     }
     assert set(extract_feature_dataframe(cups)) == {Feature.CLASS} | statistics

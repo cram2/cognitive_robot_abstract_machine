@@ -16,12 +16,13 @@ import numpy as np
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
 from krrood.exceptions import DataclassException
-from krrood.ormatic.data_access_objects.dao import get_dao_schema, to_dao
+from krrood.ormatic.data_access_objects.dao import get_dao_schema
+from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
-from typing_extensions import Any, ClassVar, List
+from typing_extensions import Any
 
 from experiments.confidence_aware_eql.feature_pipeline import extract_feature_dataframe
 
@@ -49,7 +50,7 @@ class UnmodeledClassError(DataclassException):
 class AmbiguousThresholdError(DataclassException):
     """Raised when reading the single-class threshold of a model fitted on several classes."""
 
-    fitted_classes: List[type]
+    fitted_classes: list[type]
     """The classes this confidence model was actually fitted on."""
 
     def error_message(self) -> str:
@@ -79,7 +80,7 @@ def _build_grounding_query(domain_class: type, instance: Any) -> Match:
     :param instance: The domain instance whose collection structure the query mirrors.
     :return: A resolved query ready to pass to :meth:`RelationalProbabilisticCircuit.ground`.
     """
-    schema = get_dao_schema(type(to_dao(instance)))
+    schema = get_dao_schema(get_data_access_object_class(type(instance)))
     collection_relationships = {
         relationship.key: relationship
         for relationship in schema.collection_relationships
@@ -115,23 +116,20 @@ class PerClassConfidenceModel:
     threshold: float
     """The log-likelihood below which an instance of this class is judged unfamiliar."""
 
-    minimum_instances_per_leaf: ClassVar[int] = 2
-    """Fewest training instances a leaf of the class circuit may describe.
+    minimum_instances_per_leaf: int = 2
+    """Fewest training instances a leaf of the class circuit describes.
 
-    A leaf fitted to a single instance collapses onto that instance's exact feature
-    values, leaving the circuit a point mass per training instance: every object the
-    model was not trained on then scores an infinitely low log-likelihood, however
-    ordinary it is, and no threshold can tell such an object from a genuinely odd
-    one. Two is the fewest that leaves a leaf spanning a range of feature values.
+    One leaves every leaf a point mass, which judges unfamiliar every object the model
+    was not trained on.
     """
 
     @classmethod
-    def fit(cls, domain_class: type, instances: List[Any]) -> PerClassConfidenceModel:
+    def fit(cls, domain_class: type, instances: list[Any]) -> PerClassConfidenceModel:
         """Fit a relational probabilistic circuit and calibrate its threshold.
 
-        The circuit is fitted on the class + volume + aspect ratio dataframe
-        :func:`extract_feature_dataframe` produces, rather than the DAO's own mapped
-        columns, since those are the class's real, non-redundant features.
+        The circuit is fitted on the features
+        :func:`extract_feature_dataframe` produces: the object's class and the
+        statistics over its collision geometry.
 
         The threshold is calibrated as the first percentile of the training
         instances' own log-likelihoods, so an instance less likely than almost every
@@ -147,8 +145,9 @@ class PerClassConfidenceModel:
                 min_samples_per_leaf=cls.minimum_instances_per_leaf
             ),
         )
-        daos = [to_dao(instance) for instance in instances]
-        circuit.fit(daos, dataframe_from_parent=extract_feature_dataframe(instances))
+        circuit.fit(
+            instances, dataframe_from_parent=extract_feature_dataframe(instances)
+        )
         model = cls(circuit, threshold=-np.inf)
         training_log_likelihoods = [
             model.log_likelihood_of(instance) for instance in instances
@@ -196,14 +195,14 @@ class ConfidenceModel:
     """Mapping from each observed class to its fitted per-class confidence model."""
 
     @classmethod
-    def fit_from_instances(cls, instances: List[Any]) -> ConfidenceModel:
+    def fit_from_instances(cls, instances: list[Any]) -> ConfidenceModel:
         """Fit one confidence model per distinct class found among the instances.
 
         :param instances: The familiar instances the model is learned from, of any
             number of distinct classes.
         :return: A fitted confidence model ready to score new instances.
         """
-        instances_by_class: dict[type, List[Any]] = {}
+        instances_by_class: dict[type, list[Any]] = {}
         for instance in instances:
             instances_by_class.setdefault(type(instance), []).append(instance)
         models_by_class = {
