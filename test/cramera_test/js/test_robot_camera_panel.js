@@ -178,8 +178,10 @@ function mount(restoreFocus) {
   const properties = new Map(Array.from(cameraRule.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g),
     match => [match[1], match[2]]));
   const scope = {getComputedStyle: () => ({getPropertyValue: name => properties.get(name) || ''})};
-  for (const file of ['robot-camera.js', 'robot-camera-panel.js']) {
-    new Function('window', BrowserSource.read(path.join(WEB, 'core', file)))(scope);
+  const cameraScripts = BrowserSource.read(path.join(WEB, 'index.html'))
+    .matchAll(/<script src="(core\/robot-camera[^"]*\.js)"><\/script>/g);
+  for (const [, file] of cameraScripts) {
+    new Function('window', BrowserSource.read(path.join(WEB, file)))(scope);
   }
   const root = new ViewElement();
   root.bounds = {left: 500, top: 250, width: 320, height: 248};
@@ -320,8 +322,11 @@ test('destroy disconnects resize observation and removes control listeners', () 
   view.panel.destroy();
   view.layer.checked = true;
   view.layer.dispatch('change');
+  view.elements.get('[data-robot-camera="source"]').dispatch('change');
+  view.resize(view.container);
   assert.equal(view.changes(), before);
-  assert.equal(view.panel.observer.disconnected, true);
+  assert.equal(view.elements.get('[data-robot-camera="source"]').handlers.size, 0);
+  assert.equal(view.panel.window.observer.disconnected, true);
 });
 
 // %% dragging within the scene
@@ -671,14 +676,14 @@ test('tall and wide windows preserve the camera projection and clear obsolete im
   const viewport = view.elements.get('[data-robot-camera="viewport"]');
   viewport.bounds = {left: 500, bottom: 500, width: 400, height: 180};
   view.panel.render();
-  const projection = view.panel.pose.camera.projectionMatrix.clone();
+  const projection = view.panel.image.pose.camera.projectionMatrix.clone();
   const canvas = viewport.children[0];
   assert.deepEqual(view.renderer.renders[0].viewport.toArray(), [480, 150, 240, 180]);
   assert.deepEqual(canvas.draws[0].slice(5), [160, 0, 480, 360]);
 
   viewport.bounds = {left: 500, bottom: 500, width: 280, height: 360};
   view.panel.render();
-  assert.equal(view.panel.pose.camera.projectionMatrix.equals(projection), true);
+  assert.equal(view.panel.image.pose.camera.projectionMatrix.equals(projection), true);
   assert.deepEqual(view.renderer.renders[1].viewport.toArray(), [400, 225, 280, 210]);
   assert.deepEqual(canvas.draws[1].slice(5), [0, 150, 560, 420]);
   assert.deepEqual(canvas.fills, [[0, 0, 800, 360], [0, 0, 560, 720]]);
@@ -696,7 +701,7 @@ test('a failed inset render restores every shared renderer setting', () => {
     const scissor = view.renderer.scissor.clone();
     const failure = new Error('Image unavailable');
     if (operation === 'render') view.renderer.render = () => { throw failure; };
-    else view.panel.context.drawImage = () => { throw failure; };
+    else view.panel.image.context.drawImage = () => { throw failure; };
     assert.throws(() => view.panel.render(), error => error === failure);
     assert.deepEqual(view.renderer.viewport, viewport);
     assert.deepEqual(view.renderer.scissor, scissor);
