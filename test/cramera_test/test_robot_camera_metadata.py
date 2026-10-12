@@ -28,6 +28,7 @@ from cramera.live.live_bundle import (
 )
 from cramera.live.recording import RecordedFrame
 from cramera.live.recording_bundle import write_recording_bundle
+from cramera.live.visualization import WorldModelSync
 from cramera.recording_fields import SceneField
 
 from .test_live_bundle import use_scratch_scenes_directory
@@ -377,6 +378,28 @@ def test_camera_motion_preserves_the_published_signature(camera_bridge: Bridge) 
     assert camera_bridge.status()[SceneField.BUNDLE_SIGNATURE] == before
 
 
+def test_signature_returns_last_consistent_value_for_a_mismatched_robot(
+    camera_bridge: Bridge,
+) -> None:
+    """
+    Finish a status read while the robot and attached world disagree.
+
+    :param camera_bridge: Bridge with a previously published camera signature.
+    """
+    before = camera_bridge.bundle_signature()
+    original_robot = camera_bridge.robot
+    replacement_world = deepcopy(camera_bridge.world)
+    [replacement_robot] = replacement_world.get_semantic_annotations_by_type(PR2)
+    camera_bridge.robot = replacement_robot
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        try:
+            signature = executor.submit(camera_bridge.bundle_signature)
+            assert signature.result(timeout=1) == before
+        finally:
+            camera_bridge.robot = original_robot
+
+
 def test_signature_locks_the_replacement_world_after_attachment_changes(
     camera_bridge: Bridge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -415,6 +438,122 @@ def test_signature_locks_the_replacement_world_after_attachment_changes(
             with pytest.raises(TimeoutError):
                 signature.result(timeout=0.1)
         assert signature.result(timeout=10) == camera_bridge.bundle_signature()
+
+
+def test_repeated_attachment_changes_do_not_keep_a_signature_read_running(
+    camera_bridge: Bridge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Keep the published value when every selected world becomes outdated.
+
+    :param camera_bridge: Bridge with a previously published camera signature.
+    :param monkeypatch: Replaces the attachment whenever its lock is selected.
+    """
+    before = camera_bridge.bundle_signature()
+    initial_world = camera_bridge.world
+    initial_robot = camera_bridge.robot
+    replacement_world = deepcopy(initial_world)
+    [replacement_robot] = replacement_world.get_semantic_annotations_by_type(PR2)
+    world_lock = WorldState.world_lock
+
+    def replaced_world_lock(state: WorldState) -> RLock:
+        """
+        Replace a selected attachment before returning its native lock.
+
+        :param state: State belonging to the world selected by the reader.
+        :return: The selected world's unchanged native lock.
+        """
+        if state is initial_world.state:
+            camera_bridge.world = replacement_world
+            camera_bridge.robot = replacement_robot
+        else:
+            camera_bridge.world = initial_world
+            camera_bridge.robot = initial_robot
+        return world_lock.__get__(state, WorldState)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        try:
+            with monkeypatch.context() as patch:
+                patch.setattr(WorldState, "world_lock", property(replaced_world_lock))
+                signature = executor.submit(camera_bridge.bundle_signature)
+                assert signature.result(timeout=1) == before
+        finally:
+            camera_bridge.world = initial_world
+            camera_bridge.robot = initial_robot
+
+
+def test_outdated_camera_read_cannot_overwrite_a_new_attachment_signature(
+    camera_bridge: Bridge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Discard camera metadata completed after another world has been attached.
+
+    :param camera_bridge: Bridge initially attached to the first robot world.
+    :param monkeypatch: Pauses camera serialization while the attachment changes.
+    """
+    before = camera_bridge.bundle_signature()
+    initial_world = camera_bridge.world
+    replacement_world = deepcopy(initial_world)
+    [replacement_robot] = replacement_world.get_semantic_annotations_by_type(PR2)
+    replacement_robot.get_default_camera().field_of_view.vertical_angle /= 2
+    reading = Event()
+    release = Event()
+    to_json = Camera.to_json
+
+    def paused_camera_json(camera: Camera, **kwargs: Any) -> dict[str, Any]:
+        """
+        Hold the old camera read until the replacement is published.
+
+        :param camera: Camera annotation being serialized.
+        :param kwargs: Context forwarded to the serializer.
+        :return: The camera's ordinary metadata.
+        """
+        if camera.root._world is initial_world:
+            reading.set()
+            assert release.wait(timeout=10)
+        return to_json(camera, **kwargs)
+
+    monkeypatch.setattr(Camera, "to_json", paused_camera_json)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        signature = executor.submit(camera_bridge.bundle_signature)
+        try:
+            assert reading.wait(timeout=10)
+            camera_bridge.attach(replacement_world)
+            current = camera_bridge.bundle_signature()
+            assert current != before
+        finally:
+            release.set()
+        assert signature.result(timeout=10) == current
+        assert camera_bridge.bundle_signature() == current
+
+
+def test_previous_world_callback_does_not_wait_for_the_replacement_world(
+    camera_bridge: Bridge,
+) -> None:
+    """
+    Ignore a previous world's callback without acquiring the new world's lock.
+
+    :param camera_bridge: Bridge whose original model callback can still be running.
+    """
+    initial_world = camera_bridge.world
+    replacement_world = deepcopy(initial_world)
+    callback = WorldModelSync(_world=initial_world, bridge=camera_bridge)
+    camera_bridge.attach(replacement_world)
+    before = camera_bridge.status()
+
+    def notify_previous_world() -> None:
+        """
+        Notify from inside the native model callback's world lock.
+        """
+        with initial_world.state.world_lock:
+            callback.on_model_change()
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with replacement_world.state.world_lock:
+            notification = executor.submit(notify_previous_world)
+            assert notification.result(timeout=1) is None
+
+    assert camera_bridge.status() == before
 
 
 # %% independent camera snapshot locks

@@ -567,7 +567,12 @@ class Bridge:
 
     _bundle_signature: str = ""
     """
-    Cached digest of the bundled scene content, recomputed on attach and model change.
+    Last consistent digest of the bundled topology, robot and camera metadata.
+    """
+
+    SIGNATURE_REFRESH_ATTEMPTS: ClassVar[int] = 2
+    """
+    One initial read and one retry after an attachment changes during lock acquisition.
     """
 
     live_server: Optional[ThreadingHTTPServer] = None
@@ -589,10 +594,11 @@ class Bridge:
         :param world: The world to visualize and query.
         :return: The revision identifying this attachment's query ownership.
         """
-        self.world = world
-        self._model_revision += 1
+        with self._lock:
+            self.world = world
+            self._model_revision += 1
         self.bind()
-        self._refresh_bundle_signature()
+        self._refresh_bundle_signature(expected_world=world)
         self._query_attachment = self._model_revision
         logger.info(
             "attached to world (robot=%s, %d joints)",
@@ -631,13 +637,20 @@ class Bridge:
         self._plan = plan
         self.snapshot_plan()
 
-    def observe_model_change(self) -> None:
+    def observe_model_change(self, world: Optional[World] = None) -> None:
         """
         Refresh the catalogs and the bundle signature after a world model change.
+
+        :param world: World that emitted the change, or the current attachment.
         """
-        self._model_revision += 1
+        with self._lock:
+            if world is None:
+                world = self.world
+            if world is not self.world:
+                return
+            self._model_revision += 1
         self.bind()
-        self._refresh_bundle_signature()
+        self._refresh_bundle_signature(expected_world=world)
 
     def observe_ros_markers(self, topic: str, markers: List[Any]) -> None:
         """
@@ -873,68 +886,80 @@ class Bridge:
         grasped object changes the world model but not the bundled scene, and must not
         make the viewer reload it. Joint and base poses do not affect the signature.
 
-        :return: The topology signature combined with the native camera descriptions.
+        :return: The latest consistent topology and camera digest, retaining the
+            previous value while the attachment cannot be read consistently.
         """
-        while True:
-            world = self.world
-            robot = self.robot
-            topology = self._bundle_signature
-            if world is None or robot is None:
-                return topology
-            with world.state.world_lock:
-                if (
-                    world is not self.world
-                    or robot is not self.robot
-                    or robot.root._world is not world
-                ):
-                    continue
-                cameras = [
-                    sensor.to_json()
-                    for sensor in robot.all_sensors
-                    if isinstance(sensor, Camera)
-                ]
-                if (
-                    world is not self.world
-                    or robot is not self.robot
-                    or topology != self._bundle_signature
-                ):
-                    continue
-                digest = hashlib.sha1(
-                    json.dumps(cameras, sort_keys=True).encode()
-                ).hexdigest()
-                return f"{topology}-{digest}"
+        self._refresh_bundle_signature()
+        with self._lock:
+            return self._bundle_signature
 
-    def _refresh_bundle_signature(self) -> None:
+    def _refresh_bundle_signature(self, expected_world: Optional[World] = None) -> None:
         """
-        Recompute the cached bundle signature from the current world model.
+        Publish a digest of the current topology, robot type and camera descriptions.
+
+        World locks precede the publication lock. An attachment change permits one
+        retry; further changes leave the last consistent digest for the next refresh.
+
+        :param expected_world: Restrict the refresh to this world when its caller may
+            already hold that world's lock.
         """
-        if self.world is None:
-            self._bundle_signature = ""
-            return
-        robot_name = type(self.robot).__name__.lower() if self.robot else None
-        entries: List[str] = []
-        try:
-            overlay_bodies = set(self.overlay_bodies())
-            for body in self.world.bodies:
-                name = str(body.name)
-                if body in overlay_bodies:
-                    continue
-                connection = body.parent_connection
-                entries.append(
-                    "%s<-%s:%s"
-                    % (
-                        name,
-                        str(connection.parent.name) if connection else "",
-                        type(connection).__name__ if connection else "root",
+        for _ in range(self.SIGNATURE_REFRESH_ATTEMPTS):
+            with self._lock:
+                world = self.world
+                robot = self.robot
+                revision = self._model_revision
+                if expected_world is not None and world is not expected_world:
+                    return
+                if world is None:
+                    self._bundle_signature = ""
+                    return
+            with world.state.world_lock:
+                with self._lock:
+                    if (
+                        world is not self.world
+                        or robot is not self.robot
+                        or revision != self._model_revision
+                    ):
+                        continue
+                if robot is not None and robot.root._world is not world:
+                    return
+                overlay_bodies = set(self.overlay_bodies())
+                entries: List[str] = []
+                for body in world.bodies:
+                    if body in overlay_bodies:
+                        continue
+                    connection = body.parent_connection
+                    entries.append(
+                        "%s<-%s:%s"
+                        % (
+                            str(body.name),
+                            str(connection.parent.name) if connection else "",
+                            type(connection).__name__ if connection else "root",
+                        )
                     )
-                )
-        except Exception as error:
-            # boundary guard: the world is mid-modification and iterating it is not
-            # safe; keep the previous signature rather than flapping the viewer.
-            logger.debug("signature refresh skipped: %s", error)
-            return
-        digest = hashlib.sha1("|".join(sorted(entries)).encode()).hexdigest()[:16]
-        self._bundle_signature = "world-%s-robot-%s" % (digest, robot_name)
+                digest = hashlib.sha1("|".join(sorted(entries)).encode()).hexdigest()[
+                    :16
+                ]
+                robot_name = type(robot).__name__.lower() if robot else None
+                signature = "world-%s-robot-%s" % (digest, robot_name)
+                if robot is not None:
+                    cameras = [
+                        sensor.to_json()
+                        for sensor in robot.all_sensors
+                        if isinstance(sensor, Camera)
+                    ]
+                    camera_digest = hashlib.sha1(
+                        json.dumps(cameras, sort_keys=True).encode()
+                    ).hexdigest()
+                    signature = f"{signature}-{camera_digest}"
+                with self._lock:
+                    if (
+                        world is self.world
+                        and robot is self.robot
+                        and revision == self._model_revision
+                    ):
+                        self._bundle_signature = signature
+                        return
 
     def status(self) -> Dict[str, Any]:
         """
@@ -1225,7 +1250,10 @@ class Bridge:
             return
         self._last_bind_time = time.time()
         robots = world.get_semantic_annotations_by_type(AbstractRobot)
-        self.robot = robots[0] if robots else None
+        with self._lock:
+            if world is not self.world:
+                return
+            self.robot = robots[0] if robots else None
         self._kinematic_connections = list(world.connections)
         self._connections = self._actuated_connections(self._kinematic_connections)
         bodies: Dict[str, Body] = {}
