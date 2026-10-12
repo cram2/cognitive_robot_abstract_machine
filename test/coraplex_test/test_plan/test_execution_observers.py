@@ -1,6 +1,7 @@
 """Execution callbacks preserve the native plan and motion lifecycle."""
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import StrEnum
 from unittest.mock import Mock
 
@@ -11,7 +12,7 @@ from coraplex.datastructures.dataclasses import Context
 from giskardpy.motion_statechart.graph_node import EndMotion, Goal, Task
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.attachment_nodes import ReAttachNode
 from coraplex.plans.executables import MotionPlanHistory
 from coraplex.plans.factories import code, parallel, sequential
@@ -25,6 +26,8 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
+from giskardpy.motion_statechart.exceptions import NoProgressError
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
     StateHistoryItem,
@@ -257,7 +260,7 @@ def test_native_motion_reports_boundaries_and_ticks(pr2_apartment_context) -> No
     recorder = ExecutionRecorder(plan=plan)
     plan.node_callbacks.append(recorder)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert recorder.events[0] == NodeEvent(
@@ -294,7 +297,7 @@ def test_native_attachment_reports_its_own_completion(pr2_apartment_context) -> 
     recorder = ExecutionRecorder(plan=plan)
     plan.node_callbacks.append(recorder)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert [event for event in recorder.events if event.node is attachment] == [
@@ -494,24 +497,29 @@ def test_compilation_failure_preserves_error_without_starting_motion(
     executor.tick.assert_not_called()
 
 
-def test_exhausted_execution_ends_started_motion_observation(
+def test_stalled_execution_ends_started_motion_observation(
     monkeypatch, tracked_motion, cylinder_bot_world
 ) -> None:
-    """A motion that exhausts its native tick budget reports a failed observation."""
+    """A motion that stops approaching its goal reports a failed observation."""
     node = tracked_motion
     recorder = ExecutionRecorder(plan=node.plan)
     node.plan.node_callbacks.append(recorder)
     motion = RecordedMotion()
-    executor = AbortedExecution(motion, failure=None)
+    stall = NoProgressError(
+        progress_monitor=StillProgressing(
+            monitored_node=EndMotion(), timeout=timedelta(seconds=3)
+        )
+    )
+    executor = AbortedExecution(motion, failure=stall)
     monkeypatch.setattr(executables, "Ros2Executor", Mock(return_value=executor))
     robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
     executable = executables.GiskardExecutable(
-        context=Context(cylinder_bot_world, robot, ticks_per_motion=1),
+        context=Context(cylinder_bot_world, robot),
         root_node=Goal(),
         motion_state_chart=motion.chart,
         motion_mappings={node: motion.task},
     )
-    with pytest.raises(executables.MotionDidNotFinish):
+    with pytest.raises(NoProgressError):
         executable._execute_simulation()
     assert recorder.events == [
         NodeEvent(ExecutionEvent.START, node, LifeCycleValues.RUNNING),
@@ -563,7 +571,7 @@ def test_direct_motion_reports_one_pair_of_boundaries(pr2_apartment_context) -> 
     recorder = ExecutionRecorder(plan=root.plan)
     root.plan.node_callbacks.append(recorder)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         node.perform()
 
     assert recorder.events == [
@@ -652,7 +660,7 @@ def test_direct_motion_observer_receives_native_history(pr2_apartment_context) -
     recorder = ExecutionRecorder(plan=root.plan)
     root.plan.node_callbacks.append(recorder)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         node.perform()
 
     assert recorder.statecharts
@@ -698,7 +706,7 @@ def test_direct_motion_failure_closes_its_native_boundary(
     recorder = ExecutionRecorder(plan=node.plan)
     node.plan.node_callbacks.append(recorder)
 
-    with simulated_robot, pytest.raises(type(failure)) as caught:
+    with kinematically_simulated_robot, pytest.raises(type(failure)) as caught:
         node.perform()
 
     assert caught.value is failure
@@ -730,7 +738,7 @@ def test_direct_motion_compilation_failure_has_no_unmatched_end(
     recorder = ExecutionRecorder(plan=node.plan)
     node.plan.node_callbacks.append(recorder)
 
-    with simulated_robot, pytest.raises(type(failure)) as caught:
+    with kinematically_simulated_robot, pytest.raises(type(failure)) as caught:
         node.perform()
 
     assert caught.value is failure
@@ -812,7 +820,7 @@ def test_parallel_plan_reports_failed_native_verdict(
     monkeypatch.setattr(node, "parse", Mock(return_value=executable))
     root = parallel([node])
 
-    with simulated_robot, pytest.raises(PlanFailure):
+    with kinematically_simulated_robot, pytest.raises(PlanFailure):
         root.notify()
 
     assert node.status is LifeCycleValues.FAILED

@@ -341,11 +341,11 @@ class MujocoVideoRecorder:
 
         pose = MujocoCamera.overview_pose(np.asarray(bounds))
         # MuJoCo orders the quaternion scalar-first, while Quaternion.to_np is [x, y, z, w].
-        quaternion_xyzw = pose.to_quaternion().to_np().tolist()
+        quaternion_xyzw = pose.quaternion.to_np().tolist()
         camera = MujocoCamera(
             name="cram_video_overview_camera",
             body=self.world.root,
-            position=pose.to_position().to_np()[:3].tolist(),
+            position=pose.position.to_np()[:3].tolist(),
             quaternion=[quaternion_xyzw[3]] + quaternion_xyzw[:3],
             resolution=[float(self.resolution.width), float(self.resolution.height)],
         )

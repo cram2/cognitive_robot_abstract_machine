@@ -10,7 +10,7 @@ from cramera.knowledge.entity import NamedEntity
 
 from typing_extensions import Optional
 
-from coraplex.datastructures.enums import Arms
+from cramera.robot_parts import ArmSide
 from semantic_digital_twin.spatial_types import Point3
 
 from cramera.knowledge.enums import JointRegion
@@ -22,7 +22,7 @@ class Gripper(NamedEntity):
     An end effector of the recorded robot.
     """
 
-    side: Optional[Arms]
+    side: Optional[ArmSide]
     """
     Which arm the gripper belongs to, or None for a robot that does not specify a left
     and a right arm.
@@ -41,7 +41,7 @@ class RecordedArm(NamedEntity):
     A manipulator of the recorded robot.
     """
 
-    side: Optional[Arms]
+    side: Optional[ArmSide]
     """
     Which arm this is, or None for a robot that does not specify a left and a right arm.
     """

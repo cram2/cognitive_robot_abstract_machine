@@ -14,7 +14,7 @@ from functools import partial
 from importlib.metadata import entry_points
 from types import TracebackType
 
-from typing_extensions import TYPE_CHECKING, ClassVar, Self
+from typing_extensions import TYPE_CHECKING, ClassVar, Optional, Self
 
 from coraplex.datastructures.enums import VisualizationBackend, VisualizationOption
 from coraplex.exceptions import (
@@ -33,11 +33,17 @@ if TYPE_CHECKING:
 
 try:
     import rclpy
+    from semantic_digital_twin.adapters.ros.tf_publisher import (
+        TFPublisher,
+        TfFrameNames,
+    )
     from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
         VizMarkerPublisher,
     )
 except ImportError:
     rclpy = None
+    TFPublisher = None
+    TfFrameNames = None
     VizMarkerPublisher = None
 
 
@@ -278,6 +284,25 @@ class RvizVisualization(WorldVisualization):
     Whether the RViz renderer also publishes native collision results.
     """
 
+    frame_prefix: str = field(default="", kw_only=True)
+    """
+    Put in front of every tf frame of the world, so a copy can be shown next to the
+    world it copies.
+
+    Empty publishes the frames under their own names.
+    """
+
+    marker_topic: Optional[str] = field(default=None, kw_only=True)
+    """
+    The topic the markers are published on, or ``None`` for the marker publisher's own.
+    """
+
+    marker_alpha: Optional[float] = field(default=None, kw_only=True)
+    """
+    The opacity the markers are drawn with, in [0.0, 1.0], or ``None`` for the marker
+    publisher's own.
+    """
+
     publisher: VizMarkerPublisher | None = field(default=None, init=False)
     """
     The owned RViz marker publisher.
@@ -299,10 +324,36 @@ class RvizVisualization(WorldVisualization):
                 cleanup.callback(self._shutdown_context)
             self.ros_node = rclpy.create_node("coraplex_visualization")
             cleanup.callback(self._destroy_node, self.ros_node)
-        self.publisher = VizMarkerPublisher(_world=self.world, node=self.ros_node)
+        self.publisher = VizMarkerPublisher(
+            _world=self.world,
+            node=self.ros_node,
+            topic_name=self.marker_topic or VizMarkerPublisher.topic_name,
+            alpha=(
+                VizMarkerPublisher.alpha
+                if self.marker_alpha is None
+                else self.marker_alpha
+            ),
+            tf_publisher=self._prefixed_tf_publisher(cleanup),
+        )
         cleanup.callback(self._stop_publisher, self.publisher)
         if self.collision_visualization:
             self.publisher.with_collision_visualization()
+
+    def _prefixed_tf_publisher(self, cleanup: ExitStack) -> Optional[TFPublisher]:
+        """
+        :return: A tf publisher of the world under :attr:`frame_prefix`, stopped with
+            this renderer, or ``None`` to let the marker publisher find or start the
+            world's own.
+        """
+        if not self.frame_prefix:
+            return None
+        tf_publisher = TFPublisher(
+            node=self.ros_node,
+            _world=self.world,
+            frame_names=TfFrameNames(prefix=self.frame_prefix),
+        )
+        cleanup.callback(tf_publisher.stop)
+        return tf_publisher
 
     def _shutdown_context(self) -> None:
         if rclpy.ok():

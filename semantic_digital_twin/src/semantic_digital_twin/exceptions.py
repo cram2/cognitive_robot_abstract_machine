@@ -25,17 +25,22 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
     from semantic_digital_twin.adapters.ros.messages import MetaData
+    from semantic_digital_twin.input_synchronization import InputSynchronizer
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootBody,
         HasSupportingSurface,
     )
+    from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         AbstractRobotPart,
+        EndEffector,
     )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.geometry import Scale
+    from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
     from semantic_digital_twin.world_description.world_entity import (
+        Connection,
         SemanticAnnotation,
         WorldEntity,
         WorldEntityWithID,
@@ -754,36 +759,6 @@ class PartWholeFieldInAnnotationKwargs(UsageError):
 
 
 @dataclass
-class MechanicalJointAlreadyMounted(UsageError):
-    """
-    Raised when a mechanical joint that already connects a child is mounted onto a
-    different whole.
-
-    If you think a single Mechanical Joint should be able to have multiple children,
-    contact @LucaKro.
-    """
-
-    joint: SemanticAnnotation
-    """
-    The mechanical joint being mounted.
-    """
-
-    main_has_root_body_annotation: SemanticAnnotation
-    """
-    The annotation (the whole) the joint was being mounted onto.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"{type(self.joint).__name__} already connects a child and cannot be mounted onto "
-            f"{type(self.main_has_root_body_annotation).__name__}: a mechanical joint connects exactly one child."
-        )
-
-    def suggest_correction(self) -> str:
-        return f"if you think that you found a case where this error does not apply, please contact @LucaKro"
-
-
-@dataclass
 class SemanticAnnotationCircularDependencyError(UsageError):
     """
     Raised when a circular dependency between semantic annotations is detected.
@@ -799,6 +774,31 @@ class SemanticAnnotationCircularDependencyError(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class MissingMovableJointError(UsageError):
+    """
+    Raised when a part is to be moved, but nothing moves it: its root is fixed to its
+    parent.
+    """
+
+    semantic_annotation: SemanticAnnotation
+    """
+    The part that has no movable joint.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.semantic_annotation).__name__} {self.semantic_annotation.name} "
+            f"has no movable joint: its root is fixed to its parent."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "create it with an active parent_connection_specification, or mount it on "
+            "one with mount_on_movable_joint."
+        )
 
 
 @dataclass
@@ -884,7 +884,7 @@ class InvalidHingeActiveAxis(UsageError):
         return f"Axis {self.axis} provided when trying to calculate the hinge position is invalid."
 
     def suggest_correction(self) -> str:
-        return "if you think this is incorrect, consider extending Door.calculate_world_T_hinge_based_on_handle."
+        return "if you think this is incorrect, consider extending Door.calculate_self_T_movable_joint."
 
 
 @dataclass
@@ -1410,6 +1410,159 @@ class MissingDefaultCameraError(UsageError):
 
 
 @dataclass
+class NoLaserScanReceived(UsageError):
+    """
+    Raised when reading a lidar that has not received a scan yet.
+    """
+
+    topic_name: str
+    """
+    The topic the lidar is waiting for a scan on.
+    """
+
+    def error_message(self) -> str:
+        return f"No laser scan has been received on '{self.topic_name}' yet."
+
+    def suggest_correction(self) -> str:
+        return f"check that something publishes on '{self.topic_name}' and that the node has been spun since."
+
+
+@dataclass
+class InputAlreadyAddedError(UsageError):
+    """
+    Raised when an input is added to a loop that already applies it.
+    """
+
+    synchronizer: InputSynchronizer
+    """
+    The input that was added a second time.
+    """
+
+    def error_message(self) -> str:
+        return f"The loop already applies {self.synchronizer}."
+
+    def suggest_correction(self) -> str:
+        return "add every input only once per loop."
+
+
+@dataclass
+class AlreadyTrackedByTfFrameError(UsageError):
+    """
+    Raised when a connection is registered for tf tracking a second time.
+    """
+
+    connection_name: str
+    """
+    The name of the connection that is already tracked.
+    """
+
+    tf_parent_frame: str
+    """
+    The tf parent frame the connection is already tracked with.
+    """
+
+    tf_child_frame: str
+    """
+    The tf child frame the connection is already tracked with.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Connection '{self.connection_name}' is already tracked with a tf frame: "
+            f"'{self.tf_parent_frame}'<-'{self.tf_child_frame}'"
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class UnboundMessageTypeError(UsageError):
+    """
+    Raised when a topic subscriber does not name the type of its messages.
+    """
+
+    subscriber_type: Type
+    """
+    The subscriber whose message type is unknown.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.subscriber_type.__name__}' does not name the type of the "
+            f"messages it reads."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Declare it in the bases of '{self.subscriber_type.__name__}', as in "
+            f"'LatestMessageSubscriber[Odometry]'."
+        )
+
+
+@dataclass
+class ConnectionCannotBeTrackedByTfFrameError(UsageError):
+    """
+    Raised when a connection without 6 degrees of freedom is registered for tf tracking.
+    """
+
+    connection: Connection
+    """
+    The connection that cannot be tracked.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Can only sync Connection6DoF with tf, but '{str(self.connection.name)}' is of "
+            f"type '{type(self.connection).__name__}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class InvalidBeamCount(UsageError):
+    """
+    Raised when deriving a scan pattern from a beam count too small to space beams by.
+    """
+
+    beam_count: int
+    """
+    The beam count that was rejected.
+    """
+
+    def error_message(self) -> str:
+        return f"A scan pattern cannot be derived from {self.beam_count} beams."
+
+    def suggest_correction(self) -> str:
+        return "give at least two beams, or state the angle increment directly."
+
+
+@dataclass
+class InvalidScanPattern(UsageError):
+    """
+    Raised when a scan pattern describes a sweep a scanner cannot perform.
+    """
+
+    pattern: ScanPattern
+    """
+    The pattern that was rejected.
+    """
+
+    reason: str
+    """
+    What about the pattern is wrong.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid scan pattern {self.pattern}: {self.reason}."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
 class MissingWorldError(UsageError):
     """
     Raised when trying to access a world that is None, but a world is required for the
@@ -1860,6 +2013,109 @@ class ExerciseVerificationFailed(UsageError):
 
     def suggest_correction(self) -> str:
         return "revisit the task description of this exercise and adjust your solution."
+
+
+@dataclass
+class NothingHeld(UsageError):
+    """
+    Raised when the grasp of a gripper that holds nothing is asked for.
+    """
+
+    end_effector: EndEffector
+    """
+    The end effector that holds nothing.
+    """
+
+    def error_message(self) -> str:
+        return f"The end effector '{self.end_effector.name}' holds no body."
+
+    def suggest_correction(self) -> str:
+        return (
+            "check that a body is attached below the end effector's tool frame before "
+            "reading the grasp it is held by."
+        )
+
+
+@dataclass
+class NoGraspGeometry(UsageError):
+    """
+    Raised when an object's grasps are derived from its shape, but its root body has no
+    shape to derive them from.
+    """
+
+    graspable: HasGraspCandidates
+    """
+    The annotation whose grasps were asked for.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The grasps of '{self.graspable.name}' follow its shape, but its root body "
+            f"'{self.graspable.root.name}' offers none to follow."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "give the root body collision geometry, or annotate the object with a type "
+            "whose grasps do not depend on its shape."
+        )
+
+
+@dataclass
+class GripperAxesNotPerpendicular(UsageError):
+    """
+    Raised when a gripper's closing axis is not perpendicular to its approach axis, so
+    the two cannot span a grasp frame.
+    """
+
+    end_effector: EndEffector
+    """
+    The end effector stating the axes.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The end effector '{self.end_effector.name}' has an approach axis "
+            f"{self.end_effector.approach_axis.to_np()[:3].tolist()} and a closing axis "
+            f"{self.end_effector.closing_axis.to_np()[:3].tolist()} that are not "
+            f"perpendicular."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "return a closing axis at a right angle to the approach axis, both in the "
+            "tool frame."
+        )
+
+
+@dataclass
+class MoreThanOneBodyHeld(UsageError):
+    """
+    Raised when a gripper's tool frame has more than one body attached to it.
+    """
+
+    end_effector: EndEffector
+    """
+    The end effector whose tool frame carries them.
+    """
+
+    held_bodies: List[KinematicStructureEntity]
+    """
+    The entities attached to that tool frame.
+    """
+
+    def error_message(self) -> str:
+        names = [str(body.name) for body in self.held_bodies]
+        return (
+            f"The end effector '{self.end_effector.name}' has more than one body "
+            f"attached to its tool frame: {names}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "detach everything but the grasped body from the tool frame, so that the "
+            "body the gripper holds is unambiguous."
+        )
 
 
 @dataclass

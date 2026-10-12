@@ -18,10 +18,7 @@ class TracyVelocityInterface(RobotInterfaceConfig):
     """
 
     def setup(self):
-        self.sync_joint_state_topic("/left_arm/joint_states")
-        self.sync_joint_state_topic("/right_arm/joint_states")
-        self.sync_joint_state_topic("/right_gripper/joint_states")
-        self.sync_joint_state_topic("/left_gripper/joint_states")
+        self.sync_robot_parts()
         joints_left = [
             TracyJoint.LEFT_SHOULDER_PAN,
             TracyJoint.LEFT_SHOULDER_LIFT,

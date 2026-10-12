@@ -25,7 +25,7 @@ numerically integrating the joint density.
 from __future__ import annotations
 
 import unittest
-from enum import IntEnum
+from enum import Enum, IntEnum
 from unittest import mock
 
 import numpy as np
@@ -35,9 +35,10 @@ from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.set import Set
 from random_events.variable import Continuous, Integer, Symbolic
 
+from probabilistic_model.adapters.exceptions import CannotConvertError
 from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
-    CannotConvertError,
     NotExactlyOneRootError,
+    UnitNotConvertedError,
 )
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
@@ -118,6 +119,19 @@ class SparseSymbolEnum(IntEnum):
 
 
 sparse = Symbolic(name="sparse", domain=Set.from_iterable(SparseSymbolEnum))
+
+
+class SymbolWithLargeHash(Enum):
+    """
+    Domain elements whose hashes are larger than the hashes Python reduces integers to,
+    so that hashing such a hash again does not give it back.
+    """
+
+    FIRST = 2**62 + 2**20
+    SECOND = 2**62 + 2**21
+
+    def __hash__(self) -> int:
+        return self.value
 
 
 class UnconvertibleUniformDistribution(UniformDistribution):
@@ -293,6 +307,26 @@ class ConversionTestCase(unittest.TestCase):
                 layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
                 self.assertEqual(list(layered.variables), list(rx_circuit.variables))
                 layered.validate()
+
+    def test_the_product_units_of_a_level_become_the_nodes_of_one_layer(self):
+        circuit = shared_children_circuit()
+        converted = RustworkxCircuitToLayeredCircuitConverter.convert_with_layers(
+            circuit
+        )
+        product_units = [
+            unit for unit in circuit.nodes() if isinstance(unit, ProductUnit)
+        ]
+        nodes = [converted.node_of(unit) for unit in product_units]
+        self.assertIs(nodes[0].layer, nodes[1].layer)
+        self.assertIsInstance(nodes[0].layer, ProductLayer)
+        self.assertEqual({node.node for node in nodes}, {0, 1})
+
+    def test_a_unit_of_another_circuit_was_not_converted(self):
+        converted = RustworkxCircuitToLayeredCircuitConverter.convert_with_layers(
+            shared_children_circuit()
+        )
+        with self.assertRaises(UnitNotConvertedError):
+            converted.node_of(shared_children_circuit().root)
 
     def test_a_leaf_without_a_converter_is_reported(self):
         circuit = RxCircuit()
@@ -1255,6 +1289,28 @@ class SymbolicEncodingTestCase(unittest.TestCase):
         encoding = SymbolicEncoding(sparse)
         np.testing.assert_array_equal(
             encoding.indices_of_hashes(np.array([5.0, np.nan])), [-1, -1]
+        )
+
+    def test_a_distribution_over_elements_with_large_hashes_keeps_its_probabilities(
+        self,
+    ):
+        variable = Symbolic(
+            name="large_hash", domain=Set.from_iterable(SymbolWithLargeHash)
+        )
+        distribution = SymbolicDistribution(
+            variable=variable,
+            probabilities=MissingDict(
+                float,
+                {
+                    hash(SymbolWithLargeHash.FIRST): 0.25,
+                    hash(SymbolWithLargeHash.SECOND): 0.75,
+                },
+            ),
+        )
+        layer = SymbolicLayer.from_distributions(0, [distribution])
+        self.assertEqual(
+            dict(layer.node_distribution(0, variable).probabilities),
+            dict(distribution.probabilities),
         )
 
     def test_symbolic_layer_stores_positions_in_the_domain(self):

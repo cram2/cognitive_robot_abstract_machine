@@ -25,8 +25,9 @@ composed of structured semantic annotations of its parts (all defined in
 `semantic_digital_twin.robots.robot_parts`):
 
 * A `KinematicChain` is a contiguous sequence of kinematic structure entities from a `root` body to a `tip` body.
-* An `EndEffector` is the abstract base for end effectors and always defines a `tool_frame` as well as a
-  `front_facing_orientation` and the derived `front_facing_axis` used for tasks such as approach planning. Concrete
+* An `EndEffector` is the abstract base for end effectors and always defines a `tool_frame`. Each concrete end
+  effector states, in its tool frame, the `approach_axis` it travels toward an object along and the `closing_axis`
+  its fingers close along; together they are the grasp frame's x- and y-axis. Concrete
   grippers such as `PR2RightGripper` and `HSRBGripper` extend `EndEffector` (together with the `HasTwoFingers`
   mixin and one or more `Finger` parts).
 * A `Sensor` is any perceptual device; `Camera` is a concrete sensor that adds a forward-facing axis, a field of
@@ -45,7 +46,7 @@ construction. Calling `validate()` confirms that all fields are plausibly filled
 synchronized without issues.
 
 To query a robot's parts regardless of its specific structure, `AbstractRobot` provides accessor methods:
-`get_end_effectors()`, `get_arms()`, `get_sensors()`, `get_torso()`, `get_left_arm_if_specified()`,
+`all_end_effectors`, `all_arms`, `all_sensors`, `get_torso()`, `get_left_arm_if_specified()`,
 `get_right_arm_if_specified()` and `get_default_camera()`.
 
 ## Interaction with the World and Motion Control
@@ -84,6 +85,6 @@ world model.
 - `AbstractRobot` is a semantic, world-backed description of a robot's structure and capabilities.
 - Parts are composed from `KinematicChain`, `EndEffector`, `Sensor` and `Torso` using specialized structures
   (mixins and generics), and reached as nested attributes.
-- Accessor methods such as `get_arms()` and `get_default_camera()` query parts in a robot-agnostic way.
+- Accessor methods such as `all_arms` and `get_default_camera()` query parts in a robot-agnostic way.
 - The robot is reconstructed from a `World` via `from_world`; new robots are added by subclassing and implementing
   `get_ros_file_path` and `_get_root_body_name`.

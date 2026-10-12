@@ -10,13 +10,11 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.graph_node import Task, MotionStatechartNode
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.designator import Designator
-from coraplex.view_manager import ViewManager
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
 )
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from coraplex.alternative_motion_mapping import AlternativeMotion
 
 logger = logging.getLogger(__name__)
@@ -72,21 +70,17 @@ class BaseMotion(Designator):
         )
 
     def _only_allow_gripper_collision_rules(
-        self, arm: Arms
+        self, end_effector: EndEffector
     ) -> list[MotionStatechartNode]:
         """
-        :param arm: The arm whose manipulator may collide with the environment.
-        :return: Collision rules that only allow collisions between the manipulator of
-            the given arm, together with whatever it holds, and the environment.
+        :param end_effector: The end effector that may collide with the environment.
+        :return: Collision rules that only allow collisions between the end effector,
+            together with whatever it holds, and the environment.
         """
         return [
             UpdateTemporaryCollisionRules(
                 temporary_rules=[
-                    AllowCollisionForEndEffector(
-                        end_effector=ViewManager().get_end_effector_view(
-                            arm, self.robot
-                        )
-                    )
+                    AllowCollisionForEndEffector(end_effector=end_effector)
                 ]
             )
         ]

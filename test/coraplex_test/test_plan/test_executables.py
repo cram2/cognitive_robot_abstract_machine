@@ -8,6 +8,8 @@ nodes that terminate the chart, which depend on the execution type.
 """
 
 from copy import deepcopy
+from dataclasses import dataclass, field
+from datetime import timedelta
 
 import pytest
 from typing_extensions import List
@@ -16,43 +18,68 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
+from coraplex.plans.failures import (
+    MotionExceededSimulationTimeLimit,
+    MotionMadeNoProgress,
+    MotionViolatedCollisionAvoidance,
+)
+from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.ros_executor import Ros2Executor
 from giskardpy.motion_statechart.graph_node import (
     CancelMotion,
     EndMotion,
     Goal,
     MotionStatechartNode,
-    Task,
 )
 from giskardpy.motion_statechart.monitors.payload_monitors import (
     ThreadedPredicateMonitor,
 )
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tiago import Tiago
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Sphere
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.execution_environment import (
     ExecutionEnvironment,
+    PhysicallySimulatedRobot,
     real_robot,
-    simulated_robot,
+    kinematically_simulated_robot,
 )
+from coraplex.exceptions import ConditionNotSatisfied
 from coraplex.plans.executables import GiskardExecutable
+from coraplex.plans.attachment_nodes import ReAttachNode
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
-from coraplex.view_manager import ViewManager
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+
+
+@dataclass
+class SimulationThatCountsItsSteps:
+    """
+    Stands in for a started simulation, counting the physics steps asked of it.
+    """
+
+    steps: List[timedelta] = field(default_factory=list)
+    """
+    Every period the physics was asked to advance by.
+    """
+
+    def step_simulation(self, duration: timedelta) -> None:
+        """
+        :param duration: Simulated time to advance.
+        """
+        self.steps.append(duration)
 
 
 @pytest.fixture
@@ -68,14 +95,10 @@ def reach_action_executable(pr2_apartment_context):
     )
     plan = execute_single(
         ReachAction(
-            Pose.from_xyz_rpy(2, 1.5, 0.7, reference_frame=world.root),
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
+            grasp=GraspCandidate.from_body_origin(
+                world.get_semantic_annotations_by_type(Milk)[0]
             ),
-            world.get_semantic_annotations_by_type(Milk)[0],
+            arm=context.robot.right_arm,
         ),
         context=context,
     )
@@ -170,7 +193,9 @@ def test_prepare_for_execution_adds_a_single_end_motion(reach_action_executable)
     assert len(chart.get_nodes_by_type(EndMotion)) == 1
 
 
-@pytest.mark.parametrize("execution_environment", [real_robot, simulated_robot])
+@pytest.mark.parametrize(
+    "execution_environment", [real_robot, kinematically_simulated_robot]
+)
 def test_execution_does_not_add_condition_monitors(
     reach_action_executable, execution_environment
 ):
@@ -186,7 +211,9 @@ def test_execution_does_not_add_condition_monitors(
 
     chart = reach_action_executable.motion_state_chart
     assert chart.get_nodes_by_type(ThreadedPredicateMonitor) == []
-    assert chart.get_nodes_by_type(CancelMotion) == []
+    # The only way out of the chart is giving up on a motion that stopped converging.
+    [progress_cancel] = chart.get_nodes_by_type(CancelMotion)
+    assert not isinstance(progress_cancel.exception, ConditionNotSatisfied)
 
 
 # %% wiring conditions into a chart
@@ -241,7 +268,9 @@ def test_prepare_for_execution_avoids_the_robot_colliding_with_itself(
     robot's ``AvoidSelfCollisions`` rule only shapes the collision matrix and never
     becomes a constraint on its own.
     """
-    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+    with ExecutionEnvironment(
+        ExecutionType.KINEMATICALLY_SIMULATED, collision_avoidance=True
+    ):
         reach_action_executable.prepare_for_execution()
 
     chart = reach_action_executable.motion_state_chart
@@ -255,7 +284,9 @@ def test_prepare_for_execution_leaves_out_collision_avoidance_when_not_asked_for
     """
     A run that does not ask for collision avoidance gets neither goal.
     """
-    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=False):
+    with ExecutionEnvironment(
+        ExecutionType.KINEMATICALLY_SIMULATED, collision_avoidance=False
+    ):
         reach_action_executable.prepare_for_execution()
 
     chart = reach_action_executable.motion_state_chart
@@ -275,7 +306,7 @@ def test_a_robot_keeps_moving_while_it_holds_a_body(_tiago_world_setup, holds_a_
     world = deepcopy(_tiago_world_setup)
     tiago = world.get_semantic_annotations_by_type(Tiago)[0]
     if holds_a_body:
-        tool_frame = ViewManager.get_end_effector_view(Arms.RIGHT, tiago).tool_frame
+        tool_frame = tiago.get_right_arm_if_specified().end_effector.tool_frame
         with world.modify_world():
             held_body = Body(
                 name=PrefixedName("held"),
@@ -286,17 +317,192 @@ def test_a_robot_keeps_moving_while_it_holds_a_body(_tiago_world_setup, holds_a_
         MoveTorsoAction(TorsoState.HIGH), context=Context(world, tiago)
     )
 
-    with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+    with ExecutionEnvironment(
+        ExecutionType.KINEMATICALLY_SIMULATED, collision_avoidance=True
+    ):
         plan.perform()
 
 
 # %% how long a motion may take
 
 
-def test_the_tick_budget_is_not_class_state(reach_action_executable):
+def test_prepare_for_execution_watches_the_whole_motion_for_progress(
+    reach_action_executable,
+):
     """
-    The budget is a policy of the run, carried by its context, so two runs in one
-    process cannot be given different budgets by class state that outlives them.
+    A stalled run has to end by itself, so the chart carries a monitor watching the root
+    goal and an abort path wired to it.
     """
-    assert not hasattr(GiskardExecutable, "ticks_per_motion")
-    assert reach_action_executable.context.ticks_per_motion
+    with ExecutionEnvironment(
+        ExecutionType.KINEMATICALLY_SIMULATED, collision_avoidance=False
+    ):
+        reach_action_executable.prepare_for_execution()
+
+    chart = reach_action_executable.motion_state_chart
+    [progress_monitor] = chart.get_nodes_by_type(StillProgressing)
+
+    assert progress_monitor.monitored_node is reach_action_executable.root_node
+    assert len(chart.get_nodes_by_type(CancelMotion)) == 1
+
+
+def test_a_motion_that_stops_approaching_its_goal_is_given_up_on(
+    pr2_apartment_context,
+):
+    """
+    Nothing bounds the tick loop but the monitor, so a reach the arm cannot close on has
+    to end the run rather than tick forever.
+    """
+    world, view, context = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2, 1.5, 50, reference_frame=milk.root.parent_connection.parent
+    )
+    plan = execute_single(
+        ReachAction(
+            grasp=GraspCandidate.from_body_origin(milk),
+            arm=context.robot.right_arm,
+        ),
+        context=context,
+    )
+    plan.notify()
+    executable = plan.parse()
+
+    with kinematically_simulated_robot:
+        with pytest.raises(MotionMadeNoProgress):
+            executable.execute()
+
+
+def test_a_motion_that_outlasts_the_simulation_time_limit_is_given_up_on(
+    reach_action_executable, monkeypatch
+):
+    """
+    A simulated motion is given up on once it exceeds the simulation time limit.
+    """
+    monkeypatch.setattr(GiskardExecutable, "simulation_time_limit", timedelta(0))
+
+    with kinematically_simulated_robot:
+        with pytest.raises(MotionExceededSimulationTimeLimit):
+            reach_action_executable.execute()
+
+
+def test_a_motion_that_violates_collision_avoidance_fails_as_a_plan_failure(
+    reach_action_executable, monkeypatch
+):
+    """
+    A motion that brings the robot closer to something than collision avoidance allows
+    did not work from where it started, so a plan can try another candidate instead of
+    stopping.
+    """
+    violation = CollisionViolatedError(violated_collisions=[], thresholds=[])
+
+    def violate_collision_avoidance(executor):
+        raise violation
+
+    monkeypatch.setattr(Ros2Executor, "tick", violate_collision_avoidance)
+
+    with kinematically_simulated_robot:
+        with pytest.raises(MotionViolatedCollisionAvoidance) as failure:
+            reach_action_executable.execute()
+
+    assert failure.value.violation is violation
+
+
+# %% performing a plan in a physically simulated world
+
+
+def test_a_physically_simulated_motion_is_given_the_same_time_limit(
+    reach_action_executable, monkeypatch
+):
+    """
+    Both simulated paths tick the same loop, so a motion performed in physics is given
+    up on by the same limit as one projected kinematically.
+    """
+    monkeypatch.setattr(GiskardExecutable, "simulation_time_limit", timedelta(0))
+
+    with PhysicallySimulatedRobot(simulation=SimulationThatCountsItsSteps()):
+        with pytest.raises(MotionExceededSimulationTimeLimit):
+            reach_action_executable.execute()
+
+
+def test_entering_a_physically_simulated_robot_hands_over_the_simulation():
+    simulation = SimulationThatCountsItsSteps()
+
+    with PhysicallySimulatedRobot(simulation=simulation):
+        assert GiskardExecutable.execution_type == ExecutionType.PHYSICALLY_SIMULATED
+        assert GiskardExecutable.simulation is simulation
+
+
+def test_leaving_a_physically_simulated_robot_restores_what_was_there_before():
+    """
+    One simulation nested inside another leaves the outer one performing again.
+    """
+    outer = SimulationThatCountsItsSteps()
+    inner = SimulationThatCountsItsSteps()
+
+    with PhysicallySimulatedRobot(simulation=outer):
+        with PhysicallySimulatedRobot(simulation=inner):
+            assert GiskardExecutable.simulation is inner
+        assert GiskardExecutable.simulation is outer
+    assert GiskardExecutable.simulation is None
+
+
+# %% what holds a picked object
+
+
+def test_a_kinematically_simulated_pick_is_held_by_the_world(pr2_apartment_context):
+    """
+    Nothing in a world ticked against its own belief holds an object, so the object is
+    put under the gripper for it to be held at all.
+    """
+    world, _, context = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0].root
+    gripper = context.robot.right_arm.end_effector.tool_frame
+    plan = execute_single(ReAttachNode(body=milk, new_parent=gripper), context=context)
+
+    with kinematically_simulated_robot:
+        plan.perform()
+
+    assert milk.parent_connection.parent is gripper
+
+
+def test_a_physically_simulated_pick_is_held_by_its_own_grip(pr2_apartment_context):
+    """
+    The pads hold the object in physics, so putting it under the gripper as well would
+    hold it whether or not the grasp did.
+    """
+    world, _, context = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0].root
+    stood_under = milk.parent_connection.parent
+    plan = execute_single(
+        ReAttachNode(
+            body=milk, new_parent=context.robot.right_arm.end_effector.tool_frame
+        ),
+        context=context,
+    )
+
+    with PhysicallySimulatedRobot(simulation=SimulationThatCountsItsSteps()):
+        plan.perform()
+
+    assert milk.parent_connection.parent is stood_under
+
+
+def test_a_physically_simulated_place_is_released_by_its_own_grip(
+    pr2_apartment_context,
+):
+    """
+    Releasing is the same move the other way, and in physics the pads opening is what
+    lets the object go, so the model is left alone here too.
+    """
+    world, _, context = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0].root
+    gripper = context.robot.right_arm.end_effector.tool_frame
+    with world.modify_world():
+        world.move_branch(milk, gripper)
+    plan = execute_single(
+        ReAttachNode(body=milk, new_parent=world.root), context=context
+    )
+
+    with PhysicallySimulatedRobot(simulation=SimulationThatCountsItsSteps()):
+        plan.perform()
+
+    assert milk.parent_connection.parent is gripper

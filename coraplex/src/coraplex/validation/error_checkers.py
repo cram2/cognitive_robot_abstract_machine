@@ -333,11 +333,9 @@ def calculate_pose_error(pose_1: Pose, pose_2: Pose) -> List[float]:
     :return: The error between the two poses.
     """
     return [
-        calculate_position_error(
-            pose_1.to_position().to_list(), pose_2.to_position().to_list()
-        ),
+        calculate_position_error(pose_1.position.to_list(), pose_2.position.to_list()),
         calculate_orientation_error(
-            pose_1.to_quaternion().to_list(), pose_2.to_quaternion().to_list()
+            pose_1.quaternion.to_list(), pose_2.quaternion.to_list()
         ),
     ]
 

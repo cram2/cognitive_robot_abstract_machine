@@ -9,14 +9,25 @@ from enum import StrEnum
 from typing_extensions import Optional, Tuple, Union
 
 
+# %% viewer entity identifiers
+class SceneEntityPrefix(StrEnum):
+    """
+    Prefixes distinguishing viewer entity identifiers from plain object names.
+    """
+
+    URDF_LINK = "urdf:"
+    """
+    A robot-model link addressed by the name stored in its URDF.
+    """
+
+
 class JointRegion(StrEnum):
     """
     Which region of the robot/scene a joint belongs to, as inferred from its name.
 
-    Arms and grippers use :class:`coraplex.datastructures.enums.Arms` instead, since
-    they always name a specific arm; a joint can also belong to the robot's body or to
-    the environment, which :class:`~coraplex.datastructures.enums.Arms` has no member
-    for.
+    Arms and grippers use :class:`cramera.robot_parts.ArmSide` instead, since they
+    always name a specific arm; a joint can also belong to the robot's body or to the
+    environment, which :class:`~cramera.robot_parts.ArmSide` has no member for.
     """
 
     LEFT = "left"

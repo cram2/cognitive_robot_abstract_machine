@@ -23,7 +23,6 @@ from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFr
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 from cramera.onboard import bundle_urdf as bundler
@@ -76,9 +75,8 @@ class TestSerializeUnclaimedBodies:
         )
         drawer_dof = DegreeOfFreedom(
             name=PrefixedName("drawer_dof"),
-            limits=DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=0.0, velocity=-0.5),
-                upper=DerivativeMap(position=0.5, velocity=0.5),
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=0.0, upper_position=0.5, maximum_speed=0.5
             ),
         )
         with world.modify_world():

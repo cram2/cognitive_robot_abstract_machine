@@ -179,7 +179,15 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
     A subset of bodies managed by the rule. 
     All of them must belong to `robot`.
     If None, all robot bodies are used.
+
+    Bodies without collision geometry are dropped, since no distance is ever kept to
+    one.
     """
+
+    def __post_init__(self):
+        if self.body_subset is None:
+            return
+        self.body_subset = {body for body in self.body_subset if body.has_collision()}
 
     def _update(self, world: World):
         robot_bodies = set(self.robot.bodies_with_collision)
@@ -202,12 +210,17 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
     def to_json(self, **kwargs) -> Dict[str, Any]:
         return {
             **super().to_json(**kwargs),
-            "buffer_zone_distance": self.buffer_zone_distance,
-            "violated_distance": self.violated_distance,
             "robot": to_json(self.robot.id, **kwargs),
             "body_subset": to_json(
-                {b.id for b in self.body_subset} if self.body_subset else None, **kwargs
+                (
+                    {body.id for body in self.body_subset}
+                    if self.body_subset is not None
+                    else None
+                ),
+                **kwargs,
             ),
+            "buffer_zone_distance": to_json(self.buffer_zone_distance, **kwargs),
+            "violated_distance": to_json(self.violated_distance, **kwargs),
         }
 
     @classmethod
@@ -219,10 +232,10 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
         if body_subset_ids is not None:
             body_subset = {tracker.get(body_id) for body_id in body_subset_ids}
         return cls(
-            buffer_zone_distance=data["buffer_zone_distance"],
-            violated_distance=data["violated_distance"],
             robot=robot,
             body_subset=body_subset,
+            buffer_zone_distance=from_json(data["buffer_zone_distance"], **kwargs),
+            violated_distance=from_json(data["violated_distance"], **kwargs),
         )
 
 
@@ -335,7 +348,7 @@ class AllowCollisionBetweenEndEffectorsAndHeldBodies(AllowCollisionRule):
         self.allowed_collision_pairs = {
             CollisionCheck.create_for_bodies_with_collision(held_body, body)
             for robot in world.get_semantic_annotations_by_type(AbstractRobot)
-            for end_effector in robot.get_end_effectors()
+            for end_effector in robot.all_end_effectors
             for held_body in end_effector.held_bodies
             for body in end_effector.bodies_with_collision
             if body != held_body

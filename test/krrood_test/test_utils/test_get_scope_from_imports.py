@@ -2,7 +2,7 @@ import ast
 import inspect
 import os
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 from collections import defaultdict
 from typing import Any, Dict
@@ -12,6 +12,9 @@ from typing_extensions import Optional
 from krrood.utils import get_scope_from_imports
 from krrood.exceptions import SourceDataNotProvided
 
+from ..dataset import deferred_import_owner
+from ..dataset.deferred_import_owner import Reading, SensorBindingItsReading
+from ..dataset.type_checking_cycle_owner import Content, HolderBindingItsContent
 from ..dataset.type_checking_import_of_missing_module import (
     OwnerOfAnnotationFromMissingModule,
 )
@@ -108,3 +111,44 @@ def test_scope_holds_the_other_imports_when_one_targets_a_missing_module():
     assert scope["Optional"] == Optional
     assert scope["dataclass"] == dataclass
     assert "GeneratedMapping" not in scope
+
+
+# %% function-local imports
+
+
+def test_scope_excludes_names_imported_inside_functions():
+    """
+    A name imported inside a function body is bound only within that function, so it is
+    not part of the module's scope.
+    """
+    scope = get_scope_from_imports(file_path=deferred_import_owner.__file__)
+
+    assert "ReadingOfBoundSensor" not in scope
+
+
+def test_subclass_binding_during_import_narrows_field_despite_deferred_import():
+    """
+    Binding a generic parameter while the module is still being imported narrows the
+    field, even though the module defers an import of a module importing it back.
+    """
+    reading_field = next(
+        field for field in fields(SensorBindingItsReading) if field.name == "reading"
+    )
+
+    assert reading_field.type == Optional[Reading]
+
+
+# %% circular imports seen only while type checking
+
+
+def test_subclass_binding_during_import_narrows_field_despite_type_checking_cycle():
+    """
+    Binding a generic parameter while the module is still being imported narrows the
+    field, even though one of the module's ``TYPE_CHECKING`` imports targets a module
+    that imports it back.
+    """
+    content_field = next(
+        field for field in fields(HolderBindingItsContent) if field.name == "content"
+    )
+
+    assert content_field.type == Optional[Content]

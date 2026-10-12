@@ -32,7 +32,6 @@ from giskardpy.motion_statechart.data_types import (
     DefaultWeights,
     NodeJSONKey,
 )
-from giskardpy.motion_statechart.error_signals import ErrorSignal
 from giskardpy.motion_statechart.exceptions import (
     NotInMotionStatechartError,
     EndMotionInGoalError,
@@ -610,7 +609,7 @@ class NodeArtifacts:
     The advantage of using observation is that you can reuse the expressions used in constraints.
     .. warning:: the result of `on_tick` takes precedence over the observation expression.
     """
-    error: Optional[ErrorSignal] = field(default=None)
+    error: Optional[Scalar] = field(default=None)
     """
     How far this node is from its goal. Set by :class:`ConvergingTask`, which derives
     :attr:`observation` from it, and used to watch whether the node is still converging.
@@ -721,7 +720,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     """The parameter is set after build() using its NodeArtifacts."""
     _observation_expression: Scalar = field(init=False, repr=False)
     """The parameter is set after build() using its NodeArtifacts."""
-    _error_signal: Optional[ErrorSignal] = field(init=False, repr=False, default=None)
+    _error_signal: Optional[Scalar] = field(init=False, repr=False, default=None)
     """The parameter is set after build() using its NodeArtifacts."""
     _debug_expressions: List[DebugExpression] = field(default_factory=list, init=False)
     """The parameter is set after build() using its NodeArtifacts."""
@@ -1573,14 +1572,11 @@ def velocity_convergence_expression(
         ref.append(velocity_limit)
         symbols.append(dof.variables.velocity)
 
-    dt = (
-        context.qp_controller_config.control_dt
-        or context.qp_controller_config.model_predictive_control_time_step
-    )
+    time_step = context.qp_controller_config.control_time_step.total_seconds()
     elapsed_cycles = context.control_cycle_variable
     if reference_cycle_variable is not None:
         elapsed_cycles = elapsed_cycles - reference_cycle_variable
-    trajectory_longer_than_minimum_time = elapsed_cycles * dt > minimum_time
+    trajectory_longer_than_minimum_time = elapsed_cycles * time_step > minimum_time
     return sm.trinary_logic_and(
         trajectory_longer_than_minimum_time,
         sm.logic_all(sm.abs(sm.Vector(symbols)) < sm.Vector(ref)),
@@ -1633,8 +1629,15 @@ class ConvergingTask(ABC, Task):
         artifacts = super().build(context)
         if artifacts.error is None:
             raise MissingErrorSignalError(node=self)
-        artifacts.observation = artifacts.error.expression <= self.threshold
+        artifacts.observation = self.goal_reached_at(artifacts.error)
         return artifacts
+
+    def goal_reached_at(self, error: Scalar) -> Scalar:
+        """
+        :param error: An error of this task, in its own units.
+        :return: Whether this task observes its goal as reached at that error.
+        """
+        return error <= self.threshold
 
     @abstractmethod
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -1648,7 +1651,7 @@ class ConvergingTask(ABC, Task):
         """
 
     @property
-    def error_signal(self) -> ErrorSignal:
+    def error_signal(self) -> Scalar:
         """
         :return: The error signal produced during build.
         """
@@ -1667,7 +1670,7 @@ class ConvergingTask(ABC, Task):
 
         :return: The threshold relative error of this task.
         """
-        return self.error_signal.expression / self.threshold
+        return self.error_signal / self.threshold
 
 
 @dataclass(eq=False, repr=False)

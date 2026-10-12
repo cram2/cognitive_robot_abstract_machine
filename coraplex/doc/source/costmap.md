@@ -1,16 +1,18 @@
 # Costmaps
 
-Costmaps are way to describe positions in a defined area around a pose with respect to certain constrains. For example,
-there is a costmap which contains every position from which a certain object is visible.
+A costmap is a square grid of cells laid out on the floor around an origin pose. Every cell holds a rating: a cell
+rated above zero is a position that meets the costmap's criterion, and the higher the rating, the better it meets it.
+There is, for example, a costmap whose positive cells are every position from which a certain object is visible.
 
-In CoraPlex these costmaps are used to dynamically generate poses for certain criteria like visibility, reachability
-or occupancy. So if you, for example, want to find a position from where the robot can see a certain object you would
-generate a costmap for the visibility and one for occupancy. These costmaps can then be merged with one another and
-result in a costmap which contains every position from which the object is visible and where the robot can stand.
+In CoraPlex costmaps are what the locations in {mod}`coraplex.locations.locations` sample their poses from (see
+{doc}`notebooks/location_designator`). A {class}`~coraplex.locations.locations.ReachabilityLocation`, for example,
+merges an occupancy costmap with a ring costmap, so its poses are positions where the robot can stand that are also at
+the right distance to reach its target.
 
 All costmaps live in {mod}`coraplex.locations.costmaps` and are dataclasses, so their parameters are best given as
-keyword arguments. Every costmap needs the {class}`~semantic_digital_twin.world.World` it is built for. Currently there
-are four types of costmaps implemented:
+keyword arguments. Every costmap needs the {class}`~semantic_digital_twin.world.World` it is built for, the
+`resolution` (the edge length of a cell, in meters) and the `origin` it is centred on. Four kinds of costmaps are
+implemented:
 
 * Occupancy Costmap
 * Visibility Costmap
@@ -19,10 +21,10 @@ are four types of costmaps implemented:
 
 ## Occupancy Costmap
 
-Occupancy costmaps represent all positions that don't have any objects positioned above them. Meaning the robot can
-stand there without colliding with anything. The map is generated directly from the semantic digital twin world by
-casting rays around the origin. A user can additionally specify a value by which obstacles should be inflated, creating
-a boundary around obstacles to avoid colliding with them.
+An occupancy costmap marks every position where the robot can stand without colliding with anything. For every cell, a
+ray is cast from just above the height of the robot's base straight down to the ground; a cell whose ray hits something
+is occupied. The robot itself, whatever it carries and the floors it drives on do not count as obstacles. Obstacles are
+then inflated by `distance_to_obstacle`, so the robot keeps that distance to them.
 
 ```python
 from coraplex.locations.costmaps import OccupancyCostmap
@@ -41,33 +43,29 @@ occupancy = OccupancyCostmap(
 
 See {class}`~coraplex.locations.costmaps.OccupancyCostmap` for the full parameter reference.
 
-For the common case of a costmap centered on a target pose with the inflation radius derived from the robot base, there
-is the convenience classmethod {meth}`~coraplex.locations.costmaps.OccupancyCostmap.default_map`.
+For the common case there is the classmethod {meth}`~coraplex.locations.costmaps.OccupancyCostmap.default_map`. It
+centres the costmap on the floor below a target pose and inflates obstacles by the radius of the robot's base. The
+resolution and the number of cells along each side are optional keyword arguments.
 
 ```python
 occupancy = OccupancyCostmap.default_map(context, target_pose)
 ```
 
-You can see an image of the final Occupancy costmap with an inflation radius of 0.2 m below.
-
-![](_static/images/occupancy_costmap.png)
-
 ## Visibility Costmap
 
-Visibility costmaps show the visibility for a specific position in a restricted area. This means every position from
-which the robot can see the position given as the map origin.
-
-The visibility costmap is created by taking depth images from the origin
-position of the costmap and then checking which positions are occluded by other objects. Essentially, this specifies
-how far you can look from the object in all direction. Afterwards, a 2D representation is created from these depth images.
+A visibility costmap marks every position from which the robot can see its origin. Four depth images are rendered
+from the origin, one in each direction. A position counts as visible if, in these images, nothing blocks the line of
+sight from the origin to any height between `minimum_height` and `maximum_height` above that position, the heights a
+camera can be at. A {class}`~coraplex.locations.locations.VisibilityLocation` takes these heights from the robot's
+default camera.
 
 ```python
 from coraplex.locations.costmaps import VisibilityCostmap
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 visibility = VisibilityCostmap(
-    min_height=1.27,
-    max_height=1.6,
+    minimum_height=1.27,
+    maximum_height=1.6,
     resolution=0.02,
     width=200,
     height=200,
@@ -76,22 +74,14 @@ visibility = VisibilityCostmap(
 )
 ```
 
-See {class}`~coraplex.locations.costmaps.VisibilityCostmap` for the full parameter reference.
-
-A simple visibility costmap with two objects can be seen below.
-
-![](_static/images/visibility_costmap.png)
+See {class}`~coraplex.locations.costmaps.VisibilityCostmap` for the full parameter reference. The method is explained
+in Lorenz Mösenlechner's [PhD thesis](https://mediatum.ub.tum.de/doc/1239461/1239461.pdf) (page 173).
 
 ## Gaussian Costmap
 
-A gaussian costmap is essentially a 2D gauss distribution with its peak at the centre of the the costmap. Gaussian
-costmaps are, for example, used to approximate reachability of objects. The idea being that to reach an object the
-robot has to be relatively close to the object to reach it.
-
-Since all other objects use just 0 or 1 to represent if an entry in the costmap is valid according to their respective
-constraint Gaussian Costmaps add some variance to highlight a certain point. This is especially useful when keeping in
-mind that sampling from the costmap is based on the maximum likelihood, meaning the cells with the highest value will be
-sampled first.
+A gaussian costmap is a 2D gaussian distribution with its peak at the centre of the costmap, which favours positions
+close to the origin. A small square at the very centre is cut out, so the robot does not stand on top of the origin.
+Here `mean` is the number of cells along each side of the costmap and `sigma` the standard deviation, in cells.
 
 ```python
 from coraplex.locations.costmaps import GaussianCostmap
@@ -108,23 +98,18 @@ gauss = GaussianCostmap(
 
 See {class}`~coraplex.locations.costmaps.GaussianCostmap` for the full parameter reference.
 
-A plot of the gaussian costmap can be seen below. This is a matplotlib plot of the costmap to better show the
-distribution.
-
-![](_static/images/gaussian_costmap.png)
-
 ## Ring Costmap
 
-A ring costmap is similar to the gaussian costmap but looks more like a donut: the high-probability area forms a ring
-at a configurable distance from the center. This is useful to create poses for reaching a point, where standing exactly
-on top of the target is not desirable.
+A ring costmap is like a gaussian costmap shaped as a donut: the highest ratings form a ring at `distance` meters from
+the origin, falling off with `standard_deviation` cells to either side. This is what reaching needs: the robot has to
+stand close enough to the target, but not on top of it.
 
 ```python
 from coraplex.locations.costmaps import RingCostmap
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 ring = RingCostmap(
-    std=15,
+    standard_deviation=15,
     distance=0.7,
     resolution=0.02,
     width=200,
@@ -134,13 +119,44 @@ ring = RingCostmap(
 )
 ```
 
+The classmethod {meth}`~coraplex.locations.costmaps.RingCostmap.from_arm_reach_distance` draws the ring at a fraction
+of an arm's length around a target, which is how a {class}`~coraplex.locations.locations.ReachabilityLocation` uses it.
+
+```python
+from coraplex.datastructures.enums import ReachFraction
+
+ring = RingCostmap.from_arm_reach_distance(
+    context, robot.left_arm, target_pose, ReachFraction.GRASPING
+)
+```
+
 See {class}`~coraplex.locations.costmaps.RingCostmap` for the full parameter reference.
+
+## Sampling Poses from a Costmap
+
+Every costmap is a {class}`~coraplex.locations.base.Location` itself, so iterating it yields pose candidates, at most
+`number_of_samples` of them, drawn with its `seed`. {meth}`~coraplex.locations.costmaps.Costmap.sample` draws a given
+number of candidates directly:
+
+```python
+for pose in ring.sample(number_of_samples=10, seed=0):
+    print(pose)
+```
+
+The candidates are drawn as follows:
+
+* The costmap is split into segments: groups of neighbouring cells rated above zero. The segment with the best rated
+  cell is sampled from first.
+* The samples are shared out among the segments in proportion to their summed ratings.
+* Within a segment, cells are drawn at random, weighted by their rating, and no cell is drawn twice.
+* Every candidate is a pose in the world frame, at the position of its cell, facing the costmap's origin.
+
+The same seed always draws the same candidates from the same costmap; a seed of `None` draws different ones each time.
 
 ## Visualization of Costmaps
 
-For a comprehensive visualization of a costmap there is the {func}`~coraplex.locations.costmaps.plot_grid` function in
-`costmaps.py`. It creates a matplotlib plot of the 2D numpy array which represents the costmap and can be called as
-follows:
+The {func}`~coraplex.locations.costmaps.plot_grid` function plots the 2D numpy array that holds a costmap's ratings with
+matplotlib:
 
 ```python
 from coraplex.locations.costmaps import plot_grid
@@ -148,27 +164,23 @@ from coraplex.locations.costmaps import plot_grid
 plot_grid(visibility.map)
 ```
 
-The image for the gaussian costmap shows such a matplotlib plot.
-
 ## Merging Costmaps
 
-It is possible to merge different costmaps to create a costmap that contains positions that adhere to more than one
-constraint. For example, if you merge a visibility and occupancy costmap you get a costmap that contains positions
-where the robot can stand and see a specific point. Costmaps support the `+` operator (additive merge) and the `&`
-operator.
+Merging costmaps gives a costmap whose cells meet the criteria of all of them. For example, merging a visibility and an
+occupancy costmap gives the positions where the robot can stand and see a specific point. Costmaps are merged with the
+`&` operator (`+` does the same):
 
 ```python
-reachability_map = occupancy + gauss
 visible_and_free = occupancy & visibility
 ```
 
-To be able to merge different costmaps there are a few restrictions that you have to follow. The restrictions are:
+A merged cell is rated above zero only if it is rated above zero in both costmaps. Its rating is the product of the two
+ratings, scaled so the best cell is rated 1. The merged costmap keeps the `number_of_samples` and `seed` of the left
+one.
 
-* The costmaps must have the same size
-* The costmaps must have the same origin
-* The costmaps must have the same resolution
-* The costmaps must belong to the same world
+Only costmaps that cover the same cells can be merged, so a `ValueError` is raised unless both costmaps have:
 
-These restrictions make it much easier to merge costmaps and also reduce the probability of errors occurring in the
-resulting costmap. Since for all costmaps these parameter can be set when creating them, it shouldn't pose a
-problem to match these parameter for all created costmaps, making them able to be merged.
+* the same width and height,
+* the same origin, apart from its height,
+* the same resolution,
+* the same world.

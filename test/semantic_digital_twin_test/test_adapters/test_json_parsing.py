@@ -24,7 +24,7 @@ from semantic_digital_twin.spatial_types import (
     Quaternion,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap, Derivatives
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,
@@ -558,8 +558,8 @@ def test_a_degree_of_freedom_survives_a_json_round_trip():
     A degree of freedom carries its limits into json, which is the part of it a world
     cannot recompute.
     """
-    limits = DegreeOfFreedomLimits(
-        lower=DerivativeMap(position=-1.5), upper=DerivativeMap(position=1.5)
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+        lower_position=-1.5, upper_position=1.5
     )
     degree_of_freedom = DegreeOfFreedom(name=PrefixedName("joint"), limits=limits)
     payload = degree_of_freedom.to_json()
@@ -652,8 +652,10 @@ def test_a_spatial_type_over_a_variable_survives_a_json_round_trip(
 def test_a_transformation_over_a_variable_keeps_its_child_frame():
     reference_frame = Body(name=PrefixedName("reference"))
     child_frame = Body(name=PrefixedName("child"))
+    # the transformation does not keep its variable alive, so the test has to
+    variable = FloatVariable(name="muh")
     transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
-        FloatVariable(name="muh"),
+        variable,
         reference_frame=reference_frame,
         child_frame=child_frame,
     )

@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from datetime import timedelta
+
 import numpy as np
 import pytest
 from giskardpy.motion_statechart.goals.collision_avoidance import (
@@ -5,8 +8,12 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
 )
 from scipy.spatial.transform import Rotation
 
-from coraplex.datastructures.enums import Arms, CuttingTechnique
+from coraplex.datastructures.enums import CuttingTechnique, PouringSide
 from coraplex.exceptions import WipingTargetMissing
+from coraplex.plans.failures import MotionMadeNoProgress
+from giskardpy.motion_statechart.exceptions import NoProgressError
+from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import MotionNode
 from coraplex.robot_plans.actions.composite.tool_based import (
@@ -16,7 +23,6 @@ from coraplex.robot_plans.actions.composite.tool_based import (
     WipingAction,
 )
 from coraplex.robot_plans.motions.gripper import MoveTCPWaypointsAlignedMotion
-from coraplex.view_manager import ViewManager
 from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -79,7 +85,7 @@ def test_mixing_action_expands_to_aligned_motion(tool_action_world):
     world, robot, context, container, tool_body = tool_action_world
     whisk = Whisk(root=tool_body)
 
-    action = MixingAction(container=container, arm=Arms.RIGHT, tool=whisk)
+    action = MixingAction(container=container, arm=context.robot.right_arm, tool=whisk)
     motions = _expanded_aligned_motions(action, context)
 
     assert len(motions) == 1
@@ -95,13 +101,13 @@ def test_cutting_action_pointer_stride_reduces_waypoints(tool_action_world):
 
     dense_action = CuttingAction(
         object_to_cut=container,
-        arm=Arms.RIGHT,
+        arm=context.robot.right_arm,
         tool=knife,
         technique=CuttingTechnique.SLICE,
     )
     strided_action = CuttingAction(
         object_to_cut=container,
-        arm=Arms.RIGHT,
+        arm=context.robot.right_arm,
         tool=knife,
         technique=CuttingTechnique.SLICE,
         pointer_stride=10,
@@ -131,7 +137,7 @@ def test_aligned_motion_collision_rules_follow_allow_gripper_collision(
     world, robot, context, container, tool_body = tool_action_world
     whisk = Whisk(root=tool_body)
 
-    action = MixingAction(container=container, arm=Arms.RIGHT, tool=whisk)
+    action = MixingAction(container=container, arm=context.robot.right_arm, tool=whisk)
     motion = _expanded_aligned_motions(action, context)[0]
 
     assert motion.allow_gripper_collision is True
@@ -146,7 +152,7 @@ def test_wiping_action_requires_container_or_target_pose(tool_action_world):
     sponge = Sponge(root=tool_body)
 
     with pytest.raises(WipingTargetMissing):
-        WipingAction(arm=Arms.RIGHT, tool=sponge)
+        WipingAction(arm=context.robot.right_arm, tool=sponge)
 
 
 def test_wiping_action_around_target_pose(tool_action_world):
@@ -154,7 +160,7 @@ def test_wiping_action_around_target_pose(tool_action_world):
     sponge = Sponge(root=tool_body)
 
     action = WipingAction(
-        arm=Arms.RIGHT,
+        arm=context.robot.right_arm,
         tool=sponge,
         target_pose=Pose.from_xyz_rpy(x=2.4, y=2.2, z=1.0, reference_frame=world.root),
     )
@@ -172,16 +178,16 @@ def test_pouring_action_poses_tilt_and_mirror(tool_action_world):
     right_action = PouringAction(
         target_container=container,
         source_container=cup,
-        arm=Arms.RIGHT,
+        arm=context.robot.right_arm,
     )
     sequential([right_action], context)
     right_pre_pose, right_pour_pose = right_action._pour_poses()
 
     pre_rotation = Rotation.from_quat(
-        [float(value) for value in right_pre_pose.to_quaternion().to_np()]
+        [float(value) for value in right_pre_pose.quaternion.to_np()]
     )
     pour_rotation = Rotation.from_quat(
-        [float(value) for value in right_pour_pose.to_quaternion().to_np()]
+        [float(value) for value in right_pour_pose.quaternion.to_np()]
     )
     tilt_magnitude = (pre_rotation.inv() * pour_rotation).magnitude()
     assert tilt_magnitude == pytest.approx(right_action.tilt_angle, abs=1e-6)
@@ -191,8 +197,8 @@ def test_pouring_action_poses_tilt_and_mirror(tool_action_world):
     left_action = PouringAction(
         target_container=container,
         source_container=cup,
-        arm=Arms.RIGHT,
-        pour_side=Arms.LEFT,
+        arm=context.robot.right_arm,
+        pour_side=PouringSide.LEFT,
     )
     sequential([left_action], context)
     left_pre_pose, _ = left_action._pour_poses()
@@ -213,12 +219,81 @@ def test_pouring_action_poses_tilt_and_mirror(tool_action_world):
     np.testing.assert_allclose(left_offset, -right_offset, atol=1e-9)
 
 
+@pytest.mark.parametrize(
+    "arm_of, side",
+    [
+        (lambda robot: robot.right_arm, PouringSide.RIGHT),
+        (lambda robot: robot.left_arm, PouringSide.LEFT),
+    ],
+    ids=["right-arm", "left-arm"],
+)
+def test_pouring_pours_to_the_side_of_its_arm_unless_told_otherwise(
+    tool_action_world, arm_of, side
+):
+    world, robot, context, container, tool_body = tool_action_world
+    action = PouringAction(
+        target_container=container,
+        source_container=PouringCup(root=tool_body),
+        arm=arm_of(context.robot),
+    )
+    sequential([action], context)
+
+    assert action._effective_pour_side() is side
+
+
+@dataclass
+class _GivingUpSubplan:
+    """
+    A subplan whose motion stops approaching its goal.
+    """
+
+    def perform(self) -> None:
+        raise MotionMadeNoProgress(
+            NoProgressError(
+                progress_monitor=StillProgressing(
+                    monitored_node=EndMotion(), timeout=timedelta(seconds=3)
+                )
+            )
+        )
+
+
+@pytest.mark.parametrize("reached_final_waypoint", [True, False])
+def test_wiping_accepts_a_motion_that_gave_up_only_at_its_last_waypoint(
+    tool_action_world, monkeypatch, reached_final_waypoint
+):
+    """
+    A wipe that stops making progress once the sponge is at its last waypoint has done
+    its job; one that stops anywhere else has not.
+    """
+    world, robot, context, container, tool_body = tool_action_world
+    action = WipingAction(
+        arm=context.robot.right_arm,
+        tool=Sponge(root=tool_body),
+        target_pose=Pose.from_xyz_rpy(x=2.4, y=2.2, z=1.0, reference_frame=world.root),
+    )
+    sequential([action], context)
+    monkeypatch.setattr(
+        WipingAction, "add_subplan", lambda self, root: _GivingUpSubplan()
+    )
+    monkeypatch.setattr(
+        WipingAction,
+        "_tool_reached_final_waypoint",
+        lambda self: reached_final_waypoint,
+    )
+
+    if reached_final_waypoint:
+        action._perform_plan()
+    else:
+        with pytest.raises(MotionMadeNoProgress):
+            action._perform_plan()
+
+
 def _attach_box_to_gripper(world, robot, name, size, mount_z):
     shape_collection = ShapeCollection([Box(scale=Scale(*size))])
     body = Body(
         name=PrefixedName(name), collision=shape_collection, visual=shape_collection
     )
-    tool_frame = ViewManager.get_end_effector_view(Arms.RIGHT, robot).tool_frame
+    tool_frame = robot.right_arm.end_effector.tool_frame
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
         world.add_connection(
@@ -243,15 +318,15 @@ def test_pouring_action_pour_point_lands_on_target_container_center(
     cup = PouringCup(root=held_source)
 
     action = PouringAction(
-        target_container=container, source_container=cup, arm=Arms.RIGHT
+        target_container=container, source_container=cup, arm=context.robot.right_arm
     )
     sequential([action], context)
     _, pour_pose = action._pour_poses()
 
-    tool_frame = ViewManager.get_end_effector_view(Arms.RIGHT, robot).tool_frame
+    tool_frame = context.robot.right_arm.end_effector.tool_frame
     tool_frame_T_source = world.compute_forward_kinematics_np(tool_frame, held_source)
     mouth_in_tool_frame = tool_frame_T_source @ np.array([0.0, 0.0, 0.1, 1.0])
-    mouth_in_world = pour_pose.to_homogeneous_matrix().to_np() @ mouth_in_tool_frame
+    mouth_in_world = pour_pose.homogeneous_matrix.to_np() @ mouth_in_tool_frame
 
     assert mouth_in_world[0] == pytest.approx(float(container.global_pose.x), abs=1e-6)
     assert mouth_in_world[1] == pytest.approx(float(container.global_pose.y), abs=1e-6)
@@ -261,7 +336,7 @@ def test_mixing_action_orm_roundtrip(tool_action_world, coraplex_testing_session
     world, robot, context, container, tool_body = tool_action_world
     whisk = Whisk(root=tool_body)
 
-    action = MixingAction(container=container, arm=Arms.RIGHT, tool=whisk)
+    action = MixingAction(container=container, arm=context.robot.right_arm, tool=whisk)
     sequential([action], context)
     action.expand()
 

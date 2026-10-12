@@ -24,7 +24,7 @@ For bayesian networks, the next class diagram is relevant.
         :caption: Inheritance Diagram for baysian networks.
 ```
 
-For networkx based probabilistic circuits the next class diagram is relevant.
+For rustworkx based probabilistic circuits the next class diagram is relevant.
 
 ```{eval-rst}
     .. autoclasstree:: probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit probabilistic_model.probabilistic_circuit.rx.helper
@@ -34,7 +34,8 @@ For networkx based probabilistic circuits the next class diagram is relevant.
         :caption: Inheritance Diagram for probabilistic circuits implemented with rustworkx.
 ```
 
-Finally, for jax based faster circuits with limited inference, this class diagram is relevant.
+Finally, for jax based circuits, which are learned by gradient descent and converted into
+layered numpy circuits for inference, this class diagram is relevant.
 
 ```{eval-rst}
     .. autoclasstree:: probabilistic_model.probabilistic_circuit.jax probabilistic_model.probabilistic_circuit.jax.coupling_circuit probabilistic_model.probabilistic_circuit.jax.gaussian_layer probabilistic_model.probabilistic_circuit.jax.discrete_layer probabilistic_model.probabilistic_circuit.jax.uniform_layer

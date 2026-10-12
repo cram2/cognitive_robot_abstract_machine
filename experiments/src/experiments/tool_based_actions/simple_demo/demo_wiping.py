@@ -14,8 +14,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Spon
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.composite.tool_based import WipingAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -37,7 +36,7 @@ def main() -> None:
     pr2 = PR2.from_world(world)
     context = Context(world=world, robot=pr2, _debug=False, ros_node=None)
 
-    sponge_body = attach_sponge(world, pr2, Arms.RIGHT)
+    sponge_body = attach_sponge(world, pr2.right_arm)
 
     sponge = Sponge(root=sponge_body)
     with world.modify_world():
@@ -47,14 +46,14 @@ def main() -> None:
 
     plan = sequential(
         [
-            SetGripperAction(Arms.RIGHT, GripperState.CLOSE),
-            ParkArmsAction(Arms.BOTH),
+            SetGripperAction(pr2.right_arm.end_effector, GripperState.CLOSE),
+            ParkArmsAction(pr2.all_arms),
             MoveTorsoAction(TorsoState.HIGH),
             NavigateAction(
                 Pose.from_xyz_rpy(*BASE_POSITION_XYZ, reference_frame=world.root)
             ),
             WipingAction(
-                arm=Arms.RIGHT,
+                arm=pr2.right_arm,
                 tool=sponge,
                 target_pose=Pose.from_xyz_rpy(
                     *TARGET_POSITION_XYZ, reference_frame=world.root
@@ -64,7 +63,7 @@ def main() -> None:
         context=context,
     ).plan
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
 

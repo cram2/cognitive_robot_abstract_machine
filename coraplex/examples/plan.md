@@ -25,7 +25,7 @@ need a language expression.
 # Setup a World
 
 ```python
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.testing import setup_world
 from coraplex.datastructures.dataclasses import Context
 from semantic_digital_twin.robots.pr2 import PR2
@@ -42,13 +42,12 @@ context = Context(world, pr2)
 
 ```python
 from coraplex.robot_plans import *
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import *
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 
 navigate = NavigateAction(Pose.from_xyz_quaternion(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.all_arms)
 
 plan = sequential([navigate, park], context=context).plan
 ```
@@ -86,7 +85,7 @@ of Action Designators.
 
 ```python
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -98,7 +97,7 @@ The execution environments accept a `collision_avoidance` flag. When set to `Tru
 environment, keeping the robot from colliding with the rest of the world while the motions run.
 
 ```python
-with simulated_robot(collision_avoidance=True):
+with kinematically_simulated_robot(collision_avoidance=True):
     plan.perform()
 ```
 
@@ -109,7 +108,7 @@ nested environments:
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.execution_environment import ExecutionEnvironment
 
-with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+with ExecutionEnvironment(ExecutionType.KINEMATICALLY_SIMULATED, collision_avoidance=True):
     plan.perform()
 ```
 

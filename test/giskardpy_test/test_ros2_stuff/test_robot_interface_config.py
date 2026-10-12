@@ -1,4 +1,6 @@
-from dataclasses import fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass
+
+import pytest
 
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.robot_interface_config import (
@@ -10,6 +12,7 @@ from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import (
     PR2VelocityMujocoInterface,
+    WorldWithPR2Config,
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
     StretchStandaloneInterface,
@@ -17,12 +20,26 @@ from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
 from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
     TracyStandAloneRobotInterfaceConfig,
 )
-from giskardpy.middleware.ros2.server_config import GiskardServerConfig
+from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
+from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.model.world_config import EmptyWorld
+from semantic_digital_twin.adapters.ros.input_synchronization import (
+    LatestJointPositionSource,
+    PendingJointPositionSource,
+    SubscribedBasePoseSource,
+)
+from semantic_digital_twin.input_synchronization import WorldStateInputs
+from semantic_digital_twin.robots.input_source import SimulatedJointPositionSource
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.daisy import DAiSyJoint
 from semantic_digital_twin.robots.stretch import StretchJoint
 from semantic_digital_twin.robots.tracy import TracyJoint
+from semantic_digital_twin.world import World
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+
+from ...semantic_digital_twin_test.test_ros.test_input_synchronization import (
+    joint_state_message,
+)
 
 # %% the interface hierarchy is built from dataclasses
 
@@ -47,15 +64,14 @@ def test_two_interfaces_with_the_same_joint_names_are_equal():
     )
 
 
-def test_the_mujoco_interface_defaults_name_every_part_of_the_drive():
+def test_the_mujoco_interface_defaults_name_the_frames_its_localization_uses():
     interface = PR2VelocityMujocoInterface()
 
     assert (
         interface.map_name,
         interface.localization_joint_name,
         interface.odom_link_name,
-        interface.drive_joint_name,
-    ) == ("map", "localization", "odom_combined", "brumbrum")
+    ) == ("map", "localization", "odom_combined")
 
 
 # %% the tf frame synchronizer is created on demand
@@ -146,3 +162,265 @@ def test_the_stretch_interface_controls_every_joint_except_the_drive():
         StretchJoint.HEAD_PAN,
         StretchJoint.HEAD_TILT,
     ]
+
+
+# %% reading the robot's own parts from the robot
+
+
+@dataclass
+class PartReadingInterface(RobotInterfaceConfig):
+    """
+    An interface that reads every part of the robot from the robot itself, on the topics
+    the parts declare.
+    """
+
+    def setup(self):
+        self.sync_robot_parts()
+
+
+@pytest.fixture()
+def pr2_reading_its_own_parts(init_rospy) -> Giskard:
+    """
+    A closed-loop Giskard whose PR2 is read from what the robot publishes.
+    """
+    giskard = Giskard(
+        world_config=WorldWithPR2Config(urdf=load_xacro(PR2.get_ros_file_path())),
+        robot_interface_config=PartReadingInterface(),
+        server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
+        qp_controller_config=QPControllerConfig(target_frequency=25),
+    )
+    giskard.setup()
+    return giskard
+
+
+def test_a_chain_read_from_the_robot_is_applied_by_the_motion_server(
+    pr2_reading_its_own_parts,
+):
+    arm = pr2_reading_its_own_parts.robot.left_arm
+
+    assert isinstance(arm.source, PendingJointPositionSource)
+    assert any(
+        synchronizer is arm.source
+        for synchronizer in pr2_reading_its_own_parts.motion_server.inputs.synchronizers
+    )
+
+
+def test_the_closed_control_loop_rewrites_the_joint_positions_every_cycle(
+    pr2_reading_its_own_parts,
+):
+    """
+    A closed-loop cycle integrates the commanded velocities, so it has to be pulled back
+    onto the last measurement in every cycle rather than reading each message once.
+    """
+    loop_inputs = (
+        pr2_reading_its_own_parts.motion_server.control_loop.inputs.synchronizers
+    )
+
+    assert any(
+        isinstance(synchronizer, LatestJointPositionSource)
+        for synchronizer in loop_inputs
+    )
+    assert not any(
+        isinstance(synchronizer, PendingJointPositionSource)
+        for synchronizer in loop_inputs
+    )
+
+
+def test_the_base_pose_is_read_by_both_loops_from_one_source(
+    pr2_reading_its_own_parts,
+):
+    """
+    Odometry reports a pose rather than integrating one, so the same source serves both
+    loops and nothing has to be read twice.
+    """
+    base_source = pr2_reading_its_own_parts.robot.mobile_base.source
+    motion_server = pr2_reading_its_own_parts.motion_server
+
+    assert isinstance(base_source, SubscribedBasePoseSource)
+    assert any(
+        synchronizer is base_source
+        for synchronizer in motion_server.inputs.synchronizers
+    )
+    assert any(
+        synchronizer is base_source
+        for synchronizer in motion_server.control_loop.inputs.synchronizers
+    )
+
+
+@dataclass
+class BaseReadingInterface(RobotInterfaceConfig):
+    """
+    An interface that reads only the robot's base from the robot itself, leaving its
+    joints to whatever else reads them.
+    """
+
+    def setup(self):
+        self.sync_robot_part(self.robot.mobile_base)
+
+
+@pytest.fixture()
+def pr2_reading_only_its_base(init_rospy) -> Giskard:
+    """
+    A closed-loop Giskard whose PR2 reads only its base from what the robot publishes.
+    """
+    giskard = Giskard(
+        world_config=WorldWithPR2Config(urdf=load_xacro(PR2.get_ros_file_path())),
+        robot_interface_config=BaseReadingInterface(),
+        server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
+        qp_controller_config=QPControllerConfig(target_frequency=25),
+    )
+    giskard.setup()
+    return giskard
+
+
+def test_syncing_one_part_applies_that_part(pr2_reading_only_its_base):
+    base_source = pr2_reading_only_its_base.robot.mobile_base.source
+    motion_server = pr2_reading_only_its_base.motion_server
+
+    assert isinstance(base_source, SubscribedBasePoseSource)
+    assert [
+        synchronizer
+        for synchronizer in motion_server.inputs.synchronizers
+        if synchronizer is base_source
+    ] == [base_source]
+
+
+def test_syncing_one_part_leaves_the_other_parts_reading_the_world(
+    pr2_reading_only_its_base,
+):
+    arm = pr2_reading_only_its_base.robot.left_arm
+
+    assert isinstance(arm.source, SimulatedJointPositionSource)
+
+
+# %% reading the robot from a joint state topic
+
+
+@dataclass
+class ControlLoopMimic:
+    """
+    Holds the inputs a control loop reads in every cycle.
+    """
+
+    inputs: WorldStateInputs
+    """
+    The inputs read before every tick of the controller.
+    """
+
+
+@dataclass
+class MotionServerMimic:
+    """
+    Holds the inputs read between goals and the control loop that executes a goal.
+    """
+
+    inputs: WorldStateInputs
+    """
+    The inputs read while no goal is executed.
+    """
+
+    control_loop: ControlLoopMimic
+    """
+    The loop that executes a goal.
+    """
+
+
+@dataclass
+class ContextMimic:
+    """
+    Holds the world a motion is executed in.
+    """
+
+    world: World
+    """
+    The world whose state the inputs write.
+    """
+
+
+@dataclass
+class ExecutorMimic:
+    """
+    Holds the context of the motion.
+    """
+
+    context: ContextMimic
+    """
+    The context whose world the inputs write.
+    """
+
+
+@dataclass
+class RobotMimic:
+    """
+    A robot that is only known by its name.
+    """
+
+    name: str
+    """
+    The name that joint state topics are grouped under.
+    """
+
+
+@dataclass
+class GiskardMimic:
+    """
+    Offers the parts of Giskard that a robot interface configures.
+    """
+
+    executor: ExecutorMimic
+    """
+    The executor whose world the inputs write.
+    """
+
+    robot: RobotMimic
+    """
+    The robot the interface talks to.
+    """
+
+    server_config: GiskardServerConfig
+    """
+    Decides whether the robot is commanded in a closed loop.
+    """
+
+    motion_server: MotionServerMimic
+    """
+    The server whose inputs the interface registers.
+    """
+
+
+@dataclass
+class JointStateTopicInterface(RobotInterfaceConfig):
+    """
+    Reads the state of the robot from a single joint state topic.
+    """
+
+    def setup(self):
+        self.sync_joint_state_topic("joint_states")
+
+
+def test_closed_loop_does_not_rewrite_a_joint_state_it_already_wrote(
+    init_rospy, mini_world: World
+):
+    [connection] = mini_world.connections
+    control_loop_inputs = WorldStateInputs(world=mini_world)
+    interface = JointStateTopicInterface()
+    interface.attach(
+        GiskardMimic(
+            executor=ExecutorMimic(context=ContextMimic(world=mini_world)),
+            robot=RobotMimic(name="robot"),
+            server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
+            motion_server=MotionServerMimic(
+                inputs=WorldStateInputs(world=mini_world),
+                control_loop=ControlLoopMimic(inputs=control_loop_inputs),
+            ),
+        )
+    )
+    interface.setup()
+    [synchronizer] = control_loop_inputs.synchronizers
+    synchronizer.latest_message = joint_state_message(connection.name.name, 0.42)
+
+    control_loop_inputs.apply_inputs()
+    mini_world.state[connection.raw_dof.id].position = 1.0
+    control_loop_inputs.apply_inputs()
+
+    assert mini_world.state[connection.raw_dof.id].position == 1.0

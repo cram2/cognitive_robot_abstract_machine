@@ -87,9 +87,7 @@ class DifferentialDriveBaseGoal(Sequence):
 
         root_T_goal = context.world.transform(self.goal_pose, map)
         root_T_current = context.world.compose_forward_kinematics_expression(map, tip)
-        root_V_current_to_goal = (
-            root_T_goal.to_position() - root_T_current.to_position()
-        )
+        root_V_current_to_goal = root_T_goal.position - root_T_current.position
         root_V_current_to_goal.scale(1)
         root_V_z = Vector3.Z(reference_frame=map)
         root_R_first_orientation = RotationMatrix.from_vectors(
@@ -97,8 +95,8 @@ class DifferentialDriveBaseGoal(Sequence):
         )
 
         root_T_goal2 = Pose(
-            position=root_T_goal.to_position(),
-            orientation=root_R_first_orientation.to_quaternion(),
+            position=root_T_goal.position,
+            orientation=root_R_first_orientation.quaternion,
             reference_frame=map,
         )
 
@@ -177,7 +175,7 @@ class CartesianPoseStraight(Parallel):
                 name=self.name + "/position",
                 root_link=self.root_link,
                 tip_link=self.tip_link,
-                goal_point=self.goal_pose.to_position(),
+                goal_point=self.goal_pose.position,
                 weight=self.weight,
                 binding_policy=self.binding_policy,
             ),
@@ -185,7 +183,7 @@ class CartesianPoseStraight(Parallel):
                 name=self.name + "/orientation",
                 root_link=self.root_link,
                 tip_link=self.tip_link,
-                goal_orientation=self.goal_pose.to_rotation_matrix(),
+                goal_orientation=self.goal_pose.rotation_matrix,
                 weight=self.weight,
                 binding_policy=self.binding_policy,
             ),

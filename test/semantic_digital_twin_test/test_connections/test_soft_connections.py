@@ -15,7 +15,6 @@ from semantic_digital_twin.datastructures.soft_trunk import (
 from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
@@ -129,7 +128,7 @@ class TestSoftTrunk:
 
         # Validate distance
         fk = world.compute_forward_kinematics_np(world.root, trunk.arms[0].tip)
-        dist_error = np.linalg.norm(fk[:3, 3] - target.to_position().to_np()[:3])
+        dist_error = np.linalg.norm(fk[:3, 3] - target.position.to_np()[:3])
         assert dist_error < 0.03
 
     def test_soft_trunk_semantic_annotation(self):
@@ -159,9 +158,8 @@ class TestSoftConnectionFactories:
 
     def test_piecewise_constant_curvature_factory_applies_placement(self):
         world = World.create_with_root_body("root")
-        limits = DegreeOfFreedomLimits(
-            lower=DerivativeMap(position=-10.0, velocity=-10.0),
-            upper=DerivativeMap(position=10.0, velocity=10.0),
+        limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
         )
         kappa = DegreeOfFreedom(name=PrefixedName("kappa"), limits=limits)
         phi = DegreeOfFreedom(name=PrefixedName("phi"), limits=limits)
@@ -191,9 +189,8 @@ class TestSoftConnectionFactories:
 
     def test_cosserat_rod_factory_applies_placement(self):
         world = World.create_with_root_body("root")
-        limits = DegreeOfFreedomLimits(
-            lower=DerivativeMap(position=-10.0, velocity=-10.0),
-            upper=DerivativeMap(position=10.0, velocity=10.0),
+        limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
         )
         strain_dofs = {
             name: DegreeOfFreedom(name=PrefixedName(name), limits=limits)

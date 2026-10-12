@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
 from semantic_digital_twin.spatial_types import Point3, Vector3
@@ -66,7 +65,7 @@ class Pointing(CartesianTask):
             self.root_T_goal_reference_frame @ goal_reference_frame_P_goal_point
         )
 
-        root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
+        root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip @ tip_V_pointing_axis
         root_V_pointing_axis.visualisation_frame = self.tip_link
@@ -82,9 +81,7 @@ class Pointing(CartesianTask):
             artifacts, goal=root_V_goal_axis, current=root_V_pointing_axis
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            root_V_pointing_axis.angle_between(root_V_goal_axis)
-        )
+        artifacts.error = root_V_pointing_axis.angle_between(root_V_goal_axis)
         return artifacts
 
 
@@ -143,7 +140,7 @@ class PointingCone(CartesianTask):
 
         root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point
 
-        root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
+        root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
         root_V_pointing_axis.visualisation_frame = self.tip_link
@@ -165,7 +162,5 @@ class PointingCone(CartesianTask):
             artifacts, goal=root_V_goal_axis_proj, current=root_V_pointing_axis
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            root_V_pointing_axis.angle_between(root_V_goal_axis_proj)
-        )
+        artifacts.error = root_V_pointing_axis.angle_between(root_V_goal_axis_proj)
         return artifacts

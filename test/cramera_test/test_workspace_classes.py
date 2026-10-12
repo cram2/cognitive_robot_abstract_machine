@@ -176,7 +176,7 @@ class TestQueryingWorkspaceClasses:
             domains=[], class_index=WorkspaceClassIndex.of_scanned_classes([BODY])
         )
 
-        assert runner.run("Body").rows == [{"value": repr(Body)}]
+        assert runner.run_source("Body").rows == [{"value": repr(Body)}]
 
     def test_a_query_naming_nothing_known_still_fails_as_an_unknown_name(self):
         runner = EqlQueryRunner(
@@ -184,7 +184,7 @@ class TestQueryingWorkspaceClasses:
         )
 
         with pytest.raises(NameError):
-            runner.run("NoSuchClass")
+            runner.run_source("NoSuchClass")
 
     def test_a_ready_made_variable_is_not_shadowed_by_a_workspace_class(self):
         from cramera.knowledge.entities import BenchObject

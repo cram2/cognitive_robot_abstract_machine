@@ -14,6 +14,7 @@ from cramera.knowledge.query_vocabulary import (
     VocabularyKind,
 )
 from cramera.knowledge.workspace_classes import WorkspaceClassIndex
+from semantic_digital_twin.world import World
 
 from .test_workspace_classes import scanned_class
 
@@ -149,6 +150,24 @@ class TestVocabularyMembers:
     def test_a_members_request_for_an_unknown_type_is_refused(self, vocabulary):
         with pytest.raises(UnknownVocabularyName):
             vocabulary.members_of("NoSuchType")
+
+    def test_native_world_values_offer_their_own_members(self) -> None:
+        """
+        A native world value advertises its type and exposes dot completions.
+        """
+        name = World.__name__.lower()
+        vocabulary = EqlQueryRunner(
+            domains=[], extra_names={name: World()}
+        ).vocabulary()
+
+        entry = entry_named(vocabulary, name)
+        members = {member.name: member for member in vocabulary.members_of(name)}
+
+        assert entry.kind is VocabularyKind.VALUE
+        assert entry.type_name == World.__name__
+        assert entry.module == World.__module__
+        assert members[World.bodies.fget.__name__].kind is VocabularyKind.PROPERTY
+        assert members[World.connections.fget.__name__].kind is VocabularyKind.PROPERTY
 
 
 # %% the payload the panel reads

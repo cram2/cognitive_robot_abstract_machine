@@ -21,6 +21,7 @@ from .episode_player import EpisodePlayer
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class EpisodeSegmenterExecutor(Executor):
     """
@@ -53,7 +54,6 @@ class EpisodeSegmenterExecutor(Executor):
     A list of objects that should be fixed during the episode.
     """
 
-
     def __post_init__(self):
         """
         Adds the SegmindContext extension to the context.
@@ -61,14 +61,12 @@ class EpisodeSegmenterExecutor(Executor):
         super().__post_init__()
         self.context.add_extension(SegmindContext())
 
-
     def start(self):
         """
         Starts the episode player.
         """
         if self.player:
             self.player.start()
-
 
     def compile(self, motion_statechart: DetectorStateChart):
         """
@@ -78,7 +76,6 @@ class EpisodeSegmenterExecutor(Executor):
         self.detect_holes()
         if self.player:
             self.player.start()
-
 
     def detect_holes(self):
         """
@@ -126,7 +123,9 @@ class EpisodeSegmenterExecutor(Executor):
             else None
         )
         with self.context.world.modify_world():
-            self.context.world.merge_world(obj_world, *([connection] if connection else []))
+            self.context.world.merge_world(
+                obj_world, *([connection] if connection else [])
+            )
 
     def _load_stl(self, file: Path):
         """

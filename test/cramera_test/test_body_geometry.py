@@ -193,8 +193,8 @@ def test_rounded_pose_reports_position_then_quaternion():
     body = _body_with_shapes()
     assert rounded_pose(body, 5) == pytest.approx(
         [
-            *body.global_pose.to_position().to_np().tolist()[:3],
-            *body.global_pose.to_quaternion().to_np().tolist(),
+            *body.global_pose.position.to_np().tolist()[:3],
+            *body.global_pose.quaternion.to_np().tolist(),
         ]
     )
 

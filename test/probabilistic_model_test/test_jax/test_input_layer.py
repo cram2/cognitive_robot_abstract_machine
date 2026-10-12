@@ -5,11 +5,13 @@ import jax.numpy as jnp
 import jax
 from random_events.interval import closed
 
-from probabilistic_model.probabilistic_circuit.jax.input_layer import DiracDeltaLayer
+from probabilistic_model.probabilistic_circuit.jax.input_layer import (
+    DifferentiableDiracDeltaLayer,
+)
 
 
 class DiracDeltaLayerTestCase(unittest.TestCase):
-    layer = DiracDeltaLayer(
+    layer = DifferentiableDiracDeltaLayer(
         0, location=jnp.array([0.0, 1.0]), density_cap=jnp.array([1.0, 2.0])
     )
 

@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     NodeArtifacts,
@@ -80,7 +79,7 @@ class AlignPlanes(ConvergingTask):
 
         root_R_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_rotation_matrix()
+        ).rotation_matrix
         root_V_tip_normal = root_R_tip @ tip_V_tip_normal
         root_V_tip_normal.scale(1)
 
@@ -104,7 +103,5 @@ class AlignPlanes(ConvergingTask):
             reference_velocity=self.reference_velocity,
             quadratic_weight=self.weight,
         )
-        artifacts.error = SymbolicErrorSignal(
-            root_V_tip_normal.angle_between(root_V_root_normal)
-        )
+        artifacts.error = root_V_tip_normal.angle_between(root_V_root_normal)
         return artifacts

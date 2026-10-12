@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, ConvergingTask
 from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import Body
@@ -106,7 +105,7 @@ class GraspBar(ConvergingTask):
             quadratic_weight=self.weight,
         )
 
-        root_P_tip = root_T_tip.to_position()
+        root_P_tip = root_T_tip.position
 
         root_P_line_start = root_P_bar_center + root_V_bar_axis * self.bar_length / 2
         root_P_line_end = root_P_bar_center - root_V_bar_axis * self.bar_length / 2
@@ -122,5 +121,5 @@ class GraspBar(ConvergingTask):
             quadratic_weight=self.weight,
         )
 
-        artifacts.error = SymbolicErrorSignal(distance)
+        artifacts.error = distance
         return artifacts

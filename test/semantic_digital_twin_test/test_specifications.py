@@ -8,9 +8,8 @@ import numpy as np
 import pytest
 
 from krrood.utils import recursive_subclasses
-from semantic_digital_twin.api import (
-    BodySpecification,
-    RegionSpecification,
+from semantic_digital_twin.specifications.base import SpawnSpecification
+from semantic_digital_twin.specifications.connections import (
     ActiveConnection1DOFSpecification,
     ConnectionSpecification,
     FixedConnectionSpecification,
@@ -18,12 +17,18 @@ from semantic_digital_twin.api import (
     PrismaticConnectionSpecification,
     RevoluteConnectionSpecification,
     ScrewConnectionSpecification,
-    SemanticAnnotationWithRootSpecification,
-    RobotSpecification,
-    WorldSpecification,
-    SpawnSpecification,
 )
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
+    RegionSpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from krrood.ormatic.data_access_objects.helper import to_dao
+import semantic_digital_twin.orm.ormatic_interface  # registers the DAOs to_dao looks up
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -41,10 +46,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobotPart
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cabinet,
     Milk,
-    Slider,
     Handle,
-    Hinge,
-    ScrewMechanism,
     Door,
     Floor,
     Wall,
@@ -79,7 +81,6 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.geometry import Color, Scale, Box
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -139,7 +140,7 @@ def test_body_and_connection_pose_and_name_override(empty_world):
     body = spec.spawn(empty_world, name="renamed")
     assert body.name == PrefixedName("renamed")
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
-    np.testing.assert_allclose(root_T_body.to_position().to_np()[:3], [1, 2, 3])
+    np.testing.assert_allclose(root_T_body.position.to_np()[:3], [1, 2, 3])
 
 
 def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
@@ -150,7 +151,7 @@ def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
         parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=5),
     )
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
-    np.testing.assert_allclose(root_T_body.to_position().to_np()[0], 5)
+    np.testing.assert_allclose(root_T_body.position.to_np()[0], 5)
 
 
 def test_body_and_connection_active(empty_world):
@@ -185,13 +186,16 @@ def test_fixed_annotation_spawns(empty_world):
 
 
 def test_active_annotation_spawns(empty_world):
-    spec = Slider.get_annotation_specification(
-        "slider",
-        BodySpecification.box("slider", Scale(0.1, 0.1, 0.1)),
+    spec = Drawer.get_annotation_specification(
+        "drawer",
+        BodySpecification.box("drawer", Scale(0.4, 0.5, 0.6)),
+        parent_connection_specification=PrismaticConnectionSpecification(
+            axis=Vector3.X()
+        ),
     )
     annotation = spec.spawn(empty_world)
-    assert isinstance(annotation, Slider)
-    assert isinstance(annotation.root.parent_connection, PrismaticConnection)
+    assert isinstance(annotation, Drawer)
+    assert isinstance(annotation.movable_joint, PrismaticConnection)
 
 
 def test_annotation_root_connection_specification_overrides_type(empty_world):
@@ -214,13 +218,6 @@ def test_active_connection_specification_requires_axis():
     # This replaces the former spawn-time MissingConnectionAxisError for specifications.
     with pytest.raises(TypeError):
         PrismaticConnectionSpecification()
-
-
-def test_fixed_connection_annotation_rejects_axis():
-    # A fixed parent connection takes no axis, so offering one is a call-time error
-    # rather than a silently ignored argument.
-    with pytest.raises(TypeError):
-        Milk.parent_connection_specification(axis=Vector3.Z())
 
 
 def test_nested_annotation_on_non_part_whole_field_raises():
@@ -360,7 +357,7 @@ def test_shape_constructors_apply_parent_T_self(empty_world, make_spec):
     pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
     entity = make_spec(pose).spawn(empty_world)
     root_T_entity = empty_world.compute_forward_kinematics(empty_world.root, entity)
-    np.testing.assert_allclose(root_T_entity.to_position().to_np()[:3], [1, 2, 3])
+    np.testing.assert_allclose(root_T_entity.position.to_np()[:3], [1, 2, 3])
 
 
 def test_body_specification_from_3d_points_matches_direct_construction():
@@ -553,7 +550,7 @@ def test_world_specification_with_robot():
     assert isinstance(drive, OmniDrive)
 
     root_T_odom = world.compute_forward_kinematics(world.root, odom_body)
-    np.testing.assert_allclose(root_T_odom.to_position().to_np()[0], 1.0)
+    np.testing.assert_allclose(root_T_odom.position.to_np()[0], 1.0)
 
 
 def test_world_specification_from_urdf_with_robot():
@@ -610,7 +607,7 @@ def test_world_specification_with_several_robots():
         assert odom_body.parent_connection.parent is world.root
 
     odom_positions = sorted(
-        world.compute_forward_kinematics(world.root, odom_body).to_position().to_np()[0]
+        world.compute_forward_kinematics(world.root, odom_body).position.to_np()[0]
         for odom_body in odom_bodies
     )
     np.testing.assert_allclose(odom_positions, [-1.0, 1.0])
@@ -651,9 +648,7 @@ def test_connection_6dof_spec_binds_type_without_params():
 
 
 def test_active_1dof_spec_captures_parameters():
-    limits = DegreeOfFreedomLimits(
-        lower=DerivativeMap(velocity=-1.0), upper=DerivativeMap(velocity=1.0)
-    )
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1.0)
     axis = Vector3.Z()
     spec = PrismaticConnectionSpecification(
         axis=axis, multiplier=2.0, offset=0.5, dof_limits=limits
@@ -743,9 +738,7 @@ def test_connection_spec_connect_defaults_parent_to_root(empty_world):
 
 
 def test_connection_spec_connect_active_forwards_kwargs(empty_world):
-    limits = DegreeOfFreedomLimits(
-        lower=DerivativeMap(velocity=-1.5), upper=DerivativeMap(velocity=1.5)
-    )
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1.5)
     child = BodySpecification.box("slider", Scale(1, 1, 1)).to_domain_object()
     connection = PrismaticConnectionSpecification(
         axis=Vector3.Z(), dof_limits=limits
@@ -772,7 +765,7 @@ def test_connection_spec_connect_applies_pose(empty_world):
         child=child,
     )
     root_T_child = empty_world.compute_forward_kinematics(empty_world.root, child)
-    np.testing.assert_allclose(root_T_child.to_position().to_np()[:3], [1, 2, 3])
+    np.testing.assert_allclose(root_T_child.position.to_np()[:3], [1, 2, 3])
 
 
 def test_connection_spec_connect_without_pose_places_the_child_at_the_parent(
@@ -786,7 +779,7 @@ def test_connection_spec_connect_without_pose_places_the_child_at_the_parent(
         empty_world, parent_T_connection=None, child=child
     )
     root_T_child = empty_world.compute_forward_kinematics(empty_world.root, child)
-    np.testing.assert_allclose(root_T_child.to_position().to_np()[:3], [0, 0, 0])
+    np.testing.assert_allclose(root_T_child.position.to_np()[:3], [0, 0, 0])
 
 
 def test_connection_spec_connect_requires_child(empty_world):
@@ -815,43 +808,220 @@ def test_connection_spec_connect_without_name_matches_direct_creation(empty_worl
     assert spec_connection.name == direct_connection.name
 
 
-@pytest.mark.parametrize(
-    "annotation_type, expected_specification_type",
-    [
-        (Milk, FixedConnectionSpecification),
-        (Slider, PrismaticConnectionSpecification),
-        (Hinge, RevoluteConnectionSpecification),
-        (ScrewMechanism, ScrewConnectionSpecification),
-    ],
-)
-def test_annotation_declares_parent_connection_specification_type(
-    annotation_type, expected_specification_type
-):
-    assert isinstance(
-        annotation_type.parent_connection_specification(), expected_specification_type
-    )
+# %% the child's constant offset from its connection frame
+# connection_T_child lets a child sit away from the frame its connection moves about,
+# like a door whose origin is its centre hanging on a hinge at its edge.
 
 
-def test_screw_mechanism_pitch_reads_back_from_its_connection(empty_world):
-    # The pitch is stored only on the connection, so the annotation must report the
-    # value the connection it was spawned with actually carries.
-    screw_mechanism = ScrewMechanism.create_with_new_body_in_world(
-        name="screw_mechanism",
-        world=empty_world,
-        parent_connection_specification=ScrewMechanism.parent_connection_specification(
-            screw_pitch=0.005
+def _hinge_T_door() -> HomogeneousTransformationMatrix:
+    """
+    The pose of a door's centre relative to the hinge it swings on.
+    """
+    return HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+
+
+def _door_on_hinge_specification() -> BodySpecification:
+    return BodySpecification.box(
+        "door",
+        Scale(0.03, 1, 2),
+        connection_specification=RevoluteConnectionSpecification(
+            axis=Vector3.Z(), connection_T_child=_hinge_T_door()
         ),
     )
-    assert screw_mechanism.screw_pitch == 0.005
 
 
-def test_parent_connection_specification_is_built_per_call():
-    # Callers may mutate the returned specification, so each call must hand out a fresh
-    # instance rather than a shared default.
-    first = Slider.parent_connection_specification()
-    second = Slider.parent_connection_specification()
-    assert first is not second
-    assert first.axis is not second.axis
+def test_connect_places_the_child_at_its_offset_from_the_connection(empty_world):
+    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+    connection = FixedConnectionSpecification(
+        connection_T_child=_hinge_T_door()
+    ).connect(empty_world, child=child, parent_T_connection=parent_T_connection)
+
+    np.testing.assert_allclose(
+        connection.connection_T_child_expression.to_np(), _hinge_T_door().to_np()
+    )
+    np.testing.assert_allclose(
+        empty_world.compute_forward_kinematics(empty_world.root, child).to_np(),
+        (parent_T_connection @ _hinge_T_door()).to_np(),
+    )
+
+
+def test_spawn_places_the_child_at_parent_T_self_when_its_joint_is_at_zero(
+    empty_world,
+):
+    parent_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(x=2, yaw=0.3)
+    door = _door_on_hinge_specification().spawn(
+        empty_world, parent_T_self=parent_T_door
+    )
+
+    np.testing.assert_allclose(
+        empty_world.compute_forward_kinematics(empty_world.root, door).to_np(),
+        parent_T_door.to_np(),
+    )
+
+
+def test_child_swings_about_its_connection_frame_not_its_own_origin(empty_world):
+    door = _door_on_hinge_specification().spawn(empty_world)
+    angle = np.pi / 2
+
+    door.parent_connection.position = angle
+    empty_world.notify_state_change()
+
+    expected_root_T_door = (
+        _hinge_T_door().inverse()
+        @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=angle)
+        @ _hinge_T_door()
+    )
+    np.testing.assert_allclose(
+        empty_world.compute_forward_kinematics(empty_world.root, door).to_np(),
+        expected_root_T_door.to_np(),
+        atol=1e-12,
+    )
+
+
+def test_connection_T_child_is_not_bound_to_the_children_it_connected(empty_world):
+    specification = FixedConnectionSpecification(connection_T_child=_hinge_T_door())
+    first_child = BodySpecification.box("first", Scale(1, 1, 1)).to_domain_object()
+    second_child = BodySpecification.box("second", Scale(1, 1, 1)).to_domain_object()
+
+    first = specification.connect(empty_world, child=first_child)
+    second = specification.connect(empty_world, child=second_child)
+
+    assert first.connection_T_child_expression.child_frame is first_child
+    assert second.connection_T_child_expression.child_frame is second_child
+    assert specification.connection_T_child.child_frame is None
+
+
+def test_reconnect_keeps_the_child_and_its_branch_where_they_are(empty_world):
+    door_specification = BodySpecification.box("door", Scale(0.03, 1, 2))
+    door_specification.child_specifications.append(
+        BodySpecification.box("handle", Scale(0.05, 0.1, 0.02))
+    )
+    door = door_specification.spawn(
+        empty_world,
+        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=0.3),
+    )
+    handle = empty_world.get_body_by_name("handle")
+    root_T_door = empty_world.compute_forward_kinematics(empty_world.root, door)
+
+    connection = RevoluteConnectionSpecification(
+        axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+    ).reconnect(empty_world, door)
+
+    assert isinstance(door.parent_connection, RevoluteConnection)
+    assert door.parent_connection is connection
+    assert connection.parent is empty_world.root
+    assert handle.parent_kinematic_structure_entity is door
+    np.testing.assert_allclose(
+        empty_world.compute_forward_kinematics(empty_world.root, door).to_np(),
+        root_T_door.to_np(),
+        atol=1e-12,
+    )
+
+
+def test_reconnect_swings_the_child_about_the_new_connection_frame(empty_world):
+    door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(empty_world)
+    connection = RevoluteConnectionSpecification(
+        axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+    ).reconnect(empty_world, door)
+    angle = np.pi / 2
+
+    connection.position = angle
+    empty_world.notify_state_change()
+
+    expected_root_T_door = (
+        _hinge_T_door().inverse()
+        @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=angle)
+        @ _hinge_T_door()
+    )
+    np.testing.assert_allclose(
+        empty_world.compute_forward_kinematics(empty_world.root, door).to_np(),
+        expected_root_T_door.to_np(),
+        atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize(
+    "joint_specification",
+    [
+        RevoluteConnectionSpecification(
+            axis=Vector3.Z(), offset=0.3, connection_T_child=_hinge_T_door()
+        ),
+        RevoluteConnectionSpecification(
+            axis=Vector3.Z(),
+            dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=0.2, upper_position=1.0
+            ),
+            connection_T_child=_hinge_T_door(),
+        ),
+    ],
+    ids=["offset", "limits_excluding_zero"],
+)
+def test_reconnect_keeps_the_child_where_it_is_when_the_joint_starts_away_from_zero(
+    empty_world, joint_specification
+):
+    door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(
+        empty_world,
+        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=0.3),
+    )
+    root_T_door = empty_world.compute_forward_kinematics(empty_world.root, door)
+
+    connection = joint_specification.reconnect(empty_world, door)
+
+    assert connection.position != 0
+    np.testing.assert_allclose(
+        empty_world.compute_forward_kinematics(empty_world.root, door).to_np(),
+        root_T_door.to_np(),
+        atol=1e-12,
+    )
+
+
+def test_reconnect_keeps_the_name_of_the_specification(empty_world):
+    door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(empty_world)
+    specification = RevoluteConnectionSpecification(
+        name="front_door_hinge", axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+    )
+
+    connection = specification.reconnect(empty_world, door)
+
+    assert empty_world.get_connection_by_name(specification.name) is connection
+
+
+def test_reconnect_releases_the_degrees_of_freedom_of_the_replaced_connection(
+    empty_world,
+):
+    drawer = BodySpecification.box(
+        "drawer",
+        Scale(0.5, 0.5, 0.2),
+        connection_specification=PrismaticConnectionSpecification(axis=Vector3.X()),
+    ).spawn(empty_world)
+    [replaced_degree_of_freedom] = drawer.parent_connection.dofs
+
+    connection = RevoluteConnectionSpecification(axis=Vector3.Z()).reconnect(
+        empty_world, drawer
+    )
+
+    assert set(empty_world.degrees_of_freedom) == set(connection.dofs)
+    assert replaced_degree_of_freedom not in empty_world.degrees_of_freedom
+
+
+def test_connection_T_child_survives_orm_round_trip(empty_world):
+    specification = Door.get_annotation_specification(
+        "door",
+        Door.get_default_root_kinematic_structure_entity_specification(
+            scale=Scale(0.03, 1, 2)
+        ),
+        parent_connection_specification=RevoluteConnectionSpecification(
+            axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+        ),
+    )
+
+    door = to_dao(specification).from_dao().spawn(empty_world)
+
+    np.testing.assert_allclose(
+        door.root.parent_connection.connection_T_child_expression.to_np(),
+        _hinge_T_door().to_np(),
+    )
 
 
 # %% default geometry specifications match the factories
@@ -1031,31 +1201,19 @@ def test_annotation_spec_base_body(empty_world):
     _assert_same_geometry(annotation.root.collision, factory.root.collision)
 
 
-def test_annotation_spec_active_slider(empty_world):
-    scale = Scale(0.1, 0.1, 0.1)
-    spec = Slider.get_annotation_specification(
-        "slider",
-        Slider.get_default_root_kinematic_structure_entity_specification(scale=scale),
-        parent_connection_specification=Slider.parent_connection_specification(
+def test_annotation_spec_active_door(empty_world):
+    spec = Door.get_annotation_specification(
+        "door",
+        Door.get_default_root_kinematic_structure_entity_specification(
+            scale=Scale(0.03, 1, 2)
+        ),
+        parent_connection_specification=RevoluteConnectionSpecification(
             axis=Vector3.Z()
         ),
     )
     annotation = spec.spawn(empty_world)
-    assert isinstance(annotation, Slider)
-    assert isinstance(annotation.root.parent_connection, PrismaticConnection)
-
-
-def test_annotation_spec_active_uses_default_axis(empty_world):
-    # Slider declares its own parameterized default, so omitting the axis still yields a
-    # usable prismatic connection instead of failing at spawn time.
-    spec = Slider.get_annotation_specification(
-        "slider",
-        Slider.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.1, 0.1)
-        ),
-    )
-    slider = spec.spawn(empty_world)
-    assert isinstance(slider.root.parent_connection, PrismaticConnection)
+    assert isinstance(annotation, Door)
+    assert isinstance(annotation.movable_joint, RevoluteConnection)
 
 
 def test_annotation_spec_aperture_region(empty_world):
@@ -1120,48 +1278,20 @@ def test_nested_handle_attaches_as_child(empty_world):
     assert isinstance(drawer.handle.root.parent_connection, FixedConnection)
 
 
-def test_nested_mechanical_joint_reparents_whole(empty_world):
-    hinge_part = Hinge.get_annotation_specification(
-        "hinge",
-        Hinge.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.05, 0.05, 0.05)
-        ),
-        parent_connection_specification=Hinge.parent_connection_specification(
-            axis=Vector3.Z()
-        ),
-    )
-    drawer = _spawn_with_parts(
-        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"mechanical_joint": hinge_part}
-    )
-    assert isinstance(drawer.mechanical_joint, Hinge)
-    # whole_parent -(revolute)-> hinge -(fixed)-> whole
-    assert drawer.root.parent_connection.parent is drawer.mechanical_joint.root
-    assert drawer.mechanical_joint.root.parent_connection.parent is empty_world.root
-    assert isinstance(
-        drawer.mechanical_joint.root.parent_connection, RevoluteConnection
-    )
-
-
-def test_hinge_survives_mounting_its_whole_as_a_part(empty_world):
+def test_door_joint_survives_mounting_the_door_as_a_part(empty_world):
     """
-    A door hangs off its hinge, and mounting the door onto a cabinet must not bypass
-    that hinge: a door attached rigidly to the cabinet can no longer be opened.
+    A door swings on its hinge, and mounting the door onto a cabinet must keep that
+    hinge, including where the door sits relative to it: a door attached rigidly to the
+    cabinet can no longer be opened.
     """
-    hinge_part = Hinge.get_annotation_specification(
-        "hinge",
-        Hinge.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.05, 0.05, 0.05)
-        ),
-        parent_connection_specification=Hinge.parent_connection_specification(
-            axis=Vector3.Z()
-        ),
-    )
     door_part = Door.get_annotation_specification(
         "door",
         Door.get_default_root_kinematic_structure_entity_specification(
             scale=Scale(0.03, 1, 2)
         ),
-        part_specifications={"mechanical_joint": hinge_part},
+        parent_connection_specification=RevoluteConnectionSpecification(
+            axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+        ),
     )
 
     cabinet = _spawn_with_parts(
@@ -1169,33 +1299,27 @@ def test_hinge_survives_mounting_its_whole_as_a_part(empty_world):
     )
 
     [door] = cabinet.doors
-    # cabinet -(revolute)-> hinge -(fixed)-> door
-    assert door.root.parent_connection.parent is door.mechanical_joint.root
-    assert door.mechanical_joint.root.parent_connection.parent is cabinet.root
-    assert isinstance(door.mechanical_joint.root.parent_connection, RevoluteConnection)
-
-
-def test_slider_survives_mounting_its_whole_as_a_part(empty_world):
-    """
-    A drawer slides on its slider, and mounting the drawer into a cabinet must not
-    bypass that slider: a drawer attached rigidly to the cabinet can no longer be
-    pulled out.
-    """
-    slider_part = Slider.get_annotation_specification(
-        "slider",
-        Slider.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.05, 0.05, 0.05)
-        ),
-        parent_connection_specification=Slider.parent_connection_specification(
-            axis=Vector3.X()
-        ),
+    assert isinstance(door.movable_joint, RevoluteConnection)
+    assert door.movable_joint.parent is cabinet.root
+    np.testing.assert_allclose(
+        door.movable_joint.connection_T_child_expression.to_np(),
+        _hinge_T_door().to_np(),
     )
+
+
+def test_drawer_joint_survives_mounting_the_drawer_as_a_part(empty_world):
+    """
+    A drawer slides on its rails, and mounting the drawer into a cabinet must keep
+    them: a drawer attached rigidly to the cabinet can no longer be pulled out.
+    """
     drawer_part = Drawer.get_annotation_specification(
         "drawer",
         Drawer.get_default_root_kinematic_structure_entity_specification(
             scale=Scale(0.4, 0.5, 0.6)
         ),
-        part_specifications={"mechanical_joint": slider_part},
+        parent_connection_specification=PrismaticConnectionSpecification(
+            axis=Vector3.X()
+        ),
     )
 
     cabinet = _spawn_with_parts(
@@ -1203,12 +1327,8 @@ def test_slider_survives_mounting_its_whole_as_a_part(empty_world):
     )
 
     [drawer] = cabinet.drawers
-    # cabinet -(prismatic)-> slider -(fixed)-> drawer
-    assert drawer.root.parent_connection.parent is drawer.mechanical_joint.root
-    assert drawer.mechanical_joint.root.parent_connection.parent is cabinet.root
-    assert isinstance(
-        drawer.mechanical_joint.root.parent_connection, PrismaticConnection
-    )
+    assert isinstance(drawer.movable_joint, PrismaticConnection)
+    assert drawer.movable_joint.parent is cabinet.root
 
 
 def test_nested_aperture_cuts_geometry(empty_world):
@@ -1309,25 +1429,23 @@ def test_nested_part_placement_is_relative_to_whole(empty_world):
         drawer.root, drawer.handle.root
     )
     np.testing.assert_allclose(
-        drawer_T_handle.to_position().to_np()[:3], [0, 0.5, 0], atol=1e-9
+        drawer_T_handle.position.to_np()[:3], [0, 0.5, 0], atol=1e-9
     )
 
 
 def test_annotation_connection_limits_threaded(empty_world):
-    limits = DegreeOfFreedomLimits(
-        lower=DerivativeMap(velocity=-1.5), upper=DerivativeMap(velocity=1.5)
-    )
-    spec = Slider.get_annotation_specification(
-        "slider",
-        Slider.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.1, 0.1)
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1.5)
+    spec = Drawer.get_annotation_specification(
+        "drawer",
+        Drawer.get_default_root_kinematic_structure_entity_specification(
+            scale=Scale(0.4, 0.5, 0.6)
         ),
-        parent_connection_specification=Slider.parent_connection_specification(
+        parent_connection_specification=PrismaticConnectionSpecification(
             axis=Vector3.Z(), dof_limits=limits
         ),
     )
-    slider = spec.spawn(empty_world)
-    dof_limits = slider.root.parent_connection.dof.limits
+    drawer = spec.spawn(empty_world)
+    dof_limits = drawer.movable_joint.dof.limits
     assert dof_limits.upper.velocity == 1.5
     assert dof_limits.lower.velocity == -1.5
 
@@ -1410,20 +1528,14 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
         Drawer.get_default_root_kinematic_structure_entity_specification(
             scale=Scale(0.4, 0.5, 0.6)
         ),
+        parent_connection_specification=RevoluteConnectionSpecification(
+            axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+        ),
         part_specifications={
             "handle": Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(0.1, 0.05, 0.05)
-                ),
-            ),
-            "mechanical_joint": Hinge.get_annotation_specification(
-                "hinge",
-                Hinge.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.05, 0.05, 0.05)
-                ),
-                parent_connection_specification=Hinge.parent_connection_specification(
-                    axis=Vector3.Z()
                 ),
             ),
         },
@@ -1464,11 +1576,13 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
 def test_nested_composite_matches_manual_construction(empty_world):
     scale = Scale(0.4, 0.5, 0.6)
     handle_scale = Scale(0.1, 0.05, 0.05)
-    hinge_scale = Scale(0.05, 0.05, 0.05)
 
     drawer = Drawer.get_annotation_specification(
         "drawer",
         Drawer.get_default_root_kinematic_structure_entity_specification(scale=scale),
+        parent_connection_specification=PrismaticConnectionSpecification(
+            axis=Vector3.X()
+        ),
         part_specifications={
             "handle": Handle.get_annotation_specification(
                 "handle",
@@ -1476,43 +1590,29 @@ def test_nested_composite_matches_manual_construction(empty_world):
                     scale=handle_scale
                 ),
             ),
-            "mechanical_joint": Hinge.get_annotation_specification(
-                "hinge",
-                Hinge.get_default_root_kinematic_structure_entity_specification(
-                    scale=hinge_scale
-                ),
-                parent_connection_specification=Hinge.parent_connection_specification(
-                    axis=Vector3.Z()
-                ),
-            ),
         },
     ).spawn(empty_world)
 
     assert isinstance(drawer.handle, Handle)
-    assert isinstance(drawer.mechanical_joint, Hinge)
+    assert isinstance(drawer.movable_joint, PrismaticConnection)
     assert drawer.handle.root.parent_connection.parent is drawer.root
-    assert drawer.root.parent_connection.parent is drawer.mechanical_joint.root
 
     manual_world = _fresh_world()
     with manual_world.modify_world():
         manual_drawer = Drawer.create_with_new_body_in_world(
-            name="drawer_manual", world=manual_world, scale=scale
+            name="drawer_manual",
+            world=manual_world,
+            scale=scale,
+            parent_connection_specification=PrismaticConnectionSpecification(
+                axis=Vector3.X()
+            ),
         )
         manual_handle = Handle.create_with_new_body_in_world(
             name="handle_manual",
             world=manual_world,
             scale=handle_scale,
         )
-        manual_hinge = Hinge.create_with_new_body_in_world(
-            name="hinge_manual",
-            world=manual_world,
-            scale=hinge_scale,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
-        )
         manual_drawer.add(manual_handle)
-        manual_drawer.add(manual_hinge)
 
     _assert_same_geometry(drawer.root.collision, manual_drawer.root.collision)
     _assert_same_geometry(drawer.handle.root.collision, manual_handle.root.collision)
@@ -1550,36 +1650,6 @@ def test_factories_have_no_shared_mutable_spatial_defaults():
         if isinstance(parameter.default, (Vector3, Point3, Scale))
     ]
     assert not offenders, f"shared mutable defaults: {offenders}"
-
-
-# %% zero-argument parent connection resolution
-# Spawning resolves an annotation's parent connection through the
-# zero-argument form, so every override must keep that form working.
-
-
-def _annotation_types_declaring_a_parent_connection():
-    roots = [HasRootBody, HasRootRegion]
-    return {
-        annotation_type
-        for root in roots
-        for annotation_type in [root, *recursive_subclasses(root)]
-        if "parent_connection_specification" in vars(annotation_type)
-    }
-
-
-def test_parent_connection_specification_overrides_stay_zero_argument():
-    # spawn() falls back to parent_connection_specification() with no arguments, so an
-    # override that adds a *required* parameter would only fail once a world is built.
-    offenders = [
-        f"{annotation_type.__name__}({parameter.name})"
-        for annotation_type in _annotation_types_declaring_a_parent_connection()
-        for parameter in inspect.signature(
-            annotation_type.parent_connection_specification
-        ).parameters.values()
-        if parameter.default is inspect.Parameter.empty
-        and parameter.kind not in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD)
-    ]
-    assert not offenders, f"required parameters break the spawn fallback: {offenders}"
 
 
 # %% default geometry builders take a connection

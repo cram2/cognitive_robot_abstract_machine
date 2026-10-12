@@ -42,7 +42,7 @@ designators are leafs.
 If you are performing a plan with a simulated robot, you need a BulletWorld.
 
 ```python
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.testing import setup_world
 from coraplex.datastructures.dataclasses import Context
 from semantic_digital_twin.robots.pr2 import PR2
@@ -62,14 +62,13 @@ the execution will be aborted and the state FAILED will be returned.
 We will start with a simple example that uses an action designator for moving the robot and parking its arms.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.all_arms)
 
 plan = sequential([navigate, park], context=context).plan
 ```
@@ -84,11 +83,11 @@ As you can see there is the root node which is the language expression and then 
 designators. When executing this plan the Sequential node will try to execute the NavigateAction and if that is finished
 without any error the ParkArmsAction will be executed.
 
-The plan can be executed by wrapping it inside a ```with simulated_robot``` environment and calling perform on the
+The plan can be executed by wrapping it inside a ```with kinematically_simulated_robot``` environment and calling perform on the
 plan.
 
 ```python
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -101,18 +100,17 @@ be returned if all designator executions raise an error.
 Besides the described difference in behaviour this language expression can be used in the same way as Sequential.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import try_in_order
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.all_arms)
 
 plan = try_in_order([navigate, park], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -126,18 +124,17 @@ in any other case FAILED will be returned.
 Using the parallel expressions works like Sequential and TryInOrder.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import parallel
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.all_arms)
 
 plan = parallel([navigate, park], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -149,18 +146,17 @@ will return SUCCEEDED if at least one designator is executed without raising an 
 TryAll can be used like any other language expression.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import try_all
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.all_arms)
 
 plan = try_all([navigate, park], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -170,7 +166,6 @@ You can also combine different language expressions to further structure your pl
 Sequential expression inside a Parallel one by passing the result of one factory as a child of another.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import parallel, sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
@@ -178,12 +173,12 @@ from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.all_arms)
 move_torso = MoveTorsoAction(TorsoState.HIGH)
 
 plan = parallel([navigate, sequential([park, move_torso])], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -202,7 +197,6 @@ Although this expression is more intended for debugging and testing purposes sin
 other parts of the plan.
 
 ```python
-from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import code, parallel
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 
@@ -212,13 +206,13 @@ def code_test():
     print("Code function")
 
 
-park = ParkArmsAction(Arms.BOTH)
+park = ParkArmsAction(pr2.all_arms)
 code_lambda = code(lambda: print("This is from the code object"), context=context)
 code_func = code(code_test, context=context)
 
 plan = parallel([park, code_lambda, code_func], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -253,7 +247,7 @@ code_func = code(code_test, context=context)
 
 plan = try_all([navigate, code_func], context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 
 print(plan.root.status)
@@ -277,7 +271,7 @@ move_torso_down = MoveTorsoAction(TorsoState.LOW)
 
 plan = repeat([move_torso_up, move_torso_down], maximum_repetitions=3, context=context).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 
@@ -316,7 +310,7 @@ plan = cancel_when(
 ).plan
 
 try:
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 except PlanCancelled as cancelled:
     print(cancelled)
@@ -340,7 +334,7 @@ plan = pause_until(
     context=context,
 ).plan
 
-with simulated_robot:
+with kinematically_simulated_robot:
     plan.perform()
 ```
 This will hold the wrapped plan for the first 2 seconds of simulation time before letting it run.

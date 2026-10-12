@@ -4,12 +4,32 @@ Module holding all enums of CoraPlex.
 
 from __future__ import annotations
 
-from enum import Enum, auto, IntEnum, StrEnum
+from enum import Enum, auto, StrEnum
 from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from coraplex.plans.plan import Plan
     from coraplex.plans.plan_node import PlanNode
+
+
+class ReachFraction(float, Enum):
+    """
+    How far the robot stands off what it reaches for, as a fraction of the arm's length.
+    """
+
+    GRASPING = 0.5
+    """
+    Reaching something that stays where it is.
+    """
+
+    ACCESSING = 0.66
+    """
+    Working a container's handle.
+
+    A container is pulled open towards the robot, so it stands further back than it does
+    to reach something that stays where it is.
+    """
+
 
 class VisualizationLayout(Enum):
     BFS = "bfs"
@@ -81,13 +101,49 @@ class FindBodyInRegionMethod(Enum):
 
 class ExecutionType(Enum):
     """
-    Enum for Execution Process Module types.
+    What carries out the motions of a plan, which decides both how a motion is performed
+    and how a query about the world may be answered.
     """
 
     REAL = auto()
-    SIMULATED = auto()
+    """
+    Performed by the robot itself, by handing the motion state chart to giskard.
+    """
+
+    KINEMATICALLY_SIMULATED = auto()
+    """
+    Performed against a world the robot is moved through kinematically, where reaching
+    a goal may be answered by writing the pose it was reached at into the world.
+
+    Nothing pushes back: a joint arrives wherever it was commanded and an object is held
+    by being attached to the gripper.
+    """
+
+    PHYSICALLY_SIMULATED = auto()
+    """
+    Performed against a physically simulated world, where the robot's joints are driven
+    to a goal by its servos and an object is held by friction alone.
+
+    Apart from :attr:`KINEMATICALLY_SIMULATED`, since a motion that may be answered by
+    writing the robot's own pose into the world cannot be answered that way here: see
+    :class:`~coraplex.robot_plans.motions.navigation.MoveMotion`.
+    """
+
     SEMI_REAL = auto()
+    """
+    Perceived from the real world while the motions are only simulated.
+
+    .. warning:: No execution path answers this type:
+        :meth:`~coraplex.plans.executables.GiskardExecutable.execute` raises
+        :class:`~coraplex.exceptions.UnknownExecutionType` for a plan that holds any
+        motion.
+    """
+
     NO_EXECUTION = auto()
+    """
+    Not performed at all: the motion state chart is built but never run, which leaves a
+    plan to be inspected rather than carried out.
+    """
 
 
 class VisualizationBackend(StrEnum):
@@ -101,6 +157,23 @@ class VisualizationBackend(StrEnum):
     """Use the native Rerun adapter."""
     CRAMERA = "cramera"
     """Use an installed browser visualization provider."""
+
+
+class ActionTrialVisualization(StrEnum):
+    """
+    Where the world copy an action trial runs in is published while debugging, apart
+    from the world it copies.
+    """
+
+    FRAME_PREFIX = "action_trial/"
+    """
+    Put in front of every tf frame of the copy.
+    """
+
+    MARKER_TOPIC = "/semworld/action_trial/viz_marker"
+    """
+    The topic the markers of the copy are published on.
+    """
 
 
 class VisualizationOption(StrEnum):
@@ -129,23 +202,13 @@ class VisualizationOption(StrEnum):
     """
 
 
-class Arms(IntEnum):
+class PouringSide(StrEnum):
     """
-    Enum for Arms.
+    The side of a target container, as the robot sees it, that is poured from.
     """
 
-    # LEFT = "left"
-    # RIGHT = "right"
-    # BOTH = "both"
-    LEFT = 0
-    RIGHT = 1
-    BOTH = 2
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return self.name
+    LEFT = "left"
+    RIGHT = "right"
 
 
 class JointType(Enum):
@@ -176,56 +239,6 @@ class AxisIdentifier(Enum):
     @classmethod
     def from_tuple(cls, axis_tuple):
         return next((axis for axis in cls if axis.value == axis_tuple), None)
-
-
-class Grasp(Enum):
-    """
-    Base class for grasp enums.
-    """
-
-    def __hash__(self):
-        return [index for index, value in enumerate(self.__class__) if self == value][0]
-
-    @classmethod
-    def from_axis_direction(cls, axis: AxisIdentifier, direction: int):
-        """
-        Get the Grasp face from an axis-index tuple.
-        """
-        return next((grasp for grasp in cls if grasp.value == (axis, direction)), None)
-
-
-class ApproachDirection(Grasp):
-    """
-    Enum for the approach direction of a gripper.
-
-    The AxisIdentifier is used to identify the axis of the gripper, and the int is used
-    to identify the direction along  that axis.
-    """
-
-    FRONT = (AxisIdentifier.X, -1)
-    BACK = (AxisIdentifier.X, 1)
-    RIGHT = (AxisIdentifier.Y, -1)
-    LEFT = (AxisIdentifier.Y, 1)
-
-    @property
-    def axis(self) -> AxisIdentifier:
-        """
-        Returns the axis of the approach direction.
-        """
-        return self.value[0]
-
-
-class VerticalAlignment(Grasp):
-    """
-    Enum for the vertical alignment of a gripper.
-
-    The AxisIdentifier is used to identify the axis of the gripper, and the int is used
-    to identify the direction along  that axis.
-    """
-
-    NoAlignment = (AxisIdentifier.Undefined, 0)
-    TOP = (AxisIdentifier.Z, -1)
-    BOTTOM = (AxisIdentifier.Z, 1)
 
 
 class GripperType(Enum):

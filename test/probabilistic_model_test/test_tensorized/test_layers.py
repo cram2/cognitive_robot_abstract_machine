@@ -330,6 +330,29 @@ class VectorizedTruncationTestCase(unittest.TestCase):
             )
             self.assertAlmostEqual(float(np.exp(log_probabilities[node])), expected)
 
+    def test_dirac_delta_layer_probability_agrees_with_the_scalar_truncation(self):
+        layer = DiracDeltaLayer(0, np.array([0.0, 1.0, 2.0]), np.array([1.0, 1.0, 1.0]))
+        for assignment in (
+            closed(1.0, 2.0),
+            open(1.0, 2.0),
+            closed(0.5, 1.5),
+            closed(5.0, 6.0),
+        ):
+            with self.subTest(str(assignment)):
+                event = SimpleEvent.from_data({x: assignment})
+                probabilities = layer.probability_of_simple_event_of_nodes(
+                    event, SortedSet([x])
+                )
+                expected_log_probabilities = [
+                    layer.node_distribution(node, x).log_truncated(
+                        event.as_composite_set()
+                    )[1]
+                    for node in range(layer.number_of_nodes)
+                ]
+                np.testing.assert_array_equal(
+                    probabilities, np.exp(expected_log_probabilities)
+                )
+
     def test_dirac_delta_layer_agrees_with_the_scalar_truncation(self):
         layer = DiracDeltaLayer(0, np.array([0.0, 1.0, 2.0]), np.array([1.0, 1.0, 1.0]))
         for assignment in (

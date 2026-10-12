@@ -33,7 +33,7 @@ from krrood.ormatic.data_access_objects.conversion_order import (
     ConversionOrder,
     DeclaredOrder,
 )
-from krrood.ormatic.data_access_objects.helper import get_dao_class
+from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 
 if TYPE_CHECKING:
     from krrood.ormatic.data_access_objects.dao import (

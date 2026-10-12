@@ -24,12 +24,8 @@ from rclpy.node import Node
 from typing_extensions import List, Tuple
 
 from coraplex.datastructures.enums import (
-    ApproachDirection,
-    Arms,
     ExecutionType,
-    VerticalAlignment,
 )
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.exceptions import (
     AmbiguousDetection,
     NothingDetected,
@@ -38,7 +34,7 @@ from coraplex.exceptions import (
     UnidentifiedDetections,
     UnknownExecutionType,
 )
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.perception import (
     ROBOKUDO_QUERY_ACTION_NAME,
     Detection,
@@ -95,7 +91,8 @@ class SpecializedMilk(Milk):
 @pytest.mark.parametrize(
     "execution_type, expected_source",
     [
-        (ExecutionType.SIMULATED, WorldPerception),
+        (ExecutionType.KINEMATICALLY_SIMULATED, WorldPerception),
+        (ExecutionType.PHYSICALLY_SIMULATED, WorldPerception),
         (ExecutionType.NO_EXECUTION, WorldPerception),
         (ExecutionType.REAL, RoboKudoPerception),
     ],
@@ -132,7 +129,7 @@ def test_detection_moves_the_annotated_body_to_the_perceived_pose(
 
     assert annotations == world.get_semantic_annotations_by_type(Milk)
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -189,7 +186,7 @@ def test_several_annotations_on_one_body_are_not_ambiguous(pr2_apartment_context
     assert len(annotations) == 2
     assert {annotation.root for annotation in annotations} == {milk_body}
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -212,13 +209,11 @@ def test_an_upside_down_detection_is_flipped_without_moving_the_body(
     Detection(semantic_annotation=Milk, pose=upside_down_pose).apply_to(world)
 
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
-    assert (
-        milk_body.global_pose.to_rotation_matrix().z_vector().to_np().flatten()[2] > 0
-    )
+    assert milk_body.global_pose.rotation_matrix.z_vector().to_np().flatten()[2] > 0
 
 
 # %% distrusting a source's orientation
@@ -242,7 +237,7 @@ def test_untrusted_orientation_still_moves_the_body_to_the_perceived_position(
     )
 
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -258,7 +253,7 @@ def test_untrusted_orientation_keeps_the_bodys_existing_orientation(
     world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     orientation_before_detection = (
-        milk_body.parent_connection.origin.to_rotation_matrix().to_np()
+        milk_body.parent_connection.origin.rotation_matrix.to_np()
     )
     perceived_pose = Pose.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, yaw=np.pi / 2, reference_frame=world.root
@@ -269,7 +264,7 @@ def test_untrusted_orientation_keeps_the_bodys_existing_orientation(
     )
 
     np.testing.assert_allclose(
-        milk_body.parent_connection.origin.to_rotation_matrix().to_np(),
+        milk_body.parent_connection.origin.rotation_matrix.to_np(),
         orientation_before_detection,
         atol=1e-9,
     )
@@ -307,8 +302,8 @@ def test_world_perception_reports_the_pose_the_world_holds(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         atol=1e-9,
     )
 
@@ -440,15 +435,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
     )
 
     plan = execute_single(
-        PickUpAction(
-            milk,
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
-        ),
+        PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
         context=context,
     )
     plan.notify()
@@ -463,10 +450,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
         return [
             float(
                 np.linalg.norm(
-                    world.transform(target, world.root)
-                    .to_position()
-                    .to_np()
-                    .flatten()[:3]
+                    world.transform(target, world.root).position.to_np().flatten()[:3]
                     - np.array(position)
                 )
             )
@@ -614,7 +598,7 @@ def test_robokudo_detection_is_named_and_placed_by_the_pipeline(
     assert robokudo_query_server.received_types == ["milk"]
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -633,10 +617,7 @@ def test_robokudo_detection_moves_the_body_in_the_world(
     RoboKudoPerception(ros_node=rclpy_node).detect(query).apply_to(world)
 
     np.testing.assert_allclose(
-        world.get_body_by_name("milk.stl")
-        .global_pose.to_position()
-        .to_np()
-        .flatten()[:3],
+        world.get_body_by_name("milk.stl").global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -660,7 +641,7 @@ def test_untyped_detection_is_identified_from_the_query(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -723,7 +704,7 @@ def test_a_caller_that_accepts_any_candidate_gets_one_of_them(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -795,10 +776,7 @@ def test_perception_task_moves_the_detected_body(
     run_perception_task(task, build_perception_task(task, world, rclpy_node))
 
     np.testing.assert_allclose(
-        world.get_body_by_name("milk.stl")
-        .global_pose.to_position()
-        .to_np()
-        .flatten()[:3],
+        world.get_body_by_name("milk.stl").global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -836,7 +814,9 @@ def test_perception_task_reports_a_failed_query_as_itself(
     """
     world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
-    task = PerceptionTask(query=query, execution_type=ExecutionType.SIMULATED)
+    task = PerceptionTask(
+        query=query, execution_type=ExecutionType.KINEMATICALLY_SIMULATED
+    )
     build_context = build_perception_task(task, world, rclpy_node)
     task.perception_source = UnanswerablePerception(
         PerceptionSourceUnavailable(ROBOKUDO_QUERY_ACTION_NAME)
@@ -930,12 +910,12 @@ def test_detecting_motion_takes_the_execution_type_of_the_environment(
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     plan = execute_single(DetectingMotion(query=query), context=context)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         executable = plan.parse()
 
     tasks = list(executable.motion_mappings.values())
     assert [type(task) for task in tasks] == [PerceptionTask]
-    assert tasks[0].execution_type is ExecutionType.SIMULATED
+    assert tasks[0].execution_type is ExecutionType.KINEMATICALLY_SIMULATED
 
 
 def test_perception_task_survives_a_chart_round_trip(
@@ -998,7 +978,7 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
     reach.on_start(build_context)
 
     np.testing.assert_allclose(
-        reach.root_T_goal_reference_frame.to_position().evaluate().flatten()[:3],
+        reach.root_T_goal_reference_frame.position.evaluate().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )

@@ -7,6 +7,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     SpatialType,
     Quaternion,
+    AxisAngle,
     GenericSpatialType,
     Pose,
     Pose2D,

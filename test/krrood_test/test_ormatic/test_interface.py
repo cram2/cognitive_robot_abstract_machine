@@ -9,7 +9,7 @@ from krrood.ormatic.data_access_objects.dao import selectin_loading
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.helper import (
     to_dao,
-    get_dao_class,
+    get_data_access_object_class,
 )
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.exceptions import NoDAOFoundError, UncallableFunction
@@ -712,7 +712,7 @@ def test_persons(session, database):
 
 
 def test_underspecified_types():
-    dao_class = get_dao_class(UnderspecifiedTypesContainer)
+    dao_class = get_data_access_object_class(UnderspecifiedTypesContainer)
     assert dao_class is not None
     inst = inspect(dao_class)
     column_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
@@ -918,6 +918,17 @@ def test_path_custom_type(session, database):
     reconstructed = queried.from_dao()
     assert isinstance(reconstructed.path, Path)
     assert reconstructed == path
+
+
+def test_duration_keeps_sub_second_resolution(session, database):
+    duration = DurationAssociation(timedelta(seconds=3, microseconds=12500))
+
+    dao = to_dao(duration)
+    session.add(dao)
+    session.commit()
+
+    queried = session.scalars(select(DurationAssociationDAO)).one()
+    assert queried.from_dao() == duration
 
 
 def test_selectin_loading_preloads_relationships(session, database):

@@ -132,7 +132,7 @@ def _get_concrete_generic_subclass(
 
 
 @lru_cache(maxsize=None)
-def get_dao_class(
+def get_data_access_object_class(
     original_clazz: Type, expected_type: Optional[Type] = None
 ) -> Optional[Type[DataAccessObject]]:
     """
@@ -185,7 +185,7 @@ def clear_dao_lookup_caches() -> None:
     """
     _get_clazz_by_original_clazz.cache_clear()
     _get_concrete_generic_subclass.cache_clear()
-    get_dao_class.cache_clear()
+    get_data_access_object_class.cache_clear()
     get_alternative_mapping.cache_clear()
 
 
@@ -218,7 +218,7 @@ def to_dao(
     """
     from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 
-    dao_clazz = get_dao_class(type(source_object))
+    dao_clazz = get_data_access_object_class(type(source_object))
     if dao_clazz is None:
         raise NoDAOFoundError(source_object)
     state = state or ToDataAccessObjectState()

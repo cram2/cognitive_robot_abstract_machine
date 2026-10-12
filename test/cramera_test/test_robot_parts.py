@@ -58,10 +58,12 @@ class TwoArmedRobot:
     left: ArmPart
     right: ArmPart
 
-    def get_arms(self) -> List[ArmPart]:
+    @property
+    def all_arms(self) -> List[ArmPart]:
         return [self.left, self.right]
 
-    def get_sensors(self) -> list[PartWithBodies]:
+    @property
+    def all_sensors(self) -> list[PartWithBodies]:
         return []
 
     def get_left_arm_if_specified(self) -> ArmPart:
@@ -84,10 +86,12 @@ class OneArmedRobot:
     The robot's root body, read for the base link name.
     """
 
-    def get_arms(self) -> List[ArmPart]:
+    @property
+    def all_arms(self) -> List[ArmPart]:
         return [self.arm]
 
-    def get_sensors(self) -> list[PartWithBodies]:
+    @property
+    def all_sensors(self) -> list[PartWithBodies]:
         return []
 
     def get_left_arm_if_specified(self) -> None:

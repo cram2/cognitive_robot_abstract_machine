@@ -21,7 +21,6 @@ import numpy as np
 import pytest
 
 from krrood.entity_query_language.factories import a
-from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
@@ -62,7 +61,7 @@ def confounded_model() -> RelationalProbabilisticCircuit:
     rng = np.random.default_rng(0)
     robots = [_sample_confounded_robot(rng) for _ in range(TRAINING_ROBOT_COUNT)]
     model = RelationalProbabilisticCircuit(PickingRobot)
-    model.fit([to_dao(robot) for robot in robots])
+    model.fit(robots)
     return model
 
 

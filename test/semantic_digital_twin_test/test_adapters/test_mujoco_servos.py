@@ -19,7 +19,6 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoSim,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -45,8 +44,8 @@ def test_the_servo_actuator_is_a_pd_law_clamped_to_the_joints_range():
     gains = ServoGains(stiffness=100.0, damping=10.0, torque_limit=5.0)
     degree_of_freedom = DegreeOfFreedom(
         name=PrefixedName("hinge"),
-        limits=DegreeOfFreedomLimits(
-            DerivativeMap(position=-1.0), DerivativeMap(position=1.0)
+        limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=-1.0, upper_position=1.0
         ),
     )
     servo = PositionServo(name=PrefixedName("hinge_servo"), gains=gains)
@@ -112,8 +111,8 @@ def _pendulum_world() -> PendulumWorld:
             )
         degree_of_freedom = DegreeOfFreedom(
             name=PrefixedName("hinge"),
-            limits=DegreeOfFreedomLimits(
-                DerivativeMap(position=-1.0), DerivativeMap(position=1.0)
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=-1.0, upper_position=1.0
             ),
         )
         world.add_degree_of_freedom(degree_of_freedom)

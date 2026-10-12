@@ -11,6 +11,13 @@ from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 # %% the payload a client sends
 
 
+def create_client() -> MetaData:
+    """
+    The identity a client names itself with.
+    """
+    return MetaData(node_name="client", process_id=3)
+
+
 def create_motion_statechart() -> MotionStatechart:
     """
     Build a motion statechart that ends after some simulated time.
@@ -29,18 +36,34 @@ class TestMotionGoalPayload:
 
     def test_the_motion_statechart_survives_the_round_trip(self):
         motion_statechart = create_motion_statechart()
-        goal = MotionGoal.for_motion_statechart(motion_statechart)
+        goal = MotionGoal.for_motion_statechart(
+            motion_statechart, client=create_client()
+        )
 
         restored = MotionGoal.from_json(json.loads(json.dumps(goal.to_json())))
 
         assert restored.motion_statechart_json_data == motion_statechart.to_json()
 
-    def test_a_goal_built_on_a_change_names_it(self):
-        position = StreamPosition(
-            origin=MetaData(node_name="client", process_id=3), sequence_number=11
-        )
+    def test_a_goal_names_the_client_that_waits_for_it(self):
+        """
+        Giskard stops a motion whose client is gone, which it can only do for a client
+        the goal names.
+        """
+        client = create_client()
         goal = MotionGoal.for_motion_statechart(
-            create_motion_statechart(), required_position=position
+            create_motion_statechart(), client=client
+        )
+
+        restored = MotionGoal.from_json(json.loads(json.dumps(goal.to_json())))
+
+        assert restored.client == client
+
+    def test_a_goal_built_on_a_change_names_it(self):
+        position = StreamPosition(origin=create_client(), sequence_number=11)
+        goal = MotionGoal.for_motion_statechart(
+            create_motion_statechart(),
+            client=create_client(),
+            required_position=position,
         )
 
         restored = MotionGoal.from_json(json.loads(json.dumps(goal.to_json())))
@@ -48,7 +71,9 @@ class TestMotionGoalPayload:
         assert restored.required_position == position
 
     def test_a_goal_built_on_nothing_requires_nothing(self):
-        goal = MotionGoal.for_motion_statechart(create_motion_statechart())
+        goal = MotionGoal.for_motion_statechart(
+            create_motion_statechart(), client=create_client()
+        )
 
         restored = MotionGoal.from_json(json.loads(json.dumps(goal.to_json())))
 

@@ -210,6 +210,83 @@ class TestConditioningTheLeaf:
         )
 
 
+class TestConditioningATruncatedLeaf:
+    """
+    A truncated Gaussian has no marginal, so conditioning must not ask a leaf it keeps
+    whole for one.
+    """
+
+    @pytest.fixture
+    def truncated_circuit(
+        self, correlated, independent_of_it, first, second
+    ) -> ProbabilisticCircuit:
+        box = SimpleEvent.from_data(
+            {first: closed(-11.0, -9.0), second: closed(9.0, 11.0)}
+        ).as_composite_set()
+        truncated, _ = correlated.log_truncated(box)
+        circuit = ProbabilisticCircuit()
+        product = ProductUnit(probabilistic_circuit=circuit)
+        product.add_subcircuit(leaf(truncated, circuit))
+        product.add_subcircuit(leaf(independent_of_it, circuit))
+        return circuit
+
+    def test_fixing_only_other_variables_keeps_the_truncated_leaf(
+        self, truncated_circuit, independent_of_it, first, second, other
+    ):
+        [truncated] = [
+            unit.distribution
+            for unit in truncated_circuit.leaves
+            if isinstance(unit, MultivariateLeaf)
+        ]
+        conditional, log_density = truncated_circuit.log_conditional({other: 3.0})
+        assert log_density == pytest.approx(
+            independent_of_it.log_likelihood(np.array([[3.0]]))[0]
+        )
+        points = np.array([[-10.0, 10.0], [-9.5, 9.2]])
+        assert conditional.marginal([first, second]).log_likelihood(
+            points
+        ) == pytest.approx(truncated.log_likelihood(points[:, ::-1]))
+
+    def test_fixing_a_variable_of_the_truncated_leaf(
+        self, truncated_circuit, first, second, other
+    ):
+        [truncated] = [
+            unit.distribution
+            for unit in truncated_circuit.leaves
+            if isinstance(unit, MultivariateLeaf)
+        ]
+        expected, expected_log_density = truncated.log_conditional({first: -10.0})
+        conditional, log_density = truncated_circuit.log_conditional({first: -10.0})
+        assert log_density == pytest.approx(expected_log_density)
+        points = np.array([[9.5], [10.5]])
+        assert conditional.marginal([second]).log_likelihood(points) == pytest.approx(
+            expected.log_likelihood(points)
+        )
+
+
+# %% moments of the leaf
+
+
+class TestMomentsOfTheLeaf:
+    def test_the_moment_of_every_variable(self, circuit, first, second, other):
+        order = {first: 1, second: 1, other: 1}
+        center = {first: 0.0, second: 0.0, other: 0.0}
+        assert dict(circuit.moment(order, center)) == pytest.approx(
+            {first: -10.0, second: 10.0, other: 3.0}
+        )
+
+    def test_the_moment_of_some_variables_of_the_leaf(self, circuit, first, other):
+        moment = circuit.moment({first: 1}, {first: 0.0})
+        assert moment[first] == pytest.approx(-10.0)
+
+    def test_the_moment_of_a_variable_of_the_leaf_and_one_outside_of_it(
+        self, circuit, second, other
+    ):
+        moment = circuit.moment({second: 2, other: 1}, {second: 10.0, other: 0.0})
+        assert moment[second] == pytest.approx(1.0)
+        assert moment[other] == pytest.approx(3.0)
+
+
 # %% confining the leaf to an event
 
 

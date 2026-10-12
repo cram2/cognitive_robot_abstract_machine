@@ -3,8 +3,7 @@ from pathlib import Path
 
 from krrood.entity_query_language.factories import entity, an, variable, count
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
@@ -79,8 +78,8 @@ milk_place_pose = Pose(Point3(x=2.2, y=7.6, z=0.865), reference_frame=world.root
 # number_of_arms = an(entity(count(robot.end_effectors))).tolist()
 
 # print(number_of_arms)
-with simulated_robot:
+with kinematically_simulated_robot:
     sequential(
-        [ParkArmsAction(arm=Arms.BOTH)],
+        [ParkArmsAction(garmi.all_arms)],
         context,
     ).perform()

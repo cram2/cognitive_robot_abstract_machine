@@ -3,33 +3,28 @@ import threading
 import time
 from copy import deepcopy
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import numpy as np
 import pytest
-from xdist import get_xdist_worker_id, is_xdist_controller, is_xdist_worker
 
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     ActiveConnection1DOFSpecification,
+    PrismaticConnectionSpecification,
 )
-from semantic_digital_twin.predetermined_maps.building_floor import BuildingFloor
+from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
 from semantic_digital_twin.callbacks.callback import Callback
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     HasRootKinematicStructureEntity,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 
 from .living_worlds import (
-    LeakedWorldsAcrossWorkersError,
     LivingWorlds,
-    WorkerTally,
-    WorldTallyLedger,
 )
 from .orm_interface_build import ORM_BUILD_OPTION, OrmBuild
 from .pytest_environment import PytestEnvironmentVariable
@@ -71,7 +66,7 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
-from semantic_digital_twin.predetermined_maps.apartment_environment import (
+from semantic_digital_twin.predefined_maps.apartment_environment import (
     ApartmentEnvironment,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -99,9 +94,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Handle,
     Elevator,
-    Slider,
     Door,
-    Hinge,
     Floor,
     GroundFloor,
     FirstFloor,
@@ -178,20 +171,18 @@ The structure of fixtures in this conftest:
 """
 
 
+# %% repeatable location samples
+
+SAMPLING_SEED = 0
+"""
+The sampling seed of every plan context the tests build, so location samples repeat.
+"""
+
+
 LIVING_WORLDS = pytest.StashKey[LivingWorlds]()
 """
 Where a run keeps the record of which test created each world.
 """
-
-
-def world_tally_ledger(config: pytest.Config) -> WorldTallyLedger:
-    """
-    :param config: The run's configuration.
-    :return: The ledger every process of this run shares to combine their tallies.
-    """
-    return WorldTallyLedger(
-        directory=Path(config.rootpath) / WorldTallyLedger.DIRECTORY_NAME
-    )
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -229,12 +220,6 @@ def pytest_configure(config: pytest.Config) -> None:
     if worker:
         worker_num = int(worker.removeprefix("gw"))
         os.environ["ROS_DOMAIN_ID"] = str(100 + worker_num)
-    else:
-        # The one process not split off as an xdist worker: either the controller of a
-        # distributed run, which never runs a test itself, or the whole run when it is
-        # not distributed at all. Either way, exactly one process reaches here, before
-        # any process has written a tally for this run.
-        world_tally_ledger(config).clear()
 
     living_worlds = LivingWorlds(world_type=World)
     living_worlds.watch()
@@ -246,47 +231,6 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     Attribute the worlds created from now on to the test that is about to run.
     """
     item.config.stash[LIVING_WORLDS].current_test = item.nodeid
-
-
-def pytest_sessionfinish(session: pytest.Session) -> None:
-    """
-    Write this process's final world tally where every process of the run can read it
-    back, and once every process has, enforce a limit on their combined total.
-
-    ..note:: An xdist worker only writes its tally, since the combined limit needs
-        every worker's tally to be meaningful. The controller of a distributed run
-        never ran a test, so it only enforces the combined limit, once every worker
-        has written its own. A run that was not distributed at all does both: it is
-        the only process, so its own tally already is the combined total.
-
-    ..note:: The limit is enforced here rather than in a fixture, since there is no
-        fixture left to tear down once the session is finishing. Raising the
-        combined-limit error would still fail the run, but as an uncaught exception
-        during hook teardown, reported as an internal error rather than a clean
-        test-run failure - so it is caught here and turned into a terminal message
-        plus a failing exit status instead.
-    """
-    ledger = world_tally_ledger(session.config)
-
-    if not is_xdist_controller(session):
-        living_worlds = session.config.stash[LIVING_WORLDS]
-        ledger.record(
-            WorkerTally(
-                worker=get_xdist_worker_id(session),
-                left_behind=living_worlds.collect_surviving_worlds(),
-            )
-        )
-
-    if is_xdist_worker(session):
-        return
-
-    try:
-        ledger.enforce_combined_limit()
-    except LeakedWorldsAcrossWorkersError as error:
-        terminal_reporter = session.config.pluginmanager.get_plugin("terminalreporter")
-        if terminal_reporter is not None:
-            terminal_reporter.write_line(str(error), red=True)
-        session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
 
 @pytest.fixture(scope="session")
@@ -325,6 +269,22 @@ def check_for_leaked_worlds(request: pytest.FixtureRequest) -> Iterator[None]:
 #############################################
 ############### Worlds ######################
 #############################################
+
+
+@pytest.fixture()
+def mini_world() -> World:
+    """
+    A world of two bodies joined by a revolute connection about the z axis.
+    """
+    world = World()
+    with world.modify_world():
+        body = Body(name=PrefixedName("root"))
+        body2 = Body(name=PrefixedName("tip"))
+        connection = RevoluteConnection.create_with_dofs(
+            world=world, parent=body, child=body2, axis=Vector3.Z()
+        )
+        world.add_connection(connection)
+    return world
 
 
 @pytest.fixture()
@@ -788,67 +748,33 @@ def _elevator_world_setup():
             Elevator.get_default_root_kinematic_structure_entity_specification(
                 scale=Scale(2, 2, 2), wall_thickness=0.05
             ),
-        ).spawn(world)
-
-        vertical_drive = Slider.get_annotation_specification(
-            f"{name.name}_drive",
-            Slider.get_default_root_kinematic_structure_entity_specification(),
-            parent_connection_specification=Slider.parent_connection_specification(
+            parent_connection_specification=PrismaticConnectionSpecification(
                 axis=Vector3.Z(),
-                dof_limits=DegreeOfFreedomLimits(
-                    lower=DerivativeMap(velocity=-1.0),
-                    upper=DerivativeMap(velocity=1.0),
+                dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                    maximum_speed=1.0
                 ),
             ),
         ).spawn(world)
-        elevator.add(vertical_drive)
 
         door_scale = Scale(wall_thickness, scale.y / 2, scale.z)
-        door1 = Door.create_with_new_body_in_world(
-            name=f"{name.name}_door0",
-            world=world,
-            world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                Point3(-scale.x / 2, -scale.y / 4, 0),
-                reference_frame=world.root,
-            ),
-            scale=door_scale,
-        )
-        door2 = Door.create_with_new_body_in_world(
-            name=f"{name.name}_door1",
-            world=world,
-            world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                Point3(-scale.x / 2, scale.y / 4, 0),
-                reference_frame=world.root,
-            ),
-            scale=door_scale,
-        )
-
-        elevator.add(door1)
-        elevator.add(door2)
-
         door_travel = door_scale.y
-        door_slider_configs = (
-            (
-                door1,
-                DerivativeMap(position=0.0),
-                DerivativeMap(position=door_travel),
-            ),
-            (
-                door2,
-                DerivativeMap(position=0.0),
-                DerivativeMap(position=door_travel),
-            ),
-        )
-        for i, (current_door, lower, upper) in enumerate(door_slider_configs):
-            door_slider = Slider.get_annotation_specification(
-                f"{name.name}_door{i}_drive",
-                Slider.get_default_root_kinematic_structure_entity_specification(),
-                parent_connection_specification=Slider.parent_connection_specification(
-                    axis=(Vector3.Y() * ((-1) ** (i + 1))),
-                    dof_limits=DegreeOfFreedomLimits(lower=lower, upper=upper),
+        for i, door_y in enumerate((-scale.y / 4, scale.y / 4)):
+            door = Door.create_with_new_body_in_world(
+                name=f"{name.name}_door{i}",
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                    Point3(-scale.x / 2, door_y, 0),
+                    reference_frame=world.root,
                 ),
-            ).spawn(world)
-            current_door.add(door_slider)
+                parent_connection_specification=PrismaticConnectionSpecification(
+                    axis=(Vector3.Y() * ((-1) ** (i + 1))),
+                    dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                        lower_position=0.0, upper_position=door_travel
+                    ),
+                ),
+                scale=door_scale,
+            )
+            elevator.add(door)
 
         world.add_semantic_annotation(elevator)
     return world
@@ -871,6 +797,7 @@ def apartment_world_pr2_copy_with_context(_apartment_world_setup, _pr2_world_set
         Context(
             result,
             result.get_semantic_annotations_by_type(AbstractRobot)[0],
+            sampling_seed=SAMPLING_SEED,
         ),
     )
 
@@ -1100,7 +1027,11 @@ def simple_pr2_world_setup(_pr2_world_setup, _simple_apartment_setup):
     pr2_copy = deepcopy(_pr2_world_setup)
     pr2_copy.merge_world(apartment_world)
     robot_view = pr2_copy.get_semantic_annotations_by_type(PR2)[0]
-    return pr2_copy, robot_view, Context(pr2_copy, robot_view)
+    return (
+        pr2_copy,
+        robot_view,
+        Context(pr2_copy, robot_view, sampling_seed=SAMPLING_SEED),
+    )
 
 
 @pytest.fixture(scope="session")
@@ -1113,7 +1044,11 @@ def hsr_apartment_world(_hsr_world_setup, _apartment_world_setup):
         hsr_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
     )
 
-    return apartment_copy, robot_view, Context(apartment_copy, robot_view)
+    return (
+        apartment_copy,
+        robot_view,
+        Context(apartment_copy, robot_view, sampling_seed=SAMPLING_SEED),
+    )
 
 
 @pytest.fixture(scope="session")

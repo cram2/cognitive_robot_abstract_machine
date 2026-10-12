@@ -14,6 +14,7 @@ from typing_extensions import (
     Optional,
     Self,
     Tuple,
+    Type,
 )
 
 from probabilistic_model.exceptions import ShapeMismatchError
@@ -115,6 +116,89 @@ class SumLayer(InnerLayer):
             ),
         )
 
+    @classmethod
+    def from_edges(
+        cls,
+        child_layers: List[Layer],
+        edges: InnerLayerEdges,
+        log_weights: EdgeValues,
+        number_of_nodes: int,
+    ) -> Self:
+        """
+        :param child_layers: The child layers.
+        :param edges: The edges from the nodes of the new layer into the child layers.
+        :param log_weights: The logarithmic weight of every edge.
+        :param number_of_nodes: The number of nodes of the new layer.
+        :return: The sum layer with these edges and weights.
+        """
+        offsets = np.concatenate(
+            [
+                [0],
+                np.cumsum(
+                    [child_layer.number_of_nodes for child_layer in child_layers]
+                ),
+            ]
+        ).astype(np.int64)
+        return cls(
+            child_layers,
+            RowGroupedSparseArray.from_entries(
+                SparseEntries(
+                    log_weights,
+                    edges.nodes,
+                    offsets[edges.child_layer_indices] + edges.child_nodes,
+                ),
+                (number_of_nodes, int(offsets[-1])),
+            ),
+        )
+
+    @classmethod
+    def mixture_of_pieces(
+        cls, pieces: List[LayerWithLogProbabilities]
+    ) -> LayerWithLogProbabilities:
+        """
+        Mix the pieces a structural query splits every node of a layer into.
+
+        Node ``i`` of the result mixes node ``i`` of every piece, weighted by the
+        probability of that piece. Pieces of the same type are joined into one child
+        layer, so the number of layers does not grow with the number of pieces.
+
+        :param pieces: The pieces, each with as many nodes as the layer that was split,
+            and the log-probabilities of their nodes.
+        :return: The mixture and the log-probabilities of its nodes.
+        """
+        number_of_nodes = pieces[0].layer.number_of_nodes
+        pieces_by_type: Dict[Type[Layer], List[LayerWithLogProbabilities]] = {}
+        for piece in pieces:
+            pieces_by_type.setdefault(type(piece.layer), []).append(piece)
+
+        child_layers = []
+        log_probabilities_per_child_layer = []
+        for layer_type, typed_pieces in pieces_by_type.items():
+            child_layers.append(
+                layer_type.concatenate([piece.layer for piece in typed_pieces])
+            )
+            log_probabilities_per_child_layer.extend(
+                piece.log_probabilities for piece in typed_pieces
+            )
+
+        # the pieces are the columns in order, and node i of every piece sits in row i
+        number_of_pieces = len(pieces)
+        log_weights = RowGroupedSparseArray.from_entries(
+            SparseEntries(
+                np.concatenate(log_probabilities_per_child_layer),
+                np.tile(np.arange(number_of_nodes), number_of_pieces),
+                np.arange(number_of_pieces * number_of_nodes),
+            ),
+            (number_of_nodes, number_of_pieces * number_of_nodes),
+        )
+
+        node_log_probabilities = np.logaddexp.reduce(
+            [piece.log_probabilities for piece in pieces], axis=0
+        )
+        return LayerWithLogProbabilities(
+            cls(child_layers, log_weights), node_log_probabilities
+        )
+
     @property
     def variables(self) -> VariableIndices:
         if self._variables_cache is None:
@@ -182,6 +266,21 @@ class SumLayer(InnerLayer):
         ):
             return values
         return values[..., columns]
+
+    def has_equal_edges(self, other: Self) -> bool:
+        return super().has_equal_edges(other) and np.array_equal(
+            self.log_weights.data, other.log_weights.data
+        )
+
+    def with_edges(
+        self, child_layers: List[Layer], edges: InnerLayerEdges, copies: List[Self]
+    ) -> Self:
+        return self.from_edges(
+            child_layers,
+            edges,
+            np.concatenate([copy.log_weights.data for copy in copies]),
+            len(copies) * self.number_of_nodes,
+        )
 
     # %% weights
 

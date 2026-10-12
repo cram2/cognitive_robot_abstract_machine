@@ -68,12 +68,7 @@ class PR2VelocityMujocoInterface(RobotInterfaceConfig):
     Name of the body the drive moves relative to.
     """
 
-    drive_joint_name: str = "brumbrum"
-    """
-    Name of the drive connection that the odometry topic is synced into.
-    """
-
     def setup(self):
         self.discover_interfaces_from_controller_manager()
-        self.sync_odometry_topic("/odom", self.drive_joint_name)
+        self.sync_robot_part(self.robot.mobile_base)
         self.add_base_cmd_velocity(cmd_vel_topic="/cmd_vel")

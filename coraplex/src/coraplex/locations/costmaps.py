@@ -1,29 +1,26 @@
 from __future__ import annotations
 
 import logging
-import random
 from copy import deepcopy
 from dataclasses import dataclass, field
-from functools import partial
 from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 from matplotlib import colors
 from skimage.measure import label
 from typing_extensions import (
-    Tuple,
     List,
     Optional,
     Iterator,
-    Callable,
     Set,
-    TYPE_CHECKING,
 )
 
-from coraplex.locations.base import PoseGeneratorBackend
+from coraplex.locations.base import Location
+from krrood.entity_query_language.exceptions import NonPositiveLimitValue
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import (
@@ -35,100 +32,13 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vect
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-if TYPE_CHECKING:
-    from coraplex.datastructures.dataclasses import Context
+from coraplex.datastructures.dataclasses import Context
 
 logger = logging.getLogger("coraplex")
 
 
-class OrientationGenerator:
-    """
-    Provides methods to generate orientations for pose candidates.
-    """
-
-    @staticmethod
-    def generate_origin_orientation(
-        position: Point3, origin: Pose, rotate_by_angle: float = 0
-    ) -> Quaternion:
-        """
-        Generates an orientation such that the robot faces the origin of the locations.
-
-        :param position: The position in the locations, already converted to the world coordinate frame.
-        :param origin: The origin of the locations, the point which the robot should face.
-        :param rotate_by_angle: Angle to rotate the orientation.
-        :return: A quaternion of the calculated orientation.
-        """
-        rotation_R_new_rotation = RotationMatrix.from_rpy(0, 0, rotate_by_angle)
-        angle = (
-            np.arctan2(
-                position.y - origin.y,
-                position.x - origin.x,
-            )
-            + np.pi
-        )[0]
-        world_R_rotation = RotationMatrix.from_rpy(0, 0, angle)
-        world_R_new_rotation = world_R_rotation @ rotation_R_new_rotation
-        return world_R_new_rotation.to_quaternion()
-
-    @staticmethod
-    def orientation_generator_for_axis(
-        axis: Vector3,
-    ) -> Callable[[Point3, Pose], Quaternion]:
-        """
-        Creates an orientation generator where the given axis is facing the target.
-
-        :param axis: The axis which should be facing the target
-        :return: A callable orientation generator
-        """
-        rotation = axis[1] * (np.pi / 2) * -1
-        return partial(
-            OrientationGenerator.generate_origin_orientation, rotate_by_angle=rotation
-        )
-
-    @staticmethod
-    def generate_random_orientation(
-        *_, rng: random.Random = random.Random(42)
-    ) -> Quaternion:
-        """
-        Generates a random orientation rotated around the z-axis (yaw).
-        A random angle is sampled using a provided RNG instance to ensure reproducibility.
-
-        :param _: Ignored parameters to maintain compatibility with other orientation generators.
-        :param rng: Random number generator instance for reproducible sampling.
-
-        :return: A quaternion of the randomly generated orientation.
-        """
-        return Quaternion.from_rpy(0, 0, rng.uniform(0, 2 * np.pi))
-
-
 @dataclass
-class Rectangle:
-    """
-    A rectangle that is described by a lower and upper x and y value.
-    """
-
-    x_lower: float
-    x_upper: float
-    y_lower: float
-    y_upper: float
-
-    def translate(self, x: float, y: float):
-        """Translate the rectangle by x and y"""
-        self.x_lower += x
-        self.x_upper += x
-        self.y_lower += y
-        self.y_upper += y
-
-    def scale(self, x_factor: float, y_factor: float):
-        """Scale the rectangle by x_factor and y_factor"""
-        self.x_lower *= x_factor
-        self.x_upper *= x_factor
-        self.y_lower *= y_factor
-        self.y_upper *= y_factor
-
-
-@dataclass
-class Costmap(PoseGeneratorBackend):
+class Costmap(Location):
     """
     The base class of all Costmaps.
     Costmaps describe regions in the world that are suitable for a certaint task.
@@ -177,86 +87,17 @@ class Costmap(PoseGeneratorBackend):
     """
     The world from which this locations was created.
     """
-    vis_ids: List[int] = field(default_factory=list, init=False)
-
-    number_of_samples: int = field(kw_only=True, default=200)
-    """
-    Number of samples to return at max
-    """
-
-    sample_randomly: bool = field(kw_only=True, default=False)
-    """
-    If the sampling should randomly pick valid entries
-    """
-
-    orientation_generator: Optional[Callable[[Point3, Pose], Quaternion]] = field(
-        kw_only=True, default=None
-    )
-    """
-    An optional orientatoin generator to use to generate the orientation for a sampled pose
-    """
-
-    def _chunks(self, lst: List, n: int) -> Iterator[List]:
-        """
-        Yield successive n-sized chunks from lst.
-
-        :param lst: The list from which chunks should be yielded
-        :param n: Size of the chunks
-        :return: A list of size n from lst
-        """
-        for i in range(0, len(lst), n):
-            yield lst[i : i + n]
+    visualization_ids: List[int] = field(default_factory=list, init=False)
 
     def close_visualization(self) -> None:
         """
         Removes the visualization from the World.
         """
-        for v_id in self.vis_ids:
-            self.world.remove_visual_object(v_id)
-        self.vis_ids = []
+        for visualization_id in self.visualization_ids:
+            self.world.remove_visual_object(visualization_id)
+        self.visualization_ids = []
 
-    def _find_consectuive_line(self, start: Tuple[int, int], map: np.ndarray) -> int:
-        """
-        Finds the number of consecutive entries in the locations which are greater
-        than zero.
-
-        :param start: The indices in the locations from which the consecutive line should be found.
-        :param map: The locations in which the line should be found.
-        :return: The length of the consecutive line of entries greater than zero.
-        """
-        width = map.shape[1]
-        length = 0
-        for i in range(start[1], width):
-            if map[start[0]][i] > 0:
-                length += 1
-            else:
-                return length
-        return length
-
-    def _find_max_box_height(
-        self, start: Tuple[int, int], length: int, map: np.ndarray
-    ) -> int:
-        """
-        Finds the maximal height for a rectangle with a given width in a locations.
-        The method traverses one row at a time and checks if all entries for the
-        given width are greater than zero. If an entry is less or equal than zero
-        the height is returned.
-
-        :param start: The indices in the locations from which the method should start.
-        :param length: The given width for the rectangle
-        :param map: The locations in which should be searched.
-        :return: The height of the rectangle.
-        """
-        height, width = map.shape
-        curr_height = 1
-        for i in range(start[0], height):
-            for j in range(start[1], start[1] + length):
-                if map[i][j] <= 0:
-                    return curr_height
-            curr_height += 1
-        return curr_height
-
-    def merge(self, other_cm: Costmap) -> Costmap:
+    def merge(self, other: Costmap) -> Costmap:
         """
         Merges the values of two locations and returns a new locations that has for
         every cell the merged values of both inputs. To merge two locations they
@@ -268,33 +109,34 @@ class Costmap(PoseGeneratorBackend):
 
         If any of these constrains is not fulfilled a ValueError will be raised.
 
-        :param other_cm: The other locations with which this locations should be merged.
-        :return: A new locations that contains the merged values
+        :param other: The other locations with which this locations should be merged.
+        :return: A new locations that contains the merged values, carrying this map's
+            :attr:`number_of_samples` and :attr:`seed`.
         """
-        if self.width != other_cm.width or self.height != other_cm.height:
+        if self.width != other.width or self.height != other.height:
             raise ValueError("You can only merge locations of the same size.")
         elif (
-            not np.allclose(self.origin.x, other_cm.origin.x)
-            or not np.allclose(self.origin.y, other_cm.origin.y)
+            not np.allclose(self.origin.x, other.origin.x)
+            or not np.allclose(self.origin.y, other.origin.y)
             or not np.allclose(
-                self.origin.to_rotation_matrix(), other_cm.origin.to_rotation_matrix()
+                self.origin.rotation_matrix, other.origin.rotation_matrix
             )
         ):
             raise ValueError(
                 "To merge locations, the x and y coordinate as well as the orientation must be equal."
             )
-        elif self.resolution != other_cm.resolution:
+        elif self.resolution != other.resolution:
             raise ValueError("To merge two locations their resolution must be equal.")
-        elif self.world != other_cm.world:
+        elif self.world != other.world:
             raise ValueError(
                 "To merge two locations they must belong to the same world."
             )
         new_map = np.zeros((self.height, self.width))
         # A numpy array of the positions where both locations are greater than 0
-        merge = np.logical_and(self.map > 0, other_cm.map > 0)
-        new_map[merge] = self.map[merge] * other_cm.map[merge]
-        max_val = np.max(new_map)
-        if max_val != 0:
+        merge = np.logical_and(self.map > 0, other.map > 0)
+        new_map[merge] = self.map[merge] * other.map[merge]
+        maximum_value = np.max(new_map)
+        if maximum_value != 0:
             new_map = (new_map / np.max(new_map)).reshape((self.height, self.width))
         else:
             new_map = new_map.reshape((self.height, self.width))
@@ -306,6 +148,8 @@ class Costmap(PoseGeneratorBackend):
             origin=self.origin,
             map=new_map,
             world=self.world,
+            number_of_samples=self.number_of_samples,
+            seed=self.seed,
         )
 
     def __add__(self, other: Costmap) -> Costmap:
@@ -326,92 +170,133 @@ class Costmap(PoseGeneratorBackend):
     def __and__(self, other):
         return self.merge(other)
 
-    def partitioning_rectangles(self) -> List[Rectangle]:
+    def candidates(self) -> Iterator[Pose]:
+        return self.sample(self.number_of_samples, self.seed)
+
+    def sample(
+        self, number_of_samples: int, seed: Optional[int] = None
+    ) -> Iterator[Pose]:
         """
-        Partition the map attached to this locations into rectangles. The rectangles are axis aligned, exhaustive and
-        disjoint sets.
+        Sample pose candidates from this map.
 
-        :return: A list containing the partitioning rectangles
+        The sample count is capped at the number of entries this map holds, and every
+        candidate faces this map's origin.
+
+        :param number_of_samples: How many candidates to sample.
+        :param seed: Fixes the sampling, or ``None`` to sample afresh.
+        :return: The candidate poses, in the order they should be tried.
+        :raises NonPositiveLimitValue: If asked for fewer than one candidate.
         """
-        ocm_map = np.copy(self.map)
-        origin = np.array([self.height / 2, self.width / 2]) * -1
-        rectangles = []
+        if number_of_samples < 1:
+            raise NonPositiveLimitValue(number_of_samples)
 
-        # for every index pair (i, j) in the occupancy locations
-        for i in range(0, self.map.shape[0]):
-            for j in range(0, self.map.shape[1]):
-
-                # if this index has not been used yet
-                if ocm_map[i][j] > 0:
-                    curr_width = self._find_consectuive_line((i, j), ocm_map)
-                    curr_pose = (i, j)
-                    curr_height = self._find_max_box_height((i, j), curr_width, ocm_map)
-
-                    # calculate the rectangle in the locations
-                    x_lower = curr_pose[0]
-                    x_upper = curr_pose[0] + curr_height
-                    y_lower = curr_pose[1]
-                    y_upper = curr_pose[1] + curr_width
-
-                    # mark the found rectangle as occupied
-                    ocm_map[i : i + curr_height, j : j + curr_width] = 0
-
-                    # transform rectangle to map space
-                    rectangle = Rectangle(x_lower, x_upper, y_lower, y_upper)
-                    rectangle.translate(*origin)
-                    rectangle.scale(self.resolution, self.resolution)
-                    rectangles.append(rectangle)
-
-        return rectangles
-
-    def __iter__(self) -> Iterator[Pose]:
-        """
-        A generator that crates pose candidates from a given locations. The generator
-        selects the highest 100 values and returns the corresponding positions.
-        Orientations are calculated such that the Robot faces the center of the locations.
-
-        :Yield: A tuple of position and orientation
-        """
-
-        ori_gen = (
-            self.orientation_generator
-            or OrientationGenerator.generate_origin_orientation
+        # An entry is only ever offered once, so the whole map is all there is to
+        # sample.
+        return self._sample(
+            min(number_of_samples, self.map.size),
+            np.random.default_rng(seed),
         )
 
-        # Determines how many positions should be sampled from the locations
-        if (
-            self.number_of_samples == -1
-            or self.number_of_samples > self.map.flatten().shape[0]
-        ):
-            self.number_of_samples = self.map.flatten().shape[0]
+    def _orientation_facing_origin(self, position: Point3) -> Quaternion:
+        """
+        The orientation a candidate sampled at the given position is offered with.
 
-        segmented_maps = self.segment_map()
-        samples_per_map = self.number_of_samples // len(segmented_maps)
-        for seg_map in segmented_maps:
+        A candidate faces this map's origin, so that whatever the map was built around
+        is in front of the robot standing there.
 
-            if self.sample_randomly:
-                indices = np.random.choice(seg_map.size, samples_per_map, replace=False)
-            else:
-                indices = np.argpartition(seg_map.flatten(), -samples_per_map)[
-                    -samples_per_map:
-                ]
-
-            indices = np.dstack(np.unravel_index(indices, self.map.shape)).reshape(
-                samples_per_map, 2
+        :param position: Where the candidate lies, in world frame.
+        :return: The orientation for that candidate.
+        """
+        angle = (
+            np.arctan2(
+                position.y - self.origin.y,
+                position.x - self.origin.x,
             )
+            + np.pi
+        )[0]
+        return RotationMatrix.from_rpy(0, 0, angle).quaternion
 
-            height = seg_map.shape[0]
-            width = seg_map.shape[1]
+    def _budget_per_segment(
+        self, segments: List[np.ndarray], number_of_samples: int
+    ) -> List[int]:
+        """
+        Split a sample budget over this map's segments in proportion to their summed
+        ratings; what a segment cannot take goes to the best rated segments that can.
+
+        :param segments: This map's segments, the best rated first.
+        :param number_of_samples: How many candidates the whole map was asked for.
+        :return: How many to sample from each segment, in the order they were given.
+        """
+        # Only entries rated above zero can be sampled.
+        capacities = [int(np.count_nonzero(segment)) for segment in segments]
+        ratings = np.array([segment.sum() for segment in segments], dtype=float)
+        if not ratings.any():
+            return [0] * len(segments)
+        shares = number_of_samples * ratings / ratings.sum()
+        budgets = np.minimum(np.floor(shares).astype(int), capacities)
+        # Spend the rest on the best rated segments first (segments are sorted that way).
+        unspent = number_of_samples - int(budgets.sum())
+        for index, capacity in enumerate(capacities):
+            if unspent <= 0:
+                break
+            taken = min(unspent, capacity - int(budgets[index]))
+            budgets[index] += taken
+            unspent -= taken
+        return budgets.tolist()
+
+    def _pick_entries(
+        self,
+        ratings: NDArray[np.float64],
+        count: int,
+        random_generator: np.random.Generator,
+    ) -> NDArray[np.intp]:
+        """
+        Draw entries without repetition, each with a probability proportional to its
+        rating; entries rated zero are never drawn.
+
+        :param ratings: The flattened map, one rating per entry.
+        :param count: How many entries to pick at most.
+        :param random_generator: The source of randomness to sample from.
+        :return: The indices to offer, in the order they should be offered.
+        """
+        offerable = min(count, int(np.count_nonzero(ratings)))
+        if offerable <= 0:
+            return np.empty(0, dtype=np.intp)
+        return random_generator.choice(
+            ratings.size, offerable, replace=False, p=ratings / ratings.sum()
+        )
+
+    def _sample(
+        self,
+        number_of_samples: int,
+        random_generator: np.random.Generator,
+    ) -> Iterator[Pose]:
+        """
+        Sample candidates, the given number of them spread over this map's segments.
+
+        :param number_of_samples: How many candidates to sample, no more than this map
+            holds.
+        :param random_generator: The source of randomness to sample with.
+        :Yield: A candidate pose.
+        """
+        segmented_maps = self.segment_map()
+        budgets = self._budget_per_segment(segmented_maps, number_of_samples)
+        for segmented_map, budget in zip(segmented_maps, budgets):
+            indices = self._pick_entries(
+                segmented_map.flatten(), budget, random_generator
+            )
+            indices = np.column_stack(np.unravel_index(indices, segmented_map.shape))
+
+            height = segmented_map.shape[0]
+            width = segmented_map.shape[1]
             center = np.array([height // 2, width // 2])
-            for ind in indices:
-                if seg_map[ind[0]][ind[1]] == 0:
-                    continue
+            for index in indices:
                 # Compute world position independent of origin orientation:
                 # map indices increase with world axes; origin is at the center.
-                offset = (ind - center) * self.resolution
-                position = self.origin.to_position() + Vector3(offset[0], offset[1], 0)
+                offset = (index - center) * self.resolution
+                position = self.origin.position + Vector3(offset[0], offset[1], 0)
 
-                orientation: Quaternion = ori_gen(position, self.origin)
+                orientation: Quaternion = self._orientation_facing_origin(position)
                 yield Pose(
                     position,
                     orientation,
@@ -433,15 +318,17 @@ class Costmap(PoseGeneratorBackend):
         # Label only works on integer arrays
         discrete_map[discrete_map != 0] = 1
 
-        labeled_map, num_labels = label(discrete_map, return_num=True, connectivity=2)
+        labeled_map, number_of_labels = label(
+            discrete_map, return_num=True, connectivity=2
+        )
         result_maps = []
         # We don't want the maps for value 0
-        for i in range(1, num_labels + 1):
+        for label_value in range(1, number_of_labels + 1):
             copy_map = deepcopy(self.map)
-            copy_map[labeled_map != i] = 0
+            copy_map[labeled_map != label_value] = 0
             result_maps.append(copy_map)
         # Maps with the highest values go first
-        result_maps.sort(key=lambda m: np.max(m), reverse=True)
+        result_maps.sort(key=lambda segment: np.max(segment), reverse=True)
         return result_maps
 
 
@@ -484,7 +371,7 @@ class OccupancyCostmap(Costmap):
 
         :return: A 2d numpy array of the occupied space
         """
-        origin_position = self.origin.to_position().to_list()
+        origin_position = self.origin.position.to_list()
         # Generate 2d grid with indices
         indices = np.concatenate(
             np.dstack(
@@ -546,18 +433,20 @@ class OccupancyCostmap(Costmap):
         :param map: Map of obstacles to inflate.
         :return: The map with inflated obstacles.
         """
-        sub_shape = (
+        window_shape = (
             self._distance_to_obstacle_index * 2,
             self._distance_to_obstacle_index * 2,
         )
-        view_shape = tuple(np.subtract(map.shape, sub_shape) + 1) + sub_shape
+        view_shape = tuple(np.subtract(map.shape, window_shape) + 1) + window_shape
         strides = map.strides + map.strides
 
-        sub_matrices = np.lib.stride_tricks.as_strided(map, view_shape, strides)
-        sub_matrices = sub_matrices.reshape(sub_matrices.shape[:-2] + (-1,))
+        windows = np.lib.stride_tricks.as_strided(map, view_shape, strides)
+        windows = windows.reshape(windows.shape[:-2] + (-1,))
 
-        sum = np.sum(sub_matrices, axis=2)
-        map = (sum == (self._distance_to_obstacle_index * 2) ** 2).astype("int16")
+        window_sums = np.sum(windows, axis=2)
+        map = (window_sums == (self._distance_to_obstacle_index * 2) ** 2).astype(
+            "int16"
+        )
         return map
 
     def _create_from_world(self) -> np.ndarray:
@@ -567,10 +456,10 @@ class OccupancyCostmap(Costmap):
         creating the locations the distance to obstacle parameter is applied.
         """
 
-        res = self.create_ray_mask_around_origin()
+        ray_mask = self.create_ray_mask_around_origin()
 
         map = np.pad(
-            res,
+            ray_mask,
             (
                 int(self._distance_to_obstacle_index / 2),
                 int(self._distance_to_obstacle_index / 2),
@@ -587,22 +476,31 @@ class OccupancyCostmap(Costmap):
         return np.flip(map)
 
     @classmethod
-    def default_map(cls, context: Context, target: Pose) -> OccupancyCostmap:
+    def default_map(
+        cls,
+        context: Context,
+        target: Pose,
+        *,
+        resolution: float = 0.02,
+        cells: int = 200,
+    ) -> OccupancyCostmap:
         """
-        Creates an occupancy costmap with some default values, the most important one being that the distance_to_obstacle
-        is set to the radius of the robot base.
+        Creates an occupancy costmap around a target, keeping the robot base's radius
+        clear of obstacles.
 
         :param context: The context to create the occupancy cost map.
         :param target: The target pose for the occupancy cost map.
-        :returns: A occupancy cost map with default values.
+        :param resolution: Edge length of a cell, in meters.
+        :param cells: Number of cells along each side of the map.
+        :returns: The occupancy cost map.
         """
         ground_pose = deepcopy(target)
         ground_pose.z = 0
 
         return OccupancyCostmap(
-            resolution=0.02,
-            width=200,
-            height=200,
+            resolution=resolution,
+            width=cells,
+            height=cells,
             world=context.world,
             distance_to_obstacle=context.robot.mobile_base.base_radius,
             robot_view=context.robot,
@@ -618,9 +516,9 @@ class VisibilityCostmap(Costmap):
     please look here: `PhD Thesis (page 173) <https://mediatum.ub.tum.de/doc/1239461/1239461.pdf>`_
     """
 
-    min_height: float
+    minimum_height: float
 
-    max_height: float
+    maximum_height: float
 
     target_object: Optional[Union[Body, Pose]] = None
 
@@ -641,16 +539,16 @@ class VisibilityCostmap(Costmap):
         """
         images = []
 
-        r_t = RayTracer(self.world)
+        ray_tracer = RayTracer(self.world)
 
-        origin_copy = deepcopy(self.origin).to_homogeneous_matrix()
+        origin_copy = deepcopy(self.origin).homogeneous_matrix
 
         for _ in range(4):
             origin_copy = origin_copy @ HomogeneousTransformationMatrix.from_xyz_rpy(
                 yaw=np.pi / 2
             )
             images.append(
-                r_t.create_depth_map(
+                ray_tracer.create_depth_map(
                     origin_copy,
                     resolution=CameraResolution(
                         width=self.width,
@@ -668,11 +566,11 @@ class VisibilityCostmap(Costmap):
         in Lorenz Mösenlechners `PhD Thesis (page 178) <https://mediatum.ub.tum.de/doc/1239461/1239461.pdf>`_
         The resulting map is then saved to :py:attr:`self.map`
         """
-        depth_imgs = self._create_images()
+        depth_images = self._create_images()
         # A 2D array where every cell contains the arctan2 value with respect to
         # the middle of the array. Additionally, the interval is shifted such that
         # it is between 0 and 2pi
-        tan = (
+        angles = (
             np.arctan2(
                 np.mgrid[
                     -int(self.width / 2) : int(self.width / 2),
@@ -685,38 +583,46 @@ class VisibilityCostmap(Costmap):
             )
             + np.pi
         )
-        res = np.zeros(tan.shape)
+        image_indices = np.zeros(angles.shape)
 
-        # Just for completion, since the res array has zeros in every position this
+        # Just for completion, since the image_indices array has zeros in every position this
         # operation is not necessary.
-        # res[np.logical_and(tan <= np.pi * 0.25, tan >= np.pi * 1.75)] = 0
+        # image_indices[np.logical_and(angles <= np.pi * 0.25, angles >= np.pi * 1.75)] = 0
 
         # Creates a 2D array which contains the index of the depth image for every
         # coordinate
-        res[np.logical_and(tan >= np.pi * 1.25, tan <= np.pi * 1.75)] = 3
-        res[np.logical_and(tan >= np.pi * 0.75, tan < np.pi * 1.25)] = 2
-        res[np.logical_and(tan >= np.pi * 0.25, tan < np.pi * 0.75)] = 1
+        image_indices[
+            np.logical_and(angles >= np.pi * 1.25, angles <= np.pi * 1.75)
+        ] = 3
+        image_indices[np.logical_and(angles >= np.pi * 0.75, angles < np.pi * 1.25)] = 2
+        image_indices[np.logical_and(angles >= np.pi * 0.25, angles < np.pi * 0.75)] = 1
 
         indices = np.dstack(np.mgrid[0 : self.width, 0 : self.width])
         depth_indices = np.zeros(indices.shape)
-        # x-value of index: res == n, :1
-        # y-value of index: res == n, 1:2
+        # x-value of index: image_indices == n, :1
+        # y-value of index: image_indices == n, 1:2
 
         # (y, size-x-1) for index between 1.25 pi and 1.75 pi
-        depth_indices[res == 3, :1] = indices[res == 3, 1:2]
-        depth_indices[res == 3, 1:2] = self.width - indices[res == 3, :1] - 1
+        depth_indices[image_indices == 3, :1] = indices[image_indices == 3, 1:2]
+        depth_indices[image_indices == 3, 1:2] = (
+            self.width - indices[image_indices == 3, :1] - 1
+        )
 
         # (size-x-1, y) for index between 0.75 pi and 1.25 pi
-        depth_indices[res == 2, :1] = self.width - indices[res == 2, :1] - 1
-        depth_indices[res == 2, 1:2] = indices[res == 2, 1:2]
+        depth_indices[image_indices == 2, :1] = (
+            self.width - indices[image_indices == 2, :1] - 1
+        )
+        depth_indices[image_indices == 2, 1:2] = indices[image_indices == 2, 1:2]
 
         # (size-y-1, x) for index between 0.25 pi and 0.75 pi
-        depth_indices[res == 1, :1] = self.width - indices[res == 1, 1:2] - 1
-        depth_indices[res == 1, 1:2] = indices[res == 1, :1]
+        depth_indices[image_indices == 1, :1] = (
+            self.width - indices[image_indices == 1, 1:2] - 1
+        )
+        depth_indices[image_indices == 1, 1:2] = indices[image_indices == 1, :1]
 
         # (x, y) for index between 0.25 pi and 1.75 pi
-        depth_indices[res == 0, :1] = indices[res == 0, :1]
-        depth_indices[res == 0, 1:2] = indices[res == 0, 1:2]
+        depth_indices[image_indices == 0, :1] = indices[image_indices == 0, :1]
+        depth_indices[image_indices == 0, 1:2] = indices[image_indices == 0, 1:2]
 
         # Convert back to origin in the middle of the locations
         depth_indices[:, :, :1] -= self.width / 2
@@ -759,53 +665,60 @@ class VisibilityCostmap(Costmap):
 
         # Row ranges
         # Calculation of the ranges of coordinates in the row which have to be
-        # taken into account. The range is from r_min to r_max.
-        # These are two arrays with shape: size*size, the r_min constrains the beginning
-        # of the range for every coordinate and r_max contains the end for each
+        # taken into account. The range is from row_minimum to row_maximum.
+        # These are two arrays with shape: size*size, the row_minimum constrains the beginning
+        # of the range for every coordinate and row_maximum contains the end for each
         # coordinate
-        r_min = (
-            np.arctan((self.min_height - self.origin.z) / distances) * self.width
+        row_minimum = (
+            np.arctan((self.minimum_height - self.origin.z) / distances) * self.width
         ) + self.width / 2
-        r_max = (
-            np.arctan((self.max_height - self.origin.z) / distances) * self.width
+        row_maximum = (
+            np.arctan((self.maximum_height - self.origin.z) / distances) * self.width
         ) + self.width / 2
 
-        r_min = np.minimum(np.around(r_min), self.width - 1).astype("int16")
-        r_max = np.minimum(np.around(r_max), self.width - 1).astype("int16")
+        row_minimum = np.minimum(np.around(row_minimum), self.width - 1).astype("int16")
+        row_maximum = np.minimum(np.around(row_maximum), self.width - 1).astype("int16")
 
-        rs = np.dstack((r_min, r_max + 1)).reshape((self.width**2, 2))
-        r = np.arange(self.width)
-        # Calculates a mask from the r_min and r_max values. This mask is for every
+        row_ranges = np.dstack((row_minimum, row_maximum + 1)).reshape(
+            (self.width**2, 2)
+        )
+        row_indices = np.arange(self.width)
+        # Calculates a mask from the row_minimum and row_maximum values. This mask is for every
         # coordinate respectively and determines which values from the computed column
         # of the depth image should be taken into account for the locations.
         # A Mask of a single coordinate has the length of the column of the depth image
         # and together with the computed column at this coordinate determines which
         # values of the depth image make up the value of the visibility locations at this
         # point.
-        mask = ((rs[:, 0, None] <= r) & (rs[:, 1, None] > r)).reshape(
-            (self.width, self.width, self.width)
-        )
+        mask = (
+            (row_ranges[:, 0, None] <= row_indices)
+            & (row_ranges[:, 1, None] > row_indices)
+        ).reshape((self.width, self.width, self.width))
 
         values = np.zeros((self.width, self.width))
         map = np.zeros((self.width, self.width))
         # This is done to iterate over the depth images one at a time
-        for i in range(4):
-            row_masks = mask[res == i].T
+        for image_index in range(4):
+            row_masks = mask[image_indices == image_index].T
             # This statement does several things, first it takes the values from
             # the depth image for this quarter of the locations. The values taken are
             # the complete columns of the depth image (which where computed beforehand)
             # and checks if the values in them are greater than the distance to the
             # respective coordinates. This does not take the row ranges into account.
             values = (
-                depth_imgs[i][:, columns[res == i].flatten()]
-                < np.tile(distances[res == i][:, None], (1, self.width)).T
+                depth_images[image_index][
+                    :, columns[image_indices == image_index].flatten()
+                ]
+                < np.tile(
+                    distances[image_indices == image_index][:, None], (1, self.width)
+                ).T
                 * self.resolution
             )
             # This applies the created mask of the row ranges to the values of
             # the columns which are compared in the previous statement
             masked = np.ma.masked_array(values, mask=~row_masks)
             # The calculated values are added to the locations
-            map[res == i] = np.sum(masked, axis=0)
+            map[image_indices == image_index] = np.sum(masked, axis=0)
         map /= np.max(map)
         # Weird flipping shit so that the map fits the orientation of the visualization.
         # the locations in itself is consistent and just needs to be flipped to fit the world coordinate system
@@ -813,11 +726,11 @@ class VisibilityCostmap(Costmap):
         map = np.flip(map)
 
         # Invert the map
-        inv_map = np.zeros(map.shape)
-        inv_map[map == 0] = 1
-        inv_map[map != 0] = 0
+        inverted_map = np.zeros(map.shape)
+        inverted_map[map == 0] = 1
+        inverted_map[map != 0] = 0
 
-        self.map = inv_map
+        self.map = inverted_map
 
 
 @dataclass
@@ -844,29 +757,34 @@ class GaussianCostmap(Costmap):
     """
 
     def __post_init__(self):
-        self.gau: np.ndarray = self._gaussian_window(self.mean, self.sigma)
-        self.map: np.ndarray = np.outer(self.gau, self.gau)
-        cut_dist = int(0.05 * self.mean)
+        self.gaussian_window: np.ndarray = self._create_gaussian_window(
+            self.mean, self.sigma
+        )
+        self.map: np.ndarray = np.outer(self.gaussian_window, self.gaussian_window)
+        cut_distance = int(0.05 * self.mean)
         center = int(self.mean / 2)
         # Cuts out the middle 5% of the gaussian to avoid the robot being too close to the target since this is usually
         # bad for reaching the target with a end_effector. 15% is a magic number that might need some tuning in the future
         self.map[
-            center - cut_dist : center + cut_dist, center - cut_dist : center + cut_dist
+            center - cut_distance : center + cut_distance,
+            center - cut_distance : center + cut_distance,
         ] = 0
         self.size: float = self.mean
         self.width = int(self.size)
         self.height = int(self.size)
 
-    def _gaussian_window(self, mean: int, std: float) -> np.ndarray:
+    def _create_gaussian_window(
+        self, mean: int, standard_deviation: float
+    ) -> np.ndarray:
         """
-        This method creates a window of values with a gaussian distribution of
-        size "mean" and standart deviation "std".
+        Creates a window of values with a gaussian distribution of the given size
+        and standard deviation.
+
         Code from `Scipy <https://github.com/scipy/scipy/blob/v0.14.0/scipy/signal/windows.py#L976>`_
         """
-        n = np.arange(0, mean) - (mean - 1.0) / 2.0
-        sig2 = 2 * std * std
-        w = np.exp(-(n**2) / sig2)
-        return w
+        offsets = np.arange(0, mean) - (mean - 1.0) / 2.0
+        twice_variance = 2 * standard_deviation * standard_deviation
+        return np.exp(-(offsets**2) / twice_variance)
 
 
 @dataclass
@@ -876,7 +794,7 @@ class RingCostmap(Costmap):
     for reaching a point for the robot.
     """
 
-    std: int
+    standard_deviation: int
     """
     Standard deviation of the gaussian distribution that makes up the ring.
     """
@@ -889,6 +807,42 @@ class RingCostmap(Costmap):
     def __post_init__(self):
         self.map = self.ring()
 
+    @classmethod
+    def from_arm_reach_distance(
+        cls,
+        context: Context,
+        arm: Arm,
+        origin: Pose,
+        reach_fraction: float,
+        *,
+        resolution: float = 0.02,
+        cells: int = 200,
+        standard_deviation: int = 15,
+    ) -> RingCostmap:
+        """
+        Creates a ring costmap around a target the robot is to reach with one arm.
+
+        :param context: The context holding the robot and world.
+        :param arm: The arm that will do the reaching.
+        :param origin: The target the ring is drawn around.
+        :param reach_fraction: The fraction of the arm's length the ring stands off
+            the target by.
+        :param resolution: Edge length of a cell, in meters.
+        :param cells: Number of cells along each side of the map.
+        :param standard_deviation: How far, in cells, the ring spreads around its
+            stand-off distance.
+        :returns: The ring costmap.
+        """
+        return cls(
+            resolution=resolution,
+            width=cells,
+            height=cells,
+            standard_deviation=standard_deviation,
+            distance=arm.approximate_length() * reach_fraction,
+            world=context.world,
+            origin=origin,
+        )
+
     def ring(self) -> np.ndarray:
         radius_in_pixels = self.distance / self.resolution
 
@@ -899,12 +853,13 @@ class RingCostmap(Costmap):
         distance_from_center = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
 
         ring_costmap = np.exp(
-            -((distance_from_center - radius_in_pixels) ** 2) / (2 * self.std**2)
+            -((distance_from_center - radius_in_pixels) ** 2)
+            / (2 * self.standard_deviation**2)
         )
         return ring_costmap
 
 
-cmap = colors.ListedColormap(["white", "black", "green", "red", "blue"])
+grid_color_map = colors.ListedColormap(["white", "black", "green", "red", "blue"])
 
 
 # Mainly used for debugging
@@ -914,14 +869,14 @@ def plot_grid(data: np.ndarray) -> None:
     An auxiliary method only used for debugging, it will plot a 2D numpy array using MatplotLib.
     """
     rows = data.shape[0]
-    cols = data.shape[1]
-    fig, ax = plt.subplots()
-    ax.imshow(data, cmap=cmap)
+    columns = data.shape[1]
+    figure, axes = plt.subplots()
+    axes.imshow(data, cmap=grid_color_map)
     # draw gridlines
-    # ax.grid(which='major', axis='both', linestyle='-', rgba_color='k', linewidth=1)
-    ax.set_xticks(np.arange(0.5, rows, 1))
-    ax.set_yticks(np.arange(0.5, cols, 1))
+    # axes.grid(which='major', axis='both', linestyle='-', rgba_color='k', linewidth=1)
+    axes.set_xticks(np.arange(0.5, rows, 1))
+    axes.set_yticks(np.arange(0.5, columns, 1))
     plt.tick_params(axis="both", labelsize=0, length=0)
-    # fig.set_size_inches((8.5, 11), forward=False)
+    # figure.set_size_inches((8.5, 11), forward=False)
     # plt.savefig(saveImageName + ".png", dpi=500)
     plt.show()

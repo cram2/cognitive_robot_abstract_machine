@@ -31,7 +31,6 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World, Body
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.connections import (
@@ -572,14 +571,11 @@ class MJCFParser(WorldModelParser):
                     name=PrefixedName(dof_name),
                 )
             else:
-                lower_limits = DerivativeMap()
-                lower_limits.position = float(mujoco_joint.range[0])
-                upper_limits = DerivativeMap()
-                upper_limits.position = float(mujoco_joint.range[1])
                 dof = DegreeOfFreedom(
                     name=PrefixedName(dof_name),
-                    limits=DegreeOfFreedomLimits(
-                        lower=lower_limits, upper=upper_limits
+                    limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                        lower_position=float(mujoco_joint.range[0]),
+                        upper_position=float(mujoco_joint.range[1]),
                     ),
                 )
             self.world.add_degree_of_freedom(dof)

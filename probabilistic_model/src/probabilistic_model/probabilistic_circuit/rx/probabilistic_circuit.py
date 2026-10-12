@@ -1702,7 +1702,8 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         Rename each variable in this circuit to include ``prefix`` as a namespace.
 
         Produces names of the form ``"{prefix}.{variable.name}"``. Variables in
-        ``excluded_variables`` are left unchanged.
+        ``excluded_variables``, and variables already inside that namespace, are left
+        unchanged.
 
         :param prefix: String prefix to prepend to every variable name.
         :param excluded_variables: Variables that should keep their current names.
@@ -1713,6 +1714,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
             )
             for variable in self.variables
             if variable not in excluded_variables
+            and not variable.name.startswith(f"{prefix}.")
         }
         self.update_variables(variable_renames)
 
@@ -2282,6 +2284,20 @@ class MultivariateLeaf(LeafUnit):
         self.distribution, self.result_of_current_query = (
             self.distribution.log_conditional(own_point)
         )
+
+    def moment(self, order, center, variable_to_index_map):
+        result = np.zeros(len(variable_to_index_map))
+        requested = [
+            variable for variable in self.distribution.variables if variable in order
+        ]
+        if requested:
+            moment = self.distribution.moment(
+                {variable: order[variable] for variable in requested},
+                {variable: center[variable] for variable in requested},
+            )
+            for variable in requested:
+                result[variable_to_index_map[variable]] = moment[variable]
+        self.result_of_current_query = result
 
     def replace_by_dirac_product(self, point: Dict[Variable, Any]) -> ProductUnit:
         """
