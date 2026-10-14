@@ -55,6 +55,9 @@ CUP_MESHES = (
 POT_MESHES = ("bread.stl", "big-knife.stl", "whisk.stl")
 """Watertight meshes standing in for the familiar instances of another class."""
 
+INWARD_FACING_MESH = "whisk.stl"
+"""A watertight mesh whose faces point inward, so trimesh reports its volume negative."""
+
 
 def annotated_object(
     annotation_class: type[SemanticAnnotation], name: str, mesh_file: str
@@ -96,6 +99,21 @@ def test_object_description_carries_the_collision_shapes(cups):
     """An object is described by the shapes of its own collision geometry."""
     described = ObjectShape.from_annotation(cups[0])
     assert described.shapes == list(cups[0].root.collision)
+
+
+def test_volume_of_an_inward_facing_mesh_is_its_magnitude(cups):
+    """A mesh whose faces point inward encloses as much space as one facing outward.
+
+    Such a mesh reports a negative volume, which would subtract from the total of an
+    object built from several pieces instead of adding to it.
+    """
+    inward_facing = annotated_object(Cup, "inward_facing", INWARD_FACING_MESH)
+    described = ObjectShape.from_annotation(inward_facing)
+    [shape] = described.shapes
+    assert shape.volume < 0
+    assert ObjectShapeAggregations(
+        role_taker=described, field_name="shapes"
+    ).volume() == abs(shape.volume)
 
 
 # %% what the model learns from
@@ -170,6 +188,17 @@ def test_unseen_object_inside_the_learnt_range_is_accepted(
     anything it was not trained on.
     """
     assert model_without_the_first_cup.is_familiar(cups[0])
+
+
+def test_leaf_minimum_passed_to_fitting_is_the_one_used(cups, pots):
+    """The leaf minimum a caller passes reaches the model that was fitted with it."""
+    model = ConfidenceModel.fit_from_instances(
+        cups + pots, minimum_instances_per_leaf=3
+    )
+    assert all(
+        fitted.minimum_instances_per_leaf == 3
+        for fitted in model.models_by_class.values()
+    )
 
 
 # %% thresholds

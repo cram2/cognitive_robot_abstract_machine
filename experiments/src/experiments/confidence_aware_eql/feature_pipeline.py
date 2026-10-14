@@ -84,12 +84,13 @@ class ObjectShapeAggregations(AggregationStatistic[ObjectShape]):
 
         Meshes that are not watertight enclose no well-defined volume and are left out
         of the sum, since an object is often several convex pieces of which only some
-        are.
+        are. A mesh whose faces point inward reports a negative volume and is counted
+        by its magnitude.
 
         :return: The total volume in cubic meters, ``0.0`` if no shape is watertight.
         """
         return sum(
-            shape.volume
+            abs(shape.volume)
             for shape in self.shapes
             if isinstance(shape, Mesh) and shape.mesh.is_watertight
         )

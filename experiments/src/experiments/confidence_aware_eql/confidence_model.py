@@ -124,7 +124,12 @@ class PerClassConfidenceModel:
     """
 
     @classmethod
-    def fit(cls, domain_class: type, instances: list[Any]) -> PerClassConfidenceModel:
+    def fit(
+        cls,
+        domain_class: type,
+        instances: list[Any],
+        minimum_instances_per_leaf: int = 2,
+    ) -> PerClassConfidenceModel:
         """Fit a relational probabilistic circuit and calibrate its threshold.
 
         The circuit is fitted on the features
@@ -137,18 +142,20 @@ class PerClassConfidenceModel:
 
         :param domain_class: The class every instance belongs to.
         :param instances: The familiar instances of ``domain_class`` to learn from.
+        :param minimum_instances_per_leaf: Fewest training instances a leaf of the
+            class circuit describes.
         :return: A fitted per-class confidence model.
         """
         circuit = RelationalProbabilisticCircuit(
             domain_class,
             learning_method=JointProbabilityTree(
-                min_samples_per_leaf=cls.minimum_instances_per_leaf
+                min_samples_per_leaf=minimum_instances_per_leaf
             ),
         )
         circuit.fit(
             instances, dataframe_from_parent=extract_feature_dataframe(instances)
         )
-        model = cls(circuit, threshold=-np.inf)
+        model = cls(circuit, -np.inf, minimum_instances_per_leaf)
         training_log_likelihoods = [
             model.log_likelihood_of(instance) for instance in instances
         ]
@@ -195,18 +202,24 @@ class ConfidenceModel:
     """Mapping from each observed class to its fitted per-class confidence model."""
 
     @classmethod
-    def fit_from_instances(cls, instances: list[Any]) -> ConfidenceModel:
+    def fit_from_instances(
+        cls, instances: list[Any], minimum_instances_per_leaf: int = 2
+    ) -> ConfidenceModel:
         """Fit one confidence model per distinct class found among the instances.
 
         :param instances: The familiar instances the model is learned from, of any
             number of distinct classes.
+        :param minimum_instances_per_leaf: Fewest training instances a leaf of each
+            class circuit describes.
         :return: A fitted confidence model ready to score new instances.
         """
         instances_by_class: dict[type, list[Any]] = {}
         for instance in instances:
             instances_by_class.setdefault(type(instance), []).append(instance)
         models_by_class = {
-            domain_class: PerClassConfidenceModel.fit(domain_class, class_instances)
+            domain_class: PerClassConfidenceModel.fit(
+                domain_class, class_instances, minimum_instances_per_leaf
+            )
             for domain_class, class_instances in instances_by_class.items()
         }
         return cls(models_by_class)
