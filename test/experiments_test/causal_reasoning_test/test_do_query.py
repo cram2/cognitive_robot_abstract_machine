@@ -13,12 +13,12 @@ import pytest
 from krrood.entity_query_language.factories import variable
 from typing_extensions import List
 
+from experiments.causal_reasoning.do_query import DoQueryAnswer
 from experiments.causal_reasoning.mutagenesis.dataset import (
     synthetic_mutagenesis_molecules,
 )
 from experiments.causal_reasoning.mutagenesis.do_query import (
     CountCausesMutagenicity,
-    DoQueryAnswer,
     IndicatorCausesMutagenicity,
     MoleculeAttribute,
     MoleculeCount,

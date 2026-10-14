@@ -96,7 +96,7 @@ def regions(
         [cause],
         [effect],
     )
-    return tuple(causal_circuit._extract_disjoint_regions_for_variable(cause))
+    return tuple(causal_circuit.disjoint_support_regions_of(cause))
 
 
 # %% one region per range, however the support writes it

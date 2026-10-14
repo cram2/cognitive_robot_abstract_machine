@@ -9,33 +9,24 @@ side.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, fields
 from enum import StrEnum
 
-import numpy as np
 from krrood.entity_query_language.factories import a, cause, confounder, variable
-from krrood.parametrization.model_registries import RelationalCircuitRegistry
-from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from random_events.product_algebra import Event, SimpleEvent
-from random_events.variable import Variable
-from typing_extensions import Any, Dict, List, Tuple
+from typing_extensions import Any, Dict, List, Tuple, Type
 
-from experiments.causal_reasoning.do_query import CauseRegion, DoQueryAnswer
+from experiments.causal_reasoning.do_query import (
+    CausalQuestion,
+    CauseStratification,
+    DoQuery,
+)
 from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisAtom,
     MutagenesisBond,
     MutagenesisElement,
     MutagenesisMolecule,
     MutagenesisMoleculeAggregations,
-)
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.learning_method import StratifiedLearning
-from probabilistic_model.probabilistic_circuit.relational.causal import (
-    RelationalCausalCircuit,
-)
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
-    RelationalProbabilisticCircuit,
 )
 
 # %% what a molecule offers as a cause
@@ -129,7 +120,7 @@ class MoleculeCount(StrEnum):
 
 
 @dataclass(frozen=True, kw_only=True)
-class MutagenesisQuestion(ABC):
+class MutagenesisQuestion(CausalQuestion):
     """
     One question of the form: does this property of a molecule cause that, once the
     confounders are adjusted for?
@@ -165,6 +156,13 @@ class MutagenesisQuestion(ABC):
         """
         The name a fitted circuit gives the cause, to stratify the fit by.
         """
+
+    @property
+    def stratification(self) -> CauseStratification:
+        """
+        :return: The grouping for the cause, which a molecule always carries itself.
+        """
+        return CauseStratification(column=self.cause_variable_name)
 
     @property
     @abstractmethod
@@ -458,10 +456,9 @@ def question_catalogue() -> List[MutagenesisQuestion]:
 
 
 @dataclass
-class MutagenesisDoQuery:
+class MutagenesisDoQuery(DoQuery):
     """
-    Fits a relational circuit on molecules, grounds it against one question, and reads
-    the question's effect off every region of its cause.
+    Asks one mutagenesis question of a circuit fitted on molecules.
     """
 
     question: MutagenesisQuestion
@@ -469,116 +466,9 @@ class MutagenesisDoQuery:
     The question to ask.
     """
 
-    monte_carlo_sample_count: int = 2000
-    """
-    How many samples grounding draws when it retains a statistic over the parts.
-    """
-
-    random_seed: int = 0
-    """
-    Seed applied to the global NumPy random state before grounding, which draws those
-    samples.
-    """
-
-    def run(self, training_molecules: List[MutagenesisMolecule]) -> DoQueryAnswer:
+    @property
+    def fitted_type(self) -> Type:
         """
-        Fit a circuit on the molecules and answer the question on it.
-
-        :param training_molecules: Molecules to fit on.
-        :return: The answer, one entry per region of the cause.
+        :return: The molecule the circuit is fitted on.
         """
-        causal_circuit = self._grounded_against(training_molecules)
-        [cause_variable] = causal_circuit.causal_variables
-        [effect_variable] = causal_circuit.effect_variables
-        conditioned_circuit = causal_circuit.backdoor_adjustment(
-            cause_variable, effect_variable
-        )
-        adjusted_circuit = causal_circuit.backdoor_adjustment(
-            cause_variable,
-            effect_variable,
-            adjustment_variables=self._adjustment_variables(causal_circuit),
-        )
-
-        regions = [
-            CauseRegion(
-                description=str(region.event.simple_sets[0][cause_variable]),
-                probability=region.probability,
-                conditioned_probability=self._effect_probability(
-                    conditioned_circuit, region.event, effect_variable
-                ),
-                adjusted_probability=self._effect_probability(
-                    adjusted_circuit, region.event, effect_variable
-                ),
-            )
-            for region in causal_circuit._extract_disjoint_regions_for_variable(
-                cause_variable
-            )
-        ]
-        return DoQueryAnswer(
-            asked=self.question.asked,
-            training_example_count=len(training_molecules),
-            regions=tuple(sorted(regions, key=lambda region: region.description)),
-        )
-
-    def _grounded_against(
-        self, training_molecules: List[MutagenesisMolecule]
-    ) -> RelationalCausalCircuit:
-        """
-        Fit a circuit whose class-level branches each hold one value of the cause, and
-        ground it against the question.
-
-        Stratifying by the cause is what lets the registration verify support
-        determinism: an unconstrained fit gives no guarantee that training rows sharing
-        a value of the cause end up under one branch, and two branches claiming one
-        value are rejected.
-
-        :param training_molecules: Molecules to fit on.
-        :return: The grounded circuit, with its cause and effect registered.
-        """
-        model = RelationalProbabilisticCircuit(
-            MutagenesisMolecule,
-            monte_carlo_sample_count=self.monte_carlo_sample_count,
-            learning_method=StratifiedLearning(
-                variables=[self.question.cause_variable_name],
-                method=JointProbabilityTree(),
-            ),
-        )
-        model.fit(training_molecules)
-        registry = RelationalCircuitRegistry(relational_probabilistic_circuit=model)
-        np.random.seed(self.random_seed)
-        return registry.get_model(UnderspecifiedParameters(self.question.build()))
-
-    def _adjustment_variables(
-        self, causal_circuit: RelationalCausalCircuit
-    ) -> List[Variable]:
-        """
-        :param causal_circuit: The grounded circuit to resolve against.
-        :return: One variable per attribute the question adjusts for.
-        """
-        return [
-            RelationalCausalCircuit.resolve_variable(
-                causal_circuit.probabilistic_circuit, name
-            )
-            for name in self.question.adjustment_variable_names
-        ]
-
-    def _effect_probability(
-        self, interventional_circuit: Any, region: Event, effect_variable: Variable
-    ) -> float:
-        """
-        Read how likely the question's effect is on one region of the cause.
-
-        :param interventional_circuit: A joint circuit over the cause and the effect.
-        :param region: The region of the cause to truncate to.
-        :param effect_variable: The effect's variable.
-        :return: The truncated circuit's probability of the effect's value.
-        """
-        truncated_circuit, _ = interventional_circuit.truncated(
-            region.fill_missing_variables_pure(interventional_circuit.variables)
-        )
-        effect = (
-            SimpleEvent.from_data({effect_variable: self.question.effect_value})
-            .as_composite_set()
-            .fill_missing_variables_pure(truncated_circuit.variables)
-        )
-        return float(truncated_circuit.probability(effect))
+        return MutagenesisMolecule
