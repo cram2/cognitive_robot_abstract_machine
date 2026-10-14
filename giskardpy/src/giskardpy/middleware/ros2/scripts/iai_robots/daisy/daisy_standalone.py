@@ -1,36 +1,23 @@
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
     WorldWithDaisyConfig,
-    DaisyStandAloneRobotInterfaceConfig,
 )
-from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.utils.utils import load_xacro
-from rclpy import Parameter
-
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 
 
-def main():
-    rospy.init_node("giskard")
-    default_robot_desc = load_xacro(
-        "package://iai_daisy_description/robots/daisy.urdf.xacro"
-    )
-    rospy.get_node().declare_parameters(
-        namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
-    )
-    robot_description = rospy.get_node().get_parameter_or("robot_description").value
-    if robot_description is None:
-        robot_description = default_robot_desc
-    giskard = Giskard(
-        world_config=WorldWithDaisyConfig(urdf=robot_description),
-        robot_interface_config=DaisyStandAloneRobotInterfaceConfig(),
-        server_config=GiskardServerConfig(
-            execution_mode=ExecutionMode.STANDALONE, debug_mode=True
-        ),
+def create_giskard() -> Giskard:
+    """
+    Build a Giskard that simulates DAiSy, described by the file its robot class
+    declares.
+    """
+    return Giskard.standalone(
+        world_config=WorldWithDaisyConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=33),
     )
-    giskard.live()
+
+
+def main():
+    Giskard.launch(create_giskard)
 
 
 if __name__ == "__main__":

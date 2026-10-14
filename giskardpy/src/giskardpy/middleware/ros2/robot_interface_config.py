@@ -6,12 +6,8 @@ from typing import TYPE_CHECKING, Dict, List, Union
 
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray
 
-from giskardpy.data_types.exceptions import (
-    JointRegistrationRequiresStandaloneModeError,
-)
+from giskardpy.executor import NoPacing, Pacer, RealTimePacer
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.command_publishing import (
     DriveVelocityCommandPublisher,
@@ -23,6 +19,10 @@ from giskardpy.middleware.ros2.command_publishing import (
     MinimumVelocity,
 )
 from giskardpy.middleware.ros2.control_loop import ControlLoop
+from giskardpy.middleware.ros2.controller_manager import (
+    ControllerManager,
+    ControllerType,
+)
 from semantic_digital_twin.adapters.ros.input_synchronization import (
     PendingJointStateSynchronizer,
     OdometrySynchronizer,
@@ -30,19 +30,14 @@ from semantic_digital_twin.adapters.ros.input_synchronization import (
 )
 from giskardpy.middleware.ros2.motion_server import MotionServer
 from giskardpy.middleware.ros2.ros2_interface import (
-    search_for_subscriber_of_node_with_type,
-    get_parameters,
-    search_for_publisher_of_node_with_type,
     search_for_unique_publisher_of_type,
     search_for_unique_subscriber_of_type,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import HasInputSource
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    ActiveConnection,
     ActiveConnection1DOF,
     Connection6DoF,
     DifferentialDrive,
@@ -57,6 +52,9 @@ if TYPE_CHECKING:
 class RobotInterfaceConfig(ABC):
     """
     Describes how Giskard reads the state of a robot and how it commands it.
+
+    The kind of interface decides whether the motion is simulated or executed on the
+    robot.
     """
 
     giskard: Giskard = field(init=False, repr=False, compare=False)
@@ -67,13 +65,6 @@ class RobotInterfaceConfig(ABC):
         interface.
     """
 
-    tf_frame_synchronizer: TfFrameSynchronizer | None = field(
-        init=False, default=None, repr=False, compare=False
-    )
-    """
-    Created on demand, tracks all 6 degree of freedom connections that follow tf.
-    """
-
     def attach(self, giskard: Giskard) -> None:
         """
         Bind this interface to the Giskard instance it configures.
@@ -81,12 +72,15 @@ class RobotInterfaceConfig(ABC):
         self.giskard = giskard
 
     @abstractmethod
-    def setup(self):
+    def create_pacer(self) -> Pacer:
         """
-        Implement this method to configure how Giskard can talk to the robot using it's
-        self.
+        Build the pacer of the control loop.
+        """
 
-        methods.
+    @abstractmethod
+    def connect(self) -> None:
+        """
+        Decide which joints Giskard controls and how it reaches them.
         """
 
     @property
@@ -109,6 +103,65 @@ class RobotInterfaceConfig(ABC):
     def control_loop(self) -> ControlLoop:
         return self.giskard.motion_server.control_loop
 
+
+@dataclass
+class StandAloneRobotInterfaceConfig(RobotInterfaceConfig):
+    """
+    Simulates the motion in place, without talking to any hardware.
+
+    Giskard controls the joints the robot class declares and the base drive of the world
+    config.
+    """
+
+    def create_pacer(self) -> Pacer:
+        """
+        A simulated motion runs as fast as the computer allows.
+        """
+        return NoPacing()
+
+    def connect(self) -> None:
+        pass
+
+
+@dataclass
+class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
+    """
+    Reads the state of a real robot and sends it the commands of the controller.
+
+    Giskard controls exactly the joints that :meth:`setup` adds a command publisher for.
+    """
+
+    tf_frame_synchronizer: TfFrameSynchronizer | None = field(
+        init=False, default=None, repr=False, compare=False
+    )
+    """
+    Created on demand, tracks all 6 degree of freedom connections that follow tf.
+    """
+
+    def create_pacer(self) -> Pacer:
+        """
+        A real robot has to be commanded in real time.
+        """
+        return RealTimePacer()
+
+    def connect(self) -> None:
+        """
+        Release every joint the robot class declared as controlled, then let
+        :meth:`setup` declare the ones that are commanded.
+        """
+        with self.world.modify_world():
+            self.world.set_dofs_has_hardware_interface(
+                self.world.degrees_of_freedom, False
+            )
+        self.setup()
+
+    @abstractmethod
+    def setup(self):
+        """
+        Implement this method to configure how Giskard reads the state of the robot and
+        how it sends commands, using the ``sync_*`` and ``add_*`` methods.
+        """
+
     # %% reading the state of the robot
 
     def sync_odometry_topic(
@@ -130,7 +183,7 @@ class RobotInterfaceConfig(ABC):
             connection=joint,
         )
         self.motion_server.inputs.synchronizers.append(synchronizer)
-        if sync_in_control_loop and self.server_config.is_closed_loop:
+        if sync_in_control_loop:
             self.control_loop.inputs.synchronizers.append(synchronizer)
 
     def sync_6dof_joint_with_tf_frame(
@@ -146,10 +199,7 @@ class RobotInterfaceConfig(ABC):
             self.motion_server.inputs.synchronizers.insert(
                 0, self.tf_frame_synchronizer
             )
-            if self.server_config.is_closed_loop:
-                self.control_loop.inputs.synchronizers.insert(
-                    0, self.tf_frame_synchronizer
-                )
+            self.control_loop.inputs.synchronizers.insert(0, self.tf_frame_synchronizer)
         self.tf_frame_synchronizer.track(joint, tf_parent_frame, tf_child_frame)
 
     def sync_robot_parts(self):
@@ -162,8 +212,7 @@ class RobotInterfaceConfig(ABC):
         """
         self.robot.use_real_sources(rospy.get_node())
         self.motion_server.inputs.add_robot_inputs(self.robot)
-        if self.server_config.is_closed_loop:
-            self.control_loop.inputs.add_robot_inputs(self.robot)
+        self.control_loop.inputs.add_robot_inputs(self.robot)
 
     def sync_robot_part(self, robot_part: HasInputSource):
         """
@@ -172,8 +221,7 @@ class RobotInterfaceConfig(ABC):
         """
         robot_part.use_real_source(rospy.get_node())
         self.motion_server.inputs.add_robot_part_input(robot_part)
-        if self.server_config.is_closed_loop:
-            self.control_loop.inputs.add_robot_part_input(robot_part)
+        self.control_loop.inputs.add_robot_part_input(robot_part)
 
     def sync_joint_state_topic(self, topic_name: str, group_name: str | None = None):
         """
@@ -186,7 +234,7 @@ class RobotInterfaceConfig(ABC):
                 world=self.world, node=rospy.get_node(), topic_name=topic_name
             )
         )
-        if not self.server_config.is_closed_loop or group_name != self.robot.name:
+        if group_name != self.robot.name:
             return
         self.control_loop.inputs.synchronizers.append(
             PendingJointStateSynchronizer(
@@ -217,8 +265,6 @@ class RobotInterfaceConfig(ABC):
         """
         if cmd_vel_topic is None:
             cmd_vel_topic = search_for_unique_subscriber_of_type(Twist)
-        if not self.server_config.is_closed_loop:
-            return
         self.control_loop.command_publishers.append(
             DriveVelocityCommandPublisher(
                 world=self.world,
@@ -236,9 +282,8 @@ class RobotInterfaceConfig(ABC):
         minimum_velocity_overrides: Dict[str, float] | None = None,
     ):
         """
-        For closed loop mode.
-
         Tell Giskard how it can send velocities to joints.
+
         :param namespaces: A list of namespaces where Giskard can find the topics and
             parameters.
         :param minimum_valid_velocity: magnitude that smaller joint velocities are
@@ -265,9 +310,8 @@ class RobotInterfaceConfig(ABC):
         command_format: GroupCommandFormat | None = None,
     ):
         """
-        For closed loop mode.
-
         Tell Giskard how it can send velocities for a group of connections.
+
         :param minimum_valid_velocity: magnitude that smaller joint velocities are
             raised to so the hardware moves. ``0.0`` disables raising.
         :param minimum_velocity_overrides: minimum magnitude per joint name, overriding
@@ -291,25 +335,6 @@ class RobotInterfaceConfig(ABC):
             )
         )
 
-    def register_controlled_joints(
-        self, joint_names: List[Union[str, PrefixedName]]
-    ) -> None:
-        """
-        Flag the given joints as controlled by Giskard itself.
-
-        :raises JointRegistrationRequiresStandaloneModeError: If Giskard is not in
-            standalone mode.
-        """
-        if not self.server_config.is_standalone:
-            raise JointRegistrationRequiresStandaloneModeError()
-        for joint_name in joint_names:
-            connection: ActiveConnection = self.world.get_connection_by_name(joint_name)
-            if not isinstance(connection, ActiveConnection):
-                raise Exception(
-                    f"{joint_name} is not an active connection and cannot be controlled."
-                )
-            connection.has_hardware_interface = True
-
     # %% discovery
 
     def discover_interfaces_from_controller_manager(
@@ -318,80 +343,59 @@ class RobotInterfaceConfig(ABC):
         whitelist: List[str] | None = None,
     ) -> None:
         """
-        :param whitelist: list all controllers that should get added, if None, giskard will search automatically
+        Tell Giskard to read and command the robot through the active controllers of a
+        controller manager.
+
+        :param controller_manager_name: The controller manager node, including the
+            namespace it runs in.
+        :param whitelist: The names of the controllers to consider, all if ``None``.
         """
-        import controller_manager as cm
-        from controller_manager_msgs.srv._list_controllers import (
-            ListControllers_Response,
+        self.sync_joint_states_from_controller_manager(
+            controller_manager_name, whitelist
+        )
+        self.add_velocity_controllers_from_controller_manager(
+            controller_manager_name, whitelist
         )
 
-        controllers: ListControllers_Response = cm.list_controllers(
-            node=rospy.get_node(), controller_manager_name=controller_manager_name
-        )
+    def sync_joint_states_from_controller_manager(
+        self,
+        controller_manager_name: str = "controller_manager",
+        whitelist: List[str] | None = None,
+    ) -> None:
+        """
+        Tell Giskard to sync the world state with the active joint state broadcasters of
+        a controller manager.
 
-        controllers_to_add = self.__filter_controllers_with_whitelist(
-            controllers.controller, whitelist
-        )
-
-        for controller in controllers_to_add:
-            if controller.state == "active":
-                if controller.type == "joint_state_broadcaster/JointStateBroadcaster":
-                    topic_name = search_for_publisher_of_node_with_type(
-                        topic_type=JointState, node_name=controller.name
-                    )
-                    self.sync_joint_state_topic(topic_name)
-                elif (
-                    controller.type
-                    == "velocity_controllers/JointGroupVelocityController"
-                ):
-                    cmt_topic = search_for_subscriber_of_node_with_type(
-                        topic_type=Float64MultiArray, node_name=controller.name
-                    )
-                    joints = (
-                        get_parameters(parameters=["joints"], node_name=controller.name)
-                        .values[0]
-                        .string_array_value
-                    )
-                    self.add_joint_velocity_group_controller(
-                        cmd_topic=cmt_topic, connections=joints
-                    )
-                elif controller.type == "diff_drive_controller/DiffDriveController":
-                    self.add_base_cmd_velocity(controller.name)
-
-    def __filter_controllers_with_whitelist(
-        self, controllers: list, whitelist: List[str] | None
-    ) -> list:
-        from controller_manager_msgs.msg import ControllerState
-
-        controllers_to_add: List[ControllerState]
-        if whitelist is None:
-            return controllers
-        else:
-            available_controllers = {controller.name for controller in controllers}
-            missing_controllers = [
-                controller
-                for controller in whitelist
-                if controller not in available_controllers
-            ]
-            if missing_controllers:
-                raise ValueError(
-                    f"The following controllers from the whitelist are not available: {missing_controllers}"
+        :param controller_manager_name: The controller manager node, including the
+            namespace it runs in.
+        :param whitelist: The names of the controllers to consider, all if ``None``.
+        """
+        controller_manager = ControllerManager(controller_manager_name)
+        for controller in controller_manager.active_controllers(whitelist):
+            if controller.type == ControllerType.JOINT_STATE_BROADCASTER:
+                self.sync_joint_state_topic(
+                    controller_manager.joint_state_topic_of(controller.name)
                 )
-            return [
-                controller for controller in controllers if controller.name in whitelist
-            ]
 
+    def add_velocity_controllers_from_controller_manager(
+        self,
+        controller_manager_name: str = "controller_manager",
+        whitelist: List[str] | None = None,
+    ) -> None:
+        """
+        Tell Giskard to command the joints of the active velocity controllers of a
+        controller manager.
 
-@dataclass
-class StandAloneRobotInterfaceConfig(RobotInterfaceConfig):
-    """
-    Controls the given joints without talking to any hardware.
-    """
-
-    joint_names: List[str]
-    """
-    The joints Giskard is allowed to control.
-    """
-
-    def setup(self):
-        self.register_controlled_joints(self.joint_names)
+        :param controller_manager_name: The controller manager node, including the
+            namespace it runs in.
+        :param whitelist: The names of the controllers to consider, all if ``None``.
+        """
+        controller_manager = ControllerManager(controller_manager_name)
+        for controller in controller_manager.active_controllers(whitelist):
+            if controller.type == ControllerType.JOINT_GROUP_VELOCITY:
+                self.add_joint_velocity_group_controller(
+                    cmd_topic=controller_manager.command_topic_of(controller.name),
+                    connections=controller_manager.joints_of(controller.name),
+                )
+            elif controller.type == ControllerType.DIFF_DRIVE:
+                self.add_base_cmd_velocity(controller.name)

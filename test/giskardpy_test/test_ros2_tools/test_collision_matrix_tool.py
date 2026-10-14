@@ -5,14 +5,12 @@ import signal
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from importlib.resources import files
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-# Mock PyQt5 and ROS 2 before importing the tool
-sys.modules["giskardpy.middleware.ros2"] = MagicMock()
-sys.modules["giskardpy.middleware.ros2.rospy"] = MagicMock()
+from typing_extensions import Any, Iterator
 
 # Mock PyQt5
 QtWidgets = MagicMock()
@@ -51,11 +49,25 @@ QtWidgets.QLabel = MockQWidget
 QtWidgets.QFrame = MockQWidget
 QtWidgets.QScrollArea = MockQWidget
 
-sys.modules["PyQt5"] = MagicMock()
-sys.modules["PyQt5.QtCore"] = MagicMock()
-sys.modules["PyQt5.QtCore"].Qt = MagicMock()
-sys.modules["PyQt5.QtGui"] = MagicMock()
-sys.modules["PyQt5.QtWidgets"] = QtWidgets
+
+@contextmanager
+def substituted_modules(substitutes: dict[str, Any]) -> Iterator[None]:
+    """
+    Makes imports of the given module names resolve to their substitutes inside the
+    block, and to what they resolved to before once it is left.
+
+    :param substitutes: The substitute of each module name.
+    """
+    replaced_modules = {
+        name: sys.modules[name] for name in substitutes if name in sys.modules
+    }
+    sys.modules.update(substitutes)
+    try:
+        yield
+    finally:
+        for name in substitutes:
+            del sys.modules[name]
+        sys.modules.update(replaced_modules)
 
 
 # Import the tool
@@ -70,7 +82,18 @@ def import_tool(path):
 tool_path = os.path.abspath(
     files("giskardpy").joinpath("../../scripts/ros2-tools/collision_matrix_tool.py")
 )
-tool = import_tool(tool_path)
+# Mock PyQt5 and ROS 2 only while importing the tool
+with substituted_modules(
+    {
+        "giskardpy.middleware.ros2": MagicMock(),
+        "giskardpy.middleware.ros2.rospy": MagicMock(),
+        "PyQt5": MagicMock(),
+        "PyQt5.QtCore": MagicMock(),
+        "PyQt5.QtGui": MagicMock(),
+        "PyQt5.QtWidgets": QtWidgets,
+    }
+):
+    tool = import_tool(tool_path)
 from collision_matrix_tool import SelfCollisionMatrixInterface, DisableCollisionReason
 
 STARTUP_TIMEOUT_SECONDS = 120

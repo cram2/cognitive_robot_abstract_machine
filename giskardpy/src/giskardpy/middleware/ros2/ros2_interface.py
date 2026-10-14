@@ -1,6 +1,7 @@
 import json
 import threading
-from typing import List, Tuple, Union, Any
+from datetime import timedelta
+from typing import List, Tuple, Type, Union, Any
 
 from action_msgs.msg import GoalStatus
 from rcl_interfaces.srv._get_parameters import (
@@ -14,14 +15,15 @@ from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy
 from std_msgs.msg import String
-from giskardpy.middleware.ros2.utils.asynio_utils import wait_until_not_none
 
+from giskardpy.middleware.ros2 import rospy
+from giskardpy.middleware.ros2.event_loop_manager import get_event_loop
 from giskardpy.middleware.ros2.exceptions import (
     ExecutionAbortedException,
     ExecutionCanceledException,
+    ServiceUnavailableError,
 )
-from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.event_loop_manager import get_event_loop
+from giskardpy.middleware.ros2.utils.asynio_utils import wait_until_not_none
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.adapters.json_serializer import from_json
 
@@ -64,20 +66,29 @@ def wait_for_message(
 def get_robot_description(topic: str = "/robot_description") -> str:
     qos_profile = QoSProfile(depth=10)
     qos_profile.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
+    rospy.get_node().get_logger().info(f"Waiting for the robot description on {topic}.")
     return wait_for_message(String, rospy.get_node(), topic, qos_profile=qos_profile)[
         1
     ].data
 
 
-def search_for_publisher_of_node_with_type(node_name: str, topic_type):
-    topics = rospy.get_node().get_publisher_names_and_types_by_node(node_name, "/")
+def search_for_publisher_of_node_with_type(
+    node_name: str, topic_type, namespace: str = "/"
+):
+    topics = rospy.get_node().get_publisher_names_and_types_by_node(
+        node_name, namespace
+    )
     return _search_in_topic_list(
         node_name=node_name, topic_list=topics, topic_type=topic_type
     )[0]
 
 
-def search_for_subscriber_of_node_with_type(node_name: str, topic_type):
-    topics = rospy.get_node().get_subscriber_names_and_types_by_node(node_name, "/")
+def search_for_subscriber_of_node_with_type(
+    node_name: str, topic_type, namespace: str = "/"
+):
+    topics = rospy.get_node().get_subscriber_names_and_types_by_node(
+        node_name, namespace
+    )
     return _search_in_topic_list(
         node_name=node_name, topic_list=topics, topic_type=topic_type
     )[0]
@@ -121,20 +132,43 @@ def search_for_subscribers_of_type(topic_type) -> List[str]:
     return matches
 
 
+def call_service(
+    service_type: Type,
+    service_name: str,
+    request: Any,
+    wait_timeout: timedelta = timedelta(seconds=10),
+) -> Any:
+    """
+    Call a service through Giskard's node and wait for its response.
+
+    .. warning:: The response is delivered by the executor that spins Giskard's node, so
+        this must not be called from one of that node's callbacks.
+
+    :param service_type: The type of the service.
+    :param service_name: The name of the service.
+    :param request: The request to send.
+    :param wait_timeout: How long to wait for the service to become available.
+    :return: The response of the service.
+    :raises ServiceUnavailableError: If the service does not become available in time.
+    """
+    node = rospy.get_node()
+    client = node.create_client(service_type, service_name)
+    node.get_logger().info(f"Waiting for the service {service_name}.")
+    if not client.wait_for_service(timeout_sec=wait_timeout.total_seconds()):
+        node.destroy_client(client)
+        raise ServiceUnavailableError(service_name=service_name)
+    future = client.call_async(request)
+    rospy.wait_for_future_to_complete(future)
+    node.destroy_client(client)
+    return future.result()
+
+
 def get_parameters(
     parameters: List[str], node_name: str = "controller_manager"
 ) -> GetParameters_Response:
-    from controller_manager import controller_manager_services
-
-    req = GetParameters_Request()
-    req.names = parameters
-    return controller_manager_services.service_caller(
-        node=rospy.get_node(),
-        service_name=f"{node_name}/get_parameters",
-        service_type=GetParameters,
-        request=req,
-        service_timeout=10,
-    )
+    request = GetParameters_Request()
+    request.names = parameters
+    return call_service(GetParameters, f"{node_name}/get_parameters", request)
 
 
 def _search_in_topic_list(

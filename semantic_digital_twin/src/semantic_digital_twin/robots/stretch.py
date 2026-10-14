@@ -44,7 +44,10 @@ from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
 )
 from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.world_description.connections import DifferentialDrive
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection,
+    DifferentialDrive,
+)
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -437,7 +440,11 @@ class StretchMobileBase(
         return Vector3.NEGATIVE_Y()
 
     def setup_hardware_interfaces(self):
-        pass
+        for joint_name in (StretchJoint.RIGHT_WHEEL, StretchJoint.LEFT_WHEEL):
+            connection: ActiveConnection = self._world.get_connection_by_name(
+                joint_name
+            )
+            connection.has_hardware_interface = True
 
     def setup_joint_states(self) -> List[JointState]:
         return []

@@ -15,11 +15,13 @@ from experiments.control_loop_experiments.control_loop_profiler import (
     ControlLoopProfiler,
 )
 from giskardpy.middleware.ros2.giskard import Giskard
+from giskardpy.middleware.ros2.robot_interface_config import (
+    StandAloneRobotInterfaceConfig,
+)
 from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import (
-    PR2StandaloneInterface,
     WorldWithPR2Config,
 )
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
+from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
 from giskardpy.motion_statechart.goals.collision_avoidance import (
@@ -194,9 +196,8 @@ class BenchmarkRobot(GiskardTester):
                     "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
                 )
             ),
-            robot_interface_config=PR2StandaloneInterface(),
+            robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
-                execution_mode=ExecutionMode.STANDALONE,
                 debug_mode=records_trajectory,
                 plot_trajectory=records_trajectory,
             ),

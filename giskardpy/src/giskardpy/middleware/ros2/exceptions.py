@@ -41,6 +41,78 @@ class UnknownMinimumVelocityJointError(SetupException):
 
 
 @dataclass
+class ServiceUnavailableError(SetupException):
+    """
+    Raised when a service Giskard needs for its setup does not become available.
+    """
+
+    service_name: str
+    """
+    The service that was waited for.
+    """
+
+    def error_message(self) -> str:
+        return f'The service "{self.service_name}" is not available.'
+
+    def suggest_correction(self) -> str:
+        return "Make sure the node offering the service is running."
+
+
+@dataclass
+class ControllersNotLoadedError(SetupException):
+    """
+    Raised when controllers Giskard was told to use are not loaded by their controller
+    manager.
+    """
+
+    controller_manager_name: str
+    """
+    The controller manager that was asked.
+    """
+
+    missing_controllers: List[str]
+    """
+    The requested controllers the manager does not report.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'The controller manager "{self.controller_manager_name}" has not loaded '
+            f"the controllers {self.missing_controllers}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Load the controllers or remove them from the whitelist."
+
+
+@dataclass
+class ControllersNotActiveError(SetupException):
+    """
+    Raised when controllers Giskard was told to use are loaded by their controller
+    manager but do not run.
+    """
+
+    controller_manager_name: str
+    """
+    The controller manager that was asked.
+    """
+
+    inactive_controllers: List[str]
+    """
+    The requested controllers the manager reports in another state than active.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The controllers {self.inactive_controllers} of the controller manager "
+            f'"{self.controller_manager_name}" are not active.'
+        )
+
+    def suggest_correction(self) -> str:
+        return "Activate the controllers or remove them from the whitelist."
+
+
+@dataclass
 class ExecutionException(GiskardException):
     """
     Base class for errors that occur while executing a trajectory.

@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 
-from giskardpy.model.world_config import WorldWithOmniDriveRobot
+from giskardpy.model.world_config import WorldWithMobileRobot
 from giskardpy.middleware.ros2.robot_interface_config import (
-    RobotInterfaceConfig,
+    ClosedLoopRobotInterfaceConfig,
 )
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -13,33 +12,19 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass
-class WorldWithHSRConfig(WorldWithOmniDriveRobot):
-    urdf_view: AbstractRobot = field(kw_only=True, default=HSRB, init=False)
+class WorldWithHSRConfig(WorldWithMobileRobot):
+    """
+    A world containing only the HSR, which drives on an omnidirectional base.
+    """
+
+    robot_class: type[HSRB] = field(kw_only=True, default=HSRB, init=False)
+    """
+    The robot class that is applied to the parsed description.
+    """
 
 
 @dataclass
-class HSRStandaloneInterface(RobotInterfaceConfig):
-    """
-    Simulates the arm, head and drive of the HSR without talking to hardware.
-    """
-
-    def setup(self):
-        self.register_controlled_joints(
-            [
-                HSRBJoint.ARM_FLEX,
-                HSRBJoint.ARM_LIFT,
-                HSRBJoint.ARM_ROLL,
-                HSRBJoint.HEAD_PAN,
-                HSRBJoint.HEAD_TILT,
-                HSRBJoint.WRIST_FLEX,
-                HSRBJoint.WRIST_ROLL,
-                self.world.get_connections_by_type(OmniDrive)[0].name,
-            ]
-        )
-
-
-@dataclass
-class HSRVelocityInterface(RobotInterfaceConfig):
+class HSRVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
     Commands the arm, head and drive of the HSR through their velocity controllers.
     """

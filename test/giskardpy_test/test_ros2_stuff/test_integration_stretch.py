@@ -9,9 +9,6 @@ will actually be reached on the robot.
 import numpy as np
 import pytest
 
-from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
-    StretchStandaloneInterface,
-)
 from giskardpy.middleware.ros2.utils.utils_for_tests import StretchTester
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
@@ -61,25 +58,12 @@ def tool_frame_height(giskard: StretchTester) -> float:
 
 def test_standalone_interface_controls_the_base_drive(giskard: StretchTester):
     """
-    The standalone interface registers the base drive it resolved from the world, so the
-    controller can actually move the base rather than silently holding it.
+    The base drive is controlled in standalone, so the controller can actually move the
+    base rather than silently holding it.
     """
     drive = giskard.api.world.get_connections_by_type(DifferentialDrive)[0]
 
     assert drive.has_hardware_interface
-
-
-def test_standalone_interface_controls_every_declared_joint(giskard: StretchTester):
-    """
-    Every joint the interface declares ends up controlled; a name that no longer matches
-    the robot description would otherwise fail only once the robot is running.
-    """
-    interface = StretchStandaloneInterface()
-
-    for joint_name in interface.controlled_joint_names(giskard.api.world):
-        assert giskard.api.world.get_connection_by_name(
-            joint_name
-        ).has_hardware_interface
 
 
 # %% goal convergence

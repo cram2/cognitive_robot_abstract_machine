@@ -37,6 +37,22 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
+class DAiSyController(StrEnum):
+    """
+    The ros2_control controllers of the DAiSy, as its controller manager names them.
+    """
+
+    LEFT_FORWARD_VELOCITY = "left_forward_velocity_controller"
+    """
+    Commands the joint velocities of the left arm.
+    """
+
+    RIGHT_FORWARD_VELOCITY = "right_forward_velocity_controller"
+    """
+    Commands the joint velocities of the right arm.
+    """
+
+
 class DAiSyJoint(StrEnum):
     """
     Names of the DAiSy's commandable connections, as spelled in its URDF.

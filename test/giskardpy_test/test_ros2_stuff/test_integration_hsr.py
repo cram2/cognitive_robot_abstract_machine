@@ -3,11 +3,13 @@ from time import sleep
 
 import numpy as np
 import pytest
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
+from giskardpy.middleware.ros2.robot_interface_config import (
+    StandAloneRobotInterfaceConfig,
+)
+from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs import (
     WorldWithHSRConfig,
-    HSRStandaloneInterface,
 )
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.middleware.ros2.utils.utils_for_tests import compare_poses, GiskardTester
@@ -80,9 +82,8 @@ class HSRTester(GiskardTester):
         robot_desc = load_xacro("package://hsr_description/robots/hsrb4s.urdf.xacro")
         return Giskard(
             world_config=WorldWithHSRConfig(urdf=robot_desc),
-            robot_interface_config=HSRStandaloneInterface(),
+            robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
-                execution_mode=ExecutionMode.STANDALONE,
                 debug_mode=True,
                 plot_gantt_chart=True,
                 plot_trajectory=True,

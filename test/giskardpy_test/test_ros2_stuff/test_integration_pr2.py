@@ -14,9 +14,11 @@ import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import (
     MaxTrajectoryLengthException,
 )
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
+from giskardpy.middleware.ros2.robot_interface_config import (
+    StandAloneRobotInterfaceConfig,
+)
+from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import (
-    PR2StandaloneInterface,
     WorldWithPR2Config,
 )
 from giskardpy.middleware.ros2.giskard import Giskard
@@ -153,9 +155,8 @@ class PR2Tester(GiskardTester):
         )
         return Giskard(
             world_config=WorldWithPR2Config(urdf=robot_desc),
-            robot_interface_config=PR2StandaloneInterface(),
+            robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
-                execution_mode=ExecutionMode.STANDALONE,
                 debug_mode=True,
                 plot_trajectory=True,
             ),

@@ -9,10 +9,12 @@ import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.python_interface import GiskardWrapperNode
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
-    StretchStandaloneInterface,
     WorldWithStretchConfigDiffDrive,
 )
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
+from giskardpy.middleware.ros2.robot_interface_config import (
+    StandAloneRobotInterfaceConfig,
+)
+from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.stretch import Stretch
@@ -338,10 +340,8 @@ class StretchTester(GiskardTester):
             world_config=WorldWithStretchConfigDiffDrive(
                 urdf=load_xacro(Stretch.get_ros_file_path())
             ),
-            robot_interface_config=StretchStandaloneInterface(),
-            server_config=GiskardServerConfig(
-                execution_mode=ExecutionMode.STANDALONE, debug_mode=True
-            ),
+            robot_interface_config=StandAloneRobotInterfaceConfig(),
+            server_config=GiskardServerConfig(debug_mode=True),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
         )
 

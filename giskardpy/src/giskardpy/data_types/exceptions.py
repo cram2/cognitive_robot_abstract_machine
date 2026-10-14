@@ -158,19 +158,6 @@ class NonPositiveRealTimeFactorError(SetupException):
 
 
 @dataclass
-class JointRegistrationRequiresStandaloneModeError(SetupException):
-    """
-    Raised when joints are registered outside of StandAlone mode.
-    """
-
-    def error_message(self) -> str:
-        return "Joints only need to be registered in StandAlone mode."
-
-    def suggest_correction(self) -> str:
-        return "Remove the manual registration. For real robots, the joints are retrieved from the connected controllers."
-
-
-@dataclass
 class MaxTrajectoryLengthException(PlanningException):
     """
     Raised when a planned trajectory exceeds the maximum allowed length.
