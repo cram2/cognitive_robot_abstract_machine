@@ -27,6 +27,7 @@ from giskardpy.motion_statechart.data_types import LifeCycleValues
 from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.factories import inference
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
+from krrood.ormatic.utils import classproperty
 
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Camera
 from semantic_digital_twin.world import World
@@ -570,11 +571,6 @@ class Bridge:
     Last consistent digest of the bundled topology, robot and camera metadata.
     """
 
-    SIGNATURE_REFRESH_ATTEMPTS: ClassVar[int] = 2
-    """
-    One initial read and one retry after an attachment changes during lock acquisition.
-    """
-
     live_server: Optional[ThreadingHTTPServer] = None
     """
     The bridge's HTTP server once it is listening, so a second start reuses it.
@@ -587,6 +583,11 @@ class Bridge:
     """
 
     # %% what the visualization drives
+    @classproperty
+    def signature_refresh_attempts(cls) -> int:
+        """Maximum attempts to read one consistent bundle signature."""
+        return 2
+
     def attach(self, world: World) -> int:
         """
         Publish a world's geometry and provide its default live query source.
@@ -903,7 +904,7 @@ class Bridge:
         :param expected_world: Restrict the refresh to this world when its caller may
             already hold that world's lock.
         """
-        for _ in range(self.SIGNATURE_REFRESH_ATTEMPTS):
+        for _ in range(self.signature_refresh_attempts):
             with self._lock:
                 world = self.world
                 robot = self.robot
