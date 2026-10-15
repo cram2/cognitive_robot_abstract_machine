@@ -155,9 +155,12 @@ A few things worth noticing in this one small example:
   dependent out of this list while it has no pull request at all — once one
   exists, whether it is a draft, ready, or already landed, the branch stacked
   on top is worth reviewing.
-- **Done items are hidden by default** — the sidebar's "Show done / merged
-  items" checkbox reveals `retry-backoff-strategy` and `retry-fallback-queue`
-  when you want them back.
+- **Done and deferred items are hidden by default** — the sidebar's "Show done
+  / merged items" checkbox reveals `retry-backoff-strategy` and
+  `retry-fallback-queue` when you want them back, and "Show deferred items"
+  does the same for anything parked. Whatever is left keeps its indentation
+  honest: a dependent of a hidden item dedents to the left edge rather than
+  hanging one level in under nothing.
 - **A `bug` chip** — `retry-fallback-queue`'s pull request carries the `bug`
   label, so its sidebar entry is marked as a bug fix. The chip appears
   wherever the item already sits; being a bug fix is a property of the work,

@@ -140,11 +140,16 @@ computes drift, builds the "ready to start"/"blocker may be cleared" lists
 (a blocked item whose dependency becomes ready always lands in "blocker may
 be cleared", never "ready to start" — it's still blocked, not fresh),
 stacks items by dependency depth (indented, capped at 4 levels, wrapping
-with a left-edge arrow past the cap). `done` items are hidden by default
-behind a sidebar toggle ("Show done / merged items") — done client-side via
-CSS custom properties, so a dependent item's indentation dedents to
-whatever it would be if its done dependencies weren't dependencies at all,
-not just one level shallower. Every not-`done` item gets a dashboard action
+with a left-edge arrow past the cap). `done` and `deferred` items are hidden
+by default, each behind its own sidebar toggle ("Show done / merged items",
+"Show deferred items") — both mean there is nothing to act on, a done item
+having landed and a deferred one being intentionally paused or superseded.
+Hiding is client-side via CSS custom properties: every item carries one
+indent level per combination of hidden statuses, so a dependent's
+indentation dedents to whatever it would be if its hidden dependencies
+weren't dependencies at all, not just one level shallower, and the
+wrap-around arrow past the cap likewise names a parent that is actually on
+screen. Every not-`done` item gets a dashboard action
 button, worded to match its status — "Start now" (`plan-item-kickoff`) for
 not-started once every dependency is ready, "Resolve"/"Resume"/"Reconsider"
 (`plan-item-resolve`) for blocked/in-progress/deferred respectively — plus
@@ -165,7 +170,7 @@ where it already sits: a bug fix is a property of the work rather than an
 action of its own, so it is never grouped or ordered separately. A "Bug
 fixes only" checkbox — shown only when some entry is a bug fix — filters the
 sidebar down to them, client-side, with each group's shown count swapped in
-alongside its total the same way the done-items toggle swaps indent levels.
+alongside its total the same way the visibility toggles swap indent levels.
 Renders the final HTML — including `roadmap.md` converted to HTML and
 shown in a collapsed `<details>` section, and the tracking-issue link if
 one was passed. None of that is this document's job to describe further;
