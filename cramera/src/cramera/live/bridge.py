@@ -588,6 +588,11 @@ class Bridge:
         """Maximum attempts to read one consistent bundle signature."""
         return 2
 
+    @classproperty
+    def topology_digest_length(cls) -> int:
+        """Number of hexadecimal characters retained in the topology digest."""
+        return 16
+
     def attach(self, world: World) -> int:
         """
         Publish a world's geometry and provide its default live query source.
@@ -894,7 +899,7 @@ class Bridge:
         with self._lock:
             return self._bundle_signature
 
-    def _refresh_bundle_signature(self, expected_world: Optional[World] = None) -> None:
+    def _refresh_bundle_signature(self, expected_world: World | None = None) -> None:
         """
         Publish a digest of the current topology, robot type and camera descriptions.
 
@@ -924,35 +929,7 @@ class Bridge:
                         continue
                 if robot is not None and robot.root._world is not world:
                     return
-                overlay_bodies = set(self.overlay_bodies())
-                entries: List[str] = []
-                for body in world.bodies:
-                    if body in overlay_bodies:
-                        continue
-                    connection = body.parent_connection
-                    entries.append(
-                        "%s<-%s:%s"
-                        % (
-                            str(body.name),
-                            str(connection.parent.name) if connection else "",
-                            type(connection).__name__ if connection else "root",
-                        )
-                    )
-                digest = hashlib.sha1("|".join(sorted(entries)).encode()).hexdigest()[
-                    :16
-                ]
-                robot_name = type(robot).__name__.lower() if robot else None
-                signature = "world-%s-robot-%s" % (digest, robot_name)
-                if robot is not None:
-                    cameras = [
-                        sensor.to_json()
-                        for sensor in robot.all_sensors
-                        if isinstance(sensor, Camera)
-                    ]
-                    camera_digest = hashlib.sha1(
-                        json.dumps(cameras, sort_keys=True).encode()
-                    ).hexdigest()
-                    signature = f"{signature}-{camera_digest}"
+                signature = self._compute_bundle_signature(world, robot)
                 with self._lock:
                     if (
                         world is self.world
@@ -961,6 +938,46 @@ class Bridge:
                     ):
                         self._bundle_signature = signature
                         return
+
+    def _compute_bundle_signature(
+        self, world: World, robot: AbstractRobot | None
+    ) -> str:
+        """Identify bundled topology and camera metadata in a locked world.
+
+        :param world: World whose native lock is held for this read.
+        :param robot: Robot annotation belonging to that world, if any.
+        :return: Content digest excluding joint poses and independently tracked bodies.
+        """
+        overlay_bodies = set(self.overlay_bodies())
+        entries: list[str] = []
+        for body in world.bodies:
+            if body in overlay_bodies:
+                continue
+            connection = body.parent_connection
+            entries.append(
+                "%s<-%s:%s"
+                % (
+                    str(body.name),
+                    str(connection.parent.name) if connection else "",
+                    type(connection).__name__ if connection else "root",
+                )
+            )
+        digest = hashlib.sha1("|".join(sorted(entries)).encode()).hexdigest()[
+            : self.topology_digest_length
+        ]
+        robot_name = type(robot).__name__.lower() if robot else None
+        signature = "world-%s-robot-%s" % (digest, robot_name)
+        if robot is None:
+            return signature
+        cameras = [
+            sensor.to_json()
+            for sensor in robot.all_sensors
+            if isinstance(sensor, Camera)
+        ]
+        camera_digest = hashlib.sha1(
+            json.dumps(cameras, sort_keys=True).encode()
+        ).hexdigest()
+        return f"{signature}-{camera_digest}"
 
     def status(self) -> Dict[str, Any]:
         """
