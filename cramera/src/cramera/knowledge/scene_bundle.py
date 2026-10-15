@@ -148,9 +148,9 @@ class SceneBundle:
         """
         if has_robot:
             robot = self.scene.get(SceneField.ROBOT)
-            if not isinstance(robot, dict):
-                return False
-            if not isinstance(robot.get(SceneField.CAMERAS), list):
+            if not isinstance(robot, dict) or not isinstance(
+                robot.get(SceneField.CAMERAS), list
+            ):
                 return False
         return self.scene.get(SceneField.BUNDLE_SIGNATURE) == content_digest
 
