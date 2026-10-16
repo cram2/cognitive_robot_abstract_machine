@@ -163,6 +163,10 @@ class StretchApartmentDemonstration(RobotDemonstration):
         """
         world = context.world
 
+        gripper_configuration = context.robot.all_arms[
+            0
+        ].end_effector.default_configuration(GripperState.CLOSE)
+
         cereal = world.get_semantic_annotations_by_type(CheezeIt)[0]
         arm = context.robot.all_arms[0]
         shelf_layer_body = world.get_body_by_name(CEREAL_SHELF_LAYER_NAME)
@@ -172,7 +176,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
         plan = sequential(
             [
                 ParkArmsAction(context.robot.all_arms),
-                SetGripperAction(arm.end_effector, motion=GripperState.CLOSE),
+                SetGripperAction(configuration=gripper_configuration),
                 NavigateAction(
                     Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
@@ -211,7 +215,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     ),
                 ),
                 ParkArmsAction(context.robot.all_arms),
-                SetGripperAction(arm.end_effector, motion=GripperState.CLOSE),
+                SetGripperAction(configuration=gripper_configuration),
                 NavigateAction(
                     Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
@@ -245,7 +249,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     target_location=CEREAL_SHELF_LAYER_T_CEREAL.pose,
                 ),
                 ParkArmsAction(context.robot.all_arms),
-                SetGripperAction(arm.end_effector, motion=GripperState.CLOSE),
+                SetGripperAction(configuration=gripper_configuration),
             ],
             context=context,
         )

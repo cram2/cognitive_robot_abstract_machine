@@ -47,7 +47,7 @@ class DAiSyVelocityInterface(RobotInterfaceConfig):
 
 
 @dataclass
-class WorldWithDaisyConfig(WorldWithFixedRobot):
+class WorldWithDAiSyConfig(WorldWithFixedRobot):
     """
     A world containing only DAiSy, whose base is fixed to the world root.
     """
@@ -68,7 +68,7 @@ class WorldWithDaisyConfig(WorldWithFixedRobot):
 
 
 @dataclass
-class DaisyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
+class DAiSyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
     """
     Simulates both arms and both grippers of DAiSy without talking to hardware.
     """

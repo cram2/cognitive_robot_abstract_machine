@@ -3,15 +3,12 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import pytest
-from rustworkx.rustworkx import NoEdgeBetweenNodes
-from typing_extensions import Iterable, Tuple, Generator
-
 from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
-    StretchMoveToolCenterPoint,
-    StretchMoveSim,
-    StretchMoveReal,
     StretchClose,
+    StretchMoveReal,
+    StretchMoveSim,
+    StretchMoveToolCenterPoint,
 )
 from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
 from coraplex.datastructures.dataclasses import Context
@@ -23,42 +20,44 @@ from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.exceptions import NoFloorBelowRobot
 from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential, execute_single
-from coraplex.robot_plans.plan_transformations import OpenDrawerBeforeMoveAndPickUp
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
-from coraplex.robot_plans.actions.core.container import OpenAction, CloseAction
+from coraplex.robot_plans.actions.core.container import CloseAction, OpenAction
 from coraplex.robot_plans.actions.core.misc import DetectAction, MoveToReach
 from coraplex.robot_plans.actions.core.navigation import (
-    FaceAtAction,
-    NavigateAction,
-    LookAtAction,
     ElevatorNavigation,
-)
-from coraplex.robot_plans.actions.core.navigation import (
+    FaceAtAction,
+    LookAtAction,
+    NavigateAction,
     PathPlanningNavigateAction,
 )
 from coraplex.robot_plans.actions.core.pick_up import (
-    ReachAction,
     GraspingAction,
     PickUpAction,
+    ReachAction,
 )
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import (
-    MoveTorsoAction,
-    SetGripperAction,
-    ParkArmsAction,
     FollowToolCenterPointPathAction,
+    MoveTorsoAction,
+    ParkArmsAction,
+    SetGripperAction,
 )
+from coraplex.robot_plans.plan_transformations import OpenDrawerBeforeMoveAndPickUp
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
+from rustworkx.rustworkx import NoEdgeBetweenNodes
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.datastructures.definitions import (
-    TorsoState,
     GripperState,
     StaticJointState,
+    TorsoState,
 )
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+from typing_extensions import Generator, Iterable, Tuple
+
 from ..conftest import grasp_point_of, left_or_only_arm, right_or_only_arm
 from ..world_snapshot import WorldSnapshot
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.garmi import Garmi
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
@@ -68,7 +67,6 @@ from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
 )
 from semantic_digital_twin.exceptions import MissingMovableJointError
-from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Elevator,
@@ -77,8 +75,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     GroundFloor,
     Handle,
     Level,
-)
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
@@ -274,11 +270,15 @@ def multiple_robot_apartment_context(
         if isinstance(view, HasMobileBase)
         else False
     )
-    yield world, view, Context(
+    yield (
         world,
         view,
-        alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS,
-        sampling_seed=SAMPLING_SEED,
+        Context(
+            world,
+            view,
+            alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS,
+            sampling_seed=SAMPLING_SEED,
+        ),
     )
     view.mobile_base.full_body_controlled = full_body_controlled
     snapshot.restore()
@@ -325,7 +325,9 @@ def test_move_gripper_multi(multiple_robot_apartment_context):
 
     plan = execute_single(
         SetGripperAction(
-            left_or_only_arm(context.robot).end_effector, GripperState.OPEN
+            configuration=left_or_only_arm(view).end_effector.default_configuration(
+                GripperState.OPEN
+            )
         ),
         context,
     )
@@ -342,7 +344,9 @@ def test_move_gripper_multi(multiple_robot_apartment_context):
 
     plan = execute_single(
         SetGripperAction(
-            left_or_only_arm(context.robot).end_effector, GripperState.CLOSE
+            configuration=left_or_only_arm(view).end_effector.default_configuration(
+                GripperState.CLOSE
+            )
         ),
         context,
     )

@@ -11,10 +11,12 @@ from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     DefaultWeights,
+    ObservationStateValues,
 )
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     _CancelBecauseSelfCollisionViolated,
+    _SelfCollisionAvoidanceTask,
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
     ExternalCollisionDistanceMonitor,
@@ -51,6 +53,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheckingResult,
+    ClosestPoints,
 )
 from semantic_digital_twin.collision_checking.collision_manager import CollisionConsumer
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -518,6 +521,87 @@ def test_cancel_node_without_tasks_never_starts():
     cancel.build(MotionStatechartContext.empty())
 
     assert cancel.start_condition.is_constant_false()
+
+
+# %% cancel on violated self collisions
+
+
+def _add_violated_self_collision_task(
+    world: World,
+) -> tuple[
+    MotionStatechartContext,
+    _SelfCollisionAvoidanceTask,
+    _CancelBecauseSelfCollisionViolated,
+]:
+    """
+    Adds a self collision task between the two arm tips of a world, observing FALSE, and
+    a cancel node watching it.
+
+    :param world: The world whose arm tips the task avoids self collisions between.
+    :return: The context, the violated task and the cancel node watching it.
+    """
+    l_tip = world.get_kinematic_structure_entity_by_name("l_tip")
+    r_tip = world.get_kinematic_structure_entity_by_name("r_tip")
+    context = MotionStatechartContext(world=world)
+    manager = context.self_collision_manager
+    manager.update_collision_groups(world)
+    manager.on_compute_collisions(CollisionCheckingResult())
+    task = _SelfCollisionAvoidanceTask(
+        name="task",
+        collision_group_a=manager.get_collision_group(l_tip),
+        collision_group_b=manager.get_collision_group(r_tip),
+        self_collision_manager=manager,
+    )
+    msc = MotionStatechart()
+    msc.add_nodes(
+        [
+            task,
+            cancel := _CancelBecauseSelfCollisionViolated(name="cancel", tasks=[task]),
+        ]
+    )
+    msc.observation_state[task] = ObservationStateValues.FALSE
+    return context, task, cancel
+
+
+def test_cancel_node_without_recorded_contacts_does_not_raise(self_collision_bot_world):
+    """
+    Ticking the cancel node of a violated task whose contact data the collision manager
+    has not recorded yet raises no exception.
+    """
+    context, task, cancel = _add_violated_self_collision_task(self_collision_bot_world)
+
+    assert cancel.on_tick(context) is None
+
+
+def test_cancel_node_with_recorded_contacts_raises_the_recorded_contact(
+    self_collision_bot_world,
+):
+    """
+    Ticking the cancel node of a violated task whose contacts the collision manager has
+    recorded raises a ``CollisionViolatedError`` carrying the closest contact and the
+    task's violated distance.
+    """
+    world = self_collision_bot_world
+    context, task, cancel = _add_violated_self_collision_task(world)
+    manager = context.self_collision_manager
+    manager.float_variable_data.set_value(task.violated_distance, 0.25)
+    contact = ClosestPoints(
+        body_a=world.get_kinematic_structure_entity_by_name("l_tip"),
+        body_b=world.get_kinematic_structure_entity_by_name("r_tip"),
+        distance=0.5,
+        root_P_point_on_body_a=np.zeros(3),
+        root_P_point_on_body_b=np.zeros(3),
+        root_V_contact_normal_from_b_to_a=np.zeros(3),
+    )
+    manager.last_closest_contacts[(task.collision_group_a, task.collision_group_b)] = [
+        contact
+    ]
+
+    with pytest.raises(CollisionViolatedError) as exc_info:
+        cancel.on_tick(context)
+
+    assert exc_info.value.violated_collisions == [contact]
+    assert exc_info.value.thresholds == [0.25]
 
 
 def test_self_collision_avoidance_without_checked_body_combinations(

@@ -11,8 +11,7 @@ from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
 from giskardpy.model.world_config import WorldWithOmniDriveRobot
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.garmi import Garmi, GarmiJoint
-from semantic_digital_twin.world_description.connections import OmniDrive
-from world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.connections import Connection6DoF, OmniDrive
 
 
 class GarmiInteractiveMarkerChain(Enum):

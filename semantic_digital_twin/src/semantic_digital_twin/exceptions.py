@@ -481,6 +481,99 @@ class WorldEntityWithIDBelongsToAnotherWorld(WorldValidationError):
 
 
 @dataclass
+class WorldHasNoUniqueRootError(WorldValidationError):
+    """
+    Raised when a non-empty world has none or more than one root.
+    """
+
+    possible_roots: List[KinematicStructureEntity]
+    """
+    The kinematic structure entities without incoming connections that were found.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A world must have exactly one root, but found {len(self.possible_roots)}: "
+            f"{self.possible_roots}."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class CopiedWorldDiffersFromOriginalError(WorldValidationError):
+    """
+    Raised when deepcopying a world does not reproduce the original world's entities.
+    """
+
+    differing_entity_hashes: List[int]
+    """
+    Hashes of the entities that are only in the original world or only in the copy.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Deepcopying the world changed its entity set; "
+            f"{len(self.differing_entity_hashes)} entities differ between the original "
+            f"and the copy (hashes: {self.differing_entity_hashes})."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class NoControlledConnectionInChainError(UsageError):
+    """
+    Raised when the kinematic chain between two entities contains no controlled
+    connection.
+    """
+
+    root: KinematicStructureEntity
+    """
+    The start of the chain.
+    """
+
+    tip: KinematicStructureEntity
+    """
+    The end of the chain.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The chain between {self.root} and {self.tip} contains no controlled "
+            f"connection."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class RobotPartBelongsToAnotherRobotError(UsageError):
+    """
+    Raised when a robot part refers to a robot other than the one that holds it.
+    """
+
+    robot_part: AbstractRobotPart
+    """
+    The robot part whose robot reference was checked.
+    """
+
+    robot: AbstractRobot
+    """
+    The robot that holds the part but is not referred to by it.
+    """
+
+    def error_message(self) -> str:
+        return f"Robot part {self.robot_part} does not refer to robot {self.robot}."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
 class InvalidConnectionLimits(UsageError):
     """
     Raised when the lower limit is not less than the upper limit for a degree of
@@ -499,6 +592,33 @@ class InvalidConnectionLimits(UsageError):
 
     def error_message(self) -> str:
         return f"Lower limit for {self.name} must be less than upper limit. Given limits: {self.limits}."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class MissingPositionLimits(UsageError):
+    """
+    Raised when a target position must be derived from the limits of a degree of freedom
+    that declares no position limits.
+    """
+
+    name: PrefixedName
+    """
+    The name of the degree of freedom.
+    """
+
+    limits: DegreeOfFreedomLimits
+    """
+    The limits without positions.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Degree of freedom {self.name} must declare position limits. "
+            f"Given limits: {self.limits}."
+        )
 
     def suggest_correction(self) -> str:
         return ""
@@ -658,8 +778,8 @@ class AmbiguousPart(UsageError):
 
     def suggest_correction(self) -> str:
         return (
-            f"consider if its practical to use the 'field_name' keyword argument for the `add` method to"
-            f" disambiguate the matching cases."
+            "consider if its practical to use the 'field_name' keyword argument for the `add` method to"
+            " disambiguate the matching cases."
         )
 
 
@@ -694,8 +814,7 @@ class UnknownPartWholeRelationshipField(UsageError):
 
     def suggest_correction(self) -> str:
         return (
-            f"the available fields are:"
-            f" {', '.join(self.available_fields) or '(none)'}"
+            f"the available fields are: {', '.join(self.available_fields) or '(none)'}"
         )
 
 
@@ -816,6 +935,36 @@ class PartWholeFieldInAnnotationKwargs(UsageError):
 
     def suggest_correction(self) -> str:
         return "move these entries to part_specifications instead of annotation_kwargs."
+
+
+@dataclass
+class MechanicalJointAlreadyMounted(UsageError):
+    """
+    Raised when a mechanical joint that already connects a child is mounted onto a
+    different whole.
+
+    If you think a single Mechanical Joint should be able to have multiple children,
+    contact @LucaKro.
+    """
+
+    joint: SemanticAnnotation
+    """
+    The mechanical joint being mounted.
+    """
+
+    main_has_root_body_annotation: SemanticAnnotation
+    """
+    The annotation (the whole) the joint was being mounted onto.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.joint).__name__} already connects a child and cannot be mounted onto "
+            f"{type(self.main_has_root_body_annotation).__name__}: a mechanical joint connects exactly one child."
+        )
+
+    def suggest_correction(self) -> str:
+        return "if you think that you found a case where this error does not apply, please contact @LucaKro"
 
 
 @dataclass
@@ -2053,6 +2202,37 @@ class MergedRobotAnnotationNotFound(UsageError):
         return (
             "check that merging the robot world replays its semantic annotations into "
             "the target world."
+        )
+
+
+@dataclass
+class ConnectionsOutsideEndEffector(UsageError):
+    """
+    Raised when a gripper specification's joint state moves connections that do not
+    belong to the specification's end effector.
+    """
+
+    end_effector: EndEffector
+    """
+    The end effector the specification was built for.
+    """
+
+    foreign_connection_names: List[str]
+    """
+    The names of the connections in the joint state that are not active connections of
+    the end effector.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The joint state moves connections that do not belong to the end effector "
+            f"'{self.end_effector.name}': {self.foreign_connection_names}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "build the specification from a joint state whose connections are all "
+            "active connections of the same end effector."
         )
 
 

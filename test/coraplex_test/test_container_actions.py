@@ -64,10 +64,14 @@ def test_gripper_backs_off_the_handle_after_letting_go(pr2_at_drawer, action_typ
     sequential([action], context)
 
     motions = motions_of(action)
+    open_state = left_or_only_arm(robot).end_effector.get_joint_state_by_type(
+        GripperState.OPEN
+    )
     gripper_openings = [
         index
         for index, motion in enumerate(motions)
-        if isinstance(motion, MoveGripperMotion) and motion.motion is GripperState.OPEN
+        if isinstance(motion, MoveGripperMotion)
+        and motion.configuration.joint_state is open_state
     ]
     back_off = motions[-1]
 

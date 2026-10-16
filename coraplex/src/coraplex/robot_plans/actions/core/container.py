@@ -3,14 +3,22 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import Any, Dict
-
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import (
-    variable_from,
     ConditionType,
+    variable_from,
 )
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+)
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from typing_extensions import Any, Dict
+
 from coraplex.datastructures.dataclasses import Context
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
@@ -24,14 +32,6 @@ from coraplex.robot_plans.motions.gripper import (
     MoveGripperMotion,
     MoveToolCenterPointMotion,
 )
-from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
-from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Handle,
-)
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 
 @dataclass
@@ -91,8 +91,9 @@ class ContainerAction(ActionDescription, HasApproachesGraspPoses):
                 ),
                 self._mechanism_motion,
                 MoveGripperMotion(
-                    GripperState.OPEN,
-                    self.arm.end_effector,
+                    configuration=self.arm.end_effector.default_configuration(
+                        GripperState.OPEN
+                    ),
                     allow_gripper_collision=True,
                 ),
                 MoveToolCenterPointMotion(

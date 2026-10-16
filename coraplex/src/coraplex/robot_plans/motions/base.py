@@ -42,6 +42,19 @@ class BaseMotion(Designator):
         """
         pass
 
+    @classmethod
+    def handles(cls, motion: BaseMotion) -> bool:
+        """
+        Whether this alternative can be built from the given motion.
+
+        Defaults to ``True``; motions that carry a specification type override this to
+        reject motions whose specification they do not understand.
+
+        :param motion: The motion instance to check.
+        :return: True if this alternative can be built from the motion.
+        """
+        return True
+
     @property
     def motion_chart(self) -> Task:
         """
@@ -68,7 +81,7 @@ class BaseMotion(Designator):
 
     def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
         return AlternativeMotion.check_for_alternative(
-            self.context.alternative_motion_mappings, self.robot, self.__class__
+            self.context.alternative_motion_mappings, self.robot, self
         )
 
     def keep_base_still(self) -> List[MotionStatechartNode]:
@@ -100,9 +113,10 @@ class BaseMotion(Designator):
         self, end_effector: EndEffector
     ) -> list[MotionStatechartNode]:
         """
-        :param end_effector: The end effector that may collide with the environment.
-        :return: Collision rules that only allow collisions between the end effector,
-            together with whatever it holds, and the environment.
+        :param end_effector: The end effector whose manipulator may collide with the
+            environment.
+        :return: Collision rules that only allow collisions between the manipulator of
+            the given end effector, together with whatever it holds, and the environment.
         """
         return [
             UpdateTemporaryCollisionRules(

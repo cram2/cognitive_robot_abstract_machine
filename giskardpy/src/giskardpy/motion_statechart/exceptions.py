@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-
-from typing_extensions import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.exceptions import DataclassException
@@ -11,15 +10,16 @@ from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
 from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.world_description.world_entity import (
+        KinematicStructureEntity,
+    )
+
     from giskardpy.motion_statechart.graph_node import (
         MotionStatechartNode,
         NodeStateVariable,
         TrinaryCondition,
     )
     from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
-    from semantic_digital_twin.world_description.world_entity import (
-        KinematicStructureEntity,
-    )
 
 
 @dataclass
@@ -181,7 +181,7 @@ class UnexpectedWorldEntityCountError(NodeInitializationError):
     The number of matching entities that were found in the world.
     """
 
-    entity_type: Type | str | tuple[Type, ...]
+    entity_type: type | str | tuple[type, ...]
     """
     The type of entity that was searched for.
     """
@@ -571,7 +571,7 @@ class MissingContextExtensionError(MotionStatechartError):
     Raised when a context extension is requested that was never added to the context.
     """
 
-    expected_extension: Type
+    expected_extension: type
     """
     The type of the requested extension.
     """
@@ -589,7 +589,7 @@ class DuplicateContextExtensionError(MotionStatechartError):
     Raised when an extension is added to a context that already holds one of that type.
     """
 
-    extension_type: Type
+    extension_type: type
     """
     The type of the extension that is already present.
     """
@@ -599,6 +599,27 @@ class DuplicateContextExtensionError(MotionStatechartError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class UnknownGriplinkActionError(MotionStatechartError):
+    """
+    Raised when a griplink action server task is built for a griplink action it does not
+    build goals for.
+    """
+
+    message_type: type
+    """
+    The griplink action the task was built with.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'Cannot build a goal for the griplink action "{self.message_type.__name__}".'
+        )
+
+    def suggest_correction(self) -> str:
+        return "Build the task with Grip, Release, Flexgrip or Flexrelease."
 
 
 @dataclass
@@ -613,12 +634,12 @@ class ActionClientTypeMismatchError(MotionStatechartError):
     The action topic that was requested with two different message types.
     """
 
-    existing_message_type: Type
+    existing_message_type: type
     """
     The message type the cached action client for this topic was created with.
     """
 
-    requested_message_type: Type
+    requested_message_type: type
     """
     The message type that was requested for this topic instead.
     """

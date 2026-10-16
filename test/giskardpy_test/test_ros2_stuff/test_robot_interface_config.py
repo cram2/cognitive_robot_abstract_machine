@@ -8,7 +8,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
-    DaisyStandAloneRobotInterfaceConfig,
+    DAiSyStandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import (
     PR2VelocityMujocoInterface,
@@ -120,7 +120,7 @@ def test_the_tracy_interface_controls_both_arms():
 
 
 def test_the_daisy_interface_controls_both_arms_and_both_grippers():
-    assert DaisyStandAloneRobotInterfaceConfig().joint_names == [
+    assert DAiSyStandAloneRobotInterfaceConfig().joint_names == [
         DAiSyJoint.LEFT_SHOULDER_PAN,
         DAiSyJoint.LEFT_SHOULDER_LIFT,
         DAiSyJoint.LEFT_ELBOW,
@@ -141,8 +141,8 @@ def test_the_daisy_interface_controls_both_arms_and_both_grippers():
 
 
 def test_two_daisy_interfaces_do_not_share_their_joint_name_list():
-    first = DaisyStandAloneRobotInterfaceConfig()
-    second = DaisyStandAloneRobotInterfaceConfig()
+    first = DAiSyStandAloneRobotInterfaceConfig()
+    second = DAiSyStandAloneRobotInterfaceConfig()
 
     assert first.joint_names is not second.joint_names
 
