@@ -336,3 +336,30 @@ class SourceDataNotProvided(InputError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class DifferentQuantities(DataclassException):
+    """
+    Raised when amounts of two different quantities are added, subtracted or divided,
+    such as an amount of data and a length.
+    """
+
+    first: Any
+    """
+    The amount the operation was asked of.
+    """
+
+    second: Any
+    """
+    The amount of the other quantity.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.first).__name__} and {type(self.second).__name__} are "
+            f"different quantities."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Convert one amount into the other's quantity first."

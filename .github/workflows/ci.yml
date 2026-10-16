@@ -46,6 +46,7 @@ jobs:
           - lib: segmind
           - lib: experiments
           - lib: cramera
+          - lib: crollywood
           - lib: version
           - lib: cognitive_robot_abstract_machine
     uses: ./.github/workflows/ci_reusable.yml

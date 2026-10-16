@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crollywood"
+authors = [
+    { name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de" },
+    { name = "Naren Vasantakumaar", email = "naren.vasant@gmail.com" },
+]
+description = "Narrated, subtitled videos: scenes on a timeline, a narrator, subtitles and H.264 encoding to a size budget."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+keywords = ["robotics", "video"]
+license = "LGPL-3.0-only"
+dynamic = ["version"]
+dependencies = [
+    "imageio-ffmpeg",  # encodes with the ffmpeg binary it ships
+    "krrood",
+    "matplotlib",
+    "numpy",
+    "opencv-python",
+    "pillow",
+    "pygments",  # cuts code into the tokens it is coloured by
+    "semantic_digital_twin",
+    "typing_extensions",
+]
+
+[project.optional-dependencies]
+narrator = [
+    "kokoro-onnx>=0.6",  # the Kokoro speech model, run locally
+]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+]
+
+[project.urls]
+"Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["crollywood*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "crollywood._version.__version__" }

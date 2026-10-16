@@ -25,6 +25,7 @@ dependencies = [
   "experiments",
   "segmind",
   "cramera",
+  "crollywood",
   "ipykernel>=7.2.0",
   "lark-parser>=0.12.0",
   "tqdm"
@@ -93,7 +94,8 @@ members = [
   "robokudo",
   "experiments",
   "segmind",
-  "cramera"
+  "cramera",
+  "crollywood"
 ]
 
 [tool.uv.sources]
@@ -108,6 +110,7 @@ physics_simulators    = { workspace = true }
 segmind               = { workspace = true }
 experiments           = { workspace = true }
 cramera                = { workspace = true }
+crollywood             = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -124,6 +127,7 @@ physics_simulators = { path = "physics_simulators", develop = true }
 experiments = { path = "experiments", develop = true }
 segmind = { path = "segmind", develop = true }
 cramera = { path = "cramera", develop = true }
+crollywood = { path = "crollywood", develop = true }
 
 [tool.setuptools]
 packages = ["cognitive_robot_abstract_machine"]

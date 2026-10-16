@@ -108,6 +108,12 @@ recorded playback, EQL questions and plan/statechart inspection. Start `cramera`
 from the activated environment, then run an existing demo with
 `cramera-live path/to/demo.py`.
 
+## Narrated videos
+
+[crollywood](crollywood/README.md) makes narrated, subtitled mp4 videos from scenes you
+write, of experiments, demonstrations or anything else: slides, recorded footage and
+your own scenes on a timeline, encoded to a size budget.
+
 ## To run tests
 
 **1. Install system dependencies, set up and build the ROS 2 workspace**

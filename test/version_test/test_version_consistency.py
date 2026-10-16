@@ -3,6 +3,7 @@ from pathlib import Path
 PACKAGES = [
     "cognitive_robot_abstract_machine",
     "coraplex",
+    "crollywood",
     "cramera",
     "experiments",
     "giskardpy",

@@ -119,9 +119,17 @@ class Color:
         ..note:: The opacity is not part of it, the same way it is not part of
             :meth:`to_rgb`.
         """
-        return prefix + "".join(
-            f"{round(channel * 255):02X}" for channel in self.to_rgb()
-        )
+        return prefix + self.to_rgb_bytes().hex().upper()
+
+    def to_rgb_bytes(self) -> bytes:
+        """
+        :return: The red, green and blue channels as one byte each, the way an 8-bit
+            image stores a pixel.
+
+        ..note:: The opacity is not part of it, the same way it is not part of
+            :meth:`to_rgb`.
+        """
+        return bytes(round(channel * 255) for channel in self.to_rgb())
 
     @classmethod
     def RED(self):

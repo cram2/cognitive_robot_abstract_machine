@@ -63,6 +63,18 @@ def test_the_written_hex_string_leaves_out_the_opacity():
     assert translucent.to_hex() == Color.from_hex("#4080C0").to_hex()
 
 
+# %% writing the bytes of a pixel
+
+
+def test_each_channel_becomes_the_byte_its_hex_digits_name():
+    assert Color.from_hex("#4080C0").to_rgb_bytes() == bytes([0x40, 0x80, 0xC0])
+
+
+def test_the_pixel_bytes_leave_out_the_opacity():
+    translucent = Color.from_hex("#4080C020")
+    assert translucent.to_rgb_bytes() == Color.from_hex("#4080C0").to_rgb_bytes()
+
+
 # %% colors as set and dictionary members
 
 
