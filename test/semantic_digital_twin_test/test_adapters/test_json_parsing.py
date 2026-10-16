@@ -518,7 +518,7 @@ def test_joint_state_resolves_the_connection_it_was_built_from():
         RotationMatrix.from_rpy(0.1, 0.2, 0.3),
         HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 3.0, 0.1, 0.2, 0.3),
         Pose.from_xyz_quaternion(1.0, 2.0, 3.0, 0.0, 0.0, 0.0, 1.0),
-        Pose2D(1.0, 2.0, 0.3),
+        Pose2D.from_xy_yaw(1.0, 2.0, 0.3),
     ],
 )
 def test_a_spatial_type_survives_a_json_round_trip(spatial_type):
@@ -612,7 +612,7 @@ def symbolic_pose(variable: FloatVariable, frame: Body) -> Pose:
 
 
 def symbolic_pose2d(variable: FloatVariable, frame: Body) -> Pose2D:
-    return Pose2D(variable, 2.0, variable, reference_frame=frame)
+    return Pose2D.from_xy_yaw(variable, 2.0, variable, reference_frame=frame)
 
 
 @pytest.mark.parametrize(

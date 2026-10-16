@@ -2558,13 +2558,21 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __init__(
         self,
-        x: sm.ScalarData = 0,
-        y: sm.ScalarData = 0,
+        position: Point2 | None = None,
         yaw: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-    ):
-        self.casadi_sx = sm.to_sx([x, y, yaw])
-        self.reference_frame = reference_frame
+        reference_frame: KinematicStructureEntity | None = None,
+    ) -> None:
+        """
+        :param position: Where the pose is. Defaults to the origin.
+        :param yaw: Which way the pose faces. Defaults to 0.
+        :param reference_frame: The reference frame. Defaults to *position*'s.
+        """
+        if position is None:
+            position = Point2()
+        self.casadi_sx = sm.to_sx([position.x, position.y, yaw])
+        self.reference_frame = (
+            reference_frame if reference_frame is not None else position.reference_frame
+        )
         super().__post_init__()
 
     def _verify_type(self):
@@ -2672,7 +2680,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         _, _, yaw = pose.rotation_matrix.rpy
         frame = reference_frame if reference_frame is not None else pose.reference_frame
-        return cls(x=pose.x, y=pose.y, yaw=yaw, reference_frame=frame)
+        return cls.from_xy_yaw(x=pose.x, y=pose.y, yaw=yaw, reference_frame=frame)
 
     def transform(
         self, target_frame_T_reference_frame: HomogeneousTransformationMatrix
@@ -2693,24 +2701,23 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return Pose2D.from_pose(target_frame_T_reference_frame @ self.pose)
 
     @classmethod
-    def from_position_and_yaw(
+    def from_xy_yaw(
         cls,
-        position: Point2,
+        x: sm.ScalarData = 0,
+        y: sm.ScalarData = 0,
         yaw: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Pose2D:
         """
-        Compose a Pose2D from a position and a bearing.
+        Create a Pose2D from its coordinates and bearing.
 
-        :param position: Where the pose is.
-        :param yaw: Which way the pose faces. Defaults to 0.
-        :param reference_frame: The reference frame. Defaults to ``position``'s.
+        :param x: The x-coordinate of the position.
+        :param y: The y-coordinate of the position.
+        :param yaw: The rotation around the z-axis.
+        :param reference_frame: The reference frame.
         :return: The Pose2D instance.
         """
-        frame = (
-            reference_frame if reference_frame is not None else position.reference_frame
-        )
-        return cls(x=position.x, y=position.y, yaw=yaw, reference_frame=frame)
+        return cls(position=Point2(x=x, y=y), yaw=yaw, reference_frame=reference_frame)
 
     # %% JSON serialization
 
@@ -2719,12 +2726,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
-        return cls(
-            x=data["data"][0],
-            y=data["data"][1],
-            yaw=data["data"][2],
-            reference_frame=reference_frame,
-        )
+        return cls.from_xy_yaw(*data["data"], reference_frame=reference_frame)
 
     def _constant_to_json(self) -> Dict[str, Any]:
         return {

@@ -566,7 +566,7 @@ def test_transform_a_pose_2d(world_setup):
     world.state[connection.dof.id].position = 1.0
     world.notify_state_change()
 
-    pose_2d = Pose2D(x=2.0, y=0.5, yaw=0.3, reference_frame=l2)
+    pose_2d = Pose2D.from_xy_yaw(x=2.0, y=0.5, yaw=0.3, reference_frame=l2)
 
     relative_pose_2d = world.transform(pose_2d, l1)
 

@@ -1436,7 +1436,7 @@ class TestTransformationMatrix:
             sm.Scalar(1),
             np.eye(4),
             Point2(x=1, y=1),
-            Pose2D(x=1, y=1, yaw=1),
+            Pose2D.from_xy_yaw(x=1, y=1, yaw=1),
         ]
 
         for other in works:
@@ -1512,7 +1512,7 @@ class TestTransformationMatrix:
         pose with those dropped.
         """
         transformation = self._transformation()
-        pose_2d = Pose2D(x=1, y=2, yaw=0.4)
+        pose_2d = Pose2D.from_xy_yaw(x=1, y=2, yaw=0.4)
 
         transformed = pose_2d.transform(transformation)
 

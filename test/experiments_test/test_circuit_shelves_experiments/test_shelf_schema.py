@@ -86,7 +86,7 @@ def _make_layer(relative_height: float = 0.0) -> RelationalCircuitExperimentShel
             RelationalCircuitExperimentObject2D(
                 object_type=ObjectType.BOOK,
                 scale=Scale(x=0.05, y=0.1, z=0.2),
-                pose=Pose2D(x=0.0, y=0.0, yaw=0.0),
+                pose=Pose2D.from_xy_yaw(x=0.0, y=0.0, yaw=0.0),
                 source_id="chair_src",
             )
         ],

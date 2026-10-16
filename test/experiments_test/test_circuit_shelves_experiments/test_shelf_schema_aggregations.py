@@ -20,7 +20,7 @@ def _object(source_id: str) -> RelationalCircuitExperimentObject2D:
     return RelationalCircuitExperimentObject2D(
         object_type=ObjectType.BOOK,
         scale=Scale(x=0.05, y=0.1, z=0.2),
-        pose=Pose2D(x=0.0, y=0.0, yaw=0.0),
+        pose=Pose2D.from_xy_yaw(x=0.0, y=0.0, yaw=0.0),
         source_id=source_id,
     )
 

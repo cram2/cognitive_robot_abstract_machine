@@ -766,7 +766,7 @@ def test_transport(multiple_robot_apartment_context, rclpy_node):
 def test_move_to_reach(multiple_robot_apartment_context, rclpy_node):
     world, robot, context = multiple_robot_apartment_context
     move_to_reach = MoveToReach(
-        target_pose_offset_robot=Pose2D(0.2, -0.55),
+        target_pose_offset_robot=Pose2D.from_xy_yaw(0.2, -0.55),
         reference_T_grasp=Pose.from_xyz_rpy(
             x=0.7, y=-1.3, z=0.9, reference_frame=world.root
         ),
