@@ -557,6 +557,55 @@ def test_builder_writes_a_geoms_contact_bitmasks(tmp_path):
     assert geom.conaffinity == 4
 
 
+def _world_with_one_cylinder(cylinder: Cylinder) -> World:
+    """
+    A world whose only link is shaped as ``cylinder``.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        link = Body(name=PrefixedName("link"), collision=ShapeCollection([cylinder]))
+        world.add_kinematic_structure_entity(link)
+        world.add_connection(FixedConnection(parent=root, child=link))
+    return world
+
+
+def test_builder_sizes_a_cylinder_by_its_radius_and_half_its_height(tmp_path):
+    """
+    MuJoCo sizes a cylinder by its radius and half its length, so a cylinder written
+    with its whole height stands twice as tall in the simulation as in the world.
+    """
+    cylinder = Cylinder(width=0.028, height=0.03)
+    builder = MujocoBuilder()
+    builder.build_world(
+        world=_world_with_one_cylinder(cylinder), file_path=str(tmp_path / "scene.xml")
+    )
+
+    [geom] = [
+        geom
+        for body in builder.spec.bodies
+        for geom in body.geoms
+        if body.name == "link"
+    ]
+    assert list(geom.size[:2]) == [cylinder.radius, cylinder.height / 2]
+
+
+def test_a_cylinder_keeps_its_size_through_a_round_trip(tmp_path):
+    cylinder = Cylinder(width=0.028, height=0.03)
+    builder = MujocoBuilder()
+    builder.build_world(
+        world=_world_with_one_cylinder(cylinder), file_path=str(tmp_path / "scene.xml")
+    )
+
+    parsed_world = MJCFParser(str(tmp_path / "scene.xml")).parse()
+
+    [parsed_cylinder] = parsed_world.get_body_by_name("link").collision.shapes
+    assert (parsed_cylinder.width, parsed_cylinder.height) == pytest.approx(
+        (cylinder.width, cylinder.height)
+    )
+
+
 def test_contact_declarations_and_gravity_compensation_survive_a_round_trip(tmp_path):
     """
     A shape's contact parameters and a body's gravity compensation are written into the
@@ -598,9 +647,11 @@ def test_builder_keeps_a_visual_only_geom_contactless_despite_its_bitmasks(tmp_p
         root = Body(name=PrefixedName("root"))
         world.add_body(root)
         box_shape = Box(scale=Scale(1, 1, 1))
-        box_shape.add_simulator_property(MujocoGeom(
-            contact_type=ContactCategories(2), contact_affinity=ContactCategories(4)
-        ))
+        box_shape.add_simulator_property(
+            MujocoGeom(
+                contact_type=ContactCategories(2), contact_affinity=ContactCategories(4)
+            )
+        )
         link = Body(name=PrefixedName("link"), visual=ShapeCollection([box_shape]))
         world.add_kinematic_structure_entity(link)
         world.add_connection(FixedConnection(parent=root, child=link))

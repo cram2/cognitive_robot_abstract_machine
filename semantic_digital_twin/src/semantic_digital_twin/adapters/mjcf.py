@@ -479,7 +479,7 @@ class MJCFParser(WorldModelParser):
                 return Cylinder(
                     origin=origin_transform,
                     width=size[0],
-                    height=size[1] / 2,
+                    height=size[1],
                     color=color,
                     texture=self._resolve_primitive_texture(mujoco_geom),
                 )

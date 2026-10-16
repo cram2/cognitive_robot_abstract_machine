@@ -3,6 +3,11 @@ from numpy.typing import NDArray
 import pytest
 import trimesh
 
+from krrood.adapters.json_serializer import from_json, to_json
+
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     MissingReferenceFrameError,
@@ -25,6 +30,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
     Handle,
     Milk,
+    MontessoriPiece,
     Spoon,
     Table,
 )
@@ -60,6 +66,16 @@ Height of the synthetic bowl's wall.
 BOX_SCALE = Scale(0.1, 0.2, 0.3)
 """
 Extents of the box body used by the default grasp pose tests.
+"""
+
+PIECE_SCALE = Scale(0.03, 0.04, 0.03)
+"""
+Extents of the Montessori piece, a rectangular prism.
+"""
+
+PIECE_GRASP_HEIGHT = 0.0185
+"""
+How far above its bottom face the Montessori piece is gripped.
 """
 
 
@@ -250,6 +266,93 @@ def test_cutlery_without_a_shape_offers_no_grasp():
         spoon.grasp_candidates()
 
 
+# %% Montessori piece grasp poses
+
+
+def _montessori_piece(collision: ShapeCollection) -> MontessoriPiece:
+    """
+    :param collision: The piece's collision geometry.
+    :return: A Montessori piece standing alone in a world of its own.
+    """
+    body = Body(
+        name=PrefixedName("montessori_piece", prefix="grasp_candidates"),
+        collision=collision,
+    )
+    annotation = MontessoriPiece(root=body, grasp_height=PIECE_GRASP_HEIGHT)
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+        world.add_semantic_annotation(annotation)
+    return annotation
+
+
+@pytest.fixture
+def montessori_piece() -> MontessoriPiece:
+    """
+    A Montessori piece whose box is centred on its origin, so its bottom face lies half
+    its height below the origin.
+    """
+    return _montessori_piece(
+        ShapeCollection(
+            [Box(origin=HomogeneousTransformationMatrix(), scale=PIECE_SCALE)]
+        )
+    )
+
+
+def test_a_montessori_piece_is_grasped_from_above_closing_along_its_own_x(
+    montessori_piece,
+):
+    """
+    The fingers come down onto the piece and close along its own x, so a triangular
+    prism turned with a face across x is held by that face and the opposite edge.
+    """
+    [grasp] = montessori_piece.grasp_candidates()
+    approach, closing = (
+        axes_of(grasp.grasp_pose)[:, 0],
+        axes_of(grasp.grasp_pose)[:, 1],
+    )
+
+    np.testing.assert_allclose(approach, [0, 0, -1], atol=1e-9)
+    np.testing.assert_allclose(closing, [1, 0, 0], atol=1e-9)
+
+
+def test_a_montessori_piece_is_gripped_its_grasp_height_above_its_bottom_face(
+    montessori_piece,
+):
+    [grasp] = montessori_piece.grasp_candidates()
+    bottom_face = -PIECE_SCALE.z / 2
+
+    np.testing.assert_allclose(
+        grasp.grasp_pose.to_np()[:3, 3],
+        [0, 0, bottom_face + montessori_piece.grasp_height],
+        atol=1e-9,
+    )
+
+
+def test_a_montessori_piece_reaches_another_world_with_its_grasp_height(
+    montessori_piece,
+):
+    """
+    A world kept in step with another one is sent its annotations as JSON, so a piece has
+    to arrive able to say where it is gripped.
+    """
+    [block] = (
+        montessori_piece.root._world.get_world_model_manager().model_modification_blocks
+    )
+    other_world = World()
+    sent = from_json(to_json(block), **WorldEntityWithIDKwargsTracker().create_kwargs())
+    with other_world.modify_world():
+        sent.apply(other_world)
+
+    [arrived] = other_world.get_semantic_annotations_by_type(MontessoriPiece)
+    assert arrived.grasp_height == montessori_piece.grasp_height
+
+
+def test_a_montessori_piece_without_a_shape_offers_no_grasp():
+    with pytest.raises(NoGraspGeometry):
+        _montessori_piece(ShapeCollection()).grasp_candidates()
+
+
 # %% the frame a grasp is expressed in
 
 
@@ -315,7 +418,7 @@ def test_only_annotations_that_can_be_held_offer_grasps():
     The mixin sits below :class:`HasRootBody` rather than above it precisely so that a
     dishwasher cannot be asked where to grasp it.
     """
-    for graspable in (Bowl, Milk, Spoon, Handle):
+    for graspable in (Bowl, Milk, Spoon, Handle, MontessoriPiece):
         assert issubclass(graspable, HasGraspCandidates)
     for fixed in (Dishwasher, Cabinet, Table, Floor):
         assert issubclass(fixed, HasRootBody)

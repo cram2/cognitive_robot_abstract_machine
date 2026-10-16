@@ -1452,6 +1452,55 @@ class Pen(HasGraspCandidates):
 
 
 @dataclass(eq=False)
+class MontessoriPiece(HasGraspCandidates):
+    """
+    A loose piece of a Montessori shape-sorting toy, which drops through the hole of its
+    own outline.
+    """
+
+    grasp_height: float = field(kw_only=True)
+    """
+    How far above its bottom face the piece is gripped.
+
+    Gripped low, the piece hangs as little as possible below the fingers when it is let
+    go of over its hole; how low depends on how far the closing fingers reach past the
+    point they are brought to.
+    """
+
+    def grasp_candidates(self) -> List[GraspCandidate]:
+        """
+        :return: The grasp from above, on the piece's vertical axis at
+            :attr:`grasp_height`, closing along the piece's own x.
+        :raises NoGraspGeometry: If the root body has no collision geometry to find the
+            bottom face in.
+        """
+        if not self.root.has_collision():
+            raise NoGraspGeometry(self)
+        bottom_face = (
+            self.root.collision.as_bounding_box_collection_in_frame(self.root)
+            .bounding_box()
+            .min_z
+        )
+        return [
+            GraspCandidate(
+                self,
+                Pose(
+                    position=Point3(
+                        0.0,
+                        0.0,
+                        bottom_face + self.grasp_height,
+                        reference_frame=self.root,
+                    ),
+                    orientation=RotationMatrix.from_vectors(
+                        x=Vector3.NEGATIVE_Z(), y=Vector3.X()
+                    ).quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+        ]
+
+
+@dataclass(eq=False)
 class Baseball(HasGraspCandidates):
     """
     A baseball.
