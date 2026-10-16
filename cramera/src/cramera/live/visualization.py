@@ -85,7 +85,7 @@ class WorldModelSync(ModelChangeCallback):
 
         :param kwargs: Metadata provided by the native callback dispatcher.
         """
-        self.bridge.observe_model_change()
+        self.bridge.observe_model_change(self._world)
 
 
 # %% plan synchronization

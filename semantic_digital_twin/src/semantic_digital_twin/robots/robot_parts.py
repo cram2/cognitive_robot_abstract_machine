@@ -611,6 +611,16 @@ class Camera(Sensor, ABC):
         The direction the camera looks, expressed in :attr:`root`'s frame.
         """
 
+    def to_json(self, **kwargs: Any) -> dict[str, Any]:
+        """Serialize the camera fields and its computed viewing direction.
+
+        :param kwargs: Serialization context forwarded to the fields and direction.
+        :return: Camera properties including the direction's value and reference frame.
+        """
+        result = super().to_json(**kwargs)
+        result["forward_facing_axis"] = self.forward_facing_axis.to_json(**kwargs)
+        return result
+
     @property
     def root_T_forward_view(self) -> HomogeneousTransformationMatrix:
         """

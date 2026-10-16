@@ -14,6 +14,7 @@ class PlaybackLoop extends ScenePanelFunctions {
       playing: true, traj: {frames: Array(1000).fill({}), framesPerSecond: 30},
       liveOn: false, playhead: 0, playbackSpeedMultiplier: speed, playheadCbs: [],
       follow: false, needsRender: false, requestAnimationFrame() {},
+      robotCameraPanel: {render() {}},
     });
     this.scope.applyFrame = () => {};
     this.scope.renderFrame = () => {};

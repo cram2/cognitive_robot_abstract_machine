@@ -79,12 +79,12 @@ def write_recording_bundle(
             "framesPerSecond": frames_per_second,
             "trajectory": "trajectory.json",
             "models": geometry.models,
-            "robot": geometry.robot,
+            SceneField.ROBOT: geometry.robot,
             "objects": objects,
             "segments": [segment.to_payload() for segment in derive_segments(frames)],
             "missingAssets": geometry.missing_assets,
             "worldBound": True,
-            "bundleSignature": bridge.bundle_signature(),
+            SceneField.BUNDLE_SIGNATURE: bridge.bundle_signature(),
             SceneField.PLAN_TREES: bridge.plan_state.recorded_trees(),
         }
         statecharts = RecordedStatecharts.of_snapshots(
