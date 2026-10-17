@@ -1,3 +1,7 @@
+from collections.abc import Sequence
+
+import numpy.typing as npt
+
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
@@ -170,6 +174,37 @@ def fully_factorized(
         root.add_subcircuit(distribution)
 
     return root.probabilistic_circuit
+
+
+def factorized_gaussian_mixture(
+    variables: Sequence[Continuous], means: npt.NDArray, scales: npt.NDArray
+) -> ProbabilisticCircuit:
+    """
+    Create an equally weighted mixture of fully factorized Gaussian distributions.
+
+    :param variables: The variables, in the order of the columns of ``means`` and
+        ``scales``.
+    :param means: The mean of every variable, one row per mixture component.
+    :param scales: The standard deviation of every variable, one row per mixture
+        component.
+    :return: The circuit describing the mixture.
+    """
+    result = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=result)
+    for component_means, component_scales in zip(means, scales):
+        component = ProductUnit(probabilistic_circuit=result)
+        for variable, mean, scale in zip(variables, component_means, component_scales):
+            component.add_subcircuit(
+                leaf(
+                    GaussianDistribution(
+                        variable=variable, location=float(mean), scale=float(scale)
+                    ),
+                    result,
+                )
+            )
+        root.add_subcircuit(component, 0.0)
+    root.normalize()
+    return result
 
 
 def multiply_distributions(

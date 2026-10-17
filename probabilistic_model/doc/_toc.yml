@@ -18,6 +18,7 @@ parts:
     chapters:
     - file: graphical_models
     - file: circuits
+    - file: progressive_circuits
     - file: truncated_gaussian
     - file: nyga_distribution
     - file: joint_probability_trees
