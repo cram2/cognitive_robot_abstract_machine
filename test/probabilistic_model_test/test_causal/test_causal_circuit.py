@@ -28,7 +28,7 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
 )
 
 from probabilistic_model.probabilistic_circuit.causal.exceptions import (
-    OverlappingChildSupportsViolation,
+    OverlappingComponentsViolation,
     SupportDeterminismVerificationResult,
     UnregisteredVariableError,
     NoCauseVariablesError,
@@ -568,9 +568,7 @@ class SupportDeterminismVerificationResultTestCase(unittest.TestCase):
 
     def test_failing_result_contains_fail_and_violation_text(self):
         x = Continuous("x")
-        violation = OverlappingChildSupportsViolation(
-            sum_unit_index=0, query_variable=x
-        )
+        violation = OverlappingComponentsViolation(mixture=0, query_variable=x)
         result = SupportDeterminismVerificationResult(
             passed=False,
             violations=[violation],
@@ -745,8 +743,8 @@ class VerifySupportDeterminismDisjointnessTestCase(unittest.TestCase):
         """
         x = Continuous("x")
         one_child = [SimpleEvent.from_data({x: closed(0, 1)}).as_composite_set()]
-        self.assertFalse(CausalCircuit._child_marginals_split_on_variable([]))
-        self.assertFalse(CausalCircuit._child_marginals_split_on_variable(one_child))
+        self.assertFalse(CausalCircuit._components_split_on_variable([]))
+        self.assertFalse(CausalCircuit._components_split_on_variable(one_child))
 
 
 class VerifySupportDeterminismSharedSubcircuitTestCase(unittest.TestCase):

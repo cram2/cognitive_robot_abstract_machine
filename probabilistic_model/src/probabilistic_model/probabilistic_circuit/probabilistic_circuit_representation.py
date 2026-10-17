@@ -23,6 +23,13 @@ NodeType = TypeVar("NodeType")
 How a representation refers to one node of a circuit it holds.
 """
 
+RepresentationType = TypeVar(
+    "RepresentationType", bound="ProbabilisticCircuitRepresentation"
+)
+"""
+The representation a circuit is read from and answered in.
+"""
+
 # %% what the mixtures of a circuit look like
 
 
