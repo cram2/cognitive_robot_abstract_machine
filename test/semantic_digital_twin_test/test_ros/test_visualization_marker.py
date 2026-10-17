@@ -293,6 +293,22 @@ def test_markers_are_stamped_with_the_frame_names_the_tf_publisher_publishes(
     assert marker_frames(viz) == published_child_frames(tf_publisher)
 
 
+def test_markers_of_equally_named_bodies_do_not_replace_each_other(rclpy_node):
+    """
+    RViz identifies a marker by its namespace and id, so a marker sharing both with
+    another one replaces it.
+    """
+    world, bodies = world_with_visible_bodies("milk", "milk")
+
+    viz = VizMarkerPublisher(_world=world, node=rclpy_node)
+
+    assert sorted((marker.ns, marker.id) for marker in viz.markers.markers) == sorted(
+        (viz.tf_publisher.tf_model_callback.frame_names.assign(body), shape_index)
+        for body in bodies
+        for shape_index, _ in enumerate(body.visual.shapes)
+    )
+
+
 def test_the_tf_publisher_of_the_world_is_adopted(rclpy_node):
     world, _ = world_with_visible_bodies("milk")
     tf_publisher = TFPublisher(node=rclpy_node, _world=world)

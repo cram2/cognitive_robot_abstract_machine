@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from time import sleep
 from typing import Optional
-from typing_extensions import Dict, Set
 from uuid import UUID
 
 from geometry_msgs.msg import TransformStamped
@@ -25,6 +24,7 @@ from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
+from semantic_digital_twin.datastructures.unique_entity_names import UniqueEntityNames
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
@@ -46,19 +46,13 @@ class TfTopic(StrEnum):
 
 
 @dataclass
-class TfFrameNames:
+class TfFrameNames(UniqueEntityNames):
     """
-    Names the tf frame every kinematic structure entity is published under.
+    Names the tf frame every kinematic structure entity is published under, unique
+    across the whole tf tree.
 
-    Frame names must be unique across the whole tf tree, while entity names need not be
-    unique even within one world. Only entities that actually share a name are told
-    apart, by appending their identifier; every other frame keeps the entity's name. An
-    entity another publisher already broadcasts therefore keeps that publisher's frame
-    name, which is where our tree joins theirs.
-
-    The name an entity is first published under is kept for as long as this publisher
-    lives, so a frame never moves to another entity and an entity arriving later never
-    renames the ones already on the tree.
+    An entity another publisher already broadcasts keeps that publisher's frame name,
+    which is where our tree joins theirs.
     """
 
     prefix: str = field(default="", kw_only=True)
@@ -70,39 +64,8 @@ class TfFrameNames:
     body ``copy/milk``, while ``"copy"`` would name it ``copymilk``.
     """
 
-    _frame_name_per_entity: Dict[UUID, str] = field(init=False, default_factory=dict)
-    """
-    The frame name each entity has been published under so far.
-    """
-
-    _assigned_frame_names: Set[str] = field(init=False, default_factory=set)
-    """
-    Every frame name handed out so far, kept even after the entity holding it is gone so
-    that no later entity can take over a name someone may still be following.
-    """
-
-    def assign(self, entity: KinematicStructureEntity) -> str:
-        """
-        :param entity: The entity about to be published.
-        :return: the tf frame name of an entity, giving it one if it has none yet.
-        """
-        if entity.id in self._frame_name_per_entity:
-            return self._frame_name_per_entity[entity.id]
-
-        frame_name = self._unused_frame_name_for(entity)
-        self._frame_name_per_entity[entity.id] = frame_name
-        self._assigned_frame_names.add(frame_name)
-        return frame_name
-
-    def _unused_frame_name_for(self, entity: KinematicStructureEntity) -> str:
-        """
-        :param entity: The entity about to be published.
-        :return: the frame name a not yet published entity should get.
-        """
-        frame_name = f"{self.prefix}{entity.name}"
-        if frame_name not in self._assigned_frame_names:
-            return frame_name
-        return f"{frame_name}_{entity.id.hex}"
+    def preferred_name(self, entity: KinematicStructureEntity) -> str:
+        return f"{self.prefix}{entity.name}"
 
 
 @dataclass(eq=False)

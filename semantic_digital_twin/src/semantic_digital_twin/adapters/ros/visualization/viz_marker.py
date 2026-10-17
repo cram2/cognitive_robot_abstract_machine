@@ -50,8 +50,8 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
     """
     Publishes the world model as a visualization marker.
 
-    Markers are stamped with the frame names the world's tf publisher hands out, so
-    equally named bodies are told apart the same way in both.
+    Markers are stamped with, and namespaced by, the frame names the world's tf
+    publisher hands out, so equally named bodies are told apart the same way in both.
     .. warning:: Relies on the tf tree to correctly position the markers.
     .. warning:: To see something in Rviz you must:
         1. add a MarkerArray plugin,
@@ -189,12 +189,12 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
         frame_names = self.tf_publisher.tf_model_callback.frame_names
         for body in self._world.bodies:
             shapes = self._select_shapes(body)
-            self._add_markers_for_shapes(shapes, str(body.name), frame_names)
+            self._add_markers_for_shapes(shapes, frame_names.assign(body), frame_names)
 
         for region in self._world.regions:
             self._add_markers_for_shapes(
                 region.area.shapes,
-                str(region.name),
+                frame_names.assign(region),
                 frame_names,
                 force_alpha=self.region_alpha,
             )
