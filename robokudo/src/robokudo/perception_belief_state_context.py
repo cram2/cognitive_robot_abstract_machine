@@ -9,9 +9,7 @@ share, every change perception makes to it is published to them.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from uuid import UUID
 
-import numpy as np
 import trimesh.creation
 from py_trees.blackboard import Blackboard
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
@@ -24,19 +22,14 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
-from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale
+from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Dict, Optional
+from typing_extensions import Optional
 
-from robokudo.cas import CAS
 from robokudo.exceptions import SharedWorldReplacementError
 from robokudo.identifier import BBIdentifier
-from robokudo.types.annotation import BoundingBox3DAnnotation
-from robokudo.types.belief_state import ObjectBeliefState
-from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.annotator_helper import get_camera_to_world_transform_matrix
-from robokudo.utils.transform import get_transform_matrix_from_q
+from robokudo.perceived_objects import PerceivedObjects
 
 # %% belief state context
 
@@ -44,7 +37,7 @@ from robokudo.utils.transform import get_transform_matrix_from_q
 @dataclass
 class PerceptionBeliefStateContext:
     """
-    The world RoboKudo perceives into and the object beliefs it holds in that world.
+    The world RoboKudo perceives into and the objects it believes in, in that world.
 
     Annotators and camera interfaces find the context of the running pipeline on the
     blackboard through :meth:`from_blackboard`.
@@ -55,9 +48,9 @@ class PerceptionBeliefStateContext:
     The world perception reads its prior knowledge from and writes its beliefs into.
     """
 
-    object_belief_states: Dict[UUID, ObjectBeliefState] = field(default_factory=dict)
+    perceived_objects: PerceivedObjects = field(init=False)
     """
-    The object beliefs perception holds, by the id of their body.
+    The objects perception believes in, kept as bodies in :attr:`world`.
     """
 
     entity_tracker: WorldEntityWithIDKwargsTracker = field(init=False)
@@ -66,6 +59,7 @@ class PerceptionBeliefStateContext:
     """
 
     def __post_init__(self) -> None:
+        self.perceived_objects = PerceivedObjects(world=self.world)
         self.entity_tracker = WorldEntityWithIDKwargsTracker.from_world(self.world)
 
     @classmethod
@@ -100,7 +94,7 @@ class PerceptionBeliefStateContext:
         """
         Perceive into ``world`` from now on.
 
-        The object beliefs held in the previous world are dropped with it.
+        The objects perceived in the previous world are dropped with it.
 
         :param world: The world to perceive into.
         :raises SharedWorldReplacementError: If the current world is shared with other
@@ -109,8 +103,8 @@ class PerceptionBeliefStateContext:
         if self.is_synchronized:
             raise SharedWorldReplacementError()
         self.world = world
+        self.perceived_objects = PerceivedObjects(world=world)
         self.entity_tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-        self.object_belief_states.clear()
 
     # %% camera placement
 
@@ -191,127 +185,3 @@ class PerceptionBeliefStateContext:
         :return: The connection name.
         """
         return PrefixedName(name=f"{frame}_T_{parent_frame}")
-
-    # %% object beliefs
-
-    def add_object_hypothesis_as_belief_state(
-        self, object_hypothesis: ObjectHypothesis, cas: CAS
-    ) -> ObjectBeliefState:
-        """
-        Believe in a new object seen as ``object_hypothesis``.
-
-        The object is added to :attr:`world` below the world frame of ``cas``, shaped
-        and placed as the latest 3D bounding box of the hypothesis. Without a world
-        frame the belief is kept outside the world.
-
-        :param object_hypothesis: The hypothesis the object was seen as.
-        :param cas: The CAS whose camera pose locates the hypothesis.
-        :return: The new object belief.
-        """
-        object_belief = ObjectBeliefState.create_with_new_body().add_hypothesis(
-            object_hypothesis
-        )
-        self.object_belief_states[object_belief.uuid] = object_belief
-
-        world_body = self._world_body_of(cas)
-        if world_body is None:
-            return object_belief
-
-        bounding_box = object_belief.latest_bbox_3d
-        if bounding_box is not None:
-            object_belief.body.visual.append(Box(scale=self._scale_of(bounding_box)))
-        with self.world.modify_world():
-            self.world.add_connection(
-                Connection6DoF.create_with_dofs(
-                    world=self.world, parent=world_body, child=object_belief.body
-                )
-            )
-        if bounding_box is not None:
-            object_belief.body.parent_connection.origin = self._world_T_bounding_box(
-                bounding_box, cas, world_body, object_belief.body
-            )
-        return object_belief
-
-    def update_belief_state_with_object_hypothesis(
-        self,
-        object_belief: ObjectBeliefState,
-        object_hypothesis: ObjectHypothesis,
-        cas: CAS,
-    ) -> None:
-        """
-        Update ``object_belief`` with the object seen again as ``object_hypothesis``.
-
-        The body of the belief is moved to and reshaped as the latest 3D bounding box of
-        the hypothesis.
-
-        .. note:: Only the move reaches the processes :attr:`world` is shared with; they
-            keep the shape the object was first believed in with.
-
-        :param object_belief: The belief in the object that was seen again.
-        :param object_hypothesis: The hypothesis it was seen as.
-        :param cas: The CAS whose camera pose locates the hypothesis.
-        """
-        object_belief.add_hypothesis(object_hypothesis)
-
-        world_body = self._world_body_of(cas)
-        bounding_box = object_belief.latest_bbox_3d
-        if world_body is None or bounding_box is None:
-            return
-
-        object_belief_body = object_belief.body
-        with self.world.modify_world(publish_changes=False):
-            object_belief_body.visual.shapes.clear()
-            object_belief_body.visual.append(Box(scale=self._scale_of(bounding_box)))
-        object_belief_body.parent_connection.origin = self._world_T_bounding_box(
-            bounding_box, cas, world_body, object_belief_body
-        )
-
-    def _world_body_of(self, cas: CAS) -> Optional[Body]:
-        """
-        The body of the world frame ``cas`` locates its camera in.
-
-        :param cas: The CAS of the current frame.
-        :return: The world frame body, or None if the CAS names no world frame.
-        """
-        if cas.world_frame is None:
-            return None
-        return self.world.get_body_by_name(PrefixedName(name=cas.world_frame))
-
-    @staticmethod
-    def _scale_of(bounding_box: BoundingBox3DAnnotation) -> Scale:
-        """
-        The extent of a 3D bounding box along its axes.
-
-        :param bounding_box: The bounding box.
-        :return: The extent of the box.
-        """
-        return Scale(
-            x=bounding_box.x_length, y=bounding_box.y_length, z=bounding_box.z_length
-        )
-
-    @staticmethod
-    def _world_T_bounding_box(
-        bounding_box: BoundingBox3DAnnotation,
-        cas: CAS,
-        world_body: Body,
-        object_body: Body,
-    ) -> HomogeneousTransformationMatrix:
-        """
-        Pose of a bounding box seen by the camera of ``cas``, in the world frame.
-
-        :param bounding_box: The bounding box in camera coordinates.
-        :param cas: The CAS holding the camera pose.
-        :param world_body: The world frame body.
-        :param object_body: The body the bounding box belongs to.
-        :return: The world frame pose of the box.
-        """
-        camera_T_bounding_box = get_transform_matrix_from_q(
-            bounding_box.pose.rotation, bounding_box.pose.translation
-        )
-        return HomogeneousTransformationMatrix(
-            data=np.matmul(
-                get_camera_to_world_transform_matrix(cas), camera_T_bounding_box
-            ),
-            reference_frame=world_body,
-            child_frame=object_body,
-        )

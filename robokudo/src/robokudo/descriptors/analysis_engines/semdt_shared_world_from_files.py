@@ -22,7 +22,6 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -79,7 +78,6 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
                 ClusterPoseBBAnnotator(),
-                SemanticDigitalTwinConnector(),
             ]
         )
         return pipeline

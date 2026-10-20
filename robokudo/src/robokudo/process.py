@@ -32,6 +32,7 @@ from robokudo.exceptions import MultipleRobotsInWorldError, RoboKudoAlreadyRunni
 from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
 from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
+from robokudo.pipeline import Pipeline
 from robokudo.utils.tree import setup_with_descendants_rk
 
 if TYPE_CHECKING:
@@ -87,6 +88,12 @@ class RoboKudo:
     tree: Optional[BehaviourTree] = field(init=False, default=None)
     """
     The behaviour tree of :attr:`analysis_engine`; None until :meth:`start`.
+    """
+
+    pipeline: Optional[Pipeline] = field(init=False, default=None)
+    """
+    The pipeline :attr:`analysis_engine` perceives with, whose finished passes are put
+    into the world; None until :meth:`start`, and for an engine without a pipeline.
     """
 
     @classmethod
@@ -167,8 +174,11 @@ class RoboKudo:
         blackboard.set(BBIdentifier.ROBOKUDO, self)
         self.belief_state_context.store_on_blackboard()
 
+        engine_tree = self.analysis_engine.implementation()
+        if isinstance(engine_tree, Pipeline):
+            self.pipeline = engine_tree
         self.tree = grow_tree(
-            self.analysis_engine.implementation(),
+            engine_tree,
             node=self.node,
             include_gui=include_gui,
             visualizer_types=visualizer_types,
@@ -199,7 +209,7 @@ class RoboKudo:
             try:
                 logger.debug(f"--------- Tick {tick_count} ---------")
                 start = timer()
-                self.tree.tick()
+                self.tick()
                 logger.debug(f"Tick took {timer() - start:.4f} seconds")
                 if (
                     self.tree.root.children
@@ -210,6 +220,16 @@ class RoboKudo:
             except Exception as exception:
                 logger.error(f"Exception: {exception}")
                 logger.error("Traceback:\n" + traceback.format_exc())
+
+    def tick(self) -> None:
+        """
+        Tick the behaviour tree once, and put the objects found by a pass of
+        :attr:`pipeline` that finished successfully into the world.
+        """
+        self.tree.tick()
+        if self.pipeline is None or self.pipeline.status != Status.SUCCESS:
+            return
+        self.belief_state_context.perceived_objects.apply(self.pipeline.cas)
 
     def close(self) -> None:
         """

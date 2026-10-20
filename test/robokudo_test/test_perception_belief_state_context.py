@@ -8,7 +8,6 @@ from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.cas import CAS
@@ -19,7 +18,6 @@ from ._perception_world import (
     CAMERA_FRAME,
     WORLD_FRAME,
     camera_pose,
-    cas_seen_from,
 )
 
 # %% blackboard
@@ -43,15 +41,20 @@ class TestContextOnBlackboard:
 
 
 class TestWorldReplacement:
-    def test_replaced_world_drops_the_beliefs_held_in_the_previous_one(self) -> None:
+    def test_replaced_world_drops_the_objects_perceived_in_the_previous_one(
+        self,
+    ) -> None:
         context = PerceptionBeliefStateContext()
-        context.add_object_hypothesis_as_belief_state(make_object_hypothesis(), CAS())
+        cas = CAS()
+        cas.annotations.append(make_object_hypothesis())
+        context.perceived_objects.apply(cas)
         new_world = World()
 
         context.replace_world(new_world)
 
         assert context.world is new_world
-        assert context.object_belief_states == {}
+        assert context.perceived_objects.world is new_world
+        assert context.perceived_objects.beliefs == {}
 
 
 # %% camera placement
@@ -116,62 +119,3 @@ class TestCameraPlacement:
         assert np.allclose(camera_body.global_transform.to_np(), camera_pose_before)
         assert bound_world_T_camera.child_frame is camera_body
         assert np.allclose(bound_world_T_camera.to_np(), world_T_camera.to_np())
-
-
-# %% object beliefs
-
-
-class TestObjectBeliefs:
-    def test_new_belief_is_a_box_at_the_world_pose_of_its_hypothesis(self) -> None:
-        context = PerceptionBeliefStateContext()
-        cas = cas_seen_from(context, camera_pose(x=1.0))
-        hypothesis = make_object_hypothesis(translation=(0.0, 0.5, 2.0))
-
-        object_belief = context.add_object_hypothesis_as_belief_state(hypothesis, cas)
-
-        bounding_box = object_belief.latest_bbox_3d
-        assert context.object_belief_states == {object_belief.uuid: object_belief}
-        assert object_belief.latest_hypothesis is hypothesis
-        assert np.allclose(
-            object_belief.body.global_transform.position.to_np()[:3],
-            np.array([1.0, 0.0, 0.0]) + np.array(bounding_box.pose.translation),
-        )
-        assert [shape.scale for shape in object_belief.body.visual.shapes] == [
-            Scale(bounding_box.x_length, bounding_box.y_length, bounding_box.z_length)
-        ]
-
-    def test_belief_without_world_frame_is_kept_outside_the_world(self) -> None:
-        context = PerceptionBeliefStateContext()
-
-        object_belief = context.add_object_hypothesis_as_belief_state(
-            make_object_hypothesis(), CAS()
-        )
-
-        assert context.object_belief_states == {object_belief.uuid: object_belief}
-        assert object_belief.body not in context.world.bodies
-
-    def test_updated_belief_moves_to_and_takes_the_shape_of_the_new_hypothesis(
-        self,
-    ) -> None:
-        context = PerceptionBeliefStateContext()
-        cas = cas_seen_from(context, camera_pose())
-        object_belief = context.add_object_hypothesis_as_belief_state(
-            make_object_hypothesis(), cas
-        )
-        hypothesis = make_object_hypothesis(
-            translation=(0.3, 0.0, 1.0), extent=(0.4, 0.5, 0.6)
-        )
-
-        context.update_belief_state_with_object_hypothesis(
-            object_belief, hypothesis, cas
-        )
-
-        bounding_box = object_belief.latest_bbox_3d
-        assert object_belief.latest_hypothesis is hypothesis
-        assert np.allclose(
-            object_belief.body.global_transform.position.to_np()[:3],
-            bounding_box.pose.translation,
-        )
-        assert [shape.scale for shape in object_belief.body.visual.shapes] == [
-            Scale(bounding_box.x_length, bounding_box.y_length, bounding_box.z_length)
-        ]

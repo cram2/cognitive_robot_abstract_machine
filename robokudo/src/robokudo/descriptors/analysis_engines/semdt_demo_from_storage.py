@@ -13,7 +13,6 @@ from robokudo.annotators.outlier_removal_objecthypothesis import (
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -48,7 +47,6 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClusterColorHistogramAnnotator(),
                 OutlierRemovalOnObjectHypothesisAnnotator(),
                 ClusterPoseBBAnnotator(),
-                SemanticDigitalTwinConnector(),
             ]
         )
         return seq

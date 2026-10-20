@@ -73,12 +73,27 @@ def cas_seen_from(
     :return: The CAS.
     """
     cas = CAS()
+    place_camera_of(cas, context, world_T_camera)
+    return cas
+
+
+def place_camera_of(
+    cas: CAS,
+    context: PerceptionBeliefStateContext,
+    world_T_camera: HomogeneousTransformationMatrix,
+) -> None:
+    """
+    Place the camera of ``cas`` at ``world_T_camera`` in the world of ``context``.
+
+    :param cas: The CAS whose camera is placed.
+    :param context: The context the camera is placed in.
+    :param world_T_camera: Pose of the camera in the world frame.
+    """
     cas.world_frame = WORLD_FRAME
     cas.camera_frame = CAMERA_FRAME
     cas.camera_to_world_transform = context.place_camera(
         WORLD_FRAME, CAMERA_FRAME, world_T_camera
     )
-    return cas
 
 
 # %% shared world

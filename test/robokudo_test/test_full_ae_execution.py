@@ -4,6 +4,7 @@ import numpy as np
 import py_trees
 import pytest
 
+from robokudo.perceived_objects import PerceivedObjects
 from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
 import robokudo.cas
 import robokudo.defs
@@ -25,7 +26,6 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
 from robokudo.annotators.shape_estimator import ShapeEstimatorAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
@@ -109,7 +109,6 @@ class TestFullAEExecution(object):
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
                 ClusterPoseBBAnnotator(),
-                SemanticDigitalTwinConnector(),
             ]
         )
 
@@ -123,12 +122,14 @@ class TestFullAEExecution(object):
                 len(object_hypotheses) == 1
             ), "Each successful CAS should already contain the object hypothesis to be synchronized."
 
-            object_beliefs = list(
-                PerceptionBeliefStateContext.from_blackboard().object_belief_states.values()
+            perceived_objects = (
+                PerceptionBeliefStateContext.from_blackboard().perceived_objects
             )
+            perceived_objects.apply(cas)
+            object_beliefs = list(perceived_objects.beliefs.values())
             assert (
                 len(object_beliefs) == 1
-            ), "After each successful connector run, the current object should map to exactly one belief."
+            ), "After each successful pass, the current object should map to exactly one belief."
 
             object_belief = object_beliefs[0]
             assert (
@@ -209,13 +210,12 @@ class TestFullAEExecution(object):
             assert len(bbox_annotations) == 1
             assert len(stamped_pose_annotations) == 1
             assert (
-                stamped_pose_annotations[0].source
-                == SemanticDigitalTwinConnector.__name__
+                stamped_pose_annotations[0].source == PerceivedObjects.__name__
             )
             assert stamped_pose_annotations[0].frame == "map"
 
         object_beliefs = list(
-            PerceptionBeliefStateContext.from_blackboard().object_belief_states.values()
+            PerceptionBeliefStateContext.from_blackboard().perceived_objects.beliefs.values()
         )
         assert (
             len(object_beliefs) == 1
