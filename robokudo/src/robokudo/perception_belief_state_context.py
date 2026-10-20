@@ -2,22 +2,18 @@
 The semantic digital twin RoboKudo perceives into.
 
 Perception reads its prior knowledge from this world and writes what it perceives back
-into it. Connected to other processes through a
-:class:`~semantic_digital_twin.adapters.ros.world_synchronizer.WorldSynchronizer`, the
-world starts from the state those processes share and every change perception makes to
-it is published to them.
+into it. When :class:`~robokudo.process.RoboKudo` joined the world other processes
+share, every change perception makes to it is published to them.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import timedelta
 from uuid import UUID
 
 import numpy as np
 import trimesh.creation
 from py_trees.blackboard import Blackboard
-from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -31,7 +27,7 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import TYPE_CHECKING, Dict, Optional, Self
+from typing_extensions import Dict, Optional
 
 from robokudo.cas import CAS
 from robokudo.exceptions import SharedWorldReplacementError
@@ -42,14 +38,6 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import get_camera_to_world_transform_matrix
 from robokudo.utils.transform import get_transform_matrix_from_q
 
-if TYPE_CHECKING:
-    from rclpy.node import Node
-
-DEFAULT_WORLD_FETCH_TIMEOUT = timedelta(seconds=10)
-"""
-How long to wait for another process to serve the shared world.
-"""
-
 # %% belief state context
 
 
@@ -59,20 +47,12 @@ class PerceptionBeliefStateContext:
     The world RoboKudo perceives into and the object beliefs it holds in that world.
 
     Annotators and camera interfaces find the context of the running pipeline on the
-    blackboard through :meth:`from_blackboard`. A context created by
-    :meth:`synchronized_with_shared_world` starts from the world other processes share
-    and publishes every change perception makes to it.
+    blackboard through :meth:`from_blackboard`.
     """
 
     world: World = field(default_factory=World)
     """
     The world perception reads its prior knowledge from and writes its beliefs into.
-    """
-
-    synchronizer: Optional[WorldSynchronizer] = None
-    """
-    Shares :attr:`world` with other processes; None while perception keeps its world to
-    itself.
     """
 
     object_belief_states: Dict[UUID, ObjectBeliefState] = field(default_factory=dict)
@@ -87,27 +67,6 @@ class PerceptionBeliefStateContext:
 
     def __post_init__(self) -> None:
         self.entity_tracker = WorldEntityWithIDKwargsTracker.from_world(self.world)
-
-    @classmethod
-    def synchronized_with_shared_world(
-        cls, node: Node, fetch_timeout: timedelta = DEFAULT_WORLD_FETCH_TIMEOUT
-    ) -> Self:
-        """
-        Create a context whose world is shared with other processes.
-
-        The world is fetched from the process serving it, then kept in sync in both
-        directions: changes of the other processes are applied to it and changes
-        perception makes are published.
-
-        :param node: The node to fetch and synchronize the world through. It has to be
-            spun by an executor.
-        :param fetch_timeout: How long to wait for a process serving the world.
-        :return: The synchronized context.
-        """
-        world = fetch_world_from_service(
-            node, timeout_seconds=fetch_timeout.total_seconds()
-        )
-        return cls(world=world, synchronizer=WorldSynchronizer(node=node, _world=world))
 
     @classmethod
     def from_blackboard(cls) -> PerceptionBeliefStateContext:
@@ -135,7 +94,7 @@ class PerceptionBeliefStateContext:
         """
         Whether :attr:`world` is shared with other processes.
         """
-        return self.synchronizer is not None
+        return bool(WorldSynchronizer.all_callbacks_of_this_type_from_world(self.world))
 
     def replace_world(self, world: World) -> None:
         """
@@ -152,15 +111,6 @@ class PerceptionBeliefStateContext:
         self.world = world
         self.entity_tracker = WorldEntityWithIDKwargsTracker.from_world(world)
         self.object_belief_states.clear()
-
-    def close(self) -> None:
-        """
-        Stop sharing :attr:`world` with other processes.
-        """
-        if self.synchronizer is None:
-            return
-        self.synchronizer.close()
-        self.synchronizer = None
 
     # %% camera placement
 

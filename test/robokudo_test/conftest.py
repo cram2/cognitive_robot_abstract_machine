@@ -12,12 +12,19 @@ from py_trees.blackboard import Blackboard
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
+from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 import robokudo.defs
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
 )
 from robokudo.identifier import BBIdentifier
+
+from ._perception_world import WORLD_FRAME, SharedWorld
 
 # %% Mongo storage preservation
 
@@ -150,6 +157,23 @@ def spinning_node(node: Node) -> Iterator[Node]:
     yield node
     executor.shutdown()
     thread.join()
+
+
+@pytest.fixture
+def shared_world(spinning_node: Node) -> Iterator[SharedWorld]:
+    """
+    A world another process serves and synchronizes, holding only the world frame.
+    """
+    world = World()
+    with world.modify_world():
+        world.add_body(Body(name=PrefixedName(WORLD_FRAME)))
+    served_world = SharedWorld(
+        world=world,
+        server=FetchWorldServer(node=spinning_node, world=world),
+        synchronizer=WorldSynchronizer(node=spinning_node, _world=world),
+    )
+    yield served_world
+    served_world.close()
 
 
 def clear_blackboard() -> None:

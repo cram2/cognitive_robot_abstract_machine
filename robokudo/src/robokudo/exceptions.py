@@ -439,6 +439,44 @@ class SharedWorldReplacementError(RoboKudoError, RuntimeError):
 
 
 @dataclass
+class RoboKudoAlreadyRunningError(RoboKudoError, RuntimeError):
+    """
+    Raised when a RoboKudo starts in a process another RoboKudo already runs in.
+
+    Both would share the one blackboard of the process, so each would read the
+    perception world of the other.
+    """
+
+    def error_message(self) -> str:
+        return "Another RoboKudo is already running in this process."
+
+    def suggest_correction(self) -> str:
+        return "close the running RoboKudo first, or run the second one in its own process."
+
+
+@dataclass
+class MultipleRobotsInWorldError(RoboKudoError, ValueError):
+    """
+    Raised when the camera of the robot is requested from a world holding several
+    robots.
+    """
+
+    robot_count: int
+    """
+    How many robots the world holds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The perception world holds {self.robot_count} robots, so it is unclear "
+            f"whose camera perception sees through."
+        )
+
+    def suggest_correction(self) -> str:
+        return "run perception on a world that holds a single robot."
+
+
+@dataclass
 class WorldDescriptorError(RoboKudoError, ABC):
     """
     Base class for world descriptor related errors.

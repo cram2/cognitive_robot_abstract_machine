@@ -41,5 +41,8 @@ class BBIdentifier(object):
     BLACKBOARD_EXCEPTION_NAME: str = "exception"
     """Name for storing exceptions on the blackboard"""
 
+    ROBOKUDO: str = "robokudo"
+    """The :class:`~robokudo.process.RoboKudo` running in this process"""
+
     PERCEPTION_BELIEF_STATE_CONTEXT: str = "perception_belief_state_context"
     """The :class:`~robokudo.perception_belief_state_context.PerceptionBeliefStateContext` of the running pipeline"""

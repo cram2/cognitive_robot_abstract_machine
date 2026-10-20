@@ -3,99 +3,32 @@
 from __future__ import annotations
 
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 
 import argparse
 import logging
 import os
 import sys
-import time
-import traceback
 from threading import Thread
-
-# For time measurements or additional logic
-from timeit import default_timer as timer
 
 import rclpy
 import rclpy.impl.logging_severity
 import rclpy.logging
 from py_trees.blackboard import Blackboard
-from py_trees.common import Status
 from rclpy.executors import MultiThreadedExecutor, SingleThreadedExecutor
 from rclpy.parameter import Parameter
-from typing_extensions import TYPE_CHECKING
 
 # RoboKudo imports
 from robokudo.annotators.query import QueryActionServer
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE, PACKAGE_NAME
-from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
+from robokudo.process import RoboKudo
 from robokudo.utils.logging_configuration import configure_logging
 from robokudo.utils.module_loader import ModuleLoader
-from robokudo.utils.tree import setup_with_descendants_rk
 from robokudo.vis.cv_visualizer import CVVisualizer
 from robokudo.vis.ros_visualizer import AllAnnotatorROSVisualizer, SharedROSVisualizer
 
-if TYPE_CHECKING:
-    from py_trees_ros.trees import BehaviourTree
-
 # Silence some TensorFlow GPU logs if needed
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
-
-def run_ae(
-    ae_name: str,
-    ae_root: BehaviourTree,
-    tickrate: int = 20,
-) -> None:
-    """
-    Run an Analysis Engine (AE) by periodically ticking the Behavior Tree.
-    """
-    logger = logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE)
-    logger.info(f"Running AE named '{ae_name}'...")
-
-    blackboard = Blackboard()
-    blackboard.set("CAS", None)
-    tick_count = 0
-
-    def tick_tree() -> bool:
-        nonlocal tick_count
-        try:
-            logger.debug(f"--------- Tick {tick_count} ---------")
-            start = timer()
-            ae_root.tick()
-            end = timer()
-            logger.debug(f"Tick took {end - start:.4f} seconds")
-            if (
-                ae_root.root.children
-                and ae_root.root.children[0].status == Status.FAILURE
-            ):
-                # If your top-level child fails, maybe shut down
-                rclpy.shutdown()
-                return False
-            tick_count += 1
-        except Exception as e:
-            logger.error(f"Exception: {e}")
-            logger.error("Traceback:\n" + traceback.format_exc())
-        return True
-
-    interval = 1.0 / tickrate
-    last_tick = time.monotonic()
-
-    while True:
-        current_time = time.monotonic()
-        elapsed = current_time - last_tick
-
-        if elapsed >= interval:
-            if not tick_tree():
-                break
-
-            last_tick = current_time
-        else:
-            time.sleep(interval - elapsed)
 
 
 def main() -> None:
@@ -232,22 +165,20 @@ def main() -> None:
     thread_main.start()
     thread_asrv.start()
 
-    # 7. Create the world perception perceives into; fetching a shared one needs the
-    #    executors above to serve the node
-    belief_state_context = (
-        PerceptionBeliefStateContext.synchronized_with_shared_world(node=node1)
-        if args.synchronize_world
-        else PerceptionBeliefStateContext()
-    )
-    belief_state_context.store_on_blackboard()
-
-    # 8. Dynamically load the requested Analysis Engine (AE) using the **refactored** ModuleLoader
+    # 7. Dynamically load the requested Analysis Engine (AE) using the **refactored** ModuleLoader
     loader = ModuleLoader()
     logger.info(f"Loading AE '{args.ae}' from package '{args.ros_pkg}'...")
     loaded_ae = loader.load_ae(ros_pkg_name=args.ros_pkg, module_name=args.ae)
 
-    # 9. Build your Behavior Tree from the loaded AE
-    #    (Assuming loaded_ae.implementation() returns a py_trees root or something similar)
+    # 8. Create RoboKudo on the world it perceives into; fetching a shared one needs the
+    #    executors above to serve the node
+    robokudo = (
+        RoboKudo.joining_shared_world(node=node1, analysis_engine=loaded_ae)
+        if args.synchronize_world
+        else RoboKudo(node=node1, analysis_engine=loaded_ae)
+    )
+
+    # 9. Build the Behavior Tree of the loaded AE
     visualizer_types = None
     if args.no3d:
         visualizer_types = [
@@ -255,26 +186,16 @@ def main() -> None:
             SharedROSVisualizer,
             AllAnnotatorROSVisualizer,
         ]
-    ae_root = grow_tree(
-        loaded_ae.implementation(),
-        node=node1,
-        include_gui=not args.headless,
-        visualizer_types=visualizer_types,
-    )
-
-    # If you have a custom version of `setup_with_descendants`, call it:
-    setup_with_descendants_rk(ae_root)
-
-    viz = VizMarkerPublisher(_world=belief_state_context.world, node=node1)
+    robokudo.start(include_gui=not args.headless, visualizer_types=visualizer_types)
 
     try:
         # 10. Start ticking the Behavior Tree
-        run_ae(ae_name=args.ae, ae_root=ae_root, tickrate=args.tickrate)
+        robokudo.run(tick_rate=args.tickrate)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received; shutting down.")
     finally:
         # 11. Stop sharing the world, then shutdown executors cleanly
-        belief_state_context.close()
+        robokudo.close()
         executor_main.shutdown()
         executor_asrv.shutdown()
 
