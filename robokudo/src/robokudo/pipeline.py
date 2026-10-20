@@ -11,6 +11,7 @@ Key features:
 * Visualization support through annotator outputs
 * Helper methods for accessing annotators and CAS
 * Nested pipeline support with proper scoping
+* The world its annotators perceive into
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ import timeit
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
+from semantic_digital_twin.world import World
 from typing_extensions import TYPE_CHECKING, Any, List, Optional
 
 import robokudo.annotators.core
@@ -47,6 +49,7 @@ class Pipeline(Sequence):
         name: str = "Sequence",
         children: Optional[List[Behaviour]] = None,
         *args: Any,
+        world: Optional[World] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(name, memory=True, children=children)
@@ -55,6 +58,12 @@ class Pipeline(Sequence):
 
         :param name: Name of the pipeline, defaults to "Sequence"
         :param children: List of child behaviors, defaults to None
+        :param world: The world the annotators perceive into; an empty world of its own
+            when None
+        """
+        self._world: World = world if world is not None else World()
+        """
+        The world of this pipeline, used unless it is nested in another pipeline.
         """
         self.cas: cas.CAS = None
         """
@@ -112,6 +121,22 @@ class Pipeline(Sequence):
             a.add_self_to_annotator_output_struct()
         annotator_output_pipeline_map_buffer.map[self.name].redraw = True
         return True
+
+    @property
+    def world(self) -> World:
+        """
+        The world the annotators of this pipeline perceive into.
+
+        A pipeline nested in another one perceives into the world of the outer pipeline.
+        """
+        outer_pipeline = robokudo.utils.tree.find_parent_of_type(self, Pipeline)
+        if outer_pipeline is not None:
+            return outer_pipeline.world
+        return self._world
+
+    @world.setter
+    def world(self, world: World) -> None:
+        self._world = world
 
     def get_cas(self) -> cas.CAS:
         """

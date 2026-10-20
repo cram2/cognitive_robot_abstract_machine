@@ -1,6 +1,3 @@
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
-from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.clip_annotator import ClipAnnotator
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
@@ -27,11 +24,6 @@ class AnalysisEngine(AnalysisEngineInterface):
         Create a pipeline that does tabletop segmentation and integrates primary
         navigation using a YOLO annotator.
         """
-        tf_publisher = TFPublisher(
-            _world=PerceptionBeliefStateContext.from_blackboard().world,
-            node=ROSNodeRegistry().get(),
-        )
-
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
             "mongo", loop=False
         )

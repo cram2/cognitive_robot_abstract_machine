@@ -1,21 +1,13 @@
 """
-The semantic digital twin RoboKudo perceives into.
-
-Perception reads its prior knowledge from this world and writes what it perceives back
-into it. When :class:`~robokudo.process.RoboKudo` joined the world other processes
-share, every change perception makes to it is published to them.
+Placement of the camera that recorded a pipeline pass, in the world perception perceives
+into.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import trimesh.creation
-from py_trees.blackboard import Blackboard
-from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    WorldEntityWithIDKwargsTracker,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -27,88 +19,22 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Optional
 
-from robokudo.exceptions import SharedWorldReplacementError
-from robokudo.identifier import BBIdentifier
-from robokudo.perceived_objects import PerceivedObjects
-
-# %% belief state context
+# %% camera placement
 
 
 @dataclass
-class PerceptionBeliefStateContext:
+class CameraPlacement:
     """
-    The world RoboKudo perceives into and the objects it believes in, in that world.
-
-    Annotators and camera interfaces find the context of the running pipeline on the
-    blackboard through :meth:`from_blackboard`.
+    Puts the camera of a pipeline pass into :attr:`world`, adding the frames it does not
+    know yet.
     """
 
-    world: World = field(default_factory=World)
+    world: World
     """
-    The world perception reads its prior knowledge from and writes its beliefs into.
-    """
-
-    perceived_objects: PerceivedObjects = field(init=False)
-    """
-    The objects perception believes in, kept as bodies in :attr:`world`.
+    The world the camera is placed in.
     """
 
-    entity_tracker: WorldEntityWithIDKwargsTracker = field(init=False)
-    """
-    Resolves the world entities serialized CAS content refers to.
-    """
-
-    def __post_init__(self) -> None:
-        self.perceived_objects = PerceivedObjects(world=self.world)
-        self.entity_tracker = WorldEntityWithIDKwargsTracker.from_world(self.world)
-
-    @classmethod
-    def from_blackboard(cls) -> PerceptionBeliefStateContext:
-        """
-        The context of the running pipeline.
-
-        A pipeline started without one perceives into a fresh world of its own, which is
-        stored on the blackboard on first access.
-
-        :return: The context stored on the blackboard.
-        """
-        blackboard = Blackboard()
-        if not blackboard.exists(BBIdentifier.PERCEPTION_BELIEF_STATE_CONTEXT):
-            cls().store_on_blackboard()
-        return blackboard.get(BBIdentifier.PERCEPTION_BELIEF_STATE_CONTEXT)
-
-    def store_on_blackboard(self) -> None:
-        """
-        Make this the context of the running pipeline.
-        """
-        Blackboard().set(BBIdentifier.PERCEPTION_BELIEF_STATE_CONTEXT, self)
-
-    @property
-    def is_synchronized(self) -> bool:
-        """
-        Whether :attr:`world` is shared with other processes.
-        """
-        return bool(WorldSynchronizer.all_callbacks_of_this_type_from_world(self.world))
-
-    def replace_world(self, world: World) -> None:
-        """
-        Perceive into ``world`` from now on.
-
-        The objects perceived in the previous world are dropped with it.
-
-        :param world: The world to perceive into.
-        :raises SharedWorldReplacementError: If the current world is shared with other
-            processes.
-        """
-        if self.is_synchronized:
-            raise SharedWorldReplacementError()
-        self.world = world
-        self.perceived_objects = PerceivedObjects(world=world)
-        self.entity_tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-
-    # %% camera placement
-
-    def place_camera(
+    def place(
         self,
         world_frame: str,
         camera_frame: str,

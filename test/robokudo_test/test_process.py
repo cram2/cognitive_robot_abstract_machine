@@ -19,15 +19,12 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Optional
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.exceptions import (
     MultipleRobotsInWorldError,
     RoboKudoAlreadyRunningError,
-    SharedWorldReplacementError,
 )
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
 from robokudo.pipeline import Pipeline
 from robokudo.process import RoboKudo
 
@@ -47,10 +44,9 @@ How long ticking a failing engine may take to stop.
 
 
 @dataclass
-class EngineReadingItsWorld:
+class EngineWithoutPipeline:
     """
-    An analysis engine that reads the perception world while it builds its tree, as
-    engines restoring a stored scene do.
+    An analysis engine whose tree is a plain behaviour rather than a pipeline.
     """
 
     tree: Behaviour = field(default_factory=lambda: Success(name="Perceive"))
@@ -58,18 +54,10 @@ class EngineReadingItsWorld:
     The tree the engine builds.
     """
 
-    world_seen_while_building: Optional[World] = None
-    """
-    The perception world the engine found while building its tree.
-    """
-
     def name(self) -> str:
         return type(self).__name__
 
     def implementation(self) -> Behaviour:
-        self.world_seen_while_building = (
-            PerceptionBeliefStateContext.from_blackboard().world
-        )
         return self.tree
 
 
@@ -84,7 +72,7 @@ class FindsAnObjectInView(BaseAnnotator):
 
     def update(self) -> Status:
         cas = self.get_cas()
-        place_camera_of(cas, PerceptionBeliefStateContext.from_blackboard(), camera_pose())
+        place_camera_of(cas, self.world, camera_pose())
         cas.annotations.append(make_object_hypothesis())
         return self.outcome
 
@@ -109,9 +97,29 @@ class EngineFindingAnObject:
         return pipeline
 
 
+@dataclass
+class EngineWithAPipelineInsideASequence:
+    """
+    An analysis engine whose pipeline is a child of a plain sequence.
+    """
+
+    pipeline: Pipeline = field(default_factory=lambda: Pipeline("Inner"))
+    """
+    The pipeline inside the sequence.
+    """
+
+    def name(self) -> str:
+        return type(self).__name__
+
+    def implementation(self) -> Sequence:
+        root = Sequence(name="Root", memory=True)
+        root.add_child(self.pipeline)
+        return root
+
+
 @pytest.fixture
-def engine() -> EngineReadingItsWorld:
-    return EngineReadingItsWorld()
+def engine() -> EngineWithoutPipeline:
+    return EngineWithoutPipeline()
 
 
 @pytest.fixture
@@ -129,7 +137,7 @@ def following_node(ros_default: None) -> Iterator[Node]:
 
 @pytest.fixture
 def joined_robokudo(
-    spinning_node: Node, shared_world: SharedWorld, engine: EngineReadingItsWorld
+    spinning_node: Node, shared_world: SharedWorld, engine: EngineWithoutPipeline
 ) -> Iterator[RoboKudo]:
     robokudo = RoboKudo.joining_shared_world(node=spinning_node, analysis_engine=engine)
     yield robokudo
@@ -140,41 +148,47 @@ def joined_robokudo(
 
 
 class TestPerceptionWorld:
-    def test_engine_builds_its_tree_on_the_given_world(
-        self, node: Node, engine: EngineReadingItsWorld
-    ) -> None:
+    def test_pipeline_perceives_into_the_given_world(self, node: Node) -> None:
         world = World()
         robokudo = RoboKudo(
-            node=node,
-            analysis_engine=engine,
-            belief_state_context=PerceptionBeliefStateContext(world=world),
+            node=node, analysis_engine=EngineFindingAnObject(), world=world
         )
 
         robokudo.start(include_gui=False)
 
-        assert engine.world_seen_while_building is world
+        [annotator] = robokudo.pipeline.children
+        assert annotator.world is world
         robokudo.close()
 
     def test_without_a_world_perceives_into_an_empty_world_of_its_own(
-        self, node: Node, engine: EngineReadingItsWorld
+        self, node: Node
     ) -> None:
+        robokudo = RoboKudo(node=node, analysis_engine=EngineFindingAnObject())
+
+        robokudo.start(include_gui=False)
+
+        assert robokudo.pipeline.world is robokudo.world
+        assert robokudo.world.is_empty()
+        robokudo.close()
+
+    def test_pipeline_inside_the_engine_tree_perceives_into_the_world(
+        self, node: Node
+    ) -> None:
+        engine = EngineWithAPipelineInsideASequence()
         robokudo = RoboKudo(node=node, analysis_engine=engine)
 
         robokudo.start(include_gui=False)
 
-        assert engine.world_seen_while_building is robokudo.belief_state_context.world
-        assert robokudo.belief_state_context.world.is_empty()
+        assert engine.pipeline.world is robokudo.world
         robokudo.close()
 
     def test_world_of_its_own_is_not_shared(
-        self, node: Node, engine: EngineReadingItsWorld
+        self, node: Node, engine: EngineWithoutPipeline
     ) -> None:
         robokudo = RoboKudo(node=node, analysis_engine=engine)
 
         assert (
-            WorldSynchronizer.all_callbacks_of_this_type_from_world(
-                robokudo.belief_state_context.world
-            )
+            WorldSynchronizer.all_callbacks_of_this_type_from_world(robokudo.world)
             == []
         )
 
@@ -186,10 +200,10 @@ class TestJoiningSharedWorld:
     def test_starts_from_the_shared_world(
         self, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
-        context = joined_robokudo.belief_state_context
-
-        assert context.is_synchronized
-        assert [body.id for body in context.world.bodies] == [
+        assert WorldSynchronizer.all_callbacks_of_this_type_from_world(
+            joined_robokudo.world
+        ) == [joined_robokudo.synchronizer]
+        assert [body.id for body in joined_robokudo.world.bodies] == [
             body.id for body in shared_world.world.bodies
         ]
 
@@ -207,20 +221,20 @@ class TestJoiningSharedWorld:
             )
 
         assert wait_until(
-            lambda: table.id
-            in [body.id for body in joined_robokudo.belief_state_context.world.bodies]
+            lambda: table.id in [body.id for body in joined_robokudo.world.bodies]
         )
 
     def test_perceived_object_reaches_the_shared_world_at_its_pose(
         self, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
-        context = joined_robokudo.belief_state_context
-        cas = cas_seen_from(context, camera_pose(x=1.0))
+        cas = cas_seen_from(joined_robokudo.world, camera_pose(x=1.0))
         cas.annotations.append(make_object_hypothesis(translation=(0.0, 0.5, 2.0)))
 
-        [body_id] = context.perceived_objects.apply(cas)
+        [body_id] = joined_robokudo.perceived_objects.apply(cas)
 
-        perceived_body = context.world.get_kinematic_structure_entity_by_id(body_id)
+        perceived_body = joined_robokudo.world.get_kinematic_structure_entity_by_id(
+            body_id
+        )
         expected_pose = perceived_body.global_transform.to_np()
         assert wait_until(
             lambda: body_id in [body.id for body in shared_world.world.bodies]
@@ -236,16 +250,17 @@ class TestJoiningSharedWorld:
             shape.scale for shape in perceived_body.visual.shapes
         ]
 
-    def test_shared_world_cannot_be_replaced(self, joined_robokudo: RoboKudo) -> None:
-        with pytest.raises(SharedWorldReplacementError):
-            joined_robokudo.belief_state_context.replace_world(World())
-
     def test_closed_robokudo_no_longer_shares_its_world(
         self, joined_robokudo: RoboKudo
     ) -> None:
         joined_robokudo.close()
 
-        assert not joined_robokudo.belief_state_context.is_synchronized
+        assert (
+            WorldSynchronizer.all_callbacks_of_this_type_from_world(
+                joined_robokudo.world
+            )
+            == []
+        )
 
 
 # %% one RoboKudo per process
@@ -253,33 +268,29 @@ class TestJoiningSharedWorld:
 
 class TestOneRoboKudoPerProcess:
     def test_second_robokudo_cannot_start(
-        self, node: Node, engine: EngineReadingItsWorld
+        self, node: Node, engine: EngineWithoutPipeline
     ) -> None:
         running = RoboKudo(node=node, analysis_engine=engine)
         running.start(include_gui=False)
 
         with pytest.raises(RoboKudoAlreadyRunningError):
-            RoboKudo(node=node, analysis_engine=EngineReadingItsWorld()).start(
+            RoboKudo(node=node, analysis_engine=EngineWithoutPipeline()).start(
                 include_gui=False
             )
         running.close()
 
     def test_closed_robokudo_makes_room_for_the_next(
-        self, node: Node, following_node: Node, engine: EngineReadingItsWorld
+        self, node: Node, following_node: Node, engine: EngineWithoutPipeline
     ) -> None:
         RoboKudo(node=node, analysis_engine=engine).start(include_gui=False)
         RoboKudo.from_blackboard().close()
         following = RoboKudo(
-            node=following_node, analysis_engine=EngineReadingItsWorld()
+            node=following_node, analysis_engine=EngineWithoutPipeline()
         )
 
         following.start(include_gui=False)
 
         assert RoboKudo.from_blackboard() is following
-        assert (
-            PerceptionBeliefStateContext.from_blackboard()
-            is following.belief_state_context
-        )
         following.close()
 
 
@@ -288,25 +299,21 @@ class TestOneRoboKudoPerProcess:
 
 class TestRobotCamera:
     def test_camera_is_the_default_camera_of_the_robot(
-        self, node: Node, engine: EngineReadingItsWorld, tracy_world: World
+        self, node: Node, engine: EngineWithoutPipeline, tracy_world: World
     ) -> None:
         robot = tracy_world.get_semantic_annotations_by_type(AbstractRobot)[0]
 
-        robokudo = RoboKudo(
-            node=node,
-            analysis_engine=engine,
-            belief_state_context=PerceptionBeliefStateContext(world=tracy_world),
-        )
+        robokudo = RoboKudo(node=node, analysis_engine=engine, world=tracy_world)
 
         assert robokudo.camera is robot.get_default_camera()
 
     def test_world_without_a_robot_has_no_camera(
-        self, node: Node, engine: EngineReadingItsWorld
+        self, node: Node, engine: EngineWithoutPipeline
     ) -> None:
         assert RoboKudo(node=node, analysis_engine=engine).camera is None
 
     def test_camera_of_a_world_with_several_robots_is_ambiguous(
-        self, node: Node, engine: EngineReadingItsWorld
+        self, node: Node, engine: EngineWithoutPipeline
     ) -> None:
         world = World()
         first_robot_root = Body(name=PrefixedName("first_robot"))
@@ -323,11 +330,7 @@ class TestRobotCamera:
         MinimalRobot.from_branch_in_world(second_robot_root)
 
         with pytest.raises(MultipleRobotsInWorldError):
-            RoboKudo(
-                node=node,
-                analysis_engine=engine,
-                belief_state_context=PerceptionBeliefStateContext(world=world),
-            ).camera
+            RoboKudo(node=node, analysis_engine=engine, world=world).camera
 
 
 # %% ticking
@@ -338,7 +341,7 @@ class TestTicking:
         failing_tree = Sequence(name="FailingPipeline", memory=True)
         failing_tree.add_child(Failure(name="Fail"))
         robokudo = RoboKudo(
-            node=node, analysis_engine=EngineReadingItsWorld(tree=failing_tree)
+            node=node, analysis_engine=EngineWithoutPipeline(tree=failing_tree)
         )
         robokudo.start(include_gui=False)
         running = Thread(target=robokudo.run, daemon=True)
@@ -361,9 +364,8 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick()
 
-        context = robokudo.belief_state_context
-        [body_id] = context.perceived_objects.beliefs
-        assert body_id in [body.id for body in context.world.bodies]
+        [body_id] = robokudo.perceived_objects.beliefs
+        assert body_id in [body.id for body in robokudo.world.bodies]
         robokudo.close()
 
     def test_failed_pass_puts_nothing_into_the_world(self, node: Node) -> None:
@@ -374,16 +376,16 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick()
 
-        assert robokudo.belief_state_context.perceived_objects.beliefs == {}
+        assert robokudo.perceived_objects.beliefs == {}
         robokudo.close()
 
     def test_engine_without_a_pipeline_puts_nothing_into_the_world(
-        self, node: Node, engine: EngineReadingItsWorld
+        self, node: Node, engine: EngineWithoutPipeline
     ) -> None:
         robokudo = RoboKudo(node=node, analysis_engine=engine)
         robokudo.start(include_gui=False)
 
         robokudo.tick()
 
-        assert robokudo.belief_state_context.perceived_objects.beliefs == {}
+        assert robokudo.perceived_objects.beliefs == {}
         robokudo.close()

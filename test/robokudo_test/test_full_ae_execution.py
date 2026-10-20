@@ -5,7 +5,6 @@ import py_trees
 import pytest
 
 from robokudo.perceived_objects import PerceivedObjects
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
 import robokudo.cas
 import robokudo.defs
 import robokudo.descriptors.camera_configs.config_filereader_playback
@@ -112,6 +111,7 @@ class TestFullAEExecution(object):
             ]
         )
 
+        perceived_objects = PerceivedObjects(world=seq.world)
         belief_uuids_after_each_successful_cas = []
 
         def assert_current_cas_updates_single_belief(cas):
@@ -122,9 +122,6 @@ class TestFullAEExecution(object):
                 len(object_hypotheses) == 1
             ), "Each successful CAS should already contain the object hypothesis to be synchronized."
 
-            perceived_objects = (
-                PerceptionBeliefStateContext.from_blackboard().perceived_objects
-            )
             perceived_objects.apply(cas)
             object_beliefs = list(perceived_objects.beliefs.values())
             assert (
@@ -209,14 +206,10 @@ class TestFullAEExecution(object):
             assert len(pose_annotations) == 1
             assert len(bbox_annotations) == 1
             assert len(stamped_pose_annotations) == 1
-            assert (
-                stamped_pose_annotations[0].source == PerceivedObjects.__name__
-            )
+            assert stamped_pose_annotations[0].source == PerceivedObjects.__name__
             assert stamped_pose_annotations[0].frame == "map"
 
-        object_beliefs = list(
-            PerceptionBeliefStateContext.from_blackboard().perceived_objects.beliefs.values()
-        )
+        object_beliefs = list(perceived_objects.beliefs.values())
         assert (
             len(object_beliefs) == 1
         ), "Both observations of the static object should update one stable object belief."

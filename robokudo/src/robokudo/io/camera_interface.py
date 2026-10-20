@@ -41,15 +41,16 @@ from sensor_msgs.msg import CompressedImage, CameraInfo, Image
 from tf2_ros import Buffer
 from typing_extensions import Optional, List, Any, TYPE_CHECKING, Union, Tuple
 
+from robokudo.camera_placement import CameraPlacement
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import CameraDataMissing
 from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.types.tf import StampedTransform
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -93,20 +94,19 @@ class CameraInterface(object):
     @staticmethod
     def store_camera_to_world_transform_in_cas(
         cas: CAS,
+        world: World,
         world_frame: str,
         camera_frame: str,
         world_T_camera: HomogeneousTransformationMatrix,
         timestamp_ns: Optional[int] = None,
     ) -> None:
-        """Write a camera-to-world transform to the CAS and runtime world."""
+        """Write a camera-to-world transform to the CAS and place the camera in ``world``."""
         cas.world_frame = world_frame
         cas.camera_frame = camera_frame
-        cas.camera_to_world_transform = (
-            PerceptionBeliefStateContext.from_blackboard().place_camera(
-                world_frame=world_frame,
-                camera_frame=camera_frame,
-                world_T_camera=world_T_camera,
-            )
+        cas.camera_to_world_transform = CameraPlacement(world).place(
+            world_frame=world_frame,
+            camera_frame=camera_frame,
+            world_T_camera=world_T_camera,
         )
         if timestamp_ns is not None:
             cas.data_timestamp = timestamp_ns
@@ -114,14 +114,16 @@ class CameraInterface(object):
     def store_camera_to_world_transform(
         self,
         cas: CAS,
+        world: World,
         world_frame: str,
         camera_frame: str,
         world_T_camera: HomogeneousTransformationMatrix,
         timestamp_ns: Optional[int] = None,
     ) -> None:
-        """Write a camera-to-world transform to the CAS and runtime world."""
+        """Write a camera-to-world transform to the CAS and place the camera in ``world``."""
         self.store_camera_to_world_transform_in_cas(
             cas=cas,
+            world=world,
             world_frame=world_frame,
             camera_frame=camera_frame,
             world_T_camera=world_T_camera,
@@ -129,7 +131,7 @@ class CameraInterface(object):
         )
 
     def store_static_camera_transform_if_configured(
-        self, cas: CAS, timestamp_ns: Optional[int] = None
+        self, cas: CAS, world: World, timestamp_ns: Optional[int] = None
     ) -> bool:
         """Write the configured static camera transform, if enabled."""
         if not self.camera_config.static_camera_transform_enabled:
@@ -137,6 +139,7 @@ class CameraInterface(object):
 
         self.store_camera_to_world_transform(
             cas=cas,
+            world=world,
             world_frame=self.camera_config.static_world_frame,
             camera_frame=self.camera_config.static_camera_frame,
             world_T_camera=self.camera_config.static_world_T_camera,
@@ -144,7 +147,7 @@ class CameraInterface(object):
         )
         return True
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, cas: CAS, world: World) -> None:
         """
         This method is supposed to read in, convert (if needed) and put the data into
         the CAS. If you are running a CameraInterface which is getting data via callback
@@ -152,6 +155,7 @@ class CameraInterface(object):
         work here! Callbacks should be short.
 
         :param cas: The CAS where the data should be placed in
+        :param world: The world perception perceives into, where the camera is placed
         """
         raise NotImplementedError
 
@@ -238,13 +242,14 @@ class ROSCameraInterface(CameraInterface):
         return True
 
     def store_camera_to_world_transform_from_tf(
-        self, cas: CAS, timestamp: builtin_interfaces.msg.Time
+        self, cas: CAS, world: World, timestamp: builtin_interfaces.msg.Time
     ) -> None:
         """
         If the camera is configured to look up transforms, store the camera transform in
         the CAS.
 
         :param cas: The CAS to store the transform in
+        :param world: The world the camera is placed in
         :param timestamp: The timestamp of the transform
         """
         if self.lookup_viewpoint:
@@ -259,6 +264,7 @@ class ROSCameraInterface(CameraInterface):
             )
             super().store_camera_to_world_transform(
                 cas=cas,
+                world=world,
                 world_frame=self.tf_to,
                 camera_frame=self.tf_from,
                 world_T_camera=world_T_camera,
@@ -592,7 +598,7 @@ class KinectCameraInterface(ROSCameraInterface):
         self._has_new_data = True
         self.lock.release()
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, cas: CAS, world: World) -> None:
         if not self.has_new_data():
             return
 
@@ -620,7 +626,7 @@ class KinectCameraInterface(ROSCameraInterface):
         cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.color2depth_ratio)
 
-        self.store_camera_to_world_transform_from_tf(cas, self.timestamp)
+        self.store_camera_to_world_transform_from_tf(cas, world, self.timestamp)
 
         self._has_new_data = False
 

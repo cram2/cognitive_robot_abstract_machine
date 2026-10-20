@@ -28,8 +28,9 @@ from robokudo.cas import CAS, CASViews
 from robokudo.exceptions import StoredCameraTransformFrameMetadataMissing
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.io.storage import Storage
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
+from robokudo.camera_placement import CameraPlacement
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 
 
 class StorageReaderInterface(CameraInterface):
@@ -75,7 +76,7 @@ class StorageReaderInterface(CameraInterface):
 
         return self.reader.cursor_has_frames()
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, cas: CAS, world: World) -> None:
         """
         Update the Common Analysis Structure with data from storage.
 
@@ -86,6 +87,7 @@ class StorageReaderInterface(CameraInterface):
         * Sets depth availability flag
 
         :param cas: Common Analysis Structure to update
+        :param world: The world perception perceives into, where the camera is placed
         """
         cas_frame = self.reader.get_next_frame()
         if cas_frame is None:
@@ -98,9 +100,10 @@ class StorageReaderInterface(CameraInterface):
         cas_frame["views"] = {}
         self.storage.load_views_from_mongo_in_cas(
             cas_frame,
+            world,
             excluded_view_names={CASViews.CAMERA_TO_WORLD_TRANSFORM},
         )
-        self._restore_camera_to_world_transform(cas_frame)
+        self._restore_camera_to_world_transform(cas_frame, world)
 
         # Bring flat CAS representation into the proper CAS class
         for view_name, view_content in cas_frame["views"].items():
@@ -108,7 +111,7 @@ class StorageReaderInterface(CameraInterface):
 
         # Restore annotations
         if self.camera_config.restore_annotations:
-            self.storage.load_annotations_from_mongo_in_cas(cas_frame, cas)
+            self.storage.load_annotations_from_mongo_in_cas(cas_frame, cas, world)
 
         if cas.depth_image is None:
             # no depth image available
@@ -139,14 +142,17 @@ class StorageReaderInterface(CameraInterface):
             )
             cas.set(CASViews.CAMERA_INTRINSIC, camera_intrinsic)
 
-    def _restore_camera_to_world_transform(self, cas_frame: dict) -> None:
+    def _restore_camera_to_world_transform(self, cas_frame: dict, world: World) -> None:
         """
-        Restore the stored camera pose as a transform bound to the running world.
+        Restore the stored camera pose as a transform bound to ``world``.
 
         The serialized ``CAMERA_TO_WORLD_TRANSFORM`` may reference bodies from the
         recorded world. This method decodes the numeric transform, resolves the intended
-        frame names, creates/updates the matching bodies in the current RoboKudo world,
-        and stores the rebound transform in ``cas_frame["views"]``.
+        frame names, creates/updates the matching bodies in ``world``, and stores the
+        rebound transform in ``cas_frame["views"]``.
+
+        :param cas_frame: The stored CAS frame.
+        :param world: The world perception perceives into.
         """
         view_ids = cas_frame.get("view_ids", {})
         view_id = view_ids.get(CASViews.CAMERA_TO_WORLD_TRANSFORM)
@@ -164,7 +170,7 @@ class StorageReaderInterface(CameraInterface):
         # Non-SemDT transform payloads are left to the regular codec path.
         if view_document["serializer_id"] != "semdt_homogeneous_transform_v1":
             decoded_view_name, decoded_view_value = Storage.decode_view_document(
-                view_document
+                view_document, world
             )
             if decoded_view_name == CASViews.CAMERA_TO_WORLD_TRANSFORM:
                 cas_frame["views"][
@@ -176,6 +182,7 @@ class StorageReaderInterface(CameraInterface):
             self._decode_stored_camera_to_world_transform(view_document, cas_frame)
         )
         rebound_transform = self._rebind_camera_to_world_transform(
+            world=world,
             stored_transform=stored_transform,
             world_frame=world_frame,
             camera_frame=camera_frame,
@@ -219,6 +226,7 @@ class StorageReaderInterface(CameraInterface):
 
     @staticmethod
     def _rebind_camera_to_world_transform(
+        world: World,
         stored_transform: HomogeneousTransformationMatrix,
         world_frame: str,
         camera_frame: str,
@@ -227,9 +235,9 @@ class StorageReaderInterface(CameraInterface):
         Create a camera transform whose frames belong to the running world.
 
         The numeric pose is copied from ``stored_transform`` and the camera is placed
-        there in the world of the running pipeline.
+        there in ``world``.
         """
-        return PerceptionBeliefStateContext.from_blackboard().place_camera(
+        return CameraPlacement(world).place(
             world_frame=world_frame,
             camera_frame=camera_frame,
             world_T_camera=stored_transform,

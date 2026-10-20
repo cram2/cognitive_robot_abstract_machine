@@ -15,7 +15,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
 from robokudo.cas import CAS
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
+from robokudo.camera_placement import CameraPlacement
 
 WORLD_FRAME = "map"
 """
@@ -62,36 +62,36 @@ def camera_pose(x: float = 0.0) -> HomogeneousTransformationMatrix:
 
 
 def cas_seen_from(
-    context: PerceptionBeliefStateContext,
+    world: World,
     world_T_camera: HomogeneousTransformationMatrix,
 ) -> CAS:
     """
-    A CAS whose camera is placed at ``world_T_camera`` in the world of ``context``.
+    A CAS whose camera is placed at ``world_T_camera`` in ``world``.
 
-    :param context: The context the camera is placed in.
+    :param world: The world the camera is placed in.
     :param world_T_camera: Pose of the camera in the world frame.
     :return: The CAS.
     """
     cas = CAS()
-    place_camera_of(cas, context, world_T_camera)
+    place_camera_of(cas, world, world_T_camera)
     return cas
 
 
 def place_camera_of(
     cas: CAS,
-    context: PerceptionBeliefStateContext,
+    world: World,
     world_T_camera: HomogeneousTransformationMatrix,
 ) -> None:
     """
-    Place the camera of ``cas`` at ``world_T_camera`` in the world of ``context``.
+    Place the camera of ``cas`` at ``world_T_camera`` in ``world``.
 
     :param cas: The CAS whose camera is placed.
-    :param context: The context the camera is placed in.
+    :param world: The world the camera is placed in.
     :param world_T_camera: Pose of the camera in the world frame.
     """
     cas.world_frame = WORLD_FRAME
     cas.camera_frame = CAMERA_FRAME
-    cas.camera_to_world_transform = context.place_camera(
+    cas.camera_to_world_transform = CameraPlacement(world).place(
         WORLD_FRAME, CAMERA_FRAME, world_T_camera
     )
 

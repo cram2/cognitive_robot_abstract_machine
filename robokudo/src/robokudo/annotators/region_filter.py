@@ -20,7 +20,6 @@ from semantic_digital_twin.world_description.world_entity import Region
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
 from robokudo.types.scene import RegionHypothesis
 from robokudo.utils.annotator_helper import get_world_to_camera_transform_matrix
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
@@ -96,7 +95,7 @@ class RegionFilter(ThreadedAnnotator):
         if self.get_cas().contains(CASViews.QUERY):
             query = self.get_cas().get(CASViews.QUERY)
 
-        runtime_world = PerceptionBeliefStateContext.from_blackboard().world
+        runtime_world = self.world
 
         regions = runtime_world.get_kinematic_structure_entity_by_type(Region)
         all_regions = {str(region.name): region for region in regions}

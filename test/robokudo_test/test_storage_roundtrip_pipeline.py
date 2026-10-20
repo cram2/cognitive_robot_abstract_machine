@@ -21,9 +21,12 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.io.storage import Storage
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
 from robokudo.pipeline import Pipeline
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
+from semantic_digital_twin.world import World
 
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",
@@ -101,18 +104,20 @@ class TestStorageRoundtripPipeline:
             assert "state" in world_snapshot_payload
             assert {"ids", "states"}.issubset(world_snapshot_payload["state"])
 
-            restored_context = PerceptionBeliefStateContext()
-            restored_context.store_on_blackboard()
+            restored_world = World()
             WorldModelSnapshot.apply_to_json_snapshot_to_world(
-                restored_context.world,
+                restored_world,
                 world_snapshot_payload,
-                **restored_context.entity_tracker.create_kwargs(),
+                **WorldEntityWithIDKwargsTracker.from_world(
+                    restored_world
+                ).create_kwargs(),
             )
-            assert len(restored_context.world.state.keys()) == len(
+            assert len(restored_world.state.keys()) == len(
                 world_snapshot_payload["state"]["ids"]
             )
 
             reader_pipeline = _build_reader_pipeline(db_name)
+            reader_pipeline.world = restored_world
             reader_status = robokudo.utils.tree_execution.run_tree_once(
                 reader_pipeline, reader_node
             )

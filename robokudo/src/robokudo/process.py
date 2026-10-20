@@ -21,6 +21,7 @@ from py_trees.common import Status
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Camera
+from semantic_digital_twin.world import World
 from typing_extensions import TYPE_CHECKING, List, Optional, Self, Type
 
 # robokudo.pipeline must be imported before robokudo.garden, whose import otherwise
@@ -31,7 +32,7 @@ from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE
 from robokudo.exceptions import MultipleRobotsInWorldError, RoboKudoAlreadyRunningError
 from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
+from robokudo.perceived_objects import PerceivedObjects
 from robokudo.pipeline import Pipeline
 from robokudo.utils.tree import setup_with_descendants_rk
 
@@ -57,8 +58,9 @@ class RoboKudo:
     """
     The RoboKudo perception process, running an analysis engine on a world.
 
-    Only one RoboKudo runs per process: annotators reach it and its world through the
-    blackboard, which the process shares.
+    The engine's pipelines perceive into :attr:`world`; annotators reach it through
+    their pipeline. Only one RoboKudo runs per process, since the blackboard its
+    behaviour tree uses is shared by the whole process.
     """
 
     node: Node
@@ -71,12 +73,14 @@ class RoboKudo:
     The engine whose behaviour tree perceives.
     """
 
-    belief_state_context: PerceptionBeliefStateContext = field(
-        default_factory=PerceptionBeliefStateContext
-    )
+    world: World = field(default_factory=World)
     """
-    The world perception perceives into and the object beliefs it holds in it; an empty
-    world of its own by default.
+    The world perception perceives into; an empty world of its own by default.
+    """
+
+    perceived_objects: PerceivedObjects = field(init=False)
+    """
+    The objects perception believes in, kept as bodies in :attr:`world`.
     """
 
     synchronizer: Optional[WorldSynchronizer] = field(init=False, default=None)
@@ -95,6 +99,9 @@ class RoboKudo:
     The pipeline :attr:`analysis_engine` perceives with, whose finished passes are put
     into the world; None until :meth:`start`, and for an engine without a pipeline.
     """
+
+    def __post_init__(self) -> None:
+        self.perceived_objects = PerceivedObjects(world=self.world)
 
     @classmethod
     def joining_shared_world(
@@ -119,11 +126,7 @@ class RoboKudo:
         world = fetch_world_from_service(
             node, timeout_seconds=fetch_timeout.total_seconds()
         )
-        robokudo = cls(
-            node=node,
-            analysis_engine=analysis_engine,
-            belief_state_context=PerceptionBeliefStateContext(world=world),
-        )
+        robokudo = cls(node=node, analysis_engine=analysis_engine, world=world)
         robokudo.synchronizer = WorldSynchronizer(node=node, _world=world)
         return robokudo
 
@@ -144,9 +147,7 @@ class RoboKudo:
 
         :raises MultipleRobotsInWorldError: If the world holds several robots.
         """
-        robots = self.belief_state_context.world.get_semantic_annotations_by_type(
-            AbstractRobot
-        )
+        robots = self.world.get_semantic_annotations_by_type(AbstractRobot)
         if not robots:
             return None
         if len(robots) > 1:
@@ -159,10 +160,8 @@ class RoboKudo:
         self, include_gui: bool = True, visualizer_types: Optional[List[Type]] = None
     ) -> None:
         """
-        Become the RoboKudo of this process and build the behaviour tree.
-
-        The perception world is available on the blackboard before the engine builds its
-        tree, so an engine can read it while building.
+        Become the RoboKudo of this process and build the behaviour tree, whose
+        pipelines perceive into :attr:`world`.
 
         :param include_gui: Whether to show the visualizers.
         :param visualizer_types: The visualizers to show; all of them when None.
@@ -172,11 +171,13 @@ class RoboKudo:
         if blackboard.exists(BBIdentifier.ROBOKUDO):
             raise RoboKudoAlreadyRunningError()
         blackboard.set(BBIdentifier.ROBOKUDO, self)
-        self.belief_state_context.store_on_blackboard()
 
         engine_tree = self.analysis_engine.implementation()
         if isinstance(engine_tree, Pipeline):
             self.pipeline = engine_tree
+        for behaviour in engine_tree.iterate():
+            if isinstance(behaviour, Pipeline):
+                behaviour.world = self.world
         self.tree = grow_tree(
             engine_tree,
             node=self.node,
@@ -229,7 +230,7 @@ class RoboKudo:
         self.tree.tick()
         if self.pipeline is None or self.pipeline.status != Status.SUCCESS:
             return
-        self.belief_state_context.perceived_objects.apply(self.pipeline.cas)
+        self.perceived_objects.apply(self.pipeline.cas)
 
     def close(self) -> None:
         """

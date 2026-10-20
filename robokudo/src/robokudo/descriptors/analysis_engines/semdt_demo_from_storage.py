@@ -1,7 +1,4 @@
 from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
-from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
@@ -28,11 +25,6 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         Create a tabletop segmentation pipeline that synchronizes detections to SemDT.
         """
-        tf_publisher = TFPublisher(
-            _world=PerceptionBeliefStateContext.from_blackboard().world,
-            node=ROSNodeRegistry().get(),
-        )
-
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         seq = Pipeline("RWPipeline")

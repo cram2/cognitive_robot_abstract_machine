@@ -3,18 +3,31 @@ from py_trees.common import Status
 from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
+from robokudo.camera_placement import CameraPlacement
+from robokudo.pipeline import Pipeline
 from robokudo.world_descriptor import PredefinedObject
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Region
+
+
+def in_pipeline_of(
+    world: World, annotator: WorldDescriptorBootstrapAnnotator
+) -> WorldDescriptorBootstrapAnnotator:
+    """
+    ``annotator`` in a pipeline that perceives into ``world``.
+    """
+    Pipeline("WorldDescriptorBootstrapTestPipeline", world=world).add_child(annotator)
+    return annotator
 
 
 class TestWorldDescriptorBootstrapAnnotator:
     def test_augment_world_keeps_existing_frame_references(self):
-        context = PerceptionBeliefStateContext.from_blackboard()
-        context.place_camera("map", "camera", HomogeneousTransformationMatrix())
+        runtime_world = World()
+        CameraPlacement(runtime_world).place(
+            "map", "camera", HomogeneousTransformationMatrix()
+        )
 
-        runtime_world = context.world
         camera_body = runtime_world.get_body_by_name("camera")
         map_body = runtime_world.get_body_by_name("map")
         camera_body_id = camera_body.id
@@ -32,7 +45,7 @@ class TestWorldDescriptorBootstrapAnnotator:
             reference_frame=map_body,
         )
 
-        annotator = WorldDescriptorBootstrapAnnotator()
+        annotator = in_pipeline_of(runtime_world, WorldDescriptorBootstrapAnnotator())
         result = annotator.update()
 
         assert result is Status.SUCCESS
@@ -58,11 +71,11 @@ class TestWorldDescriptorBootstrapAnnotator:
         assert "kitchen_island" in region_names
 
     def test_update_is_idempotent_for_same_world_instance(self):
-        annotator = WorldDescriptorBootstrapAnnotator()
+        runtime_world = World()
+        annotator = in_pipeline_of(runtime_world, WorldDescriptorBootstrapAnnotator())
 
         first = annotator.update()
         second = annotator.update()
-        runtime_world = PerceptionBeliefStateContext.from_blackboard().world
 
         assert first is Status.SUCCESS
         assert second is Status.SUCCESS

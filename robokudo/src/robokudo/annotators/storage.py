@@ -30,7 +30,6 @@ from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.storage import Storage
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
 
 
 class StorageWriter(BaseAnnotator):
@@ -109,7 +108,7 @@ class StorageWriter(BaseAnnotator):
         flat_cas = self.storage.generate_dict_from_real_cas(persist_cas)
         flat_cas["view_ids"] = {}
 
-        world = PerceptionBeliefStateContext.from_blackboard().world
+        world = self.world
         snapshot = WorldModelSnapshot(
             modifications=list(
                 world.get_world_model_manager().model_modification_blocks

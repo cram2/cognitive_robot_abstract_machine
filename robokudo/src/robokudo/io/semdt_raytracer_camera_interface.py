@@ -20,7 +20,6 @@ from robokudo.utils.camera_model import (
     pinhole_camera_parameters_from_horizontal_field_of_view,
 )
 from robokudo.utils.module_loader import ModuleLoader
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -65,13 +64,18 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         # Simulated camera can always render a fresh frame.
         return True
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, cas: CAS, world: World) -> None:
         """
-        Render a simulated RGB-D frame and write it into the CAS.
+        Render a simulated RGB-D frame of the configured scene and write it into the
+        CAS.
+
+        The scene is a world of its own, the simulated reality the camera sees; the
+        world perception perceives into is left untouched.
 
         :param cas: CAS that receives rendered camera data and frame metadata.
+        :param world: The world perception perceives into.
         """
-        world = self._load_runtime_world()
+        world = self._load_scene_world()
         world_frame_body = self._ensure_world_frame(world)
         camera_body = self._ensure_camera_body(world, world_frame_body)
         (
@@ -132,25 +136,23 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         cas.data_timestamp = timestamp_ns
         ROSCameraInterface.store_legacy_camera_to_world_transform_from_cas(cas)
 
-    def _load_runtime_world(self) -> World:
+    def _load_scene_world(self) -> World:
         """
-        Load the configured SemDT world and install it as runtime world.
+        Load the configured SemDT world the camera renders.
 
-        :return: Runtime world instance used for rendering.
+        :return: The scene world used for rendering.
         """
         world_descriptor = self.module_loader.load_world_descriptor(
             ros_pkg_name=self.camera_config.world_descriptor_ros_package,
             module_name=self.camera_config.world_descriptor_name,
         )
-        context = PerceptionBeliefStateContext.from_blackboard()
-        context.replace_world(world_descriptor.world)
-        return context.world
+        return world_descriptor.world
 
     def _ensure_world_frame(self, world: World) -> Body:
         """
         Return the configured world frame body, creating it when needed.
 
-        :param world: Runtime world that contains the scene and camera frames.
+        :param world: Scene world that contains the scene and camera frames.
         :return: Body representing the configured world frame.
         """
         world_frame_name = self.camera_config.world_frame
@@ -180,7 +182,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         """
         Return the configured camera body, creating it when needed.
 
-        :param world: Runtime world that contains the scene and camera frames.
+        :param world: Scene world that contains the scene and camera frames.
         :param world_frame_body: Parent frame for a newly created camera body.
         :return: Body representing the configured camera frame.
         """
@@ -204,9 +206,9 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         self, world: World, world_frame_body: Body, camera_body: Body
     ) -> Tuple[HomogeneousTransformationMatrix, HomogeneousTransformationMatrix]:
         """
-        Apply the configured camera pose to the runtime world.
+        Apply the configured camera pose to the scene world.
 
-        :param world: Runtime world that owns the camera body connection.
+        :param world: Scene world that owns the camera body connection.
         :param world_frame_body: Reference frame for the configured camera pose.
         :param camera_body: Camera frame body that receives the configured pose.
         :return: RayTracer render pose and ROS optical camera pose.
@@ -347,7 +349,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         """
         Render a BGR color image for the current frame.
 
-        :param world: Runtime world that provides semantic body colors.
+        :param world: Scene world that provides semantic body colors.
         :param ray_tracer: SemDT ray tracer used for optional mesh rendering.
         :param camera_to_world: Camera pose used by the RayTracer renderer.
         :param segmentation: Body-index segmentation image.
@@ -409,7 +411,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         """
         Render deterministic semantic RGB colors from segmentation labels.
 
-        :param world: Runtime world that maps body indices to bodies.
+        :param world: Scene world that maps body indices to bodies.
         :param segmentation: Body-index segmentation image.
         :return: RGB image and RGB-to-object-name color map.
         """

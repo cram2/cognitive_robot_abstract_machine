@@ -24,7 +24,6 @@ from typing_extensions import TYPE_CHECKING, Dict, List, Optional
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing, UnknownMode
-from robokudo.perception_belief_state_context import PerceptionBeliefStateContext
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
     Classification,
@@ -365,7 +364,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         world_frame_required = False
         world_to_camera_transform_matrix = None
         if self.descriptor.parameters.mode == StaticObjectMode.WORLD_DESCRIPTOR:
-            predefined_object_annotations = PerceptionBeliefStateContext.from_blackboard().world.get_semantic_annotations_by_type(
+            predefined_object_annotations = self.world.get_semantic_annotations_by_type(
                 PredefinedObject
             )
             object_bodies = [

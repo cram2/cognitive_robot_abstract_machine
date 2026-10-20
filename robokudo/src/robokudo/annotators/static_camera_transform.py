@@ -47,6 +47,7 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
 
         CameraInterface.store_camera_to_world_transform_in_cas(
             cas=cas,
+            world=self.world,
             world_frame=params.world_frame,
             camera_frame=params.camera_frame,
             world_T_camera=params.world_T_camera,
