@@ -7,7 +7,7 @@ fetches it, and every object it perceives is added to this world as well; the
 server prints each body it learns about and shows the world in RViz::
 
     python -m robokudo.scripts.shared_world_server
-    python -m robokudo.scripts.main _ae semdt_shared_world_from_files _synchronize_world
+    ros2 run robokudo_ros main _ae=semdt_shared_world_from_files _synchronize_world
 """
 
 from __future__ import annotations

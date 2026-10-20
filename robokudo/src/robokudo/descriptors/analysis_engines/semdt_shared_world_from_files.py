@@ -8,7 +8,7 @@ scene. Each segmented object becomes a body in the perception world, so with
 ``_synchronize_world`` the objects appear in the world of every process sharing it::
 
     python -m robokudo.scripts.shared_world_server
-    python -m robokudo.scripts.main _ae semdt_shared_world_from_files _synchronize_world
+    ros2 run robokudo_ros main _ae=semdt_shared_world_from_files _synchronize_world
 """
 
 import math
