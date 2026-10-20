@@ -27,6 +27,7 @@ from robokudo.exceptions import (
 )
 from robokudo.pipeline import Pipeline
 from robokudo.process import RoboKudo
+from robokudo.types.scene import ObjectHypothesis
 
 from ._object_hypotheses import make_object_hypothesis
 from ._perception_world import (
@@ -366,6 +367,25 @@ class TestObjectsOfAFinishedPass:
 
         [body_id] = robokudo.perceived_objects.beliefs
         assert body_id in [body.id for body in robokudo.world.bodies]
+        robokudo.close()
+
+    def test_finished_pass_is_put_into_the_world_only_once(
+        self, node: Node, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        robokudo = RoboKudo(node=node, analysis_engine=EngineFindingAnObject())
+        robokudo.start(include_gui=False)
+        robokudo.tick()
+        [hypothesis] = robokudo.pipeline.cas.filter_annotations_by_type(
+            ObjectHypothesis
+        )
+        annotation_count = len(hypothesis.annotations)
+        # A tick that does not reach the pipeline leaves it at its finished pass.
+        monkeypatch.setattr(robokudo.tree, "tick", lambda: None)
+
+        robokudo.tick()
+
+        assert len(robokudo.perceived_objects.beliefs) == 1
+        assert len(hypothesis.annotations) == annotation_count
         robokudo.close()
 
     def test_failed_pass_puts_nothing_into_the_world(self, node: Node) -> None:

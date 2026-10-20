@@ -94,6 +94,11 @@ class RoboKudo:
     The behaviour tree of :attr:`analysis_engine`; None until :meth:`start`.
     """
 
+    applied_cas_id: Optional[int] = field(init=False, default=None)
+    """
+    The id of the last CAS of :attr:`pipeline` whose objects were put into the world.
+    """
+
     pipeline: Optional[Pipeline] = field(init=False, default=None)
     """
     The pipeline :attr:`analysis_engine` perceives with, whose finished passes are put
@@ -225,12 +230,16 @@ class RoboKudo:
     def tick(self) -> None:
         """
         Tick the behaviour tree once, and put the objects found by a pass of
-        :attr:`pipeline` that finished successfully into the world.
+        :attr:`pipeline` that finished successfully into the world, once per pass.
         """
         self.tree.tick()
         if self.pipeline is None or self.pipeline.status != Status.SUCCESS:
             return
-        self.perceived_objects.apply(self.pipeline.cas)
+        cas = self.pipeline.cas
+        if cas.cas_id == self.applied_cas_id:
+            return
+        self.perceived_objects.apply(cas)
+        self.applied_cas_id = cas.cas_id
 
     def close(self) -> None:
         """
