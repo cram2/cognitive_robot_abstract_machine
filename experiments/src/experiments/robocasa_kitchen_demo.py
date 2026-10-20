@@ -39,7 +39,7 @@ with robocasa_version_assertions_relaxed():
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.plans.failures import PlanFailure
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -388,7 +388,7 @@ def _spawn_robot_and_prepare_pick_up(
         ]
         logger.info("Spawned PR2; parking arms, raising torso, picking up an apple ...")
         try:
-            with simulated_robot:
+            with kinematically_simulated_robot:
                 plan.perform()
         except PlanFailure as failure:
             logger.warning("Robot could not complete the pick-up: %s", failure)

@@ -44,6 +44,8 @@ from robokudo.utils.transform import get_transform_matrix
 if TYPE_CHECKING:
     import numpy.typing as npt
 
+    from robokudo.types.cv import ColorToDepthRatio
+
 DILATION_KERNEL = np.ones((3, 3), np.uint8)
 
 
@@ -52,7 +54,7 @@ def generate_roi_with_mask_from_points(
     image_width: int,
     pointcloud_camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
     cloud: o3d.geometry.PointCloud,
-    color2depth_ratio: Tuple[int, int] = (1, 1),
+    color_to_depth_ratio: ColorToDepthRatio,
 ) -> Tuple[ImageROI, npt.NDArray]:
     """Generate ROI and mask from projected point cloud points.
 
@@ -66,7 +68,7 @@ def generate_roi_with_mask_from_points(
     :param image_width: Width of the target image
     :param pointcloud_camera_intrinsics: Camera intrinsic parameters
     :param cloud: Point cloud to project
-    :param color2depth_ratio: Scale ratio between color and depth images
+    :param color_to_depth_ratio: Size of the depth image relative to the color image.
     :return: Tuple of (ROI with mask, full image mask)
     """
     # TODO: Use robokudo.utils.o3d_helper.get_mask_from_pointcloud
@@ -79,11 +81,7 @@ def generate_roi_with_mask_from_points(
     x = (uvd[:, 0] / uvd[:, 2]).astype(int)
     y = (uvd[:, 1] / uvd[:, 2]).astype(int)
 
-    # We have to respect the ratio of the depth and rgb image to properly project back.
-    # Invert from RGB-> Depth to Depth->RGB
-    depth2color_ratio = (1 / color2depth_ratio[0], 1 / color2depth_ratio[1])
-    x_scaled = (x * depth2color_ratio[0]).astype(int)
-    y_scaled = (y * depth2color_ratio[1]).astype(int)
+    x_scaled, y_scaled = color_to_depth_ratio.color_pixels(np.stack((x, y), axis=1)).T
 
     full_mask = np.zeros((image_height, image_width), np.uint8)
     full_mask[y_scaled, x_scaled] = 255
@@ -302,7 +300,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         start_timer = default_timer()
         self.rk_logger.info("PCE Start")
         cloud = self.get_cas().get(CASViews.CLOUD)
-        color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
+        color_to_depth_ratio = self.get_cas().get(CASViews.COLOR_TO_DEPTH_RATIO)
         pointcloud_camera_intrinsics = self.get_cas().get(
             CASViews.POINTCLOUD_CAMERA_INTRINSIC
         )
@@ -386,7 +384,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
                     image_width=width,
                     pointcloud_camera_intrinsics=pointcloud_camera_intrinsics,
                     cloud=cluster_cloud,
-                    color2depth_ratio=color2depth_ratio,
+                    color_to_depth_ratio=color_to_depth_ratio,
                 )
             )
             # Add the image pixel belonging to the cluster to the mask containing all found objects
@@ -497,7 +495,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         """
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
-        color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
+        color_to_depth_ratio = self.get_cas().get(CASViews.COLOR_TO_DEPTH_RATIO)
         pointcloud_camera_intrinsics = self.get_cas().get(
             CASViews.POINTCLOUD_CAMERA_INTRINSIC
         )
@@ -562,7 +560,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
                     image_width=width,
                     pointcloud_camera_intrinsics=pointcloud_camera_intrinsics,
                     cloud=cluster_cloud,
-                    color2depth_ratio=color2depth_ratio,
+                    color_to_depth_ratio=color_to_depth_ratio,
                 )
             )
             # Add the image pixel belonging to the cluster to the mask containing all found objects

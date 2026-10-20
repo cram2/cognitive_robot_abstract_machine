@@ -12,8 +12,14 @@ from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     MovementType,
 )
-from coraplex.execution_environment import simulated_robot, real_robot
+from coraplex.execution_environment import (
+    PhysicallySimulatedRobot,
+    real_robot,
+    kinematically_simulated_robot,
+)
+from coraplex.exceptions import FingerWidthNeedsPhysics
 from coraplex.plans.executables import MoveBranchExecutable
+from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.plans.plan_node import MotionNode, ActionNode
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -22,6 +28,7 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from coraplex.robot_plans.motions.container import ClosingMotion, OpeningMotion
 from coraplex.robot_plans.motions.gripper import (
+    MoveFingersToWidthMotion,
     MoveGripperMotion,
     MoveTCPWaypointsMotion,
     MoveTCPWaypointsAlignedMotion,
@@ -34,10 +41,13 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.goals.templates import Parallel
+from giskardpy.motion_statechart.graph_node import Goal
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    HoldPose,
     CartesianOrientation,
     CartesianPose,
+    CartesianPosition,
     CartesianPositionTrajectory,
     CartesianPositionVelocityLimit,
     CartesianRotationVelocityLimit,
@@ -100,7 +110,7 @@ def test_pick_up_motion(pr2_apartment_context):
         context=test_context,
     )
     assert pick_up.plan is not None
-    with simulated_robot:
+    with kinematically_simulated_robot:
         root.perform()
 
     pick_up_node = root.plan.get_nodes_by_designator_type(PickUpAction)[0]
@@ -136,6 +146,41 @@ def test_move_motion_chart(pr2_apartment_context):
     np.testing.assert_equal(msc.goal_pose.position.to_np(), np.array([1, 1, 1, 1]))
 
 
+def test_a_simulated_base_is_written_where_it_was_sent(pr2_apartment_context):
+    """
+    A robot simulated against the world's own belief about where it is can be put at a
+    pose by saying so.
+    """
+    world, _, context = pr2_apartment_context
+    motion = MoveMotion(
+        Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+    )
+
+    with kinematically_simulated_robot:
+        execute_single(motion, context=context)
+
+        assert isinstance(motion.motion_chart, SetOdometry)
+
+
+def test_a_physically_simulated_base_is_driven_where_it_was_sent(
+    pr2_apartment_context,
+):
+    """
+    A robot whose wheels have to carry it cannot be put at a pose by saying so, which is
+    why performing in physics is told apart from performing against the world's own
+    belief.
+    """
+    world, _, context = pr2_apartment_context
+    motion = MoveMotion(
+        Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+    )
+
+    with PhysicallySimulatedRobot(simulation=None):
+        execute_single(motion, context=context)
+
+        assert isinstance(motion.motion_chart, CartesianPose)
+
+
 def test_move_tool_center_point_motion_uses_tight_threshold(pr2_apartment_context):
     """
     MoveToolCenterPointMotion drives grasp approaches, so it must not fall back to
@@ -150,9 +195,10 @@ def test_move_tool_center_point_motion_uses_tight_threshold(pr2_apartment_contex
         target, left_or_only_arm(context.robot), movement_type=MovementType.CARTESIAN
     )
     execute_single(cartesian_motion, context=context)
-    assert isinstance(cartesian_motion.motion_chart, CartesianPose)
+    cartesian_task = _motion_task(cartesian_motion.motion_chart, view)
+    assert isinstance(cartesian_task, CartesianPose)
     assert (
-        cartesian_motion.motion_chart.translation_threshold
+        cartesian_task.translation_threshold
         == context.motion_tolerances.default_tcp_position_threshold
     )
 
@@ -161,7 +207,7 @@ def test_move_tool_center_point_motion_uses_tight_threshold(pr2_apartment_contex
     )
     execute_single(translation_motion, context=context)
     assert (
-        translation_motion.motion_chart.threshold
+        _motion_task(translation_motion.motion_chart, view).threshold
         == context.motion_tolerances.default_tcp_position_threshold
     )
 
@@ -182,7 +228,7 @@ def test_move_tcp_waypoints_motion_forwards_thresholds(pr2_apartment_context):
     )
     execute_single(motion, context=context)
 
-    nodes = motion.motion_chart.nodes
+    nodes = _motion_task(motion.motion_chart, view).nodes
     assert len(nodes) == 1
     assert isinstance(nodes[0], CartesianPose)
     assert nodes[0].translation_threshold == 0.001
@@ -203,7 +249,7 @@ def test_move_tcp_waypoints_motion_uses_giskard_defaults_when_unset(
     motion = MoveTCPWaypointsMotion(waypoints, left_or_only_arm(context.robot))
     execute_single(motion, context=context)
 
-    nodes = motion.motion_chart.nodes
+    nodes = _motion_task(motion.motion_chart, view).nodes
     assert isinstance(nodes[0], CartesianPose)
     assert (
         nodes[0].translation_threshold
@@ -232,11 +278,96 @@ def test_move_tcp_waypoints_aligned_motion_forwards_position_threshold(
 
     trajectory = next(
         node
-        for parallel in motion.motion_chart.nodes
-        for node in parallel.nodes
+        for group in motion.motion_chart.nodes
+        if isinstance(group, Goal)
+        for node in group.nodes
         if isinstance(node, CartesianPositionTrajectory)
     )
     assert trajectory.threshold == 0.001
+
+
+# %% a robot that does not move its whole body stands still while it moves an arm
+
+
+def _base_holding_tasks(motion_chart, robot):
+    """
+    :return: The tasks of ``motion_chart`` that hold the robot's own root where it is,
+        which is what holding its base in place amounts to.
+    """
+    nodes = motion_chart.nodes if type(motion_chart) is Parallel else []
+    return [
+        node
+        for node in nodes
+        if isinstance(node, HoldPose) and node.tip_link == robot.root
+    ]
+
+
+@pytest.fixture
+def full_body_controlled_pr2(pr2_apartment_context):
+    """
+    The PR2 apartment context with the PR2 allowed to move its whole body, restored
+    afterwards: the robot is shared between tests and the world snapshot does not cover
+    this setting.
+    """
+    world, view, context = pr2_apartment_context
+    with world.modify_world():
+        view.mobile_base.full_body_controlled = True
+    yield world, view, context
+    with world.modify_world():
+        view.mobile_base.full_body_controlled = False
+
+
+def _motion_task(motion_chart, robot):
+    """
+    :return: The task the motion is built around, set apart from the one holding the
+        robot's base in place.
+
+    Only a chart that is exactly a :class:`Parallel` is looked into, since a
+    :class:`CartesianPose` is one too and its own halves accompany nothing.
+    """
+    holding = _base_holding_tasks(motion_chart, robot)
+    if not holding:
+        return motion_chart
+    [task] = [node for node in motion_chart.nodes if node not in holding]
+    return task
+
+
+def test_an_arm_motion_holds_the_base_of_a_robot_that_stands_still(pr2_apartment_context):
+    """
+    A base that is not full body controlled stands still while an arm moves, so the
+    motion has to hold it there rather than leave it for another task to command.
+
+    An arm goal is expressed relative to the robot's own root and bound when the motion
+    starts, so a base that moves afterwards carries the goal away from the object.
+    """
+    world, view, context = pr2_apartment_context
+    assert not view.mobile_base.full_body_controlled
+    target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+
+    motion = MoveToolCenterPointMotion(
+        target, left_or_only_arm(context.robot), movement_type=MovementType.CARTESIAN
+    )
+    execute_single(motion, context=context)
+
+    [hold_base] = _base_holding_tasks(motion.motion_chart, view)
+    assert hold_base.root_link == world.root
+    assert hold_base.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+
+
+def test_an_arm_motion_leaves_a_full_body_controlled_base_free(full_body_controlled_pr2):
+    """
+    A robot that may move its whole body drives while it reaches, so its base is not
+    held.
+    """
+    world, view, context = full_body_controlled_pr2
+    target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+
+    motion = MoveToolCenterPointMotion(
+        target, left_or_only_arm(context.robot), movement_type=MovementType.CARTESIAN
+    )
+    execute_single(motion, context=context)
+
+    assert _base_holding_tasks(motion.motion_chart, view) == []
 
 
 def test_move_tool_center_point_motion_without_max_velocity_returns_bare_task(
@@ -254,7 +385,16 @@ def test_move_tool_center_point_motion_without_max_velocity_returns_bare_task(
         target, left_or_only_arm(context.robot), movement_type=MovementType.CARTESIAN
     )
     execute_single(motion, context=context)
-    assert isinstance(motion.motion_chart, CartesianPose)
+
+    chart = motion.motion_chart
+    nodes = chart.nodes if isinstance(chart, Parallel) else [chart]
+    assert not [
+        node
+        for node in nodes
+        if isinstance(
+            node, (CartesianPositionVelocityLimit, CartesianRotationVelocityLimit)
+        )
+    ]
 
 
 def test_move_tool_center_point_motion_max_linear_velocity_adds_real_limit(
@@ -719,7 +859,7 @@ def test_looking_motion_pointing_parameters(pr2_apartment_context):
     motion = LookingMotion(target=target, camera=camera)
     execute_single(motion, context=context)
 
-    pointing = motion.motion_chart
+    pointing = _motion_task(motion.motion_chart, view)
 
     assert isinstance(pointing, Pointing)
     assert pointing.root_link is view.get_torso().root
@@ -730,6 +870,37 @@ def test_looking_motion_pointing_parameters(pr2_apartment_context):
     assert pointing.pointing_axis.reference_frame is camera.root
     assert pointing.goal_point.reference_frame is world.root
     assert np.array_equal(pointing.goal_point.to_np(), target.position.to_np())
+
+
+def test_looking_holds_the_base_of_a_robot_that_stands_still(pr2_apartment_context):
+    """
+    The look's goal is bound relative to the torso when the motion starts, so a base
+    that collision avoidance pushes afterwards carries the goal along and the head
+    points past the target.
+    """
+    world, view, context = pr2_apartment_context
+    assert not view.mobile_base.full_body_controlled
+    target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+
+    motion = LookingMotion(target=target, camera=view.get_default_camera())
+    execute_single(motion, context=context)
+
+    [hold_base] = _base_holding_tasks(motion.motion_chart, view)
+    assert hold_base.root_link == world.root
+    assert hold_base.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+
+
+def test_looking_leaves_a_full_body_controlled_base_free(full_body_controlled_pr2):
+    """
+    A robot that may move its whole body is not held while it looks.
+    """
+    world, view, context = full_body_controlled_pr2
+    target = Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+
+    motion = LookingMotion(target=target, camera=view.get_default_camera())
+    execute_single(motion, context=context)
+
+    assert _base_holding_tasks(motion.motion_chart, view) == []
 
 
 # %% stretch tool center point
@@ -812,7 +983,7 @@ def test_stretch_base_motion_follows_the_execution_environment(
         assert motion.get_alternative_motion() is StretchMoveReal
         assert isinstance(motion.motion_chart, DifferentialDriveBaseGoal)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         assert motion.get_alternative_motion() is StretchMoveSim
 
 
@@ -911,3 +1082,63 @@ def test_grasping_action_frees_the_gripper_for_its_whole_approach(
     )
     assert len(reach_nodes) == 2
     assert all(node.designator.allow_gripper_collision is True for node in reach_nodes)
+
+
+# %% sending the fingers to a width
+
+
+def test_fingers_sent_to_a_width_aim_one_fingertip_at_the_other(pr2_apartment_context):
+    """
+    The distance between the fingertips is what Giskard is given, so it finds the joint
+    positions that realise it rather than being told them.
+    """
+    _, _, context = pr2_apartment_context
+    gripper = context.robot.left_arm.end_effector
+    motion = MoveFingersToWidthMotion(gripper=gripper, width=0.04)
+
+    with PhysicallySimulatedRobot(simulation=None):
+        execute_single(motion, context=context)
+
+        chart = motion.motion_chart
+        assert isinstance(chart, CartesianPosition)
+        assert chart.root_link is gripper.finger.tip
+        assert chart.tip_link is gripper.thumb.tip
+
+
+def test_a_squeeze_sends_the_fingers_past_the_width(pr2_apartment_context):
+    _, _, context = pr2_apartment_context
+    gripper = context.robot.left_arm.end_effector
+    width = 0.04
+    squeeze = 0.001
+
+    with PhysicallySimulatedRobot(simulation=None):
+        touching = MoveFingersToWidthMotion(gripper=gripper, width=width)
+        pressing = MoveFingersToWidthMotion(
+            gripper=gripper, width=width, squeeze=squeeze
+        )
+        execute_single(touching, context=context)
+        execute_single(pressing, context=context)
+
+        apart = touching.motion_chart.goal_point.to_np()[:3].ravel()
+        pressed = pressing.motion_chart.goal_point.to_np()[:3].ravel()
+
+    assert np.linalg.norm(pressed) == pytest.approx(np.linalg.norm(apart) - 2 * squeeze)
+
+
+def test_fingers_are_not_sent_to_a_width_where_nothing_pushes_back(
+    pr2_apartment_context,
+):
+    """
+    Closing to an object's own width only means something where the object resists; in a
+    world moved kinematically a held body hangs off the tool frame however the fingers
+    stand.
+    """
+    _, _, context = pr2_apartment_context
+    gripper = context.robot.left_arm.end_effector
+    motion = MoveFingersToWidthMotion(gripper=gripper, width=0.04)
+
+    with kinematically_simulated_robot:
+        execute_single(motion, context=context)
+
+        with pytest.raises(FingerWidthNeedsPhysics):
+            motion.motion_chart

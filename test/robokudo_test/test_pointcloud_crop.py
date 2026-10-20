@@ -17,6 +17,7 @@ from py_trees.common import Status
 
 # robokudo.pipeline must be imported before robokudo.annotators.outputs: importing
 # outputs first trips a circular import between it and robokudo.annotators.core.
+from robokudo.types.cv import ColorToDepthRatio
 import robokudo.pipeline
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap, AnnotatorOutputs
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
@@ -67,7 +68,7 @@ def cas_with_cloud_at_world_origin(
     cas.set_ref(CASViews.CLOUD, cloud)
     cas.set(CASViews.COLOR_IMAGE, np.zeros((200, 200, 3), dtype=np.uint8))
     cas.set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, camera_intrinsics)
-    cas.set(CASViews.COLOR2DEPTH_RATIO, (1.0, 1.0))
+    cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
     return cas
 
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan import Plan
 from coraplex.robot_plans import MoveJointsMotion
@@ -20,11 +20,11 @@ from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.testing import start_visualization
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    RobotSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Parcel
@@ -203,7 +203,7 @@ assert abs(lowest_collision_point_of(robot, world)) < 1e-3
 
 start_visualization(world)
 
-with simulated_robot:
+with kinematically_simulated_robot:
     for _ in range(10):
         build_plan(world, robot, PICK_POSE, PLACE_POSE, turn=-1.57).perform()
         build_plan(world, robot, PLACE_POSE, PICK_POSE, turn=1.57).perform()

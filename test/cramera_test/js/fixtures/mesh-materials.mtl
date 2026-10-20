@@ -1,0 +1,17 @@
+newmtl relative
+map_Kd textures/paint.png
+
+newmtl parent_relative
+map_Kd ../textures/shared.png
+
+newmtl absolute_path
+map_Kd /images/paint.png
+
+newmtl remote
+map_Kd https://assets.example.test/paint.png
+
+newmtl embedded
+map_Kd data:image/png;base64,aW1hZ2U=
+
+newmtl blob
+map_Kd blob:https://viewer.example.test/texture

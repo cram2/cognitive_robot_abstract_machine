@@ -16,7 +16,6 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -50,9 +49,8 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             )
         ]
     )
-    dof_limits = DegreeOfFreedomLimits(
-        lower=DerivativeMap(None, -vel_limit, None, None),
-        upper=DerivativeMap(None, vel_limit, None, None),
+    dof_limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+        maximum_speed=vel_limit
     )
     world = World()
     with world.modify_world():

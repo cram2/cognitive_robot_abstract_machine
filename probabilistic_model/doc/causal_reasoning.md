@@ -273,15 +273,18 @@ differ, and it is not free for the exact-partition case:
   (trivially "one region", not a genuine partition) or, in principle, with overlapping
   branches -- either of which would violate the theorem's hypothesis while still
   superficially looking like "a sum unit over $L$".
-  `_undetermined_latents_partition_disjointly` checks pairwise disjointness on the
-  marginalized circuit directly, rather than assuming it from how the circuit was fit. If the
+  Branches that the fitted circuit only separates by other variables have the same region
+  over $L$ once marginalized; `_distinct_component_regions` treats them as one branch, the
+  marginal truncated to that region. `_undetermined_latents_partition_disjointly` then
+  checks pairwise disjointness of the distinct regions on the marginalized circuit
+  directly, rather than assuming it from how the circuit was fit. A single region passes
+  only if it is a point. If the
   check fails, the precondition of {prf:ref}`thm-retained-latent-disjoint` does not hold, and
   `attach_exact_partition_mixture` raises `UndeterminedLatentsNotPartitionedError` rather than
   silently grounding every branch from the same representative point (which would discard
   $L$'s correlation with the rest of the circuit while still looking, structurally, like a
-  valid disjoint partition). Grounding catches exactly this and falls back to `SAMPLED`,
-  logging a warning that the template needs refitting so that it actually splits on $L$ for
-  `EXACT` to apply.
+  valid disjoint partition). Grounding passes the error on to the caller, who either refits
+  the template so that it actually splits on $L$ or grounds with `SAMPLED`.
 
 The theorem only gives *structural* determinism (the property `verify_support_determinism`
 checks); it says nothing about whether the mixture weights $w_i$ are the right ones. Getting

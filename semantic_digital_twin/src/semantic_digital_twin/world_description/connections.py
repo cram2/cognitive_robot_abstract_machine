@@ -26,7 +26,6 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     Quaternion,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -886,14 +885,6 @@ class OmniDrive(WheeledDrive):
         """
         name = name or cls._generate_default_name(parent=parent, child=child)
         stringified_name = str(name)
-        lower_translation_limits = DerivativeMap()
-        lower_translation_limits.velocity = -translation_velocity_limits
-        upper_translation_limits = DerivativeMap()
-        upper_translation_limits.velocity = translation_velocity_limits
-        lower_rotation_limits = DerivativeMap()
-        lower_rotation_limits.velocity = -rotation_velocity_limits
-        upper_rotation_limits = DerivativeMap()
-        upper_rotation_limits.velocity = rotation_velocity_limits
 
         x = DegreeOfFreedom(name=PrefixedName("x", stringified_name))
         world.add_degree_of_freedom(x)
@@ -905,26 +896,23 @@ class OmniDrive(WheeledDrive):
         world.add_degree_of_freedom(pitch)
         yaw = DegreeOfFreedom(
             name=PrefixedName("yaw", stringified_name),
-            limits=DegreeOfFreedomLimits(
-                lower=lower_rotation_limits,
-                upper=upper_rotation_limits,
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                maximum_speed=rotation_velocity_limits
             ),
         )
         world.add_degree_of_freedom(yaw)
 
         x_vel = DegreeOfFreedom(
             name=PrefixedName("x_vel", stringified_name),
-            limits=DegreeOfFreedomLimits(
-                lower=lower_translation_limits,
-                upper=upper_translation_limits,
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                maximum_speed=translation_velocity_limits
             ),
         )
         world.add_degree_of_freedom(x_vel)
         y_vel = DegreeOfFreedom(
             name=PrefixedName("y_vel", stringified_name),
-            limits=DegreeOfFreedomLimits(
-                lower=lower_translation_limits,
-                upper=upper_translation_limits,
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                maximum_speed=translation_velocity_limits
             ),
         )
         world.add_degree_of_freedom(y_vel)
@@ -1096,14 +1084,6 @@ class DifferentialDrive(WheeledDrive):
         """
         name = name or cls._generate_default_name(parent=parent, child=child)
         stringified_name = str(name)
-        lower_translation_limits = DerivativeMap()
-        lower_translation_limits.velocity = -translation_velocity_limits
-        upper_translation_limits = DerivativeMap()
-        upper_translation_limits.velocity = translation_velocity_limits
-        lower_rotation_limits = DerivativeMap()
-        lower_rotation_limits.velocity = -rotation_velocity_limits
-        upper_rotation_limits = DerivativeMap()
-        upper_rotation_limits.velocity = rotation_velocity_limits
 
         x = DegreeOfFreedom(name=PrefixedName("x", stringified_name))
         world.add_degree_of_freedom(x)
@@ -1115,18 +1095,16 @@ class DifferentialDrive(WheeledDrive):
         world.add_degree_of_freedom(pitch)
         yaw = DegreeOfFreedom(
             name=PrefixedName("yaw", stringified_name),
-            limits=DegreeOfFreedomLimits(
-                lower=lower_rotation_limits,
-                upper=upper_rotation_limits,
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                maximum_speed=rotation_velocity_limits
             ),
         )
         world.add_degree_of_freedom(yaw)
 
         x_vel = DegreeOfFreedom(
             name=PrefixedName("x_vel", stringified_name),
-            limits=DegreeOfFreedomLimits(
-                lower=lower_translation_limits,
-                upper=upper_translation_limits,
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                maximum_speed=translation_velocity_limits
             ),
         )
         world.add_degree_of_freedom(x_vel)

@@ -3,13 +3,16 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 import pytest
+import trimesh
 from trimesh.proximity import closest_point
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from semantic_digital_twin.adapters.mesh import STLParser
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl
+from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
+from semantic_digital_twin.part_finding.splitting import PartSplitter
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Rim
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
@@ -35,6 +38,23 @@ meters.
 """
 
 
+def split_off_rim(bowl: Bowl, rim_depth: float = 0.02) -> Rim:
+    """
+    Split the bowl's rim off its shape, at the faces whose centers lie within
+    ``rim_depth`` of its highest point.
+
+    :param bowl: The bowl, its rim still part of its body's shape.
+    :param rim_depth: How far below the bowl's highest point its rim reaches, in meters.
+    :return: The rim.
+    """
+    mesh = bowl.root.collision.combined_mesh
+    centers = mesh.triangles_center
+    rim_centers = centers[centers[:, 2] > mesh.bounds[1][2] - rim_depth]
+    return PartSplitter(
+        part_type=Rim, finder=LocatedFacesFinder(face_centers=rim_centers)
+    ).split(bowl)
+
+
 @pytest.fixture
 def bowl() -> Bowl:
     world = STLParser(BOWL_MESH).parse()
@@ -44,15 +64,26 @@ def bowl() -> Bowl:
     return annotation
 
 
+@pytest.fixture
+def bowl_with_rim(bowl) -> Bowl:
+    """
+    The bowl with its rim split off as a part of its own.
+    """
+    split_off_rim(bowl)
+    return bowl
+
+
 def distances_to_surface(
     bowl: Bowl, positions: NDArray[np.float64]
 ) -> NDArray[np.float64]:
     """
     :param bowl: The bowl whose surface to measure against.
     :param positions: Points in the bowl's own frame.
-    :return: Each point's distance to the nearest point of the bowl's surface.
+    :return: Each point's distance to the nearest point of the bowl's surface: that of
+        its body and of its rim, if split off, which shares the body's frame.
     """
-    _, distances, _ = closest_point(bowl.root.combined_mesh, positions)
+    surface = trimesh.util.concatenate([body.combined_mesh for body in bowl.bodies])
+    _, distances, _ = closest_point(surface, positions)
     return distances
 
 
@@ -61,9 +92,10 @@ def distances_to_surface(
 
 def test_bowl_grasps_close_on_the_bowls_wall(bowl):
     """
-    The fingers must meet material. Grasping the bowl at its own origin -- which is
-    what an object without grasp candidates of its own offers -- closes them in mid air
-    inside the bowl.
+    The fingers must meet material.
+
+    Grasping the bowl at its own origin -- which is what an object without grasp
+    candidates of its own offers -- closes them in mid air inside the bowl.
     """
     positions = np.array(
         [grasp.grasp_pose.to_np()[:3, 3] for grasp in bowl.grasp_candidates()]
@@ -71,6 +103,15 @@ def test_bowl_grasps_close_on_the_bowls_wall(bowl):
 
     assert len(positions) == bowl.grasp_candidate_count
     assert np.all(distances_to_surface(bowl, positions) < GRIPPABLE_DISTANCE)
+
+
+def test_grasps_of_a_split_off_rim_close_on_the_bowls_wall(bowl_with_rim):
+    positions = np.array(
+        [grasp.grasp_pose.to_np()[:3, 3] for grasp in bowl_with_rim.grasp_candidates()]
+    )
+
+    assert len(positions) == bowl_with_rim.rim.grasp_candidate_count
+    assert np.all(distances_to_surface(bowl_with_rim, positions) < GRIPPABLE_DISTANCE)
 
 
 def test_the_bowls_origin_is_not_grippable(bowl):

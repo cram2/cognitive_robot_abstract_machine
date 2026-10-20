@@ -13,6 +13,7 @@ from probabilistic_model.adapters.rustworkx_tensorized.converter import (
 )
 from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
     NotExactlyOneRootError,
+    UnitNotConvertedError,
 )
 from probabilistic_model.distributions.distributions import (
     DiracDeltaDistribution,
@@ -65,6 +66,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.uniform_la
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
+    LayerNode,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
     RowGroupedSparseArray,
@@ -285,6 +287,36 @@ class TruncatedMultivariateGaussianLeavesToTruncatedMultivariateGaussianLayerCon
     """
 
 
+@dataclass
+class ConvertedCircuit:
+    """
+    A layered circuit created from a rustworkx circuit, together with the layers its
+    units became.
+    """
+
+    circuit: LayeredProbabilisticCircuit
+    """
+    The created circuit.
+    """
+
+    converted_layers: List[ConvertedLayer]
+    """
+    Every layer of the circuit, with the units it was created from.
+    """
+
+    def node_of(self, unit: Unit) -> LayerNode:
+        """
+        :param unit: A unit of the rustworkx circuit.
+        :return: The layer and node that the unit became.
+        :raises UnitNotConvertedError: If no layer was created from the unit.
+        """
+        for converted_layer in self.converted_layers:
+            node = converted_layer.node_of_unit.get(hash(unit))
+            if node is not None:
+                return LayerNode(converted_layer.layer, node)
+        raise UnitNotConvertedError(unit)
+
+
 class RustworkxCircuitToLayeredCircuitConverter(
     RustworkxToTensorizedConverter[ProbabilisticCircuit, LayeredProbabilisticCircuit]
 ):
@@ -295,6 +327,14 @@ class RustworkxCircuitToLayeredCircuitConverter(
 
     @classmethod
     def convert(cls, data: ProbabilisticCircuit) -> LayeredProbabilisticCircuit:
+        return cls.convert_with_layers(data).circuit
+
+    @classmethod
+    def convert_with_layers(cls, data: ProbabilisticCircuit) -> ConvertedCircuit:
+        """
+        :param data: The rustworkx circuit.
+        :return: The layered circuit, and which layer and node every unit became.
+        """
         converted_layers: List[ConvertedLayer] = []
         for units in reversed(list(data.layers)):
             converted_layers = [
@@ -309,7 +349,10 @@ class RustworkxCircuitToLayeredCircuitConverter(
         ]
         if len(roots) != 1:
             raise NotExactlyOneRootError(number_of_roots=len(roots))
-        return LayeredProbabilisticCircuit(SortedSet(data.variables), roots[0].layer)
+        return ConvertedCircuit(
+            LayeredProbabilisticCircuit(SortedSet(data.variables), roots[0].layer),
+            converted_layers,
+        )
 
     @staticmethod
     def groups_of_level(units: List[Unit]) -> List[List[Unit]]:

@@ -19,13 +19,15 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoSim,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import ServoGains
+from semantic_digital_twin.world_description.connection_properties import (
+    ServoGains,
+    VelocityServoGains,
+)
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     RevoluteConnection,
@@ -36,7 +38,11 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body, PositionServo
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    PositionServo,
+    VelocityServo,
+)
 
 # %% the servo's actuator
 
@@ -45,8 +51,8 @@ def test_the_servo_actuator_is_a_pd_law_clamped_to_the_joints_range():
     gains = ServoGains(stiffness=100.0, damping=10.0, torque_limit=5.0)
     degree_of_freedom = DegreeOfFreedom(
         name=PrefixedName("hinge"),
-        limits=DegreeOfFreedomLimits(
-            DerivativeMap(position=-1.0), DerivativeMap(position=1.0)
+        limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=-1.0, upper_position=1.0
         ),
     )
     servo = PositionServo(name=PrefixedName("hinge_servo"), gains=gains)
@@ -59,6 +65,21 @@ def test_the_servo_actuator_is_a_pd_law_clamped_to_the_joints_range():
     assert actuator.bias_type == mujoco.mjtBias.mjBIAS_AFFINE
     assert actuator.bias_parameters[:3] == [0.0, -gains.stiffness, -gains.damping]
     assert actuator.control_range == [-1.0, 1.0]
+    assert actuator.force_range == [-gains.torque_limit, gains.torque_limit]
+
+
+def test_the_velocity_servo_actuator_pushes_against_the_velocity_error():
+    gains = VelocityServoGains(damping=10.0, torque_limit=5.0)
+    servo = VelocityServo(name=PrefixedName("wheel_servo"), gains=gains)
+    servo.add_dof(DegreeOfFreedom(name=PrefixedName("wheel")))
+
+    actuator = MujocoActuator.create_velocity_servo(servo)
+
+    assert actuator.gain_type == mujoco.mjtGain.mjGAIN_FIXED
+    assert actuator.gain_parameters[0] == gains.damping
+    assert actuator.bias_type == mujoco.mjtBias.mjBIAS_AFFINE
+    assert actuator.bias_parameters[:3] == [0.0, 0.0, -gains.damping]
+    assert actuator.control_limited == mujoco.mjtLimited.mjLIMITED_FALSE
     assert actuator.force_range == [-gains.torque_limit, gains.torque_limit]
 
 
@@ -112,8 +133,8 @@ def _pendulum_world() -> PendulumWorld:
             )
         degree_of_freedom = DegreeOfFreedom(
             name=PrefixedName("hinge"),
-            limits=DegreeOfFreedomLimits(
-                DerivativeMap(position=-1.0), DerivativeMap(position=1.0)
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=-1.0, upper_position=1.0
             ),
         )
         world.add_degree_of_freedom(degree_of_freedom)
@@ -163,6 +184,19 @@ def test_a_position_servo_becomes_a_servo_actuator_on_the_degree_of_freedoms_joi
     assert servo.trntype == mujoco.mjtTrn.mjTRN_JOINT
     assert servo.gainprm[0] == 50.0
     assert list(servo.forcerange) == [-2.0, 2.0]
+
+
+def test_the_servo_of_a_joint_without_position_limits_leaves_its_control_unclamped():
+    degree_of_freedom = DegreeOfFreedom(name=PrefixedName("continuous_hinge"))
+    servo = PositionServo(
+        name=PrefixedName("continuous_hinge_servo"),
+        gains=ServoGains(stiffness=100.0, damping=10.0, torque_limit=5.0),
+    )
+    servo.add_dof(degree_of_freedom)
+
+    actuator = MujocoActuator.create_servo(servo)
+
+    assert actuator.control_limited == mujoco.mjtLimited.mjLIMITED_FALSE
 
 
 def test_a_degree_of_freedom_without_a_servo_gets_no_actuator(tmp_path):

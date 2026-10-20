@@ -21,7 +21,7 @@ import numpy as np
 import pytest
 
 from krrood.entity_query_language.factories import a
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
 from ..dataset import ormatic_interface  # type: ignore
@@ -60,7 +60,7 @@ def _sample_confounded_robot(rng: np.random.Generator) -> PickingRobot:
 def confounded_model() -> RelationalProbabilisticCircuit:
     rng = np.random.default_rng(0)
     robots = [_sample_confounded_robot(rng) for _ in range(TRAINING_ROBOT_COUNT)]
-    model = RelationalProbabilisticCircuit(PickingRobot)
+    model = RelationalProbabilisticCircuit()
     model.fit(robots)
     return model
 
@@ -126,7 +126,7 @@ def test_grounding_an_underspecified_query_yields_one_connected_circuit(
     """
     Every attempt field is left underspecified, so ``success_count`` cannot be
     determined from the query and is retained via the default
-    :attr:`~probabilistic_model.probabilistic_circuit.relational.rspn.GroundingMode.SAMPLED`
+    :attr:`~probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit.GroundingMode.SAMPLED`
     Monte-Carlo path rather than integrated out, while ``total_count`` is determined
     directly from the query's attempt count.
     """

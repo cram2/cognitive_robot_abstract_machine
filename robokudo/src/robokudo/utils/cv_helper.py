@@ -68,61 +68,33 @@ def get_scaled_color_image_for_depth_image(
     """
     Scale color image to match depth image resolution.
 
-    If the color2depth ratio is not 1,1, we will usually scale the color image to the
+    If the color-to-depth ratio is not 1,1, we will usually scale the color image to the
     same size the depth image has. This method will get check if a conversion is
     required and will return the correct size. This is usually called before
     o3d.geometry.RGBDImage.create_from_color_and_depth is called, so that depth and
     color image match.
 
-    :param cas: The CAS where the COLOR2DEPTH_RATIO is stored.
+    :param cas: The CAS holding the color-to-depth ratio.
     :param color_image: The color image to be adjusted
     :return: A resized copy of the color image if a resize necessary. Otherwise, the
         unchanged color_image is returned.
     :raises ColorToDepthRatioMissing: If color-to-depth ratio not set in CAS
     """
-    color2depth_ratio = cas.get(CASViews.COLOR2DEPTH_RATIO)
+    color_to_depth_ratio = cas.get(CASViews.COLOR_TO_DEPTH_RATIO)
 
-    if not color2depth_ratio:
+    if color_to_depth_ratio is None:
         raise ColorToDepthRatioMissing(
             operation="scale color image to depth image resolution"
         )
 
-    if color2depth_ratio == (1, 1):
-        resized_color = color_image
-    else:
-        c2d_ratio_x = color2depth_ratio[0]
-        c2d_ratio_y = color2depth_ratio[1]
-        resized_color = cv2.resize(
-            color_image,
-            None,
-            fx=c2d_ratio_x,
-            fy=c2d_ratio_y,
-            interpolation=cv2.INTER_NEAREST,
-        )
-
-    return resized_color
-
-
-def get_scale_coordinates(
-    color2depth_ratio: Tuple[int, int], coordinates: Tuple[int, int]
-) -> Tuple[int, int]:
-    """
-    Scale coordinates based on color-to-depth ratio.
-
-    :param color2depth_ratio: Scale factors (x_scale, y_scale)
-    :param coordinates: Input coordinates (x, y)
-    :return: Scaled coordinates
-    :raises ColorToDepthRatioMissing: If color-to-depth ratio not provided
-    """
-    if not color2depth_ratio:
-        raise ColorToDepthRatioMissing(operation="scale coordinates")
-
-    if color2depth_ratio == (1, 1):
-        return coordinates
-
-    return (
-        color2depth_ratio[0] * coordinates[0],
-        color2depth_ratio[1] * coordinates[1],
+    if color_to_depth_ratio.is_identity:
+        return color_image
+    return cv2.resize(
+        color_image,
+        None,
+        fx=color_to_depth_ratio.horizontal,
+        fy=color_to_depth_ratio.vertical,
+        interpolation=cv2.INTER_NEAREST,
     )
 
 

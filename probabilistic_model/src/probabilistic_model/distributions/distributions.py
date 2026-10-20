@@ -304,6 +304,10 @@ class DiscreteDistribution(UnivariateDistribution):
     A dict that maps from integers (hash(symbol) for symbols) to probabilities.
     """
 
+    def __post_init__(self):
+        if not isinstance(self.probabilities, MissingDict):
+            self.probabilities = MissingDict(float, self.probabilities)
+
     def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
         events = events[:, 0]
 
@@ -668,22 +672,22 @@ class DiracDeltaDistribution(ContinuousDistribution):
     def log_conditional_from_simple_interval_if_not_singleton(
         self, interval: SimpleInterval
     ) -> Tuple[Optional[ContinuousDistribution], float]:
-        if interval.contains(self.location):
+        if self._reaches(interval.as_composite_set()):
             return self, 0.0
         else:
             return None, -np.inf
 
     def probability_of_simple_event(self, event: SimpleEvent) -> float:
-        interval: Interval = event[self.variable]
+        return 1.0 if self._reaches(event[self.variable]) else 0.0
 
-        return (
-            0.0
-            if (
-                closed(self.location - self.tolerance, self.location + self.tolerance)
-                & interval
-            ).is_empty()
-            else 1.0
-        )
+    def _reaches(self, interval: Interval) -> bool:
+        """
+        :param interval: An assignment of the variable of this distribution.
+        :return: Whether the assignment reaches this distribution's mass, up to
+            :attr:`tolerance`.
+        """
+        window = closed(self.location - self.tolerance, self.location + self.tolerance)
+        return not (window & interval).is_empty()
 
     def univariate_log_mode(self) -> Tuple[AbstractCompositeSet, float]:
         return self.univariate_support, np.log(self.density_cap)

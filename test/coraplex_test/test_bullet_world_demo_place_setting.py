@@ -10,7 +10,7 @@ import importlib.util
 from enum import StrEnum
 from pathlib import Path
 
-from semantic_digital_twin.api import WorldSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.reasoning.predicates import SupportedBy
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world_description.connections import FixedConnection

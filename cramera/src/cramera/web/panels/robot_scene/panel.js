@@ -293,11 +293,15 @@ Panels.define('robot-scene', function (root, bus) {
     // any relative resource an OBJ/MTL references (the mtllib line, texture maps) is
     // fetched as a side asset of the mesh's own /mesh URL, so a live mesh keeps its
     // authored materials without the bridge serving its whole directory
-    function sideAssetModifier(meshUrl) {
+    function sideAssetModifier(meshUrl, materialUrl) {
+      const materialQuery = new URLSearchParams((materialUrl || '').split('?')[1] || '');
+      const materialPath = materialQuery.get('side') || '';
+      const directory = materialPath.slice(0, materialPath.lastIndexOf('/') + 1);
       return function (url) {
+        // MTLLoader's explicit resource path leaves texture references relative.
+        if (url.indexOf('./') === 0) url = url.slice(2);
         if (/^(\/|https?:|data:|blob:)/.test(url)) return url;
-        const resource = url.split('/').pop();
-        return meshUrl + '&side=' + encodeURIComponent(resource);
+        return meshUrl + '&side=' + encodeURIComponent(directory + url);
       };
     }
     function loadShapeMesh(shapeSpec, holder) {
@@ -313,7 +317,7 @@ Panels.define('robot-scene', function (root, bus) {
       };
       if (shapeSpec.format === 'obj' && THREE.OBJLoader) {
         const manager = new THREE.LoadingManager();
-        manager.setURLModifier(sideAssetModifier(shapeSpec.url));
+        manager.setURLModifier(sideAssetModifier(shapeSpec.url, shapeSpec.mtl));
         const loadObj = function (materials) {
           const objLoader = new THREE.OBJLoader(manager);
           if (materials) { materials.preload(); objLoader.setMaterials(materials); }
@@ -325,7 +329,7 @@ Panels.define('robot-scene', function (root, bus) {
           }, undefined, fail);
         };
         if (shapeSpec.mtl && THREE.MTLLoader) {
-          new THREE.MTLLoader(manager).load(shapeSpec.mtl, loadObj,
+          new THREE.MTLLoader(manager).setResourcePath('./').load(shapeSpec.mtl, loadObj,
             undefined, function () { loadObj(null); });
         } else {
           loadObj(null);
@@ -369,13 +373,16 @@ Panels.define('robot-scene', function (root, bus) {
     if (spec.box) { box(spec.box, true); return; }
     const fmt = (spec.format || (spec.meshUrl || '').split('?')[0].split('.').pop() || '').toLowerCase();
     if (fmt === 'obj' && THREE.OBJLoader) {
-      // an OBJ may bring its own materials and textures -- a printed cardboard box, say;
-      // only without them is the mesh painted in the object's flat colour
+      // keep authored textures and vertex colours; use the object's tint for plain geometry
       const loadObj = function (materials) {
         const objLoader = new THREE.OBJLoader();
         if (materials) { materials.preload(); objLoader.setMaterials(materials); spec.tame = true; }
         objLoader.load(spec.meshUrl, function (o) {
-          if (!materials) o.traverse(function (c) { if (c.isMesh) c.material = mat; });
+          if (!materials) {
+            o.traverse(function (c) {
+              if (c.isMesh && !c.geometry.hasAttribute('color')) c.material = mat;
+            });
+          }
           place(o);
         }, undefined, function () { box(); });
       };
@@ -602,6 +609,7 @@ Panels.define('robot-scene', function (root, bus) {
     (sc.objects || []).forEach(function (o) {
       addObject({
         id: o.id, key: o.key, color: o.color,
+        shapes: o.shapes,
         box: o.box || null,
         meshUrl: o.mesh ? sceneBase + o.mesh : null,
         mtlUrl: o.mtl ? sceneBase + o.mtl : null,
@@ -1369,7 +1377,7 @@ Panels.define('robot-scene', function (root, bus) {
             return;
           }
           const spec = { id: o.id, key: o.key, color: o.color };
-          if (o.kind === 'shapes' && o.shapes) { spec.shapes = o.shapes; spec.liveBase = liveUrl(); }
+          if (o.shapes) { spec.shapes = o.shapes; spec.liveBase = liveUrl(); }
           else if (o.kind === 'mesh' && o.mesh) { spec.meshUrl = liveUrl() + o.mesh; spec.format = o.format; }
           else spec.box = o.size || [0.06, 0.06, 0.1];
           liveSpawned[o.key] = true;

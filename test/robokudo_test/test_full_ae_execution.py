@@ -4,6 +4,7 @@ import numpy as np
 import py_trees
 import pytest
 
+from robokudo.types.cv import ColorToDepthRatio
 from robokudo import world as rk_world
 import robokudo.cas
 import robokudo.defs
@@ -13,6 +14,7 @@ import robokudo.descriptors.camera_configs.config_semdt_raytracer
 import robokudo.io.file_reader_interface
 import robokudo.io.semdt_raytracer_camera_interface
 import robokudo.io.storage_reader_interface
+import robokudo.behaviours.clear_annotator_outputs
 import robokudo.pipeline
 import robokudo.types.annotation
 import robokudo.types.scene
@@ -53,7 +55,7 @@ class TestFullAEExecution(object):
             loop=False,
             target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
             kinect_height_fix_mode=True,
-            color2depth_ratio=(0.5, 0.5),
+            color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
             static_camera_transform_enabled=True,
             static_world_frame="map",
             static_camera_frame="camera",
@@ -69,7 +71,7 @@ class TestFullAEExecution(object):
         seq = robokudo.pipeline.Pipeline("TestPipeline")
         seq.add_children(
             [
-                robokudo.annotators.outputs.ClearAnnotatorOutputs(),
+                robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=cr_fr_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=pc_crop_config),
@@ -96,7 +98,7 @@ class TestFullAEExecution(object):
             loop=False,
             target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
             kinect_height_fix_mode=True,
-            color2depth_ratio=(0.5, 0.5),
+            color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
             static_camera_transform_enabled=True,
             static_world_frame="map",
             static_camera_frame="camera",
@@ -111,7 +113,7 @@ class TestFullAEExecution(object):
         seq = robokudo.pipeline.Pipeline("SemanticDigitalTwinFileReaderTestPipeline")
         seq.add_children(
             [
-                robokudo.annotators.outputs.ClearAnnotatorOutputs(),
+                robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=cr_fr_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=pc_crop_config),
@@ -271,7 +273,7 @@ class TestFullAEExecution(object):
         seq = robokudo.pipeline.Pipeline("SemDTRayTracerTestPipeline")
         seq.add_children(
             [
-                robokudo.annotators.outputs.ClearAnnotatorOutputs(),
+                robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 PointcloudCropAnnotator(),
@@ -341,7 +343,7 @@ class TestFullAEExecution(object):
         seq = robokudo.pipeline.Pipeline("SemDTRayTracerTabletopTestPipeline")
         seq.add_children(
             [
-                robokudo.annotators.outputs.ClearAnnotatorOutputs(),
+                robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 PointcloudCropAnnotator(),

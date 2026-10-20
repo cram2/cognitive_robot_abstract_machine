@@ -67,7 +67,9 @@ class Sage10kOpenDoor(ActionDescription):
 
         reach_query = a(MoveToReach)(
             target_pose_offset_robot=a(Pose2D)(
-                x=..., y=..., yaw=..., reference_frame=None
+                position=a(Point2)(x=..., y=..., reference_frame=None),
+                yaw=...,
+                reference_frame=None,
             ),
             hip_rotation=0.0,
             reference_T_grasp=pre_grasp_pose,
@@ -81,7 +83,7 @@ class Sage10kOpenDoor(ActionDescription):
         # -- appended directly rather than via Match.where(), since that would re-add
         # it to the Entity a second time.
         free_space_condition = gcs.constrain_to_free_space(
-            reach_query.target_pose_offset_robot
+            reach_query.target_pose_offset_robot.position
         )
         reach_query._where_conditions_.append(free_space_condition)
         reach_action = reach_query

@@ -113,14 +113,9 @@ class TestLooseObjects:
         assert "mesh" not in entry
         assert not (tmp_path / "rec" / "meshes" / "objects").exists()
 
-    def test_a_shapeless_object_falls_back_to_the_catalogs_placeholder_box(
-        self, tmp_path
-    ):
+    def test_a_shapeless_object_keeps_an_empty_shape_list(self, tmp_path):
         """
-        Not every published body carries real geometry (e.g. one only ever named, never
-        given a shape) — the bridge already renders it as a placeholder box live, and
-        the recording must reuse that same size rather than trying to measure or export
-        geometry that does not exist.
+        A shapeless body keeps its identity and pose without invented solid geometry.
         """
         world = laboratory_world()
         blob = Body(name=PrefixedName("blob.stl", prefix="world"))
@@ -144,7 +139,8 @@ class TestLooseObjects:
         )
 
         entry = next(e for e in scene["objects"] if e["key"] == "blob.stl")
-        assert entry["box"] == list(Bridge.DEFAULT_OBJECT_SIZE)
+        assert entry["shapes"] == []
+        assert "box" not in entry
         assert "mesh" not in entry
 
     def test_a_mesh_shaped_object_is_copied_into_the_bundle(self, tmp_path):

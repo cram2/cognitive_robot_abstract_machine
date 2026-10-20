@@ -2,13 +2,18 @@ import unittest
 
 import jax
 import numpy as np
+from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from equinox import tree_flatten_one_level
 from jax.tree_util import tree_flatten, tree_map
 
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.probabilistic_circuit.jax.uniform_layer import UniformLayer
-from probabilistic_model.probabilistic_circuit.jax.inner_layer import SparseSumLayer
+from probabilistic_model.probabilistic_circuit.jax.uniform_layer import (
+    DifferentiableUniformLayer,
+)
+from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
+    DifferentiableSparseSumLayer,
+)
 from probabilistic_model.probabilistic_circuit.jax.coupling_circuit import (
     Conditioner,
     CouplingCircuit,
@@ -25,7 +30,7 @@ import tqdm
 
 
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
-    ProbabilisticCircuit,
+    DifferentiableLayeredCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as NXProbabilisticCircuit,
@@ -61,8 +66,10 @@ class CouplingCircuitTestCase(unittest.TestCase):
             (np.random.uniform(0, 1, (100, 1)), np.random.uniform(2, 3, (200, 1)))
         )
     )
-    uniform_layer = UniformLayer(0, jnp.array([[-0.01, 1.01], [1.99, 3.01]]))
-    sum_layer = SparseSumLayer(
+    uniform_layer = DifferentiableUniformLayer(
+        0, jnp.array([[-0.01, 1.01], [1.99, 3.01]])
+    )
+    sum_layer = DifferentiableSparseSumLayer(
         [uniform_layer],
         [BCOO((jnp.array([0.0, 0.0]), jnp.array([[0, 0], [0, 1]])), shape=(1, 2))],
     )
@@ -139,7 +146,9 @@ class CouplingCircuit4DTestCase(unittest.TestCase):
         cls.jpt = cls.non_marginalized_jpt.marginal(
             jpt.variables[cls.number_of_variables // 2 :]
         )
-        circuit = ProbabilisticCircuit.from_rustworkx(cls.jpt, False)
+        circuit = CircuitRepresentations().convert(
+            cls.jpt, DifferentiableLayeredCircuit
+        )
         conditioner = LinearConditioner(
             cls.number_of_variables // 2, circuit.root.number_of_trainable_parameters
         )

@@ -12,7 +12,7 @@ from coraplex.datastructures.dataclasses import Context
 from giskardpy.motion_statechart.graph_node import EndMotion, Goal, Task
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.attachment_nodes import ReAttachNode
 from coraplex.plans.executables import MotionPlanHistory
 from coraplex.plans.factories import code, parallel, sequential
@@ -260,7 +260,7 @@ def test_native_motion_reports_boundaries_and_ticks(pr2_apartment_context) -> No
     recorder = ExecutionRecorder(plan=plan)
     plan.node_callbacks.append(recorder)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert recorder.events[0] == NodeEvent(
@@ -297,7 +297,7 @@ def test_native_attachment_reports_its_own_completion(pr2_apartment_context) -> 
     recorder = ExecutionRecorder(plan=plan)
     plan.node_callbacks.append(recorder)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert [event for event in recorder.events if event.node is attachment] == [
@@ -571,7 +571,7 @@ def test_direct_motion_reports_one_pair_of_boundaries(pr2_apartment_context) -> 
     recorder = ExecutionRecorder(plan=root.plan)
     root.plan.node_callbacks.append(recorder)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         node.perform()
 
     assert recorder.events == [
@@ -660,7 +660,7 @@ def test_direct_motion_observer_receives_native_history(pr2_apartment_context) -
     recorder = ExecutionRecorder(plan=root.plan)
     root.plan.node_callbacks.append(recorder)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         node.perform()
 
     assert recorder.statecharts
@@ -706,7 +706,7 @@ def test_direct_motion_failure_closes_its_native_boundary(
     recorder = ExecutionRecorder(plan=node.plan)
     node.plan.node_callbacks.append(recorder)
 
-    with simulated_robot, pytest.raises(type(failure)) as caught:
+    with kinematically_simulated_robot, pytest.raises(type(failure)) as caught:
         node.perform()
 
     assert caught.value is failure
@@ -738,7 +738,7 @@ def test_direct_motion_compilation_failure_has_no_unmatched_end(
     recorder = ExecutionRecorder(plan=node.plan)
     node.plan.node_callbacks.append(recorder)
 
-    with simulated_robot, pytest.raises(type(failure)) as caught:
+    with kinematically_simulated_robot, pytest.raises(type(failure)) as caught:
         node.perform()
 
     assert caught.value is failure
@@ -820,7 +820,7 @@ def test_parallel_plan_reports_failed_native_verdict(
     monkeypatch.setattr(node, "parse", Mock(return_value=executable))
     root = parallel([node])
 
-    with simulated_robot, pytest.raises(PlanFailure):
+    with kinematically_simulated_robot, pytest.raises(PlanFailure):
         root.notify()
 
     assert node.status is LifeCycleValues.FAILED

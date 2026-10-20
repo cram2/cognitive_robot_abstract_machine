@@ -17,7 +17,7 @@ class ReachFraction(float, Enum):
     How far the robot stands off what it reaches for, as a fraction of the arm's length.
     """
 
-    GRASPING = 0.5
+    GRASPING = 0.6
     """
     Reaching something that stays where it is.
     """
@@ -101,13 +101,57 @@ class FindBodyInRegionMethod(Enum):
 
 class ExecutionType(Enum):
     """
-    Enum for Execution Process Module types.
+    What carries out the motions of a plan, which decides both how a motion is performed
+    and how a query about the world may be answered.
     """
 
     REAL = auto()
-    SIMULATED = auto()
+    """
+    Performed by the robot itself, by handing the motion state chart to giskard.
+    """
+
+    KINEMATICALLY_SIMULATED = auto()
+    """
+    Performed against a world the robot is moved through kinematically, where reaching
+    a goal may be answered by writing the pose it was reached at into the world.
+
+    Nothing pushes back: a joint arrives wherever it was commanded and an object is held
+    by being attached to the gripper.
+    """
+
+    PHYSICALLY_SIMULATED = auto()
+    """
+    Performed against a physically simulated world, where the robot's joints are driven
+    to a goal by its servos and an object is held by friction alone.
+
+    Apart from :attr:`KINEMATICALLY_SIMULATED`, since a motion that may be answered by
+    writing the robot's own pose into the world cannot be answered that way here: see
+    :class:`~coraplex.robot_plans.motions.navigation.MoveMotion`.
+    """
+
     SEMI_REAL = auto()
+    """
+    Perceived from the real world while the motions are only simulated.
+
+    .. warning:: No execution path answers this type:
+        :meth:`~coraplex.plans.executables.GiskardExecutable.execute` raises
+        :class:`~coraplex.exceptions.UnknownExecutionType` for a plan that holds any
+        motion.
+    """
+
     NO_EXECUTION = auto()
+    """
+    Not performed at all: the motion state chart is built but never run, which leaves a
+    plan to be inspected rather than carried out.
+    """
+
+    @property
+    def objects_push_back(self) -> bool:
+        """
+        Whether a body the robot touches resists it, so that contact rather than the
+        world model decides what is held.
+        """
+        return self in (ExecutionType.REAL, ExecutionType.PHYSICALLY_SIMULATED)
 
 
 class VisualizationBackend(StrEnum):
@@ -188,21 +232,6 @@ class JointType(Enum):
     UNKNOWN = 5
     CONTINUOUS = 6
     FLOATING = 7
-
-
-class AxisIdentifier(Enum):
-    """
-    Enum for translating the axis name to a vector along that axis.
-    """
-
-    X = (1, 0, 0)
-    Y = (0, 1, 0)
-    Z = (0, 0, 1)
-    Undefined = (0, 0, 0)
-
-    @classmethod
-    def from_tuple(cls, axis_tuple):
-        return next((axis for axis in cls if axis.value == axis_tuple), None)
 
 
 class GripperType(Enum):

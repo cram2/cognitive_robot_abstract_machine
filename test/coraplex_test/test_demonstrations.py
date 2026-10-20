@@ -193,13 +193,15 @@ def test_plan_runs_in_the_demonstrations_execution_environment(cylinder_bot_worl
     demonstration = RecordingDemonstration(
         world=cylinder_bot_world,
         used_robot=MinimalRobot,
-        execution_type=ExecutionType.SIMULATED,
+        execution_type=ExecutionType.KINEMATICALLY_SIMULATED,
         collision_avoidance=True,
     )
 
     demonstration.run()
 
-    assert demonstration.observed_execution_type is ExecutionType.SIMULATED
+    assert (
+        demonstration.observed_execution_type is ExecutionType.KINEMATICALLY_SIMULATED
+    )
     assert demonstration.observed_collision_avoidance is True
     assert GiskardExecutable.execution_type is previous_execution_type
     assert GiskardExecutable.collision_avoidance is False

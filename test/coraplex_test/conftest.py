@@ -10,9 +10,10 @@ regenerate_orm_interfaces()
 
 from functools import partial
 
+import numpy as np
 import pytest
 
-from semantic_digital_twin.predetermined_maps.building_floor import BuildingFloor
+from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
@@ -23,11 +24,7 @@ except ModuleNotFoundError:
 from sqlalchemy.orm import sessionmaker
 
 from krrood.ormatic.utils import create_engine, drop_database
-
-try:
-    from coraplex.datastructures.dataclasses import Context
-except ModuleNotFoundError:
-    pass
+from coraplex.datastructures.dataclasses import Context
 
 try:
     from coraplex.orm.ormatic_interface import Base
@@ -64,6 +61,24 @@ def right_or_only_arm(robot: AbstractRobot) -> Arm:
     :return: The right arm of a robot that names one, otherwise its first arm.
     """
     return robot.get_right_arm_if_specified() or robot.all_arms[0]
+
+
+# %% where a gripper grasps, which is what a goal is aimed at
+
+
+def grasp_point_of(arm: Arm) -> np.ndarray:
+    """
+    :param arm: The arm whose gripper to read.
+    :return: Where its fingers meet, in world coordinates. A goal puts this point on
+        its target, not the tool frame, so this is what a reached goal is read at.
+    """
+    end_effector = arm.end_effector
+    world = end_effector._world
+    return (
+        world.transform(end_effector.tool_P_grasp_when_closed, world.root)
+        .to_np()
+        .flatten()[:3]
+    )
 
 
 @pytest.fixture(scope="session")

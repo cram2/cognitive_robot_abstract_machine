@@ -27,7 +27,7 @@ mappings, so they hold for every plan built with that context.
 
 ```python
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2
 
@@ -255,7 +255,7 @@ show(navigate)
 The parking is part of the plan like any other action, so it is performed with it:
 
 ```python
-with simulated_robot:
+with kinematically_simulated_robot:
     navigate.perform()
 
 print(navigate.status)

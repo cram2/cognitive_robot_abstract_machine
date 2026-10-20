@@ -15,6 +15,7 @@ from giskardpy.motion_statechart.graph_node import (
     EndMotion,
 )
 from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
 )
@@ -30,14 +31,16 @@ from giskardpy.motion_statechart.tasks.feature_functions import (
     HeightGoal,
 )
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
+from semantic_digital_twin.specifications.connections import (
+    RevoluteConnectionSpecification,
+    ScrewConnectionSpecification,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Door,
-    Hinge,
     Bottle,
     BottleCap,
-    ScrewMechanism,
 )
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.spatial_types import (
@@ -45,7 +48,6 @@ from semantic_digital_twin.spatial_types import (
     Vector3,
     Point3,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -531,6 +533,53 @@ def test_pointing(pr2_world_state_reset: World):
     kin_sim.tick_until_end()
 
 
+def test_pointing_lowers_the_torso_when_the_head_cannot_tilt_far_enough(
+    pr2_world_state_reset: World,
+):
+    """
+    A point on the floor close in front of a PR2 whose torso is fully raised lies
+    further below the head than its tilt joint reaches, and lowering the torso brings
+    it within reach. The torso only moves the head, never turns it, so pointing has to
+    count where the head is, not just which way it faces, for the torso to help.
+    """
+    world = pr2_world_state_reset
+    base = world.get_kinematic_structure_entity_by_name("base_link")
+    head = world.get_kinematic_structure_entity_by_name("head_tilt_link")
+    torso = world.get_connection_by_name("torso_lift_joint")
+    head_tilt = world.get_connection_by_name("head_tilt_joint")
+    torso.position = torso.dof.limits.upper.position
+    world.notify_state_change()
+
+    # Steeper below the raised head than the tilt joint reaches, but not once the torso
+    # is lowered.
+    world_P_head = head.global_pose.to_np()[:3, 3]
+    steepest_tilt_at_full_height = head_tilt.dof.limits.upper.position + 0.03
+    distance = world_P_head[2] / np.tan(steepest_tilt_at_full_height)
+    goal_point = Point3(
+        world_P_head[0] + distance, world_P_head[1], 0.0, reference_frame=world.root
+    )
+
+    msc = MotionStatechart()
+    pointing = Pointing(
+        root_link=base,
+        tip_link=head,
+        goal_point=goal_point,
+        pointing_axis=Vector3.X(reference_frame=head),
+    )
+    msc.add_node(pointing)
+    msc.add_node(still_progressing := StillProgressing(monitored_node=pointing))
+    msc.add_node(still_progressing.cancel_motion())
+    end = EndMotion()
+    end.start_condition = pointing.observation_variable
+    msc.add_node(end)
+
+    kin_sim = Executor(MotionStatechartContext(world=world))
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+
+    assert torso.position < torso.dof.limits.upper.position - 0.05
+
+
 def test_pointing_cone(pr2_world_state_reset: World):
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
@@ -777,12 +826,24 @@ class TestOpenClose:
 
     def test_open(self, pr2_world_copy, tmp_path):
 
+        world_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
+        )
+        world_T_hinge = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=1.5, y=-0.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
+        )
+        limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=-np.pi / 2, upper_position=np.pi / 2, maximum_speed=1
+        )
         with pr2_world_copy.modify_world():
             door = Door.create_with_new_body_in_world(
                 name="door",
                 world=pr2_world_copy,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
+                world_root_T_self=world_T_door,
+                parent_connection_specification=RevoluteConnectionSpecification(
+                    dof_limits=limits,
+                    axis=Vector3.Z(),
+                    connection_T_child=world_T_hinge.inverse() @ world_T_door,
                 ),
             )
 
@@ -798,35 +859,9 @@ class TestOpenClose:
                 ),
             )
 
-            lower_limits = DerivativeMap()
-            lower_limits.position = -np.pi / 2
-            lower_limits.velocity = -1
-            upper_limits = DerivativeMap()
-            upper_limits.position = np.pi / 2
-            upper_limits.velocity = 1
-
-            hinge = Hinge.create_with_new_body_in_world(
-                name="hinge",
-                world=pr2_world_copy,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1.5,
-                    y=-0.5,
-                    z=1,
-                    yaw=np.pi,
-                    reference_frame=pr2_world_copy.root,
-                ),
-                parent_connection_specification=Hinge.parent_connection_specification(
-                    dof_limits=DegreeOfFreedomLimits(
-                        lower=lower_limits, upper=upper_limits
-                    ),
-                    axis=Vector3.Z(),
-                ),
-            )
-
             door.add(handle)
-            door.add(hinge)
 
-        root_C_hinge = door.mechanical_joint.root.parent_connection
+        root_C_hinge = door.movable_joint
 
         r_tip = pr2_world_copy.get_body_by_name("r_gripper_tool_frame")
         handle = pr2_world_copy.get_semantic_annotations_by_type(Handle)[0].root
@@ -894,6 +929,9 @@ class TestOpenClose:
     def test_unscrew_and_tighten_bottle_cap(self, pr2_world_copy):
         screw_pitch = 0.03
         unscrew_goal = 2 * np.pi
+        limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=0, upper_position=unscrew_goal, maximum_speed=1
+        )
         with pr2_world_copy.modify_world():
             # The bottle lies on its side, its thread axis pointing towards the robot.
             Bottle.create_with_new_body_in_world(
@@ -912,35 +950,16 @@ class TestOpenClose:
                     x=0.65, y=-0.2, z=0.9, reference_frame=pr2_world_copy.root
                 ),
                 scale=Scale(0.02, 0.04, 0.04),
-            )
-
-            lower_limits = DerivativeMap()
-            lower_limits.position = 0
-            lower_limits.velocity = -1
-            upper_limits = DerivativeMap()
-            upper_limits.position = unscrew_goal
-            upper_limits.velocity = 1
-
-            # The thread axis points from the bottle out through the cap, here
-            # towards the robot, so unscrewing moves the cap away from the bottle.
-            screw_joint = ScrewMechanism.create_with_new_body_in_world(
-                name="screw_joint",
-                world=pr2_world_copy,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=0.65, y=-0.2, z=0.9, reference_frame=pr2_world_copy.root
-                ),
-                parent_connection_specification=ScrewMechanism.parent_connection_specification(
+                # The thread axis points from the bottle out through the cap, here
+                # towards the robot, so unscrewing moves the cap away from the bottle.
+                parent_connection_specification=ScrewConnectionSpecification(
                     axis=Vector3(-1, 0, 0),
-                    dof_limits=DegreeOfFreedomLimits(
-                        lower=lower_limits, upper=upper_limits
-                    ),
+                    dof_limits=limits,
                     screw_pitch=screw_pitch,
                 ),
             )
 
-            bottle_cap.add(screw_joint)
-
-        root_C_screw = bottle_cap.mechanical_joint.root.parent_connection
+        root_C_screw = bottle_cap.movable_joint
         cap_body = bottle_cap.root
         r_tip = pr2_world_copy.get_body_by_name("r_gripper_tool_frame")
 

@@ -8,6 +8,7 @@ segmind's package -- and without the ROS overlay it needs.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from segmind.datastructures.events import DetectionEvent, EventWithTrackedObjects
@@ -105,29 +106,34 @@ class DetectedEvents:
     The event logger the demo's detectors write their events to.
     """
 
-    def knowledge(self) -> QueryableKnowledge:
+    def knowledge(self) -> list[QueryableKnowledge]:
         """
-        What a question about the detections may range over.
+        The query scopes supplied by the current detections.
 
-        Read fresh on every call, so an answer names every moment detected up to now.
-        """
-        return QueryableKnowledge(
-            scope=QueryScope.DETECTED_EVENTS,
-            domains=[
-                QueryDomain(
-                    EVENT_VARIABLE,
-                    DetectedEventRecord,
-                    self.records(),
-                )
-            ],
-        )
+        The event domain reads the logger again whenever it is queried.
 
-    def records(self) -> List[DetectedEventRecord]:
+        :return: The detected-events scope retaining the live record domain.
         """
-        Everything detected so far, oldest first.
+        return [
+            QueryableKnowledge(
+                scope=QueryScope.DETECTED_EVENTS,
+                domains=[
+                    QueryDomain(
+                        EVENT_VARIABLE,
+                        DetectedEventRecord,
+                        self,
+                    )
+                ],
+            )
+        ]
+
+    def __iter__(self) -> Iterator[DetectedEventRecord]:
         """
-        with self.logger.timeline_lock:
-            return records_of(list(self.logger.timeline))
+        Iterate over the logger's current events as an ordered record snapshot.
+
+        :return: Records captured while holding the logger's timeline lock.
+        """
+        return iter(records_of(self.logger.get_events()))
 
     def presets(self) -> List[Preset]:
         """
