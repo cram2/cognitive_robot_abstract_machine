@@ -14,6 +14,9 @@ from typing_extensions import TYPE_CHECKING, Any, Callable
 from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
+    import random_events.variable
+    from probabilistic_model.causal_structure.identification import Identification
+
     from krrood.entity_query_language.backends import QueryBackend
     from krrood.entity_query_language.query.query import (
         Query,
@@ -1447,3 +1450,64 @@ class NoReturnStatementInProperty(ModelingError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class EffectNotIdentified(DataclassException):
+    """
+    Raised when the causal structure learned for a query's class does not identify the
+    effect of a cause on the query's effect by adjusting for the variables the query
+    names.
+    """
+
+    cause: random_events.variable.Variable
+    """
+    The cause variable.
+    """
+
+    effect: random_events.variable.Variable
+    """
+    The effect variable.
+    """
+
+    identification: Identification
+    """
+    What the learned structure says about the effect: a
+    :class:`~probabilistic_model.causal_structure.identification.PartiallyIdentifiedEffect`
+    or an
+    :class:`~probabilistic_model.causal_structure.identification.UnidentifiedEffect`.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The learned causal structure does not identify the effect of "
+            f"'{self.cause.name}' on '{self.effect.name}': {self.identification}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Name more of the variables in the query, add domain causal knowledge that "
+            "orients the undirected edges, or mark the confounders yourself."
+        )
+
+
+@dataclass
+class VariableNotInCausalGraph(DataclassException):
+    """
+    Raised when a causal query's cause or effect has no node in the causal structure
+    learned for its class.
+    """
+
+    variable: random_events.variable.Variable
+    """
+    The variable.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The learned causal structure has no node for the variable "
+            f"'{self.variable.name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Learn the structure over the variables the query's model is fitted on."

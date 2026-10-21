@@ -222,6 +222,53 @@ overlap) has nothing for an adjustment set to correct, the same as an empty one.
 
 ---
 
+### Letting a learned graph choose the adjustment set
+
+Marking `confounder` asserts that adjusting for that variable identifies the effect, and
+nothing checks the assertion. A causal structure learned from the training data can
+choose the set instead, or check the declared one. Learn it once per fitted relational
+circuit and hand it to the backend by class:
+
+```python
+from krrood.class_diagrams.class_diagram import ClassDiagram
+from probabilistic_model.causal_structure.domain_causal_knowledge import (
+    DomainCausalKnowledge,
+)
+from probabilistic_model.causal_structure.learning import (
+    RelationalCausalStructureLearner,
+)
+
+class_diagram = ClassDiagram([SceneRoom, SceneObject, KRROODPosition])
+structure = RelationalCausalStructureLearner(class_diagram).learn(
+    circuit,  # a RelationalProbabilisticCircuit fitted on the rooms
+    rooms,
+    DomainCausalKnowledge(tiers=[["SceneRoom.position.x"], ["SceneRoom.position.y"]]),
+)
+backend = ProbabilisticBackend(
+    model_registry=RelationalCircuitRegistry(circuit),
+    causal_structures={SceneRoom: structure},
+)
+
+# No confounder marked: the learned graph chooses what to adjust for.
+query = a(SceneRoom)(position=a(KRROODPosition)(x=cause, y=..., z=...), objects=...)
+query.causes_effect(query.position.y == 1.0)
+backend.rank_causes(query)
+```
+
+The learned edges are kept in the class diagram, as causal relations of `SceneRoom`
+next to its associations; the structure reads them from there whenever a query asks.
+
+What the backend does with the learned structure:
+
+| The query marks | For a class without a structure | For a class with one |
+|---|---|---|
+| `cause`, `confounder`, `causes_effect` | backdoor adjustment with the marked set, unchecked | the marked set is checked; a set that fails the adjustment criterion raises {py:class}`~probabilistic_model.causal_structure.exceptions.InvalidAdjustmentSet` |
+| `cause`, `causes_effect` | an empty adjustment set, which is plain conditioning | the set is chosen from the graph, among the variables the query names and the aggregation statistics; {py:class}`~krrood.entity_query_language.exceptions.EffectNotIdentified` if the graph identifies the effect by no such set |
+
+Each cause candidate gets its own set. A part attribute is one node for every part of
+its collection (`Class.collection.attribute`); a query on one part uses that part's
+copy.
+
 ## Declaring a causal query
 
 `cause` and `causes_effect()` are always used together: `cause` marks the field to

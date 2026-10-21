@@ -365,6 +365,12 @@ warns when that product is large, as a diagnostic against discovering the cost o
 time -- not a guarantee, since it is read off however the adjustment variables actually got
 grounded.
 
+## Learning the causal structure
+
+Backdoor adjustment is only correct for an adjustment set that meets the adjustment
+criterion in the true causal graph. {ref}`chapter:causal-structure` covers learning that
+graph from the training rows and choosing the set from it.
+
 ## Literature position
 
 | Work | Relational | Causal | Substrate | Tractability mechanism |
