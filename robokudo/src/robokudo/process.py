@@ -42,16 +42,6 @@ if TYPE_CHECKING:
     from py_trees_ros.trees import BehaviourTree
     from rclpy.node import Node
 
-DEFAULT_WORLD_FETCH_TIMEOUT = timedelta(seconds=10)
-"""
-How long to wait for another process to serve the shared world.
-"""
-
-DEFAULT_TICK_RATE = 5.0
-"""
-How often the behaviour tree is ticked per second.
-"""
-
 # %% perception process
 
 
@@ -115,7 +105,7 @@ class RoboKudo:
         cls,
         node: Node,
         analysis_engine: AnalysisEngineInterface,
-        fetch_timeout: timedelta = DEFAULT_WORLD_FETCH_TIMEOUT,
+        fetch_timeout: timedelta = timedelta(seconds=10),
     ) -> Self:
         """
         Create a RoboKudo that perceives into the world other processes share.
@@ -133,9 +123,9 @@ class RoboKudo:
         world = fetch_world_from_service(
             node, timeout_seconds=fetch_timeout.total_seconds()
         )
-        robokudo = cls(node=node, analysis_engine=analysis_engine, world=world)
-        robokudo.synchronizer = WorldSynchronizer(node=node, _world=world)
-        return robokudo
+        perception = cls(node=node, analysis_engine=analysis_engine, world=world)
+        perception.synchronizer = WorldSynchronizer(node=node, _world=world)
+        return perception
 
     @classmethod
     def from_blackboard(cls) -> RoboKudo:
@@ -200,7 +190,7 @@ class RoboKudo:
         )
         setup_with_descendants_rk(self.tree)
 
-    def run(self, tick_rate: float = DEFAULT_TICK_RATE) -> None:
+    def run(self, tick_rate: float = 5.0) -> None:
         """
         Tick the behaviour tree until its first top-level child fails or the ROS context
         of :attr:`node` shuts down, as it does on SIGINT and SIGTERM.

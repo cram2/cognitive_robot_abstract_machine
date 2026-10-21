@@ -24,7 +24,7 @@ from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from semantic_digital_twin.world import World
-from typing_extensions import TYPE_CHECKING, Any, List, Optional
+from typing_extensions import Any, List, Optional
 
 import robokudo.annotators.core
 import robokudo.annotators.outputs
@@ -47,11 +47,10 @@ class Pipeline(Sequence):
         self,
         name: str = "Sequence",
         children: Optional[List[Behaviour]] = None,
-        *args: Any,
+        *,
         world: Optional[World] = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(name, memory=True, children=children)
         """
         Initialize the pipeline.
 
@@ -60,6 +59,7 @@ class Pipeline(Sequence):
         :param world: The world the annotators perceive into; an empty world of its own
             when None
         """
+        super().__init__(name, memory=True, children=children)
         self._world: World = world if world is not None else World()
         """
         The world of this pipeline, used unless it is nested in another pipeline.
@@ -69,7 +69,7 @@ class Pipeline(Sequence):
         The camera placement of this pipeline, used unless it is nested in another
         pipeline; None to place into :attr:`world`, adding the frames it needs.
         """
-        self.cas: cas.CAS = None
+        self.cas: cas.CAS | None = None
         """
         The Common Analysis Structure for this pipeline.
         """
@@ -77,7 +77,7 @@ class Pipeline(Sequence):
         """
         Monotonic CAS counter that is local to this pipeline instance.
         """
-        self.cas_start_timer: timeit.default_timer = None
+        self.cas_start_timer: float | None = None
         """
         Timer for measuring pipeline execution time.
         """
