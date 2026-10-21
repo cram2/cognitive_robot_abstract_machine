@@ -75,13 +75,13 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         :param cas: CAS that receives rendered camera data and frame metadata.
         :param world: The world perception perceives into.
         """
-        world = self._load_scene_world()
-        world_frame_body = self._ensure_world_frame(world)
-        camera_body = self._ensure_camera_body(world, world_frame_body)
+        scene_world = self._load_scene_world()
+        world_frame_body = self._ensure_world_frame(scene_world)
+        camera_body = self._ensure_camera_body(scene_world, world_frame_body)
         (
             render_camera_to_world,
             optical_camera_to_world,
-        ) = self._set_camera_pose(world, world_frame_body, camera_body)
+        ) = self._set_camera_pose(scene_world, world_frame_body, camera_body)
 
         image_size = int(self.camera_config.resolution)
         resolution = CameraResolution(width=image_size, height=image_size)
@@ -92,7 +92,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         min_distance = float(self.camera_config.min_distance)
         max_distance = float(self.camera_config.max_distance)
 
-        ray_tracer = world.ray_tracer
+        ray_tracer = scene_world.ray_tracer
         segmentation, depth_m = self._render_segmentation_and_depth(
             ray_tracer=ray_tracer,
             camera_to_world=render_camera_to_world,
@@ -103,7 +103,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         )
 
         color_bgr, object_color_map = self._render_color_image(
-            world=world,
+            world=scene_world,
             ray_tracer=ray_tracer,
             camera_to_world=render_camera_to_world,
             segmentation=segmentation,
@@ -130,7 +130,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         cas.set(CASViews.OBJECT_IMAGE, segmentation)
         cas.set(CASViews.OBJECT_COLOR_MAP, object_color_map)
         # Shared SemDT ground-truth world for this frame. Consumers must treat as read-only.
-        cas.set_ref(CASViews.GROUND_TRUTH_WORLD_REFERENCE, world)
+        cas.set_ref(CASViews.GROUND_TRUTH_WORLD_REFERENCE, scene_world)
 
         cas.camera_to_world_transform = optical_camera_to_world
         cas.data_timestamp = timestamp_ns

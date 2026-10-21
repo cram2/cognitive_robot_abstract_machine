@@ -560,9 +560,10 @@ class KrroodCodec(ViewCodec):
 
     def decode(self, payload: ViewPayload, **kwargs: Any) -> Any:
         """
-        Decode a value using KRROOD JSON deserialization.
+        Decode a value using KRROOD JSON deserialization, resolving the world entities
+        it refers to with ``kwargs``.
         """
-        return krrood_from_json(payload.payload)
+        return krrood_from_json(payload.payload, **kwargs)
 
 
 @dataclass
