@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import timedelta
 from threading import Thread
 
 import numpy as np
@@ -34,17 +33,13 @@ from robokudo.types.scene import ObjectHypothesis
 
 from ._object_hypotheses import make_object_hypothesis
 from ._perception_world import (
+    FrameName,
     SharedWorld,
     camera_pose,
     cas_seen_from,
     place_camera_of,
     wait_until,
 )
-
-RUN_TIMEOUT = timedelta(seconds=5)
-"""
-How long ticking a failing engine may take to stop.
-"""
 
 
 @dataclass
@@ -354,7 +349,7 @@ class TestRobotCamera:
         first_robot_root = Body(name=PrefixedName("first_robot"))
         second_robot_root = Body(name=PrefixedName("second_robot"))
         with world.modify_world():
-            world.add_body(Body(name=PrefixedName("map")))
+            world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
             for robot_root in (first_robot_root, second_robot_root):
                 world.add_connection(
                     Connection6DoF.create_with_dofs(
@@ -382,7 +377,7 @@ class TestTicking:
         running = Thread(target=robokudo.run, daemon=True)
 
         running.start()
-        running.join(timeout=RUN_TIMEOUT.total_seconds())
+        wait_until(lambda: not running.is_alive())
 
         assert not running.is_alive()
         assert failing_tree.children[0].status is Status.FAILURE
@@ -401,7 +396,7 @@ class TestTicking:
         running.start()
 
         rclpy.shutdown(context=context)
-        running.join(timeout=RUN_TIMEOUT.total_seconds())
+        wait_until(lambda: not running.is_alive())
 
         assert not running.is_alive()
         robokudo.close()

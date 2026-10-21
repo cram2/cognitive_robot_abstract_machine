@@ -14,7 +14,7 @@ from robokudo.exceptions import UnknownWorldFrameError
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.pipeline import Pipeline
 
-from ._perception_world import CAMERA_FRAME, WORLD_FRAME, camera_pose
+from ._perception_world import FrameName, camera_pose
 
 
 class MeasuresItsCameraPose(CameraInterface):
@@ -59,8 +59,8 @@ def pipeline_reading(camera_interface: CameraInterface) -> Pipeline:
 class TestCameraPoseOfAFrame:
     def test_camera_is_placed_where_its_interface_measured_it(self) -> None:
         measured_pose = MeasuredCameraPose(
-            world_frame=WORLD_FRAME,
-            camera_frame=CAMERA_FRAME,
+            world_frame=FrameName.WORLD,
+            camera_frame=FrameName.CAMERA,
             world_T_camera=camera_pose(x=1.0),
         )
         pipeline = pipeline_reading(MeasuresItsCameraPose(measured_pose))
@@ -70,7 +70,7 @@ class TestCameraPoseOfAFrame:
 
         camera_to_world_transform = pipeline.cas.camera_to_world_transform
         assert camera_to_world_transform.child_frame is pipeline.world.get_body_by_name(
-            CAMERA_FRAME
+            FrameName.CAMERA
         )
         assert np.allclose(
             camera_to_world_transform.to_np(), measured_pose.world_T_camera.to_np()
@@ -85,8 +85,8 @@ class TestCameraPoseOfAFrame:
         pipeline = pipeline_reading(
             MeasuresItsCameraPose(
                 MeasuredCameraPose(
-                    world_frame=WORLD_FRAME,
-                    camera_frame=CAMERA_FRAME,
+                    world_frame=FrameName.WORLD,
+                    camera_frame=FrameName.CAMERA,
                     world_T_camera=camera_pose(),
                 )
             )

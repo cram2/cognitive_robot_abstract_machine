@@ -25,7 +25,7 @@ from robokudo.descriptors.camera_configs.config_mongodb_playback import (
 )
 from robokudo.identifier import BBIdentifier
 
-from ._perception_world import WORLD_FRAME, SharedWorld
+from ._perception_world import FrameName, SharedWorld
 
 # %% Mongo storage preservation
 
@@ -167,7 +167,7 @@ def shared_world(spinning_node: Node) -> Iterator[SharedWorld]:
     """
     world = World()
     with world.modify_world():
-        world.add_body(Body(name=PrefixedName(WORLD_FRAME)))
+        world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
     served_world = SharedWorld(
         world=world,
         server=FetchWorldServer(node=spinning_node, world=world),

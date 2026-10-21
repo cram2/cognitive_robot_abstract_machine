@@ -22,7 +22,7 @@ from robokudo.types.annotation import BoundingBox3DAnnotation, StampedPoseAnnota
 from robokudo.types.scene import ObjectHypothesis
 
 from ._object_hypotheses import make_object_hypothesis
-from ._perception_world import WORLD_FRAME, camera_pose, cas_seen_from
+from ._perception_world import FrameName, camera_pose, cas_seen_from
 
 
 @pytest.fixture
@@ -77,7 +77,7 @@ def add_perceivable_object(
         connection with six degrees of freedom.
     :return: The body of the object.
     """
-    world_body = world.get_body_by_name(PrefixedName(name=WORLD_FRAME))
+    world_body = world.get_body_by_name(PrefixedName(name=FrameName.WORLD))
     world_T_object = HomogeneousTransformationMatrix.from_xyz_rpy(
         *position, yaw=yaw, reference_frame=world_body
     )
@@ -197,7 +197,7 @@ class TestNewObjects:
     def test_object_seen_against_a_prefixed_world_frame_becomes_a_body_below_it(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
-        world_body = Body(name=PrefixedName(WORLD_FRAME, prefix="robot"))
+        world_body = Body(name=PrefixedName(FrameName.WORLD, prefix="robot"))
         with world.modify_world():
             world.add_body(world_body)
         cas = cas_seen_from(world, camera_pose())
@@ -499,7 +499,7 @@ class TestWorldPoses:
             cas_holding(cas_seen_from(world, camera_pose()), hypothesis)
         )
 
-        assert [pose.frame for pose in world_poses_of(hypothesis)] == [WORLD_FRAME]
+        assert [pose.frame for pose in world_poses_of(hypothesis)] == [FrameName.WORLD]
 
     def test_object_without_a_camera_pose_gets_no_world_pose(
         self, perceived_objects: PerceivedObjects

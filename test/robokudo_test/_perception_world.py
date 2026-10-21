@@ -8,6 +8,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import StrEnum
 
 from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
@@ -17,36 +18,47 @@ from semantic_digital_twin.world import World
 from robokudo.cas import CAS
 from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
 
-WORLD_FRAME = "map"
-"""
-Frame the camera pose is given in.
-"""
-
-CAMERA_FRAME = "camera"
-"""
-Frame of the camera.
-"""
-
-SYNCHRONIZATION_TIMEOUT = timedelta(seconds=5)
-"""
-How long a change may take to travel between synchronized worlds.
-"""
-
-# %% waiting for synchronization
+# %% frames
 
 
-def wait_until(condition: Callable[[], bool]) -> bool:
+class FrameName(StrEnum):
     """
-    Wait for ``condition`` to hold, at most :data:`SYNCHRONIZATION_TIMEOUT`.
+    The names of the frames tests place cameras against.
+    """
+
+    WORLD = "map"
+    """
+    The frame the camera pose is given in.
+    """
+
+    CAMERA = "camera"
+    """
+    The frame of the camera.
+    """
+
+
+# %% waiting
+
+
+def wait_until(
+    condition: Callable[[], bool],
+    timeout: timedelta = timedelta(seconds=5),
+    poll_interval: timedelta = timedelta(milliseconds=50),
+) -> bool:
+    """
+    Wait for ``condition`` to hold, at most ``timeout``.
 
     :param condition: The condition to wait for.
+    :param timeout: How long to wait, long enough for a change to travel between
+        synchronized worlds or a thread to stop.
+    :param poll_interval: How long to sleep between two checks of ``condition``.
     :return: Whether the condition held in time.
     """
-    deadline = time.monotonic() + SYNCHRONIZATION_TIMEOUT.total_seconds()
+    deadline = time.monotonic() + timeout.total_seconds()
     while time.monotonic() < deadline:
         if condition():
             return True
-        time.sleep(0.05)
+        time.sleep(poll_interval.total_seconds())
     return condition()
 
 
@@ -92,8 +104,8 @@ def place_camera_of(
     CameraPlacement(world).place(
         cas,
         MeasuredCameraPose(
-            world_frame=WORLD_FRAME,
-            camera_frame=CAMERA_FRAME,
+            world_frame=FrameName.WORLD,
+            camera_frame=FrameName.CAMERA,
             world_T_camera=world_T_camera,
         ),
     )
