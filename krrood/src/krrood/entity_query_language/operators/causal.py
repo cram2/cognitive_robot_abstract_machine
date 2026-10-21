@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing_extensions import TYPE_CHECKING, Any, Iterable, Self
 
 import random_events.variable
+from random_events.product_algebra import Event
 from krrood.entity_query_language.core.base_expressions import (
     BinaryExpression,
     OperationResult,
@@ -28,6 +29,7 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 )
 
 if TYPE_CHECKING:
+    from probabilistic_model.causal_structure.identification import Identification
     from krrood.entity_query_language.core.mapped_variable import Attribute
     from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
         ProbabilisticCircuitRepresentation,
@@ -214,4 +216,81 @@ class ScoredIntervention:
     primary cause.
 
     Of the circuit type the causal circuit was read from.
+    """
+
+
+@dataclass
+class AdjustmentCandidates:
+    """
+    What a learned causal structure says one cause candidate adjusts for.
+    """
+
+    cause_variable: random_events.variable.Variable
+    """
+    The cause candidate.
+    """
+
+    identification: Identification
+    """
+    What the structure says about the effect of the cause.
+    """
+
+    candidate_variables: list[list[random_events.variable.Variable]]
+    """
+    The variables of each set the effect may be identified by adjusting for: the one
+    chosen set if the effect is identified, one per candidate if it is partially
+    identified, none if it is not identified.
+    """
+
+
+@dataclass
+class RegionRange:
+    """
+    The effect's probability under an intervention setting the cause to one region,
+    across every candidate adjustment set.
+    """
+
+    cause_region: Event
+    """
+    The region of the cause.
+    """
+
+    lowest_effect_probability: float
+    """
+    The lowest probability of the effect across the candidates.
+    """
+
+    highest_effect_probability: float
+    """
+    The highest probability of the effect across the candidates.
+    """
+
+
+@dataclass
+class InterventionalRange:
+    """
+    The range an effect's interventional probability lies in, per region of one cause,
+    when the learned causal structure identifies it only up to a few candidate
+    adjustment sets.
+    """
+
+    cause_variable: random_events.variable.Variable
+    """
+    The cause.
+    """
+
+    candidate_adjustments: list[list[random_events.variable.Variable]]
+    """
+    The candidate adjustment sets the range is taken across.
+    """
+
+    includes_no_effect: bool
+    """
+    Whether the range also takes in the effect's probability without any intervention,
+    since in some graph the structure stands for the cause does not cause it at all.
+    """
+
+    regions: list[RegionRange]
+    """
+    The range per region of the cause.
     """
