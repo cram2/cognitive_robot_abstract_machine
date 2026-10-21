@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from timeit import default_timer as timer
 
+import rclpy
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
@@ -201,7 +202,8 @@ class RoboKudo:
 
     def run(self, tick_rate: float = DEFAULT_TICK_RATE) -> None:
         """
-        Tick the behaviour tree until its first top-level child fails.
+        Tick the behaviour tree until its first top-level child fails or the ROS context
+        of :attr:`node` shuts down, as it does on SIGINT and SIGTERM.
 
         An exception raised while ticking is logged and ticking goes on.
 
@@ -214,7 +216,7 @@ class RoboKudo:
         interval = 1.0 / tick_rate
         tick_count = 0
         last_tick = time.monotonic()
-        while True:
+        while rclpy.ok(context=self.node.context):
             elapsed = time.monotonic() - last_tick
             if elapsed < interval:
                 time.sleep(interval - elapsed)

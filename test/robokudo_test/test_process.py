@@ -7,10 +7,12 @@ from threading import Thread
 
 import numpy as np
 import pytest
+import rclpy
 from py_trees.behaviour import Behaviour
-from py_trees.behaviours import Failure, Success
+from py_trees.behaviours import Failure, Running, Success
 from py_trees.common import Status
 from py_trees.composites import Sequence
+from rclpy.context import Context
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -385,6 +387,25 @@ class TestTicking:
         assert not running.is_alive()
         assert failing_tree.children[0].status is Status.FAILURE
         robokudo.close()
+
+    def test_stops_when_ros_shuts_down(self) -> None:
+        context = Context()
+        rclpy.init(context=context)
+        node = Node("shutting_down_robokudo", context=context)
+        robokudo = RoboKudo(
+            node=node,
+            analysis_engine=EngineWithoutPipeline(tree=Running(name="Perceive")),
+        )
+        robokudo.start(include_gui=False)
+        running = Thread(target=robokudo.run, daemon=True)
+        running.start()
+
+        rclpy.shutdown(context=context)
+        running.join(timeout=RUN_TIMEOUT.total_seconds())
+
+        assert not running.is_alive()
+        robokudo.close()
+        node.destroy_node()
 
 
 # %% objects of a finished pass
