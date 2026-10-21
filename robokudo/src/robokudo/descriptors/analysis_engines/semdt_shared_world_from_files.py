@@ -63,7 +63,6 @@ class AnalysisEngine(AnalysisEngineInterface):
             target_ros_package="robokudo_test_data",
             target_dir="data",
             kinect_height_fix_mode=True,
-            color2depth_ratio=(0.5, 0.5),
             static_camera_transform_enabled=True,
             static_world_T_camera=WORLD_T_CAMERA,
         )
