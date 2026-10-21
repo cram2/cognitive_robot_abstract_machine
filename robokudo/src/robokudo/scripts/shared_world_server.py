@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 import rclpy
-from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -27,16 +27,6 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Set
-
-WORLD_FRAME = "map"
-"""
-Name of the root frame of the served world.
-"""
-
-REPORT_PERIOD = 1.0
-"""
-How often, in seconds, the server reports bodies it has not reported yet.
-"""
 
 # %% served world
 
@@ -52,9 +42,14 @@ class SharedWorldServer:
     The node the world is served and synchronized through.
     """
 
+    world_frame: str = "map"
+    """
+    The name of the root frame of the served world.
+    """
+
     world: World = field(init=False)
     """
-    The served world, holding only :data:`WORLD_FRAME` until others change it.
+    The served world, holding only :attr:`world_frame` until others change it.
     """
 
     reported_body_ids: Set[UUID] = field(init=False, default_factory=set)
@@ -80,7 +75,7 @@ class SharedWorldServer:
     def __post_init__(self) -> None:
         self.world = World()
         with self.world.modify_world():
-            self.world.add_body(Body(name=PrefixedName(WORLD_FRAME)))
+            self.world.add_body(Body(name=PrefixedName(self.world_frame)))
         self.reported_body_ids = {body.id for body in self.world.bodies}
         self.server = FetchWorldServer(node=self.node, world=self.world)
         self.synchronizer = WorldSynchronizer(node=self.node, _world=self.world)
@@ -111,26 +106,31 @@ class SharedWorldServer:
 # %% entry point
 
 
-def main() -> None:
+def main(report_period: float = 1.0) -> None:
     """
-    Serve the world until interrupted.
+    Serve the world until ROS shuts down, as it does on SIGINT and SIGTERM.
+
+    :param report_period: How often, in seconds, to report the bodies not reported yet.
     """
     rclpy.init()
     node = rclpy.create_node("shared_world_server")
     served_world = SharedWorldServer(node=node)
-    node.create_timer(REPORT_PERIOD, served_world.report_new_bodies)
-    executor = SingleThreadedExecutor()
+    node.create_timer(report_period, served_world.report_new_bodies)
+    # One thread runs the callbacks one at a time; unlike the single-threaded
+    # executor, this one ends its spin quietly when ROS shuts down.
+    executor = MultiThreadedExecutor(num_threads=1)
     executor.add_node(node)
-    print(f"Serving a world with root '{WORLD_FRAME}'. Start RoboKudo now.")
+    print(
+        f"Serving a world with root '{served_world.world_frame}'. Start RoboKudo now."
+    )
     try:
         executor.spin()
-    except (KeyboardInterrupt, ExternalShutdownException):
-        pass
     finally:
         served_world.close()
         executor.shutdown()
         node.destroy_node()
         rclpy.try_shutdown()
+
 
 if __name__ == "__main__":
     main()
