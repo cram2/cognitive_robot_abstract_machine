@@ -24,6 +24,11 @@ from robokudo.io.storage import Storage
 from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",
@@ -37,13 +42,17 @@ def _camera_info_k_values(camera_info):
     return list(camera_info.K)
 
 
-def _build_writer_pipeline(db_name: str) -> Pipeline:
+def _build_writer_pipeline(
+    db_name: str, world_T_camera: HomogeneousTransformationMatrix
+) -> Pipeline:
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=False,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
         kinect_height_fix_mode=True,
         color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
+        static_camera_transform_enabled=True,
+        static_world_T_camera=world_T_camera,
     )
 
     writer_descriptor = StorageWriter.Descriptor()
@@ -86,7 +95,12 @@ class TestStorageRoundtripPipeline:
             f"{robokudo.defs.TEST_ROS_NODE_NAME}_reader_{uuid.uuid4().hex}"
         )
         try:
-            writer_pipeline = _build_writer_pipeline(db_name)
+            writer_pipeline = _build_writer_pipeline(
+                db_name,
+                HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.0, y=2.0, z=3.0, yaw=0.5
+                ),
+            )
             writer_status = robokudo.utils.tree_execution.run_tree_once(
                 writer_pipeline, writer_node
             )
@@ -112,6 +126,9 @@ class TestStorageRoundtripPipeline:
             assert len(restored_world.state.keys()) == len(
                 world_snapshot_payload["state"]["ids"]
             )
+            assert {body.id for body in restored_world.bodies} == {
+                body.id for body in writer_pipeline.world.bodies
+            }
 
             reader_pipeline = _build_reader_pipeline(db_name)
             reader_pipeline.world = restored_world
@@ -119,6 +136,14 @@ class TestStorageRoundtripPipeline:
                 reader_pipeline, reader_node
             )
             assert reader_status is py_trees.common.Status.SUCCESS
+
+            replayed_camera_pose = reader_pipeline.cas.camera_to_world_transform
+            np.testing.assert_allclose(
+                replayed_camera_pose.to_np(),
+                writer_pipeline.cas.camera_to_world_transform.to_np(),
+            )
+            assert replayed_camera_pose.reference_frame in restored_world.bodies
+            assert replayed_camera_pose.child_frame in restored_world.bodies
 
             np.testing.assert_array_equal(
                 writer_pipeline.cas.get(CASViews.COLOR_IMAGE),
