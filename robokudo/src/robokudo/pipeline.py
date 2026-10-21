@@ -29,6 +29,7 @@ from typing_extensions import TYPE_CHECKING, Any, List, Optional
 import robokudo.annotators.core
 import robokudo.annotators.outputs
 import robokudo.cas as cas
+from robokudo.camera_placement import CameraPlacement
 import robokudo.defs as defs
 import robokudo.utils.tree
 
@@ -62,6 +63,11 @@ class Pipeline(Sequence):
         self._world: World = world if world is not None else World()
         """
         The world of this pipeline, used unless it is nested in another pipeline.
+        """
+        self._camera_placement: CameraPlacement | None = None
+        """
+        The camera placement of this pipeline, used unless it is nested in another
+        pipeline; None to place into :attr:`world`, adding the frames it needs.
         """
         self.cas: cas.CAS = None
         """
@@ -131,6 +137,26 @@ class Pipeline(Sequence):
     @world.setter
     def world(self, world: World) -> None:
         self._world = world
+
+    @property
+    def camera_placement(self) -> CameraPlacement:
+        """
+        Puts the camera of each pass of this pipeline into :attr:`world`.
+
+        A pipeline nested in another one places with the camera placement of the outer
+        pipeline. One that was given none places into :attr:`world`, adding the frames
+        it needs.
+        """
+        outer_pipeline = robokudo.utils.tree.find_parent_of_type(self, Pipeline)
+        if outer_pipeline is not None:
+            return outer_pipeline.camera_placement
+        if self._camera_placement is None:
+            return CameraPlacement(world=self.world)
+        return self._camera_placement
+
+    @camera_placement.setter
+    def camera_placement(self, camera_placement: CameraPlacement) -> None:
+        self._camera_placement = camera_placement
 
     def get_cas(self) -> cas.CAS:
         """

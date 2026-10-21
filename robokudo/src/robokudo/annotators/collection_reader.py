@@ -133,6 +133,8 @@ class CollectionReaderAnnotator(BaseAnnotator):
 
         * Checks for new data from all readers
         * Creates new CAS when data available
+        * Places the camera where each reader measured it, with the camera placement
+          of the pipeline
         * Preserves existing queries
         * Updates feedback messages
         * Monitors data availability
@@ -185,9 +187,11 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 pipeline.cas.query = query
 
             for collection_reader in self.collection_readers:
-                collection_reader.parameters.camera_interface.set_data(
+                measured_pose = collection_reader.parameters.camera_interface.set_data(
                     self.get_cas(), self.world
                 )
+                if measured_pose is not None:
+                    pipeline.camera_placement.place(self.get_cas(), measured_pose)
 
             self.feedback_message = (
                 f"Got sensor data... Waited for {time_difference} seconds"

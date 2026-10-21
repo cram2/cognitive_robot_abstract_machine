@@ -10,7 +10,7 @@ from py_trees.common import Status
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.io.camera_interface import CameraInterface
+from robokudo.camera_placement import MeasuredCameraPose
 
 
 class StaticCameraTransformAnnotator(BaseAnnotator):
@@ -45,12 +45,13 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
         cas = self.get_cas()
         params = self.descriptor.parameters
 
-        CameraInterface.store_camera_to_world_transform_in_cas(
-            cas=cas,
-            world=self.world,
-            world_frame=params.world_frame,
-            camera_frame=params.camera_frame,
-            world_T_camera=params.world_T_camera,
+        self.get_parent_pipeline().camera_placement.place(
+            cas,
+            MeasuredCameraPose(
+                world_frame=params.world_frame,
+                camera_frame=params.camera_frame,
+                world_T_camera=params.world_T_camera,
+            ),
         )
 
         end_timer = default_timer()

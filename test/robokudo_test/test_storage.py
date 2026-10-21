@@ -9,7 +9,7 @@ import pymongo
 import numpy as np
 
 import robokudo.cas
-from robokudo.camera_placement import CameraPlacement
+from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
@@ -304,7 +304,12 @@ class TestStorage:
 
         sem_world = World()
         CameraPlacement(sem_world).place(
-            world_frame, camera_frame, HomogeneousTransformationMatrix()
+            CAS(),
+            MeasuredCameraPose(
+                world_frame=world_frame,
+                camera_frame=camera_frame,
+                world_T_camera=HomogeneousTransformationMatrix(),
+            ),
         )
         camera_body = sem_world.get_body_by_name(camera_frame)
         world_body = sem_world.get_body_by_name(world_frame)
@@ -366,7 +371,12 @@ class TestStorage:
 
         stored_world = World()
         CameraPlacement(stored_world).place(
-            stored_world_frame, stored_camera_frame, HomogeneousTransformationMatrix()
+            CAS(),
+            MeasuredCameraPose(
+                world_frame=stored_world_frame,
+                camera_frame=stored_camera_frame,
+                world_T_camera=HomogeneousTransformationMatrix(),
+            ),
         )
         stored_world_body = stored_world.get_body_by_name(stored_world_frame)
         stored_camera_body = stored_world.get_body_by_name(stored_camera_frame)
@@ -402,11 +412,13 @@ class TestStorage:
             running_world,
             excluded_view_names={CASViews.CAMERA_TO_WORLD_TRANSFORM},
         )
-        reader._restore_camera_to_world_transform(retrieved_cas_record, running_world)
+        recorded_pose = reader._recorded_camera_pose(
+            retrieved_cas_record, running_world
+        )
+        replayed_cas = CAS()
+        CameraPlacement(running_world).place(replayed_cas, recorded_pose)
 
-        restored_transform = retrieved_cas_record["views"][
-            CASViews.CAMERA_TO_WORLD_TRANSFORM
-        ]
+        restored_transform = replayed_cas.camera_to_world_transform
         assert isinstance(restored_transform, HomogeneousTransformationMatrix)
         np.testing.assert_allclose(restored_transform.to_np(), transform.to_np())
         assert restored_transform.reference_frame is running_world.get_body_by_name(
@@ -428,4 +440,4 @@ class TestStorage:
         }
 
         with pytest.raises(StoredCameraTransformFrameMetadataMissing):
-            reader._decode_stored_camera_to_world_transform(view_document, {})
+            reader._decode_recorded_camera_pose(view_document)

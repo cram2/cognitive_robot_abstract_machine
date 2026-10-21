@@ -284,6 +284,32 @@ class StoredCameraTransformFrameMetadataMissing(RoboKudoError):
 
 
 @dataclass
+class StoredViewMissing(RoboKudoError, LookupError):
+    """
+    Raised when a stored CAS refers to a view the storage does not hold.
+    """
+
+    view_name: str
+    """
+    The name of the view the CAS refers to.
+    """
+
+    view_id: Any
+    """
+    The id the CAS refers to the view by.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The stored CAS refers to the view '{self.view_name}' with id "
+            f"{self.view_id}, which the storage does not hold."
+        )
+
+    def suggest_correction(self) -> str:
+        return "replay a recording whose views were all stored."
+
+
+@dataclass
 class AnalysisPreconditionError(RoboKudoError, ABC):
     """
     Base class for unmet analysis preconditions.
@@ -460,6 +486,32 @@ class MultipleRobotsInWorldError(RoboKudoError, ValueError):
 
     def suggest_correction(self) -> str:
         return "run perception on a world that holds a single robot."
+
+
+@dataclass
+class UnknownWorldFrameError(RoboKudoError, LookupError):
+    """
+    Raised when a camera pose is measured against a frame the shared world does not
+    hold.
+    """
+
+    world_frame: str
+    """
+    The name of the frame the camera pose was measured against.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The camera pose was measured against the frame '{self.world_frame}', "
+            f"which the shared world does not hold. Perception does not add it, since "
+            f"adding a frame would change the world of every process sharing it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "measure the camera pose against a frame of the shared world, such as its "
+            "root, or make the camera frame a body of the shared world."
+        )
 
 
 @dataclass

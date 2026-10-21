@@ -21,6 +21,7 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.camera_placement import CameraPlacement, SharedWorldCameraPlacement
 from robokudo.exceptions import (
     MultipleRobotsInWorldError,
     RoboKudoAlreadyRunningError,
@@ -262,6 +263,37 @@ class TestJoiningSharedWorld:
             )
             == []
         )
+
+
+# %% camera placement
+
+
+class TestCameraPlacementOfRoboKudo:
+    def test_world_of_its_own_places_the_camera_adding_the_frames_it_needs(
+        self, node: Node
+    ) -> None:
+        robokudo = RoboKudo(node=node, analysis_engine=EngineFindingAnObject())
+
+        robokudo.start(include_gui=False)
+
+        camera_placement = robokudo.pipeline.camera_placement
+        assert type(camera_placement) is CameraPlacement
+        assert camera_placement.world is robokudo.world
+        robokudo.close()
+
+    def test_shared_world_places_the_camera_without_adding_world_frames(
+        self, spinning_node: Node, shared_world: SharedWorld
+    ) -> None:
+        robokudo = RoboKudo.joining_shared_world(
+            node=spinning_node, analysis_engine=EngineFindingAnObject()
+        )
+
+        robokudo.start(include_gui=False)
+
+        camera_placement = robokudo.pipeline.camera_placement
+        assert type(camera_placement) is SharedWorldCameraPlacement
+        assert camera_placement.world is robokudo.world
+        robokudo.close()
 
 
 # %% one RoboKudo per process

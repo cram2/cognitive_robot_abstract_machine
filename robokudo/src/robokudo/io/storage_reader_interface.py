@@ -25,10 +25,13 @@ from robokudo.descriptors.camera_configs.config_mongodb_playback import (
 import open3d as o3d
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.cas import CAS, CASViews
-from robokudo.exceptions import StoredCameraTransformFrameMetadataMissing
+from robokudo.exceptions import (
+    StoredCameraTransformFrameMetadataMissing,
+    StoredViewMissing,
+)
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.io.storage import Storage
-from robokudo.camera_placement import CameraPlacement
+from robokudo.camera_placement import MeasuredCameraPose
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
@@ -76,34 +79,25 @@ class StorageReaderInterface(CameraInterface):
 
         return self.reader.cursor_has_frames()
 
-    def set_data(self, cas: CAS, world: World) -> None:
+    def set_data(self, cas: CAS, world: World) -> MeasuredCameraPose | None:
         """
-        Update the Common Analysis Structure with data from storage.
-
-        This method:
-        * Retrieves the next frame from storage
-        * Restores views and annotations
-        * Updates camera intrinsics
-        * Sets depth availability flag
-
-        :param cas: Common Analysis Structure to update
-        :param world: The world perception perceives into, where the camera is placed
+        :meth:`CameraInterface.set_data` for the next stored frame, whose camera pose is
+        the one recorded with it.
         """
         cas_frame = self.reader.get_next_frame()
         if cas_frame is None:
             self.rk_logger.debug(f"Reader has no next frame cas_frame:={cas_frame}")
-            return
+            return None
 
-        # Restore the views from the individual documents. The camera transform is
-        # rebound explicitly below because its stored frame references belong to
-        # the recorded world, not the currently running world.
+        # The camera transform is left out, since its stored frame references belong
+        # to the recorded world, not the running one.
         cas_frame["views"] = {}
         self.storage.load_views_from_mongo_in_cas(
             cas_frame,
             world,
             excluded_view_names={CASViews.CAMERA_TO_WORLD_TRANSFORM},
         )
-        self._restore_camera_to_world_transform(cas_frame, world)
+        recorded_pose = self._recorded_camera_pose(cas_frame, world)
 
         # Bring flat CAS representation into the proper CAS class
         for view_name, view_content in cas_frame["views"].items():
@@ -124,13 +118,8 @@ class StorageReaderInterface(CameraInterface):
         # TODO this can be unified with the camera intrinsic creation in the camera interface. Check
         #  ROSCameraInterface.set_o3d_camera_intrinsics_from_ros_camera_info
         #  => type_conversion.o3d_camera_intrinsics_from_ros_camera_info(camera_info):
-        if "cam_info" in cas_frame["views"]:
-            camera_info = cas_frame["views"]["cam_info"]
-
-            if camera_info is None:
-                # nothing to do
-                return
-
+        camera_info = cas_frame["views"].get("cam_info")
+        if camera_info is not None:
             width = camera_info.width
             height = 960  # we assume that the kinect right now only outputs 1280x... images with the 4:3 crop
             fx = camera_info.k[0]
@@ -141,64 +130,55 @@ class StorageReaderInterface(CameraInterface):
                 width, height, fx, fy, cx, cy
             )
             cas.set(CASViews.CAMERA_INTRINSIC, camera_intrinsic)
+        return recorded_pose
 
-    def _restore_camera_to_world_transform(self, cas_frame: dict, world: World) -> None:
+    def _recorded_camera_pose(
+        self, cas_frame: dict, world: World
+    ) -> MeasuredCameraPose | None:
         """
-        Restore the stored camera pose as a transform bound to ``world``.
+        The camera pose recorded with ``cas_frame``.
 
-        The serialized ``CAMERA_TO_WORLD_TRANSFORM`` may reference bodies from the
-        recorded world. This method decodes the numeric transform, resolves the intended
-        frame names, creates/updates the matching bodies in ``world``, and stores the
-        rebound transform in ``cas_frame["views"]``.
+        A camera transform stored in a format without frame names is decoded into the
+        views of ``cas_frame`` instead.
 
         :param cas_frame: The stored CAS frame.
         :param world: The world perception perceives into.
+        :return: The recorded camera pose, or None if ``cas_frame`` has none with frame
+            names.
+        :raises StoredViewMissing: If the storage does not hold the recorded camera
+            transform.
         """
         view_ids = cas_frame.get("view_ids", {})
         view_id = view_ids.get(CASViews.CAMERA_TO_WORLD_TRANSFORM)
         if view_id is None:
-            return
+            return None
 
         view_document = self.storage.db[Storage.VIEW_COLLECTION_NAME].find_one(
             {"_id": view_id}
         )
         if not view_document:
-            raise RuntimeError(
-                f"Couldn't find view '{CASViews.CAMERA_TO_WORLD_TRANSFORM}' with id={view_id}."
+            raise StoredViewMissing(
+                view_name=CASViews.CAMERA_TO_WORLD_TRANSFORM, view_id=view_id
             )
 
-        # Non-SemDT transform payloads are left to the regular codec path.
-        if view_document["serializer_id"] != "semdt_homogeneous_transform_v1":
-            decoded_view_name, decoded_view_value = Storage.decode_view_document(
-                view_document, world
-            )
-            if decoded_view_name == CASViews.CAMERA_TO_WORLD_TRANSFORM:
-                cas_frame["views"][
-                    CASViews.CAMERA_TO_WORLD_TRANSFORM
-                ] = decoded_view_value
-            return
+        if view_document["serializer_id"] == "semdt_homogeneous_transform_v1":
+            return self._decode_recorded_camera_pose(view_document)
 
-        stored_transform, world_frame, camera_frame = (
-            self._decode_stored_camera_to_world_transform(view_document, cas_frame)
+        decoded_view_name, decoded_view_value = Storage.decode_view_document(
+            view_document, world
         )
-        rebound_transform = self._rebind_camera_to_world_transform(
-            world=world,
-            stored_transform=stored_transform,
-            world_frame=world_frame,
-            camera_frame=camera_frame,
-        )
-        cas_frame["views"][CASViews.CAMERA_TO_WORLD_TRANSFORM] = rebound_transform
+        if decoded_view_name == CASViews.CAMERA_TO_WORLD_TRANSFORM:
+            cas_frame["views"][CASViews.CAMERA_TO_WORLD_TRANSFORM] = decoded_view_value
+        return None
 
-    def _decode_stored_camera_to_world_transform(
-        self, view_document: dict, cas_frame: dict
-    ) -> tuple[HomogeneousTransformationMatrix, str, str]:
+    def _decode_recorded_camera_pose(self, view_document: dict) -> MeasuredCameraPose:
         """
-        Decode a stored camera transform and determine its frame names.
-
-        Recordings must carry frame names as view metadata. The returned transform
-        contains only the numeric pose and must be rebound before use.
+        :param view_document: The stored document of the camera transform.
+        :return: The camera pose the document recorded, named by the frame names in its
+            metadata.
+        :raises StoredCameraTransformFrameMetadataMissing: If the metadata names no
+            frames.
         """
-        payload = view_document["payload"]
         metadata = view_document.get("metadata", {})
         world_frame = metadata.get("reference_frame_name")
         camera_frame = metadata.get("child_frame_name")
@@ -206,10 +186,12 @@ class StorageReaderInterface(CameraInterface):
         if world_frame is None or camera_frame is None:
             raise StoredCameraTransformFrameMetadataMissing()
 
-        return (
-            self._decode_transform_payload_without_frames(payload),
-            world_frame,
-            camera_frame,
+        return MeasuredCameraPose(
+            world_frame=world_frame,
+            camera_frame=camera_frame,
+            world_T_camera=self._decode_transform_payload_without_frames(
+                view_document["payload"]
+            ),
         )
 
     @staticmethod
@@ -223,22 +205,3 @@ class StorageReaderInterface(CameraInterface):
         payload_without_frames.pop("reference_frame_id", None)
         payload_without_frames.pop("child_frame_id", None)
         return HomogeneousTransformationMatrix.from_json(payload_without_frames)
-
-    @staticmethod
-    def _rebind_camera_to_world_transform(
-        world: World,
-        stored_transform: HomogeneousTransformationMatrix,
-        world_frame: str,
-        camera_frame: str,
-    ) -> HomogeneousTransformationMatrix:
-        """
-        Create a camera transform whose frames belong to the running world.
-
-        The numeric pose is copied from ``stored_transform`` and the camera is placed
-        there in ``world``.
-        """
-        return CameraPlacement(world).place(
-            world_frame=world_frame,
-            camera_frame=camera_frame,
-            world_T_camera=stored_transform,
-        )

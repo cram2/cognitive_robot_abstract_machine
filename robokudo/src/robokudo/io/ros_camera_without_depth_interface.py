@@ -38,6 +38,8 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from semantic_digital_twin.world import World
 
+    from robokudo.camera_placement import MeasuredCameraPose
+
 
 # TODO Needs to be migrated to ROS2 for new RGB-only use cases
 class ROSCameraWithoutDepthInterface(ROSCameraInterface):
@@ -213,21 +215,9 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self._has_new_data = True
         self.lock.release()
 
-    def set_data(self, cas: CAS, world: World) -> None:
-        """
-        Update the Common Analysis Structure with latest camera data.
-
-        This method:
-        * Applies any configured image rotation
-        * Updates camera intrinsics accordingly
-        * Sets RGB image, camera info, and transform data in the CAS
-        * Handles thread synchronization
-
-        :param cas: Common Analysis Structure to update
-        :param world: The world perception perceives into, where the camera is placed
-        """
+    def set_data(self, cas: CAS, world: World) -> MeasuredCameraPose | None:
         if not self.has_new_data():
-            return
+            return None
 
         self.lock.acquire()
 
@@ -266,7 +256,8 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         cas.set(CASViews.CAMERA_INFO, self.camera_info)
         cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
-        self.store_camera_to_world_transform_from_tf(cas, world, self.timestamp)
+        camera_pose = self.camera_pose_from_tf(cas, self.timestamp)
 
         self._has_new_data = False
         self.lock.release()
+        return camera_pose

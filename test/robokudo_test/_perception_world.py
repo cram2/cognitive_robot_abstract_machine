@@ -15,7 +15,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
 from robokudo.cas import CAS
-from robokudo.camera_placement import CameraPlacement
+from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
 
 WORLD_FRAME = "map"
 """
@@ -89,10 +89,13 @@ def place_camera_of(
     :param world: The world the camera is placed in.
     :param world_T_camera: Pose of the camera in the world frame.
     """
-    cas.world_frame = WORLD_FRAME
-    cas.camera_frame = CAMERA_FRAME
-    cas.camera_to_world_transform = CameraPlacement(world).place(
-        WORLD_FRAME, CAMERA_FRAME, world_T_camera
+    CameraPlacement(world).place(
+        cas,
+        MeasuredCameraPose(
+            world_frame=WORLD_FRAME,
+            camera_frame=CAMERA_FRAME,
+            world_T_camera=world_T_camera,
+        ),
     )
 
 
