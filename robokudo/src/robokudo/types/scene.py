@@ -17,13 +17,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import open3d as o3d
-from typing_extensions import TYPE_CHECKING, Any, List
+from typing_extensions import TYPE_CHECKING, Any, List, TypeVar
 
+from robokudo.types.annotation import Classification
 from robokudo.types.core import Annotation, IdentifiableAnnotation, Nameable
 from robokudo.types.cv import ImageROI
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import Body
+
+AnnotationType = TypeVar("AnnotationType", bound=Annotation)
 
 
 @dataclass
@@ -62,6 +65,19 @@ class AnalyzableAnnotation(IdentifiableAnnotation):
     Image region of interest
     """
 
+    def latest_annotation_of_type(
+        self, annotation_type: type[AnnotationType]
+    ) -> AnnotationType | None:
+        """
+        :param annotation_type: The type of the annotation.
+        :return: The annotation of ``annotation_type`` added last to
+            :attr:`annotations`, or None if there is none.
+        """
+        for annotation in reversed(self.annotations):
+            if isinstance(annotation, annotation_type):
+                return annotation
+        return None
+
 
 @dataclass
 class ObjectHypothesis(AnalyzableAnnotation):
@@ -70,6 +86,17 @@ class ObjectHypothesis(AnalyzableAnnotation):
     Basic object hypothesis without additional specialization.
     Inherits all capabilities from AnalyzableAnnotation.
     """
+
+    @property
+    def class_label(self) -> str | None:
+        """
+        The class name of the latest classification of this hypothesis, or None if it
+        was not classified.
+        """
+        classification = self.latest_annotation_of_type(Classification)
+        if classification is None or not classification.classname:
+            return None
+        return classification.classname
 
 
 @dataclass

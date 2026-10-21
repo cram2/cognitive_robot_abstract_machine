@@ -2,12 +2,23 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    FixedConnection,
+)
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.cas import CAS
 from robokudo.perceived_objects import PerceivedObjects
-from robokudo.types.annotation import StampedPoseAnnotation
+from robokudo.types.annotation import BoundingBox3DAnnotation, StampedPoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 
 from ._object_hypotheses import make_object_hypothesis
@@ -46,6 +57,56 @@ def scale_of_latest_box(perceived_objects: PerceivedObjects, body_id) -> Scale:
     return Scale(bounding_box.x_length, bounding_box.y_length, bounding_box.z_length)
 
 
+def add_perceivable_object(
+    world: World,
+    *,
+    position: tuple[float, float, float],
+    yaw: float = 0.0,
+    class_label: str | None = None,
+    fixed: bool = False,
+) -> Body:
+    """
+    Add a perceivable object of the size :func:`make_object_hypothesis` reports by
+    default to ``world``, below its world frame.
+
+    :param world: The world, whose world frame a camera was placed against.
+    :param position: Position of the object in the world frame.
+    :param yaw: Rotation of the object about the z axis of the world frame.
+    :param class_label: The class label of the object's annotation.
+    :param fixed: Whether the object is attached with a fixed connection instead of a
+        connection with six degrees of freedom.
+    :return: The body of the object.
+    """
+    world_body = world.get_body_by_name(PrefixedName(name=WORLD_FRAME))
+    world_T_object = HomogeneousTransformationMatrix.from_xyz_rpy(
+        *position, yaw=yaw, reference_frame=world_body
+    )
+    body = Body(
+        name=PrefixedName("perceivable_object"),
+        visual=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.2, 0.3))]),
+    )
+    with world.modify_world():
+        if fixed:
+            world.add_connection(
+                FixedConnection.create_with_dofs(
+                    world=world,
+                    parent=world_body,
+                    child=body,
+                    parent_T_connection_expression=world_T_object,
+                )
+            )
+        else:
+            world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    world=world, parent=world_body, child=body
+                )
+            )
+        world.add_semantic_annotations([Milk(root=body, class_label=class_label)])
+    if not fixed:
+        body.parent_connection.origin = world_T_object
+    return body
+
+
 # %% new objects
 
 
@@ -69,6 +130,19 @@ class TestNewObjects:
             scale_of_latest_box(perceived_objects, body_id)
         ]
 
+    def test_new_object_has_the_size_of_its_bounding_box(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), make_object_hypothesis())
+        )
+
+        size = world.get_kinematic_structure_entity_by_id(body_id).visual.scale
+        expected = scale_of_latest_box(perceived_objects, body_id)
+        assert np.allclose(
+            [size.x, size.y, size.z], [expected.x, expected.y, expected.z]
+        )
+
     def test_reports_the_bodies_of_the_objects_in_the_order_they_were_found(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
@@ -89,6 +163,23 @@ class TestNewObjects:
     ) -> None:
         [body_id] = perceived_objects.apply(
             cas_holding(CAS(), make_object_hypothesis())
+        )
+
+        assert body_id in perceived_objects.beliefs
+        assert body_id not in [body.id for body in world.bodies]
+
+    def test_object_without_a_bounding_box_is_kept_outside_the_world(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        hypothesis = make_object_hypothesis()
+        hypothesis.annotations = [
+            annotation
+            for annotation in hypothesis.annotations
+            if not isinstance(annotation, BoundingBox3DAnnotation)
+        ]
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), hypothesis)
         )
 
         assert body_id in perceived_objects.beliefs
@@ -156,24 +247,187 @@ class TestObjectsSeenAgain:
         assert body_ids[1] != first_id
         assert set(perceived_objects.beliefs) == {first_id, body_ids[1]}
 
-    def test_object_too_unlike_any_known_one_gets_a_body_of_its_own(
-        self, world: World
+
+# %% matching
+
+
+class TestMatching:
+    def test_object_beyond_the_match_distance_gets_a_body_of_its_own(
+        self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
-        perceived_objects = PerceivedObjects(world=world, match_threshold=0.99)
-        first_hypothesis = make_object_hypothesis()
+        first_hypothesis = make_object_hypothesis(translation=(0.0, 0.0, 1.0))
         [first_id] = perceived_objects.apply(
             cas_holding(cas_seen_from(world, camera_pose()), first_hypothesis)
         )
+        beyond = 2 * perceived_objects.matcher.maximum_match_distance
 
         [second_id] = perceived_objects.apply(
             cas_holding(
                 cas_seen_from(world, camera_pose()),
-                make_object_hypothesis(translation=(5.0, 0.0, 1.0)),
+                make_object_hypothesis(translation=(beyond, 0.0, 1.0)),
             )
         )
 
         assert second_id != first_id
         assert perceived_objects.beliefs[first_id].latest_hypothesis is first_hypothesis
+
+    def test_object_of_another_class_gets_a_body_of_its_own(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        [first_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(class_label="cup"),
+            )
+        )
+
+        [second_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(class_label="bowl"),
+            )
+        )
+
+        assert second_id != first_id
+
+    def test_object_classified_in_only_one_pass_keeps_its_body(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        [first_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), make_object_hypothesis())
+        )
+
+        [second_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(class_label="cup"),
+            )
+        )
+
+        assert second_id == first_id
+
+    def test_object_of_a_very_different_size_gets_a_body_of_its_own(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        extent = (0.1, 0.2, 0.3)
+        [first_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(extent=extent),
+            )
+        )
+        factor = 2 * perceived_objects.matcher.maximum_match_size_ratio
+
+        [second_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(
+                    extent=tuple(factor * length for length in extent)
+                ),
+            )
+        )
+
+        assert second_id != first_id
+
+    def test_objects_are_matched_so_that_as_many_as_possible_keep_their_body(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        distance = perceived_objects.matcher.maximum_match_distance
+        left_id, right_id = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(translation=(0.0, 0.0, 1.0)),
+                make_object_hypothesis(translation=(1.75 * distance, 0.0, 1.0)),
+            )
+        )
+        # Closer to the left object, but also within reach of the right one, which
+        # nothing else can take.
+        between = make_object_hypothesis(translation=(0.85 * distance, 0.0, 1.0))
+        # Within reach of the left object only.
+        left = make_object_hypothesis(translation=(-0.1 * distance, 0.0, 1.0))
+
+        body_ids = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), between, left)
+        )
+
+        assert body_ids == [right_id, left_id]
+
+
+# %% objects of the world
+
+
+class TestPerceivableObjectsOfTheWorld:
+    def test_object_at_a_perceivable_body_is_taken_as_that_body(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        body = add_perceivable_object(world, position=(0.0, 0.0, 1.0))
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas, make_object_hypothesis(translation=(0.05, 0.0, 1.0)))
+        )
+
+        assert body_id == body.id
+        assert perceived_objects.beliefs == {}
+
+    def test_perceivable_body_moves_to_where_it_was_seen_and_keeps_its_orientation(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        body = add_perceivable_object(world, position=(0.0, 0.0, 1.0), yaw=np.pi / 2)
+        rotation_before = body.global_transform.to_np()[:3, :3]
+        hypothesis = make_object_hypothesis(translation=(0.05, 0.0, 1.0))
+
+        perceived_objects.apply(cas_holding(cas, hypothesis))
+
+        assert np.allclose(
+            body.global_transform.position.to_np()[:3],
+            hypothesis.latest_annotation_of_type(
+                BoundingBox3DAnnotation
+            ).pose.translation,
+        )
+        assert np.allclose(body.global_transform.to_np()[:3, :3], rotation_before)
+
+    def test_perceivable_body_keeps_its_shape(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        body = add_perceivable_object(world, position=(0.0, 0.0, 1.0))
+        scales_before = [shape.scale for shape in body.visual.shapes]
+
+        perceived_objects.apply(
+            cas_holding(cas, make_object_hypothesis(extent=(0.12, 0.22, 0.32)))
+        )
+
+        assert [shape.scale for shape in body.visual.shapes] == scales_before
+
+    def test_perceivable_body_on_a_fixed_connection_is_reported_without_moving(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        body = add_perceivable_object(world, position=(0.0, 0.0, 1.0), fixed=True)
+        pose_before = body.global_transform.to_np()
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas, make_object_hypothesis(translation=(0.05, 0.0, 1.0)))
+        )
+
+        assert body_id == body.id
+        assert np.allclose(body.global_transform.to_np(), pose_before)
+
+    def test_object_of_another_class_than_a_perceivable_body_gets_a_body_of_its_own(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        body = add_perceivable_object(
+            world, position=(0.0, 0.0, 1.0), class_label="milk"
+        )
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas, make_object_hypothesis(class_label="cup"))
+        )
+
+        assert body_id != body.id
 
 
 # %% world poses
