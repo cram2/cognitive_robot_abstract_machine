@@ -14,7 +14,6 @@ from uuid import UUID
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     IsPerceivable,
@@ -161,12 +160,15 @@ class BelievedObject(KnownObject):
     def update(self, detection: Detection) -> None:
         """
         :meth:`KnownObject.update` by moving and reshaping the body to the 3D bounding
-        box of ``detection``.
+        box of ``detection``. A body that cannot move relative to its parent, such as
+        one another process attached rigidly, keeps its pose and shape.
 
         .. note:: Only the move reaches the processes :attr:`world` is shared with;
             they keep the shape the object was first believed in with.
         """
         self.belief.add_hypothesis(detection.hypothesis)
+        if not isinstance(self.body.parent_connection, Connection6DoF):
+            return
         with self.world.modify_world(publish_changes=False):
             self.body.visual.shapes.clear()
             self.body.visual.append(Box(scale=detection.extent))
@@ -327,7 +329,7 @@ class PerceivedObjects:
     The objects perception believes in, by the id of their body.
     """
 
-    def apply(self, cas: CAS) -> list[UUID]:
+    def apply(self, cas: CAS) -> list[UUID | None]:
         """
         Put the objects a finished pipeline pass found into :attr:`world`.
 
@@ -335,12 +337,12 @@ class PerceivedObjects:
         object: one perception believes in, or a perceivable object of :attr:`world`. A
         matched object moves to where it was seen, and one perception believes in also
         takes the new shape. Any other object becomes a new body. An object that cannot
-        be located, because ``cas`` holds no camera pose or the object has no 3D
-        bounding box, is believed in outside the world.
+        be located in :attr:`world`, because ``cas`` holds no camera pose in it or the
+        object has no 3D bounding box, gets no body.
 
         :param cas: The CAS of the finished pass.
         :return: The ids of the bodies of the found objects, in the order of the
-            objects in ``cas``.
+            objects in ``cas``; None for an object that got no body.
         """
         hypotheses = cas.filter_annotations_by_type(ObjectHypothesis)
         self._annotate_world_poses(hypotheses, cas)
@@ -353,7 +355,7 @@ class PerceivedObjects:
         body_ids = []
         for hypothesis, detection in zip(hypotheses, detections):
             if detection is None:
-                body_ids.append(self._believe_in_unlocated_object(hypothesis).uuid)
+                body_ids.append(None)
                 continue
             known_object = matches.get(detection)
             if known_object is None:
@@ -397,15 +399,15 @@ class PerceivedObjects:
         :param hypothesis: The hypothesis to locate.
         :param cas: The CAS whose camera pose locates the hypothesis.
         :return: ``hypothesis`` located at its latest 3D bounding box in the world frame
-            of ``cas``, or None if ``cas`` names no camera pose or world frame, or
-            ``hypothesis`` has no 3D bounding box.
+            of ``cas``, or None if ``cas`` holds no camera pose relative to a body of
+            :attr:`world`, or ``hypothesis`` has no 3D bounding box.
         """
         bounding_box = hypothesis.latest_annotation_of_type(BoundingBox3DAnnotation)
-        if (
-            cas.camera_to_world_transform is None
-            or cas.world_frame is None
-            or bounding_box is None
-        ):
+        camera_to_world_transform = cas.camera_to_world_transform
+        if camera_to_world_transform is None or bounding_box is None:
+            return None
+        world_body = camera_to_world_transform.reference_frame
+        if world_body not in self.world.kinematic_structure_entities:
             return None
 
         camera_T_bounding_box = get_transform_matrix_from_q(
@@ -415,9 +417,7 @@ class PerceivedObjects:
             hypothesis=hypothesis,
             pose=HomogeneousTransformationMatrix(
                 data=get_camera_to_world_transform_matrix(cas) @ camera_T_bounding_box,
-                reference_frame=self.world.get_body_by_name(
-                    PrefixedName(name=cas.world_frame)
-                ),
+                reference_frame=world_body,
             ),
             extent=Scale(
                 x=bounding_box.x_length,
@@ -451,19 +451,6 @@ class PerceivedObjects:
         return believed_objects + list(perceivable_objects.values())
 
     # %% beliefs
-
-    def _believe_in_unlocated_object(
-        self, hypothesis: ObjectHypothesis
-    ) -> ObjectBeliefState:
-        """
-        Believe in a new object seen as ``hypothesis``, kept outside the world.
-
-        :param hypothesis: The hypothesis the object was seen as.
-        :return: The new belief.
-        """
-        belief = ObjectBeliefState.create_with_new_body().add_hypothesis(hypothesis)
-        self.beliefs[belief.uuid] = belief
-        return belief
 
     def _believe_in_new_object(self, detection: Detection) -> ObjectBeliefState:
         """

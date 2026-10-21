@@ -158,19 +158,19 @@ class TestNewObjects:
             perceived_objects.beliefs[body_id].latest_hypothesis for body_id in body_ids
         ] == hypotheses
 
-    def test_object_without_a_camera_pose_is_kept_outside_the_world(
+    def test_object_without_a_camera_pose_gets_no_body(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
-        [body_id] = perceived_objects.apply(
-            cas_holding(CAS(), make_object_hypothesis())
-        )
+        body_ids = perceived_objects.apply(cas_holding(CAS(), make_object_hypothesis()))
 
-        assert body_id in perceived_objects.beliefs
-        assert body_id not in [body.id for body in world.bodies]
+        assert body_ids == [None]
+        assert perceived_objects.beliefs == {}
 
-    def test_object_without_a_bounding_box_is_kept_outside_the_world(
+    def test_object_without_a_bounding_box_gets_no_body(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        bodies_before = list(world.bodies)
         hypothesis = make_object_hypothesis()
         hypothesis.annotations = [
             annotation
@@ -178,12 +178,34 @@ class TestNewObjects:
             if not isinstance(annotation, BoundingBox3DAnnotation)
         ]
 
-        [body_id] = perceived_objects.apply(
-            cas_holding(cas_seen_from(world, camera_pose()), hypothesis)
+        body_ids = perceived_objects.apply(cas_holding(cas, hypothesis))
+
+        assert body_ids == [None]
+        assert perceived_objects.beliefs == {}
+        assert list(world.bodies) == bodies_before
+
+    def test_object_seen_by_a_camera_placed_in_another_world_gets_no_body(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        body_ids = perceived_objects.apply(
+            cas_holding(cas_seen_from(World(), camera_pose()), make_object_hypothesis())
         )
 
-        assert body_id in perceived_objects.beliefs
-        assert body_id not in [body.id for body in world.bodies]
+        assert body_ids == [None]
+        assert world.bodies == []
+
+    def test_object_seen_against_a_prefixed_world_frame_becomes_a_body_below_it(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        world_body = Body(name=PrefixedName(WORLD_FRAME, prefix="robot"))
+        with world.modify_world():
+            world.add_body(world_body)
+        cas = cas_seen_from(world, camera_pose())
+
+        [body_id] = perceived_objects.apply(cas_holding(cas, make_object_hypothesis()))
+
+        body = world.get_kinematic_structure_entity_by_id(body_id)
+        assert body.parent_connection.parent is world_body
 
     def test_pass_without_objects_reports_none(
         self, world: World, perceived_objects: PerceivedObjects
@@ -246,6 +268,40 @@ class TestObjectsSeenAgain:
         assert body_ids[0] == first_id
         assert body_ids[1] != first_id
         assert set(perceived_objects.beliefs) == {first_id, body_ids[1]}
+
+    def test_object_another_process_attached_rigidly_is_reported_unchanged(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), make_object_hypothesis())
+        )
+        body = world.get_kinematic_structure_entity_by_id(body_id)
+        parent = body.parent_connection.parent
+        parent_T_body = body.parent_connection.origin
+        with world.modify_world():
+            world.remove_connection(body.parent_connection)
+            world.add_connection(
+                FixedConnection(
+                    parent=parent,
+                    child=body,
+                    parent_T_connection_expression=parent_T_body,
+                )
+            )
+        pose_before = body.global_transform.to_np()
+        scales_before = [shape.scale for shape in body.visual.shapes]
+
+        [second_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(
+                    translation=(0.03, 0.0, 1.0), extent=(0.12, 0.22, 0.32)
+                ),
+            )
+        )
+
+        assert second_id == body_id
+        assert np.allclose(body.global_transform.to_np(), pose_before)
+        assert [shape.scale for shape in body.visual.shapes] == scales_before
 
 
 # %% matching
