@@ -122,7 +122,7 @@ actually depends on.
 ### Implementation: `CausalCircuit`
 
 `probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit` wraps a
-fitted `ProbabilisticCircuit` together with:
+fitted circuit of any circuit type (see {ref}`sec-causal-circuit-types`) together with:
 
 - `causal_variables` / `effect_variables` -- the registered $X$ and $Y$ of
   {prf:ref}`def-backdoor-criterion`.
@@ -134,7 +134,7 @@ fitted `ProbabilisticCircuit` together with:
   {prf:ref}`def-support-determinism`. `find_node_for_variable` additionally lets
   `diagnose_failure` walk the tree to recover the priority a variable was registered with.
 - `verify_support_determinism()`, which takes that union of query variables and checks
-  {prf:ref}`def-support-determinism` for each of them against every sum unit in the circuit,
+  {prf:ref}`def-support-determinism` for each of them against every mixture in the circuit,
   raising `SupportDeterminismVerificationResult` with every violation found if any check
   fails. This is a validity *check*, not a construction step: it does not repair a circuit
   that fails it.
@@ -143,6 +143,52 @@ fitted `ProbabilisticCircuit` together with:
   set it truncates the circuit to each cause region and reads off the effect marginal; with
   one, it additionally weights each cause-region branch by $P(Z = z)$ and sums, using the
   region structure `verify_support_determinism` already confirmed is disjoint.
+
+(sec-causal-circuit-types)=
+### One causal circuit per circuit type
+
+`CausalCircuit` reads the circuit it wraps, and builds the interventional circuit, through
+the operations every circuit type offers, declared by
+`probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation.ProbabilisticCircuitRepresentation`:
+
+- `mixture_of(components, log_weights)` and `product_of(factors)` build the mixture of
+  products that is the interventional circuit. A mixture needs components over the same
+  variables and a product needs factors over disjoint ones, so a composition that would not
+  be smooth or decomposable raises rather than producing a circuit that answers queries
+  wrongly.
+- `unnormalized_mixtures()` and `mixtures_over(variables)` report what
+  `verify_support_determinism` checks: which mixtures are not normalized, and what each
+  mixture's components model of a query variable.
+- `restrict_to_variables(variables)` marginalizes without collapsing the mixtures, so the
+  branch boundaries the disjointness check reads stay visible.
+
+`ProbabilisticCircuit` (a graph of units) and `LayeredProbabilisticCircuit` (a stack of
+numpy arrays) both implement them, so the same causal inference runs on either, and
+`backdoor_adjustment` returns a circuit of the type it read. Nothing in `CausalCircuit`
+knows how the nodes it reads are stored.
+
+A layered circuit answers a query for all nodes of a layer at once instead of node by node,
+which is what makes `verify_support_determinism` cheap on a large circuit: it reads the
+component supports of a whole layer in one pass, rather than projecting one unit's support
+at a time. On a mixture of *n* disjoint strata over a cause, an effect and a confounder,
+the check a single run and the interventional circuit the best of three, measured on an
+AMD EPYC 7662:
+
+| strata | `verify_support_determinism` | | `backdoor_adjustment` | |
+|---|---|---|---|---|
+| | units | layers | units | layers |
+| 16 | 14 ms | 4 ms | 98 ms | 60 ms |
+| 64 | 623 ms | 19 ms | 1.7 s | 0.8 s |
+| 128 | 5.0 s | 44 ms | 9.0 s | 5.5 s |
+| 256 | 41.4 s | 152 ms | 55.4 s | 41.8 s |
+
+Both types give every event the same probability to the last bit. The check scales with the
+number of mixtures times the number of query variables, which is where the layout pays off.
+Building the interventional circuit truncates the circuit once per cause region in either
+type, so it gains only what the structural pass itself saves; truncating to every region in
+one pass, the way
+{py:meth}`~probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit.LayeredProbabilisticCircuit.truncated_root_of_simple_events`
+already truncates to every simple set of an event, is the next step there.
 
 ### Worked example: a confounded discrete circuit
 
@@ -305,9 +351,14 @@ via `resolve_variable`), builds the `MarginalDeterminismTreeNode`, and returns a
 `backdoor_adjustment` and `diagnose_failure` work identically regardless of whether the
 circuit came from a fixed template or was grounded per-query.
 
+The grounding comes back in the circuit type the relational circuit was fitted in, so a
+relational circuit fitted with `LayeredLearning` grounds into a `LayeredProbabilisticCircuit`
+and is wrapped as a causal circuit over that type. Which type a causal query is answered in
+is therefore decided once, at fitting time, and nothing on the causal side changes with it.
+
 Registering more than one relational adjustment variable at once is the one place this can
 get expensive: `CausalCircuit`'s adjustment-region extraction takes a Cartesian product
-across the adjustment variables' leaf regions, and a `GroundingMode.EXACT` variable's region
+across the adjustment variables' regions, and a `GroundingMode.EXACT` variable's region
 count can grow with the training data (unlike `SAMPLED`, capped by
 `monte_carlo_sample_count`). `RelationalCausalCircuit.adjustment_region_count_warning_threshold`
 warns when that product is large, as a diagnostic against discovering the cost only at query
