@@ -1,5 +1,7 @@
 from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.annotators.clip_annotator import ClipAnnotator
+from robokudo.annotators.clip_annotator import (
+    CLIPAnnotator,
+)
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
 from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
@@ -40,7 +42,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClusterColorAnnotator(),
                 ClusterColorHistogramAnnotator(),
                 ClusterPoseBBAnnotator(),
-                ClipAnnotator(),
+                CLIPAnnotator(),
                 # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
             ]
         )

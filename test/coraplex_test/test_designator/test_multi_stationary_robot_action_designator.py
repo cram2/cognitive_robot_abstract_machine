@@ -2,11 +2,16 @@ import numpy as np
 import pytest
 from rustworkx import NoEdgeBetweenNodes
 
+from ...pytest_environment import runs_in_continuous_integration
+
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.trajectory import PoseTrajectory
 
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import (
+    PhysicallySimulatedRobot,
+    kinematically_simulated_robot,
+)
 from coraplex.plans.factories import execute_single, sequential
 from coraplex.robot_plans.actions.core.pick_up import (
     ReachAction,
@@ -22,6 +27,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 from coraplex.testing import _make_sine_scan_poses
 from krrood.entity_query_language.factories import an, entity, variable
 
+from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
@@ -34,15 +40,13 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.grasping.grasp_candidates import (
-    GraspCandidate,
-    HasGraspCandidates,
-)
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ...conftest import SAMPLING_SEED
-from ..conftest import left_or_only_arm, right_or_only_arm
+from ..conftest import grasp_point_of, left_or_only_arm, right_or_only_arm
 from ..world_snapshot import WorldSnapshot
 
 
@@ -147,7 +151,7 @@ def test_park_arms_multi(stationary_block_context):
 
     description = ParkArmsAction(context.robot.all_arms)
     plan = execute_single(description, context=context).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     joints = []
@@ -186,16 +190,15 @@ def test_reach_action_multi(stationary_block_context):
         context=context,
     ).plan
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     end_effector_pose = left_arm.end_effector.tool_frame.global_transform
-    end_effector_position = end_effector_pose.position.to_np()
     end_effector_orientation = end_effector_pose.quaternion.to_np()
 
     target_orientation = left_arm.end_effector.tool_frame_goal(grasp_pose).quaternion
 
-    assert end_effector_position[:3] == pytest.approx(position[:3], abs=0.01)
+    assert grasp_point_of(left_arm) == pytest.approx(position[:3], abs=0.01)
     compare_orientations(
         end_effector_orientation, target_orientation.to_np(), decimal=2
     )
@@ -211,7 +214,7 @@ def test_move_gripper_multi(stationary_block_context):
         context=context,
     ).plan
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     arm = view.all_arms[0]
@@ -228,7 +231,7 @@ def test_move_gripper_multi(stationary_block_context):
         context=context,
     ).plan
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     for connection, target in close_state.items():
@@ -251,13 +254,13 @@ def test_grasping(stationary_block_context):
         [ParkArmsAction(context.robot.all_arms), description],
         context=context,
     ).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
-    # The grasp sits at the box's own origin, so that is where the tool frame ends up.
+    # The grasp sits at the box's own origin, so that is where the fingers end up.
     assert np.allclose(
-        box_body.global_pose.position.to_np(),
-        left_arm.end_effector.tool_frame.global_pose.position.to_np(),
+        box_body.global_pose.position.to_np().flatten()[:3],
+        grasp_point_of(left_arm),
         atol=0.01,
     )
 
@@ -278,7 +281,7 @@ def test_pick_up_multi(stationary_block_context):
         context=context,
     ).plan
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert (
@@ -324,7 +327,7 @@ def test_place_multi(stationary_block_context, place_position):
         context=context,
     ).plan
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     with pytest.raises(NoEdgeBetweenNodes):
@@ -370,7 +373,7 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
         ),
         context=context,
     )
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     tip_pose = right_arm.end_effector.tool_frame.global_transform
@@ -378,3 +381,83 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
 
     assert np.allclose(tip_pose.position, expected.position, atol=0.01)
     assert np.allclose(tip_pose.quaternion, expected.quaternion, atol=0.01)
+
+
+# %% picking and placing in physics
+
+
+@pytest.fixture
+def physically_simulated_block_context(stationary_block_context):
+    """
+    The block world with its physics running, so a plan performed in it is carried out
+    by the robot's own servos.
+    """
+    world, view, context = stationary_block_context
+    if not isinstance(view, Tracy):
+        pytest.skip("only Tracy is set up with the servos a physical simulation needs")
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    yield world, view, context, simulation
+    simulation.stop_simulation()
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_pick_in_physics_leaves_the_box_to_the_grip(
+    physically_simulated_block_context,
+):
+    """
+    Nothing puts the box under the gripper in the model, so whether it comes along at
+    all is up to the pads holding it.
+    """
+    world, _, context, simulation = physically_simulated_block_context
+    arm = left_or_only_arm(context.robot)
+    box = world.get_body_by_name("box1")
+    stood_on = box.parent_connection.parent
+    plan = sequential(
+        [
+            ParkArmsAction(context.robot.all_arms),
+            PickUpAction(graspable_annotation(world, box).grasp_candidates()[0], arm),
+        ],
+        context=context,
+    ).plan
+
+    with PhysicallySimulatedRobot(simulation=simulation):
+        plan.perform()
+
+    assert box.parent_connection.parent is stood_on
+    with pytest.raises(NoEdgeBetweenNodes):
+        world.get_connection(arm.end_effector.tool_frame, box)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_place_in_physics_leaves_the_box_to_the_release(
+    physically_simulated_block_context, place_position
+):
+    """
+    Nothing puts the box back under the world in the model either, so where it ends up
+    is where the pads opening leaves it.
+    """
+    world, _, context, simulation = physically_simulated_block_context
+    arm = left_or_only_arm(context.robot)
+    box = world.get_body_by_name("box1")
+    stood_on = box.parent_connection.parent
+    plan = sequential(
+        [
+            ParkArmsAction(context.robot.all_arms),
+            PickUpAction(graspable_annotation(world, box).grasp_candidates()[0], arm),
+            PlaceAction(
+                graspable_annotation(world, box),
+                Pose(place_position, reference_frame=world.root),
+            ),
+        ],
+        context=context,
+    ).plan
+
+    with PhysicallySimulatedRobot(simulation=simulation):
+        plan.perform()
+
+    assert box.parent_connection.parent is stood_on

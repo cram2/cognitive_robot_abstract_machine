@@ -20,7 +20,7 @@ def _object(source_id: str) -> RelationalCircuitExperimentObject2D:
     return RelationalCircuitExperimentObject2D(
         object_type=ObjectType.BOOK,
         scale=Scale(x=0.05, y=0.1, z=0.2),
-        pose=Pose2D(x=0.0, y=0.0, yaw=0.0),
+        pose=Pose2D.from_xy_yaw(x=0.0, y=0.0, yaw=0.0),
         source_id=source_id,
     )
 
@@ -45,7 +45,9 @@ def test_a_layer_counts_the_objects_it_holds(object_count: int) -> None:
     layer = _layer(object_count)
 
     assert (
-        RelationalCircuitExperimentShelfLayerAggregations(layer).total_count()
+        RelationalCircuitExperimentShelfLayerAggregations(
+            role_taker=layer
+        ).total_count()
         == object_count
     )
 
@@ -63,5 +65,6 @@ def test_a_shelf_counts_the_layers_it_holds(layer_count: int) -> None:
     )
 
     assert (
-        RelationalCircuitExperimentShelfAggregations(shelf).layer_count() == layer_count
+        RelationalCircuitExperimentShelfAggregations(role_taker=shelf).layer_count()
+        == layer_count
     )

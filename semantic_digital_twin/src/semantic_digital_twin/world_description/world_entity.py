@@ -49,7 +49,10 @@ from semantic_digital_twin.exceptions import (
     ReferenceFrameMismatchError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties, UniqueSimulatorProperty
-from semantic_digital_twin.world_description.connection_properties import ServoGains
+from semantic_digital_twin.world_description.connection_properties import (
+    ServoGains,
+    VelocityServoGains,
+)
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -550,9 +553,9 @@ class Body(KinematicStructureEntity):
     The index of the entity in `_world.kinematic_structure`.
     """
 
-    inertial: Optional[Inertial] = field(default_factory=Inertial, repr=False)
+    inertial: Optional[Inertial] = field(default=None, repr=False)
     """
-    Inertia properties of the body.
+    Inertia properties of the body, or ``None`` if its description gives none.
     """
 
     def __post_init__(self):
@@ -577,6 +580,26 @@ class Body(KinematicStructureEntity):
         return cls(
             name=name, collision=shape_collection, visual=visuals_shape_collection
         )
+
+    @synchronized_attribute_modification
+    def update_shapes(
+        self, visual: ShapeCollection, collision: ShapeCollection
+    ) -> None:
+        """
+        Replace the shapes of this body and record the change in the world's
+        modification history, so that it is synchronized and can be rolled back.
+
+        :param visual: The shapes that represent how the body looks. Shapes whose origin
+            has no reference frame are taken relative to the body; the others are
+            expressed relative to it.
+        :param collision: The shapes that represent how the body collides, taken like
+            ``visual``.
+        """
+        for shapes in (visual, collision):
+            shapes.reference_frame = self
+            shapes.transform_all_shapes_to_own_frame()
+        self.visual = visual
+        self.collision = collision
 
     @property
     def combined_mesh(self) -> Optional[trimesh.Trimesh]:
@@ -841,6 +864,25 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
     @property
     def bodies_with_collision(self) -> List[Body]:
         return [x for x in self.bodies if x.has_collision()]
+
+    @property
+    def mass(self) -> float:
+        """
+        :return: The mass of what the annotation references: the sum of the masses of
+            its bodies, the bodies of its parts included. A body that states no inertial
+            properties counts as weightless.
+        """
+        return sum(
+            body.inertial.mass
+            for body in self._distinct_bodies()
+            if body.inertial is not None
+        )
+
+    def _distinct_bodies(self) -> List[Body]:
+        """
+        :return: :attr:`bodies`, each once, told apart by their ids.
+        """
+        return list({body.id: body for body in self.bodies}.values())
 
     def as_bounding_box_collection_at_origin(
         self, origin: HomogeneousTransformationMatrix
@@ -1354,6 +1396,15 @@ class Actuator(WorldEntityWithSimulatorProperties):
         """
         self._dofs.append(dof)
 
+    @property
+    def set_point(self) -> float:
+        """
+        The value the world commands this actuator to: by default, the position the
+        world holds for its one degree of freedom.
+        """
+        [degree_of_freedom] = self.dofs
+        return float(self._world.state[degree_of_freedom.id].position)
+
 
 @dataclass(eq=False)
 class PositionServo(Actuator):
@@ -1368,3 +1419,22 @@ class PositionServo(Actuator):
     """
     How hard the servo pulls the degree of freedom towards the set point.
     """
+
+
+@dataclass(eq=False)
+class VelocityServo(Actuator):
+    """
+    An actuator that drives its degree of freedom at a commanded velocity: the velocity
+    the world holds for the degree of freedom is the servo's set point, and where the
+    degree of freedom ends up is what the physics makes of it.
+    """
+
+    gains: VelocityServoGains = field(kw_only=True)
+    """
+    How hard the servo pushes the degree of freedom towards the set point.
+    """
+
+    @property
+    def set_point(self) -> float:
+        [degree_of_freedom] = self.dofs
+        return float(self._world.state[degree_of_freedom.id].velocity)

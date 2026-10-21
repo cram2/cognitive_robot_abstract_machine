@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Dict, Optional, Tuple, Union, List
+from typing_extensions import Dict, Optional, Union, List
 from urdf_parser_py import urdf as urdfpy
 from xacro import process_file
 
@@ -13,7 +13,6 @@ from semantic_digital_twin.adapters.package_resolver import (
 from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import NegativeConnectionVelocity
-from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -63,7 +62,7 @@ connection_type_map = {  # 'unknown': JointType.UNKNOWN,
 
 def urdf_joint_to_limits(
     urdf_joint: urdfpy.Joint,
-) -> Tuple[DerivativeMap[float], DerivativeMap[float]]:
+) -> DegreeOfFreedomLimits[float]:
     """
     Maps the URDF joint specifications to lower and upper joint limits, including
     position and velocity constraints. Mimics and safety controller parameters are also
@@ -71,11 +70,10 @@ def urdf_joint_to_limits(
 
     :param urdf_joint: A URDF (Unified Robot Description Format) joint object which
         contains the joint's type, limits, safety controller, and mimic information.
-    :return: A tuple containing two DerivativeMap objects, representing the lower and
-        upper limits of the joint in terms of position and velocity.
+    :return: The limits of the joint's position and velocity.
     """
-    lower_limits = DerivativeMap()
-    upper_limits = DerivativeMap()
+    lower = None
+    upper = None
     limit = getattr(urdf_joint, "limit", None)
     if not urdf_joint.type == "continuous":
         lower = limit.lower if limit is not None else None
@@ -93,19 +91,15 @@ def urdf_joint_to_limits(
             else upper
         )
 
-        lower_limits.position = lower
-        upper_limits.position = upper
-
     velocity = getattr(limit, "velocity", None) if limit is not None else None
 
     if velocity is not None and velocity < 0:
         raise NegativeConnectionVelocity(
             connection_name=urdf_joint.name, velocity=velocity
         )
-    lower_limits.velocity = -velocity if velocity is not None else None
-    upper_limits.velocity = velocity if velocity is not None else None
-
-    return lower_limits, upper_limits
+    return DegreeOfFreedomLimits.from_position_range_and_speed(
+        lower_position=lower, upper_position=upper, maximum_speed=velocity
+    )
 
 
 @dataclass
@@ -143,9 +137,14 @@ class URDFParser(WorldModelParser):
         file_path: str,
         prefix: Optional[str] = None,
         path_resolver: Optional[PathResolver] = None,
+        use_visual_as_collision_backup: bool = False,
     ) -> URDFParser:
         if file_path.endswith(".xacro"):
-            return cls.from_xacro(file_path, prefix)
+            return cls.from_xacro(
+                file_path,
+                prefix,
+                use_visual_as_collision_backup=use_visual_as_collision_backup,
+            )
 
         path_resolver = path_resolver or CompositePathResolver()
 
@@ -155,7 +154,11 @@ class URDFParser(WorldModelParser):
                 # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them
                 with suppress_stdout_stderr():
                     urdf = file.read()
-        urdf_parser = cls(urdf=urdf, prefix=prefix)
+        urdf_parser = cls(
+            urdf=urdf,
+            prefix=prefix,
+            use_visual_as_collision_backup=use_visual_as_collision_backup,
+        )
         urdf_parser.path_resolver = path_resolver
         return urdf_parser
 
@@ -165,6 +168,7 @@ class URDFParser(WorldModelParser):
         xacro_path: str,
         prefix: Optional[str] = None,
         mappings: Optional[Dict[str, str]] = None,
+        use_visual_as_collision_backup: bool = False,
     ) -> URDFParser:
         """
         Creates a parser from a xacro file by expanding it to URDF.
@@ -176,11 +180,17 @@ class URDFParser(WorldModelParser):
         :param prefix: The prefix for every name used in this world.
         :param mappings: The xacro substitution arguments to apply during expansion (the
             ``arg`` values, e.g. ``{"ur_type": "ur5"}``).
+        :param use_visual_as_collision_backup: Whether a link that describes no
+            collision geometry collides with its visual geometry instead.
         :return: A parser for the world described by the expanded xacro file.
         """
         xacro_path = CompositePathResolver().resolve(xacro_path)
         urdf = process_file(xacro_path, mappings=mappings).toxml()
-        return URDFParser(urdf=urdf, prefix=prefix)
+        return URDFParser(
+            urdf=urdf,
+            prefix=prefix,
+            use_visual_as_collision_backup=use_visual_as_collision_backup,
+        )
 
     def parse(self) -> World:
         prefix = self.parsed.name
@@ -264,11 +274,7 @@ class URDFParser(WorldModelParser):
             dof_name = PrefixedName(joint.mimic.joint, prefix)
 
         if dof_name not in [d.name for d in world.degrees_of_freedom]:
-            lower_limits, upper_limits = urdf_joint_to_limits(joint)
-            dof = DegreeOfFreedom(
-                name=dof_name,
-                limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
-            )
+            dof = DegreeOfFreedom(name=dof_name, limits=urdf_joint_to_limits(joint))
             world.add_degree_of_freedom(dof)
         else:
             dof = world.get_degree_of_freedom_by_name(dof_name)
@@ -321,6 +327,8 @@ class URDFParser(WorldModelParser):
         body = Body(name=name)
         visuals = self.parse_geometry(link.visuals, body)
         collisions = self.parse_geometry(link.collisions, body)
+        if not collisions.shapes and self.use_visual_as_collision_backup:
+            collisions = self.parse_geometry(link.visuals, body)
         body.visual = visuals
         body.collision = collisions
         inertial = self.parse_inertial(link, body)

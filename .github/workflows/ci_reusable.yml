@@ -52,6 +52,17 @@ jobs:
           source /opt/ros/cram-env/bin/activate
           uv pip install drake
 
+      - name: Install robokudo optional requirements
+        if: ${{ inputs.lib == 'robokudo' }}
+        env:
+          UV_CACHE_DIR: /opt/ros/.uv_cache
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/cram-env/bin/activate
+          # --no-sources keeps the editable workspace packages from being reinstalled from their paths;
+          # the CPU-only torch index avoids downloading the CUDA libraries onto the runner disk.
+          uv pip install -r robokudo/pyproject.toml --extra dev --no-sources --extra-index-url https://download.pytorch.org/whl/cpu
+
       - name: Restore cache
         uses: actions/cache/restore@v4
         with:

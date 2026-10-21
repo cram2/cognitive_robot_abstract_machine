@@ -31,7 +31,7 @@ import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
 import krrood.entity_query_language.factories as eql
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.orm.ormatic_interface import Base, PlanMappingDAO  # type: ignore
 from coraplex.plans.factories import sequential, try_in_order, code
 from coraplex.plans.failures import PlanFailure
@@ -247,7 +247,7 @@ def build_plan() -> Plan:
     )
 
     plan = root.plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     return plan

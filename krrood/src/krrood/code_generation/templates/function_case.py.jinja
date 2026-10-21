@@ -5,10 +5,12 @@ from typing_extensions import ClassVar, Callable, TYPE_CHECKING
 from {{ base_class_module }} import {{ base_class_name }}
 {{ import_line }}
 
+{% if type_imports %}
 if TYPE_CHECKING:
     {% for line in type_imports %}
     {{ line }}
     {% endfor %}
+{% endif %}
 
 
 @dataclass

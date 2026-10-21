@@ -21,7 +21,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProductUnit,
 )
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.plans.failures import (
     PlanFailure,
@@ -43,7 +43,12 @@ from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
 )
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Pose2D
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Point2,
+    Point3,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -120,7 +125,7 @@ class TrainingEnvironment(ABC):
                 node=rclpy.create_node("test_node"),
             )
 
-        with simulated_robot:
+        with kinematically_simulated_robot:
             try:
                 plan.perform()
             except EmptyUnderspecified:
@@ -193,7 +198,9 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         move_to_reach = a(MoveToReach)(
             reference_T_grasp=target_pose,
             target_pose_offset_robot=a(Pose2D)(
-                x=..., y=..., yaw=..., reference_frame=None
+                position=a(Point2)(x=..., y=..., reference_frame=None),
+                yaw=...,
+                reference_frame=None,
             ),
             hip_rotation=...,
             end_effector=variable(EndEffector, world.semantic_annotations),
@@ -220,10 +227,16 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         :return: The probabilistic backend
         """
         parameters = UnderspecifiedParameters(underspecified_action)
-        robot_x = parameters.variables["MoveToReach.target_pose_offset_robot.x"]
-        robot_y = parameters.variables["MoveToReach.target_pose_offset_robot.y"]
-        hip_rotation = parameters.variables["MoveToReach.hip_rotation"]
-        approach_clearance = parameters.variables["MoveToReach.approach_clearance"]
+        robot_x = parameters.variable_of(
+            underspecified_action.target_pose_offset_robot.position.x
+        )
+        robot_y = parameters.variable_of(
+            underspecified_action.target_pose_offset_robot.position.y
+        )
+        hip_rotation = parameters.variable_of(underspecified_action.hip_rotation)
+        approach_clearance = parameters.variable_of(
+            underspecified_action.approach_clearance
+        )
 
         distribution = fully_factorized(
             means={approach_clearance: 0.05},

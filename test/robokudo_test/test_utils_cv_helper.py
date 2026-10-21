@@ -5,6 +5,7 @@ import open3d as o3d
 import pytest
 from cv2 import boundingRect
 
+from robokudo.types.cv import ColorToDepthRatio
 import robokudo.cas
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -16,7 +17,6 @@ from robokudo.utils.cv_helper import (
     crop_image,
     get_hsv_for_bgr_color,
     get_scaled_color_image_for_depth_image,
-    get_scale_coordinates,
     draw_rectangle_around_center,
     clamp_bounding_rect,
     sanity_checks_bounding_rects,
@@ -130,7 +130,10 @@ class TestUtilsCVHelper(object):
 
         image = np.zeros((height, width, 3), dtype=np.uint8)
 
-        cas.set(robokudo.cas.CASViews.COLOR2DEPTH_RATIO, (scalex, scaley))
+        cas.set(
+            robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
+            ColorToDepthRatio(horizontal=scalex, vertical=scaley),
+        )
 
         annotator_in_pipeline.camera_intrinsics = copy.deepcopy(kinect_intrinsics)
 
@@ -144,32 +147,11 @@ class TestUtilsCVHelper(object):
         self, annotator_in_pipeline: BaseAnnotator
     ):
         cas = annotator_in_pipeline.get_cas()
-        cas.set(robokudo.cas.CASViews.COLOR2DEPTH_RATIO, None)
+        cas.set(robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO, None)
         image = np.zeros((640, 480, 3), dtype=np.uint8)
         assert pytest.raises(
             RuntimeError, get_scaled_color_image_for_depth_image, cas, image
         )
-
-    @pytest.mark.parametrize(
-        "scale_factor",
-        [
-            (1.0, 1.0),  # No scaling
-            (2.0, 2.0),  # Upscaling
-            (0.5, 0.5),  # Downscaling
-            (3.0, 2.0),  # Non-uniform scaling
-            (2.0, 3.0),  # Non-uniform scaling
-        ],
-    )
-    def test_get_scale_coordinates(self, scale_factor):
-        scalex, scaley = scale_factor
-        coordinates = (512, 512)
-        scaled_coordinates = get_scale_coordinates((scalex, scaley), coordinates)
-        assert np.all(
-            scaled_coordinates == (coordinates[0] * scalex, coordinates[1] * scaley)
-        ), f"Coordinates should be scaled to {scalex}, {scaley}"
-
-    def test_get_scaled_coordinates_no_depth_ratio(self):
-        assert pytest.raises(RuntimeError, get_scale_coordinates, None, (480, 320))
 
     @pytest.mark.parametrize(
         ["rgb", "hsv"],

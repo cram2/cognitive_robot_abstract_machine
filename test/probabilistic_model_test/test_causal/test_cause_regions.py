@@ -6,6 +6,8 @@ region however the circuit's support happens to write it.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
+from unittest.mock import PropertyMock, patch
 
 import pytest
 from random_events.interval import closed
@@ -24,7 +26,8 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
-from typing_extensions import Tuple
+from random_events.product_algebra import Event, SimpleEvent
+from typing_extensions import Any, List, Tuple
 
 
 @pytest.fixture
@@ -128,3 +131,98 @@ def test_each_region_holds_the_share_of_the_circuit_its_branches_carry(
     assert sorted(region.probability for region in regions) == pytest.approx(
         [0.25, 0.75]
     )
+
+
+# %% the order the regions come in
+
+
+@dataclass
+class SupportListedInReverse:
+    """
+    A support whose simple sets come in the reverse of their sorted order, standing in
+    for the order a support happens to list the branches of a circuit in.
+    """
+
+    support: Event
+    """
+    The support to list in reverse.
+    """
+
+    @property
+    def simple_sets(self) -> List[SimpleEvent]:
+        """
+        :return: The simple sets of the support, last one first.
+        """
+        return list(reversed(self.support.simple_sets))
+
+
+@pytest.fixture
+def two_equally_weighted_regions(
+    cause: Continuous, effect: Continuous
+) -> CausalCircuit:
+    """
+    A causal circuit whose two cause regions carry exactly the same weight, so that
+    nothing but the order of the regions can decide which of them a search picks.
+    """
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    for lower in (2.0, 0.0):
+        branch = ProductUnit(probabilistic_circuit=circuit)
+        for variable in (cause, effect):
+            branch.add_subcircuit(
+                leaf(
+                    UniformDistribution(
+                        variable=variable,
+                        interval=closed(lower, lower + 1.0).simple_sets[0],
+                    ),
+                    circuit,
+                )
+            )
+        root.add_subcircuit(branch, math.log(0.5))
+    return CausalCircuit.from_probabilistic_circuit(
+        circuit,
+        MarginalDeterminismTreeNode.from_causal_graph([cause], [effect]),
+        [cause],
+        [effect],
+    )
+
+
+def values_of(regions: List[SupportRegion], cause: Continuous) -> List[Any]:
+    """
+    :param regions: The regions a cause was split into.
+    :param cause: The cause the regions are of.
+    :return: The value of the cause in every region.
+    """
+    return [region.event.simple_sets[0][cause] for region in regions]
+
+
+def test_the_regions_come_in_the_order_of_their_values(
+    two_equally_weighted_regions: CausalCircuit, cause: Continuous
+) -> None:
+    """
+    The order a support happens to list its branches in must not reach the regions: a
+    search over regions of equal probability would otherwise pick between them by
+    whatever that order was, which is not fixed.
+    """
+    circuit = two_equally_weighted_regions.probabilistic_circuit
+    reversed_support = SupportListedInReverse(circuit.support)
+    with patch.object(
+        type(circuit), "support", new_callable=PropertyMock
+    ) as support_of_circuit:
+        support_of_circuit.return_value = reversed_support
+        regions = two_equally_weighted_regions._extract_disjoint_regions_for_variable(
+            cause
+        )
+    values = values_of(regions, cause)
+    assert values == sorted(values)
+
+
+def test_the_best_of_two_equally_good_regions_is_the_first_one(
+    two_equally_weighted_regions: CausalCircuit, cause: Continuous, effect: Continuous
+) -> None:
+    interventional = two_equally_weighted_regions.backdoor_adjustment(cause, effect)
+    best = two_equally_weighted_regions._best_disjoint_region(cause, interventional)
+    [first, _] = two_equally_weighted_regions._extract_disjoint_regions_for_variable(
+        cause
+    )
+    assert best == first.event

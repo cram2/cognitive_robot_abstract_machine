@@ -538,3 +538,60 @@ def test_a_shape_survives_a_json_round_trip(shape):
 
     assert restored == shape
     assert restored.to_json() == payload
+
+
+# %% a prism of equilateral cross-section
+
+PRISM_SIDE = 0.04
+"""
+Side of the triangular cross-section of the prism a test builds.
+"""
+
+PRISM_HEIGHT = 0.03
+"""
+Height of the prism a test builds.
+"""
+
+MESH_FILE_PRECISION = 1e-6
+"""
+How closely a mesh written to a file keeps its coordinates, in metres.
+"""
+
+
+def test_a_triangular_prism_has_the_side_and_height_it_is_built_with():
+    prism = Mesh.triangular_prism(side=PRISM_SIDE, height=PRISM_HEIGHT)
+    lower, upper = prism.mesh.bounds
+
+    np.testing.assert_allclose(
+        upper[1] - lower[1], PRISM_SIDE, atol=MESH_FILE_PRECISION
+    )
+    np.testing.assert_allclose(
+        upper[2] - lower[2], PRISM_HEIGHT, atol=MESH_FILE_PRECISION
+    )
+    np.testing.assert_allclose(
+        upper[0] - lower[0], PRISM_SIDE * math.sqrt(3) / 2, atol=MESH_FILE_PRECISION
+    )
+
+
+def test_a_triangular_prism_is_centred_on_its_bounding_box():
+    """
+    Centred on its bounding box rather than its centroid, the flat face and the apex
+    stand equally far from the middle, so two fingers closing along x meet both.
+    """
+    prism = Mesh.triangular_prism(side=PRISM_SIDE, height=PRISM_HEIGHT)
+    lower, upper = prism.mesh.bounds
+
+    np.testing.assert_allclose(
+        (lower + upper) / 2, np.zeros(3), atol=MESH_FILE_PRECISION
+    )
+
+
+def test_a_triangular_prism_points_its_apex_along_x():
+    prism = Mesh.triangular_prism(side=PRISM_SIDE, height=PRISM_HEIGHT)
+    vertices = prism.mesh.vertices
+    apex_x = vertices[:, 0].max()
+    face_x = vertices[:, 0].min()
+
+    assert np.sum(np.isclose(vertices[:, 0], apex_x)) < np.sum(
+        np.isclose(vertices[:, 0], face_x)
+    )

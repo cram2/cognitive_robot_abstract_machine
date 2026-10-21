@@ -19,6 +19,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 import robokudo.defs
+from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
 )
@@ -195,3 +196,16 @@ def isolate_blackboard() -> Iterator[None]:
     clear_blackboard()
     yield
     clear_blackboard()
+
+
+# %% annotator visualization output
+
+
+@pytest.fixture
+def annotator_output_buffer() -> AnnotatorOutputPerPipelineMap:
+    """
+    Provide the blackboard buffer annotators write their visualization output to.
+    """
+    buffer = AnnotatorOutputPerPipelineMap()
+    Blackboard().set("annotator_output_pipeline_map_buffer", buffer)
+    return buffer

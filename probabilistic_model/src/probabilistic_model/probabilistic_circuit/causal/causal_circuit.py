@@ -4,30 +4,30 @@ import copy
 import itertools
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Generic, List, Optional, Set, Tuple, Union
 
 from anytree import NodeMixin, PreOrderIter, findall
-from scipy.special import logsumexp
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.sigma_algebra import AbstractCompositeSet, AbstractSimpleSet
 from random_events.variable import Variable, compatible_types
+from sortedcontainers import SortedSet
 from tabulate import tabulate
 
 
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-    ProbabilisticCircuit,
-    ProductUnit,
-    SumUnit,
-    leaf,
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+
+from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
+    MixtureOverVariable,
+    RepresentationType,
 )
 
 
 from probabilistic_model.probabilistic_circuit.causal.exceptions import (
     SupportDeterminismViolation,
     MissingQueryVariableViolation,
-    UnnormalizedSumUnitViolation,
-    OverlappingChildSupportsViolation,
+    UnnormalizedMixtureViolation,
+    OverlappingComponentsViolation,
     SupportDeterminismVerificationResult,
     UnregisteredVariableError,
     EmptyInterventionalCircuitError,
@@ -41,8 +41,8 @@ class MarginalDeterminismTreeNode(NodeMixin):
     One node of a Marginal Determinism Variable Tree.
 
     Each node carries the Variable objects in its subtree and a query_set specifying
-    which Variables SumUnits at this level must be support-deterministic over. Support
-    determinism enables polytime backdoor adjustment.
+    which Variables the mixtures at this level must be support-deterministic over.
+    Support determinism enables polytime backdoor adjustment.
 
     Inherits from anytree.NodeMixin, which provides parent / children management,
     is_leaf and is_root properties, and PreOrderIter / findall traversal utilities.
@@ -51,7 +51,7 @@ class MarginalDeterminismTreeNode(NodeMixin):
     nodes manually.
 
     :param variables: All Variables in this node's subtree.
-    :param query_set: Variables for which SumUnits at this level must be support-
+    :param query_set: Variables for which the mixtures at this level must be support-
         deterministic. Defaults to an empty set.
     :param parent_node: Parent node in the tree. None for the root.
     """
@@ -61,7 +61,7 @@ class MarginalDeterminismTreeNode(NodeMixin):
 
     query_set: Set[Variable] = field(default=None)
     """
-    Variables for which SumUnits at this level must be support-deterministic.
+    Variables for which the mixtures at this level must be support-deterministic.
 
     Defaults to an empty set.
     """
@@ -288,33 +288,23 @@ class SupportRegion:
 
 
 @dataclass
-class CausalCircuit:
+class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
     """
-    A ProbabilisticCircuit extended with exact, tractable causal inference using the
-    marginal determinism framework. The Marginal Determinism Variable Tree structure
-    groups the registered cause variables for the support-determinism check that enables
-    polytime backdoor adjustment for any valid adjustment set Z; it does not represent
-    the causal graph itself, which the caller supplies implicitly by registering
-    causal_variables, effect_variables, and an adjustment set known to satisfy the
-    backdoor criterion.
+    A circuit that answers what the effect's distribution becomes when the cause is
+    intervened on.
 
-    Wraps a fitted ProbabilisticCircuit and adds:
-      - backdoor_adjustment()        — P(effect | do(cause)) as a new circuit
-      - verify_support_determinism() — structural validity check against the tree
-      - diagnose_failure()           — identify the most anomalous cause Variable
-
-    Use empty adjustment sets for independent randomised training data.
-    Supply confounder Variables for correlated deployment data.
+    The interventional circuit comes back in the representation the circuit was read
+    from.
     """
 
-    probabilistic_circuit: ProbabilisticCircuit
+    probabilistic_circuit: RepresentationType
     """
     The fitted circuit that encodes the joint distribution over all variables.
     """
 
     marginal_determinism_tree: MarginalDeterminismTreeNode
     """
-    Tree encoding which Variables SumUnits must be support-deterministic over.
+    Tree encoding which Variables the mixtures must be support-deterministic over.
     """
 
     causal_variables: List[Variable]
@@ -334,17 +324,15 @@ class CausalCircuit:
     @classmethod
     def from_probabilistic_circuit(
         cls,
-        circuit: ProbabilisticCircuit,
+        circuit: RepresentationType,
         marginal_determinism_tree: MarginalDeterminismTreeNode,
         causal_variables: List[Variable],
         effect_variables: List[Variable],
-    ) -> CausalCircuit:
+    ) -> CausalCircuit[RepresentationType]:
         """
-        Construct a CausalCircuit from an existing ProbabilisticCircuit without
-        retraining.
+        Construct a CausalCircuit from an existing circuit without retraining.
 
-        :param circuit: A fitted ProbabilisticCircuit over all causal and effect
-            variables.
+        :param circuit: A fitted circuit over all causal and effect variables.
         :param marginal_determinism_tree: Tree encoding support-determinism constraints.
         :param causal_variables: Ordered list of cause Variables.
         :param effect_variables: Ordered list of effect Variables.
@@ -376,139 +364,98 @@ class CausalCircuit:
             )
         ]
 
-    def _check_sum_units_normalized(self) -> List[UnnormalizedSumUnitViolation]:
+    def _check_mixtures_normalized(self) -> List[UnnormalizedMixtureViolation]:
         """
-        Check that every SumUnit's log-weights sum to log(1).
+        Check that the log-weights of every mixture sum to log(1).
 
-        :returns: List of violations, empty if all SumUnits are normalised.
+        :returns: List of violations, empty if all mixtures are normalised.
         """
-        violations: List[UnnormalizedSumUnitViolation] = []
-        for node in self.probabilistic_circuit.nodes():
-            if isinstance(node, SumUnit) and not node.is_normalized():
-                violations.append(
-                    UnnormalizedSumUnitViolation(
-                        sum_unit_index=node.index,
-                        actual_log_weight_sum=float(logsumexp(node.log_weights)),
-                    )
-                )
-        return violations
+        return [
+            UnnormalizedMixtureViolation(
+                mixture=unnormalized.mixture,
+                actual_log_weight_sum=unnormalized.log_weight_sum,
+            )
+            for unnormalized in self.probabilistic_circuit.unnormalized_mixtures()
+        ]
 
     @staticmethod
-    def _child_marginals_split_on_variable(
-        child_marginals: List[Any],
+    def _components_split_on_variable(
+        component_supports: List[Event],
     ) -> bool:
         """
-        Return True if the child marginals are not all the same.
+        Whether the mixture splits on the query Variable, which it does as soon as its
+        components differ in their support there, disjointly or not.
 
-        A SumUnit is treated as a split node for a query Variable as soon as its
-        children differ in their support on that Variable, whether or not any pair of
-        them is disjoint: children that overlap without coinciding, as a mixture of one
-        copy of a template per sampled value builds, leave no disjoint regions to
-        intervene on either. SumUnits whose children all share the same marginal (for
-        example a sibling SumUnit in a ProductUnit that has no relationship to this
-        variable) are not split nodes and must be skipped to avoid false positives. A
-        SumUnit with fewer than two children has nothing to split on.
-
-        :param child_marginals: Marginal support events, one per SumUnit child.
-        :returns: True if any two marginals differ.
+        :param component_supports: Support events, one per component of the mixture.
+        :returns: True if any two supports differ.
         """
-        if len(child_marginals) < 2:
+        if len(component_supports) < 2:
             return False
-        first, *others = child_marginals
+        first, *others = component_supports
         return any(other != first for other in others)
 
     @staticmethod
-    def _overlapping_pair_exists(child_marginals: List[Any]) -> bool:
+    def _overlapping_pair_exists(component_supports: List[Event]) -> bool:
         """
-        Return True if any pair of child marginals intersects in more than a boundary.
+        Return True if any pair of component supports intersects in more than a
+        boundary.
 
         Two continuous regions that only touch at an endpoint, as neighbouring leaves of
         a fitted tree do, intersect in a set of size zero and do not overlap.
 
-        :param child_marginals: Marginal support events, one per SumUnit child.
+        :param component_supports: Support events, one per component of the mixture.
         :returns: True if any pair overlaps.
         """
         return any(
             first.intersection_with(second).size > 0
-            for first, second in itertools.combinations(child_marginals, 2)
+            for first, second in itertools.combinations(component_supports, 2)
         )
 
-    def _check_sum_unit_for_variable(
-        self,
-        node: SumUnit,
-        child_marginals: List[Any],
-        query_variable: Variable,
-    ) -> Optional[OverlappingChildSupportsViolation]:
+    def _check_mixture_for_variable(
+        self, mixture: MixtureOverVariable
+    ) -> Optional[OverlappingComponentsViolation]:
         """
-        Check a single SumUnit for disjoint children, given each child's support already
-        restricted to query_variable.
+        Check a single mixture for disjoint components, given each component's support
+        already restricted to one query Variable.
 
-        Returns a violation if the SumUnit splits on the variable but has at least one
-        overlapping child pair. Returns None if the SumUnit does not split on the
-        variable, or if all splitting children are pairwise disjoint.
+        Returns a violation if the mixture splits on the variable but has at least one
+        overlapping pair of components. Returns None if the mixture does not split on
+        the variable, or if all splitting components are pairwise disjoint.
 
-        :param node: The SumUnit to inspect.
-        :param child_marginals: Each child's own support, restricted to query_variable.
-        :param query_variable: The query Variable being checked.
-        :returns: A violation if overlapping children are detected, else None.
+        :param mixture: The mixture, seen through the query Variable being checked.
+        :returns: A violation if overlapping components are detected, else None.
         """
-        if not self._child_marginals_split_on_variable(child_marginals):
+        if not self._components_split_on_variable(mixture.component_supports):
             return None
-        if self._overlapping_pair_exists(child_marginals):
-            return OverlappingChildSupportsViolation(
-                sum_unit_index=node.index,
-                query_variable=query_variable,
+        if self._overlapping_pair_exists(mixture.component_supports):
+            return OverlappingComponentsViolation(
+                mixture=mixture.mixture,
+                query_variable=mixture.variable,
             )
         return None
 
     def _check_support_disjointness(
         self, all_query_variables: Set[Variable]
-    ) -> List[OverlappingChildSupportsViolation]:
+    ) -> List[OverlappingComponentsViolation]:
         """
-        Check that for each declared query Variable, no SumUnit that splits on that
-        Variable has children with overlapping marginal support.
-
-        Reads each child's own already-computed joint support directly and restricts it
-        to one query Variable with a pure ``Event.marginal`` projection, rather than
-        calling ``ProbabilisticCircuit.marginal`` per Variable: that path simplifies the
-        circuit, flattening nested SumUnits and erasing exactly the branch boundaries
-        this check needs.
+        Check that for each declared query Variable, no mixture that splits on that
+        Variable has components with overlapping support.
 
         :param all_query_variables: Union of all Variables across all query_sets.
         :returns: List of violations, empty if all split nodes are support-disjoint.
         """
-        violations: List[OverlappingChildSupportsViolation] = []
-        # Computed for its side effect: populates result_of_current_query on every
-        # node of the circuit's own (unflattened) structure, read directly off each
-        # SumUnit's children in the loop below.
-        _ = self.probabilistic_circuit.support
-
-        for layer in self.probabilistic_circuit.layers:
-            for node in layer:
-                if not isinstance(node, SumUnit) or len(node.subcircuits) < 2:
-                    continue
-
-                for query_variable in all_query_variables:
-                    if query_variable not in node.variables:
-                        continue
-
-                    child_marginals = [
-                        child.result_of_current_query.marginal([query_variable])
-                        for child in node.subcircuits
-                    ]
-
-                    violation = self._check_sum_unit_for_variable(
-                        node, child_marginals, query_variable
-                    )
-                    if violation is not None:
-                        violations.append(violation)
-
-        return violations
+        violations = [
+            self._check_mixture_for_variable(mixture)
+            for mixture in self.probabilistic_circuit.mixtures_over(
+                SortedSet(all_query_variables)
+            )
+        ]
+        return [violation for violation in violations if violation is not None]
 
     def verify_support_determinism(self) -> SupportDeterminismVerificationResult:
         """
         Verify support determinism of the circuit against the Marginal Determinism
-        Variable Tree. Runs three checks in order — variable existence, SumUnit
+        Variable Tree. Runs three checks in order — variable existence, mixture
         normalization, and pairwise support disjointness for all declared query
         Variables. Returns early after Check 1 if any Variables are missing, since
         Variable objects are required for marginalisation in Check 3.
@@ -535,7 +482,7 @@ class CausalCircuit:
                 circuit_variables=list(self.probabilistic_circuit.variables),
             )
 
-        violations += self._check_sum_units_normalized()
+        violations += self._check_mixtures_normalized()
         violations += self._check_support_disjointness(all_query_variables)
 
         result = SupportDeterminismVerificationResult(
@@ -553,10 +500,9 @@ class CausalCircuit:
         cause_variable: Variable,
         effect_variable: Variable,
         adjustment_variables: List[Variable] = None,
-        query_resolution: float = 0.005,
-    ) -> ProbabilisticCircuit:
+    ) -> RepresentationType:
         """
-        Compute P(effect | do(cause)) as a new ProbabilisticCircuit.
+        Compute P(effect | do(cause)) as a new circuit of the same type.
 
         With empty adjustment set:
             P(effect | do(cause=v)) = P(effect | cause=v)
@@ -571,9 +517,11 @@ class CausalCircuit:
         :param effect_variable: A registered effect Variable.
         :param adjustment_variables: Variables to adjust for. Empty list performs
             no adjustment. Defaults to None, treated as empty.
-        :param query_resolution: Half-width of the interval used when querying
-            point probabilities. Defaults to 0.005.
         :returns: Joint interventional circuit over (cause, effect).
+        :raises UnregisteredVariableError: If the cause or the effect Variable was not
+            registered at construction time.
+        :raises EmptyInterventionalCircuitError: If no cause region has an effect
+            distribution to pair with.
         """
         if cause_variable not in self.causal_variables:
             raise UnregisteredVariableError(
@@ -587,196 +535,161 @@ class CausalCircuit:
                 registered_names=[v.name for v in self.effect_variables],
                 role="effect",
             )
-        if adjustment_variables is None:
-            adjustment_variables = []
-
-        if not adjustment_variables:
-            return self._compute_interventional_circuit_without_adjustment(
-                cause_variable, effect_variable, query_resolution
-            )
-        return self._compute_interventional_circuit_with_adjustment(
-            cause_variable,
-            effect_variable,
-            adjustment_variables,
-            query_resolution,
+        return self._interventional_circuit(
+            cause_variable, effect_variable, adjustment_variables or []
         )
 
-    def _build_product_unit_for_region(
+    def _circuit_truncated_to(self, event: Event) -> Optional[RepresentationType]:
+        """
+        Truncate a copy of the wrapped circuit to an event.
+
+        :param event: The event to truncate to, over some of the circuit's variables.
+        :returns: The truncated copy, or None if the event is impossible.
+        """
+        truncated, _ = copy.deepcopy(self.probabilistic_circuit).log_truncated_in_place(
+            event.fill_missing_variables_pure(self.probabilistic_circuit.variables)
+        )
+        return truncated
+
+    def _product_for_cause_region(
         self,
-        cause_event: Any,
-        cause_weight: float,
-        effect_variable: Variable,
-        cause_marginal_circuit: ProbabilisticCircuit,
-        conditioned_circuit: ProbabilisticCircuit,
-        output_circuit: ProbabilisticCircuit,
-        root_sum_unit: SumUnit,
-    ) -> bool:
+        cause_region: SupportRegion,
+        effect_branch: RepresentationType,
+        cause_marginal_circuit: RepresentationType,
+    ) -> Optional[RepresentationType]:
         """
-        Build one ProductUnit for a single cause region and attach it to root_sum_unit.
+        Build one branch of the interventional circuit: the cause restricted to its own
+        region, multiplied by the effect distribution that region implies.
 
-        Truncates conditioned_circuit to the cause region, extracts the effect marginal,
-        truncates cause_marginal_circuit to the cause region, then assembles a
-        ProductUnit of (cause branch, effect branch) weighted by cause_weight.
-
-        :param cause_event: Composite event defining the cause support region.
-        :param cause_weight: Probability mass of this cause region.
-        :param effect_variable: The effect Variable to marginalise onto.
+        :param cause_region: The cause region this branch stands for.
+        :param effect_branch: The effect distribution within the region.
         :param cause_marginal_circuit: Marginal circuit over the cause Variable.
-        :param conditioned_circuit: Full circuit to truncate to the cause region.
-        :param output_circuit: Circuit to attach the new ProductUnit to.
-        :param root_sum_unit: SumUnit to attach the weighted ProductUnit to.
-        :returns: True if the ProductUnit was successfully added, False if cause
-            truncation produced an empty circuit.
+        :returns: The product, or None if the region is empty in the cause marginal.
         """
-        truncated_circuit, _ = copy.deepcopy(
-            conditioned_circuit
-        ).log_truncated_in_place(
-            cause_event.fill_missing_variables_pure(conditioned_circuit.variables)
+        cause_branch, _ = copy.deepcopy(cause_marginal_circuit).log_truncated_in_place(
+            cause_region.event.fill_missing_variables_pure(
+                cause_marginal_circuit.variables
+            )
         )
-        if truncated_circuit is None:
-            return False
-
-        effect_marginal_circuit = truncated_circuit.marginal([effect_variable])
-        cause_region_circuit, _ = copy.deepcopy(
-            cause_marginal_circuit
-        ).log_truncated_in_place(
-            cause_event.fill_missing_variables_pure(cause_marginal_circuit.variables)
+        if cause_branch is None:
+            return None
+        return type(self.probabilistic_circuit).product_of(
+            [cause_branch, effect_branch]
         )
-        if cause_region_circuit is None:
-            return False
 
-        product_unit = ProductUnit(probabilistic_circuit=output_circuit)
-        product_unit.attach_marginal_circuit(cause_region_circuit, output_circuit)
-        product_unit.attach_marginal_circuit(effect_marginal_circuit, output_circuit)
-        root_sum_unit.add_subcircuit(product_unit, math.log(cause_weight))
-        return True
-
-    def _compute_interventional_circuit_without_adjustment(
+    def _interventional_circuit(
         self,
         cause_variable: Variable,
         effect_variable: Variable,
-        query_resolution: float,
-    ) -> ProbabilisticCircuit:
+        adjustment_variables: List[Variable],
+    ) -> RepresentationType:
         """
-        Compute P(cause, effect | do(cause)) with an empty adjustment set.
-
-        Returns a joint circuit over (cause, effect) as a SumUnit of
-        ProductUnits, one per disjoint cause support region.
-
-        Structure::
-
-            SumUnit [weight = P(cause in region_i)]
-                ProductUnit
-                    cause branch  (UniformDistribution over region_i)
-                    effect branch (P(effect | cause in region_i))
+        Compute P(cause, effect | do(cause)): a mixture over the disjoint cause regions,
+        each a product of the cause marginal restricted to that region with the effect
+        distribution that region implies.
 
         :param cause_variable: The cause Variable to intervene on.
         :param effect_variable: The effect Variable to compute the distribution over.
-        :param query_resolution: Half-width passed through to region extraction.
+        :param adjustment_variables: Variables to adjust for, possibly none.
         :returns: Joint interventional circuit over (cause, effect).
+        :raises EmptyInterventionalCircuitError: If no cause region has an effect
+            distribution to pair with.
         """
         cause_marginal_circuit = copy.deepcopy(self.probabilistic_circuit).marginal(
             [cause_variable]
         )
-        output_circuit = ProbabilisticCircuit()
-        root_sum_unit = SumUnit(probabilistic_circuit=output_circuit)
-        regions_added = sum(
-            self._build_product_unit_for_region(
-                cause_event=region.event,
-                cause_weight=region.probability,
-                effect_variable=effect_variable,
-                cause_marginal_circuit=cause_marginal_circuit,
-                conditioned_circuit=copy.deepcopy(self.probabilistic_circuit),
-                output_circuit=output_circuit,
-                root_sum_unit=root_sum_unit,
+        adjustment_partitions = self._adjustment_partitions(adjustment_variables)
+        products: List[RepresentationType] = []
+        log_weights: List[float] = []
+        for cause_region in self._extract_disjoint_regions_for_variable(cause_variable):
+            effect_branch = self._effect_branch_for_cause_region(
+                cause_region, effect_variable, adjustment_partitions
             )
-            for region in self._extract_disjoint_regions_for_variable(cause_variable)
-            if region.probability > 0.0
-        )
+            if effect_branch is None:
+                continue
+            product = self._product_for_cause_region(
+                cause_region, effect_branch, cause_marginal_circuit
+            )
+            if product is None:
+                continue
+            products.append(product)
+            log_weights.append(math.log(cause_region.probability))
 
-        if regions_added == 0:
+        if not products:
             raise EmptyInterventionalCircuitError(
                 cause_variable_name=cause_variable.name,
-                adjustment_variable_names=[],
+                adjustment_variable_names=[
+                    variable.name for variable in adjustment_variables
+                ],
             )
-        return output_circuit
+        return type(self.probabilistic_circuit).mixture_of(products, log_weights)
 
-    @staticmethod
-    def _attach_weighted_marginal(
-        sum_unit: SumUnit,
-        marginal_circuit: ProbabilisticCircuit,
-        log_weight: float,
-        target_circuit: ProbabilisticCircuit,
-    ) -> None:
+    def _adjustment_partitions(
+        self, adjustment_variables: List[Variable]
+    ) -> List[SupportRegion]:
         """
-        Attach marginal_circuit's root as a weighted child of sum_unit, constructing
-        fresh nodes owned by target_circuit.
-
-        The :class:`ProductUnit` counterpart of this,
-        ``ProductUnit.attach_marginal_circuit``, attaches its child unweighted (a
-        product's factors carry no individual weight); this instead gives the new child
-        *log_weight*, since a SumUnit's children each need one.
-
-        marginal() and log_truncated_in_place() return flat circuits (SumUnit -> leaves,
-        or a single leaf), so one level of recursion suffices to copy all nodes into
-        target_circuit.
-
-        :param sum_unit: The SumUnit to attach the new weighted child to.
-        :param marginal_circuit: The marginal or truncated circuit whose root to attach.
-        :param log_weight: The log-weight the new child is attached with.
-        :param target_circuit: The owning circuit for all newly created nodes.
+        :param adjustment_variables: Variables to adjust for, possibly none.
+        :returns: One region per distinct value combination of the adjustment variables
+            with positive probability -- together they partition the population into
+            disjoint, exhaustive groups. Empty if there is nothing to adjust for.
         """
-        root = marginal_circuit.root
-        if isinstance(root, SumUnit):
-            new_sum_unit = SumUnit(probabilistic_circuit=target_circuit)
-            for child_log_weight, child_subcircuit in root.log_weighted_subcircuits:
-                new_sum_unit.add_subcircuit(
-                    leaf(copy.deepcopy(child_subcircuit.distribution), target_circuit),
-                    child_log_weight,
-                )
-            sum_unit.add_subcircuit(new_sum_unit, log_weight)
-        else:
-            sum_unit.add_subcircuit(
-                leaf(copy.deepcopy(root.distribution), target_circuit), log_weight
+        if not adjustment_variables:
+            return []
+        return [
+            partition
+            for partition in self._extract_leaf_regions_for_variables(
+                adjustment_variables
             )
+            if partition.probability > 0.0
+        ]
 
-    def _add_region_for_cause_value(
+    def _effect_branch_for_cause_region(
         self,
         cause_region: SupportRegion,
-        adjustment_partitions: List[SupportRegion],
         effect_variable: Variable,
-        cause_marginal_circuit: ProbabilisticCircuit,
-        output_circuit: ProbabilisticCircuit,
-        root_sum_unit: SumUnit,
-    ) -> bool:
+        adjustment_partitions: List[SupportRegion],
+    ) -> Optional[RepresentationType]:
         """
-        Build one ProductUnit for cause_region and attach it to root_sum_unit, weighted
-        by cause_region's own marginal probability.
+        Build the effect side of one branch of the interventional circuit.
 
-        The ProductUnit's effect side is ``sum_z P(effect | cause=v, Z=z) * P(Z=z)``: a
-        SumUnit over each adjustment partition's own conditional effect distribution,
-        weighted by that partition's probability and renormalized (some adjustment
-        partitions may have zero joint probability with this cause region and be
-        skipped, so the weights that remain do not already sum to 1). Weighting the
-        ProductUnit itself by P(cause=v) -- not by any per-adjustment-partition weight
-        -- is what keeps the circuit a valid joint distribution overall (weights across
-        every cause region still sum to 1) while truncating to this one region recovers
-        exactly the deconfounded mixture, regardless of that region's own absolute
-        weight.
-
-        :param cause_region: The cause value/region to build this ProductUnit for.
-        :param adjustment_partitions: One :class:`SupportRegion` per distinct value
-            combination of the adjustment variables (``adjustment_variables`` in
-            :meth:`_compute_interventional_circuit_with_adjustment`) -- together they
-            partition the population into disjoint, exhaustive groups.
+        :param cause_region: The cause region the branch stands for.
         :param effect_variable: The effect Variable to marginalise onto.
-        :param cause_marginal_circuit: Marginal circuit over the cause Variable.
-        :param output_circuit: Circuit to attach the new ProductUnit to.
-        :param root_sum_unit: SumUnit to attach the weighted ProductUnit to.
-        :returns: True if the ProductUnit was successfully added, False if every
-            adjustment partition's joint truncation with this cause region was empty.
+        :param adjustment_partitions: The adjustment partitions, empty when there is
+            nothing to adjust for.
+        :returns: The effect distribution within the region, or None if the region is
+            impossible.
         """
-        effect_mixture = SumUnit(probabilistic_circuit=output_circuit)
+        if not adjustment_partitions:
+            truncated = self._circuit_truncated_to(cause_region.event)
+            if truncated is None:
+                return None
+            return truncated.marginal([effect_variable])
+        return self._effect_branch_adjusted_over(
+            cause_region, effect_variable, adjustment_partitions
+        )
+
+    def _effect_branch_adjusted_over(
+        self,
+        cause_region: SupportRegion,
+        effect_variable: Variable,
+        adjustment_partitions: List[SupportRegion],
+    ) -> Optional[RepresentationType]:
+        """
+        Build ``sum_z P(effect | cause in region, Z=z) * P(Z=z)`` as a mixture over the
+        adjustment partitions, each weighted by its own probability.
+
+        Partitions that are empty within this cause region are left out, so the mixture
+        renormalizes the weights that remain.
+
+        :param cause_region: The cause region the branch stands for.
+        :param effect_variable: The effect Variable to marginalise onto.
+        :param adjustment_partitions: One region per distinct value combination of the
+            adjustment variables.
+        :returns: The adjusted effect distribution, or None if every partition's joint
+            truncation with this cause region was empty.
+        """
+        components: List[RepresentationType] = []
+        log_weights: List[float] = []
         for adjustment_partition in adjustment_partitions:
             # fill first: intersection_with keeps only the left operand's variables.
             joint_event = adjustment_partition.event.fill_missing_variables_pure(
@@ -786,101 +699,20 @@ class CausalCircuit:
                     self.probabilistic_circuit.variables
                 )
             )
-            joint_conditioned_circuit, _ = copy.deepcopy(
-                self.probabilistic_circuit
-            ).log_truncated_in_place(joint_event)
-            if joint_conditioned_circuit is None:
+            truncated = self._circuit_truncated_to(joint_event)
+            if truncated is None:
                 continue
-            self._attach_weighted_marginal(
-                effect_mixture,
-                joint_conditioned_circuit.marginal([effect_variable]),
-                math.log(adjustment_partition.probability),
-                output_circuit,
-            )
+            components.append(truncated.marginal([effect_variable]))
+            log_weights.append(math.log(adjustment_partition.probability))
 
-        if len(effect_mixture.log_weights) == 0:
-            output_circuit.remove_node(effect_mixture)
-            return False
-        effect_mixture.normalize()
-
-        cause_region_circuit, _ = copy.deepcopy(
-            cause_marginal_circuit
-        ).log_truncated_in_place(
-            cause_region.event.fill_missing_variables_pure(
-                cause_marginal_circuit.variables
-            )
-        )
-        if cause_region_circuit is None:
-            # effect_mixture is already part of output_circuit; a skipped region
-            # must not leave it and its subtree behind as a second root.
-            output_circuit.remove_node_and_successor_structure(effect_mixture)
-            return False
-
-        product_unit = ProductUnit(probabilistic_circuit=output_circuit)
-        product_unit.attach_marginal_circuit(cause_region_circuit, output_circuit)
-        # effect_mixture already belongs to output_circuit, so attach it directly
-        # rather than through attach_marginal_circuit.
-        product_unit.add_subcircuit(effect_mixture)
-        root_sum_unit.add_subcircuit(product_unit, math.log(cause_region.probability))
-        return True
-
-    def _compute_interventional_circuit_with_adjustment(
-        self,
-        cause_variable: Variable,
-        effect_variable: Variable,
-        adjustment_variables: List[Variable],
-        query_resolution: float,
-    ) -> ProbabilisticCircuit:
-        """
-        Compute P(cause, effect | do(cause)) with a non-empty adjustment set Z.
-
-        Implements:
-            P(effect | do(cause=v)) = sum_z P(effect | cause=v, Z=z) * P(Z=z)
-
-        :param cause_variable: The cause Variable to intervene on.
-        :param effect_variable: The effect Variable to compute the distribution over.
-        :param adjustment_variables: Variables to condition on and marginalise over.
-        :param query_resolution: Half-width passed through to region extraction.
-        :returns: Joint interventional circuit over (cause, effect).
-        """
-        cause_marginal_circuit = copy.deepcopy(self.probabilistic_circuit).marginal(
-            [cause_variable]
-        )
-        adjustment_partitions = [
-            adjustment_partition
-            for adjustment_partition in self._extract_leaf_regions_for_variables(
-                adjustment_variables
-            )
-            if adjustment_partition.probability > 0.0
-        ]
-        output_circuit = ProbabilisticCircuit()
-        root_sum_unit = SumUnit(probabilistic_circuit=output_circuit)
-        regions_added = sum(
-            self._add_region_for_cause_value(
-                cause_region=cause_region,
-                adjustment_partitions=adjustment_partitions,
-                effect_variable=effect_variable,
-                cause_marginal_circuit=cause_marginal_circuit,
-                output_circuit=output_circuit,
-                root_sum_unit=root_sum_unit,
-            )
-            for cause_region in self._extract_disjoint_regions_for_variable(
-                cause_variable
-            )
-            if cause_region.probability > 0.0
-        )
-
-        if regions_added == 0:
-            raise EmptyInterventionalCircuitError(
-                cause_variable_name=cause_variable.name,
-                adjustment_variable_names=[v.name for v in adjustment_variables],
-            )
-        return output_circuit
+        if not components:
+            return None
+        return type(self.probabilistic_circuit).mixture_of(components, log_weights)
 
     def _extract_leaf_regions_for_variable(
         self,
         variable: Variable,
-        base_circuit: ProbabilisticCircuit = None,
+        base_circuit: RepresentationType = None,
     ) -> List[SupportRegion]:
         """
         Return a :class:`SupportRegion` for each support region of variable.
@@ -905,33 +737,30 @@ class CausalCircuit:
                 regions.append(SupportRegion(region_event, float(probability)))
         return regions
 
+    def number_of_regions_of(self, variable: Variable) -> int:
+        """
+        :param variable: The Variable to count the regions of.
+        :returns: How many disjoint support regions the circuit splits the Variable
+            into, which is how many branches :meth:`backdoor_adjustment` builds for it
+            as a cause, and how many values it enumerates for it as an adjustment
+            variable.
+        """
+        return len(self._extract_disjoint_regions_for_variable(variable))
+
     def _extract_disjoint_regions_for_variable(
         self,
         variable: Variable,
-        base_circuit: ProbabilisticCircuit = None,
+        base_circuit: RepresentationType = None,
     ) -> List[SupportRegion]:
         """
-        Return a :class:`SupportRegion` for each structurally disjoint support region of
-        variable, read from the circuit's unmarginalized joint support.
-
-        Reads variable's value directly off the joint support's own disjoint simple
-        sets, rather than marginalizing down to variable alone first: marginalizing
-        first would coalesce separate SumUnit branches into one region, which
-        `backdoor_adjustment` cannot use since it builds one ProductUnit per region
-        here, pairing each region's own cause branch with its own effect branch. Support
-        determinism (see `verify_support_determinism`) guarantees these branches are
-        genuinely disjoint, so the regions returned here correspond to actual circuit
-        branches rather than an arbitrary decomposition.
-
-        A single branch can itself hold several of the variable's ranges or values, so
-        `_split_into_atomic_values` splits each branch's value into its elements and the
-        regions are grouped by element. A range two branches both hold is then one
-        region carrying the probability of both, not one region per branch.
+        The disjoint support regions a variable takes, one per distinct value the
+        circuit's branches hold, each carrying the probability of every branch holding
+        it.
 
         :param variable: The Variable whose disjoint support regions to extract.
         :param base_circuit: Circuit to query. Defaults to self.probabilistic_circuit.
         :returns: List of regions, one per disjoint region, each with positive
-            probability.
+            probability, in the order of their values.
         """
         circuit = (
             base_circuit if base_circuit is not None else self.probabilistic_circuit
@@ -951,7 +780,7 @@ class CausalCircuit:
                     regions_by_value[value] = SupportRegion(
                         region_event, float(probability)
                     )
-        return list(regions_by_value.values())
+        return [regions_by_value[value] for value in sorted(regions_by_value)]
 
     @staticmethod
     def _split_into_atomic_values(
@@ -977,18 +806,13 @@ class CausalCircuit:
     def _best_disjoint_region(
         self,
         variable: Variable,
-        interventional_circuit: ProbabilisticCircuit,
+        interventional_circuit: RepresentationType,
     ) -> Optional[Event]:
         """
-        Return the structurally disjoint support region of variable (see
-        `_extract_disjoint_regions_for_variable`) with the highest interventional
-        probability, or None if no regions are found.
+        The disjoint support region of a variable the interventional circuit gives the
+        highest probability, or None where it has none.
 
-        The disjoint counterpart of `_best_region`: use this when telling one SumUnit
-        branch's region apart from another's matters (for example, ranking several
-        candidate cause Variables against each other), since `_best_region` cannot --
-        its regions come from `_extract_leaf_regions_for_variable`, which always
-        collapses to variable's whole support as a single region.
+        Regions of equal probability are decided by the order of their values.
 
         :param variable: The Variable whose disjoint support regions to search.
         :param interventional_circuit: Joint circuit used to score each region.
@@ -1026,7 +850,8 @@ class CausalCircuit:
         coalescing that method exists to undo for a single variable.
 
         :param variables: Variables whose joint support regions to extract.
-        :returns: List of regions, one per joint region, each with positive probability.
+        :returns: List of regions, one per joint region, each with positive probability,
+            in the order of their values.
         """
         regions_by_values: Dict[Any, SupportRegion] = {}
         joint_support = self.probabilistic_circuit.support.marginal(variables)
@@ -1050,11 +875,11 @@ class CausalCircuit:
                     regions_by_values[combination] = SupportRegion(
                         region_event, float(probability)
                     )
-        return list(regions_by_values.values())
+        return [regions_by_values[values] for values in sorted(regions_by_values)]
 
     def _query_probability_at_value(
         self,
-        interventional_circuit: ProbabilisticCircuit,
+        interventional_circuit: RepresentationType,
         cause_variable: Variable,
         value: float,
         query_resolution: float,
@@ -1080,7 +905,7 @@ class CausalCircuit:
     def _best_region(
         self,
         cause_variable: Variable,
-        interventional_circuit: ProbabilisticCircuit,
+        interventional_circuit: RepresentationType,
     ) -> Optional[Event]:
         """
         Return the cause support region with the highest interventional probability, or
@@ -1115,7 +940,7 @@ class CausalCircuit:
         effect_variable: Variable,
         adjustment_variables: List[Variable],
         query_resolution: float,
-    ) -> Tuple[Dict[str, Any], ProbabilisticCircuit]:
+    ) -> Tuple[Dict[str, Any], RepresentationType]:
         """
         Run diagnosis for a single cause Variable at its observed value.
 
@@ -1130,7 +955,6 @@ class CausalCircuit:
             cause_variable,
             effect_variable,
             adjustment_variables,
-            query_resolution,
         )
         probability_at_observed = self._query_probability_at_value(
             interventional_circuit,
@@ -1181,7 +1005,7 @@ class CausalCircuit:
             adjustment_variables = []
 
         all_variable_results: Dict[Variable, Dict[str, Any]] = {}
-        interventional_circuits_by_cause: Dict[Variable, ProbabilisticCircuit] = {}
+        interventional_circuits_by_cause: Dict[Variable, RepresentationType] = {}
 
         for cause_variable in self.causal_variables:
             if cause_variable not in observed_values or not cause_variable.is_numeric:

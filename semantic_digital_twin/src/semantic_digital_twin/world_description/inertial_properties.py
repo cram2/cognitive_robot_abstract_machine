@@ -247,3 +247,15 @@ class Inertial:
     The inertia tensor of the body about its center of mass, expressed in the body's
     local coordinate frame.
     """
+
+    @classmethod
+    def negligible(cls) -> Self:
+        """
+        :return: The inertial of a body whose material belongs to another body it is
+            fixed to: too light for a simulator to notice, yet stated, so that no
+            simulator weighs the body by its shapes instead.
+        """
+        return cls(
+            mass=1e-6,
+            inertia=InertiaTensor.from_values(1e-12, 1e-12, 1e-12, 0.0, 0.0, 0.0),
+        )

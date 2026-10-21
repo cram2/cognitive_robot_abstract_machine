@@ -197,7 +197,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         depth = self.camera_config.depth
         camera_info = self.camera_config.camera_info
         camera_intrinsic = self.camera_config.camera_intrinsic
-        color2depth_ratio = self.camera_config.color2depth_ratio
+        color_to_depth_ratio = self.camera_config.color_to_depth_ratio
 
         if self.camera_config.update_global_with_depth_parameter:
             AnnotatorPredefinedParameters.global_with_depth = depth is not None
@@ -206,4 +206,4 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         cas.set(CASViews.DEPTH_IMAGE, depth)
         cas.set(CASViews.CAMERA_INFO, camera_info)
         cas.set(CASViews.CAMERA_INTRINSIC, camera_intrinsic)
-        cas.set(CASViews.COLOR2DEPTH_RATIO, color2depth_ratio)
+        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, color_to_depth_ratio)

@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import timeit
 
+from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
@@ -30,9 +31,6 @@ import robokudo.annotators.outputs
 import robokudo.cas as cas
 import robokudo.defs as defs
 import robokudo.utils.tree
-
-if TYPE_CHECKING:
-    from py_trees.behaviour import Behaviour
 
 
 class Pipeline(Sequence):
@@ -106,10 +104,6 @@ class Pipeline(Sequence):
         blackboard = Blackboard()
         annotator_output_pipeline_map_buffer = blackboard.get(
             "annotator_output_pipeline_map_buffer"
-        )
-        assert isinstance(
-            annotator_output_pipeline_map_buffer,
-            robokudo.annotators.outputs.AnnotatorOutputPerPipelineMap,
         )
         if self.name not in annotator_output_pipeline_map_buffer.map:
             annotator_output_pipeline_map_buffer.map[self.name] = (

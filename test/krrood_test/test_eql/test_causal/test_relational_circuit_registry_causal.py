@@ -17,7 +17,7 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import StratifiedLearning
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     GroundingMode,
     RelationalProbabilisticCircuit,
 )
@@ -29,7 +29,7 @@ from ...dataset.example_classes import (
     SceneRoom,
     SceneRoomAggregations,
 )
-from ...test_feature_extraction.test_rspns import (  # noqa: F401
+from ...test_feature_extraction.test_relational_probabilistic_circuit import (  # noqa: F401
     _room_with_chair_count,
     correlated_room_query,
     relational_probabilistic_circuit,
@@ -169,7 +169,6 @@ def test_cause_on_an_aggregation_statistic_grounds_through_the_registry():
     ]
     chair_count_variable = variable(SceneRoomAggregations).chair_count()
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
         learning_method=StratifiedLearning(
             variables=[chair_count_variable._name_], method=JointProbabilityTree()
         ),

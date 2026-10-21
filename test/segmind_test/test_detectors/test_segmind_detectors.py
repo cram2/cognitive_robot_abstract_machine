@@ -111,29 +111,76 @@ def test_support_detector(_simple_apartment_setup):
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 3
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
-def test_containment_detector(_simple_apartment_setup):
-    segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
-    statechart = SegmindStatechart().build_statechart([ContainmentDetector()])
+def test_containment_detector(box_and_trays):
+    world = box_and_trays.world
+    box = box_and_trays.box
+    segmind_executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
+    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    statechart = SegmindStatechart().build_statechart([SupportDetector(), ContainmentDetector()])
     segmind_executor.compile(statechart)
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, ContainmentEvent)) == 0
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box1.global_pose.x, box1.global_pose.y,
-                                                                                 box1.global_pose.z, reference_frame=milk.parent_connection.parent)
+    box.parent_connection.origin = box_and_trays.set_down_in_the_tray
     segmind_executor.tick()
     assert len(events_of(segmind_context, ContainmentEvent)) == 1
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x, box2.global_pose.y,
-                                                                                 box2.global_pose.z, reference_frame=milk.parent_connection.parent)
+    box.parent_connection.origin = box_and_trays.set_down_in_the_hole
     segmind_executor.tick()
     assert len(events_of(segmind_context, ContainmentEvent)) == 2
     assert len(events_of(segmind_context, LossOfContainmentEvent)) == 1
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1, reference_frame=milk.parent_connection.parent)
+    box.parent_connection.origin = box_and_trays.lifted_out_of_the_tray
     segmind_executor.tick()
     assert len(events_of(segmind_context, LossOfContainmentEvent)) == 2
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
+
+
+def test_containment_detector_ignores_an_object_held_up_inside_a_container(box_and_trays):
+    """
+    Something carried through a container's walls has not been put into it.
+    """
+    world = box_and_trays.world
+    box = box_and_trays.box
+    segmind_executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
+    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    statechart = SegmindStatechart().build_statechart([SupportDetector(), ContainmentDetector()])
+    segmind_executor.compile(statechart)
+
+    box.parent_connection.origin = box_and_trays.held_up_in_the_tray
+    segmind_executor.tick()
+
+    assert len(events_of(segmind_context, ContainmentEvent)) == 0
+
+def test_containment_is_not_looked_for_without_the_supports_it_is_read_from(box_and_trays):
+    """
+    Containment is looked for once an object comes to rest, which only a support
+    detector ticked alongside can tell.
+    """
+    world = box_and_trays.world
+    box = box_and_trays.box
+    segmind_executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
+    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    segmind_executor.compile(SegmindStatechart().build_statechart([ContainmentDetector()]))
+
+    box.parent_connection.origin = box_and_trays.set_down_in_the_tray
+    segmind_executor.tick()
+
+    assert len(events_of(segmind_context, ContainmentEvent)) == 0
+
+
+def test_asking_which_bodies_came_to_rest_twice_gives_the_same_answer(box_and_trays):
+    box = box_and_trays.box
+    tray = box_and_trays.tray
+    detector = ContainmentDetector()
+    segmind_context = SegmindContext()
+    segmind_context.latest_support[box] = {tray}
+
+    first_answer = detector.bodies_come_to_rest(segmind_context, [box])
+    second_answer = detector.bodies_come_to_rest(segmind_context, [box])
+
+    assert first_answer == second_answer == [box]
+
 
 def test_pickup(_simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
@@ -305,39 +352,25 @@ def test_stop_translation(_simple_apartment_setup):
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 
-def test_insertion(_simple_apartment_setup):
-    segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
+def test_insertion(box_and_trays):
+    world = box_and_trays.world
+    box = box_and_trays.box
+    segmind_executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
+    segmind_context = segmind_executor.context.require_extension(SegmindContext)
     statechart = SegmindStatechart().build_statechart(
-        [ContactDetector(), InsertionDetector(), ContainmentDetector()])
-
-    with segmind_executor.context.world.modify_world():
-        hole = Body(
-            name=PrefixedName("box_hole"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
-            visual=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
-        )
-        hole_connection = FixedConnection(
-            parent=segmind_executor.context.world.root,
-            child=hole,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                2, 2, 2, reference_frame=segmind_executor.context.world.root
-            ),
-        )
-        segmind_executor.context.world.add_connection(hole_connection)
+        [ContactDetector(), SupportDetector(), InsertionDetector(), ContainmentDetector()])
     segmind_executor.compile(statechart)
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, InsertionEvent)) == 0
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(hole.global_pose.x, hole.global_pose.y,
-                                                                                 hole.global_pose.z, reference_frame=milk.parent_connection.parent)
 
+    box.parent_connection.origin = box_and_trays.set_down_in_the_hole
     segmind_executor.tick()
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x,box2.global_pose.y,box2.global_pose.z, reference_frame=milk.parent_connection.parent)
+    box.parent_connection.origin = box_and_trays.lifted_out_of_the_tray
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, InsertionEvent)) == 1
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 
 def test_rotation(_simple_apartment_setup):

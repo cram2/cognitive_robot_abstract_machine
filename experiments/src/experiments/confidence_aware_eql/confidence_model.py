@@ -19,7 +19,7 @@ from krrood.entity_query_language.query.match import Match
 from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.dao import get_dao_schema
 from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
 from typing_extensions import Any, List
@@ -70,7 +70,7 @@ class AmbiguousThresholdError(DataclassException):
 
 def _build_grounding_query(domain_class: type, instance: Any) -> Match:
     """
-    Build a query mirroring an instance's collection structure for RSPN grounding.
+    Build a query mirroring an instance's collection structure for relational grounding.
 
     Every constructor field of ``domain_class`` without a default is filled with an
     ellipsis placeholder, except for the class's collection relationships - found
@@ -126,7 +126,7 @@ class PerClassConfidenceModel:
     """
 
     @classmethod
-    def fit(cls, domain_class: type, instances: List[Any]) -> PerClassConfidenceModel:
+    def fit(cls, instances: List[Any]) -> PerClassConfidenceModel:
         """
         Fit a relational probabilistic circuit and calibrate its threshold.
 
@@ -134,11 +134,10 @@ class PerClassConfidenceModel:
         own log-likelihoods, so an instance less likely than almost every familiar one
         is judged unfamiliar.
 
-        :param domain_class: The class every instance belongs to.
-        :param instances: The familiar instances of ``domain_class`` to learn from.
+        :param instances: The familiar instances to learn from.
         :return: A fitted per-class confidence model.
         """
-        circuit = RelationalProbabilisticCircuit(domain_class)
+        circuit = RelationalProbabilisticCircuit()
         circuit.fit(instances)
         model = cls(circuit, threshold=-np.inf)
         training_log_likelihoods = [
@@ -204,7 +203,7 @@ class ConfidenceModel:
         for instance in instances:
             instances_by_class.setdefault(type(instance), []).append(instance)
         models_by_class = {
-            domain_class: PerClassConfidenceModel.fit(domain_class, class_instances)
+            domain_class: PerClassConfidenceModel.fit(class_instances)
             for domain_class, class_instances in instances_by_class.items()
         }
         return cls(models_by_class)

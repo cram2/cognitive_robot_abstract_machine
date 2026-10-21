@@ -34,10 +34,12 @@ dependencies = [
     "matplotlib>=3.0",
     "setuptools",
     "pooch",
+    "filelock",
     "krrood",
     "semantic_digital_twin",
     "transformers",
-    "faiss-cpu"
+    "faiss-cpu",
+    "ultralytics"
 ]
 
 [project.urls]
@@ -60,4 +62,6 @@ workspace = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0,<8.0.0",
+    "torch",
+    "ultralytics",
 ]

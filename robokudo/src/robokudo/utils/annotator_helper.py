@@ -206,23 +206,21 @@ def draw_bounding_boxes_from_object_hypotheses(
 
 def scale_camera_intrinsics(annotator: BaseAnnotator) -> None:
     """
-    Scale camera intrinsics based on color-to-depth ratio.
+    Scale the camera intrinsics of an annotator to the depth image resolution.
 
-    If the color2depth ratio is not 1,1, we will usually scale the color image to the
-    same size the depth image has. This also requires an adjustment of the camera
-    intrinsics.
+    If the depth image has a different resolution than the color image, the color image
+    is usually scaled to the depth image resolution, which requires the camera
+    intrinsics to be scaled as well.
 
-    If color2depth ratio is not 1,1, we'll scale the camera intrinsics in annotator. You
-    need to have a self.camera_intrinsics variable!
-
-    :param annotator: Annotator containing camera parameters
+    :param annotator: Annotator whose ``camera_intrinsics`` attribute is replaced by the
+        scaled intrinsics.
     """
-    color2depth_ratio = annotator.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-    c2d_ratio_x = color2depth_ratio[0]
-    c2d_ratio_y = color2depth_ratio[1]
-    if color2depth_ratio != (1, 1):
+    color_to_depth_ratio = annotator.get_cas().get(CASViews.COLOR_TO_DEPTH_RATIO)
+    if not color_to_depth_ratio.is_identity:
         annotator.camera_intrinsics = scale_o3d_camera_intrinsics(
-            annotator.camera_intrinsics, c2d_ratio_x, c2d_ratio_y
+            annotator.camera_intrinsics,
+            color_to_depth_ratio.horizontal,
+            color_to_depth_ratio.vertical,
         )
 
 
@@ -270,31 +268,26 @@ def resize_mask(annotator: BaseAnnotator, mask: npt.NDArray) -> npt.NDArray:
 
     :param annotator: Annotator containing resolution info
     :param mask: A binary image.
-    :return: The scaled version of mask, according to the COLOR2DEPTH_RATIO.
+    :return: The mask scaled back by the color-to-depth ratio.
     """
     if not annotator.descriptor.parameters.global_with_depth:
         # nothing to do
         return mask
 
-    color2depth_ratio = annotator.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
+    color_to_depth_ratio = annotator.get_cas().get(CASViews.COLOR_TO_DEPTH_RATIO)
 
-    if not color2depth_ratio:
+    if color_to_depth_ratio is None:
         raise ColorToDepthRatioMissing(operation="resize mask")
 
-    if color2depth_ratio == (1, 1):
+    if color_to_depth_ratio.is_identity:
         return mask
-    else:
-        c2d_ratio_x = color2depth_ratio[0]
-        c2d_ratio_y = color2depth_ratio[1]
-        resized_mask = cv2.resize(
-            mask,
-            None,
-            fx=1 / c2d_ratio_x,
-            fy=1 / c2d_ratio_y,
-            interpolation=cv2.INTER_NEAREST,
-        )
-
-    return resized_mask
+    return cv2.resize(
+        mask,
+        None,
+        fx=1 / color_to_depth_ratio.horizontal,
+        fy=1 / color_to_depth_ratio.vertical,
+        interpolation=cv2.INTER_NEAREST,
+    )
 
 
 def generate_source_name(annotator: BaseAnnotator) -> str:

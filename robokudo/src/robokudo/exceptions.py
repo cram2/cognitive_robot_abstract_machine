@@ -22,18 +22,23 @@ class RoboKudoError(DataclassException, ABC):
 @dataclass
 class ColorToDepthRatioMissing(RoboKudoError, RuntimeError):
     """
-    Raised when COLOR2DEPTH_RATIO is required but missing.
+    Raised when an operation needs the color-to-depth ratio, but the CAS holds none.
     """
 
     operation: str = "continue"
+    """
+    The operation that needs the color-to-depth ratio.
+    """
 
     def error_message(self) -> str:
-        return f"COLOR2DEPTH_RATIO is missing from the CAS. Can't {self.operation}."
+        return (
+            f"The color-to-depth ratio is missing from the CAS. Can't {self.operation}."
+        )
 
     def suggest_correction(self) -> str:
         return (
-            "make sure the camera driver or reader stores COLOR2DEPTH_RATIO in the CAS "
-            "before this operation."
+            "make sure the camera driver or reader stores the color-to-depth ratio in "
+            "the CAS before this operation."
         )
 
 
@@ -502,3 +507,45 @@ class WorldDescriptorBootstrapError(WorldDescriptorError, RuntimeError):
             "inspect the original chained exception for the underlying world model "
             "operation that failed."
         )
+
+
+@dataclass
+class DetectionModelNotConfigured(RoboKudoError, ValueError):
+    """
+    Raised when an annotator is given no model to load.
+    """
+
+    annotator_name: str
+    """
+    Name of the annotator that has no model configured.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.annotator_name} has neither a pretrained model nor weights inside "
+            f"a ROS package configured."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "set 'pretrained_model', or set both 'ros_package_name' and "
+            "'weights_path' in the annotator's parameters."
+        )
+
+
+@dataclass
+class ParentPipelineMissing(RoboKudoError, RuntimeError):
+    """
+    Raised when a behaviour that operates on its pipeline is not part of one.
+    """
+
+    behaviour_name: str
+    """
+    Name of the behaviour without a parent pipeline.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.behaviour_name} is not part of a Pipeline."
+
+    def suggest_correction(self) -> str:
+        return "add the behaviour as a descendant of a Pipeline."

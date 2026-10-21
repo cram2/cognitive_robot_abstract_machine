@@ -11,8 +11,9 @@ grasping it.
     :class:`~robokudo.types.annotation.Classification`, so every reported object designator
     has an empty ``type`` and the caller decides what it asked for. Adding a classifying
     annotator (for example
-    :class:`~robokudo.annotators.clip_annotator.ClipAnnotator` or
-    :class:`~robokudo.annotators.simple_yolo_annotator.SimpleYoloAnnotator`) before
+    :class:`~robokudo.annotators.clip_annotator.CLIPAnnotator` or
+    :class:`~robokudo.annotators.yolo_annotator.YoloAnnotator` with
+    ``classify_existing_hypotheses`` enabled) before
     :class:`~robokudo.annotators.query.GenerateQueryResult` fills that field in without any
     other change.
 """

@@ -146,6 +146,12 @@ EdgeMask: TypeAlias = npt.NDArray[np.bool_]
 One flag per edge of an inner layer, in the order the layer stores its edges.
 """
 
+DenseEdgeValues: TypeAlias = npt.NDArray[np.float64]
+"""
+One value per node of a layer and node of one of its child layers, shape (#nodes, #child
+nodes): the edges between the two layers as a dense matrix.
+"""
+
 States: TypeAlias = npt.NDArray[np.int64]
 """
 The states of a discrete variable, sorted ascending: the hash of the domain element for

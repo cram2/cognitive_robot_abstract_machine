@@ -90,7 +90,55 @@ class JointServo:
     How hard the servo pulls the joint towards the commanded position.
     """
 
-    dynamics: JointDynamics
+    dynamics: JointDynamics | None = None
     """
-    The joint's own inertia and friction, felt on top of the servo's torque.
+    The joint's own inertia and friction, felt on top of the servo's torque; ``None``
+    keeps those the robot's description states.
+    """
+
+
+@dataclass
+class VelocityServoGains:
+    r"""
+    How hard a velocity servo pushes its joint towards the velocity it was given.
+
+    .. math::
+
+       \tau = \min(\tau_\mathrm{max}, D (\dot{q}_\mathrm{set} - \dot{q}))
+
+    where :math:`D` is the damping, :math:`\dot{q}_\mathrm{set}` the commanded velocity
+    and :math:`\tau_\mathrm{max}` the torque limit.
+    """
+
+    damping: float
+    """
+    Torque per radian per second, or force per metre per second, the servo exerts
+    against the difference between the commanded and the actual velocity.
+    """
+
+    torque_limit: float
+    """
+    The largest torque, or force, the servo may exert.
+    """
+
+
+@dataclass
+class DriveServos:
+    """
+    What a mobile base declares for its drive to be moved across the floor by velocity
+    servos in a physical simulation: one servo on each translational velocity the drive
+    is commanded with, and one on its yaw. The drive's odometry is then what the
+    physics makes of those velocities.
+    """
+
+    translation_gains: VelocityServoGains
+    """
+    How hard the servos on the translational velocities push the base towards its
+    commanded velocity, in newton per metre per second.
+    """
+
+    rotation_gains: VelocityServoGains
+    """
+    How hard the servo on yaw turns the base towards its commanded angular velocity,
+    in newton metre per radian per second.
     """

@@ -34,7 +34,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base import (
-    InputLayer,
+    UnivariateInputLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
     DenseProbabilityTable,
@@ -54,7 +54,7 @@ from probabilistic_model.utils import MissingDict
 
 
 @dataclass(eq=False, repr=False)
-class DiscreteLayer(InputLayer, ABC):
+class DiscreteLayer(UnivariateInputLayer, ABC):
     """
     Abstract base class for the input layers of discrete univariate distributions.
 
@@ -301,6 +301,18 @@ class DiscreteLayer(InputLayer, ABC):
             table_type.concatenate([table_type.of(layer.table) for layer in layers])
         )
 
+    def has_equal_parameters(self, other: Self) -> bool:
+        """
+        Like :meth:`LeafLayer.has_equal_parameters`, but tables stored in different
+        types count as different, whatever they hold. The states are compared too,
+        since equal tables over different states are different distributions.
+        """
+        return (
+            np.array_equal(self.states, other.states)
+            and type(self.table) is type(other.table)
+            and self.table.has_equal_probabilities(other.table)
+        )
+
     def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
         indices = self.table.sample_state_indices(nodes)
         return np.where(
@@ -354,17 +366,18 @@ class SymbolicLayer(DiscreteLayer):
     ) -> Dict[int, float]:
         encoding = SymbolicEncoding(distribution.variable)
         return {
-            encoding.index_of_element(hash_value): probability
+            encoding.index_of_hash(hash_value): probability
             for hash_value, probability in distribution.probabilities.items()
         }
 
     def node_distribution(self, index: int, variable: Variable) -> SymbolicDistribution:
+        domain_elements = variable.domain.simple_sets
         return SymbolicDistribution(
             variable=variable,
             probabilities=MissingDict(
                 float,
                 {
-                    int(self.domain_hashes[state]): probability
+                    hash(domain_elements[state]): probability
                     for state, probability in self.probabilities_of_node(index).items()
                 },
             ),

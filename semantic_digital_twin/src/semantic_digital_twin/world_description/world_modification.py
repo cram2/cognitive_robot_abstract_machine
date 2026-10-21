@@ -653,24 +653,27 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         world._model_manager.current_model_modification_block.append(self)
 
     def revert(self, world: World):
-        tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-        kwargs = tracker.create_kwargs()
-        entity = world.get_world_entity_with_id_by_id(self.entity_id)
-        for diff in self.updated_kwargs_json_list:
-            current_value = getattr(entity, diff.attribute_name)
-            if isinstance(current_value, list_like_classes):
-                inverse_diff = JSONAttributeDiff(
+        """
+        Apply :meth:`inverse`, so that the inverse is what the history records and what
+        a synchronized world receives, as for every other modification.
+        """
+        self.inverse().apply(world)
+
+    def inverse(self) -> AttributeUpdateModification:
+        """
+        :return: The update that gives the attributes back the values this one replaced.
+        """
+        return AttributeUpdateModification(
+            entity_id=self.entity_id,
+            updated_kwargs_json_list=[
+                JSONAttributeDiff(
                     attribute_name=diff.attribute_name,
                     added_values=diff.removed_values,
                     removed_values=diff.added_values,
                 )
-                self._apply_to_list(world, current_value, inverse_diff, **kwargs)
-            else:
-                obj = self._resolve_item(
-                    world, from_json(diff.removed_values[0], **kwargs)
-                )
-                setattr(entity, diff.attribute_name, obj)
-        world._model_manager.current_model_modification_block.append(self)
+                for diff in self.updated_kwargs_json_list
+            ],
+        )
 
     def _apply_to_list(
         self,

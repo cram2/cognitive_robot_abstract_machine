@@ -42,13 +42,13 @@ designator.
 
 ```python
 from coraplex.robot_plans.motions import MoveMotion
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import *
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 motion_description = MoveMotion(target=Pose.from_xyz_quaternion(pos_x=1., reference_frame=world.root))
 
-with simulated_robot:
+with kinematically_simulated_robot:
     execute_single(motion_description, context=context).perform()
 ```
 
@@ -59,12 +59,12 @@ Like any designator we start by creating a description and then resolving and pe
 
 ```python
 from coraplex.robot_plans.motions.gripper import MoveToolCenterPointMotion
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 
 motion_description = MoveToolCenterPointMotion(
     target=Pose.from_xyz_quaternion(1.5, 0.6, 0.6, 0, 0, 0, 1, reference_frame=world.root), arm=pr2_view.left_arm)
 
-with simulated_robot:
+with kinematically_simulated_robot:
     execute_single(motion_description, context=context).perform()
 ```
 
@@ -75,12 +75,12 @@ motion designator takes the target as position and orientation, in reality only 
 
 ```python
 from coraplex.robot_plans.motions import LookingMotion
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 
 motion_description = LookingMotion(target=Pose.from_xyz_quaternion(1, 1, 1, 0, 0, 0, 1, reference_frame=world.root),
                                    camera=pr2_view.get_default_camera())
 
-with simulated_robot:
+with kinematically_simulated_robot:
     execute_single(motion_description, context=context).perform()
 ```
 
@@ -91,12 +91,12 @@ and close the gripper respectively.
 
 ```python
 from coraplex.robot_plans.motions import MoveGripperMotion
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from semantic_digital_twin.datastructures.definitions import GripperState
 
 motion_description = MoveGripperMotion(motion=GripperState.OPEN, gripper=pr2_view.left_arm.end_effector)
 
-with simulated_robot:
+with kinematically_simulated_robot:
     execute_single(motion_description, context=context).perform()
 ```
 
@@ -111,12 +111,12 @@ Since we need an object that we can detect, we will spawn a milk for this.
 
 ```python
 # from coraplex.robot_plans.motions import DetectingMotion, LookingMotion
-# from coraplex.process_module import simulated_robot
+# from coraplex.process_module import kinematically_simulated_robot
 # from coraplex.datastructures.pose import PoseStamped
 # from coraplex.datastructures.enums import DetectionTechnique, DetectionState
 # from coraplex.designators.object_designator import BelieveObject
 # 
-# with simulated_robot:
+# with kinematically_simulated_robot:
 #     LookingMotion(target=PoseStamped.from_list([1.5, 0, 1], [0, 0, 0, 1])).perform()
 # 
 #     motion_description = DetectingMotion(technique=DetectionTechnique.TYPES,
@@ -137,9 +137,9 @@ the names of all joints that should be moved and the second list are the positio
 
 ```python
 from coraplex.robot_plans.motions import MoveJointsMotion
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 
-with simulated_robot:
+with kinematically_simulated_robot:
     motion_description = MoveJointsMotion(names=["torso_lift_joint", "r_shoulder_pan_joint"], positions=[0.2, -1.2])
 
     execute_single(motion_description, context=context).perform()
