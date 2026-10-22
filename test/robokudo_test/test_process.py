@@ -17,11 +17,17 @@ from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchroni
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Cup,
+    PerceivedObject,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.cas import CAS
 from robokudo.camera_placement import CameraPlacement, SharedWorldCameraPlacement
 from robokudo.exceptions import (
     MultipleRobotsInWorldError,
@@ -114,6 +120,15 @@ class EngineWithAPipelineInsideASequence:
         root = Sequence(name="Root", memory=True)
         root.add_child(self.pipeline)
         return root
+
+
+def cas_holding_hypothesis(world: World, hypothesis: ObjectHypothesis) -> CAS:
+    """
+    :return: A CAS seen from :func:`camera_pose` in ``world`` that found ``hypothesis``.
+    """
+    cas = cas_seen_from(world, camera_pose())
+    cas.annotations.append(hypothesis)
+    return cas
 
 
 @pytest.fixture
@@ -248,6 +263,50 @@ class TestJoiningSharedWorld:
         assert [shape.scale for shape in shared_body.visual.shapes] == [
             shape.scale for shape in perceived_body.visual.shapes
         ]
+
+    def test_perceived_object_reaches_the_shared_world_with_its_class_label(
+        self, shared_world: SharedWorld, joined_robokudo: RoboKudo
+    ) -> None:
+        class_label = "fork"
+        cas = cas_seen_from(joined_robokudo.world, camera_pose())
+        cas.annotations.append(make_object_hypothesis(class_label=class_label))
+
+        [body_id] = joined_robokudo.perceived_objects.apply(cas)
+
+        assert wait_until(
+            lambda: [
+                (type(annotation), annotation.class_label)
+                for annotation in shared_world.world.get_semantic_annotations_by_type(
+                    IsPerceivable
+                )
+                if annotation.root.id == body_id
+            ]
+            == [(PerceivedObject, class_label)]
+        )
+
+    def test_classified_object_reaches_the_shared_world_as_its_semantic_annotation(
+        self, shared_world: SharedWorld, joined_robokudo: RoboKudo
+    ) -> None:
+        [body_id] = joined_robokudo.perceived_objects.apply(
+            cas_holding_hypothesis(joined_robokudo.world, make_object_hypothesis())
+        )
+
+        joined_robokudo.perceived_objects.apply(
+            cas_holding_hypothesis(
+                joined_robokudo.world, make_object_hypothesis(class_label="cup")
+            )
+        )
+
+        assert wait_until(
+            lambda: [
+                type(annotation)
+                for annotation in shared_world.world.get_semantic_annotations_by_type(
+                    IsPerceivable
+                )
+                if annotation.root.id == body_id
+            ]
+            == [Cup]
+        )
 
     def test_closed_robokudo_no_longer_shares_its_world(
         self, joined_robokudo: RoboKudo
@@ -413,8 +472,10 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick()
 
-        [body_id] = robokudo.perceived_objects.beliefs
-        assert body_id in [body.id for body in robokudo.world.bodies]
+        [perceived_object] = robokudo.world.get_semantic_annotations_by_type(
+            PerceivedObject
+        )
+        assert perceived_object.root in robokudo.world.bodies
         robokudo.close()
 
     def test_finished_pass_is_put_into_the_world_only_once(
@@ -432,7 +493,9 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick()
 
-        assert len(robokudo.perceived_objects.beliefs) == 1
+        assert (
+            len(robokudo.world.get_semantic_annotations_by_type(PerceivedObject)) == 1
+        )
         assert len(hypothesis.annotations) == annotation_count
         robokudo.close()
 
@@ -444,7 +507,7 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick()
 
-        assert robokudo.perceived_objects.beliefs == {}
+        assert robokudo.world.get_semantic_annotations_by_type(PerceivedObject) == []
         robokudo.close()
 
     def test_engine_without_a_pipeline_puts_nothing_into_the_world(
@@ -455,5 +518,5 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick()
 
-        assert robokudo.perceived_objects.beliefs == {}
+        assert robokudo.world.get_semantic_annotations_by_type(PerceivedObject) == []
         robokudo.close()

@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import numpy as np
 import pytest
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Cup,
+    Milk,
+    PerceivedObject,
+)
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
@@ -13,12 +20,22 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.geometry import Color as SemDTColor
+from semantic_digital_twin.world_description.geometry import (
+    Cylinder as SemDTCylinder,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
+from robokudo.annotators.cluster_color import ClusterColorAnnotator, Color
 from robokudo.cas import CAS
 from robokudo.perceived_objects import PerceivedObjects
-from robokudo.types.annotation import BoundingBox3DAnnotation, StampedPoseAnnotation
+from robokudo.types.annotation import (
+    BoundingBox3DAnnotation,
+    Cylinder,
+    SemanticColor,
+    StampedPoseAnnotation,
+)
 from robokudo.types.scene import ObjectHypothesis
 
 from ._object_hypotheses import make_object_hypothesis
@@ -52,9 +69,15 @@ def world_poses_of(hypothesis: ObjectHypothesis) -> list[StampedPoseAnnotation]:
     ]
 
 
-def scale_of_latest_box(perceived_objects: PerceivedObjects, body_id) -> Scale:
-    bounding_box = perceived_objects.beliefs[body_id].latest_bbox_3d
-    return Scale(bounding_box.x_length, bounding_box.y_length, bounding_box.z_length)
+def annotations_of(world: World, body_id: UUID) -> list[IsPerceivable]:
+    """
+    :return: The perceivable annotations of ``world`` rooted at the body ``body_id``.
+    """
+    return [
+        annotation
+        for annotation in world.get_semantic_annotations_by_type(IsPerceivable)
+        if annotation.root.id == body_id
+    ]
 
 
 def add_perceivable_object(
@@ -111,52 +134,176 @@ def add_perceivable_object(
 
 
 class TestNewObjects:
-    def test_new_object_is_a_box_at_the_world_pose_of_its_hypothesis(
+    def test_unclassified_object_becomes_a_perceived_object_at_its_world_pose(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
-        hypothesis = make_object_hypothesis(translation=(0.0, 0.5, 2.0))
-        cas = cas_holding(cas_seen_from(world, camera_pose(x=1.0)), hypothesis)
+        translation = (0.0, 0.5, 2.0)
+        cas = cas_holding(
+            cas_seen_from(world, camera_pose(x=1.0)),
+            make_object_hypothesis(translation=translation),
+        )
 
         [body_id] = perceived_objects.apply(cas)
 
         body = world.get_kinematic_structure_entity_by_id(body_id)
-        bounding_box = perceived_objects.beliefs[body_id].latest_bbox_3d
-        assert perceived_objects.beliefs[body_id].latest_hypothesis is hypothesis
+        [annotation] = annotations_of(world, body_id)
+        assert type(annotation) is PerceivedObject
+        assert annotation.class_label is None
         assert np.allclose(
             body.global_transform.position.to_np()[:3],
-            np.array([1.0, 0.0, 0.0]) + np.array(bounding_box.pose.translation),
+            np.array([1.0, 0.0, 0.0]) + np.array(translation),
         )
-        assert [shape.scale for shape in body.visual.shapes] == [
-            scale_of_latest_box(perceived_objects, body_id)
-        ]
 
-    def test_new_object_has_the_size_of_its_bounding_box(
+    def test_new_object_is_a_box_of_the_size_of_its_bounding_box(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        extent = (0.1, 0.2, 0.3)
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(extent=extent),
+            )
+        )
+
+        [shape] = world.get_kinematic_structure_entity_by_id(body_id).visual.shapes
+        assert type(shape) is Box
+        assert shape.scale == Scale(*extent)
+
+    def test_confidently_classified_object_becomes_its_semantic_annotation(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
         [body_id] = perceived_objects.apply(
-            cas_holding(cas_seen_from(world, camera_pose()), make_object_hypothesis())
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(class_label="cup"),
+            )
         )
 
-        size = world.get_kinematic_structure_entity_by_id(body_id).visual.scale
-        expected = scale_of_latest_box(perceived_objects, body_id)
+        [annotation] = annotations_of(world, body_id)
+        assert type(annotation) is Cup
+
+    def test_semantic_annotation_keeps_the_label_the_object_was_classified_with(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        class_label = "teacup"
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(class_label=class_label),
+            )
+        )
+
+        [annotation] = annotations_of(world, body_id)
+        assert type(annotation) is Cup
+        assert annotation.class_label == class_label
+
+    def test_object_whose_label_names_no_semantic_annotation_keeps_the_label(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        class_label = "fork"
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(class_label=class_label),
+            )
+        )
+
+        [annotation] = annotations_of(world, body_id)
+        assert type(annotation) is PerceivedObject
+        assert annotation.class_label == class_label
+
+    def test_object_classified_without_confidence_becomes_a_perceived_object(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        class_label = "cup"
+        hypothesis = make_object_hypothesis(
+            class_label=class_label,
+            class_confidence=perceived_objects.minimum_class_confidence / 2,
+        )
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), hypothesis)
+        )
+
+        [annotation] = annotations_of(world, body_id)
+        assert type(annotation) is PerceivedObject
+        assert annotation.class_label == class_label
+
+    def test_new_object_takes_the_shape_fitted_to_it(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        bounding_box_center = (0.0, 0.0, 1.0)
+        cylinder_center = (0.0, 0.01, 1.02)
+        cylinder = Cylinder(
+            geometry=SemDTCylinder(
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(*cylinder_center),
+                width=0.08,
+                height=0.12,
+            )
+        )
+        hypothesis = make_object_hypothesis(translation=bounding_box_center)
+        hypothesis.annotations.append(cylinder)
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), hypothesis)
+        )
+
+        [shape] = world.get_kinematic_structure_entity_by_id(body_id).visual.shapes
+        assert type(shape) is SemDTCylinder
+        assert (shape.width, shape.height) == (
+            cylinder.geometry.width,
+            cylinder.geometry.height,
+        )
         assert np.allclose(
-            [size.x, size.y, size.z], [expected.x, expected.y, expected.z]
+            shape.origin.position.to_np()[:3],
+            np.array(cylinder_center) - np.array(bounding_box_center),
+        )
+
+    def test_new_object_takes_its_dominant_color(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        hypothesis = make_object_hypothesis()
+        hypothesis.annotations.extend(
+            [
+                SemanticColor(color=Color.RED.name.lower(), ratio=0.3),
+                SemanticColor(color=Color.BLUE.name.lower(), ratio=0.7),
+            ]
+        )
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), hypothesis)
+        )
+
+        [shape] = world.get_kinematic_structure_entity_by_id(body_id).visual.shapes
+        blue_in_bgr = ClusterColorAnnotator.color_name_to_bgr_values[Color.BLUE]
+        assert shape.color == SemDTColor.from_rgb(
+            [value / 255 for value in reversed(blue_in_bgr)]
         )
 
     def test_reports_the_bodies_of_the_objects_in_the_order_they_were_found(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
+        class_labels = ["fork", "knife"]
         hypotheses = [
-            make_object_hypothesis(roi=(5, 5, 10, 10)),
-            make_object_hypothesis(roi=(25, 25, 10, 10), translation=(1.0, 0.0, 1.0)),
+            make_object_hypothesis(roi=(5, 5, 10, 10), class_label=class_labels[0]),
+            make_object_hypothesis(
+                roi=(25, 25, 10, 10),
+                translation=(1.0, 0.0, 1.0),
+                class_label=class_labels[1],
+            ),
         ]
         cas = cas_holding(cas_seen_from(world, camera_pose()), *hypotheses)
 
         body_ids = perceived_objects.apply(cas)
 
         assert [
-            perceived_objects.beliefs[body_id].latest_hypothesis for body_id in body_ids
-        ] == hypotheses
+            annotation.class_label
+            for body_id in body_ids
+            for annotation in annotations_of(world, body_id)
+        ] == class_labels
 
     def test_object_without_a_camera_pose_gets_no_body(
         self, world: World, perceived_objects: PerceivedObjects
@@ -164,7 +311,7 @@ class TestNewObjects:
         body_ids = perceived_objects.apply(cas_holding(CAS(), make_object_hypothesis()))
 
         assert body_ids == [None]
-        assert perceived_objects.beliefs == {}
+        assert world.bodies == []
 
     def test_object_without_a_bounding_box_gets_no_body(
         self, world: World, perceived_objects: PerceivedObjects
@@ -181,7 +328,6 @@ class TestNewObjects:
         body_ids = perceived_objects.apply(cas_holding(cas, hypothesis))
 
         assert body_ids == [None]
-        assert perceived_objects.beliefs == {}
         assert list(world.bodies) == bodies_before
 
     def test_object_seen_by_a_camera_placed_in_another_world_gets_no_body(
@@ -217,30 +363,30 @@ class TestNewObjects:
 
 
 class TestObjectsSeenAgain:
-    def test_object_seen_again_moves_its_body_and_takes_the_new_shape(
+    def test_object_seen_again_moves_its_body_and_keeps_its_orientation_and_shape(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
         [first_id] = perceived_objects.apply(
             cas_holding(cas_seen_from(world, camera_pose()), make_object_hypothesis())
         )
-        hypothesis = make_object_hypothesis(
-            translation=(0.03, 0.0, 1.0), extent=(0.12, 0.22, 0.32)
-        )
+        body = world.get_kinematic_structure_entity_by_id(first_id)
+        rotation_before = body.global_transform.to_np()[:3, :3]
+        scales_before = [shape.scale for shape in body.visual.shapes]
+        translation = (0.03, 0.0, 1.0)
 
         [second_id] = perceived_objects.apply(
-            cas_holding(cas_seen_from(world, camera_pose()), hypothesis)
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(
+                    translation=translation, extent=(0.12, 0.22, 0.32)
+                ),
+            )
         )
 
-        body = world.get_kinematic_structure_entity_by_id(second_id)
         assert second_id == first_id
-        assert perceived_objects.beliefs[second_id].latest_hypothesis is hypothesis
-        assert np.allclose(
-            body.global_transform.position.to_np()[:3],
-            perceived_objects.beliefs[second_id].latest_bbox_3d.pose.translation,
-        )
-        assert [shape.scale for shape in body.visual.shapes] == [
-            scale_of_latest_box(perceived_objects, second_id)
-        ]
+        assert np.allclose(body.global_transform.position.to_np()[:3], translation)
+        assert np.allclose(body.global_transform.to_np()[:3, :3], rotation_before)
+        assert [shape.scale for shape in body.visual.shapes] == scales_before
 
     def test_object_seen_from_a_moved_camera_keeps_its_body(
         self, world: World, perceived_objects: PerceivedObjects
@@ -267,7 +413,7 @@ class TestObjectsSeenAgain:
 
         assert body_ids[0] == first_id
         assert body_ids[1] != first_id
-        assert set(perceived_objects.beliefs) == {first_id, body_ids[1]}
+        assert len(world.get_semantic_annotations_by_type(PerceivedObject)) == 2
 
     def test_object_another_process_attached_rigidly_is_reported_unchanged(
         self, world: World, perceived_objects: PerceivedObjects
@@ -288,20 +434,16 @@ class TestObjectsSeenAgain:
                 )
             )
         pose_before = body.global_transform.to_np()
-        scales_before = [shape.scale for shape in body.visual.shapes]
 
         [second_id] = perceived_objects.apply(
             cas_holding(
                 cas_seen_from(world, camera_pose()),
-                make_object_hypothesis(
-                    translation=(0.03, 0.0, 1.0), extent=(0.12, 0.22, 0.32)
-                ),
+                make_object_hypothesis(translation=(0.03, 0.0, 1.0)),
             )
         )
 
         assert second_id == body_id
         assert np.allclose(body.global_transform.to_np(), pose_before)
-        assert [shape.scale for shape in body.visual.shapes] == scales_before
 
 
 # %% matching
@@ -311,9 +453,11 @@ class TestMatching:
     def test_object_beyond_the_match_distance_gets_a_body_of_its_own(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
-        first_hypothesis = make_object_hypothesis(translation=(0.0, 0.0, 1.0))
         [first_id] = perceived_objects.apply(
-            cas_holding(cas_seen_from(world, camera_pose()), first_hypothesis)
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(translation=(0.0, 0.0, 1.0)),
+            )
         )
         beyond = 2 * perceived_objects.matcher.maximum_match_distance
 
@@ -325,9 +469,8 @@ class TestMatching:
         )
 
         assert second_id != first_id
-        assert perceived_objects.beliefs[first_id].latest_hypothesis is first_hypothesis
 
-    def test_object_of_another_class_gets_a_body_of_its_own(
+    def test_object_seen_as_another_class_at_the_same_place_keeps_its_body(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
         [first_id] = perceived_objects.apply(
@@ -344,23 +487,30 @@ class TestMatching:
             )
         )
 
-        assert second_id != first_id
+        assert second_id == first_id
 
-    def test_object_classified_in_only_one_pass_keeps_its_body(
+    def test_object_is_taken_as_the_nearby_object_of_its_own_class(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
-        [first_id] = perceived_objects.apply(
-            cas_holding(cas_seen_from(world, camera_pose()), make_object_hypothesis())
-        )
-
-        [second_id] = perceived_objects.apply(
+        cup_id, bowl_id = perceived_objects.apply(
             cas_holding(
                 cas_seen_from(world, camera_pose()),
-                make_object_hypothesis(class_label="cup"),
+                make_object_hypothesis(
+                    translation=(-0.05, 0.0, 1.0), class_label="cup"
+                ),
+                make_object_hypothesis(
+                    translation=(0.05, 0.0, 1.0), class_label="bowl"
+                ),
             )
         )
+        # Closer to the cup, but classified as a bowl.
+        bowl = make_object_hypothesis(translation=(-0.01, 0.0, 1.0), class_label="bowl")
 
-        assert second_id == first_id
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), bowl)
+        )
+
+        assert body_id == bowl_id
 
     def test_object_of_a_very_different_size_gets_a_body_of_its_own(
         self, world: World, perceived_objects: PerceivedObjects
@@ -409,6 +559,72 @@ class TestMatching:
         assert body_ids == [right_id, left_id]
 
 
+# %% classification of objects seen again
+
+
+class TestClassificationOfObjectsSeenAgain:
+    def test_perceived_object_becomes_its_semantic_annotation_once_classified(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        class_label = "cup"
+        [first_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), make_object_hypothesis())
+        )
+
+        [second_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(class_label=class_label),
+            )
+        )
+
+        [annotation] = annotations_of(world, second_id)
+        assert second_id == first_id
+        assert type(annotation) is Cup
+        assert annotation.class_label == class_label
+
+    def test_perceived_object_classified_without_confidence_stays_as_it_is(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        [body_id] = perceived_objects.apply(
+            cas_holding(cas_seen_from(world, camera_pose()), make_object_hypothesis())
+        )
+
+        perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(
+                    class_label="cup",
+                    class_confidence=perceived_objects.minimum_class_confidence / 2,
+                ),
+            )
+        )
+
+        [annotation] = annotations_of(world, body_id)
+        assert type(annotation) is PerceivedObject
+        assert annotation.class_label is None
+
+    def test_semantic_annotation_keeps_its_class_when_seen_as_another(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        [body_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(class_label="cup"),
+            )
+        )
+
+        perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(class_label="bowl"),
+            )
+        )
+
+        [annotation] = annotations_of(world, body_id)
+        assert type(annotation) is Cup
+
+
 # %% objects of the world
 
 
@@ -424,7 +640,7 @@ class TestPerceivableObjectsOfTheWorld:
         )
 
         assert body_id == body.id
-        assert perceived_objects.beliefs == {}
+        assert world.get_semantic_annotations_by_type(PerceivedObject) == []
 
     def test_perceivable_body_moves_to_where_it_was_seen_and_keeps_its_orientation(
         self, world: World, perceived_objects: PerceivedObjects
@@ -471,19 +687,19 @@ class TestPerceivableObjectsOfTheWorld:
         assert body_id == body.id
         assert np.allclose(body.global_transform.to_np(), pose_before)
 
-    def test_object_of_another_class_than_a_perceivable_body_gets_a_body_of_its_own(
+    def test_perceivable_body_seen_as_another_class_keeps_its_annotation(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
         cas = cas_seen_from(world, camera_pose())
-        body = add_perceivable_object(
-            world, position=(0.0, 0.0, 1.0), class_label="milk"
-        )
+        body = add_perceivable_object(world, position=(0.0, 0.0, 1.0))
 
         [body_id] = perceived_objects.apply(
             cas_holding(cas, make_object_hypothesis(class_label="cup"))
         )
 
-        assert body_id != body.id
+        [annotation] = annotations_of(world, body_id)
+        assert body_id == body.id
+        assert type(annotation) is Milk
 
 
 # %% world poses
