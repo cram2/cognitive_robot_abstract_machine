@@ -170,6 +170,22 @@ class TestNewObjects:
         assert type(shape) is Box
         assert shape.scale == Scale(*extent)
 
+    def test_new_object_collides_with_the_shape_it_was_seen_with(
+        self, world: World, perceived_objects: PerceivedObjects
+    ) -> None:
+        extent = (0.1, 0.2, 0.3)
+
+        [body_id] = perceived_objects.apply(
+            cas_holding(
+                cas_seen_from(world, camera_pose()),
+                make_object_hypothesis(extent=extent),
+            )
+        )
+
+        [shape] = world.get_kinematic_structure_entity_by_id(body_id).collision.shapes
+        assert type(shape) is Box
+        assert shape.scale == Scale(*extent)
+
     def test_confidently_classified_object_becomes_its_semantic_annotation(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:

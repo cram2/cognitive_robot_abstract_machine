@@ -502,13 +502,15 @@ class PerceivedObjects:
     def _add_object(self, detection: Detection) -> IsPerceivable:
         """
         Add the object ``detection`` saw to :attr:`world`, as a body at its 3D bounding
-        box below the world frame of its pass, annotated with the semantic annotation a
-        confident classification names, or as a :class:`PerceivedObject`.
+        box below the world frame of its pass that shows and collides with the shape it
+        was seen with, annotated with the semantic annotation a confident classification
+        names, or as a :class:`PerceivedObject`.
 
         :param detection: The detection.
         :return: The annotation of the new object.
         """
-        body = Body(visual=ShapeCollection(shapes=[detection.shape]))
+        visual = ShapeCollection(shapes=[detection.shape])
+        body = Body(visual=visual, collision=visual.copy_without_reference_frame())
         semantic_class = self._confident_semantic_class(detection) or PerceivedObject
         annotation = semantic_class(root=body, class_label=detection.class_label)
         with self.world.modify_world():
