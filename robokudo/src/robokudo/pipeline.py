@@ -46,8 +46,6 @@ class Pipeline(Sequence):
         self,
         name: str = "Sequence",
         children: Optional[List[Behaviour]] = None,
-        *,
-        world: Optional[World] = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -55,13 +53,12 @@ class Pipeline(Sequence):
 
         :param name: Name of the pipeline, defaults to "Sequence"
         :param children: List of child behaviors, defaults to None
-        :param world: The world the annotators perceive into; an empty world of its own
-            when None
         """
         super().__init__(name, memory=True, children=children)
-        self._world: World = world if world is not None else World()
+        self._world: World = World()
         """
-        The world of this pipeline, used unless it is nested in another pipeline.
+        The world of this pipeline, used unless it is nested in another pipeline; an
+        empty world of its own until another is set through :attr:`world`.
         """
         self.cas: cas.CAS | None = None
         """

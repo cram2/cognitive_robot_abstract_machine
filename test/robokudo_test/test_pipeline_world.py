@@ -23,16 +23,20 @@ class ReadsItsWorld(BaseAnnotator):
 # %% world of a pipeline
 
 
+def pipeline_perceiving_into(world: World) -> Pipeline:
+    """
+    :return: A pipeline whose world was set to ``world``.
+    """
+    pipeline = Pipeline("Pipeline")
+    pipeline.world = world
+    return pipeline
+
+
 class TestWorldOfAPipeline:
     def test_pipeline_without_a_world_perceives_into_an_empty_world_of_its_own(
         self,
     ) -> None:
         assert Pipeline("Pipeline").world.is_empty()
-
-    def test_pipeline_perceives_into_the_given_world(self) -> None:
-        world = World()
-
-        assert Pipeline("Pipeline", world=world).world is world
 
     def test_pipeline_perceives_into_a_world_handed_to_it_later(self) -> None:
         pipeline = Pipeline("Pipeline")
@@ -44,8 +48,8 @@ class TestWorldOfAPipeline:
 
     def test_nested_pipeline_perceives_into_the_world_of_the_outer_one(self) -> None:
         world = World()
-        outer = Pipeline("Outer", world=world)
-        inner = Pipeline("Inner", world=World())
+        outer = pipeline_perceiving_into(world)
+        inner = pipeline_perceiving_into(World())
         outer.add_child(inner)
 
         assert inner.world is world
@@ -58,7 +62,7 @@ class TestWorldOfAnAnnotator:
     def test_annotator_perceives_into_the_world_of_its_pipeline(self) -> None:
         world = World()
         annotator = ReadsItsWorld()
-        Pipeline("Pipeline", world=world).add_child(annotator)
+        pipeline_perceiving_into(world).add_child(annotator)
 
         assert annotator.world is world
 
@@ -69,6 +73,6 @@ class TestWorldOfAnAnnotator:
         annotator = ReadsItsWorld()
         sequence = Sequence(name="Sequence", memory=True)
         sequence.add_child(annotator)
-        Pipeline("Pipeline", world=world).add_child(sequence)
+        pipeline_perceiving_into(world).add_child(sequence)
 
         assert annotator.world is world

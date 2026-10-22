@@ -18,7 +18,9 @@ def in_pipeline_of(
     """
     ``annotator`` in a pipeline that perceives into ``world``.
     """
-    Pipeline("WorldDescriptorBootstrapTestPipeline", world=world).add_child(annotator)
+    pipeline = Pipeline("WorldDescriptorBootstrapTestPipeline")
+    pipeline.world = world
+    pipeline.add_child(annotator)
     return annotator
 
 
