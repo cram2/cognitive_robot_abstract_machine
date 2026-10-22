@@ -18,7 +18,7 @@ def make_object_hypothesis(
     *,
     roi: tuple[int, int, int, int] = (10, 15, 20, 25),
     translation: tuple[float, float, float] = (0.0, 0.0, 1.0),
-    extent: tuple[float, float, float] = (0.1, 0.2, 0.3),
+    scale: tuple[float, float, float] = (0.1, 0.2, 0.3),
     source: str = "test_source",
     class_label: str | None = None,
     class_confidence: float = 1.0,
@@ -29,7 +29,7 @@ def make_object_hypothesis(
 
     :param roi: Image region as x, y, width and height.
     :param translation: Position of the object in camera coordinates.
-    :param extent: Lengths of the bounding box along x, y and z.
+    :param scale: Lengths of the bounding box along x, y and z.
     :param source: Name of the annotator the annotations claim to come from.
     :param class_label: The class the object is classified as, or None to leave it
         unclassified.
@@ -55,7 +55,7 @@ def make_object_hypothesis(
     bounding_box.source = source
     bounding_box.pose.translation = list(translation)
     bounding_box.pose.rotation = [0.0, 0.0, 0.0, 1.0]
-    bounding_box.x_length, bounding_box.y_length, bounding_box.z_length = extent
+    bounding_box.x_length, bounding_box.y_length, bounding_box.z_length = scale
     hypothesis.annotations.append(bounding_box)
 
     if class_label is not None:

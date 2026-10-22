@@ -15,14 +15,10 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description import geometry
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-)
-from semantic_digital_twin.world_description.geometry import Box, Scale
-from semantic_digital_twin.world_description.geometry import Color as SemDTColor
-from semantic_digital_twin.world_description.geometry import (
-    Cylinder as SemDTCylinder,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -106,7 +102,9 @@ def add_perceivable_object(
     )
     body = Body(
         name=PrefixedName("perceivable_object"),
-        visual=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.2, 0.3))]),
+        visual=ShapeCollection(
+            shapes=[geometry.Box(scale=geometry.Scale(0.1, 0.2, 0.3))]
+        ),
     )
     with world.modify_world():
         if fixed:
@@ -157,34 +155,34 @@ class TestNewObjects:
     def test_new_object_is_a_box_of_the_size_of_its_bounding_box(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
-        extent = (0.1, 0.2, 0.3)
+        scale = (0.1, 0.2, 0.3)
 
         [body_id] = perceived_objects.apply(
             cas_holding(
                 cas_seen_from(world, camera_pose()),
-                make_object_hypothesis(extent=extent),
+                make_object_hypothesis(scale=scale),
             )
         )
 
         [shape] = world.get_kinematic_structure_entity_by_id(body_id).visual.shapes
-        assert type(shape) is Box
-        assert shape.scale == Scale(*extent)
+        assert type(shape) is geometry.Box
+        assert shape.scale == geometry.Scale(*scale)
 
     def test_new_object_collides_with_the_shape_it_was_seen_with(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
-        extent = (0.1, 0.2, 0.3)
+        scale = (0.1, 0.2, 0.3)
 
         [body_id] = perceived_objects.apply(
             cas_holding(
                 cas_seen_from(world, camera_pose()),
-                make_object_hypothesis(extent=extent),
+                make_object_hypothesis(scale=scale),
             )
         )
 
         [shape] = world.get_kinematic_structure_entity_by_id(body_id).collision.shapes
-        assert type(shape) is Box
-        assert shape.scale == Scale(*extent)
+        assert type(shape) is geometry.Box
+        assert shape.scale == geometry.Scale(*scale)
 
     def test_confidently_classified_object_becomes_its_semantic_annotation(
         self, world: World, perceived_objects: PerceivedObjects
@@ -254,7 +252,7 @@ class TestNewObjects:
         bounding_box_center = (0.0, 0.0, 1.0)
         cylinder_center = (0.0, 0.01, 1.02)
         cylinder = Cylinder(
-            geometry=SemDTCylinder(
+            geometry=geometry.Cylinder(
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(*cylinder_center),
                 width=0.08,
                 height=0.12,
@@ -268,7 +266,7 @@ class TestNewObjects:
         )
 
         [shape] = world.get_kinematic_structure_entity_by_id(body_id).visual.shapes
-        assert type(shape) is SemDTCylinder
+        assert type(shape) is geometry.Cylinder
         assert (shape.width, shape.height) == (
             cylinder.geometry.width,
             cylinder.geometry.height,
@@ -295,7 +293,7 @@ class TestNewObjects:
 
         [shape] = world.get_kinematic_structure_entity_by_id(body_id).visual.shapes
         blue_in_bgr = ClusterColorAnnotator.color_name_to_bgr_values[Color.BLUE]
-        assert shape.color == SemDTColor.from_rgb(
+        assert shape.color == geometry.Color.from_rgb(
             [value / 255 for value in reversed(blue_in_bgr)]
         )
 
@@ -394,7 +392,7 @@ class TestObjectsSeenAgain:
             cas_holding(
                 cas_seen_from(world, camera_pose()),
                 make_object_hypothesis(
-                    translation=translation, extent=(0.12, 0.22, 0.32)
+                    translation=translation, scale=(0.12, 0.22, 0.32)
                 ),
             )
         )
@@ -531,11 +529,11 @@ class TestMatching:
     def test_object_of_a_very_different_size_gets_a_body_of_its_own(
         self, world: World, perceived_objects: PerceivedObjects
     ) -> None:
-        extent = (0.1, 0.2, 0.3)
+        scale = (0.1, 0.2, 0.3)
         [first_id] = perceived_objects.apply(
             cas_holding(
                 cas_seen_from(world, camera_pose()),
-                make_object_hypothesis(extent=extent),
+                make_object_hypothesis(scale=scale),
             )
         )
         factor = 2 * perceived_objects.matcher.maximum_match_size_ratio
@@ -544,7 +542,7 @@ class TestMatching:
             cas_holding(
                 cas_seen_from(world, camera_pose()),
                 make_object_hypothesis(
-                    extent=tuple(factor * length for length in extent)
+                    scale=tuple(factor * length for length in scale)
                 ),
             )
         )
@@ -684,7 +682,7 @@ class TestPerceivableObjectsOfTheWorld:
         scales_before = [shape.scale for shape in body.visual.shapes]
 
         perceived_objects.apply(
-            cas_holding(cas, make_object_hypothesis(extent=(0.12, 0.22, 0.32)))
+            cas_holding(cas, make_object_hypothesis(scale=(0.12, 0.22, 0.32)))
         )
 
         assert [shape.scale for shape in body.visual.shapes] == scales_before

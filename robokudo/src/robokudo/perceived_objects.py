@@ -24,12 +24,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Pose,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description import geometry
 from semantic_digital_twin.world_description.connections import Connection6DoF
-from semantic_digital_twin.world_description.geometry import Box, Scale
-from semantic_digital_twin.world_description.geometry import Color as SemDTColor
-from semantic_digital_twin.world_description.geometry import Shape as SemDTShape
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -45,11 +44,6 @@ from robokudo.types.annotation import (
     StampedPoseAnnotation,
 )
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.annotator_helper import (
-    get_camera_to_world_transform_matrix,
-    transform_pose_from_camera_to_world,
-)
-from robokudo.utils.transform import get_transform_matrix_from_q
 
 # %% detections
 
@@ -71,12 +65,12 @@ class Detection:
     pass.
     """
 
-    extent: Scale
+    scale: geometry.Scale
     """
     The lengths of the 3D bounding box of the object along its axes.
     """
 
-    shape: SemDTShape
+    shape: geometry.Shape
     """
     The shape the object was seen with, relative to its 3D bounding box.
     """
@@ -231,9 +225,9 @@ class ObjectMatcher:
         """
         if not body.visual.shapes:
             return True
-        known_extent = body.visual.scale
-        detection_edge = max(detection.extent.x, detection.extent.y, detection.extent.z)
-        known_edge = max(known_extent.x, known_extent.y, known_extent.z)
+        known_scale = body.visual.scale
+        detection_edge = max(detection.scale.x, detection.scale.y, detection.scale.z)
+        known_edge = max(known_scale.x, known_scale.y, known_scale.z)
         return max(detection_edge, known_edge) <= self.maximum_match_size_ratio * min(
             detection_edge, known_edge
         )
@@ -335,18 +329,22 @@ class PerceivedObjects:
         :param hypotheses: The hypotheses to annotate.
         :param cas: The CAS whose camera pose locates the hypotheses.
         """
-        if cas.camera_to_world_transform is None:
+        camera_to_world_transform = cas.camera_to_world_transform
+        if camera_to_world_transform is None:
             return
 
         for hypothesis in hypotheses:
             pose = hypothesis.latest_annotation_of_type(PoseAnnotation)
             if pose is None:
                 continue
-            world_pose = transform_pose_from_camera_to_world(cas, pose)
-            stamped_pose = StampedPoseAnnotation()
-            stamped_pose.source = type(self).__name__
-            stamped_pose.translation = world_pose.translation
-            stamped_pose.rotation = world_pose.rotation
+            world_pose = camera_to_world_transform @ Pose.from_xyz_quaternion(
+                *pose.translation, *pose.rotation
+            )
+            stamped_pose = StampedPoseAnnotation(
+                source=type(self).__name__,
+                translation=world_pose.position.to_np()[:3].tolist(),
+                rotation=world_pose.orientation.to_np().tolist(),
+            )
             if cas.world_frame is not None:
                 stamped_pose.frame = cas.world_frame
             if cas.contains(CASViews.CAMERA_INFO):
@@ -369,22 +367,19 @@ class PerceivedObjects:
         if world_body not in self.world.kinematic_structure_entities:
             return None
 
-        camera_T_bounding_box = get_transform_matrix_from_q(
-            bounding_box.pose.rotation, bounding_box.pose.translation
+        camera_T_bounding_box = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            *bounding_box.pose.translation, *bounding_box.pose.rotation
         )
-        extent = Scale(
+        scale = geometry.Scale(
             x=bounding_box.x_length,
             y=bounding_box.y_length,
             z=bounding_box.z_length,
         )
         return Detection(
             hypothesis=hypothesis,
-            pose=HomogeneousTransformationMatrix(
-                data=get_camera_to_world_transform_matrix(cas) @ camera_T_bounding_box,
-                reference_frame=world_body,
-            ),
-            extent=extent,
-            shape=self._shape_of(hypothesis, camera_T_bounding_box, extent),
+            pose=camera_to_world_transform @ camera_T_bounding_box,
+            scale=scale,
+            shape=self._shape_of(hypothesis, camera_T_bounding_box, scale),
             semantic_class=(
                 annotation_class_by_label(hypothesis.class_label)
                 if hypothesis.class_label is not None
@@ -395,28 +390,25 @@ class PerceivedObjects:
     def _shape_of(
         self,
         hypothesis: ObjectHypothesis,
-        camera_T_bounding_box: np.ndarray,
-        extent: Scale,
-    ) -> SemDTShape:
+        camera_T_bounding_box: HomogeneousTransformationMatrix,
+        scale: geometry.Scale,
+    ) -> geometry.Shape:
         """
         :param hypothesis: The hypothesis.
         :param camera_T_bounding_box: The pose of the 3D bounding box of ``hypothesis``
             relative to the camera.
-        :param extent: The lengths of the 3D bounding box of ``hypothesis``.
+        :param scale: The lengths of the 3D bounding box of ``hypothesis``.
         :return: The latest shape fitted to ``hypothesis``, or its 3D bounding box if
             none was, relative to the bounding box and in the dominant color of
             ``hypothesis``, if it has one.
         """
         fitted_shape = hypothesis.latest_annotation_of_type(Shape)
         if fitted_shape is None:
-            shape = Box(scale=extent)
+            shape = geometry.Box(scale=scale)
         else:
             shape = replace(
                 fitted_shape.geometry,
-                origin=HomogeneousTransformationMatrix(
-                    data=np.linalg.inv(camera_T_bounding_box)
-                    @ fitted_shape.geometry.origin.to_np()
-                ),
+                origin=camera_T_bounding_box.inverse() @ fitted_shape.geometry.origin,
             )
         color = self._dominant_color_of(hypothesis)
         if color is not None:
@@ -424,7 +416,7 @@ class PerceivedObjects:
         return shape
 
     @staticmethod
-    def _dominant_color_of(hypothesis: ObjectHypothesis) -> SemDTColor | None:
+    def _dominant_color_of(hypothesis: ObjectHypothesis) -> geometry.Color | None:
         """
         :param hypothesis: The hypothesis.
         :return: The color covering the largest part of ``hypothesis``, or None if no
@@ -441,7 +433,9 @@ class PerceivedObjects:
         blue_green_red = ClusterColorAnnotator.color_name_to_bgr_values[
             Color[dominant_color.color.upper()]
         ]
-        return SemDTColor.from_rgb([value / 255 for value in reversed(blue_green_red)])
+        return geometry.Color.from_rgb(
+            [value / 255 for value in reversed(blue_green_red)]
+        )
 
     # %% objects of the world
 
