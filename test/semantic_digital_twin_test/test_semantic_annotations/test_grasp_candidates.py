@@ -6,6 +6,7 @@ import pytest
 import trimesh
 
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.ormatic.utils import classproperty
 
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -17,9 +18,20 @@ from semantic_digital_twin.exceptions import (
     ObjectHasNoWidthWithoutCollision,
     ReferenceFrameMismatchError,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasGraspCandidates,
+    HasRootBody,
+    HasSurfaceGraspsByDefault,
+)
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.grasping.grasp_strategies import (
+    GraspABar,
+    GraspAcrossTheLength,
+    GraspFromAnySide,
+    GraspStrategy,
+    PinchARim,
+    PinchTheTopOfAWall,
+)
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
@@ -51,7 +63,7 @@ from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
-from ._statements import allowed_intervals
+from ._statements import allowed_intervals, statement_by
 
 # %% fixtures
 
@@ -209,7 +221,7 @@ class FixedlyGraspedHandle(Handle):
     A handle that offers one grasp at its origin, whatever its shape.
     """
 
-    def grasp_candidates(self, model_registry=None, require_lifting=False):
+    def grasp_candidates(self, model_registry=None, grasp_pattern=None):
         return [GraspCandidate.from_body_origin(self)]
 
 
@@ -229,9 +241,9 @@ class MilkGraspedLow(Milk):
     A carton that may be grasped only at its lower half.
     """
 
-    def surface_grasp_statement(self, require_lifting=False):
-        statement = super().surface_grasp_statement(require_lifting)
-        return statement.where(statement.height < 0.5)
+    @classproperty
+    def grasp_strategy(cls) -> GraspStrategy:
+        return GraspFromAnySide(highest_height=0.5)
 
 
 def test_an_annotation_can_state_where_it_may_be_grasped(milk):
@@ -247,14 +259,11 @@ def test_an_annotation_can_state_where_it_may_be_grasped(milk):
 
 
 @dataclass(eq=False)
-class MilkDrawnUniformly(Milk):
+class MilkDrawnUniformly(HasSurfaceGraspsByDefault, Milk):
     """
     A carton that offers grasps drawn uniformly from its statement while no model is
     given.
     """
-
-    def default_grasp_candidates(self):
-        return self.drawn_grasp_candidates()
 
 
 def test_an_annotation_can_offer_other_grasps_while_no_model_is_given(milk):
@@ -318,7 +327,9 @@ def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
     allowed = allowed_intervals(bowl.rim.surface_grasp_statement())
     wall_thickness = BOWL_OUTER_RADIUS - BOWL_INNER_RADIUS
 
-    assert bowl.rim.wall_thickness() == pytest.approx(wall_thickness, rel=0.02)
+    assert PinchARim().depth_unit(bowl.rim, bowl.rim.grasp_surface()) == pytest.approx(
+        wall_thickness, rel=0.02
+    )
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
         0.25 * wall_thickness, rel=0.02
     )
@@ -328,35 +339,24 @@ def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
 
 
 def test_a_wall_is_pinched_as_deep_as_asked(bowl):
-    shallowest_depth, deepest_depth = 0.1, 0.9
-    allowed = allowed_intervals(
-        bowl.rim.wall_grasp_statement(
-            0.25,
-            0.75,
-            False,
-            shallowest_depth=shallowest_depth,
-            deepest_depth=deepest_depth,
-        )
-    )
-    wall_thickness = bowl.rim.wall_thickness()
+    strategy = PinchARim(shallowest_depth=0.1, deepest_depth=0.9)
+    allowed = allowed_intervals(statement_by(strategy, bowl.rim))
+    wall_thickness = strategy.depth_unit(bowl.rim, bowl.rim.grasp_surface())
 
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
-        shallowest_depth * wall_thickness
+        strategy.shallowest_depth * wall_thickness
     )
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
-        deepest_depth * wall_thickness
+        strategy.deepest_depth * wall_thickness
     )
 
 
 def test_a_wall_is_pinched_as_tilted_and_turned_as_asked(bowl):
     largest_pitch, largest_roll = 0.3, 0.2
     allowed = allowed_intervals(
-        bowl.rim.wall_grasp_statement(
-            0.25,
-            0.75,
-            False,
-            largest_pitch=largest_pitch,
-            largest_roll=largest_roll,
+        statement_by(
+            PinchARim(largest_pitch=largest_pitch, largest_roll=largest_roll),
+            bowl.rim,
         )
     )
 
@@ -368,8 +368,9 @@ def test_a_wall_is_pinched_as_tilted_and_turned_as_asked(bowl):
 def test_a_rim_is_pinched_between_the_heights_asked(bowl):
     lowest_height, highest_height = 0.1, 0.9
     allowed = allowed_intervals(
-        bowl.rim.surface_grasp_statement(
-            lowest_height=lowest_height, highest_height=highest_height
+        statement_by(
+            PinchARim(lowest_height=lowest_height, highest_height=highest_height),
+            bowl.rim,
         )
     )
 
@@ -383,10 +384,13 @@ def test_a_container_without_a_rim_is_pinched_as_far_into_its_rim_depth_as_asked
     bowl.rim = None
     rim_depth, shallowest_rim_fraction, deepest_rim_fraction = 0.02, 0.1, 0.9
     allowed = allowed_intervals(
-        bowl.surface_grasp_statement(
-            rim_depth=rim_depth,
-            shallowest_rim_fraction=shallowest_rim_fraction,
-            deepest_rim_fraction=deepest_rim_fraction,
+        statement_by(
+            PinchTheTopOfAWall(
+                rim_depth=rim_depth,
+                shallowest_rim_fraction=shallowest_rim_fraction,
+                deepest_rim_fraction=deepest_rim_fraction,
+            ),
+            bowl,
         )
     )
     lowest, highest = bowl.grasp_surface().bounds
@@ -451,8 +455,8 @@ def test_drawn_cutlery_grasps_come_from_above_across_its_length(length_axis):
     """
     spoon = _spoon_lying_along(length_axis)
     allowed = allowed_intervals(spoon.surface_grasp_statement())
-    first_end = allowed["azimuth"].simple_sets[0]
-    azimuth_spread = (first_end.upper - first_end.lower) / 2
+    first_end = allowed["yaw"].simple_sets[0]
+    yaw_spread = (first_end.upper - first_end.lower) / 2
     length_direction = np.eye(3)[length_axis]
 
     grasps = spoon.drawn_grasp_candidates()
@@ -465,7 +469,7 @@ def test_drawn_cutlery_grasps_come_from_above_across_its_length(length_axis):
         )
         assert -approach[2] >= np.cos(allowed["pitch"].simple_sets[-1].upper)
         assert abs(float(np.dot(closing, length_direction))) <= np.sin(
-            allowed["roll"].simple_sets[-1].upper - np.pi / 2 + azimuth_spread
+            allowed["roll"].simple_sets[-1].upper - np.pi / 2 + yaw_spread
         )
 
 
@@ -473,21 +477,24 @@ def test_cutlery_is_grasped_within_the_bounds_asked():
     spoon = _spoon_lying_along(0)
     lowest_height, highest_height = 0.3, 0.7
     shallowest_depth, deepest_depth = 0.1, 0.4
-    azimuth_tolerance, largest_pitch, largest_roll = 0.05, 0.3, 0.2
+    yaw_tolerance, largest_pitch, largest_roll = 0.05, 0.3, 0.2
     allowed = allowed_intervals(
-        spoon.surface_grasp_statement(
-            lowest_height=lowest_height,
-            highest_height=highest_height,
-            shallowest_depth=shallowest_depth,
-            deepest_depth=deepest_depth,
-            azimuth_tolerance=azimuth_tolerance,
-            largest_pitch=largest_pitch,
-            largest_roll=largest_roll,
+        statement_by(
+            GraspAcrossTheLength(
+                lowest_height=lowest_height,
+                highest_height=highest_height,
+                shallowest_depth=shallowest_depth,
+                deepest_depth=deepest_depth,
+                yaw_tolerance=yaw_tolerance,
+                largest_pitch=largest_pitch,
+                largest_roll=largest_roll,
+            ),
+            spoon,
         )
     )
     lowest, highest = spoon.grasp_surface().bounds
     length = float(highest[0] - lowest[0])
-    first_end = allowed["azimuth"].simple_sets[0]
+    first_end = allowed["yaw"].simple_sets[0]
 
     assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
     assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
@@ -498,7 +505,7 @@ def test_cutlery_is_grasped_within_the_bounds_asked():
         deepest_depth * length
     )
     assert first_end.upper - first_end.lower == pytest.approx(
-        2 * azimuth_tolerance, rel=1e-5
+        2 * yaw_tolerance, rel=1e-5
     )
     assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(largest_pitch)
     assert allowed["roll"].simple_sets[0].lower == pytest.approx(
@@ -595,11 +602,14 @@ def test_a_handle_is_grasped_between_the_heights_and_depths_asked():
     lowest_height, highest_height = 0.3, 0.7
     shallowest_depth, deepest_depth = 0.1, 0.4
     allowed = allowed_intervals(
-        handle.surface_grasp_statement(
-            lowest_height=lowest_height,
-            highest_height=highest_height,
-            shallowest_depth=shallowest_depth,
-            deepest_depth=deepest_depth,
+        statement_by(
+            GraspABar(
+                lowest_height=lowest_height,
+                highest_height=highest_height,
+                shallowest_depth=shallowest_depth,
+                deepest_depth=deepest_depth,
+            ),
+            handle,
         )
     )
     thinnest_extent = float(min(handle.grasp_surface().extents))

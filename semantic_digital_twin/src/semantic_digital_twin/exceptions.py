@@ -2170,8 +2170,8 @@ class SurfaceGraspNotOnSurfaceError(UsageError):
 
     def error_message(self) -> str:
         return (
-            f"No surface of '{self.graspable.name}' lies at azimuth "
-            f"{self.surface_grasp.azimuth:.3f} rad and height "
+            f"No surface of '{self.graspable.name}' lies at yaw "
+            f"{self.surface_grasp.yaw:.3f} rad and height "
             f"{self.surface_grasp.height:.3f} of its bounding box."
         )
 
