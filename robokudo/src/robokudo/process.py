@@ -30,12 +30,16 @@ from typing_extensions import TYPE_CHECKING, List, Optional, Self, Type
 import robokudo.pipeline
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE
-from robokudo.exceptions import MultipleRobotsInWorldError, RoboKudoAlreadyRunningError
+from robokudo.exceptions import (
+    EngineRootIsNotAPipelineError,
+    MultipleRobotsInWorldError,
+    RoboKudoAlreadyRunningError,
+)
 from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
 from robokudo.perceived_objects import PerceivedObjects
 from robokudo.pipeline import Pipeline
-from robokudo.utils.tree import setup_with_descendants_rk
+from robokudo.utils.tree import find_parent_of_type, setup_with_descendants_rk
 
 if TYPE_CHECKING:
     from py_trees_ros.trees import BehaviourTree
@@ -85,17 +89,6 @@ class RoboKudo:
     The behaviour tree of :attr:`analysis_engine`; None until :meth:`start`.
     """
 
-    applied_cas_id: Optional[int] = field(init=False, default=None)
-    """
-    The id of the last CAS of :attr:`pipeline` whose objects were put into the world.
-    """
-
-    pipeline: Optional[Pipeline] = field(init=False, default=None)
-    """
-    The pipeline :attr:`analysis_engine` perceives with, whose finished passes are put
-    into the world; None until :meth:`start`, and for an engine without a pipeline.
-    """
-
     def __post_init__(self) -> None:
         self.perceived_objects = PerceivedObjects(world=self.world)
 
@@ -136,6 +129,21 @@ class RoboKudo:
         return Blackboard().get(BBIdentifier.ROBOKUDO)
 
     @property
+    def pipeline(self) -> Pipeline:
+        """
+        The pipeline :attr:`analysis_engine` perceives with: the one of :attr:`tree` no
+        other pipeline encloses.
+
+        Its finished passes are put into the world.
+        """
+        return next(
+            behaviour
+            for behaviour in self.tree.root.iterate()
+            if isinstance(behaviour, Pipeline)
+            and find_parent_of_type(behaviour, Pipeline) is None
+        )
+
+    @property
     def camera(self) -> Optional[Camera]:
         """
         The default camera of the robot in the perception world; None if the world holds
@@ -162,15 +170,20 @@ class RoboKudo:
         :param include_gui: Whether to show the visualizers.
         :param visualizer_types: The visualizers to show; all of them when None.
         :raises RoboKudoAlreadyRunningError: If another RoboKudo runs in this process.
+        :raises EngineRootIsNotAPipelineError: If the tree of :attr:`analysis_engine` is
+            not rooted at a pipeline.
         """
         blackboard = Blackboard()
         if blackboard.exists(BBIdentifier.ROBOKUDO):
             raise RoboKudoAlreadyRunningError()
+        engine_tree = self.analysis_engine.implementation()
+        if not isinstance(engine_tree, Pipeline):
+            raise EngineRootIsNotAPipelineError(
+                analysis_engine_name=self.analysis_engine.name(),
+                root_type=type(engine_tree),
+            )
         blackboard.set(BBIdentifier.ROBOKUDO, self)
 
-        engine_tree = self.analysis_engine.implementation()
-        if isinstance(engine_tree, Pipeline):
-            self.pipeline = engine_tree
         for behaviour in engine_tree.iterate():
             if isinstance(behaviour, Pipeline):
                 behaviour.world = self.world
@@ -222,16 +235,13 @@ class RoboKudo:
     def tick(self) -> None:
         """
         Tick the behaviour tree once, and put the objects found by a pass of
-        :attr:`pipeline` that finished successfully into the world, once per pass.
+        :attr:`pipeline` that finished successfully in this tick into the world.
         """
         self.tree.tick()
-        if self.pipeline is None or self.pipeline.status != Status.SUCCESS:
+        pipeline = self.pipeline
+        if pipeline.status != Status.SUCCESS:
             return
-        cas = self.pipeline.cas
-        if cas.cas_id == self.applied_cas_id:
-            return
-        self.perceived_objects.apply(cas)
-        self.applied_cas_id = cas.cas_id
+        self.perceived_objects.apply(pipeline.cas)
 
     def close(self) -> None:
         """

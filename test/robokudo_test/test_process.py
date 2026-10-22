@@ -8,9 +8,9 @@ import numpy as np
 import pytest
 import rclpy
 from py_trees.behaviour import Behaviour
+from py_trees.blackboard import Blackboard
 from py_trees.behaviours import Failure, Running, Success
 from py_trees.common import Status
-from py_trees.composites import Sequence
 from rclpy.context import Context
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
@@ -29,9 +29,11 @@ from semantic_digital_twin.world_description.world_entity import Body
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS
 from robokudo.exceptions import (
+    EngineRootIsNotAPipelineError,
     MultipleRobotsInWorldError,
     RoboKudoAlreadyRunningError,
 )
+from robokudo.identifier import BBIdentifier
 from robokudo.pipeline import Pipeline
 from robokudo.process import RoboKudo
 from robokudo.types.scene import ObjectHypothesis
@@ -45,6 +47,26 @@ from ._perception_world import (
     place_camera_of,
     wait_until,
 )
+
+
+@dataclass
+class EngineRunningABehaviour:
+    """
+    An analysis engine whose pipeline runs a single behaviour.
+    """
+
+    behaviour: Behaviour = field(default_factory=lambda: Success(name="Perceive"))
+    """
+    The behaviour the pipeline runs.
+    """
+
+    def name(self) -> str:
+        return type(self).__name__
+
+    def implementation(self) -> Pipeline:
+        pipeline = Pipeline("RunningABehaviour")
+        pipeline.add_child(self.behaviour)
+        return pipeline
 
 
 @dataclass
@@ -101,26 +123,6 @@ class EngineFindingAnObject:
         return pipeline
 
 
-@dataclass
-class EngineWithAPipelineInsideASequence:
-    """
-    An analysis engine whose pipeline is a child of a plain sequence.
-    """
-
-    pipeline: Pipeline = field(default_factory=lambda: Pipeline("Inner"))
-    """
-    The pipeline inside the sequence.
-    """
-
-    def name(self) -> str:
-        return type(self).__name__
-
-    def implementation(self) -> Sequence:
-        root = Sequence(name="Root", memory=True)
-        root.add_child(self.pipeline)
-        return root
-
-
 def cas_holding_hypothesis(world: World, hypothesis: ObjectHypothesis) -> CAS:
     """
     :return: A CAS seen from :func:`camera_pose` in ``world`` that found ``hypothesis``.
@@ -131,8 +133,8 @@ def cas_holding_hypothesis(world: World, hypothesis: ObjectHypothesis) -> CAS:
 
 
 @pytest.fixture
-def engine() -> EngineWithoutPipeline:
-    return EngineWithoutPipeline()
+def engine() -> EngineRunningABehaviour:
+    return EngineRunningABehaviour()
 
 
 @pytest.fixture
@@ -150,7 +152,7 @@ def following_node(ros_default: None) -> Iterator[Node]:
 
 @pytest.fixture
 def joined_robokudo(
-    spinning_node: Node, shared_world: SharedWorld, engine: EngineWithoutPipeline
+    spinning_node: Node, shared_world: SharedWorld, engine: EngineRunningABehaviour
 ) -> Iterator[RoboKudo]:
     robokudo = RoboKudo.joining_shared_world(node=spinning_node, analysis_engine=engine)
     yield robokudo
@@ -184,19 +186,16 @@ class TestPerceptionWorld:
         assert robokudo.world.is_empty()
         robokudo.close()
 
-    def test_pipeline_inside_the_engine_tree_perceives_into_the_world(
-        self, node: Node
-    ) -> None:
-        engine = EngineWithAPipelineInsideASequence()
-        robokudo = RoboKudo(node=node, analysis_engine=engine)
+    def test_engine_whose_root_is_not_a_pipeline_cannot_start(self, node: Node) -> None:
+        robokudo = RoboKudo(node=node, analysis_engine=EngineWithoutPipeline())
 
-        robokudo.start(include_gui=False)
+        with pytest.raises(EngineRootIsNotAPipelineError):
+            robokudo.start(include_gui=False)
 
-        assert engine.pipeline.world is robokudo.world
-        robokudo.close()
+        assert not Blackboard().exists(BBIdentifier.ROBOKUDO)
 
     def test_world_of_its_own_is_not_shared(
-        self, node: Node, engine: EngineWithoutPipeline
+        self, node: Node, engine: EngineRunningABehaviour
     ) -> None:
         robokudo = RoboKudo(node=node, analysis_engine=engine)
 
@@ -325,24 +324,24 @@ class TestJoiningSharedWorld:
 
 class TestOneRoboKudoPerProcess:
     def test_second_robokudo_cannot_start(
-        self, node: Node, engine: EngineWithoutPipeline
+        self, node: Node, engine: EngineRunningABehaviour
     ) -> None:
         running = RoboKudo(node=node, analysis_engine=engine)
         running.start(include_gui=False)
 
         with pytest.raises(RoboKudoAlreadyRunningError):
-            RoboKudo(node=node, analysis_engine=EngineWithoutPipeline()).start(
+            RoboKudo(node=node, analysis_engine=EngineRunningABehaviour()).start(
                 include_gui=False
             )
         running.close()
 
     def test_closed_robokudo_makes_room_for_the_next(
-        self, node: Node, following_node: Node, engine: EngineWithoutPipeline
+        self, node: Node, following_node: Node, engine: EngineRunningABehaviour
     ) -> None:
         RoboKudo(node=node, analysis_engine=engine).start(include_gui=False)
         RoboKudo.from_blackboard().close()
         following = RoboKudo(
-            node=following_node, analysis_engine=EngineWithoutPipeline()
+            node=following_node, analysis_engine=EngineRunningABehaviour()
         )
 
         following.start(include_gui=False)
@@ -356,7 +355,7 @@ class TestOneRoboKudoPerProcess:
 
 class TestRobotCamera:
     def test_camera_is_the_default_camera_of_the_robot(
-        self, node: Node, engine: EngineWithoutPipeline, tracy_world: World
+        self, node: Node, engine: EngineRunningABehaviour, tracy_world: World
     ) -> None:
         robot = tracy_world.get_semantic_annotations_by_type(AbstractRobot)[0]
 
@@ -365,12 +364,12 @@ class TestRobotCamera:
         assert robokudo.camera is robot.get_default_camera()
 
     def test_world_without_a_robot_has_no_camera(
-        self, node: Node, engine: EngineWithoutPipeline
+        self, node: Node, engine: EngineRunningABehaviour
     ) -> None:
         assert RoboKudo(node=node, analysis_engine=engine).camera is None
 
     def test_camera_of_a_world_with_several_robots_is_ambiguous(
-        self, node: Node, engine: EngineWithoutPipeline
+        self, node: Node, engine: EngineRunningABehaviour
     ) -> None:
         world = World()
         first_robot_root = Body(name=PrefixedName("first_robot"))
@@ -395,10 +394,10 @@ class TestRobotCamera:
 
 class TestTicking:
     def test_runs_until_the_engine_fails(self, node: Node) -> None:
-        failing_tree = Sequence(name="FailingPipeline", memory=True)
-        failing_tree.add_child(Failure(name="Fail"))
+        failing_behaviour = Failure(name="Fail")
         robokudo = RoboKudo(
-            node=node, analysis_engine=EngineWithoutPipeline(tree=failing_tree)
+            node=node,
+            analysis_engine=EngineRunningABehaviour(behaviour=failing_behaviour),
         )
         robokudo.start(include_gui=False)
         running = Thread(target=robokudo.run, daemon=True)
@@ -407,7 +406,7 @@ class TestTicking:
         wait_until(lambda: not running.is_alive())
 
         assert not running.is_alive()
-        assert failing_tree.children[0].status is Status.FAILURE
+        assert failing_behaviour.status is Status.FAILURE
         robokudo.close()
 
     def test_stops_when_ros_shuts_down(self) -> None:
@@ -416,7 +415,7 @@ class TestTicking:
         node = Node("shutting_down_robokudo", context=context)
         robokudo = RoboKudo(
             node=node,
-            analysis_engine=EngineWithoutPipeline(tree=Running(name="Perceive")),
+            analysis_engine=EngineRunningABehaviour(behaviour=Running(name="Perceive")),
         )
         robokudo.start(include_gui=False)
         running = Thread(target=robokudo.run, daemon=True)
@@ -446,42 +445,10 @@ class TestObjectsOfAFinishedPass:
         assert perceived_object.root in robokudo.world.bodies
         robokudo.close()
 
-    def test_finished_pass_is_put_into_the_world_only_once(
-        self, node: Node, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        robokudo = RoboKudo(node=node, analysis_engine=EngineFindingAnObject())
-        robokudo.start(include_gui=False)
-        robokudo.tick()
-        [hypothesis] = robokudo.pipeline.cas.filter_annotations_by_type(
-            ObjectHypothesis
-        )
-        annotation_count = len(hypothesis.annotations)
-        # A tick that does not reach the pipeline leaves it at its finished pass.
-        monkeypatch.setattr(robokudo.tree, "tick", lambda: None)
-
-        robokudo.tick()
-
-        assert (
-            len(robokudo.world.get_semantic_annotations_by_type(PerceivedObject)) == 1
-        )
-        assert len(hypothesis.annotations) == annotation_count
-        robokudo.close()
-
     def test_failed_pass_puts_nothing_into_the_world(self, node: Node) -> None:
         robokudo = RoboKudo(
             node=node, analysis_engine=EngineFindingAnObject(outcome=Status.FAILURE)
         )
-        robokudo.start(include_gui=False)
-
-        robokudo.tick()
-
-        assert robokudo.world.get_semantic_annotations_by_type(PerceivedObject) == []
-        robokudo.close()
-
-    def test_engine_without_a_pipeline_puts_nothing_into_the_world(
-        self, node: Node, engine: EngineWithoutPipeline
-    ) -> None:
-        robokudo = RoboKudo(node=node, analysis_engine=engine)
         robokudo.start(include_gui=False)
 
         robokudo.tick()

@@ -467,6 +467,34 @@ class RoboKudoAlreadyRunningError(RoboKudoError, RuntimeError):
 
 
 @dataclass
+class EngineRootIsNotAPipelineError(RoboKudoError, TypeError):
+    """
+    Raised when RoboKudo starts an analysis engine whose tree is not rooted at a
+    pipeline.
+    """
+
+    analysis_engine_name: str
+    """
+    The name of the analysis engine.
+    """
+
+    root_type: type
+    """
+    The type of the root of the tree the analysis engine builds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The analysis engine '{self.analysis_engine_name}' builds a tree rooted at "
+            f"a {self.root_type.__name__}, so RoboKudo has no pipeline whose passes it "
+            f"could put into the world."
+        )
+
+    def suggest_correction(self) -> str:
+        return "make a Pipeline the root of the tree the analysis engine builds."
+
+
+@dataclass
 class MultipleRobotsInWorldError(RoboKudoError, ValueError):
     """
     Raised when the camera of the robot is requested from a world holding several
