@@ -5,6 +5,7 @@ from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
 
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.explanation.explanation import explain_inference
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
@@ -696,3 +697,22 @@ def test_every_kitchen_drawer_stands_closed_at_the_lower_limit_of_its_rails(
     kitchen_environment_world.notify_state_change()
 
     assert [drawer.opening_ratio for drawer in drawers] == [0] * len(drawers)
+
+
+# %% perceived objects
+
+
+def test_perceived_object_keeps_its_class_label_when_sent_to_another_process():
+    world = World()
+    body = Body(name=PrefixedName("perceived_object"))
+    with world.modify_world():
+        world.add_body(body)
+        perceived_object = PerceivedObject(root=body, class_label="fork")
+        world.add_semantic_annotation(perceived_object)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+
+    received = from_json(to_json(perceived_object), **tracker.create_kwargs())
+
+    assert type(received) is PerceivedObject
+    assert received.root is body
+    assert received.class_label == perceived_object.class_label
