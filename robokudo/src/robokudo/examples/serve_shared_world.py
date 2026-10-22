@@ -1,13 +1,13 @@
 """
-Serve a shared world for RoboKudo to join, standing in for the process that executes
-robot motions.
+Example server of a shared world for RoboKudo to join, standing in for the process that
+executes robot motions.
 
-The world holds only the ``map`` frame. RoboKudo started while it runs
-fetches it, and every object it perceives is added to this world as well; the
-server prints each body it learns about and shows the world in RViz::
+The world holds only the ``map`` frame. RoboKudo started while it runs fetches it, and
+every object it perceives is added to this world as well; the server prints each body it
+learns about and shows the world in RViz::
 
-    python -m robokudo.scripts.shared_world_server
-    ros2 run robokudo_ros main _ae=semdt_shared_world_from_files
+    python -m robokudo.examples.serve_shared_world
+    ros2 run robokudo_ros main _ros_pkg=robokudo.examples _ae=shared_world_from_files
 """
 
 from __future__ import annotations
