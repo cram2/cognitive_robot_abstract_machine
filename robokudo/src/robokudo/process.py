@@ -2,9 +2,10 @@
 The RoboKudo perception process.
 
 A :class:`RoboKudo` runs one analysis engine on the semantic digital twin perception
-perceives into. That world is either a world of its own or the world other processes,
-such as the one executing robot motions, share; a shared world receives their changes
-and every change perception makes is published to them.
+perceives into. That world is the world other processes, such as the one executing robot
+motions, share, if one of them serves it; a shared world receives their changes and
+every change perception makes is published to them. Without one, perception keeps an
+empty world of its own.
 """
 
 from __future__ import annotations
@@ -19,11 +20,13 @@ from timeit import default_timer as timer
 import rclpy
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
-from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
+from semantic_digital_twin.adapters.ros.world_fetcher import (
+    fetch_world_from_service,
+    find_world_fetcher_service,
+)
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, Camera
 from semantic_digital_twin.world import World
-from typing_extensions import TYPE_CHECKING, List, Optional, Self, Type
+from typing_extensions import TYPE_CHECKING, List, Optional, Type
 
 # robokudo.pipeline must be imported before robokudo.garden, whose import otherwise
 # trips the circular import between robokudo.pipeline and robokudo.annotators.core.
@@ -32,7 +35,6 @@ from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE
 from robokudo.exceptions import (
     EngineRootIsNotAPipelineError,
-    MultipleRobotsInWorldError,
     RoboKudoAlreadyRunningError,
 )
 from robokudo.garden import grow_tree
@@ -68,9 +70,16 @@ class RoboKudo:
     The engine whose behaviour tree perceives.
     """
 
-    world: World = field(default_factory=World)
+    world_discovery_timeout: timedelta = timedelta(seconds=2)
     """
-    The world perception perceives into; an empty world of its own by default.
+    How long to look for a process serving a shared world before perceiving into a world
+    of its own.
+    """
+
+    world: World = field(init=False)
+    """
+    The world perception perceives into: the shared world, or an empty world of its own
+    if no process serves one.
     """
 
     perceived_objects: PerceivedObjects = field(init=False)
@@ -90,34 +99,25 @@ class RoboKudo:
     """
 
     def __post_init__(self) -> None:
-        self.perceived_objects = PerceivedObjects(world=self.world)
-
-    @classmethod
-    def joining_shared_world(
-        cls,
-        node: Node,
-        analysis_engine: AnalysisEngineInterface,
-        fetch_timeout: timedelta = timedelta(seconds=10),
-    ) -> Self:
         """
-        Create a RoboKudo that perceives into the world other processes share.
+        Join the world a process serves, keeping it in sync in both directions: changes
+        of the other processes are applied to it and changes perception makes are
+        published. Without such a process, perceive into an empty world of its own.
 
-        The world is fetched from the process serving it, then kept in sync in both
-        directions: changes of the other processes are applied to it and changes
-        perception makes are published.
-
-        :param node: The node to fetch and synchronize the world through. It has to be
-            spun by an executor.
-        :param analysis_engine: The engine whose behaviour tree perceives.
-        :param fetch_timeout: How long to wait for a process serving the world.
-        :return: The RoboKudo sharing the world.
+        .. note:: :attr:`node` has to be spun by an executor to fetch a shared world.
         """
-        world = fetch_world_from_service(
-            node, timeout_seconds=fetch_timeout.total_seconds()
+        service = find_world_fetcher_service(
+            self.node, timeout_seconds=self.world_discovery_timeout.total_seconds()
         )
-        perception = cls(node=node, analysis_engine=analysis_engine, world=world)
-        perception.synchronizer = WorldSynchronizer(node=node, _world=world)
-        return perception
+        if service is None:
+            logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE).warning(
+                "No process serves a shared world; perceiving into a world of its own."
+            )
+            self.world = World()
+        else:
+            self.world = fetch_world_from_service(self.node)
+            self.synchronizer = WorldSynchronizer(node=self.node, _world=self.world)
+        self.perceived_objects = PerceivedObjects(world=self.world)
 
     @classmethod
     def from_blackboard(cls) -> RoboKudo:
@@ -142,21 +142,6 @@ class RoboKudo:
             if isinstance(behaviour, Pipeline)
             and find_parent_of_type(behaviour, Pipeline) is None
         )
-
-    @property
-    def camera(self) -> Optional[Camera]:
-        """
-        The default camera of the robot in the perception world; None if the world holds
-        no robot.
-
-        :raises MultipleRobotsInWorldError: If the world holds several robots.
-        """
-        robots = self.world.get_semantic_annotations_by_type(AbstractRobot)
-        if not robots:
-            return None
-        if len(robots) > 1:
-            raise MultipleRobotsInWorldError(robot_count=len(robots))
-        return robots[0].get_default_camera()
 
     # %% lifecycle
 

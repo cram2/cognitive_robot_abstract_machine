@@ -89,16 +89,6 @@ def main() -> None:
         help="Rate (Hz) to tick the Behavior Tree.",
     )
     parser.add_argument(
-        "_synchronize_world",
-        action="store_true",
-        help=(
-            "If set, perception starts from the world served by another process and "
-            "keeps it synchronized: changes of the other processes are applied to it "
-            "and the changes perception makes are published."
-        ),
-    )
-    parser.set_defaults(synchronize_world=False)
-    parser.add_argument(
         "_debugmode",
         action="store_true",
         help="If set, the rcply root logger will be set to DEBUG log level which will yield many ROS-related debug messages.",
@@ -170,13 +160,9 @@ def main() -> None:
     logger.info(f"Loading AE '{args.ae}' from package '{args.ros_pkg}'...")
     loaded_ae = loader.load_ae(ros_pkg_name=args.ros_pkg, module_name=args.ae)
 
-    # 8. Create RoboKudo on the world it perceives into; fetching a shared one needs the
-    #    executors above to serve the node
-    robokudo = (
-        RoboKudo.joining_shared_world(node=node1, analysis_engine=loaded_ae)
-        if args.synchronize_world
-        else RoboKudo(node=node1, analysis_engine=loaded_ae)
-    )
+    # 8. Create RoboKudo, joining the world another process shares if one does;
+    #    fetching it needs the executors above to serve the node
+    robokudo = RoboKudo(node=node1, analysis_engine=loaded_ae)
 
     # 9. Build the Behavior Tree of the loaded AE
     visualizer_types = None

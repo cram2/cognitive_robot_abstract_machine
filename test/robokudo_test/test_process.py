@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from datetime import timedelta
 from threading import Thread
 
 import numpy as np
@@ -15,8 +16,6 @@ from rclpy.context import Context
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cup,
@@ -26,11 +25,11 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 
+from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS
 from robokudo.exceptions import (
     EngineRootIsNotAPipelineError,
-    MultipleRobotsInWorldError,
     RoboKudoAlreadyRunningError,
 )
 from robokudo.identifier import BBIdentifier
@@ -40,7 +39,6 @@ from robokudo.types.scene import ObjectHypothesis
 
 from ._object_hypotheses import make_object_hypothesis
 from ._perception_world import (
-    FrameName,
     SharedWorld,
     camera_pose,
     cas_seen_from,
@@ -132,6 +130,20 @@ def cas_holding_hypothesis(world: World, hypothesis: ObjectHypothesis) -> CAS:
     return cas
 
 
+def robokudo_of_its_own(
+    node: Node, analysis_engine: AnalysisEngineInterface
+) -> RoboKudo:
+    """
+    :return: A RoboKudo that looks for a shared world only once, finds none, and
+        perceives into a world of its own.
+    """
+    return RoboKudo(
+        node=node,
+        analysis_engine=analysis_engine,
+        world_discovery_timeout=timedelta(0),
+    )
+
+
 @pytest.fixture
 def engine() -> EngineRunningABehaviour:
     return EngineRunningABehaviour()
@@ -154,7 +166,11 @@ def following_node(ros_default: None) -> Iterator[Node]:
 def joined_robokudo(
     spinning_node: Node, shared_world: SharedWorld, engine: EngineRunningABehaviour
 ) -> Iterator[RoboKudo]:
-    robokudo = RoboKudo.joining_shared_world(node=spinning_node, analysis_engine=engine)
+    robokudo = RoboKudo(
+        node=spinning_node,
+        analysis_engine=engine,
+        world_discovery_timeout=timedelta(seconds=10),
+    )
     yield robokudo
     robokudo.close()
 
@@ -163,22 +179,19 @@ def joined_robokudo(
 
 
 class TestPerceptionWorld:
-    def test_pipeline_perceives_into_the_given_world(self, node: Node) -> None:
-        world = World()
-        robokudo = RoboKudo(
-            node=node, analysis_engine=EngineFindingAnObject(), world=world
-        )
+    def test_pipeline_perceives_into_the_world_of_robokudo(self, node: Node) -> None:
+        robokudo = robokudo_of_its_own(node, EngineFindingAnObject())
 
         robokudo.start(include_gui=False)
 
         [annotator] = robokudo.pipeline.children
-        assert annotator.world is world
+        assert annotator.world is robokudo.world
         robokudo.close()
 
-    def test_without_a_world_perceives_into_an_empty_world_of_its_own(
+    def test_without_a_shared_world_perceives_into_an_empty_world_of_its_own(
         self, node: Node
     ) -> None:
-        robokudo = RoboKudo(node=node, analysis_engine=EngineFindingAnObject())
+        robokudo = robokudo_of_its_own(node, EngineFindingAnObject())
 
         robokudo.start(include_gui=False)
 
@@ -187,7 +200,7 @@ class TestPerceptionWorld:
         robokudo.close()
 
     def test_engine_whose_root_is_not_a_pipeline_cannot_start(self, node: Node) -> None:
-        robokudo = RoboKudo(node=node, analysis_engine=EngineWithoutPipeline())
+        robokudo = robokudo_of_its_own(node, EngineWithoutPipeline())
 
         with pytest.raises(EngineRootIsNotAPipelineError):
             robokudo.start(include_gui=False)
@@ -197,8 +210,9 @@ class TestPerceptionWorld:
     def test_world_of_its_own_is_not_shared(
         self, node: Node, engine: EngineRunningABehaviour
     ) -> None:
-        robokudo = RoboKudo(node=node, analysis_engine=engine)
+        robokudo = robokudo_of_its_own(node, engine)
 
+        assert robokudo.synchronizer is None
         assert (
             WorldSynchronizer.all_callbacks_of_this_type_from_world(robokudo.world)
             == []
@@ -326,11 +340,11 @@ class TestOneRoboKudoPerProcess:
     def test_second_robokudo_cannot_start(
         self, node: Node, engine: EngineRunningABehaviour
     ) -> None:
-        running = RoboKudo(node=node, analysis_engine=engine)
+        running = robokudo_of_its_own(node, engine)
         running.start(include_gui=False)
 
         with pytest.raises(RoboKudoAlreadyRunningError):
-            RoboKudo(node=node, analysis_engine=EngineRunningABehaviour()).start(
+            robokudo_of_its_own(node, EngineRunningABehaviour()).start(
                 include_gui=False
             )
         running.close()
@@ -338,55 +352,14 @@ class TestOneRoboKudoPerProcess:
     def test_closed_robokudo_makes_room_for_the_next(
         self, node: Node, following_node: Node, engine: EngineRunningABehaviour
     ) -> None:
-        RoboKudo(node=node, analysis_engine=engine).start(include_gui=False)
+        robokudo_of_its_own(node, engine).start(include_gui=False)
         RoboKudo.from_blackboard().close()
-        following = RoboKudo(
-            node=following_node, analysis_engine=EngineRunningABehaviour()
-        )
+        following = robokudo_of_its_own(following_node, EngineRunningABehaviour())
 
         following.start(include_gui=False)
 
         assert RoboKudo.from_blackboard() is following
         following.close()
-
-
-# %% robot camera
-
-
-class TestRobotCamera:
-    def test_camera_is_the_default_camera_of_the_robot(
-        self, node: Node, engine: EngineRunningABehaviour, tracy_world: World
-    ) -> None:
-        robot = tracy_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-
-        robokudo = RoboKudo(node=node, analysis_engine=engine, world=tracy_world)
-
-        assert robokudo.camera is robot.get_default_camera()
-
-    def test_world_without_a_robot_has_no_camera(
-        self, node: Node, engine: EngineRunningABehaviour
-    ) -> None:
-        assert RoboKudo(node=node, analysis_engine=engine).camera is None
-
-    def test_camera_of_a_world_with_several_robots_is_ambiguous(
-        self, node: Node, engine: EngineRunningABehaviour
-    ) -> None:
-        world = World()
-        first_robot_root = Body(name=PrefixedName("first_robot"))
-        second_robot_root = Body(name=PrefixedName("second_robot"))
-        with world.modify_world():
-            world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
-            for robot_root in (first_robot_root, second_robot_root):
-                world.add_connection(
-                    Connection6DoF.create_with_dofs(
-                        parent=world.root, child=robot_root, world=world
-                    )
-                )
-        MinimalRobot.from_branch_in_world(first_robot_root)
-        MinimalRobot.from_branch_in_world(second_robot_root)
-
-        with pytest.raises(MultipleRobotsInWorldError):
-            RoboKudo(node=node, analysis_engine=engine, world=world).camera
 
 
 # %% ticking
@@ -395,9 +368,8 @@ class TestRobotCamera:
 class TestTicking:
     def test_runs_until_the_engine_fails(self, node: Node) -> None:
         failing_behaviour = Failure(name="Fail")
-        robokudo = RoboKudo(
-            node=node,
-            analysis_engine=EngineRunningABehaviour(behaviour=failing_behaviour),
+        robokudo = robokudo_of_its_own(
+            node, EngineRunningABehaviour(behaviour=failing_behaviour)
         )
         robokudo.start(include_gui=False)
         running = Thread(target=robokudo.run, daemon=True)
@@ -413,9 +385,8 @@ class TestTicking:
         context = Context()
         rclpy.init(context=context)
         node = Node("shutting_down_robokudo", context=context)
-        robokudo = RoboKudo(
-            node=node,
-            analysis_engine=EngineRunningABehaviour(behaviour=Running(name="Perceive")),
+        robokudo = robokudo_of_its_own(
+            node, EngineRunningABehaviour(behaviour=Running(name="Perceive"))
         )
         robokudo.start(include_gui=False)
         running = Thread(target=robokudo.run, daemon=True)
@@ -434,7 +405,7 @@ class TestTicking:
 
 class TestObjectsOfAFinishedPass:
     def test_objects_of_a_finished_pass_reach_the_world(self, node: Node) -> None:
-        robokudo = RoboKudo(node=node, analysis_engine=EngineFindingAnObject())
+        robokudo = robokudo_of_its_own(node, EngineFindingAnObject())
         robokudo.start(include_gui=False)
 
         robokudo.tick()
@@ -446,8 +417,8 @@ class TestObjectsOfAFinishedPass:
         robokudo.close()
 
     def test_failed_pass_puts_nothing_into_the_world(self, node: Node) -> None:
-        robokudo = RoboKudo(
-            node=node, analysis_engine=EngineFindingAnObject(outcome=Status.FAILURE)
+        robokudo = robokudo_of_its_own(
+            node, EngineFindingAnObject(outcome=Status.FAILURE)
         )
         robokudo.start(include_gui=False)
 

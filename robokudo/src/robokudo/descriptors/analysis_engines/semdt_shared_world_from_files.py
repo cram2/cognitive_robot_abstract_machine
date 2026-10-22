@@ -4,11 +4,11 @@ digital twin.
 
 It runs without a camera or a database: the images come from the
 ``robokudo_test_data`` package, and the camera is placed at a fixed pose above the
-scene. Each segmented object becomes a body in the perception world, so with
-``_synchronize_world`` the objects appear in the world of every process sharing it::
+scene. Each segmented object becomes a body in the perception world, so while a process
+serves a shared world the objects appear in the world of every process sharing it::
 
     python -m robokudo.scripts.shared_world_server
-    ros2 run robokudo_ros main _ae=semdt_shared_world_from_files _synchronize_world
+    ros2 run robokudo_ros main _ae=semdt_shared_world_from_files
 """
 
 import math
