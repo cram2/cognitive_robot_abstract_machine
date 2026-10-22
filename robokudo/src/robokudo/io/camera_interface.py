@@ -41,7 +41,7 @@ from sensor_msgs.msg import CompressedImage, CameraInfo, Image
 from tf2_ros import Buffer
 from typing_extensions import Optional, List, Any, TYPE_CHECKING, Union
 
-from robokudo.camera_placement import MeasuredCameraPose
+from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import CameraDataMissing
@@ -93,29 +93,37 @@ class CameraInterface(object):
         """
         return self._has_new_data
 
-    def static_camera_pose(self) -> MeasuredCameraPose | None:
+    def place_static_camera(self, cas: CAS, world: World) -> None:
         """
-        :return: The camera pose the configuration fixes, or None if it fixes none.
+        Place the camera of ``cas`` in ``world`` at the pose the configuration fixes, if
+        it fixes one.
+
+        :param cas: The CAS of the data the camera recorded.
+        :param world: The world perception perceives into.
         """
         if not self.camera_config.static_camera_transform_enabled:
-            return None
-        return MeasuredCameraPose(
-            world_frame=self.camera_config.static_world_frame,
-            camera_frame=self.camera_config.static_camera_frame,
-            world_T_camera=self.camera_config.static_world_T_camera,
+            return
+        CameraPlacement(world).place(
+            cas,
+            MeasuredCameraPose(
+                world_frame=self.camera_config.static_world_frame,
+                camera_frame=self.camera_config.static_camera_frame,
+                world_T_camera=self.camera_config.static_world_T_camera,
+            ),
         )
 
-    def set_data(self, cas: CAS, world: World) -> MeasuredCameraPose | None:
+    def set_data(self, cas: CAS, world: World) -> None:
         """
         This method is supposed to read in, convert (if needed) and put the data into
         the CAS. If you are running a CameraInterface which is getting data via callback
         methods, please make sure to keep callbacks light and do the main conversion
         work here! Callbacks should be short.
 
+        The camera is placed in ``world`` where it was when it recorded the data, if
+        that is known.
+
         :param cas: The CAS where the data should be placed in
         :param world: The world perception perceives into
-        :return: Where the camera was when it recorded the data, or None if that is
-            unknown.
         """
         raise NotImplementedError
 
@@ -201,31 +209,35 @@ class ROSCameraInterface(CameraInterface):
                 return False
         return True
 
-    def camera_pose_from_tf(
-        self, cas: CAS, timestamp: builtin_interfaces.msg.Time
-    ) -> MeasuredCameraPose | None:
+    def place_camera_from_tf(
+        self, cas: CAS, world: World, timestamp: builtin_interfaces.msg.Time
+    ) -> None:
         """
-        The camera pose last looked up from TF, for the data received at ``timestamp``,
-        which is stored in ``cas`` as the time of the data.
+        Place the camera of ``cas`` in ``world`` at the pose last looked up from TF, for
+        the data received at ``timestamp``, which is stored in ``cas`` as the time of the
+        data. A camera that does not look up its pose is not placed.
 
         :param cas: The CAS of the data.
+        :param world: The world perception perceives into.
         :param timestamp: When the data was received.
-        :return: The camera pose, or None if the camera does not look up its pose.
         """
         if not self.lookup_viewpoint:
-            return None
+            return
         cas.data_timestamp = timestamp.sec * 1_000_000_000 + timestamp.nanosec
-        return MeasuredCameraPose(
-            world_frame=self.tf_to,
-            camera_frame=self.tf_from,
-            world_T_camera=HomogeneousTransformationMatrix.from_xyz_quaternion(
-                pos_x=self.camera_translation[0],
-                pos_y=self.camera_translation[1],
-                pos_z=self.camera_translation[2],
-                quat_x=self.camera_quaternion[0],
-                quat_y=self.camera_quaternion[1],
-                quat_z=self.camera_quaternion[2],
-                quat_w=self.camera_quaternion[3],
+        CameraPlacement(world).place(
+            cas,
+            MeasuredCameraPose(
+                world_frame=self.tf_to,
+                camera_frame=self.tf_from,
+                world_T_camera=HomogeneousTransformationMatrix.from_xyz_quaternion(
+                    pos_x=self.camera_translation[0],
+                    pos_y=self.camera_translation[1],
+                    pos_z=self.camera_translation[2],
+                    quat_x=self.camera_quaternion[0],
+                    quat_y=self.camera_quaternion[1],
+                    quat_z=self.camera_quaternion[2],
+                    quat_w=self.camera_quaternion[3],
+                ),
             ),
         )
 
@@ -556,9 +568,9 @@ class KinectCameraInterface(ROSCameraInterface):
         self._has_new_data = True
         self.lock.release()
 
-    def set_data(self, cas: CAS, world: World) -> MeasuredCameraPose | None:
+    def set_data(self, cas: CAS, world: World) -> None:
         if not self.has_new_data():
-            return None
+            return
 
         self.lock.acquire()
         if self.camera_config.hi_res_mode:
@@ -584,9 +596,8 @@ class KinectCameraInterface(ROSCameraInterface):
         cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
 
-        camera_pose = self.camera_pose_from_tf(cas, self.timestamp)
+        self.place_camera_from_tf(cas, world, self.timestamp)
 
         self._has_new_data = False
 
         self.lock.release()
-        return camera_pose

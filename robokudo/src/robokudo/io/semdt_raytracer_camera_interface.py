@@ -14,6 +14,7 @@ from PIL import Image as PILImage, UnidentifiedImageError
 from pyglet.canvas.xlib import NoSuchDisplayException
 from sensor_msgs.msg import CameraInfo
 
+from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CASViews, CAS
 from robokudo.io.camera_interface import CameraInterface, ROSCameraInterface
 from robokudo.utils.camera_model import (
@@ -69,8 +70,8 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         Render a simulated RGB-D frame of the configured scene and write it into the
         CAS.
 
-        The scene is a world of its own, the simulated reality the camera sees; the
-        world perception perceives into is left untouched.
+        The scene is a world of its own, the simulated reality the camera sees. The
+        camera is placed in the world perception perceives into at its configured pose.
 
         :param cas: CAS that receives rendered camera data and frame metadata.
         :param world: The world perception perceives into.
@@ -132,8 +133,17 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         # Shared SemDT ground-truth world for this frame. Consumers must treat as read-only.
         cas.set_ref(CASViews.GROUND_TRUTH_WORLD_REFERENCE, scene_world)
 
-        cas.camera_to_world_transform = optical_camera_to_world
         cas.data_timestamp = timestamp_ns
+        CameraPlacement(world).place(
+            cas,
+            MeasuredCameraPose(
+                world_frame=world_frame_body.name.name,
+                camera_frame=camera_body.name.name,
+                world_T_camera=HomogeneousTransformationMatrix(
+                    data=optical_camera_to_world
+                ),
+            ),
+        )
         ROSCameraInterface.store_legacy_camera_to_world_transform_from_cas(cas)
 
     def _load_scene_world(self) -> World:

@@ -38,8 +38,6 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from semantic_digital_twin.world import World
 
-    from robokudo.camera_placement import MeasuredCameraPose
-
 
 # TODO Needs to be migrated to ROS2 for new RGB-only use cases
 class ROSCameraWithoutDepthInterface(ROSCameraInterface):
@@ -215,9 +213,9 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self._has_new_data = True
         self.lock.release()
 
-    def set_data(self, cas: CAS, world: World) -> MeasuredCameraPose | None:
+    def set_data(self, cas: CAS, world: World) -> None:
         if not self.has_new_data():
-            return None
+            return
 
         self.lock.acquire()
 
@@ -256,8 +254,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         cas.set(CASViews.CAMERA_INFO, self.camera_info)
         cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
-        camera_pose = self.camera_pose_from_tf(cas, self.timestamp)
+        self.place_camera_from_tf(cas, world, self.timestamp)
 
         self._has_new_data = False
         self.lock.release()
-        return camera_pose

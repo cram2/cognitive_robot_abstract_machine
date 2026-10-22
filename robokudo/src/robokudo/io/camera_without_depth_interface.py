@@ -136,7 +136,8 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         * Updates the CAS with frame and camera data
 
         :param cas: Common Analysis Structure to update
-        :param world: The world perception perceives into, where the camera is placed
+        :param world: The world perception perceives into; the camera is not placed in
+            it, since its pose is unknown
         """
         if not self.has_new_data():
             # no new frame available

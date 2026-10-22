@@ -31,7 +31,7 @@ from robokudo.exceptions import (
 )
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.io.storage import Storage
-from robokudo.camera_placement import MeasuredCameraPose
+from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
@@ -79,15 +79,15 @@ class StorageReaderInterface(CameraInterface):
 
         return self.reader.cursor_has_frames()
 
-    def set_data(self, cas: CAS, world: World) -> MeasuredCameraPose | None:
+    def set_data(self, cas: CAS, world: World) -> None:
         """
-        :meth:`CameraInterface.set_data` for the next stored frame, whose camera pose is
-        the one recorded with it.
+        :meth:`CameraInterface.set_data` for the next stored frame, whose camera is
+        placed at the pose recorded with it.
         """
         cas_frame = self.reader.get_next_frame()
         if cas_frame is None:
             self.rk_logger.debug(f"Reader has no next frame cas_frame:={cas_frame}")
-            return None
+            return
 
         # The camera transform is left out, since its stored frame references belong
         # to the recorded world, not the running one.
@@ -130,7 +130,8 @@ class StorageReaderInterface(CameraInterface):
                 width, height, fx, fy, cx, cy
             )
             cas.set(CASViews.CAMERA_INTRINSIC, camera_intrinsic)
-        return recorded_pose
+        if recorded_pose is not None:
+            CameraPlacement(world).place(cas, recorded_pose)
 
     def _recorded_camera_pose(
         self, cas_frame: dict, world: World

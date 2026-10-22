@@ -26,7 +26,6 @@ import cv2
 from semantic_digital_twin.world import World
 from typing_extensions import Any, Dict, List, Optional, TypeVar
 
-from robokudo.camera_placement import MeasuredCameraPose
 from robokudo.cas import CAS, CASViews
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.utils.type_conversion import (
@@ -269,10 +268,10 @@ class RGBDFileReaderInterface(FileReaderInterface):
     Inherits all instance variables from FileReaderInterface.
     """
 
-    def set_data(self, cas: CAS, world: World) -> MeasuredCameraPose | None:
+    def set_data(self, cas: CAS, world: World) -> None:
         """
-        :meth:`CameraInterface.set_data` for the next recorded frame, whose camera pose
-        is the one the configuration fixes.
+        :meth:`CameraInterface.set_data` for the next recorded frame, whose camera is
+        placed at the pose the configuration fixes.
         """
         data = self.data_reader.get_next_data()
 
@@ -289,4 +288,4 @@ class RGBDFileReaderInterface(FileReaderInterface):
             o3d_camera_intrinsics_from_ros_camera_info(data[CASViews.CAMERA_INFO]),
         )
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.camera_config.color_to_depth_ratio)
-        return self.static_camera_pose()
+        self.place_static_camera(cas, world)

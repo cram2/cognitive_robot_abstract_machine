@@ -3,13 +3,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
-from robokudo.camera_placement import MeasuredCameraPose
 from robokudo.cas import CAS
-from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+from robokudo.descriptors.camera_configs.config_filereader_playback import (
+    FileReaderCameraConfig,
+)
 from robokudo.exceptions import UnknownWorldFrameError
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.pipeline import Pipeline
@@ -17,23 +19,33 @@ from robokudo.pipeline import Pipeline
 from ._perception_world import FrameName, camera_pose
 
 
-class MeasuresItsCameraPose(CameraInterface):
+class PlacesItsFixedCamera(CameraInterface):
     """
-    A camera interface whose every frame comes with the camera pose it measured.
+    A camera interface whose every frame was recorded from the camera pose its
+    configuration fixes.
     """
-
-    def __init__(self, measured_pose: MeasuredCameraPose) -> None:
-        super().__init__(camera_config=BaseCameraConfig(interface_type="test"))
-        self.measured_pose = measured_pose
-        """
-        The camera pose reported with every frame.
-        """
 
     def has_new_data(self) -> bool:
         return True
 
-    def set_data(self, cas: CAS, world: World) -> MeasuredCameraPose:
-        return self.measured_pose
+    def set_data(self, cas: CAS, world: World) -> None:
+        self.place_static_camera(cas, world)
+
+
+def fixed_camera_at(world_T_camera: HomogeneousTransformationMatrix) -> CameraInterface:
+    """
+    :param world_T_camera: The pose of the camera in the world frame.
+    :return: A camera interface whose configuration fixes its camera at
+        ``world_T_camera`` against the test frames.
+    """
+    return PlacesItsFixedCamera(
+        camera_config=FileReaderCameraConfig(
+            static_camera_transform_enabled=True,
+            static_world_frame=FrameName.WORLD,
+            static_camera_frame=FrameName.CAMERA,
+            static_world_T_camera=world_T_camera,
+        )
+    )
 
 
 def pipeline_reading(camera_interface: CameraInterface) -> Pipeline:
@@ -57,13 +69,9 @@ def pipeline_reading(camera_interface: CameraInterface) -> Pipeline:
 
 
 class TestCameraPoseOfAFrame:
-    def test_camera_is_placed_where_its_interface_measured_it(self) -> None:
-        measured_pose = MeasuredCameraPose(
-            world_frame=FrameName.WORLD,
-            camera_frame=FrameName.CAMERA,
-            world_T_camera=camera_pose(x=1.0),
-        )
-        pipeline = pipeline_reading(MeasuresItsCameraPose(measured_pose))
+    def test_camera_is_placed_in_the_world_of_the_pipeline(self) -> None:
+        camera_interface = fixed_camera_at(camera_pose(x=1.0))
+        pipeline = pipeline_reading(camera_interface)
         [reader] = pipeline.children
 
         reader.update()
@@ -73,7 +81,8 @@ class TestCameraPoseOfAFrame:
             FrameName.CAMERA
         )
         assert np.allclose(
-            camera_to_world_transform.to_np(), measured_pose.world_T_camera.to_np()
+            camera_to_world_transform.to_np(),
+            camera_interface.camera_config.static_world_T_camera.to_np(),
         )
 
     def test_camera_measured_against_a_frame_the_world_lacks_is_not_placed(
@@ -82,17 +91,24 @@ class TestCameraPoseOfAFrame:
         world = World()
         with world.modify_world():
             world.add_body(Body(name=PrefixedName("root_of_another_world")))
-        pipeline = pipeline_reading(
-            MeasuresItsCameraPose(
-                MeasuredCameraPose(
-                    world_frame=FrameName.WORLD,
-                    camera_frame=FrameName.CAMERA,
-                    world_T_camera=camera_pose(),
-                )
-            )
-        )
+        pipeline = pipeline_reading(fixed_camera_at(camera_pose()))
         pipeline.world = world
         [reader] = pipeline.children
 
         with pytest.raises(UnknownWorldFrameError):
             reader.update()
+
+
+# %% camera without a fixed pose
+
+
+class TestCameraWithoutAFixedPose:
+    def test_camera_whose_configuration_fixes_no_pose_is_not_placed(self) -> None:
+        camera_interface = PlacesItsFixedCamera(camera_config=FileReaderCameraConfig())
+        world = World()
+        cas = CAS()
+
+        camera_interface.set_data(cas, world)
+
+        assert cas.camera_to_world_transform is None
+        assert world.is_empty()
