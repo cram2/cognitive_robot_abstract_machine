@@ -11,11 +11,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
-from robokudo.camera_placement import (
-    CameraPlacement,
-    MeasuredCameraPose,
-    SharedWorldCameraPlacement,
-)
+from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CAS
 from robokudo.exceptions import UnknownWorldFrameError
 
@@ -57,11 +53,11 @@ def world_with_a_head_camera() -> World:
     return world
 
 
-# %% world of its own
+# %% world frame
 
 
-class TestCameraPlacement:
-    def test_adds_missing_frames_and_moves_the_camera(self) -> None:
+class TestWorldFrame:
+    def test_empty_world_gets_the_world_frame_as_its_root(self) -> None:
         world = World()
         cas = CAS()
         world_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -77,6 +73,17 @@ class TestCameraPlacement:
         assert cas.camera_to_world_transform.child_frame is camera_body
         assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
 
+    def test_unknown_world_frame_of_a_world_with_bodies_is_not_added(self) -> None:
+        world = World()
+        with world.modify_world():
+            world.add_body(Body(name=PrefixedName("root_of_another_world")))
+        names_before = [body.name for body in world.bodies]
+
+        with pytest.raises(UnknownWorldFrameError):
+            CameraPlacement(world).place(CAS(), measured_at(camera_pose()))
+
+        assert [body.name for body in world.bodies] == names_before
+
     def test_names_the_frames_of_the_placed_camera_in_the_cas(self) -> None:
         cas = CAS()
         measured_pose = measured_at(camera_pose())
@@ -88,74 +95,49 @@ class TestCameraPlacement:
             measured_pose.camera_frame,
         )
 
-    def test_moves_a_placed_camera_again(self) -> None:
-        camera_placement = CameraPlacement(World())
-        camera_placement.place(CAS(), measured_at(camera_pose(x=1.0)))
-        world_T_camera = camera_pose(x=2.0)
 
-        camera_placement.place(CAS(), measured_at(world_T_camera))
-
-        camera_body = camera_placement.world.get_body_by_name(FrameName.CAMERA)
-        assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
-
-    def test_leaves_a_camera_located_by_another_kinematic_structure_in_place(
-        self,
-    ) -> None:
-        world = world_with_a_head_camera()
-        camera_body = world.get_body_by_name(FrameName.CAMERA)
-        camera_pose_before = camera_body.global_transform.to_np()
-        cas = CAS()
-        world_T_camera = camera_pose(x=4.0)
-
-        CameraPlacement(world).place(cas, measured_at(world_T_camera))
-
-        assert np.allclose(camera_body.global_transform.to_np(), camera_pose_before)
-        assert cas.camera_to_world_transform.child_frame is camera_body
-        assert np.allclose(
-            cas.camera_to_world_transform.to_np(), world_T_camera.to_np()
-        )
+# %% camera perception adds
 
 
-# %% shared world
-
-
-class TestSharedWorldCameraPlacement:
-    def test_unknown_world_frame_is_not_added(self) -> None:
-        world = World()
-        with world.modify_world():
-            world.add_body(Body(name=PrefixedName("root_of_the_shared_world")))
-        names_before = [body.name for body in world.bodies]
-
-        with pytest.raises(UnknownWorldFrameError):
-            SharedWorldCameraPlacement(world).place(CAS(), measured_at(camera_pose()))
-
-        assert [body.name for body in world.bodies] == names_before
-
+class TestCameraPerceptionAdds:
     def test_adds_the_camera_below_a_known_world_frame_and_moves_it(self) -> None:
         world = World()
         with world.modify_world():
             world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
-        camera_placement = SharedWorldCameraPlacement(world)
+        camera_placement = CameraPlacement(world)
         camera_placement.place(CAS(), measured_at(camera_pose(x=1.0)))
         world_T_camera = camera_pose(x=2.0)
 
         camera_placement.place(CAS(), measured_at(world_T_camera))
 
-        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        [camera_body] = world.get_bodies_by_name(FrameName.CAMERA)
         assert camera_body.parent_connection.parent is world.get_body_by_name(
             FrameName.WORLD
         )
         assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
 
-    def test_camera_located_by_another_kinematic_structure_is_seen_from_its_pose(
-        self,
-    ) -> None:
+    def test_placements_of_one_world_share_its_camera(self) -> None:
+        world = World()
+        CameraPlacement(world).place(CAS(), measured_at(camera_pose(x=1.0)))
+        world_T_camera = camera_pose(x=2.0)
+
+        CameraPlacement(world).place(CAS(), measured_at(world_T_camera))
+
+        [camera_body] = world.get_bodies_by_name(FrameName.CAMERA)
+        assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
+
+
+# %% camera of the world
+
+
+class TestCameraOfTheWorld:
+    def test_camera_of_the_world_is_located_by_the_world(self) -> None:
         world = world_with_a_head_camera()
         camera_body = world.get_body_by_name(FrameName.CAMERA)
         camera_pose_before = camera_body.global_transform.to_np()
         cas = CAS()
 
-        SharedWorldCameraPlacement(world).place(cas, measured_at(camera_pose(x=4.0)))
+        CameraPlacement(world).place(cas, measured_at(camera_pose(x=4.0)))
 
         assert np.allclose(camera_body.global_transform.to_np(), camera_pose_before)
         assert cas.camera_to_world_transform.reference_frame is world.root
@@ -163,11 +145,11 @@ class TestSharedWorldCameraPlacement:
         assert np.allclose(cas.camera_to_world_transform.to_np(), camera_pose_before)
         assert cas.world_frame == world.root.name.name
 
-    def test_camera_located_by_the_world_needs_no_known_world_frame(self) -> None:
+    def test_camera_of_the_world_needs_no_known_world_frame(self) -> None:
         world = world_with_a_head_camera()
         cas = CAS()
 
-        SharedWorldCameraPlacement(world).place(
+        CameraPlacement(world).place(
             cas,
             MeasuredCameraPose(
                 world_frame="frame_unknown_to_the_world",

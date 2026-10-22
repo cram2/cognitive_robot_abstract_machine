@@ -10,7 +10,7 @@ from py_trees.common import Status
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.camera_placement import MeasuredCameraPose
+from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
 
 
 class StaticCameraTransformAnnotator(BaseAnnotator):
@@ -45,7 +45,7 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
         cas = self.get_cas()
         params = self.descriptor.parameters
 
-        self.get_parent_pipeline().camera_placement.place(
+        CameraPlacement(self.world).place(
             cas,
             MeasuredCameraPose(
                 world_frame=params.world_frame,

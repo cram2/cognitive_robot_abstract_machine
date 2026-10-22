@@ -7,7 +7,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
-from robokudo.camera_placement import MeasuredCameraPose, SharedWorldCameraPlacement
+from robokudo.camera_placement import MeasuredCameraPose
 from robokudo.cas import CAS
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.exceptions import UnknownWorldFrameError
@@ -76,12 +76,12 @@ class TestCameraPoseOfAFrame:
             camera_to_world_transform.to_np(), measured_pose.world_T_camera.to_np()
         )
 
-    def test_camera_is_placed_with_the_camera_placement_of_the_pipeline(
+    def test_camera_measured_against_a_frame_the_world_lacks_is_not_placed(
         self,
     ) -> None:
         world = World()
         with world.modify_world():
-            world.add_body(Body(name=PrefixedName("root_of_the_shared_world")))
+            world.add_body(Body(name=PrefixedName("root_of_another_world")))
         pipeline = pipeline_reading(
             MeasuresItsCameraPose(
                 MeasuredCameraPose(
@@ -91,7 +91,7 @@ class TestCameraPoseOfAFrame:
                 )
             )
         )
-        pipeline.camera_placement = SharedWorldCameraPlacement(world)
+        pipeline.world = world
         [reader] = pipeline.children
 
         with pytest.raises(UnknownWorldFrameError):

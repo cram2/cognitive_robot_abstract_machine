@@ -56,8 +56,12 @@ class MeasuredCameraPose:
 @dataclass
 class CameraPlacement:
     """
-    Puts the camera of a pipeline pass into :attr:`world`, a world perception keeps to
-    itself, adding the frames it does not know yet.
+    Puts the camera of a pipeline pass into :attr:`world`.
+
+    A camera :attr:`world` already holds under the measured camera frame, such as the
+    camera of a robot whose joints another process keeps current, is located by the
+    world. Any other camera hangs below its world frame on a connection perception owns,
+    and moves to where it was measured.
     """
 
     world: World
@@ -67,14 +71,13 @@ class CameraPlacement:
 
     def place(self, cas: CAS, measured_pose: MeasuredCameraPose) -> None:
         """
-        Put the camera of ``cas`` where it was measured to be and store its pose, bound
-        to the bodies of :attr:`world`, and the names of its frames in ``cas``.
-
-        A camera that hangs in a kinematic structure of its own, such as the head of a
-        robot, is left where it is.
+        Put the camera of ``cas`` into :attr:`world` and store its pose, bound to the
+        bodies of :attr:`world`, and the names of its frames in ``cas``.
 
         :param cas: The CAS of the pass the camera recorded.
         :param measured_pose: Where the camera was measured to be.
+        :raises UnknownWorldFrameError: If :attr:`world` holds bodies but none of the
+            measured world frame, and does not locate the camera itself.
         """
         world_T_camera = self._bound_camera_pose(measured_pose)
         cas.world_frame = world_T_camera.reference_frame.name.name
@@ -86,56 +89,69 @@ class CameraPlacement:
     ) -> HomogeneousTransformationMatrix:
         """
         :param measured_pose: Where the camera was measured to be.
-        :return: The measured pose, bound to the bodies of its frames, with a camera
-            perception attached moved there.
+        :return: The pose of the camera, bound to the bodies of :attr:`world`: the one
+            :attr:`world` holds for a camera it locates itself, otherwise the measured
+            one, with the camera moved there.
         """
+        camera_bodies = self.world.get_bodies_by_name(name=measured_pose.camera_frame)
+        if camera_bodies and not self._is_attached_by_perception(camera_bodies[0]):
+            camera_body = camera_bodies[0]
+            return HomogeneousTransformationMatrix(
+                data=camera_body.global_transform.to_np(),
+                reference_frame=self.world.root,
+                child_frame=camera_body,
+            )
+
         world_body = self._world_frame_body(measured_pose.world_frame)
-        camera_body = self._camera_body(measured_pose.camera_frame, world_body)
+        camera_body = (
+            camera_bodies[0]
+            if camera_bodies
+            else self._attached_camera_body(measured_pose.camera_frame, world_body)
+        )
         world_T_camera = HomogeneousTransformationMatrix(
             data=measured_pose.world_T_camera,
             reference_frame=world_body,
             child_frame=camera_body,
         )
-        if self._is_attached_by_perception(camera_body):
-            camera_body.parent_connection.origin = world_T_camera
+        camera_body.parent_connection.origin = world_T_camera
         return world_T_camera
 
     def _world_frame_body(self, frame: str) -> Body:
         """
-        The body of the world frame ``frame``, added to :attr:`world` if it does not
-        exist yet: as the root of an empty world, or attached to the root otherwise.
-
         :param frame: The name of the world frame.
-        :return: The body of the world frame.
+        :return: The body of the world frame ``frame``, added as the root of
+            :attr:`world` if :attr:`world` is empty.
+        :raises UnknownWorldFrameError: If :attr:`world` holds bodies but none named
+            ``frame``.
         """
         existing_bodies = self.world.get_bodies_by_name(name=frame)
         if existing_bodies:
             return existing_bodies[0]
+        if not self.world.is_empty():
+            raise UnknownWorldFrameError(world_frame=frame)
 
         body = self._frame_body(frame)
         with self.world.modify_world():
-            if self.world.is_empty():
-                self.world.add_body(body)
-                return body
-            self._attach(body, parent=self.world.root)
+            self.world.add_body(body)
         return body
 
-    def _camera_body(self, frame: str, world_body: Body) -> Body:
+    def _attached_camera_body(self, frame: str, world_body: Body) -> Body:
         """
-        The body of the camera frame ``frame``, attached to ``world_body`` if it does
-        not exist yet.
-
         :param frame: The name of the camera frame.
         :param world_body: The body of the frame the camera pose was measured against.
-        :return: The body of the camera frame.
+        :return: A new body for the camera frame ``frame``, attached to ``world_body``
+            through a connection perception owns.
         """
-        existing_bodies = self.world.get_bodies_by_name(name=frame)
-        if existing_bodies:
-            return existing_bodies[0]
-
         body = self._frame_body(frame)
         with self.world.modify_world():
-            self._attach(body, parent=world_body)
+            self.world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    parent=world_body,
+                    child=body,
+                    world=self.world,
+                    name=self._connection_name(world_body, body),
+                )
+            )
         return body
 
     @staticmethod
@@ -147,22 +163,6 @@ class CameraPlacement:
         return Body(
             name=PrefixedName(name=frame),
             visual=ShapeCollection([Mesh.from_trimesh(mesh=trimesh.creation.axis())]),
-        )
-
-    def _attach(self, body: Body, parent: Body) -> None:
-        """
-        Attach ``body`` to ``parent`` through a connection perception owns.
-
-        :param body: The body to attach.
-        :param parent: The body it is attached to.
-        """
-        self.world.add_connection(
-            Connection6DoF.create_with_dofs(
-                parent=parent,
-                child=body,
-                world=self.world,
-                name=self._connection_name(parent, body),
-            )
         )
 
     def _is_attached_by_perception(self, body: Body) -> bool:
@@ -185,40 +185,3 @@ class CameraPlacement:
             with.
         """
         return PrefixedName(name=f"{body.name.name}_T_{parent.name.name}")
-
-
-@dataclass
-class SharedWorldCameraPlacement(CameraPlacement):
-    """
-    Puts the camera of a pipeline pass into :attr:`world`, a world other processes
-    share, without adding world frames to it.
-
-    A camera hanging in a kinematic structure of the world, such as the head of a robot
-    whose joints another process keeps current, is located by that structure: its pose
-    is read from the world instead of the measurement.
-    """
-
-    def _bound_camera_pose(
-        self, measured_pose: MeasuredCameraPose
-    ) -> HomogeneousTransformationMatrix:
-        camera_bodies = self.world.get_bodies_by_name(name=measured_pose.camera_frame)
-        if not camera_bodies or self._is_attached_by_perception(camera_bodies[0]):
-            return super()._bound_camera_pose(measured_pose)
-        camera_body = camera_bodies[0]
-        return HomogeneousTransformationMatrix(
-            data=camera_body.global_transform.to_np(),
-            reference_frame=self.world.root,
-            child_frame=camera_body,
-        )
-
-    def _world_frame_body(self, frame: str) -> Body:
-        """
-        :meth:`CameraPlacement._world_frame_body`, except that a frame the world does
-        not hold is never added.
-
-        :raises UnknownWorldFrameError: If :attr:`world` holds no body ``frame``.
-        """
-        existing_bodies = self.world.get_bodies_by_name(name=frame)
-        if not existing_bodies:
-            raise UnknownWorldFrameError(world_frame=frame)
-        return existing_bodies[0]

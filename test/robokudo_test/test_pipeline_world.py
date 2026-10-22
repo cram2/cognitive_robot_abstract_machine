@@ -5,7 +5,6 @@ from py_trees.composites import Sequence
 from semantic_digital_twin.world import World
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.camera_placement import CameraPlacement, SharedWorldCameraPlacement
 from robokudo.pipeline import Pipeline
 
 
@@ -50,42 +49,6 @@ class TestWorldOfAPipeline:
         outer.add_child(inner)
 
         assert inner.world is world
-
-
-# %% camera placement of a pipeline
-
-
-class TestCameraPlacementOfAPipeline:
-    def test_pipeline_without_a_camera_placement_places_into_its_own_world(
-        self,
-    ) -> None:
-        pipeline = Pipeline("Pipeline")
-        world = World()
-        pipeline.world = world
-
-        camera_placement = pipeline.camera_placement
-
-        assert type(camera_placement) is CameraPlacement
-        assert camera_placement.world is world
-
-    def test_pipeline_places_with_the_given_camera_placement(self) -> None:
-        camera_placement = SharedWorldCameraPlacement(World())
-        pipeline = Pipeline("Pipeline")
-
-        pipeline.camera_placement = camera_placement
-
-        assert pipeline.camera_placement is camera_placement
-
-    def test_nested_pipeline_places_with_the_camera_placement_of_the_outer_one(
-        self,
-    ) -> None:
-        camera_placement = SharedWorldCameraPlacement(World())
-        outer = Pipeline("Outer")
-        outer.camera_placement = camera_placement
-        inner = Pipeline("Inner")
-        outer.add_child(inner)
-
-        assert inner.camera_placement is camera_placement
 
 
 # %% world of an annotator

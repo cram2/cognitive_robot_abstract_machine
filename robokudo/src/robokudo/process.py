@@ -29,7 +29,6 @@ from typing_extensions import TYPE_CHECKING, List, Optional, Self, Type
 # trips the circular import between robokudo.pipeline and robokudo.annotators.core.
 import robokudo.pipeline
 from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.camera_placement import CameraPlacement, SharedWorldCameraPlacement
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE
 from robokudo.exceptions import MultipleRobotsInWorldError, RoboKudoAlreadyRunningError
 from robokudo.garden import grow_tree
@@ -158,8 +157,7 @@ class RoboKudo:
     ) -> None:
         """
         Become the RoboKudo of this process and build the behaviour tree, whose
-        pipelines perceive into :attr:`world`. Their cameras are placed without adding
-        world frames while :attr:`world` is shared.
+        pipelines perceive into :attr:`world`.
 
         :param include_gui: Whether to show the visualizers.
         :param visualizer_types: The visualizers to show; all of them when None.
@@ -173,15 +171,9 @@ class RoboKudo:
         engine_tree = self.analysis_engine.implementation()
         if isinstance(engine_tree, Pipeline):
             self.pipeline = engine_tree
-        camera_placement = (
-            CameraPlacement(world=self.world)
-            if self.synchronizer is None
-            else SharedWorldCameraPlacement(world=self.world)
-        )
         for behaviour in engine_tree.iterate():
             if isinstance(behaviour, Pipeline):
                 behaviour.world = self.world
-                behaviour.camera_placement = camera_placement
         self.tree = grow_tree(
             engine_tree,
             node=self.node,

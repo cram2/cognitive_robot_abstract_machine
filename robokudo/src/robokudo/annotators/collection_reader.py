@@ -28,7 +28,7 @@ from py_trees.display import unicode_tree
 from typing_extensions import TYPE_CHECKING, List, Optional
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.descriptors.camera_configs.components import TfComponent
+from robokudo.camera_placement import CameraPlacement
 
 if TYPE_CHECKING:
     from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
@@ -133,8 +133,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
 
         * Checks for new data from all readers
         * Creates new CAS when data available
-        * Places the camera where each reader measured it, with the camera placement
-          of the pipeline
+        * Places the camera where each reader measured it
         * Preserves existing queries
         * Updates feedback messages
         * Monitors data availability
@@ -176,12 +175,6 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 f"{self.__class__.__name__}.update(): New CAS id={pipeline.cas.cas_id}"
             )
 
-            camera_config = self.descriptor.parameters.camera_config
-            if issubclass(type(camera_config), TfComponent):
-                cas = self.get_cas()
-                cas.world_frame = camera_config.tf_to
-                cas.camera_frame = camera_config.tf_from
-
             # Restore any existing queries
             if query:
                 pipeline.cas.query = query
@@ -191,7 +184,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
                     self.get_cas(), self.world
                 )
                 if measured_pose is not None:
-                    pipeline.camera_placement.place(self.get_cas(), measured_pose)
+                    CameraPlacement(self.world).place(self.get_cas(), measured_pose)
 
             self.feedback_message = (
                 f"Got sensor data... Waited for {time_difference} seconds"

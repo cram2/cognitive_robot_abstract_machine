@@ -491,7 +491,7 @@ class MultipleRobotsInWorldError(RoboKudoError, ValueError):
 @dataclass
 class UnknownWorldFrameError(RoboKudoError, LookupError):
     """
-    Raised when a camera pose is measured against a frame the shared world does not
+    Raised when a camera pose is measured against a frame a world with bodies does not
     hold.
     """
 
@@ -503,14 +503,14 @@ class UnknownWorldFrameError(RoboKudoError, LookupError):
     def error_message(self) -> str:
         return (
             f"The camera pose was measured against the frame '{self.world_frame}', "
-            f"which the shared world does not hold. Perception does not add it, since "
-            f"adding a frame would change the world of every process sharing it."
+            f"which the perception world does not hold. Perception adds a world frame "
+            f"only to an empty world, since it cannot tell where the frame belongs."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "measure the camera pose against a frame of the shared world, such as its "
-            "root, or make the camera frame a body of the shared world."
+            "measure the camera pose against a frame of the perception world, such as "
+            "its root, or make the camera frame a body of that world."
         )
 
 
