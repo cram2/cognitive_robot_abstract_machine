@@ -14,7 +14,7 @@ import rclpy
 import rclpy.impl.logging_severity
 import rclpy.logging
 from py_trees.blackboard import Blackboard
-from rclpy.executors import MultiThreadedExecutor, SingleThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.parameter import Parameter
 
 # RoboKudo imports
@@ -135,13 +135,11 @@ def main() -> None:
         BBIdentifier.QUERY_SERVER_IN_PIPELINE, False
     )  # Ownership in Pipeline has to be declared first
 
-    # 6. Start executors in separate threads
-    executor_main = SingleThreadedExecutor()
+    # 6. Serve the action server in a separate thread
     executor_asrv = (
         MultiThreadedExecutor()
     )  # Necessary to handle long-running goals AND incoming preempts
 
-    executor_main.add_node(node1)
     executor_asrv.add_node(query_action_server)
 
     def spin_executor(exec_: rclpy.Executor) -> None:
@@ -150,9 +148,7 @@ def main() -> None:
         except KeyboardInterrupt:
             pass
 
-    thread_main = Thread(target=spin_executor, args=(executor_main,), daemon=True)
     thread_asrv = Thread(target=spin_executor, args=(executor_asrv,), daemon=True)
-    thread_main.start()
     thread_asrv.start()
 
     # 7. Dynamically load the requested Analysis Engine (AE) using the **refactored** ModuleLoader
@@ -160,8 +156,8 @@ def main() -> None:
     logger.info(f"Loading AE '{args.ae}' from package '{args.ros_pkg}'...")
     loaded_ae = loader.load_ae(ros_pkg_name=args.ros_pkg, module_name=args.ae)
 
-    # 8. Create RoboKudo, joining the world another process shares if one does;
-    #    fetching it needs the executors above to serve the node
+    # 8. Create RoboKudo, which serves the main node and joins the world another
+    #    process shares if one does
     robokudo = RoboKudo(node=node1, analysis_engine=loaded_ae)
 
     # 9. Build the Behavior Tree of the loaded AE
@@ -180,13 +176,12 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received; shutting down.")
     finally:
-        # 11. Stop sharing the world, then shutdown executors cleanly
+        # 11. Stop sharing the world and serving the main node, then shutdown the
+        #     action server executor cleanly
         robokudo.close()
-        executor_main.shutdown()
         executor_asrv.shutdown()
 
         # 12. Wait for shutdown
-        thread_main.join()
         thread_asrv.join()
 
         # 13. Clean up nodes

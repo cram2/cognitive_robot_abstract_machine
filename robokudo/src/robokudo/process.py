@@ -15,11 +15,13 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from datetime import timedelta
+from threading import Thread
 from timeit import default_timer as timer
 
 import rclpy
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
+from rclpy.executors import SingleThreadedExecutor
 from semantic_digital_twin.adapters.ros.world_fetcher import (
     fetch_world_from_service,
     find_world_fetcher_service,
@@ -62,7 +64,8 @@ class RoboKudo:
 
     node: Node
     """
-    The node perception communicates through.
+    The node perception communicates through, served by :attr:`executor` until
+    :meth:`close`.
     """
 
     analysis_engine: AnalysisEngineInterface
@@ -98,14 +101,30 @@ class RoboKudo:
     The behaviour tree of :attr:`analysis_engine`; None until :meth:`start`.
     """
 
+    executor: SingleThreadedExecutor = field(init=False)
+    """
+    Serves the services, actions and subscriptions of :attr:`node`.
+    """
+
+    executor_thread: Thread = field(init=False)
+    """
+    The thread :attr:`executor` serves :attr:`node` in.
+    """
+
     def __post_init__(self) -> None:
         """
-        Join the world a process serves, keeping it in sync in both directions: changes
-        of the other processes are applied to it and changes perception makes are
-        published. Without such a process, perceive into an empty world of its own.
+        Serve :attr:`node` in the background and join the world a process serves,
+        keeping it in sync in both directions: changes of the other processes are applied
+        to it and changes perception makes are published. Without such a process,
+        perceive into an empty world of its own.
 
-        .. note:: :attr:`node` has to be spun by an executor to fetch a shared world.
+        .. note:: No other executor may serve :attr:`node`.
         """
+        self.executor = SingleThreadedExecutor(context=self.node.context)
+        self.executor.add_node(self.node)
+        self.executor_thread = Thread(target=self.executor.spin, daemon=True)
+        self.executor_thread.start()
+
         service = find_world_fetcher_service(
             self.node, timeout_seconds=self.world_discovery_timeout.total_seconds()
         )
@@ -230,11 +249,14 @@ class RoboKudo:
 
     def close(self) -> None:
         """
-        Stop sharing the world and make room for another RoboKudo in this process.
+        Stop sharing the world and serving :attr:`node`, and make room for another
+        RoboKudo in this process.
         """
         if self.synchronizer is not None:
             self.synchronizer.close()
             self.synchronizer = None
+        self.executor.shutdown()
+        self.executor_thread.join()
         blackboard = Blackboard()
         if (
             blackboard.exists(BBIdentifier.ROBOKUDO)

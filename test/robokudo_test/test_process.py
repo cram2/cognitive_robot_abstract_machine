@@ -24,6 +24,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
+from std_srvs.srv import Trigger
 
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.core import BaseAnnotator
@@ -162,12 +163,22 @@ def following_node(ros_default: None) -> Iterator[Node]:
     node.destroy_node()
 
 
+def answer_trigger(
+    request: Trigger.Request, response: Trigger.Response
+) -> Trigger.Response:
+    """
+    :return: ``response``, reporting success.
+    """
+    response.success = True
+    return response
+
+
 @pytest.fixture
 def joined_robokudo(
-    spinning_node: Node, shared_world: SharedWorld, engine: EngineRunningABehaviour
+    node: Node, shared_world: SharedWorld, engine: EngineRunningABehaviour
 ) -> Iterator[RoboKudo]:
     robokudo = RoboKudo(
-        node=spinning_node,
+        node=node,
         analysis_engine=engine,
         world_discovery_timeout=timedelta(seconds=10),
     )
@@ -206,6 +217,7 @@ class TestPerceptionWorld:
             robokudo.start(include_gui=False)
 
         assert not Blackboard().exists(BBIdentifier.ROBOKUDO)
+        robokudo.close()
 
     def test_world_of_its_own_is_not_shared(
         self, node: Node, engine: EngineRunningABehaviour
@@ -217,6 +229,7 @@ class TestPerceptionWorld:
             WorldSynchronizer.all_callbacks_of_this_type_from_world(robokudo.world)
             == []
         )
+        robokudo.close()
 
 
 # %% joining a shared world
@@ -338,15 +351,15 @@ class TestJoiningSharedWorld:
 
 class TestOneRoboKudoPerProcess:
     def test_second_robokudo_cannot_start(
-        self, node: Node, engine: EngineRunningABehaviour
+        self, node: Node, following_node: Node, engine: EngineRunningABehaviour
     ) -> None:
         running = robokudo_of_its_own(node, engine)
         running.start(include_gui=False)
+        second = robokudo_of_its_own(following_node, EngineRunningABehaviour())
 
         with pytest.raises(RoboKudoAlreadyRunningError):
-            robokudo_of_its_own(node, EngineRunningABehaviour()).start(
-                include_gui=False
-            )
+            second.start(include_gui=False)
+        second.close()
         running.close()
 
     def test_closed_robokudo_makes_room_for_the_next(
@@ -360,6 +373,36 @@ class TestOneRoboKudoPerProcess:
 
         assert RoboKudo.from_blackboard() is following
         following.close()
+
+
+# %% serving its node
+
+
+class TestServingItsNode:
+    def test_requests_to_its_node_are_answered(
+        self, node: Node, other_process_node: Node, engine: EngineRunningABehaviour
+    ) -> None:
+        node.create_service(Trigger, "trigger_robokudo", answer_trigger)
+        robokudo = robokudo_of_its_own(node, engine)
+        client = other_process_node.create_client(Trigger, "trigger_robokudo")
+        assert client.wait_for_service(timeout_sec=5.0)
+
+        response = client.call_async(Trigger.Request())
+
+        assert wait_until(response.done)
+        robokudo.close()
+
+    def test_closed_robokudo_no_longer_answers_requests_to_its_node(
+        self, node: Node, other_process_node: Node, engine: EngineRunningABehaviour
+    ) -> None:
+        node.create_service(Trigger, "trigger_robokudo", answer_trigger)
+        robokudo_of_its_own(node, engine).close()
+        client = other_process_node.create_client(Trigger, "trigger_robokudo")
+        assert client.wait_for_service(timeout_sec=5.0)
+
+        response = client.call_async(Trigger.Request())
+
+        assert not wait_until(response.done, timeout=timedelta(seconds=1))
 
 
 # %% ticking

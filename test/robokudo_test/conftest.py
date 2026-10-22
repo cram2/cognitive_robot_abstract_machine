@@ -146,11 +146,13 @@ def node(ros_default):
 
 
 @pytest.fixture
-def spinning_node(node: Node) -> Iterator[Node]:
+def other_process_node(ros_default: None) -> Iterator[Node]:
     """
-    A node that an executor spins in the background, so that its services, actions and
-    subscriptions are served while a test blocks on them.
+    The node of another process, such as the one executing robot motions, which an
+    executor spins in the background so that its services, actions and subscriptions are
+    served while a test blocks on them.
     """
+    node = Node("other_process")
     executor = SingleThreadedExecutor()
     executor.add_node(node)
     thread = Thread(target=executor.spin, daemon=True)
@@ -158,10 +160,11 @@ def spinning_node(node: Node) -> Iterator[Node]:
     yield node
     executor.shutdown()
     thread.join()
+    node.destroy_node()
 
 
 @pytest.fixture
-def shared_world(spinning_node: Node) -> Iterator[SharedWorld]:
+def shared_world(other_process_node: Node) -> Iterator[SharedWorld]:
     """
     A world another process serves and synchronizes, holding only the world frame.
     """
@@ -170,8 +173,8 @@ def shared_world(spinning_node: Node) -> Iterator[SharedWorld]:
         world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
     served_world = SharedWorld(
         world=world,
-        server=FetchWorldServer(node=spinning_node, world=world),
-        synchronizer=WorldSynchronizer(node=spinning_node, _world=world),
+        server=FetchWorldServer(node=other_process_node, world=world),
+        synchronizer=WorldSynchronizer(node=other_process_node, _world=world),
     )
     yield served_world
     served_world.close()
