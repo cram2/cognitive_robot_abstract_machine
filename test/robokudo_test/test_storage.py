@@ -9,7 +9,7 @@ import pymongo
 import numpy as np
 
 import robokudo.cas
-from robokudo import world as rk_world
+from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
@@ -20,6 +20,7 @@ from robokudo.io.storage_reader_interface import StorageReaderInterface
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 
 
 @dataclass
@@ -165,14 +166,14 @@ class TestStorage:
 
         retrieved_cas = robokudo.cas.CAS()
         retrieved_cas_record["views"] = {}
-        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
+        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record, World())
 
         # Bring flat CAS representation into the proper CAS class
         for view_name, view_content in retrieved_cas_record["views"].items():
             retrieved_cas.set(view_name, view_content)
 
         storage_instance.load_annotations_from_mongo_in_cas(
-            retrieved_cas_record, retrieved_cas
+            retrieved_cas_record, retrieved_cas, World()
         )
 
         # Compare the most important views: COLOR and DEPTH Image
@@ -236,7 +237,7 @@ class TestStorage:
         assert len(retrieved_cas_record["view_ids"]) >= 6
 
         retrieved_cas_record["views"] = {}
-        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
+        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record, World())
 
         assert retrieved_cas_record["views"]["custom_json"] == {
             "labels": ["cup", "plate"],
@@ -276,7 +277,7 @@ class TestStorage:
         assert retrieved_cas_record is not None
 
         retrieved_cas_record["views"] = {}
-        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
+        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record, World())
 
         restored = retrieved_cas_record["views"]["custom_dataclass"]
         assert isinstance(restored, CustomDataclassView)
@@ -301,11 +302,15 @@ class TestStorage:
         world_frame = f"map_{uuid.uuid4().hex[:8]}"
         camera_frame = f"camera_{uuid.uuid4().hex[:8]}"
 
-        rk_world.init_world_with_entity_tracker()
-        rk_world.setup_world_for_camera_frame(
-            world_frame=world_frame, camera_frame=camera_frame
+        sem_world = World()
+        CameraPlacement(sem_world).place(
+            CAS(),
+            MeasuredCameraPose(
+                world_frame=world_frame,
+                camera_frame=camera_frame,
+                world_T_camera=HomogeneousTransformationMatrix(),
+            ),
         )
-        sem_world = rk_world.world_instance()
         camera_body = sem_world.get_body_by_name(camera_frame)
         world_body = sem_world.get_body_by_name(world_frame)
 
@@ -346,7 +351,7 @@ class TestStorage:
         )
 
         retrieved_cas_record["views"] = {}
-        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
+        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record, sem_world)
         restored_transform = retrieved_cas_record["views"][
             CASViews.CAMERA_TO_WORLD_TRANSFORM
         ]
@@ -364,12 +369,15 @@ class TestStorage:
         stored_world_frame = f"stored_map_{uuid.uuid4().hex[:8]}"
         stored_camera_frame = f"stored_camera_{uuid.uuid4().hex[:8]}"
 
-        rk_world.init_world_with_entity_tracker()
-        rk_world.setup_world_for_camera_frame(
-            world_frame=stored_world_frame,
-            camera_frame=stored_camera_frame,
+        stored_world = World()
+        CameraPlacement(stored_world).place(
+            CAS(),
+            MeasuredCameraPose(
+                world_frame=stored_world_frame,
+                camera_frame=stored_camera_frame,
+                world_T_camera=HomogeneousTransformationMatrix(),
+            ),
         )
-        stored_world = rk_world.world_instance()
         stored_world_body = stored_world.get_body_by_name(stored_world_frame)
         stored_camera_body = stored_world.get_body_by_name(stored_camera_frame)
         transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -392,8 +400,7 @@ class TestStorage:
         )
         assert retrieved_cas_record is not None
 
-        rk_world.init_world_with_entity_tracker()
-        running_world = rk_world.world_instance()
+        running_world = World()
         assert len(running_world.bodies) == 0
 
         reader = StorageReaderInterface(
@@ -402,13 +409,16 @@ class TestStorage:
         retrieved_cas_record["views"] = {}
         storage_instance.load_views_from_mongo_in_cas(
             retrieved_cas_record,
+            running_world,
             excluded_view_names={CASViews.CAMERA_TO_WORLD_TRANSFORM},
         )
-        reader._restore_camera_to_world_transform(retrieved_cas_record)
+        recorded_pose = reader._recorded_camera_pose(
+            retrieved_cas_record, running_world
+        )
+        replayed_cas = CAS()
+        CameraPlacement(running_world).place(replayed_cas, recorded_pose)
 
-        restored_transform = retrieved_cas_record["views"][
-            CASViews.CAMERA_TO_WORLD_TRANSFORM
-        ]
+        restored_transform = replayed_cas.camera_to_world_transform
         assert isinstance(restored_transform, HomogeneousTransformationMatrix)
         np.testing.assert_allclose(restored_transform.to_np(), transform.to_np())
         assert restored_transform.reference_frame is running_world.get_body_by_name(
@@ -430,4 +440,4 @@ class TestStorage:
         }
 
         with pytest.raises(StoredCameraTransformFrameMetadataMissing):
-            reader._decode_stored_camera_to_world_transform(view_document, {})
+            reader._decode_recorded_camera_pose(view_document)

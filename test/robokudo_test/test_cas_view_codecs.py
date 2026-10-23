@@ -1,8 +1,15 @@
 import pytest
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 from std_msgs.msg import String
 
 from robokudo.cas import CASViews
-from robokudo.io.cas_view_codecs import CASViewCodecRegistry
+from robokudo.io.cas_view_codecs import CASViewCodecRegistry, KrroodCodec
 from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.tf import StampedTransform
 
@@ -93,3 +100,24 @@ def test_decode_view_missing_required_field_raises():
                 "metadata": {},
             }
         )
+
+
+# %% world entities
+
+
+def test_krrood_codec_resolves_world_entities_against_the_given_world() -> None:
+    world = World()
+    world_body = Body(name=PrefixedName("map"))
+    with world.modify_world():
+        world.add_body(world_body)
+    transform = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=1.0, reference_frame=world_body
+    )
+    codec = KrroodCodec()
+
+    decoded = codec.decode(
+        codec.encode(transform),
+        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+    )
+
+    assert decoded.reference_frame is world_body

@@ -5,7 +5,7 @@ import py_trees
 import pytest
 
 from robokudo.types.cv import ColorToDepthRatio
-from robokudo import world as rk_world
+from robokudo.perceived_objects import PerceivedObjects
 import robokudo.cas
 import robokudo.defs
 import robokudo.descriptors.camera_configs.config_filereader_playback
@@ -27,22 +27,13 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
 from robokudo.annotators.shape_estimator import ShapeEstimatorAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.world_descriptor import PredefinedObject
+from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.world_description.geometry import Mesh
-
-
-@pytest.fixture
-def clean_semantic_world():
-    rk_world.get_object_belief_states().clear()
-    rk_world.init_world_with_entity_tracker()
-    yield
-    rk_world.get_object_belief_states().clear()
-    rk_world.init_world_with_entity_tracker()
 
 
 class TestFullAEExecution(object):
@@ -90,8 +81,8 @@ class TestFullAEExecution(object):
         assert types_of_annotations.count(robokudo.types.annotation.Plane) == 1
         assert types_of_annotations.count(robokudo.types.scene.ObjectHypothesis) == 1
 
-    def test_run_file_reader_ae_synchronizes_semantic_digital_twin_belief_state(
-        self, node, clean_semantic_world
+    def test_run_file_reader_ae_keeps_the_perceived_object_in_the_semantic_digital_twin(
+        self, node
     ):
         cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
             "file_reader",
@@ -120,13 +111,13 @@ class TestFullAEExecution(object):
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
                 ClusterPoseBBAnnotator(),
-                SemanticDigitalTwinConnector(),
             ]
         )
 
-        belief_uuids_after_each_successful_cas = []
+        perceived_objects = PerceivedObjects(world=seq.world)
+        body_ids_after_each_successful_cas = []
 
-        def assert_current_cas_updates_single_belief(cas):
+        def assert_current_cas_keeps_a_single_object(cas):
             object_hypotheses = cas.filter_annotations_by_type(
                 robokudo.types.scene.ObjectHypothesis
             )
@@ -134,16 +125,14 @@ class TestFullAEExecution(object):
                 len(object_hypotheses) == 1
             ), "Each successful CAS should already contain the object hypothesis to be synchronized."
 
-            object_beliefs = list(rk_world.get_object_belief_states().values())
-            assert (
-                len(object_beliefs) == 1
-            ), "After each successful connector run, the current object should map to exactly one belief."
-
-            object_belief = object_beliefs[0]
-            assert (
-                object_belief.latest_hypothesis is object_hypotheses[0]
-            ), "The belief observed at CAS success should point to that CAS's object hypothesis."
-            belief_uuids_after_each_successful_cas.append(object_belief.uuid)
+            [body_id] = perceived_objects.apply(cas)
+            perceivable_objects = seq.world.get_semantic_annotations_by_type(
+                IsPerceivable
+            )
+            assert [annotation.root.id for annotation in perceivable_objects] == [
+                body_id
+            ], "After each successful pass, the current object should be the one perceivable object of the world."
+            body_ids_after_each_successful_cas.append(body_id)
 
         successful_cas_instances = (
             robokudo.utils.tree_execution.run_tree_until_successful_cas_count(
@@ -152,7 +141,7 @@ class TestFullAEExecution(object):
                 expected_cas_count=2,
                 max_iterations=120,
                 tick_rate=20,
-                on_successful_cas=assert_current_cas_updates_single_belief,
+                on_successful_cas=assert_current_cas_keeps_a_single_object,
             )
         )
 
@@ -160,12 +149,12 @@ class TestFullAEExecution(object):
             len(successful_cas_instances) == 2
         ), "The file-reader integration fixture should yield the two available successful CAS instances."
         assert (
-            len(belief_uuids_after_each_successful_cas) == 2
-        ), "The integration test should inspect the belief state immediately after both successful CAS instances."
+            len(body_ids_after_each_successful_cas) == 2
+        ), "The integration test should inspect the world immediately after both successful CAS instances."
         assert (
-            belief_uuids_after_each_successful_cas[0]
-            == belief_uuids_after_each_successful_cas[1]
-        ), "The second percept should update the same ObjectBeliefState created from the first percept."
+            body_ids_after_each_successful_cas[0]
+            == body_ids_after_each_successful_cas[1]
+        ), "The second percept should move the same body created from the first percept."
 
         cas_ids = [cas.cas_id for cas in successful_cas_instances]
         assert len(set(cas_ids)) == len(
@@ -217,33 +206,16 @@ class TestFullAEExecution(object):
             assert len(pose_annotations) == 1
             assert len(bbox_annotations) == 1
             assert len(stamped_pose_annotations) == 1
-            assert (
-                stamped_pose_annotations[0].source
-                == SemanticDigitalTwinConnector.__name__
-            )
+            assert stamped_pose_annotations[0].source == PerceivedObjects.__name__
             assert stamped_pose_annotations[0].frame == "map"
 
-        object_beliefs = list(rk_world.get_object_belief_states().values())
+        [perceived_object] = seq.world.get_semantic_annotations_by_type(IsPerceivable)
         assert (
-            len(object_beliefs) == 1
-        ), "Both observations of the static object should update one stable object belief."
-
-        object_belief = object_beliefs[0]
+            perceived_object.root.parent_connection is not None
+        ), "The body of the perceived object should be attached to the SemDT world frame."
         assert (
-            object_belief.latest_hypothesis is all_hypotheses[-1]
-        ), "The object belief should point to the latest associated object hypothesis."
-        assert (
-            object_belief.latest_pose is not None
-        ), "The object belief should expose the latest pose from its associated hypothesis."
-        assert (
-            object_belief.latest_bbox_3d is not None
-        ), "The object belief should expose the latest 3D bounding box from its associated hypothesis."
-        assert (
-            object_belief.body.parent_connection is not None
-        ), "The object belief body should be attached to the SemDT world frame."
-        assert (
-            len(object_belief.body.visual.shapes) == 1
-        ), "The object belief body should contain one visual shape derived from the latest bounding box."
+            len(perceived_object.root.visual.shapes) == 1
+        ), "The body of the perceived object should contain one visual shape derived from its bounding box."
 
     def test_run_semdt_raytracer_ae_successfully(self, node):
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(

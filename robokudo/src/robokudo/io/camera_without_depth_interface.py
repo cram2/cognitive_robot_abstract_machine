@@ -28,6 +28,8 @@ from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 import cv2
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
+
     from robokudo.cas import CAS
     import numpy.typing as npt
 
@@ -123,7 +125,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
         return self._has_new_data
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, cas: CAS, world: World) -> None:
         """
         Update the Common Analysis Structure with latest frame data.
 
@@ -134,6 +136,8 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         * Updates the CAS with frame and camera data
 
         :param cas: Common Analysis Structure to update
+        :param world: The world perception perceives into; the camera is not placed in
+            it, since its pose is unknown
         """
         if not self.has_new_data():
             # no new frame available

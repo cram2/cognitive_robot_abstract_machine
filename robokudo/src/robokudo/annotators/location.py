@@ -26,7 +26,6 @@ from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Region
 from typing_extensions import TYPE_CHECKING, List
 
-import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.types.annotation import LocationAnnotation
 from robokudo.types.scene import ObjectHypothesis
@@ -106,7 +105,7 @@ class LocationAnnotator(ThreadedAnnotator):
         :param world_to_camera_transform_matrix: Transform from world to camera frame
         :param object_hypotheses: List of object hypotheses to check
         """
-        runtime_world = rk_world.world_instance()
+        runtime_world = self.world
         obb = region_obb_in_camera_coordinates(
             runtime_world, region, world_to_camera_transform_matrix
         )
@@ -144,7 +143,7 @@ class LocationAnnotator(ThreadedAnnotator):
         :return: SUCCESS after processing
         """
         start_timer = default_timer()
-        runtime_world = rk_world.world_instance()
+        runtime_world = self.world
         regions = runtime_world.get_kinematic_structure_entity_by_type(Region)
         active_regions = {str(region.name): region for region in regions}
         # TODO Filter active regions by FRUSTUM CULLING

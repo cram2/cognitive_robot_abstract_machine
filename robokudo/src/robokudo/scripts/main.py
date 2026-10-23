@@ -2,100 +2,33 @@
 
 from __future__ import annotations
 
-from robokudo.world import world_instance
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 
 import argparse
 import logging
 import os
 import sys
-import time
-import traceback
 from threading import Thread
-
-# For time measurements or additional logic
-from timeit import default_timer as timer
 
 import rclpy
 import rclpy.impl.logging_severity
 import rclpy.logging
 from py_trees.blackboard import Blackboard
-from py_trees.common import Status
-from rclpy.executors import MultiThreadedExecutor, SingleThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.parameter import Parameter
-from typing_extensions import TYPE_CHECKING
 
 # RoboKudo imports
 from robokudo.annotators.query import QueryActionServer
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE, PACKAGE_NAME
-from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
+from robokudo.process import RoboKudo
 from robokudo.utils.logging_configuration import configure_logging
 from robokudo.utils.module_loader import ModuleLoader
-from robokudo.utils.tree import setup_with_descendants_rk
 from robokudo.vis.cv_visualizer import CVVisualizer
 from robokudo.vis.ros_visualizer import AllAnnotatorROSVisualizer, SharedROSVisualizer
 
-if TYPE_CHECKING:
-    from py_trees_ros.trees import BehaviourTree
-
 # Silence some TensorFlow GPU logs if needed
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
-
-def run_ae(
-    ae_name: str,
-    ae_root: BehaviourTree,
-    tickrate: int = 20,
-) -> None:
-    """
-    Run an Analysis Engine (AE) by periodically ticking the Behavior Tree.
-    """
-    logger = logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE)
-    logger.info(f"Running AE named '{ae_name}'...")
-
-    blackboard = Blackboard()
-    blackboard.set("CAS", None)
-    tick_count = 0
-
-    def tick_tree() -> bool:
-        nonlocal tick_count
-        try:
-            logger.debug(f"--------- Tick {tick_count} ---------")
-            start = timer()
-            ae_root.tick()
-            end = timer()
-            logger.debug(f"Tick took {end - start:.4f} seconds")
-            if (
-                ae_root.root.children
-                and ae_root.root.children[0].status == Status.FAILURE
-            ):
-                # If your top-level child fails, maybe shut down
-                rclpy.shutdown()
-                return False
-            tick_count += 1
-        except Exception as e:
-            logger.error(f"Exception: {e}")
-            logger.error("Traceback:\n" + traceback.format_exc())
-        return True
-
-    interval = 1.0 / tickrate
-    last_tick = time.monotonic()
-
-    while True:
-        current_time = time.monotonic()
-        elapsed = current_time - last_tick
-
-        if elapsed >= interval:
-            if not tick_tree():
-                break
-
-            last_tick = current_time
-        else:
-            time.sleep(interval - elapsed)
 
 
 def main() -> None:
@@ -202,13 +135,11 @@ def main() -> None:
         BBIdentifier.QUERY_SERVER_IN_PIPELINE, False
     )  # Ownership in Pipeline has to be declared first
 
-    # 6. Start executors in separate threads
-    executor_main = SingleThreadedExecutor()
+    # 6. Serve the action server in a separate thread
     executor_asrv = (
         MultiThreadedExecutor()
     )  # Necessary to handle long-running goals AND incoming preempts
 
-    executor_main.add_node(node1)
     executor_asrv.add_node(query_action_server)
 
     def spin_executor(exec_: rclpy.Executor) -> None:
@@ -217,9 +148,7 @@ def main() -> None:
         except KeyboardInterrupt:
             pass
 
-    thread_main = Thread(target=spin_executor, args=(executor_main,), daemon=True)
     thread_asrv = Thread(target=spin_executor, args=(executor_asrv,), daemon=True)
-    thread_main.start()
     thread_asrv.start()
 
     # 7. Dynamically load the requested Analysis Engine (AE) using the **refactored** ModuleLoader
@@ -227,8 +156,11 @@ def main() -> None:
     logger.info(f"Loading AE '{args.ae}' from package '{args.ros_pkg}'...")
     loaded_ae = loader.load_ae(ros_pkg_name=args.ros_pkg, module_name=args.ae)
 
-    # 8. Build your Behavior Tree from the loaded AE
-    #    (Assuming loaded_ae.implementation() returns a py_trees root or something similar)
+    # 8. Create RoboKudo, which serves the main node and joins the world another
+    #    process shares if one does
+    robokudo = RoboKudo(node=node1, analysis_engine=loaded_ae)
+
+    # 9. Build the Behavior Tree of the loaded AE
     visualizer_types = None
     if args.no3d:
         visualizer_types = [
@@ -236,32 +168,23 @@ def main() -> None:
             SharedROSVisualizer,
             AllAnnotatorROSVisualizer,
         ]
-    ae_root = grow_tree(
-        loaded_ae.implementation(),
-        node=node1,
-        include_gui=not args.headless,
-        visualizer_types=visualizer_types,
-    )
-
-    # If you have a custom version of `setup_with_descendants`, call it:
-    setup_with_descendants_rk(ae_root)
-
+    robokudo.start(include_gui=not args.headless, visualizer_types=visualizer_types)
 
     try:
-        # 9. Start ticking the Behavior Tree
-        run_ae(ae_name=args.ae, ae_root=ae_root, tickrate=args.tickrate)
+        # 10. Start ticking the Behavior Tree
+        robokudo.run(tick_rate=args.tickrate)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received; shutting down.")
     finally:
-        # 10. Shutdown executors cleanly
-        executor_main.shutdown()
+        # 11. Stop sharing the world and serving the main node, then shutdown the
+        #     action server executor cleanly
+        robokudo.close()
         executor_asrv.shutdown()
 
-        # 11. Wait for shutdown
-        thread_main.join()
+        # 12. Wait for shutdown
         thread_asrv.join()
 
-        # 12. Clean up nodes
+        # 13. Clean up nodes
         node_registry.clear(node1)
         node1.destroy_node()
         query_action_server.destroy_node()

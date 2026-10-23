@@ -100,7 +100,7 @@ class FakeCameraInterface:
         """
         return False
 
-    def set_data(self, cas: Any) -> None:
+    def set_data(self, cas: Any, world: Any) -> None:
         """
         Leave the CAS unchanged.
         """

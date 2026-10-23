@@ -23,6 +23,7 @@ from pathlib import Path
 
 import ament_index_python.packages
 import cv2
+from semantic_digital_twin.world import World
 from typing_extensions import Any, Dict, List, Optional, TypeVar
 
 from robokudo.cas import CAS, CASViews
@@ -267,16 +268,10 @@ class RGBDFileReaderInterface(FileReaderInterface):
     Inherits all instance variables from FileReaderInterface.
     """
 
-    def set_data(self, cas: CAS) -> None:
-        """Set the next RGB-D data frame into the CAS.
-
-        This method:
-        * Reads the next color and depth images
-        * Applies any necessary fixes (e.g., Kinect height fix)
-        * Sets camera calibration and transformation data
-        * Updates the CAS with all loaded data
-
-        :param cas: Common Analysis Structure to update
+    def set_data(self, cas: CAS, world: World) -> None:
+        """
+        :meth:`CameraInterface.set_data` for the next recorded frame, whose camera is
+        placed at the pose the configuration fixes.
         """
         data = self.data_reader.get_next_data()
 
@@ -293,4 +288,4 @@ class RGBDFileReaderInterface(FileReaderInterface):
             o3d_camera_intrinsics_from_ros_camera_info(data[CASViews.CAMERA_INFO]),
         )
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.camera_config.color_to_depth_ratio)
-        self.store_static_camera_transform_if_configured(cas)
+        self.place_static_camera(cas, world)

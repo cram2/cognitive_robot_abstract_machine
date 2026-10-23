@@ -115,6 +115,35 @@ class NoServiceFoundError(Exception):
     service_suffix: str
 
 
+def find_world_fetcher_service(
+    node: Node,
+    service_suffix: str = "fetch_world",
+    timeout_seconds: float = 10.0,
+) -> Optional[str]:
+    """
+    Find a WorldFetcher service in the ROS2 network.
+
+    :param node: The ROS2 node to use for discovery.
+    :param service_suffix: The suffix (last part behind '/') of the WorldFetcher
+        services to look for.
+    :param timeout_seconds: How long to wait for a service to be discovered.
+    :return: The name of the first WorldFetcher service discovered, or None if none was
+        discovered within ``timeout_seconds``.
+    """
+    deadline = time() + timeout_seconds
+    while True:
+        matching_services = [
+            name
+            for name, srv_type in node.get_service_names_and_types()
+            if name.endswith(service_suffix) and srv_type == ["std_srvs/srv/Trigger"]
+        ]
+        if matching_services:
+            return matching_services[0]
+        if time() >= deadline:
+            return None
+        sleep(0.1)
+
+
 def fetch_world_from_service(
     node: Node,
     service_suffix: str = "fetch_world",
@@ -133,23 +162,11 @@ def fetch_world_from_service(
     :return: The fetched modification blocks.
     """
     deadline = time() + timeout_seconds
-    while time() < deadline:
-        available_services = node.get_service_names_and_types()
-        matching_services = [
-            name
-            for name, srv_type in available_services
-            if name.endswith(service_suffix) and srv_type == ["std_srvs/srv/Trigger"]
-        ]
-
-        if matching_services:
-            break
-
-        sleep(0.1)
-    else:
+    chosen_service = find_world_fetcher_service(node, service_suffix, timeout_seconds)
+    if chosen_service is None:
         raise NoServiceFoundError(service_suffix)
     remaining = deadline - time()
 
-    chosen_service = matching_services[0]
     client = node.create_client(Trigger, chosen_service)
 
     service_available = client.wait_for_service(timeout_sec=remaining)

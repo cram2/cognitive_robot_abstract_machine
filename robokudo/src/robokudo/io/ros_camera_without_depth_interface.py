@@ -36,6 +36,7 @@ from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+    from semantic_digital_twin.world import World
 
 
 # TODO Needs to be migrated to ROS2 for new RGB-only use cases
@@ -212,18 +213,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self._has_new_data = True
         self.lock.release()
 
-    def set_data(self, cas: CAS) -> None:
-        """
-        Update the Common Analysis Structure with latest camera data.
-
-        This method:
-        * Applies any configured image rotation
-        * Updates camera intrinsics accordingly
-        * Sets RGB image, camera info, and transform data in the CAS
-        * Handles thread synchronization
-
-        :param cas: Common Analysis Structure to update
-        """
+    def set_data(self, cas: CAS, world: World) -> None:
         if not self.has_new_data():
             return
 
@@ -264,7 +254,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         cas.set(CASViews.CAMERA_INFO, self.camera_info)
         cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
-        self.store_camera_to_world_transform_from_tf(cas, self.timestamp)
+        self.place_camera_from_tf(cas, world, self.timestamp)
 
         self._has_new_data = False
         self.lock.release()

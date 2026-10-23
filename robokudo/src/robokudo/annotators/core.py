@@ -27,6 +27,7 @@ from concurrent.futures import Future
 from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
+from semantic_digital_twin.world import World
 from sensor_msgs.msg import JointState
 from typing_extensions import (
     Any,
@@ -241,6 +242,13 @@ class BaseAnnotator(Behaviour):
         :return: The Common Analysis Structure (CAS) instance or None if not found
         """
         return self.get_parent_pipeline().cas
+
+    @property
+    def world(self) -> World:
+        """
+        The world this annotator perceives into: the world of its pipeline.
+        """
+        return self.get_parent_pipeline().world
 
     def get_parent_pipeline(self) -> Optional[robokudo.pipeline.Pipeline]:
         """

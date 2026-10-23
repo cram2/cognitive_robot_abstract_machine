@@ -1,20 +1,41 @@
 from py_trees.common import Status
 
-import robokudo.world as rk_world
 from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
+from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
+from robokudo.cas import CAS
+from robokudo.pipeline import Pipeline
 from robokudo.world_descriptor import PredefinedObject
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Region
+
+
+def in_pipeline_of(
+    world: World, annotator: WorldDescriptorBootstrapAnnotator
+) -> WorldDescriptorBootstrapAnnotator:
+    """
+    ``annotator`` in a pipeline that perceives into ``world``.
+    """
+    pipeline = Pipeline("WorldDescriptorBootstrapTestPipeline")
+    pipeline.world = world
+    pipeline.add_child(annotator)
+    return annotator
 
 
 class TestWorldDescriptorBootstrapAnnotator:
     def test_augment_world_keeps_existing_frame_references(self):
-        rk_world.init_world_with_entity_tracker()
-        rk_world.setup_world_for_camera_frame(world_frame="map", camera_frame="camera")
+        runtime_world = World()
+        CameraPlacement(runtime_world).place(
+            CAS(),
+            MeasuredCameraPose(
+                world_frame="map",
+                camera_frame="camera",
+                world_T_camera=HomogeneousTransformationMatrix(),
+            ),
+        )
 
-        runtime_world = rk_world.world_instance()
         camera_body = runtime_world.get_body_by_name("camera")
         map_body = runtime_world.get_body_by_name("map")
         camera_body_id = camera_body.id
@@ -32,7 +53,7 @@ class TestWorldDescriptorBootstrapAnnotator:
             reference_frame=map_body,
         )
 
-        annotator = WorldDescriptorBootstrapAnnotator()
+        annotator = in_pipeline_of(runtime_world, WorldDescriptorBootstrapAnnotator())
         result = annotator.update()
 
         assert result is Status.SUCCESS
@@ -58,12 +79,11 @@ class TestWorldDescriptorBootstrapAnnotator:
         assert "kitchen_island" in region_names
 
     def test_update_is_idempotent_for_same_world_instance(self):
-        rk_world.init_world_with_entity_tracker()
-        annotator = WorldDescriptorBootstrapAnnotator()
+        runtime_world = World()
+        annotator = in_pipeline_of(runtime_world, WorldDescriptorBootstrapAnnotator())
 
         first = annotator.update()
         second = annotator.update()
-        runtime_world = rk_world.world_instance()
 
         assert first is Status.SUCCESS
         assert second is Status.SUCCESS
