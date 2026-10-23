@@ -3,21 +3,21 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from typing_extensions import Any, Dict
+from typing_extensions import Any, Dict, List, Optional
 
 from coraplex.plans.attachment_nodes import ReAttachNode
+from coraplex.plans.factories import execute_single, sequential
 from coraplex.plans.plan_node import PlanNode
+from coraplex.datastructures.dataclasses import Context
+from coraplex.datastructures.enums import MovementType
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import (
+    ConditionType,
     or_,
     variable_from,
-    ConditionType,
 )
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import (
-    MovementType,
-)
-from coraplex.plans.factories import sequential
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.world_entity import Body
 from coraplex.querying.predicates import (
     GripperHolds,
     GripperIsFree,
@@ -333,3 +333,275 @@ class GraspingAction(
             ),
             ToolFrameIsAtGrasp(end_effector, kwargs["grasp"]),
         )
+
+
+# %% Simox Pick-Up Action
+
+
+@dataclass
+class SimoxPickUpAction(ActionDescription):
+    """
+    Pick up an object using grasp poses from the Simox physics-based planner.
+
+    Pipeline:
+    1. Call Simox /plan_grasp — returns ALL physically valid grasps from all
+       directions (top, front, back, left, right), each with a quality score.
+       Results are stored as Dict[str, List[GraspPose]] grouped by approach direction.
+    2. Build the trial order from ``preferred_approaches`` first, then any
+       remaining directions not listed (as automatic fallback).
+    3. Within each direction, try candidates best-quality-first.
+    4. For each candidate: reach → close gripper → attach object → lift.
+       If ANY step fails, detach the object, reopen the gripper, and continue.
+    5. If all candidates in all directions fail, raise BodyUnfetchable.
+
+    :param object_designator: The CoraPlex Body to grasp.
+    :param arm: Which arm to use (Arm instance or Arms enum).
+    :param end_effector_name: Simox EEF name, e.g. 'r_gripper' or 'l_gripper'.
+    :param kinematic_chain_name: Simox kinematic chain, e.g. 'RightArm'/'LeftArm'.
+    :param preferred_approaches: Ordered list of preferred approach directions,
+        e.g. ['right', 'front']. The system will try these first (in order),
+        then fall back to any remaining directions automatically.
+        Use None or [] to let the system decide based purely on Simox quality.
+        Valid values: 'top', 'front', 'back', 'left', 'right'.
+    :param robot_xml: Absolute path to pr2.xml (Simox robot wrapper).
+    :param lift_height: Height in meters to lift the object after grasping.
+    :param num_grasps_to_plan: Number of grasp candidates to request from Simox.
+    :param quality_threshold: Minimum Simox quality score (0.0–1.0).
+    """
+
+    object_designator: Body
+    arm: Any
+    end_effector_name: str
+    kinematic_chain_name: str
+    preferred_approaches: Optional[List[str]] = None
+    robot_xml: str = ""
+    lift_height: float = 0.1
+    num_grasps_to_plan: int = 50
+    quality_threshold: float = 0.001
+
+    _TOP_LIFT_HEIGHT: float = 0.07
+
+    def _adaptive_lift_height(self, grasp_pose: Any) -> float:
+        approach = getattr(grasp_pose, "approach", "")
+        if approach == "top":
+            logger.debug(
+                "Top-down grasp detected — using reduced lift height %.2f m"
+                " (configured %.2f m)",
+                self._TOP_LIFT_HEIGHT,
+                self.lift_height,
+            )
+            return self._TOP_LIFT_HEIGHT
+        return self.lift_height
+
+    @property
+    def _action_plan(self) -> PlanNode:
+        self.execute()
+        return sequential([])
+
+    def execute(self) -> None:
+        from copy import deepcopy
+
+        from coraplex.external_interfaces.simox_grasp_planner import (
+            DEFAULT_ROBOT_XML,
+            plan_grasps_for_body,
+        )
+        from coraplex.plans.failures import BodyUnfetchable, PlanFailure
+        from coraplex.robot_plans.actions.core.robot_body import (
+            MoveManipulatorAction,
+            SetGripperAction,
+        )
+        from krrood.exceptions import DataclassException
+
+        robot_xml = self.robot_xml or DEFAULT_ROBOT_XML
+
+        if hasattr(self.arm, "end_effector"):
+            end_effector = self.arm.end_effector
+        else:
+            arm_name = str(self.arm).lower()
+            if "left" in arm_name:
+                end_effector = self.robot.left_arm.end_effector
+            else:
+                end_effector = self.robot.right_arm.end_effector
+
+        # 1. Get ALL physics-based grasp poses from Simox, grouped by approach direction.
+        grasp_dict = plan_grasps_for_body(
+            body=self.object_designator,
+            arm=self.arm,
+            end_effector_name=self.end_effector_name,
+            kinematic_chain_name=self.kinematic_chain_name,
+            robot_xml=robot_xml,
+            num_grasps=self.num_grasps_to_plan,
+            quality_threshold=self.quality_threshold,
+        )
+
+        if not grasp_dict:
+            raise BodyUnfetchable(body=self.object_designator, arm=self.arm)
+
+        # 2. Build the trial order:
+        preferred = list(self.preferred_approaches or [])
+        preferred_order = [d for d in preferred if d in grasp_dict]
+
+        remaining = sorted(
+            [d for d in grasp_dict if d not in preferred_order],
+            key=lambda d: grasp_dict[d][0].quality if grasp_dict[d] else 0.0,
+            reverse=True,
+        )
+        trial_order = preferred_order + remaining
+
+        total_candidates = sum(len(grasp_dict[d]) for d in trial_order)
+        logger.info(
+            "SimoxPickUpAction: %d total candidates for '%s' — trial order: %s",
+            total_candidates,
+            self.object_designator.name,
+            trial_order,
+        )
+
+        # 3. Open gripper before trying any pose
+        self.add_subplan(
+            execute_single(
+                SetGripperAction(gripper=end_effector, motion=GripperState.OPEN)
+            )
+        ).perform()
+
+        # 4. Iterate directions in trial order, best-quality-first within each group.
+        last_failure: Exception = BodyUnfetchable(
+            body=self.object_designator, arm=self.arm
+        )
+        attached = False
+        candidate_index = 0
+
+        for direction in trial_order:
+            poses_in_direction = grasp_dict[direction]
+            for grasp_pose in poses_in_direction:
+                candidate_index += 1
+                approach = direction
+                quality = getattr(grasp_pose, "quality", 0.0)
+                logger.info(
+                    "SimoxPickUpAction: [%d/%d] approach=%s quality=%.4f",
+                    candidate_index,
+                    total_candidates,
+                    approach,
+                    quality,
+                )
+                attached = False
+                try:
+                    # a) Reach grasp pose
+                    self.add_subplan(
+                        execute_single(
+                            MoveManipulatorAction(
+                                target_pose=grasp_pose,
+                                end_effector=end_effector,
+                                allow_gripper_collision=True,
+                            )
+                        )
+                    ).perform()
+
+                    # b) Close gripper
+                    self.add_subplan(
+                        execute_single(
+                            SetGripperAction(
+                                gripper=end_effector, motion=GripperState.CLOSE
+                            )
+                        )
+                    ).perform()
+
+                    # c) Attach object in the digital twin
+                    with self.world.modify_world():
+                        self.world.move_branch_with_fixed_connection(
+                            self.object_designator, end_effector.tool_frame
+                        )
+                    attached = True
+
+                    # d) Lift
+                    safe_height = self._adaptive_lift_height(grasp_pose)
+                    lift_point = deepcopy(grasp_pose.position)
+                    lift_point.z = float(lift_point.z) + safe_height
+
+                    self.add_subplan(
+                        execute_single(
+                            MoveToolCenterPointMotion(
+                                target=Pose.from_xyz_quaternion(
+                                    pos_x=float(lift_point.x),
+                                    pos_y=float(lift_point.y),
+                                    pos_z=float(lift_point.z),
+                                    quat_x=0.0,
+                                    quat_y=0.0,
+                                    quat_z=0.0,
+                                    quat_w=1.0,
+                                    reference_frame=grasp_pose.reference_frame,
+                                ),
+                                arm=self.arm,
+                                allow_gripper_collision=True,
+                                movement_type=MovementType.TRANSLATION,
+                            )
+                        )
+                    ).perform()
+
+                    logger.info(
+                        "SimoxPickUpAction: ✓ picked up '%s' "
+                        "(approach=%s, quality=%.4f, lift=%.2f m)",
+                        self.object_designator.name,
+                        approach,
+                        quality,
+                        safe_height,
+                    )
+                    return
+
+                except (PlanFailure, DataclassException, RuntimeError) as plan_failure:
+                    logger.warning(
+                        "SimoxPickUpAction: [%d/%d] approach=%s FAILED — %s",
+                        candidate_index,
+                        total_candidates,
+                        approach,
+                        plan_failure,
+                    )
+                    last_failure = plan_failure
+
+                    # Detach object if it was attached before failure
+                    if attached:
+                        try:
+                            from semantic_digital_twin.world_description.connections import (
+                                Connection6DoF,
+                            )
+
+                            world_root = self.world.root
+                            obj_transform = self.world.compute_forward_kinematics(
+                                world_root, self.object_designator
+                            )
+                            with self.world.modify_world():
+                                self.world.remove_connection(
+                                    self.object_designator.parent_connection
+                                )
+                                connection = Connection6DoF.create_with_dofs(
+                                    parent=world_root,
+                                    child=self.object_designator,
+                                    world=self.world,
+                                )
+                                self.world.add_connection(connection)
+                                connection.origin = obj_transform
+                            attached = False
+                        except (RuntimeError, KeyError, AttributeError) as detach_exc:
+                            logger.warning(
+                                "SimoxPickUpAction: could not detach '%s' — %s",
+                                self.object_designator.name,
+                                detach_exc,
+                            )
+
+                    # Reopen gripper so next candidate starts clean
+                    try:
+                        self.add_subplan(
+                            execute_single(
+                                SetGripperAction(
+                                    gripper=end_effector, motion=GripperState.OPEN
+                                )
+                            )
+                        ).perform()
+                    except (PlanFailure, DataclassException, RuntimeError) as open_exc:
+                        logger.warning(
+                            "SimoxPickUpAction: could not reopen gripper — %s", open_exc
+                        )
+
+                    continue
+
+        # 5. All candidates in all directions exhausted
+        raise last_failure
