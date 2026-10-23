@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import dataclasses
-import math
 from dataclasses import dataclass, field
 from typing import Tuple
 
@@ -30,6 +29,7 @@ from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
 from typing_extensions import (
     TYPE_CHECKING,
+    Callable,
     Generic,
     List,
     Optional,
@@ -63,11 +63,15 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from krrood.entity_query_language.query.match import Match
+from semantic_digital_twin.grasping.grasp_strategies import (
+    GraspFromAnySide,
+    GraspStrategy,
+    PinchTheTopOfAWall,
+)
 from semantic_digital_twin.grasping.surface_grasp import (
     SurfaceGrasp,
     any_surface_grasp,
     draw_surface_grasps,
-    from_any_side,
 )
 from semantic_digital_twin.reasoning.predicates import SupportedBy
 from semantic_digital_twin.semantic_annotations.part_whole import (
@@ -419,32 +423,42 @@ class HasGraspCandidates(HasRootBody):
     How many grasp candidates the annotation offers.
     """
 
+    @classproperty
+    def grasp_strategy(cls) -> GraspStrategy:
+        """
+        :return: Where on its surface the annotation may be grasped.
+        """
+        return GraspFromAnySide()
+
     def grasp_candidates(
         self,
-        model_registry: Optional[ModelRegistry] = None,
-        require_lifting: bool = False,
-    ) -> List[GraspCandidate]:
+        model_registry: ModelRegistry | None = None,
+        grasp_pattern: Callable[[], Match[SurfaceGrasp]] | None = None,
+    ) -> list[GraspCandidate]:
         """
         The grasps this annotation offers, in no particular order: those of its
-        :meth:`grasped_part` when it is grasped at one of its parts; otherwise grasps
-        drawn from the model, or the :meth:`default_grasp_candidates` without one.
+        :meth:`grasped_part` when it is grasped at one of its parts; otherwise
+        :meth:`drawn_grasp_candidates`, or the :meth:`default_grasp_candidates` while
+        neither a model nor a grasp pattern is given.
 
         :param model_registry: Answers the statement of where the object may be grasped.
-        :param require_lifting: Whether to ask only for grasps that lift the object,
-            which needs a model learned over tried grasps and their results.
+        :param grasp_pattern: Builds the pattern of the grasps asked for, such as
+            :func:`~semantic_digital_twin.grasping.surface_grasp.lifting_surface_grasp`.
         """
         part = self.grasped_part()
         if part is not self:
-            return part.grasp_candidates(model_registry, require_lifting)
-        if model_registry is None and not require_lifting:
+            return part.grasp_candidates(model_registry, grasp_pattern)
+        if model_registry is None and grasp_pattern is None:
             return self.default_grasp_candidates()
-        return self.drawn_grasp_candidates(model_registry, require_lifting)
+        return self.drawn_grasp_candidates(
+            model_registry, grasp_pattern or any_surface_grasp
+        )
 
     def default_grasp_candidates(self) -> List[GraspCandidate]:
         """
-        :return: The grasps offered while no model is given: the object at its own
-            origin, approached from evenly spaced directions around its z-axis, which
-            needs no knowledge of its shape.
+        :return: The grasps offered while neither a model nor a grasp pattern is given:
+            the object at its own origin, approached from evenly spaced yaws about its
+            z-axis, which needs no knowledge of its shape.
         """
         return [
             GraspCandidate(
@@ -461,18 +475,18 @@ class HasGraspCandidates(HasRootBody):
 
     def drawn_grasp_candidates(
         self,
-        model_registry: Optional[ModelRegistry] = None,
-        require_lifting: bool = False,
-    ) -> List[GraspCandidate]:
+        model_registry: ModelRegistry | None = None,
+        grasp_pattern: Callable[[], Match[SurfaceGrasp]] = any_surface_grasp,
+    ) -> list[GraspCandidate]:
         """
         :param model_registry: Answers :meth:`surface_grasp_statement`; ``None`` draws
             uniformly from what it allows.
-        :param require_lifting: Whether to ask only for grasps that lift the object.
+        :param grasp_pattern: Builds the pattern of the grasps asked for.
         :return: Grasps drawn from :meth:`surface_grasp_statement` that reach the
             object's surface, at most :attr:`grasp_candidate_count` of them.
         """
         grasps = draw_surface_grasps(
-            self.surface_grasp_statement(require_lifting),
+            self.surface_grasp_statement(grasp_pattern),
             self.grasp_candidate_count,
             model_registry,
         )
@@ -505,35 +519,16 @@ class HasGraspCandidates(HasRootBody):
         return trimesh.util.concatenate(surfaces)
 
     def surface_grasp_statement(
-        self,
-        require_lifting: bool = False,
-        lowest_height: float = 0.05,
-        highest_height: float = 0.95,
-        shallowest_depth: float = 0.0,
-        deepest_depth: float = 0.5,
+        self, grasp_pattern: Callable[[], Match[SurfaceGrasp]] = any_surface_grasp
     ) -> Match[SurfaceGrasp]:
         """
-        :param require_lifting: Whether to ask only for grasps that lift the object.
-        :param lowest_height: The lowest height to grasp at, as a fraction of the grasp
-            surface's bounding box from its bottom to its top.
-        :param highest_height: The height to grasp below, as such a fraction.
-        :param shallowest_depth: The least depth to close the fingers at, as a fraction
-            of the object's narrower horizontal extent.
-        :param deepest_depth: The depth to close the fingers short of, as such a
-            fraction.
-        :return: The statement of where the object may be grasped. The default allows
-            the object between the two heights, closing on it between the two depths.
+        :param grasp_pattern: Builds the pattern of the grasps asked for.
+        :return: The pattern narrowed to where :attr:`grasp_strategy` allows the
+            annotation to be grasped.
+        :raises NoGraspGeometry: If the annotation has no shape to measure.
         """
-        lowest, highest = self.grasp_surface().bounds
-        narrower_extent = float(min(highest[:2] - lowest[:2]))
-        grasp = any_surface_grasp(require_lifting)
-        return grasp.where(
-            grasp.height >= lowest_height,
-            grasp.height < highest_height,
-            grasp.depth >= shallowest_depth * narrower_extent,
-            grasp.depth < deepest_depth * narrower_extent,
-            *from_any_side(grasp),
-        )
+        grasp = grasp_pattern()
+        return grasp.where(*self.grasp_strategy.conditions(grasp, self))
 
     def grasped_part(self) -> HasGraspCandidates:
         """
@@ -541,6 +536,21 @@ class HasGraspCandidates(HasRootBody):
             itself unless one of its parts is grasped instead.
         """
         return self
+
+
+@dataclass(eq=False)
+class HasSurfaceGraspsByDefault(HasGraspCandidates):
+    """
+    A mixin class for semantic annotations whose shape is known well enough that, while
+    neither a model nor a grasp pattern is given, their grasps are drawn uniformly from
+    :meth:`surface_grasp_statement` instead of taken at their origin.
+    """
+
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
+        """
+        return self.drawn_grasp_candidates()
 
 
 @dataclass(eq=False)
@@ -849,96 +859,7 @@ class HasHandle(HasGraspCandidates, PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasPinchableWall(HasGraspCandidates):
-    """
-    A mixin class for semantic annotations with a thin upright wall that a gripper
-    pinches from above.
-    """
-
-    def wall_grasp_statement(
-        self,
-        lowest_height: float,
-        highest_height: float,
-        require_lifting: bool,
-        shallowest_depth: float = 0.25,
-        deepest_depth: float = 0.75,
-        largest_pitch: float = 0.5,
-        largest_roll: float = math.pi / 8,
-    ) -> Match[SurfaceGrasp]:
-        """
-        :param lowest_height: The lowest height to pinch the wall at, as a fraction of
-            the grasp surface's bounding box from its bottom to its top.
-        :param highest_height: The height to pinch the wall below, as such a fraction.
-        :param require_lifting: Whether to ask only for grasps that lift the object.
-        :param shallowest_depth: The least depth to close the fingers at, as a fraction
-            of the wall's thickness.
-        :param deepest_depth: The depth to close the fingers short of, as such a
-            fraction.
-        :param largest_pitch: How far the approach may tilt off vertical towards the
-            wall, in radians.
-        :param largest_roll: How far the fingers may turn off closing across the wall,
-            either way, in radians.
-        :return: The wall between the two heights, all around, closing between the two
-            depths, tilted and turned at most as far as given.
-        :raises NoGraspGeometry: If there is no wall to measure.
-        """
-        thickness = self.wall_thickness((lowest_height + highest_height) / 2)
-        grasp = any_surface_grasp(require_lifting)
-        return grasp.where(
-            grasp.height >= lowest_height,
-            grasp.height < highest_height,
-            grasp.depth >= shallowest_depth * thickness,
-            grasp.depth < deepest_depth * thickness,
-            grasp.azimuth >= 0.0,
-            grasp.azimuth < 2 * math.pi,
-            grasp.pitch >= 0.0,
-            grasp.pitch < largest_pitch,
-            grasp.roll >= -largest_roll,
-            grasp.roll < largest_roll,
-        )
-
-    def wall_thickness(
-        self, height: float = 0.5, number_of_directions: int = 12
-    ) -> float:
-        """
-        Cast rays outward from the middle of the grasp surface, at ``height``, and take
-        the distance between the first two surfaces each ray passes, the inside and the
-        outside of the wall, as the wall's thickness.
-
-        :param height: Where to measure, as a fraction of the grasp surface's bounding
-            box from its bottom to its top.
-        :param number_of_directions: In how many directions around the annotation the
-            wall is measured.
-        :return: The median thickness over the directions that hit the wall.
-        :raises NoGraspGeometry: If no direction hits a wall.
-        """
-        shape = self.grasp_surface()
-        yaws = np.linspace(0, 2 * np.pi, number_of_directions, endpoint=False)
-        directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
-        lowest, highest = shape.bounds
-        middle = (lowest + highest) / 2
-        middle[2] = lowest[2] + height * (highest[2] - lowest[2])
-        # Embree reports only the inner wall here, so the exact intersector is used.
-        intersector = trimesh.ray.ray_triangle.RayMeshIntersector(shape)
-        locations, ray_indices, _ = intersector.intersects_location(
-            ray_origins=np.tile(middle, (len(yaws), 1)), ray_directions=directions
-        )
-        thicknesses = []
-        for index in range(len(yaws)):
-            distances = np.sort(
-                np.linalg.norm(
-                    locations[ray_indices == index][:, :2] - middle[:2], axis=1
-                )
-            )
-            if len(distances) > 1:
-                thicknesses.append(float(distances[1] - distances[0]))
-        if not thicknesses:
-            raise NoGraspGeometry(self)
-        return float(np.median(thicknesses))
-
-
-@dataclass(eq=False)
-class HasRim(HasPinchableWall, PartWholeRelationship):
+class HasRim(HasSurfaceGraspsByDefault, PartWholeRelationship):
     """
     A mixin class for open containers that have a rim, and are grasped at it when they
     have one.
@@ -961,38 +882,12 @@ class HasRim(HasPinchableWall, PartWholeRelationship):
             return super().grasped_part()
         return self.rim
 
-    def default_grasp_candidates(self) -> List[GraspCandidate]:
+    @classproperty
+    def grasp_strategy(cls) -> GraspStrategy:
         """
-        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
+        :return: Pinching the top of the container's own wall, as its rim would be.
         """
-        return self.drawn_grasp_candidates()
-
-    def surface_grasp_statement(
-        self,
-        require_lifting: bool = False,
-        rim_depth: float = 0.02,
-        shallowest_rim_fraction: float = 0.25,
-        deepest_rim_fraction: float = 0.75,
-    ) -> Match[SurfaceGrasp]:
-        """
-        :param require_lifting: Whether to ask only for grasps that lift the container.
-        :param rim_depth: How far below the container's highest point its rim reaches,
-            in meters.
-        :param shallowest_rim_fraction: How far below the highest point to pinch at
-            least, as a fraction of ``rim_depth``.
-        :param deepest_rim_fraction: How far below the highest point to pinch at most,
-            as such a fraction.
-        :return: The container's own surface between the two fractions of its top
-            ``rim_depth``, pinched across its wall, as a :class:`Rim` part is.
-        :raises NoGraspGeometry: If the container has no wall to measure there.
-        """
-        lowest, highest = self.grasp_surface().bounds
-        rim_fraction = rim_depth / float(highest[2] - lowest[2])
-        return self.wall_grasp_statement(
-            1 - deepest_rim_fraction * rim_fraction,
-            1 - shallowest_rim_fraction * rim_fraction,
-            require_lifting,
-        )
+        return PinchTheTopOfAWall()
 
 
 @dataclass(eq=False)

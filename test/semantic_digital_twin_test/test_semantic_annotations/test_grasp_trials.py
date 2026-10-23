@@ -12,7 +12,10 @@ from typing_extensions import List
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_trials import GraspPerformer, GraspTrials
-from semantic_digital_twin.grasping.surface_grasp import GraspResult
+from semantic_digital_twin.grasping.surface_grasp import (
+    GraspResult,
+    lifting_surface_grasp,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Milk,
@@ -20,8 +23,12 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
-from semantic_digital_twin.spatial_types.spatial_types import AxisAngle
+from semantic_digital_twin.spatial_types import (
+    AxisAngle,
+    HomogeneousTransformationMatrix,
+    Twist,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -48,10 +55,10 @@ class RecordingPerformer(GraspPerformer):
         return GraspResult(
             object_raised=True,
             motion_completed=True,
-            object_displacement=Vector3(0.0, 0.0, 0.2),
-            object_rotation=AxisAngle(),
-            translational_slip=Vector3(),
-            rotational_slip=AxisAngle(),
+            object_displacement=Twist(
+                translation=Vector3(0.0, 0.0, 0.2), rotation=AxisAngle()
+            ),
+            slip=Twist(translation=Vector3(), rotation=AxisAngle()),
         )
 
 
@@ -118,7 +125,7 @@ def test_drawn_grasps_lie_where_the_annotation_states(carton):
     assert len(grasps) == trials.number_of_trials
     for grasp in grasps:
         for value, interval in (
-            (grasp.azimuth, allowed["azimuth"]),
+            (grasp.yaw, allowed["yaw"]),
             (grasp.height, allowed["height"]),
             (grasp.depth, allowed["depth"]),
             (grasp.pitch, allowed["pitch"]),
@@ -159,7 +166,7 @@ def test_trials_can_ask_only_for_lifting_grasps(carton):
         graspable=carton,
         performer=RecordingPerformer(),
         number_of_trials=1,
-        require_lifting=True,
+        grasp_pattern=lifting_surface_grasp,
     )
 
     with pytest.raises(UnboundedParameterError):

@@ -1,10 +1,5 @@
 """
 Trying grasps on an object to collect the data a model of grasps is learned from.
-
-The grasps are drawn from the statement of where the object's annotation may be grasped,
-through a model registry: uniformly from what it allows at first, from a learned model
-later. Each tried grasp is recorded together with what happened, so the records hold the
-grasp's parameters and its result as plain numbers and truth values.
 """
 
 from __future__ import annotations
@@ -12,8 +7,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import Iterator, List
+from typing_extensions import Callable, Iterator
 
+from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import (
     ModelRegistry,
     UniformPriorRegistry,
@@ -22,6 +18,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
     SurfaceGrasp,
+    any_surface_grasp,
     draw_surface_grasps,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -66,10 +63,8 @@ class GraspTrialRecord:
 @dataclass
 class GraspTrials:
     """
-    Grasps drawn from the statement of where an object may be grasped, each tried and
-    given its result.
-
-    The grasps are placed on the object's grasped part: its handle when it has one.
+    Grasps drawn from the statement of where an object's grasped part may be grasped,
+    each tried and given its result.
     """
 
     graspable: HasGraspCandidates
@@ -92,10 +87,10 @@ class GraspTrials:
     Answers the statement.
     """
 
-    require_lifting: bool = False
+    grasp_pattern: Callable[[], Match[SurfaceGrasp]] = any_surface_grasp
     """
-    Whether to ask the model only for grasps it expects to lift the object, which needs
-    a model learned over tried grasps and their results.
+    Builds the pattern of the grasps asked for, such as
+    :func:`~semantic_digital_twin.grasping.surface_grasp.lifting_surface_grasp`.
     """
 
     @property
@@ -105,13 +100,13 @@ class GraspTrials:
         """
         return self.graspable.grasped_part()
 
-    def drawn_grasps(self) -> List[SurfaceGrasp]:
+    def drawn_grasps(self) -> list[SurfaceGrasp]:
         """
         :return: :attr:`number_of_trials` grasps answering the statement of where
             :attr:`grasped_part` may be grasped.
         """
         return draw_surface_grasps(
-            self.grasped_part.surface_grasp_statement(self.require_lifting),
+            self.grasped_part.surface_grasp_statement(self.grasp_pattern),
             self.number_of_trials,
             self.model_registry,
         )
