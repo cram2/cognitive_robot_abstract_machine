@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from contextlib import AbstractContextManager, ExitStack, nullcontext
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
@@ -42,6 +43,7 @@ from giskardpy.ros_executor import Ros2Executor
 from krrood.entity_query_language.factories import evaluate_condition
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math.symbolic_math import Scalar, trinary_logic_not
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
@@ -390,7 +392,7 @@ class GiskardExecutable(Executable):
                     | ExecutionType.PHYSICALLY_SIMULATED
                 ):
                     self._execute_simulation()
-                case ExecutionType.REAL:
+                case ExecutionType.REAL | ExecutionType.SEMI_REAL:
                     self._execute_real()
                 case _:
                     raise UnknownExecutionType(GiskardExecutable.execution_type)
@@ -542,6 +544,17 @@ class MoveBranchExecutable(Executable):
     The new parent to which the branch is moved.
     """
 
+    giskard_idle_settle_delta: timedelta = field(
+        default=timedelta(seconds=0.3), kw_only=True
+    )
+    """
+    Time to wait after publishing the model change on the real robot.
+
+    Giskard only applies buffered world updates, and only republishes tf, while its
+    behavior tree is idle between goals; this delay gives it a few idle ticks to catch
+    up before the next motion goal is sent.
+    """
+
     execution_scope: Callable[[], AbstractContextManager[None]] = field(
         default=nullcontext, kw_only=True, repr=False, compare=False
     )
@@ -554,7 +567,12 @@ class MoveBranchExecutable(Executable):
         if GiskardExecutable.execution_type == ExecutionType.PHYSICALLY_SIMULATED:
             return
         with self.execution_scope():
-            self.context.world.move_branch(self.body, self.new_parent)
+            self.context.world.move_branch(
+                self.body,
+                self.new_parent,
+            )
+        if GiskardExecutable.execution_type == ExecutionType.REAL:
+            time.sleep(self.giskard_idle_settle_delta.total_seconds())
 
 
 @dataclass

@@ -46,12 +46,12 @@ class ActionServerTask(
     Abstract base class for tasks that call a ROS2 action server.
     """
 
-    action_topic: str
+    action_topic: str = field(kw_only=True)
     """
     Topic name for the action server.
     """
 
-    message_type: Type[Action]
+    message_type: Type[Action] = field(kw_only=True)
     """
     Fully specified goal message that can be send out.
     """

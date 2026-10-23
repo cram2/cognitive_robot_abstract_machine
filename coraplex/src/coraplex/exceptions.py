@@ -17,7 +17,12 @@ if TYPE_CHECKING:
     from coraplex.plans.designator import Designator
     from coraplex.plans.plan_node import PlanNode
     from coraplex.robot_plans.actions.base import ActionDescription
-    from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
+    from semantic_digital_twin.datastructures.definitions import GripperState
+    from semantic_digital_twin.robots.robot_parts import (
+        AbstractRobot,
+        Arm,
+        EndEffector,
+    )
     from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
     from semantic_digital_twin.world_description.world_entity import (
         SemanticAnnotation,
@@ -347,6 +352,35 @@ class UnknownExecutionType(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class NoGriplinkEndpoint(DataclassException):
+    """
+    Raised when a gripper state has no griplink action server endpoint to command it on.
+    """
+
+    end_effector: EndEffector
+    """
+    The gripper whose state is to be commanded.
+    """
+
+    state_type: GripperState
+    """
+    The gripper state no griplink endpoint serves.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The gripper '{self.end_effector.name}' has no griplink endpoint to "
+            f"command the state {self.state_type.name}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "command a gripper state the motion's endpoint table declares, or add an "
+            "endpoint for this gripper and state."
+        )
 
 
 @dataclass

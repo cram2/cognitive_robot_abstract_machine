@@ -5,6 +5,10 @@ from dataclasses import dataclass, field
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
+from giskardpy.motion_statechart.monitors.payload_monitors import (
+    CountSimulationTimeSeconds,
+    Print,
+)
 from giskardpy.motion_statechart.ros_context import RosContextExtension
 from typing_extensions import Optional
 
@@ -117,3 +121,39 @@ class DetectingMotion(BaseMotion):
             execution_type=GiskardExecutable.execution_type,
             accept_first_if_multiple=self.accept_first_if_multiple,
         )
+
+
+# %% reporting and waiting inside the motion chart
+
+
+@dataclass
+class PrintMotion(BaseMotion):
+    """
+    Prints a message when the motion chart reaches it, between the surrounding motions.
+    """
+
+    message: str
+    """
+    The message to print.
+    """
+
+    @property
+    def _motion_chart(self) -> Print:
+        return Print(message=self.message)
+
+
+@dataclass
+class WaitMotion(BaseMotion):
+    """
+    Lets the motion chart wait before it continues with the next motion.
+    """
+
+    seconds: float
+    """
+    How long to wait, in seconds of control time: the control cycles that pass, times
+    the control period.
+    """
+
+    @property
+    def _motion_chart(self) -> CountSimulationTimeSeconds:
+        return CountSimulationTimeSeconds(seconds=self.seconds)

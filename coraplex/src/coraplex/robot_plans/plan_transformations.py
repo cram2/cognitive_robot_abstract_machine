@@ -446,7 +446,7 @@ class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
             for node in plan_node.descendants
             if isinstance(node, MotionNode)
             and isinstance(node.motion, MoveGripperMotion)
-            and node.motion.motion is GripperState.CLOSE
+            and node.motion.configuration.joint_state.state_type is GripperState.CLOSE
         ]
         if not motions:
             raise GraspHasNoClosingMotion(plan_node)

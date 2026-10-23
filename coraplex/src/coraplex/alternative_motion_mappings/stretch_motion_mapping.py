@@ -3,38 +3,37 @@ from __future__ import annotations
 from copy import deepcopy
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
-from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.cartesian_goals import (
-    DifferentialDriveBaseGoal,
     CartesianPoseStraight,
+    DifferentialDriveBaseGoal,
 )
 from giskardpy.motion_statechart.goals.open_close import Close
-from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
+from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
-    CartesianPose,
     CartesianOrientation,
+    CartesianPose,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.tasks.pointing import Pointing
-from coraplex.datastructures.enums import ExecutionType
-from coraplex.robot_plans import (
-    MoveToolCenterPointMotion,
-    MoveMotion,
-    ClosingMotion,
-    MoveGripperMotion,
+from semantic_digital_twin.datastructures.robots.gripper_configuration import (
+    GripperConfiguration,
 )
-from coraplex.robot_plans.motions.base import AlternativeMotion
-from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import (
-    Vector3,
-    HomogeneousTransformationMatrix,
     RotationMatrix,
+    Vector3,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
+
+from coraplex.datastructures.enums import ExecutionType
+from coraplex.robot_plans import (
+    ClosingMotion,
+    MoveGripperMotion,
+    MoveMotion,
+    MoveToolCenterPointMotion,
+)
+from coraplex.robot_plans.motions.base import AlternativeMotion
 
 
 class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[Stretch]):
@@ -152,7 +151,9 @@ class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):
         return Parallel([cart, align, close])
 
 
-class StretchMoveGripperMotion(MoveGripperMotion, AlternativeMotion[Stretch]):
+class StretchMoveGripperMotion(
+    AlternativeMotion[Stretch], MoveGripperMotion[GripperConfiguration]
+):
     """
     Gripper motion tuned for Stretch: forces convergence checks to hold for at least one
     second so the local minimum isn't reported before the gripper has actually moved.
@@ -165,15 +166,13 @@ class StretchMoveGripperMotion(MoveGripperMotion, AlternativeMotion[Stretch]):
 
     @property
     def _motion_chart(self):
+        goal_state = self.configuration.joint_state
+
         return Parallel(
             [
                 JointPositionList(
-                    goal_state=self.gripper.get_joint_state_by_type(self.motion),
-                    name=(
-                        "OpenGripper"
-                        if self.motion == GripperState.OPEN
-                        else "CloseGripper"
-                    ),
+                    goal_state=goal_state,
+                    name=goal_state.name.name,
                     threshold=0,
                 ),
                 LocalMinimumReached(

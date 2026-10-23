@@ -7,8 +7,8 @@ import pytest
 from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
-    WorldWithDaisyConfig,
-    DaisyStandAloneRobotInterfaceConfig,
+    WorldWithDAiSyConfig,
+    DAiSyStandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
@@ -28,10 +28,6 @@ from giskardpy.motion_statechart.motion_statechart import (
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-    ShapeSource,
-)
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
 from semantic_digital_twin.spatial_types import (
@@ -152,8 +148,8 @@ class DAiSyTester(GiskardTester):
             "package://iai_daisy_description/robots/daisy.urdf.xacro"
         )
         return Giskard(
-            world_config=WorldWithDaisyConfig(urdf=robot_desc),
-            robot_interface_config=DaisyStandAloneRobotInterfaceConfig(),
+            world_config=WorldWithDAiSyConfig(urdf=robot_desc),
+            robot_interface_config=DAiSyStandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
                 execution_mode=ExecutionMode.STANDALONE,
                 debug_mode=True,
@@ -193,7 +189,6 @@ def box_setup(giskard: DAiSyTester) -> DAiSyTester:
 
 
 class TestJointGoals:
-
     def test_joints1(self, giskard: DAiSyTester):
         msc = MotionStatechart()
         msc.add_node(
