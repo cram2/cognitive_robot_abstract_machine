@@ -19,6 +19,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoConnectionJoints,
     MujocoDifferentialDriveJoints,
     MujocoSim,
+    SimulatorModelNames,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -128,9 +129,9 @@ def _drive_at(
 
 
 def test_a_differential_drive_is_built_by_its_own_realisation(rover):
-    assert type(MujocoConnectionJoints.of(rover, rover._world)) is (
-        MujocoDifferentialDriveJoints
-    )
+    assert type(
+        MujocoConnectionJoints.of(rover, rover._world, SimulatorModelNames())
+    ) is (MujocoDifferentialDriveJoints)
 
 
 def test_the_compiled_model_moves_the_base_along_x_and_y_and_about_z(rover, tmp_path):
