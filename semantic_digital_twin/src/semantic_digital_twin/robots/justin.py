@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Self, Union, List
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
+    JointName,
     GripperState,
     StaticJointState,
     TorsoState,
@@ -39,7 +39,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-class JustinJoint(StrEnum):
+class JustinJoint(JointName):
     """
     Names of the Justin's commandable connections, as spelled in its URDF.
 

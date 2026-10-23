@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 
 
 class JointStateType(Enum): ...
@@ -18,3 +18,9 @@ class TorsoState(JointStateType):
 
 class StaticJointState(JointStateType):
     PARK = auto()
+
+
+class JointName(StrEnum):
+    """
+    The names a robot's description gives its joints.
+    """

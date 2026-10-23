@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 
+from krrood.ormatic.utils import classproperty
 from typing_extensions import Generic
 
 from semantic_digital_twin.robots.robot_part_mixins import (
@@ -10,10 +11,9 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     TGenericLeftFinger,
     TGenericRightFinger,
 )
-from semantic_digital_twin.robots.robot_parts import EndEffector
+from semantic_digital_twin.robots.robot_parts import EndEffector, ServoedRobotPart
 from semantic_digital_twin.world_description.connection_properties import (
-    JointDynamics,
-    JointServo,
+    JointDrive,
     ServoGains,
 )
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
@@ -23,6 +23,7 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 class Robotiq85Gripper(
     EndEffector,
     HasTwoFingers[TGenericLeftFinger, TGenericRightFinger],
+    ServoedRobotPart,
     Generic[TGenericLeftFinger, TGenericRightFinger],
     ABC,
 ):
@@ -47,15 +48,22 @@ class Robotiq85Gripper(
         """
         return self.thumb.root.parent_connection
 
-    def _setup_servos(self) -> None:
-        for connection in self.active_connections:
-            if not isinstance(connection, ActiveConnection1DOF):
-                continue
-            self._declare_servo(
-                connection,
-                JointServo(
-                    gains=ServoGains(stiffness=100.0, damping=10.0, torque_limit=10.0),
-                    dynamics=JointDynamics(armature=0.05),
-                ),
-            )
-        self._compensate_gravity()
+    @classproperty
+    def holds_its_own_weight(cls) -> bool:
+        return True
+
+    @property
+    def drive_of_each_joint(self) -> dict[str, JointDrive]:
+        """
+        Every finger joint of the linkage, with the same drive.
+        """
+        finger_drive = JointDrive(
+            gains=ServoGains(stiffness=100.0, damping=10.0, torque_limit=10.0),
+            armature=0.05,
+            joint_damping=0.0,
+        )
+        return {
+            connection.name.name: finger_drive
+            for connection in self.active_connections
+            if isinstance(connection, ActiveConnection1DOF)
+        }

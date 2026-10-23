@@ -5,11 +5,11 @@ from abc import ABC
 import numpy as np
 from collections import defaultdict
 from dataclasses import dataclass, field
-from enum import StrEnum
 from typing import Self, List
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
+    JointName,
     GripperState,
     StaticJointState,
 )
@@ -40,7 +40,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-class MMPDresdenJoint(StrEnum):
+class MMPDresdenJoint(JointName):
     """
     Names of the MMPDresden's commandable connections, as spelled in its URDF.
 

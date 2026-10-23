@@ -19,6 +19,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     SelfCollisionMatrixRule,
 )
 from semantic_digital_twin.datastructures.definitions import (
+    JointName,
     GripperState,
     StaticJointState,
     TorsoState,
@@ -39,7 +40,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 )
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
-    AbstractRobotPart,
+    ServoedRobotPart,
     Arm,
     Camera,
     Finger,
@@ -52,7 +53,7 @@ from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
-    JointServo,
+    JointDrive,
     ServoGains,
     VelocityServoGains,
 )
@@ -66,7 +67,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-class TiagoJoint(StrEnum):
+class TiagoJoint(JointName):
     """
     Names of the Tiago's commandable connections, as spelled in its URDF.
 
@@ -603,7 +604,7 @@ class Tiago(AbstractRobot, HasMobileBase[TiagoMobileBase]):
 # %% names in MuJoCo's own model of the robot
 
 
-class TiagoMujocoFingerJoint(StrEnum):
+class TiagoMujocoFingerJoint(JointName):
     """
     Names of the sliding finger joints of MuJoCo's own model of the Tiago, which has
     them in place of the URDF's linkage; its other joints are named as in
@@ -641,14 +642,14 @@ class TiagoMujocoBody(StrEnum):
 
 
 @dataclass(eq=False)
-class ServoedByItsMujocoModel(AbstractRobotPart, ABC):
+class ServoedByItsMujocoModel(ServoedRobotPart, ABC):
     """
     A part of the MuJoCo Tiago whose joints are driven in a physical simulation by the
-    servos of :attr:`servo_of_each_joint`.
+    drives of :attr:`drive_of_each_model_joint`.
     """
 
     @classproperty
-    def servo_of_each_joint(cls) -> dict[str, JointServo]:
+    def drive_of_each_model_joint(cls) -> dict[str, JointDrive]:
         """
         What drives every servoed joint of the MuJoCo description, by the name that
         description gives it: the stiffness and force limit of the position actuators
@@ -656,79 +657,82 @@ class ServoedByItsMujocoModel(AbstractRobotPart, ABC):
         ratio of 1 they state.
         """
         return {
-            TiagoJoint.TORSO_LIFT: JointServo(
+            TiagoJoint.TORSO_LIFT: JointDrive(
                 gains=ServoGains(stiffness=50000.0, damping=2361.08, torque_limit=500.0)
             ),
-            TiagoJoint.HEAD_1: JointServo(
+            TiagoJoint.HEAD_1: JointDrive(
                 gains=ServoGains(stiffness=20.0, damping=0.83, torque_limit=5.197)
             ),
-            TiagoJoint.HEAD_2: JointServo(
+            TiagoJoint.HEAD_2: JointDrive(
                 gains=ServoGains(stiffness=20.0, damping=0.87, torque_limit=5.197)
             ),
-            TiagoJoint.LEFT_ARM_1: JointServo(
+            TiagoJoint.LEFT_ARM_1: JointDrive(
                 gains=ServoGains(stiffness=250.0, damping=48.53, torque_limit=43.0)
             ),
-            TiagoJoint.LEFT_ARM_2: JointServo(
+            TiagoJoint.LEFT_ARM_2: JointDrive(
                 gains=ServoGains(stiffness=1500.0, damping=94.28, torque_limit=43.0)
             ),
-            TiagoJoint.LEFT_ARM_3: JointServo(
+            TiagoJoint.LEFT_ARM_3: JointDrive(
                 gains=ServoGains(stiffness=600.0, damping=4.36, torque_limit=26.0)
             ),
-            TiagoJoint.LEFT_ARM_4: JointServo(
+            TiagoJoint.LEFT_ARM_4: JointDrive(
                 gains=ServoGains(stiffness=1000.0, damping=35.38, torque_limit=26.0)
             ),
-            TiagoJoint.LEFT_ARM_5: JointServo(
+            TiagoJoint.LEFT_ARM_5: JointDrive(
                 gains=ServoGains(stiffness=80.0, damping=0.97, torque_limit=3.0)
             ),
-            TiagoJoint.LEFT_ARM_6: JointServo(
+            TiagoJoint.LEFT_ARM_6: JointDrive(
                 gains=ServoGains(stiffness=80.0, damping=2.57, torque_limit=6.6)
             ),
-            TiagoJoint.LEFT_ARM_7: JointServo(
+            TiagoJoint.LEFT_ARM_7: JointDrive(
                 gains=ServoGains(stiffness=80.0, damping=0.54, torque_limit=6.6)
             ),
-            TiagoJoint.RIGHT_ARM_1: JointServo(
+            TiagoJoint.RIGHT_ARM_1: JointDrive(
                 gains=ServoGains(stiffness=250.0, damping=45.14, torque_limit=43.0)
             ),
-            TiagoJoint.RIGHT_ARM_2: JointServo(
+            TiagoJoint.RIGHT_ARM_2: JointDrive(
                 gains=ServoGains(stiffness=1500.0, damping=87.68, torque_limit=43.0)
             ),
-            TiagoJoint.RIGHT_ARM_3: JointServo(
+            TiagoJoint.RIGHT_ARM_3: JointDrive(
                 gains=ServoGains(stiffness=600.0, damping=3.90, torque_limit=26.0)
             ),
-            TiagoJoint.RIGHT_ARM_4: JointServo(
+            TiagoJoint.RIGHT_ARM_4: JointDrive(
                 gains=ServoGains(stiffness=1000.0, damping=33.51, torque_limit=26.0)
             ),
-            TiagoJoint.RIGHT_ARM_5: JointServo(
+            TiagoJoint.RIGHT_ARM_5: JointDrive(
                 gains=ServoGains(stiffness=80.0, damping=0.66, torque_limit=3.0)
             ),
-            TiagoJoint.RIGHT_ARM_6: JointServo(
+            TiagoJoint.RIGHT_ARM_6: JointDrive(
                 gains=ServoGains(stiffness=80.0, damping=2.56, torque_limit=6.6)
             ),
-            TiagoJoint.RIGHT_ARM_7: JointServo(
+            TiagoJoint.RIGHT_ARM_7: JointDrive(
                 gains=ServoGains(stiffness=80.0, damping=0.53, torque_limit=6.6)
             ),
-            TiagoMujocoFingerJoint.LEFT_GRIPPER_LEFT_FINGER: JointServo(
+            TiagoMujocoFingerJoint.LEFT_GRIPPER_LEFT_FINGER: JointDrive(
                 gains=ServoGains(stiffness=500.0, damping=14.63, torque_limit=5.197)
             ),
-            TiagoMujocoFingerJoint.LEFT_GRIPPER_RIGHT_FINGER: JointServo(
+            TiagoMujocoFingerJoint.LEFT_GRIPPER_RIGHT_FINGER: JointDrive(
                 gains=ServoGains(stiffness=500.0, damping=14.63, torque_limit=5.197)
             ),
-            TiagoMujocoFingerJoint.RIGHT_GRIPPER_LEFT_FINGER: JointServo(
+            TiagoMujocoFingerJoint.RIGHT_GRIPPER_LEFT_FINGER: JointDrive(
                 gains=ServoGains(stiffness=500.0, damping=14.63, torque_limit=5.197)
             ),
-            TiagoMujocoFingerJoint.RIGHT_GRIPPER_RIGHT_FINGER: JointServo(
+            TiagoMujocoFingerJoint.RIGHT_GRIPPER_RIGHT_FINGER: JointDrive(
                 gains=ServoGains(stiffness=500.0, damping=14.63, torque_limit=5.197)
             ),
         }
 
-    def _setup_servos(self) -> None:
-        for connection in self.active_connections:
-            if not isinstance(connection, ActiveConnection1DOF):
-                continue
-            self._declare_servo(
-                connection, self.servo_of_each_joint[connection.name.name]
-            )
-        self._compensate_gravity()
+    @classproperty
+    def holds_its_own_weight(cls) -> bool:
+        return True
+
+    @property
+    def drive_of_each_joint(self) -> dict[str, JointDrive]:
+        return {
+            connection.name.name: self.drive_of_each_model_joint[connection.name.name]
+            for connection in self.active_connections
+            if isinstance(connection, ActiveConnection1DOF)
+        }
 
 
 @dataclass(eq=False)

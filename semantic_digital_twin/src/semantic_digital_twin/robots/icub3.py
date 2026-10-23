@@ -4,11 +4,11 @@ from abc import ABC
 
 import numpy as np
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Self, Union, List
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
+    JointName,
     GripperState,
     StaticJointState,
 )
@@ -41,7 +41,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-class ICub3Joint(StrEnum):
+class ICub3Joint(JointName):
     """
     Names of the ICub3's commandable connections, as spelled in its URDF.
 

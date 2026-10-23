@@ -14,6 +14,7 @@ import threading
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
@@ -23,9 +24,13 @@ from typing_extensions import List, Type
 from coraplex.alternative_motion_mapping import AlternativeMotion
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import ExecutionType, VisualizationBackend
-from coraplex.execution_environment import ExecutionEnvironment
+from coraplex.execution_environment import (
+    ExecutionEnvironment,
+    PhysicallySimulatedRobot,
+)
 from coraplex.visualization import VisualizationSession, WorldVisualization
 from coraplex.plans.plan_node import PlanNode
+from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -146,7 +151,8 @@ class RobotDemonstration(ABC):
     synchronized, and merges the scene into it unless the controller already holds it,
     so the scene reaches the controller before the plan needs it. A simulated run puts
     the robot into the scene instead, and publishes it to Rviz, so its progress can be
-    watched the same way a real run's can.
+    watched the same way a real run's can. A physically simulated run performs its plan
+    in the physics of :meth:`build_simulation`.
     """
 
     used_robot: Type[AbstractRobot]
@@ -189,6 +195,17 @@ class RobotDemonstration(ABC):
     one carrying an object away and back again.
     """
 
+    headless: bool = False
+    """
+    Whether the physics of a physically simulated run steps without a viewer.
+    """
+
+    settling_duration: timedelta = timedelta(seconds=1)
+    """
+    How long the physics of a physically simulated run steps before the plan starts, for
+    the scene to come to rest.
+    """
+
     default_visualization_backend: VisualizationBackend = VisualizationBackend.RVIZ
     """Renderer used unless explicitly selected through the environment."""
 
@@ -198,6 +215,12 @@ class RobotDemonstration(ABC):
     ros_session: RobotDemonstrationRosSession | None = field(init=False, default=None)
     """
     Session held for the duration of a real run, and ``None`` in simulation.
+    """
+
+    simulation: MujocoSim | None = field(init=False, default=None)
+    """
+    The physics a physically simulated run performs its plan in while it runs, and
+    ``None`` otherwise.
     """
 
     @abstractmethod
@@ -345,6 +368,41 @@ class RobotDemonstration(ABC):
             return world
         return self.fetch_real_world()
 
+    def build_simulation(self, world: World) -> MujocoSim:
+        """
+        :param world: The world the plan is performed in.
+        :return: The physics of a physically simulated run, not started yet.
+        """
+        return MujocoSim(world=world, headless=self.headless)
+
+    def start_simulation(self, world: World) -> None:
+        """
+        Start the physics of a physically simulated run, and let it step for
+        :attr:`settling_duration`. Starts nothing for any other run.
+
+        :param world: The world the plan is performed in.
+        """
+        if self.execution_type is not ExecutionType.PHYSICALLY_SIMULATED:
+            return
+        self.simulation = self.build_simulation(world)
+        self.simulation.start_stepped_simulation()
+        self.simulation.step_simulation(self.settling_duration)
+
+    def execution_environment(self) -> ExecutionEnvironment:
+        """
+        :return: The environment the plan is performed in, which is the started
+            :attr:`simulation` for a physically simulated run.
+        """
+        if self.simulation is None:
+            return ExecutionEnvironment(
+                execution_type=self.execution_type,
+                collision_avoidance=self.collision_avoidance,
+            )
+        return PhysicallySimulatedRobot(
+            simulation=self.simulation,
+            collision_avoidance=self.collision_avoidance,
+        )
+
     def run(self) -> World:
         """
         Acquire a world, and perform the plan against it.
@@ -353,6 +411,7 @@ class RobotDemonstration(ABC):
         """
         try:
             world = self.acquire_world()
+            self.start_simulation(world)
             for _ in range(self.repetitions):
                 context = self.build_context(world)
                 plan = self.build_plan(context)
@@ -363,10 +422,7 @@ class RobotDemonstration(ABC):
                     if self.event_segmentation
                     else nullcontext()
                 )
-                with ExecutionEnvironment(
-                    execution_type=self.execution_type,
-                    collision_avoidance=self.collision_avoidance,
-                ), event_segmentation:
+                with self.execution_environment(), event_segmentation:
                     plan.perform()
         finally:
             self.tear_down()
@@ -374,11 +430,14 @@ class RobotDemonstration(ABC):
 
     def tear_down(self) -> None:
         """
-        Release owned ROS resources after execution.
+        Stop the physics, and release owned ROS resources after execution.
 
         An explicitly selected browser viewer remains available for inspection until
         :meth:`stop_visualization`. A borrowed ROS session is left to its owner.
         """
+        if self.simulation is not None:
+            self.simulation.stop_simulation()
+            self.simulation = None
         if self.visualization is not None:
             self.visualization.finish_execution()
             if not self.visualization.is_rendering:

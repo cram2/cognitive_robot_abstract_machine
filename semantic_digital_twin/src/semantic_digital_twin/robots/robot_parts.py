@@ -100,6 +100,7 @@ from semantic_digital_twin.world_description.geometry import (
 )
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
+    JointDrive,
     JointServo,
 )
 from semantic_digital_twin.world_description.world_entity import (
@@ -468,6 +469,36 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
                 body.add_simulator_property(GravityCompensation(fraction=1.0))
                 continue
             compensation.fraction = 1.0
+
+
+@dataclass(eq=False)
+class ServoedRobotPart(AbstractRobotPart, ABC):
+    """
+    A robot part whose joints are each driven by a :class:`JointDrive` in a physical
+    simulation.
+    """
+
+    @property
+    @abstractmethod
+    def drive_of_each_joint(self) -> dict[str, JointDrive]:
+        """
+        What drives each joint of this part, by the joint's name.
+        """
+
+    @classproperty
+    def holds_its_own_weight(cls) -> bool:
+        """
+        Whether a physical simulation carries the weight of this part's bodies, see
+        :meth:`_compensate_gravity`.
+        """
+        return False
+
+    def _setup_servos(self) -> None:
+        for joint_name, drive in self.drive_of_each_joint.items():
+            connection = self._world.get_connection_by_name(joint_name)
+            self._declare_servo(connection, drive.servo_for(connection))
+        if self.holds_its_own_weight:
+            self._compensate_gravity()
 
 
 @dataclass(eq=False)

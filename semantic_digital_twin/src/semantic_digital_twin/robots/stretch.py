@@ -17,6 +17,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     SelfCollisionMatrixRule,
 )
 from semantic_digital_twin.datastructures.definitions import (
+    JointName,
     GripperState,
     StaticJointState,
     TorsoState,
@@ -62,7 +63,7 @@ class StretchTopic(StrEnum):
     """
 
 
-class StretchJoint(StrEnum):
+class StretchJoint(JointName):
     """
     Names of the Stretch's commandable connections, as spelled in its URDF.
 

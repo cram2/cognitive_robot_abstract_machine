@@ -22,12 +22,14 @@ from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.factories import code
 from coraplex.plans.plan_node import PlanNode
 from coraplex.demonstrations import RobotDemonstration, RobotDemonstrationRosSession
+from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world import World
 
 from ..conftest import SAMPLING_SEED
+from ..pytest_environment import runs_in_continuous_integration
 
 
 class PlanDeliberatelyFailed(Exception):
@@ -117,6 +119,16 @@ class RecordingDemonstration(RobotDemonstration):
     Whether the events of the run were being segmented while the plan ran.
     """
 
+    observed_simulation: MujocoSim | None = field(default=None)
+    """
+    The physical simulation the plan was performed in, ``None`` for none.
+    """
+
+    simulation_running_during_the_plan: bool | None = field(default=None)
+    """
+    Whether :attr:`observed_simulation` was running while the plan ran.
+    """
+
     def scene_specification(self) -> WorldSpecification:
         return WorldSpecification()
 
@@ -162,6 +174,11 @@ class RecordingDemonstration(RobotDemonstration):
         self.observed_execution_type = GiskardExecutable.execution_type
         self.observed_collision_avoidance = GiskardExecutable.collision_avoidance
         self.observed_segmenting_events = self.segmenting_events
+        self.observed_simulation = GiskardExecutable.simulation
+        self.simulation_running_during_the_plan = (
+            GiskardExecutable.simulation is not None
+            and GiskardExecutable.simulation.is_running()
+        )
 
     def tear_down(self) -> None:
         self.tear_down_calls += 1
@@ -290,6 +307,48 @@ def test_run_returns_the_world_it_acted_on(cylinder_bot_world):
     )
 
     assert demonstration.run() is cylinder_bot_world
+
+
+# %% physical simulation
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_physically_simulated_run_performs_its_plan_in_running_physics(
+    cylinder_bot_world,
+):
+    demonstration = RecordingDemonstration(
+        world=cylinder_bot_world,
+        used_robot=MinimalRobot,
+        execution_type=ExecutionType.PHYSICALLY_SIMULATED,
+        headless=True,
+    )
+
+    demonstration.run()
+
+    assert demonstration.observed_execution_type is (ExecutionType.PHYSICALLY_SIMULATED)
+    assert demonstration.observed_simulation.world is cylinder_bot_world
+    assert demonstration.simulation_running_during_the_plan is True
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_physics_of_a_run_stops_when_its_plan_fails(cylinder_bot_world):
+    demonstration = RecordingDemonstration(
+        world=cylinder_bot_world,
+        used_robot=MinimalRobot,
+        execution_type=ExecutionType.PHYSICALLY_SIMULATED,
+        headless=True,
+        fail_the_plan=True,
+    )
+
+    with pytest.raises(PlanDeliberatelyFailed):
+        demonstration.run()
+
+    assert demonstration.simulation is None
+    assert GiskardExecutable.simulation is None
 
 
 # %% event segmentation

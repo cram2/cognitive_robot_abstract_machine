@@ -93,13 +93,16 @@ def test_every_arm_and_gripper_degree_of_freedom_is_driven_by_one_servo(
     """
     world = mounted_tracy._world
     shoulder = world.get_connection_by_name(TracyJoint.LEFT_SHOULDER_PAN)
-    expected_shoulder = mounted_tracy.left_arm.servos_by_joint["shoulder_pan_joint"]
+    shoulder_drive = mounted_tracy.left_arm.drive_of_each_joint[
+        TracyJoint.LEFT_SHOULDER_PAN
+    ]
     [shoulder_servo] = [
         actuator for actuator in world.actuators if shoulder.raw_dof in actuator.dofs
     ]
     assert isinstance(shoulder_servo, PositionServo)
-    assert shoulder_servo.gains == expected_shoulder.gains
-    assert shoulder.dynamics == expected_shoulder.dynamics
+    assert shoulder_servo.gains == shoulder_drive.gains
+    assert shoulder.dynamics.armature == shoulder_drive.armature
+    assert shoulder.dynamics.damping == shoulder_drive.joint_damping
 
     servoed_degrees_of_freedom = {
         connection.raw_dof
