@@ -213,33 +213,33 @@ def test_a_carton_is_grasped_up_to_half_its_narrower_side_deep(carton):
 
 def test_a_grasp_from_any_side_lies_within_the_bounds_asked(carton):
     strategy = GraspFromAnySide(
-        lowest_height=0.3,
-        highest_height=0.7,
-        shallowest_depth=0.1,
-        deepest_depth=0.4,
-        largest_pitch=0.3,
-        largest_roll=0.2,
+        minimal_height=0.3,
+        maximal_height=0.7,
+        minimal_depth=0.1,
+        maximal_depth=0.4,
+        maximal_pitch=0.3,
+        maximal_roll=0.2,
     )
     allowed = allowed_intervals(statement_by(strategy, carton))
     narrower_extent = min(CARTON_EXTENTS[:2])
 
     assert allowed["height"].simple_sets[0].lower == pytest.approx(
-        strategy.lowest_height
+        strategy.minimal_height
     )
     assert allowed["height"].simple_sets[-1].upper == pytest.approx(
-        strategy.highest_height
+        strategy.maximal_height
     )
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
-        strategy.shallowest_depth * narrower_extent
+        strategy.minimal_depth * narrower_extent
     )
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
-        strategy.deepest_depth * narrower_extent
+        strategy.maximal_depth * narrower_extent
     )
     assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(
-        strategy.largest_pitch
+        strategy.maximal_pitch
     )
-    assert allowed["roll"].simple_sets[0].lower == pytest.approx(-strategy.largest_roll)
-    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(strategy.largest_roll)
+    assert allowed["roll"].simple_sets[0].lower == pytest.approx(-strategy.maximal_roll)
+    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(strategy.maximal_roll)
 
 
 # %% asking a learned model for lifting grasps

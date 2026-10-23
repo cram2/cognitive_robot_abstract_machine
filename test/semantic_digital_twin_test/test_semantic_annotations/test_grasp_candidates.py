@@ -243,7 +243,7 @@ class MilkGraspedLow(Milk):
 
     @classproperty
     def grasp_strategy(cls) -> GraspStrategy:
-        return GraspFromAnySide(highest_height=0.5)
+        return GraspFromAnySide(maximal_height=0.5)
 
 
 def test_an_annotation_can_state_where_it_may_be_grasped(milk):
@@ -339,56 +339,56 @@ def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
 
 
 def test_a_wall_is_pinched_as_deep_as_asked(bowl):
-    strategy = PinchARim(shallowest_depth=0.1, deepest_depth=0.9)
+    strategy = PinchARim(minimal_depth=0.1, maximal_depth=0.9)
     allowed = allowed_intervals(statement_by(strategy, bowl.rim))
     wall_thickness = strategy.depth_unit(bowl.rim, bowl.rim.grasp_surface())
 
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
-        strategy.shallowest_depth * wall_thickness
+        strategy.minimal_depth * wall_thickness
     )
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
-        strategy.deepest_depth * wall_thickness
+        strategy.maximal_depth * wall_thickness
     )
 
 
 def test_a_wall_is_pinched_as_tilted_and_turned_as_asked(bowl):
-    largest_pitch, largest_roll = 0.3, 0.2
+    maximal_pitch, maximal_roll = 0.3, 0.2
     allowed = allowed_intervals(
         statement_by(
-            PinchARim(largest_pitch=largest_pitch, largest_roll=largest_roll),
+            PinchARim(maximal_pitch=maximal_pitch, maximal_roll=maximal_roll),
             bowl.rim,
         )
     )
 
-    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(largest_pitch)
-    assert allowed["roll"].simple_sets[0].lower == pytest.approx(-largest_roll)
-    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(largest_roll)
+    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(maximal_pitch)
+    assert allowed["roll"].simple_sets[0].lower == pytest.approx(-maximal_roll)
+    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(maximal_roll)
 
 
 def test_a_rim_is_pinched_between_the_heights_asked(bowl):
-    lowest_height, highest_height = 0.1, 0.9
+    minimal_height, maximal_height = 0.1, 0.9
     allowed = allowed_intervals(
         statement_by(
-            PinchARim(lowest_height=lowest_height, highest_height=highest_height),
+            PinchARim(minimal_height=minimal_height, maximal_height=maximal_height),
             bowl.rim,
         )
     )
 
-    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
-    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
+    assert allowed["height"].simple_sets[0].lower == pytest.approx(minimal_height)
+    assert allowed["height"].simple_sets[-1].upper == pytest.approx(maximal_height)
 
 
 def test_a_container_without_a_rim_is_pinched_as_far_into_its_rim_depth_as_asked(
     bowl,
 ):
     bowl.rim = None
-    rim_depth, shallowest_rim_fraction, deepest_rim_fraction = 0.02, 0.1, 0.9
+    rim_depth, minimal_rim_fraction, maximal_rim_fraction = 0.02, 0.1, 0.9
     allowed = allowed_intervals(
         statement_by(
             PinchTheTopOfAWall(
                 rim_depth=rim_depth,
-                shallowest_rim_fraction=shallowest_rim_fraction,
-                deepest_rim_fraction=deepest_rim_fraction,
+                minimal_rim_fraction=minimal_rim_fraction,
+                maximal_rim_fraction=maximal_rim_fraction,
             ),
             bowl,
         )
@@ -397,10 +397,10 @@ def test_a_container_without_a_rim_is_pinched_as_far_into_its_rim_depth_as_asked
     rim_fraction = rim_depth / float(highest[2] - lowest[2])
 
     assert allowed["height"].simple_sets[0].lower == pytest.approx(
-        1 - deepest_rim_fraction * rim_fraction
+        1 - maximal_rim_fraction * rim_fraction
     )
     assert allowed["height"].simple_sets[-1].upper == pytest.approx(
-        1 - shallowest_rim_fraction * rim_fraction
+        1 - minimal_rim_fraction * rim_fraction
     )
 
 
@@ -475,19 +475,19 @@ def test_drawn_cutlery_grasps_come_from_above_across_its_length(length_axis):
 
 def test_cutlery_is_grasped_within_the_bounds_asked():
     spoon = _spoon_lying_along(0)
-    lowest_height, highest_height = 0.3, 0.7
-    shallowest_depth, deepest_depth = 0.1, 0.4
-    yaw_tolerance, largest_pitch, largest_roll = 0.05, 0.3, 0.2
+    minimal_height, maximal_height = 0.3, 0.7
+    minimal_depth, maximal_depth = 0.1, 0.4
+    yaw_tolerance, maximal_pitch, maximal_roll = 0.05, 0.3, 0.2
     allowed = allowed_intervals(
         statement_by(
             GraspAcrossTheLength(
-                lowest_height=lowest_height,
-                highest_height=highest_height,
-                shallowest_depth=shallowest_depth,
-                deepest_depth=deepest_depth,
+                minimal_height=minimal_height,
+                maximal_height=maximal_height,
+                minimal_depth=minimal_depth,
+                maximal_depth=maximal_depth,
                 yaw_tolerance=yaw_tolerance,
-                largest_pitch=largest_pitch,
-                largest_roll=largest_roll,
+                maximal_pitch=maximal_pitch,
+                maximal_roll=maximal_roll,
             ),
             spoon,
         )
@@ -496,23 +496,23 @@ def test_cutlery_is_grasped_within_the_bounds_asked():
     length = float(highest[0] - lowest[0])
     first_end = allowed["yaw"].simple_sets[0]
 
-    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
-    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
+    assert allowed["height"].simple_sets[0].lower == pytest.approx(minimal_height)
+    assert allowed["height"].simple_sets[-1].upper == pytest.approx(maximal_height)
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
-        shallowest_depth * length
+        minimal_depth * length
     )
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
-        deepest_depth * length
+        maximal_depth * length
     )
     assert first_end.upper - first_end.lower == pytest.approx(
         2 * yaw_tolerance, rel=1e-5
     )
-    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(largest_pitch)
+    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(maximal_pitch)
     assert allowed["roll"].simple_sets[0].lower == pytest.approx(
-        np.pi / 2 - largest_roll
+        np.pi / 2 - maximal_roll
     )
     assert allowed["roll"].simple_sets[-1].upper == pytest.approx(
-        np.pi / 2 + largest_roll
+        np.pi / 2 + maximal_roll
     )
 
 
@@ -599,28 +599,28 @@ def test_an_object_without_its_handle_is_grasped_as_it_offers_otherwise():
 
 def test_a_handle_is_grasped_between_the_heights_and_depths_asked():
     handle = _mug(with_handle=True).handle
-    lowest_height, highest_height = 0.3, 0.7
-    shallowest_depth, deepest_depth = 0.1, 0.4
+    minimal_height, maximal_height = 0.3, 0.7
+    minimal_depth, maximal_depth = 0.1, 0.4
     allowed = allowed_intervals(
         statement_by(
             GraspABar(
-                lowest_height=lowest_height,
-                highest_height=highest_height,
-                shallowest_depth=shallowest_depth,
-                deepest_depth=deepest_depth,
+                minimal_height=minimal_height,
+                maximal_height=maximal_height,
+                minimal_depth=minimal_depth,
+                maximal_depth=maximal_depth,
             ),
             handle,
         )
     )
     thinnest_extent = float(min(handle.grasp_surface().extents))
 
-    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
-    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
+    assert allowed["height"].simple_sets[0].lower == pytest.approx(minimal_height)
+    assert allowed["height"].simple_sets[-1].upper == pytest.approx(maximal_height)
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
-        shallowest_depth * thinnest_extent
+        minimal_depth * thinnest_extent
     )
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
-        deepest_depth * thinnest_extent
+        maximal_depth * thinnest_extent
     )
 
 

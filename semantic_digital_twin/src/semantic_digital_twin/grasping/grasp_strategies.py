@@ -33,22 +33,22 @@ class GraspStrategy(ABC):
     :class:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp`.
     """
 
-    shallowest_depth: float = 0.0
+    minimal_depth: float = 0.0
     """
     The least depth to close the fingers at, as a fraction of :meth:`depth_unit`.
     """
 
-    deepest_depth: float = 0.5
+    maximal_depth: float = 0.5
     """
     The depth to close the fingers short of, as a fraction of :meth:`depth_unit`.
     """
 
-    largest_pitch: float = 1.2
+    maximal_pitch: float = 1.2
     """
     How far the approach may tilt off vertical, in radians.
     """
 
-    largest_roll: float = math.pi / 4
+    maximal_roll: float = math.pi / 4
     """
     How far the fingers may turn off :attr:`central_roll`, either way, in radians.
     """
@@ -75,13 +75,13 @@ class GraspStrategy(ABC):
         return [
             grasp.height >= heights.lower,
             grasp.height < heights.upper,
-            grasp.depth >= self.shallowest_depth * depth_unit,
-            grasp.depth < self.deepest_depth * depth_unit,
+            grasp.depth >= self.minimal_depth * depth_unit,
+            grasp.depth < self.maximal_depth * depth_unit,
             *self.yaw_conditions(grasp, surface),
             grasp.pitch >= 0.0,
-            grasp.pitch < self.largest_pitch,
-            grasp.roll >= self.central_roll - self.largest_roll,
-            grasp.roll < self.central_roll + self.largest_roll,
+            grasp.pitch < self.maximal_pitch,
+            grasp.roll >= self.central_roll - self.maximal_roll,
+            grasp.roll < self.central_roll + self.maximal_roll,
         ]
 
     @abstractmethod
@@ -121,20 +121,20 @@ class GraspBetweenHeights(GraspStrategy, ABC):
     A strategy that grasps an object between two fixed heights.
     """
 
-    lowest_height: float = 0.05
+    minimal_height: float = 0.05
     """
-    The lowest height to grasp at, as a fraction of the grasp surface's bounding box
+    The minimal height to grasp at, as a fraction of the grasp surface's bounding box
     from its bottom to its top.
     """
 
-    highest_height: float = 0.95
+    maximal_height: float = 0.95
     """
     The height to grasp below, as such a fraction.
     """
 
     def grasped_heights(self, surface: trimesh.Trimesh) -> SimpleInterval:
         return SimpleInterval.from_data(
-            self.lowest_height, self.highest_height, Bound.CLOSED, Bound.OPEN
+            self.minimal_height, self.maximal_height, Bound.CLOSED, Bound.OPEN
         )
 
 
@@ -164,9 +164,9 @@ class GraspABar(GraspFromAnySide):
     half its thickness deep.
     """
 
-    lowest_height: float = 0.1
+    minimal_height: float = 0.1
 
-    highest_height: float = 0.9
+    maximal_height: float = 0.9
 
     def depth_unit(
         self, graspable: HasGraspCandidates, surface: trimesh.Trimesh
@@ -184,17 +184,17 @@ class GraspAcrossTheLength(GraspBetweenHeights):
     length from either end and closing across it.
     """
 
-    lowest_height: float = 0.2
+    minimal_height: float = 0.2
 
-    highest_height: float = 0.8
+    maximal_height: float = 0.8
 
-    shallowest_depth: float = 0.2
+    minimal_depth: float = 0.2
 
-    deepest_depth: float = 0.6
+    maximal_depth: float = 0.6
 
-    largest_pitch: float = 0.6
+    maximal_pitch: float = 0.6
 
-    largest_roll: float = math.pi / 8
+    maximal_roll: float = math.pi / 8
 
     yaw_tolerance: float = math.pi / 16
     """
@@ -246,13 +246,13 @@ class PinchAWall(GraspStrategy, ABC):
     closing across the wall.
     """
 
-    shallowest_depth: float = 0.25
+    minimal_depth: float = 0.25
 
-    deepest_depth: float = 0.75
+    maximal_depth: float = 0.75
 
-    largest_pitch: float = 0.5
+    maximal_pitch: float = 0.5
 
-    largest_roll: float = math.pi / 8
+    maximal_roll: float = math.pi / 8
 
     number_of_directions: int = 12
     """
@@ -303,9 +303,9 @@ class PinchARim(PinchAWall, GraspBetweenHeights):
     rim itself.
     """
 
-    lowest_height: float = 0.25
+    minimal_height: float = 0.25
 
-    highest_height: float = 0.75
+    maximal_height: float = 0.75
 
 
 @dataclass
@@ -320,13 +320,13 @@ class PinchTheTopOfAWall(PinchAWall):
     How far below the container's highest point its rim reaches, in meters.
     """
 
-    shallowest_rim_fraction: float = 0.25
+    minimal_rim_fraction: float = 0.25
     """
     How far below the highest point to pinch at least, as a fraction of
     :attr:`rim_depth`.
     """
 
-    deepest_rim_fraction: float = 0.75
+    maximal_rim_fraction: float = 0.75
     """
     How far below the highest point to pinch at most, as such a fraction.
     """
@@ -337,8 +337,8 @@ class PinchTheTopOfAWall(PinchAWall):
         """
         rim_fraction = self.rim_depth / float(surface.extents[2])
         return SimpleInterval.from_data(
-            1 - self.deepest_rim_fraction * rim_fraction,
-            1 - self.shallowest_rim_fraction * rim_fraction,
+            1 - self.maximal_rim_fraction * rim_fraction,
+            1 - self.minimal_rim_fraction * rim_fraction,
             Bound.CLOSED,
             Bound.OPEN,
         )
