@@ -114,6 +114,8 @@ if TYPE_CHECKING:
         Sink,
         ShelfLayer,
         Wall,
+        CounterTop,
+        Cabinet,
     )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
@@ -1616,3 +1618,44 @@ class HasCaseAsRootBody(HasSupportingSurface):
             cls._create_container_event(scale, wall_thickness),
             connection_specification=connection_specification,
         )
+
+
+# %% furniture built from other furniture
+
+
+@dataclass(eq=False)
+class HasCabinets(PartWholeRelationship):
+    """
+    A mixin class for semantic annotations built from cabinets.
+    """
+
+    cabinets: list[Cabinet] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The cabinets the semantic annotation is built from.
+    """
+
+
+@dataclass(eq=False)
+class HasCounterTop(PartWholeRelationship):
+    """
+    A mixin class for semantic annotations that carry a counter top.
+
+    Distinct from :class:`HasSupportingSurface`, which is the bare region something can
+    be put on: this is the worktop as a thing in its own right, which is what a scan
+    sees and what in turn carries the sink.
+    """
+
+    counter_top: CounterTop = field(
+        default=None,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The counter top of the semantic annotation.
+    """

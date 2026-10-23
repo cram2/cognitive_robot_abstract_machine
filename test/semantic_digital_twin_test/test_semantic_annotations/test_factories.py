@@ -100,7 +100,7 @@ class TestFactories(unittest.TestCase):
             returned_handle = Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.1, 0.2, 0.03), thickness=0.03
+                    scale=Scale(0.1, 0.03, 0.2), thickness=0.03
                 ),
             ).spawn(world)
         semantic_handle_annotations = world.get_semantic_annotations_by_type(Handle)

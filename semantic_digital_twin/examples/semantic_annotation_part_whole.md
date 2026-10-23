@@ -46,6 +46,8 @@ together with `add`. The rails are no part of their own: they are the prismatic 
 drawer hangs from, which `drawer.movable_joint` returns.
 
 ```{code-cell} ipython3
+import numpy as np
+
 from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
@@ -153,9 +155,11 @@ with world.modify_world():
     )
     panel_handle = Handle.create_with_new_body_in_world(
         name="panel_handle",
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.1, z=0.5),
+        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.1, z=0.5, roll=np.pi / 2
+        ),
         world=world,
-        scale=Scale(0.05, 0.1, 0.02),
+        scale=Scale(0.05, 0.02, 0.1),
     )
     panel_button = EmergencyButton.create_with_new_body_in_world(
         name="panel_button",

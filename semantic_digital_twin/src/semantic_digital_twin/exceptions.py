@@ -955,6 +955,30 @@ class InvalidPlaneDimensions(UsageError):
 
 
 @dataclass
+class HandleWiderThanLong(UsageError):
+    """
+    Raised when a handle scale is wider (y) than it is long (z).
+    """
+
+    scale: Scale
+    """
+    The scale the handle geometry was requested with.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The handle scale {self.scale} is wider (y={self.scale.y}) than it is "
+            f"long (z={self.scale.z})."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "pass the length of the handle as z and its width as y, and roll the "
+            "handle pose to lay the bar along the front it is mounted on."
+        )
+
+
+@dataclass
 class UselessConceptError(UsageError):
     """
     Used to indicate that the operation the user is trying to perform is not useful in
