@@ -3,7 +3,7 @@ from py_trees.common import Status
 from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
-from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
+from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CAS
 from robokudo.pipeline import Pipeline
 from robokudo.world_descriptor import PredefinedObject

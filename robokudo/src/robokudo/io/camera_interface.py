@@ -41,7 +41,7 @@ from sensor_msgs.msg import CompressedImage, CameraInfo, Image
 from tf2_ros import Buffer
 from typing_extensions import Optional, List, Any, TYPE_CHECKING, Union
 
-from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
+from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import CameraDataMissing

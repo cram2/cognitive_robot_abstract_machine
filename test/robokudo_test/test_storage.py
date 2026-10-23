@@ -9,7 +9,7 @@ import pymongo
 import numpy as np
 
 import robokudo.cas
-from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
+from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,

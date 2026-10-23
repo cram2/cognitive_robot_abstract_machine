@@ -11,7 +11,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
-from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
+from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CAS
 from robokudo.exceptions import UnknownWorldFrameError
 

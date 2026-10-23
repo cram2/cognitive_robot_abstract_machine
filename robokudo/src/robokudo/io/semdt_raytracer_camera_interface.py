@@ -14,7 +14,7 @@ from PIL import Image as PILImage, UnidentifiedImageError
 from pyglet.canvas.xlib import NoSuchDisplayException
 from sensor_msgs.msg import CameraInfo
 
-from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
+from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CASViews, CAS
 from robokudo.io.camera_interface import CameraInterface, ROSCameraInterface
 from robokudo.utils.camera_model import (

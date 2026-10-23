@@ -31,7 +31,7 @@ from robokudo.exceptions import (
 )
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.io.storage import Storage
-from robokudo.camera_placement import CameraPlacement, MeasuredCameraPose
+from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
