@@ -7,6 +7,7 @@ import pytest
 from scipy.spatial.transform import Rotation
 from urdf_parser_py import urdf as urdfpy
 
+from semantic_digital_twin.adapters.package_resolver import SearchPathFileResolver
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -19,6 +20,7 @@ from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
 )
+from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -96,6 +98,66 @@ def test_visual_geometry_is_left_out_where_the_link_already_collides():
     assert [shape.scale for shape in base_with_backup.collision.shapes] == [
         shape.scale for shape in base_as_written.collision.shapes
     ]
+
+
+# %% material colors
+
+MATERIAL_COLORED_LINKS_URDF = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "dataset",
+    "material_colored_links.urdf",
+)
+"""
+Description whose bare mesh links take their color from a material the description
+names, from a material of their own, and from no material, beside a mesh whose file
+paints itself and a box with a material of its own; its mesh files are named relative
+to the package's resources.
+"""
+
+
+@pytest.fixture
+def material_colored_world():
+    """
+    :return: The world of :data:`MATERIAL_COLORED_LINKS_URDF`.
+    """
+    resources = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "..",
+        "..",
+        "semantic_digital_twin",
+        "resources",
+    )
+    return URDFParser.from_file(
+        MATERIAL_COLORED_LINKS_URDF,
+        path_resolver=SearchPathFileResolver(root_directories=[resources]),
+    ).parse()
+
+
+def test_a_mesh_takes_the_color_of_the_material_it_names(material_colored_world):
+    [shape] = _body_named(material_colored_world, "named_mesh_link").visual.shapes
+    assert shape.color == Color(0.85, 0.51, 0.16, 1)
+
+
+def test_a_mesh_takes_the_color_of_its_own_material(material_colored_world):
+    [shape] = _body_named(material_colored_world, "inline_mesh_link").visual.shapes
+    assert shape.color == Color(0.8, 0, 0, 1)
+
+
+def test_a_mesh_without_a_material_keeps_the_default_color(material_colored_world):
+    [shape] = _body_named(material_colored_world, "uncolored_mesh_link").visual.shapes
+    assert shape.color == Color()
+
+
+def test_a_mesh_that_paints_itself_keeps_its_own_look(material_colored_world):
+    [shape] = _body_named(material_colored_world, "painted_mesh_link").visual.shapes
+    assert shape.is_textured
+    assert shape.color == Color()
+
+
+def test_a_primitive_takes_the_color_of_its_own_material(material_colored_world):
+    [shape] = _body_named(material_colored_world, "inline_box_link").visual.shapes
+    assert shape.color == Color(0, 0.6, 0, 1)
 
 
 @pytest.fixture

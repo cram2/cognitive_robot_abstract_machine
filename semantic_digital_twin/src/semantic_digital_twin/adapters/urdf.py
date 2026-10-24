@@ -427,68 +427,72 @@ class URDFParser(WorldModelParser):
         :return: A List of shapes corresponding to the URDF geometry.
         """
         res = []
-        material_dict = dict(
-            zip(
-                [material.name for material in self.parsed.materials],
-                [
-                    material.color.rgba if material.color else None
-                    for material in self.parsed.materials
-                ],
-            )
-        )
         for i, geom in enumerate(geometry):
             params = (*(geom.origin.xyz + geom.origin.rpy),) if geom.origin else ()
             origin_transform = HomogeneousTransformationMatrix.from_xyz_rpy(
                 *params, reference_frame=body
             )
             if isinstance(geom.geometry, urdfpy.Box):
-                color = (
-                    Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
-                    if hasattr(geom, "material") and geom.material
-                    else Color(1, 1, 1, 1)
-                )
                 res.append(
                     Box(
                         origin=origin_transform,
                         scale=Scale(*geom.geometry.size),
-                        color=color,
+                        color=self.color_of(geom),
                     )
                 )
             elif isinstance(geom.geometry, urdfpy.Sphere):
-                color = (
-                    Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
-                    if hasattr(geom, "material") and geom.material
-                    else Color(1, 1, 1, 1)
-                )
                 res.append(
                     Sphere(
                         origin=origin_transform,
                         radius=geom.geometry.radius,
-                        color=color,
+                        color=self.color_of(geom),
                     )
                 )
             elif isinstance(geom.geometry, urdfpy.Cylinder):
-                color = (
-                    Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
-                    if hasattr(geom, "material") and geom.material
-                    else Color(1, 1, 1, 1)
-                )
                 res.append(
                     Cylinder(
                         origin=origin_transform,
                         width=geom.geometry.radius * 2,
                         height=geom.geometry.length,
-                        color=color,
+                        color=self.color_of(geom),
                     )
                 )
             elif isinstance(geom.geometry, urdfpy.Mesh):
                 if geom.geometry.filename is None:
                     raise ValueError("Mesh geometry must have a filename.")
-                res.append(
-                    Mesh(
-                        origin=origin_transform,
-                        filename=self.path_resolver.resolve(geom.geometry.filename),
-                        scale=Scale(*(geom.geometry.scale or (1, 1, 1))),
-                    )
+                mesh = Mesh(
+                    origin=origin_transform,
+                    filename=self.path_resolver.resolve(geom.geometry.filename),
+                    scale=Scale(*(geom.geometry.scale or (1, 1, 1))),
                 )
+                color = self.color_of(geom)
+                # A mesh file that paints itself keeps its own look, as a viewer of the
+                # description shows it; only a bare mesh takes the material's color.
+                # The file is read for that only when there is a color to give.
+                if color != Color() and not mesh.is_textured:
+                    mesh.color = color
+                res.append(mesh)
         return ShapeCollection(res, reference_frame=body)
+
+    def color_of(self, geometry_element: urdfpy.Visual | urdfpy.Collision) -> Color:
+        """
+        :param geometry_element: A visual or collision element of the description.
+        :return: The color the element's material gives it: the material's own color,
+            else the color of the description's material of that name; the default
+            color for a collision element and an element without a material.
+        """
+        if not isinstance(geometry_element, urdfpy.Visual):
+            return Color()
+        material = geometry_element.material
+        if material is None:
+            return Color()
+        if material.color is not None:
+            return Color(*material.color.rgba)
+        named_colors = {
+            named.name: named.color
+            for named in self.parsed.materials
+            if named.color is not None
+        }
+        if material.name not in named_colors:
+            return Color()
+        return Color(*named_colors[material.name].rgba)
