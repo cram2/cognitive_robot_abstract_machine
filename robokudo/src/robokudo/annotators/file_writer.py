@@ -1,4 +1,5 @@
-"""Sensor data storage to filesystem.
+"""
+Sensor data storage to filesystem.
 
 This module provides an annotator for:
 
@@ -20,6 +21,7 @@ The module uses:
 
 from __future__ import annotations
 
+# %% Imports
 import json
 from pathlib import Path
 from timeit import default_timer
@@ -27,13 +29,14 @@ from timeit import default_timer
 import cv2
 from py_trees.common import Status
 
+from krrood.adapters.json_serializer import to_json
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.utils.type_conversion import ros_camera_info_to_dict
 
 
 class FileWriter(BaseAnnotator):
-    """Sensor data storage to filesystem.
+    """
+    Sensor data storage to filesystem.
 
     This module provides methods to store sensor data into the local filesystem.
     This way you can work on recorded data without having to use bag files.
@@ -44,10 +47,13 @@ class FileWriter(BaseAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for file writer."""
+        """
+        Configuration descriptor for file writer.
+        """
 
         class Parameters:
-            """Parameters for configuring file storage.
+            """
+            Parameters for configuring file storage.
 
             .. note::
                filename_prefix should match FileReader configuration.
@@ -55,10 +61,14 @@ class FileWriter(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.target_dir: str = "/tmp/"
-                """Directory to store files in"""
+                """
+                Directory to store files in
+                """
 
                 self.filename_prefix: str = "rk_"
-                """Prefix for generated filenames, make sure that this matches the FileReader filename_prefix"""
+                """
+                Prefix for generated filenames, make sure that this matches the FileReader filename_prefix
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -68,7 +78,8 @@ class FileWriter(BaseAnnotator):
         name: str = "FileWriter",
         descriptor: FileWriter.Descriptor | None = None,
     ) -> None:
-        """Initialize the file writer.
+        """
+        Initialize the file writer.
 
         :param name: Name of this annotator instance
         :param descriptor: Configuration descriptor
@@ -89,17 +100,18 @@ class FileWriter(BaseAnnotator):
                 f"{self.descriptor.parameters.target_dir} is not existing or not a directory"
             )
 
-    def generate_full_file_path_(self, cas_view: str, file_extension: str) -> str:
-        """Generate the full filename and path where data should be stored.
+    def generate_full_file_path_(self, data_type: CASViews, file_extension: str) -> str:
+        """
+        Generate the full filename and path where data should be stored.
 
         Creates a filepath using:
 
         * Configured prefix
         * Current timestamp
-        * CAS view name
+        * Recorded data type
         * File extension
 
-        :param cas_view: One of the definitions from CASView.X
+        :param data_type: Kind of recorded frame data.
         :param file_extension: File extension without dot (e.g. "jpg")
         :return: A string with the full path according to our naming scheme.
         """
@@ -107,58 +119,68 @@ class FileWriter(BaseAnnotator):
         timestamp = self.get_cas().timestamp
         return str(
             self.target_dir_path.joinpath(
-                f"{fn_prefix}{str(timestamp)}_{cas_view}.{file_extension}"
+                f"{fn_prefix}{str(timestamp)}_{data_type}.{file_extension}"
             )
         )
 
     def update(self) -> Status:
-        """Process and store sensor data.
+        """
+        Process and store sensor data.
 
         The method:
 
         * Checks initialization status
-        * Loads color image, depth image and camera info
+        * Loads color and depth images plus the camera observation
         * Writes color image as JPG
         * Writes depth image as PNG
-        * Saves camera info as JSON
+        * Saves camera-observation metadata as JSON
 
         :return: SUCCESS after storing, FAILURE if not initialized
         """
         start_timer = default_timer()
 
         if not self.initialized:
-            print(
-                f"FileWriter has not been properly instantiated. Check error log for __init__ errors."
+            self.rk_logger(
+                "FileWriter has not been properly instantiated. Check error log for __init__ errors."
             )
             return Status.FAILURE
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        camera_info = self.get_cas().get(CASViews.CAMERA_INFO)
+        observation = self.get_cas().require_camera_observation()
 
         cv2.imwrite(
             self.generate_full_file_path_(
-                cas_view=CASViews.COLOR_IMAGE, file_extension="jpg"
+                data_type=CASViews.COLOR_IMAGE, file_extension="jpg"
             ),
             color,
         )
         cv2.imwrite(
             self.generate_full_file_path_(
-                cas_view=CASViews.DEPTH_IMAGE, file_extension="png"
+                data_type=CASViews.DEPTH_IMAGE, file_extension="png"
             ),
             depth,
         )
 
-        camera_info_dict = ros_camera_info_to_dict(camera_info)
         with open(
             str(
                 self.generate_full_file_path_(
-                    cas_view=CASViews.CAMERA_INFO, file_extension="json"
+                    data_type=CASViews.CAMERA_OBSERVATION,
+                    file_extension="json",
                 )
             ),
             "w",
         ) as fp:
-            json.dump(camera_info_dict, fp)
+            json.dump(
+                {
+                    "camera_frame": observation.camera.root.name.name,
+                    "effective_camera_model": to_json(
+                        observation.effective_camera_model
+                    ),
+                    "timestamp_nanoseconds": observation.timestamp_nanoseconds,
+                },
+                fp,
+            )
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

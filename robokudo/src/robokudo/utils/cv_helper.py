@@ -14,9 +14,10 @@ It supports:
 
 from __future__ import annotations
 
+# %% Imports
 import cv2
 import numpy as np
-from typing_extensions import TYPE_CHECKING, Tuple
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing
@@ -71,7 +72,7 @@ def get_scaled_color_image_for_depth_image(
     If the color-to-depth ratio is not 1,1, we will usually scale the color image to the
     same size the depth image has. This method will get check if a conversion is
     required and will return the correct size. This is usually called before
-    o3d.geometry.RGBDImage.create_from_color_and_depth is called, so that depth and
+    open3d.geometry.RGBDImage.create_from_color_and_depth is called, so that depth and
     color image match.
 
     :param cas: The CAS holding the color-to-depth ratio.
@@ -80,7 +81,7 @@ def get_scaled_color_image_for_depth_image(
         unchanged color_image is returned.
     :raises ColorToDepthRatioMissing: If color-to-depth ratio not set in CAS
     """
-    color_to_depth_ratio = cas.get(CASViews.COLOR_TO_DEPTH_RATIO)
+    color_to_depth_ratio = cas.color_to_depth_ratio
 
     if color_to_depth_ratio is None:
         raise ColorToDepthRatioMissing(
@@ -98,7 +99,7 @@ def get_scaled_color_image_for_depth_image(
     )
 
 
-def get_hsv_for_rgb_color(rgb: Tuple[int, int, int]) -> npt.NDArray:
+def get_hsv_for_rgb_color(rgb: tuple[int, int, int]) -> npt.NDArray:
     """
     Convert RGB color to HSV color space.
 
@@ -108,7 +109,7 @@ def get_hsv_for_rgb_color(rgb: Tuple[int, int, int]) -> npt.NDArray:
     return cv2.cvtColor(np.uint8([[list(rgb)]]), cv2.COLOR_RGB2HSV_FULL)
 
 
-def get_hsv_for_bgr_color(bgr: Tuple[int, int, int]) -> npt.NDArray:
+def get_hsv_for_bgr_color(bgr: tuple[int, int, int]) -> npt.NDArray:
     """
     Convert BGR color to HSV color space.
 
@@ -231,8 +232,8 @@ def sanity_checks_bounding_rects(
 
 
 def adjust_roi(
-    image: npt.NDArray, roi: Tuple[int, int, int, int], offset: int
-) -> Tuple[int, int, int, int]:
+    image: npt.NDArray, roi: tuple[int, int, int, int], offset: int
+) -> tuple[int, int, int, int]:
     """
     Adjusts the ROI by a given offset while respecting image boundaries, keeping the
     same center point.

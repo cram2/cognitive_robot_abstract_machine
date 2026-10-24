@@ -332,7 +332,9 @@ def _motion_task(motion_chart, robot):
     return task
 
 
-def test_an_arm_motion_holds_the_base_of_a_robot_that_stands_still(pr2_apartment_context):
+def test_an_arm_motion_holds_the_base_of_a_robot_that_stands_still(
+    pr2_apartment_context,
+):
     """
     A base that is not full body controlled stands still while an arm moves, so the
     motion has to hold it there rather than leave it for another task to command.
@@ -354,7 +356,9 @@ def test_an_arm_motion_holds_the_base_of_a_robot_that_stands_still(pr2_apartment
     assert hold_base.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
 
 
-def test_an_arm_motion_leaves_a_full_body_controlled_base_free(full_body_controlled_pr2):
+def test_an_arm_motion_leaves_a_full_body_controlled_base_free(
+    full_body_controlled_pr2,
+):
     """
     A robot that may move its whole body drives while it reaches, so its base is not
     held.
@@ -865,7 +869,7 @@ def test_looking_motion_pointing_parameters(pr2_apartment_context):
     assert pointing.root_link is view.get_torso().root
     assert pointing.tip_link is camera.root
     assert np.array_equal(
-        pointing.pointing_axis.to_np(), camera.forward_facing_axis.to_np()
+        pointing.pointing_axis.to_np(), camera.viewing_direction.to_np()
     )
     assert pointing.pointing_axis.reference_frame is camera.root
     assert pointing.goal_point.reference_frame is world.root

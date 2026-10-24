@@ -39,4 +39,4 @@ class OrbbecCameraConfig(
 
     depth_hints: str = "raw"
 
-    filterBlurredImages: bool = False
+    filter_blurred_images: bool = False

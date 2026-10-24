@@ -4,16 +4,22 @@ A camera facing a black wall, which the YOLO annotators under test are run on.
 
 from __future__ import annotations
 
+# %% Imports
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
-import open3d as o3d
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.spatial_types import Point2
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.types.camera import CameraObservation
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera
+from semantic_digital_twin.world_description.world_entity import Body
 from robokudo.pipeline import Pipeline
 from robokudo.types.cv import ColorToDepthRatio
 
@@ -95,14 +101,20 @@ class BlackWallScene:
                 horizontal=color_to_depth_ratio, vertical=color_to_depth_ratio
             ),
         )
-        cas.set(
-            CASViews.CAMERA_INTRINSIC,
-            o3d.camera.PinholeCameraIntrinsic(
-                color_width,
-                color_height,
-                100.0,
-                100.0,
-                color_width / 2.0,
-                color_height / 2.0,
-            ),
+        camera_model = PinholeCameraModel(
+            image_resolution=self.resolution,
+            focal_length_x=100.0,
+            focal_length_y=100.0,
+            principal_point=Point2(x=color_width / 2.0, y=color_height / 2.0),
+        )
+        camera = Camera(
+            name=PrefixedName(name="camera"),
+            root=Body(name=PrefixedName(name="camera")),
+            camera_model=camera_model,
+        )
+        cas.camera_observation = CameraObservation(
+            camera=camera,
+            effective_camera_model=camera_model,
+            timestamp_nanoseconds=cas.timestamp,
+            world_T_camera=None,
         )

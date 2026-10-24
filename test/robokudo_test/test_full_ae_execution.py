@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+# %% Imports
 from pathlib import Path
 
 import numpy as np
@@ -10,9 +13,8 @@ import robokudo.cas
 import robokudo.defs
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
-import robokudo.descriptors.camera_configs.config_semdt_raytracer
 import robokudo.io.file_reader_interface
-import robokudo.io.semdt_raytracer_camera_interface
+import robokudo.io.ray_tracing_camera_interface
 import robokudo.io.storage_reader_interface
 import robokudo.behaviours.clear_annotator_outputs
 import robokudo.pipeline
@@ -29,11 +31,14 @@ from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterEx
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
 from robokudo.annotators.shape_estimator import ShapeEstimatorAnnotator
+from robokudo.descriptors.camera_configs.config_ray_tracing import (
+    RayTracingCameraConfiguration,
+    WorldDescriptorSource,
+)
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
-from robokudo.world_descriptor import PredefinedObject
-from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.robots.robot_parts import Camera
 
 
 @pytest.fixture
@@ -46,7 +51,7 @@ def clean_semantic_world():
 
 
 class TestFullAEExecution(object):
-    def test_run_simple_ae_successfully(self, node):
+    def test_run_simple_ae_successfully(self, node) -> None:
         # rclpy.init()
         # node = Node(robokudo.defs.TEST_ROS_NODE_NAME)
 
@@ -54,11 +59,9 @@ class TestFullAEExecution(object):
             "file_reader",
             loop=False,
             target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
-            kinect_height_fix_mode=True,
             color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
             static_camera_transform_enabled=True,
             static_world_frame="map",
-            static_camera_frame="camera",
         )
 
         # Restrict FOV of pointcloud to robustly get only one object
@@ -92,16 +95,14 @@ class TestFullAEExecution(object):
 
     def test_run_file_reader_ae_synchronizes_semantic_digital_twin_belief_state(
         self, node, clean_semantic_world
-    ):
+    ) -> None:
         cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
             "file_reader",
             loop=False,
             target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
-            kinect_height_fix_mode=True,
             color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
             static_camera_transform_enabled=True,
             static_world_frame="map",
-            static_camera_frame="camera",
         )
 
         pc_crop_config = (
@@ -245,11 +246,12 @@ class TestFullAEExecution(object):
             len(object_belief.body.visual.shapes) == 1
         ), "The object belief body should contain one visual shape derived from the latest bounding box."
 
-    def test_run_semdt_raytracer_ae_successfully(self, node):
+    def test_run_semdt_raytracer_ae_successfully(self, node) -> None:
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "semdt_raytracer",
-            world_descriptor_name="world_semdt_raytracer_cylinders",
-            resolution=128,
+            RayTracingCameraConfiguration.registry_name,
+            source=WorldDescriptorSource(
+                descriptor_name="world_semdt_raytracer_cylinders"
+            ),
         )
 
         plane_desc = PlaneAnnotator.Descriptor()
@@ -290,6 +292,15 @@ class TestFullAEExecution(object):
         )
         assert tree_result is py_trees.common.Status.SUCCESS
 
+        camera_observation = seq.cas.camera_observation
+        assert (
+            camera_observation.effective_camera_model
+            is camera_observation.camera.camera_model
+        )
+        assert camera_observation.camera in (
+            seq.cas.ground_truth_world_ref.get_semantic_annotations_by_type(Camera)
+        )
+
         types_of_annotations = list(map(type, seq.cas.annotations))
         assert types_of_annotations.count(robokudo.types.annotation.Plane) == 1
         assert types_of_annotations.count(robokudo.types.scene.ObjectHypothesis) == 2
@@ -323,11 +334,14 @@ class TestFullAEExecution(object):
         )
         assert all(len(shapes[0].inliers) > 0 for shapes in object_shapes)
 
-    def test_run_semdt_raytracer_tabletop_ae_loads_mesh_world_descriptor(self, node):
+    def test_run_semdt_raytracer_tabletop_ae_loads_mesh_world_descriptor(
+        self, node
+    ) -> None:
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "semdt_raytracer",
-            world_descriptor_name="world_semdt_raytracer_tabletop",
-            resolution=128,
+            RayTracingCameraConfiguration.registry_name,
+            source=WorldDescriptorSource(
+                descriptor_name="world_semdt_raytracer_tabletop"
+            ),
         )
 
         plane_desc = PlaneAnnotator.Descriptor()

@@ -1,6 +1,11 @@
+from __future__ import annotations
+
+# %% Imports
+from krrood.ormatic.utils import classproperty
 from dataclasses import dataclass
 
-from typing_extensions import ClassVar
+
+from robokudo.types.image import ImageRotation
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import (
@@ -11,6 +16,7 @@ from robokudo.descriptors.camera_configs.components import (
 )
 
 
+# %% Hand camera configuration
 @dataclass(slots=True)
 class HsrHandCameraConfig(
     BaseCameraConfig,
@@ -23,11 +29,17 @@ class HsrHandCameraConfig(
     Camera config for the camera-in-hand on the Toyota HSR robot.
     """
 
-    registry_name: ClassVar[str] = "hsr_handcam"
+    @classproperty
+    def registry_name(cls) -> str:
+        """
+        Identifier selecting this camera configuration.
+        """
+        return "hsr_handcam"
 
-    rotate_image: str = "90_ccw"
-    """Rotate the image cw = clockwise, ccw = counter-clockwise. Possible values: None, 90_{cw, ccw}, 180_{cw, ccw}."""
-
+    rotate_image: ImageRotation | None = ImageRotation.COUNTERCLOCKWISE_90
+    """
+    Optional rotation applied to the delivered image and calibration.
+    """
     interface_type: str = "ROSCameraWithoutDepthInterface"
 
     topic_color: str = "hsrb/head_rgbd_sensor/rgb/image_raw/compressed"

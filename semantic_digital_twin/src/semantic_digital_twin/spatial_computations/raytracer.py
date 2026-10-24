@@ -1,73 +1,101 @@
 from __future__ import annotations
 
-from typing_extensions import Optional, Tuple, List, TYPE_CHECKING
+# %% Imports
+from dataclasses import dataclass, field
+import io
+import math
+from typing_extensions import TYPE_CHECKING
+from PIL import Image
 
 import numpy as np
 import trimesh
 from trimesh import Scene
+from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.world_description.geometry import Color
+from semantic_digital_twin.spatial_computations.exceptions import (
+    RayPointShapeMismatch,
+    UnsupportedCameraProjection,
+)
 
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.camera_model import (
+    PinholeCameraModel,
+    NoCameraDistortion,
+)
+from semantic_digital_twin.datastructures.camera_rendering import (
+    CameraRays,
+    RayIntersections,
+    RenderedColorFrame,
+    DepthMode,
+    RenderedRGBDFrame,
+    SegmentationDepthFrame,
+    ColorRenderingMode,
+)
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types.spatial_types import GenericSpatialType
+from semantic_digital_twin.spatial_types.spatial_types import (
+    GenericSpatialType,
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.robots.robot_parts import Camera
 
 
+# %% World ray tracing
+@dataclass(eq=False)
 class RayTracer:
+    """
+    Trace world geometry and render camera segmentation, depth, and color images.
+    """
 
     world: World
     """
     The world to use for ray tracing.
     """
 
-    _last_world_model: int
+    _last_world_model: int = field(default=-1, init=False)
     """
     Last model version of the world to which the ray tracer was updated.
     """
 
-    _last_world_state: int
+    _last_world_state: int = field(default=-1, init=False)
     """
     Last state version of the world to which the ray tracer was updated.
     """
 
-    index_to_body: dict
+    index_to_body: dict[int, Body] = field(default_factory=dict, init=False)
     """
     Maps the index of a body to the body itself.
     """
 
-    scene_to_index: dict
+    scene_to_index: dict[str, int] = field(default_factory=dict, init=False)
     """
     Maps the index in the trimesh scene to the index of the body in the world.
     """
 
-    scene: Scene
+    default_body_color: Color = field(
+        default_factory=lambda: Color(R=0.5, G=0.5, B=0.5)
+    )
+    """
+    Semantic color for a body without collision or visual geometry.
+    """
+
+    scene: Scene = field(default_factory=Scene, init=False)
     """
     The trimesh scene used for ray tracing which mirrors the world.
     """
 
-    def __init__(self, world):
+    def __post_init__(self) -> None:
         """
-        Initializes the RayTracer with the given world.
-
-        :param world: The world to use for ray tracing.
+        Populate the scene from the current world geometry and state.
         """
-        self.world = world
-        self._last_world_model = -1
-        self._last_world_state = -1
-        self.index_to_body = {}
-        self.scene_to_index = {}
-
-        self.scene = Scene()
         self.update_scene()
 
-    def update_scene(self):
+    def update_scene(self) -> None:
         """
-        Updates the ray tracer scene with the current state of the world.
-
-        This method should be called whenever the world changes to ensure the ray tracer
-        has the latest information.
+        Keep collision geometry and poses consistent with the current world.
         """
         if self._last_world_model != self.world.get_world_model_manager().version:
             self.add_missing_bodies()
@@ -76,225 +104,290 @@ class RayTracer:
             self.update_transforms()
             self._last_world_state = self.world.state.version
 
-    def add_missing_bodies(self):
+    def add_missing_bodies(self) -> None:
         """
-        Adds all bodies from the world to the ray tracer scene that are not already
-        present.
+        Add collision geometry for bodies not yet represented in the scene.
         """
-        # Bodies are added to the scene with their name as the node name plus a suffix for collision geometries.
-        # We check if a body is not in the complete list of all node names in the scene graph.
-        # If the body is not present, we add it to the scene.
         bodies_to_add = [
             body
             for body in self.world.bodies
             if body.name.name not in "\t".join(self.scene.graph.nodes)
         ]
+        # Each collision geometry uses the body name with a geometry-index suffix.
         for body in bodies_to_add:
-            for i, collision in enumerate(body.collision):
+            world_T_body = self.world.compute_forward_kinematics_np(
+                self.world.root, body
+            )
+            for geometry_index, collision in enumerate(body.collision):
+                node_name = self.collision_node_name(body, geometry_index)
                 self.scene.add_geometry(
                     collision.mesh,
-                    node_name=body.name.name + f"_collision_{i}",
+                    node_name=node_name,
                     parent_node_name="world",
-                    transform=self.world.compute_forward_kinematics_np(
-                        self.world.root, body
-                    )
-                    @ collision.origin.to_np(),
+                    transform=world_T_body @ collision.origin.to_np(),
                 )
-                self.scene_to_index[body.name.name + f"_collision_{i}"] = body.index
+                self.scene_to_index[node_name] = body.index
                 self.index_to_body[body.index] = body
 
-    def update_transforms(self):
+    def update_transforms(self) -> None:
         """
-        Updates the transforms of all bodies in the ray tracer scene.
-
-        This is necessary to ensure that the ray tracing uses the correct positions and
-        orientations.
+        Update scene geometry to the current world-body poses.
         """
         for body in self.world.bodies:
-            for i, collision in enumerate(body.collision):
-                transform = (
-                    self.world.compute_forward_kinematics_np(self.world.root, body)
-                    @ collision.origin.to_np()
+            world_T_body = self.world.compute_forward_kinematics_np(
+                self.world.root, body
+            )
+            for geometry_index, collision in enumerate(body.collision):
+                world_T_collision = world_T_body @ collision.origin.to_np()
+                self.scene.graph[self.collision_node_name(body, geometry_index)] = (
+                    world_T_collision
                 )
-                self.scene.graph[body.name.name + f"_collision_{i}"] = transform
 
+    @staticmethod
+    def collision_node_name(body: Body, geometry_index: int) -> str:
+        """
+        Return the scene node identifying a body's collision geometry.
+
+        :param body: Body owning the collision geometry.
+        :param geometry_index: Position of the geometry in the body's collision list.
+        :return: Scene node name identifying the collision geometry.
+        """
+        return body.name.name + f"_collision_{geometry_index}"
+
+    # %% Camera depth and segmentation
     def create_segmentation_mask(
         self,
         camera_pose: GenericSpatialType,
-        resolution: Optional[CameraResolution] = None,
+        resolution: CameraResolution | None = None,
         min_distance: float = 0,
         max_distance: float = np.inf,
-        field_of_view: Optional[FieldOfView] = None,
+        field_of_view: FieldOfView | None = None,
     ) -> np.ndarray:
         """
-        Creates a segmentation mask for the ray tracer scene from the camera position to
-        the target position.
+        Return world-body indices per pixel, or negative values for missed rays.
 
-        Each pixel in the mask corresponds to the index of a body in the scene or -1 if
-        no body is hit at that pixel.
+        Image dimensions follow the ray tracer's width-first pixel convention.
 
-        :param camera_pose: The position of the camera.
-        :param resolution: The camera resolution, defaulting to
-            :class:`CameraResolution`.
-        :param min_distance: The minimum distance of a body to be considered a hit.
-        :param max_distance: The maximum distance of a body to be considered a hit.
-        :param field_of_view: The field of view of the camera, defaulting to
-            FieldOfView()
-        :return: A segmentation mask as a numpy array.
+        :param camera_pose: Camera pose in world coordinates, with its viewing direction
+            along x.
+        :param resolution: Pixel dimensions of the rendered image.
+        :param min_distance: Inclusive minimum ray-hit distance in meters.
+        :param max_distance: Inclusive maximum ray-hit distance in meters.
+        :param field_of_view: Horizontal and vertical viewing angles.
+        :return: Width-first body indices, with negative values for missed rays.
         """
-        self.update_scene()
-        ray_origins, ray_directions, pixels = self.create_camera_rays(
-            camera_pose, resolution=resolution, field_of_view=field_of_view
-        )
-
-        target_points = ray_origins + ray_directions * 10
-
-        points, index_ray, bodies = self.ray_test(
-            ray_origins,
-            target_points,
-            multiple_hits=True,
+        return self.create_segmentation_and_depth(
+            camera_pose,
+            resolution=resolution,
             min_distance=min_distance,
             max_distance=max_distance,
-        )
-        unique_index = np.unique(index_ray, return_index=True)[1]
-
-        index_ray = index_ray[unique_index]
-
-        bodies = np.array([body.index for body in bodies])[unique_index]
-
-        pixel_ray = pixels[index_ray]
-
-        # create a numpy array we can turn into an image
-        # doing it with uint8 creates an `L` mode greyscale image
-        a = np.zeros(self.scene.camera.resolution, dtype=np.int32) - 1
-
-        # assign bodies to correct pixel locations
-        a[pixel_ray[:, 0], pixel_ray[:, 1]] = bodies
-
-        return a
+            field_of_view=field_of_view,
+        ).segmentation
 
     def create_depth_map(
         self,
         camera_pose: GenericSpatialType,
-        resolution: Optional[CameraResolution] = None,
+        resolution: CameraResolution | None = None,
         min_distance: float = 0,
         max_distance: float = np.inf,
-        field_of_view: Optional[FieldOfView] = None,
+        field_of_view: FieldOfView | None = None,
+        depth_mode: DepthMode = DepthMode.RAY_DISTANCE,
     ) -> np.ndarray:
         """
-        Creates a depth map for the ray tracer scene from the camera position to the
-        target position.
+        Return meter depths per pixel, or negative values for missed rays.
 
-        Each pixel in the depth map corresponds to the distance from the camera to the
-        closest point on the surface of the scene or -1 if no point is hit.
+        Depth defaults to distance along the viewing ray. Optical-axis depth is
+        available through :class:`~semantic_digital_twin.datastructures.camera_rendering.DepthMode`.
+        Image dimensions follow the ray tracer's width-first pixel convention.
 
-        :param camera_pose: The position of the camera.
-        :param resolution: The camera resolution, defaulting to
-            :class:`CameraResolution`.
-        :param min_distance: The minimum distance of a body to be considered a hit.
-        :param max_distance: The maximum distance of a body to be considered a hit.
-        :param field_of_view: The field of view of the camera, defaulting to
-            FieldOfView()
-        :return: A depth map as a numpy array.
+        :param camera_pose: Camera pose in world coordinates, with its viewing direction along x.
+        :param resolution: Pixel dimensions of the rendered image.
+        :param min_distance: Inclusive minimum ray-hit distance in meters.
+        :param max_distance: Inclusive maximum ray-hit distance in meters.
+        :param field_of_view: Horizontal and vertical viewing angles.
+        :param depth_mode: Distance convention represented by the depth values.
+        :return: Width-first meter depths, with negative values for missed rays.
         """
-        self.update_scene()
-        ray_origins, ray_directions, pixels = self.create_camera_rays(
-            camera_pose, resolution=resolution, field_of_view=field_of_view
+        return self.create_segmentation_and_depth(
+            camera_pose,
+            resolution=resolution,
+            min_distance=min_distance,
+            max_distance=max_distance,
+            field_of_view=field_of_view,
+            depth_mode=depth_mode,
+        ).depth
+
+    def create_segmentation_and_depth(
+        self,
+        camera_pose: GenericSpatialType,
+        resolution: CameraResolution | None = None,
+        min_distance: float = 0,
+        max_distance: float = np.inf,
+        field_of_view: FieldOfView | None = None,
+        depth_mode: DepthMode = DepthMode.RAY_DISTANCE,
+        camera_model: PinholeCameraModel | None = None,
+    ) -> SegmentationDepthFrame:
+        """
+        Return aligned body indices and meter depths from one intersection query.
+
+        Missed rays have negative segmentation and depth values. Distance limits apply
+        along the viewing ray for both depth conventions. Arrays use the width-first
+        pixel convention of :meth:`create_camera_rays`.
+
+        :param camera_pose: Camera pose in world coordinates, with its viewing direction
+            along x.
+        :param resolution: Pixel dimensions of the rendered image.
+        :param min_distance: Inclusive minimum ray-hit distance in meters.
+        :param max_distance: Inclusive maximum ray-hit distance in meters.
+        :param field_of_view: Horizontal and vertical viewing angles.
+        :param camera_model: Full calibration, overriding resolution and angular extent.
+        :param depth_mode: Distance convention represented by the depth values.
+        :return: Aligned body indices and meter depths from the same ray query.
+        """
+        resolution = (
+            camera_model.resolution
+            if camera_model is not None
+            else (resolution or CameraResolution())
         )
-
-        target_points = ray_origins + ray_directions * 10
-
-        points, index_ray, bodies = self.ray_test(
+        segmentation = np.full(
+            (resolution.width, resolution.height), -1, dtype=np.int32
+        )
+        depth = np.full(segmentation.shape, -1.0, dtype=np.float32)
+        camera_rays = self.create_camera_rays(
+            camera_pose,
+            resolution=resolution,
+            field_of_view=field_of_view,
+            camera_model=camera_model,
+        )
+        ray_origins = camera_rays.origin_points
+        ray_directions = camera_rays.direction_vectors
+        pixels = camera_rays.pixel_coordinates
+        ray_intersections = self.ray_test(
             ray_origins,
-            target_points,
+            ray_origins + ray_directions,
             multiple_hits=True,
             min_distance=min_distance,
             max_distance=max_distance,
         )
+        points = ray_intersections.hit_points
+        ray_indices = ray_intersections.ray_indices
+        bodies = ray_intersections.bodies
+        if len(ray_indices) == 0:
+            return SegmentationDepthFrame(segmentation=segmentation, depth=depth)
 
-        # Filters rays to the first hit only to create a depth map. This is done by finding the unique indices of the
-        # rays that hit the scene and keeping only the first hit for each ray.
-        unique_index = np.unique(index_ray, return_index=True)[1]
-        if len(unique_index) != 0:
-            index_ray = index_ray[unique_index]
-            points = points[unique_index]
-            ray_origins = ray_origins[unique_index]
+        selected_hits = np.unique(ray_indices, return_index=True)[1]
+        ray_indices = ray_indices[selected_hits]
+        points = points[selected_hits]
+        body_indices = np.asarray([body.index for body in bodies], dtype=np.int32)[
+            selected_hits
+        ]
+        hit_pixels = pixels[ray_indices]
+        segmentation[hit_pixels[:, 0], hit_pixels[:, 1]] = body_indices
 
-        depth = trimesh.util.diagonal_dot(
-            points - ray_origins[0], ray_directions[index_ray]
-        )
-        pixel_ray = pixels[index_ray]
-
-        # create a numpy array we can turn into an image
-        # doing it with uint8 creates an `L` mode greyscale image
-        a = np.zeros(self.scene.camera.resolution, dtype=np.float32) - 1
-
-        # assign depth to correct pixel locations
-        a[pixel_ray[:, 0], pixel_ray[:, 1]] = depth
-
-        return a
+        if depth_mode == DepthMode.OPTICAL_AXIS:
+            camera_T_world = np.linalg.inv(self.scene.camera_transform)
+            world_P_hits = np.concatenate([points, np.ones((len(points), 1))], axis=1)
+            camera_P_hits = (camera_T_world @ world_P_hits.T).T
+            hit_depths = -camera_P_hits[:, 2]
+            valid_depths = hit_depths > 0.0
+            hit_pixels = hit_pixels[valid_depths]
+            hit_depths = hit_depths[valid_depths]
+        else:
+            hit_depths = trimesh.util.diagonal_dot(
+                points - ray_origins[ray_indices], ray_directions[ray_indices]
+            )
+        depth[hit_pixels[:, 0], hit_pixels[:, 1]] = hit_depths.astype(np.float32)
+        return SegmentationDepthFrame(segmentation=segmentation, depth=depth)
 
     def create_camera_rays(
         self,
         camera_pose: GenericSpatialType,
-        resolution: Optional[CameraResolution] = None,
-        field_of_view: Optional[FieldOfView] = None,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        resolution: CameraResolution | None = None,
+        field_of_view: FieldOfView | None = None,
+        camera_model: PinholeCameraModel | None = None,
+    ) -> CameraRays:
         """
-        Creates camera rays for the ray tracer scene from the camera position to the
-        target position.
+        Return world-space rays and width-first, top-left-origin pixels for an x-forward
+        camera pose.
 
-        Places the camera at the given position and orientation view of the camera is
-        along the x-axis.
-
-        :param camera_pose: The position of the camera as a 4x4 transformation matrix.
-        :param field_of_view: The field of view of the camera, defaulting to
-            FieldOfView()
-        :param resolution: The camera resolution, defaulting to
-            :class:`CameraResolution`.
-        :return: The origin points of the rays, the direction vectors of the rays, and
-            the pixel coordinates.
+        :param camera_pose: Camera pose in world coordinates, with its viewing direction
+            along x.
+        :param resolution: Pixel dimensions of the rendered image.
+        :param field_of_view: Horizontal and vertical viewing angles.
+        :param camera_model: Full calibration, overriding resolution and angular extent.
+        :raises UnsupportedCameraProjection: If lens distortion is requested.
+        :return: World-space ray origins and directions with corresponding width-first
+            pixels.
         """
-        field_of_view = field_of_view or FieldOfView()
-        resolution = resolution or CameraResolution()
-        camera_pose = camera_pose.to_np()
+        if camera_model is None:
+            camera_model = PinholeCameraModel.from_field_of_view(
+                resolution=resolution or CameraResolution(),
+                field_of_view=field_of_view or FieldOfView(),
+            )
+        if not isinstance(camera_model.distortion, NoCameraDistortion):
+            raise UnsupportedCameraProjection(
+                reason="distorted rendering is not supported"
+            )
+        resolution = camera_model.resolution
+        world_T_forward_view = camera_pose.to_np()
         self.update_scene()
-        # By default, the camera is looking along the -z axis, so we need to rotate it to look along the x-axis.
-        rotate = trimesh.transformations.rotation_matrix(
-            angle=np.radians(-90.0), direction=[0, 1, 0]
-        )
-        rotate_x = trimesh.transformations.rotation_matrix(
-            angle=np.radians(180.0), direction=[1, 0, 0]
-        )
-
-        self.scene.camera.fov = (
-            np.degrees(field_of_view.horizontal_angle),
-            np.degrees(field_of_view.vertical_angle),
-        )
         self.scene.camera.resolution = (resolution.width, resolution.height)
-        self.scene.graph[self.scene.camera.name] = camera_pose @ rotate_x @ rotate
+        self.scene.camera.focal = (
+            camera_model.focal_length_x,
+            camera_model.focal_length_y,
+        )
+        self.scene.graph[self.scene.camera.name] = (
+            world_T_forward_view
+            @ self.forward_view_R_image_axes
+            @ self.image_axes_R_optical
+        )
 
-        return self.scene.camera_rays()
+        pixels = np.stack(
+            np.meshgrid(
+                np.arange(resolution.width), np.arange(resolution.height), indexing="ij"
+            ),
+            axis=-1,
+        ).reshape(-1, 2)
+        optical_V_rays = np.column_stack(
+            (
+                (pixels[:, 0] + 0.5 - float(camera_model.principal_point.x))
+                / camera_model.focal_length_x,
+                (pixels[:, 1] + 0.5 - float(camera_model.principal_point.y))
+                / camera_model.focal_length_y,
+                np.ones(len(pixels)),
+            )
+        )
+        optical_V_rays /= np.linalg.norm(optical_V_rays, axis=1, keepdims=True)
+        image_axes_V_rays = optical_V_rays * np.array([1.0, -1.0, -1.0])
+        world_T_image_axes = self.scene.camera_transform
+        directions = image_axes_V_rays @ world_T_image_axes[:3, :3].T
+        origins = np.broadcast_to(world_T_image_axes[:3, 3], directions.shape).copy()
+        return CameraRays(
+            origin_points=origins,
+            direction_vectors=directions,
+            pixel_coordinates=pixels,
+        )
 
     def ray_test(
         self,
         origin_points: np.ndarray,
         target_points: np.ndarray,
-        multiple_hits=False,
+        multiple_hits: bool = False,
         min_distance: float = 0,
         max_distance: float = np.inf,
-    ) -> Tuple[np.ndarray, np.ndarray, List[Body]]:
+    ) -> RayIntersections:
         """
-        Performs a ray test from the origin point to the target point in the ray tracer
-        scene.
+        Return ray intersections within the inclusive distance interval.
 
-        :param origin_points: The starting point of the ray.
-        :param target_points: The end point of the ray.
-        :param multiple_hits: Whether to return multiple hits or not.
-        :param min_distance: The minimum distance of a body to be considered a hit.
-        :param max_distance: The maximum distance of a body to be considered a hit.
-        :return: A tuple containing the points where the ray intersects and the indices
-            of rays that hit the scene as well as the bodies that were.
+        :param origin_points: World-space starting points of the rays.
+        :param target_points: World-space points defining the ray directions.
+        :param multiple_hits: Whether to return every intersection instead of the first
+            hit.
+        :param min_distance: Inclusive minimum ray-hit distance in meters.
+        :param max_distance: Inclusive maximum ray-hit distance in meters.
+        :return: Hit points, source ray indices, and intersected world bodies.
+        :raises RayPointShapeMismatch: If origins and targets contain different point
+            counts.
         """
         origin_points = np.array(origin_points)
         target_points = np.array(target_points)
@@ -302,25 +395,210 @@ class RayTracer:
         origin_points = origin_points.reshape((-1, 3))
         target_points = target_points.reshape((-1, 3))
         if origin_points.shape != target_points.shape:
-            raise ValueError("Origin and target points must have the same shape.")
+            raise RayPointShapeMismatch(
+                origin_shape=origin_points.shape, target_shape=target_points.shape
+            )
 
         ray_directions = target_points - origin_points
         scene_geometry = trimesh.Trimesh(
             **trimesh.triangles.to_kwargs(self.scene.triangles), process=False
         )
-        points, index_ray, index_tri = scene_geometry.ray.intersects_location(
-            origin_points, ray_directions, multiple_hits=multiple_hits
+        hit_points, ray_indices, triangle_indices = (
+            scene_geometry.ray.intersects_location(
+                origin_points, ray_directions, multiple_hits=multiple_hits
+            )
         )
-        dist = np.linalg.norm(points - origin_points[index_ray], axis=1)
+        hit_distances = np.linalg.norm(hit_points - origin_points[ray_indices], axis=1)
 
-        valid_indices = np.where((dist >= min_distance) & (dist <= max_distance))[0]
-        points = points[valid_indices]
-        index_ray = index_ray[valid_indices]
-        index_tri = index_tri[valid_indices]
+        valid_indices = np.where(
+            (hit_distances >= min_distance) & (hit_distances <= max_distance)
+        )[0]
+        hit_points = hit_points[valid_indices]
+        ray_indices = ray_indices[valid_indices]
+        triangle_indices = triangle_indices[valid_indices]
 
-        bodies = self.scene.triangles_node[index_tri]
+        bodies = self.scene.triangles_node[triangle_indices]
 
-        # map the name of the scene objects to the index
         bodies = [self.index_to_body[self.scene_to_index[body]] for body in bodies]
 
-        return points, index_ray, bodies
+        return RayIntersections(
+            hit_points=hit_points, ray_indices=ray_indices, bodies=bodies
+        )
+
+    # %% Aligned RGB-D rendering
+    def render(
+        self,
+        camera: Camera,
+        rgb_mode: ColorRenderingMode = ColorRenderingMode.SEMANTIC,
+        depth_mode: DepthMode = DepthMode.OPTICAL_AXIS,
+    ) -> RenderedRGBDFrame:
+        """
+        Render camera colors, body labels, and unsigned millimeter depths.
+
+        Depth defaults to the optical-axis convention for pinhole back-projection.
+        Textured rendering errors propagate to the caller.
+
+        :param camera: Camera supplying pose, calibration, resolution, and usable range.
+        :param rgb_mode: Source of the rendered color values.
+        :param depth_mode: Distance convention represented by the depth values.
+        :raises UnsupportedCameraProjection: If distortion is requested, or textured
+            rendering cannot represent the calibration.
+        :return: Aligned BGR colors, millimeter depths, segmentation, and effective
+            calibration.
+        """
+        camera_model = camera.camera_model
+        if not isinstance(camera_model, PinholeCameraModel):
+            camera_model = PinholeCameraModel.from_field_of_view(
+                resolution=camera_model.resolution,
+                field_of_view=camera_model.field_of_view,
+            )
+        if not isinstance(camera_model.distortion, NoCameraDistortion):
+            raise UnsupportedCameraProjection(
+                reason="distorted rendering is not supported"
+            )
+        resolution = camera_model.resolution
+        if rgb_mode == ColorRenderingMode.TEXTURED and not (
+            math.isclose(float(camera_model.principal_point.x), resolution.width / 2)
+            and math.isclose(
+                float(camera_model.principal_point.y), resolution.height / 2
+            )
+            and math.isclose(camera_model.focal_length_x, camera_model.focal_length_y)
+        ):
+            raise UnsupportedCameraProjection(
+                reason="textured rendering requires a centered camera with equal focal lengths"
+            )
+        world_T_optical = camera.root.global_transform
+        world_T_forward_view = HomogeneousTransformationMatrix(
+            data=world_T_optical.to_np() @ camera.optical_R_forward_view.to_np(),
+            reference_frame=world_T_optical.reference_frame,
+        )
+        frame = self.create_segmentation_and_depth(
+            world_T_forward_view,
+            resolution=resolution,
+            camera_model=camera_model,
+            min_distance=camera.camera_range.minimum_distance,
+            max_distance=camera.camera_range.maximum_distance,
+            depth_mode=depth_mode,
+        )
+        color_frame = self._render_color_image(frame.segmentation, resolution, rgb_mode)
+        return RenderedRGBDFrame(
+            color_bgr=color_frame.color_image,
+            depth_in_millimeters=self.convert_depth_to_millimeters(frame.depth),
+            segmentation=frame.segmentation,
+            object_color_map=color_frame.object_color_map,
+            camera_model=camera_model,
+        )
+
+    def _render_color_image(
+        self,
+        segmentation: np.ndarray,
+        resolution: CameraResolution,
+        rgb_mode: ColorRenderingMode,
+    ) -> RenderedColorFrame:
+        """
+        Return BGR colors and their semantic names for the selected rendering mode.
+
+        :param segmentation: Body indices identifying visible geometry at each pixel.
+        :param resolution: Pixel dimensions of the rendered image.
+        :param rgb_mode: Source of the rendered color values.
+        :return: Width-first BGR colors and the semantic color-to-name mapping.
+        """
+        if rgb_mode == ColorRenderingMode.TEXTURED:
+            return RenderedColorFrame(
+                color_image=self._render_textured_color(resolution),
+                object_color_map={},
+            )
+        color_rgb = np.zeros((*segmentation.shape, 3), dtype=np.uint8)
+        object_color_map: dict[str, str] = {}
+        for body_index in np.unique(segmentation[segmentation >= 0]):
+            body = self.world.kinematic_structure[int(body_index)]
+            body_rgb = self.get_body_color(body)
+            color_rgb[segmentation == body_index] = body_rgb
+            color_key = ",".join(str(channel) for channel in body_rgb)
+            object_color_map[color_key] = body.name.name
+        return RenderedColorFrame(
+            color_image=color_rgb[:, :, ::-1].copy(), object_color_map=object_color_map
+        )
+
+    def _render_textured_color(
+        self,
+        resolution: CameraResolution,
+    ) -> np.ndarray:
+        """
+        Return width-first textured colors in BGR channel order.
+
+        :param resolution: Pixel dimensions of the rendered image.
+        :return: Width-first BGR colors representing surface textures and materials.
+        """
+        image_bytes = self.scene.save_image(
+            resolution=(resolution.width, resolution.height), visible=False
+        )
+        image = np.array(Image.open(io.BytesIO(image_bytes)).convert("RGB"))
+        return image.transpose(1, 0, 2)[:, :, ::-1].copy()
+
+    def get_body_color(self, body: Body) -> np.ndarray:
+        """
+        Return the first collision or visual geometry's unsigned-byte RGB color.
+
+        :param body: Body whose geometry supplies the color, or the default when
+            geometry is absent.
+        :return: Unsigned-byte RGB channels for the selected body color.
+        """
+        if len(body.collision) > 0:
+            color = body.collision[0].color
+        elif len(body.visual) > 0:
+            color = body.visual[0].color
+        else:
+            color = self.default_body_color
+        channel_maximum = np.iinfo(np.uint8).max
+        return np.clip(
+            np.round(np.asarray(color.to_rgb()) * channel_maximum), 0, channel_maximum
+        ).astype(np.uint8)
+
+    @staticmethod
+    def convert_depth_to_millimeters(depth_in_meters: np.ndarray) -> np.ndarray:
+        """
+        Round and saturate meter depths to unsigned millimeters, encoding misses as
+        zero.
+
+        :param depth_in_meters: Meter depths, with negative values marking missed rays.
+        :return: Rounded unsigned millimeter depths, saturated to the supported range,
+            with zero for misses.
+        """
+        depth_in_millimeters = np.zeros(depth_in_meters.shape, dtype=np.uint16)
+        valid_mask = depth_in_meters >= 0.0
+        depth_in_millimeters[valid_mask] = np.clip(
+            np.round(depth_in_meters[valid_mask] * RayTracer.millimeters_per_meter),
+            0,
+            np.iinfo(np.uint16).max,
+        ).astype(np.uint16)
+        return depth_in_millimeters
+
+    @classproperty
+    def millimeters_per_meter(cls: type[RayTracer]) -> float:
+        """
+        Number of millimeters in one meter.
+
+        :return: Metric conversion factor from meters to millimeters.
+        """
+        return 1000.0
+
+    @classproperty
+    def image_axes_R_optical(cls: type[RayTracer]) -> np.ndarray:
+        """
+        Map the optical negative-z viewing axis onto the intermediate x-forward axes.
+
+        :return: Rotation from optical axes to the intermediate image axes.
+        """
+        return trimesh.transformations.rotation_matrix(
+            angle=-np.pi / 2, direction=[0, 1, 0]
+        )
+
+    @classproperty
+    def forward_view_R_image_axes(cls: type[RayTracer]) -> np.ndarray:
+        """
+        Map image axes onto the camera's forward-view convention.
+
+        :return: Rotation from intermediate image axes to the forward-view axes.
+        """
+        return trimesh.transformations.rotation_matrix(angle=np.pi, direction=[1, 0, 0])

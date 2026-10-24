@@ -18,7 +18,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import open3d as o3d
+import open3d
 from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING, Any
@@ -43,7 +43,6 @@ from robokudo.utils.module_loader import ModuleLoader
 from robokudo.utils.o3d_helper import (
     concatenate_clouds,
     get_cloud_from_rgb_depth_and_mask,
-    scale_o3d_camera_intrinsics,
 )
 
 if TYPE_CHECKING:
@@ -51,6 +50,7 @@ if TYPE_CHECKING:
     from ultralytics.engine.results import Results
 
     from robokudo.types.cv import ColorToDepthRatio
+    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
 # %% body keypoints
 
@@ -103,9 +103,9 @@ class DepthFrame:
     Size of the depth image relative to the color image.
     """
 
-    camera_intrinsics: o3d.camera.PinholeCameraIntrinsic
+    camera_model: PinholeCameraModel
     """
-    Intrinsics of the camera at the depth image resolution.
+    Projection model at the depth image resolution.
     """
 
     @classproperty
@@ -115,7 +115,7 @@ class DepthFrame:
         """
         return 255
 
-    def box_cloud(self, box: Rect, depth_truncate: float) -> o3d.geometry.PointCloud:
+    def box_cloud(self, box: Rect, depth_truncate: float) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements inside a box.
 
@@ -131,7 +131,7 @@ class DepthFrame:
         mask[top:bottom, left:right] = self.mask_foreground
         return self._masked_cloud(mask, depth_truncate=depth_truncate)
 
-    def disc_cloud(self, x: float, y: float, radius: int) -> o3d.geometry.PointCloud:
+    def disc_cloud(self, x: float, y: float, radius: int) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements inside a disc.
 
@@ -153,7 +153,7 @@ class DepthFrame:
 
     def _masked_cloud(
         self, mask: npt.NDArray[np.uint8], **cloud_settings: float
-    ) -> o3d.geometry.PointCloud:
+    ) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements a mask marks.
 
@@ -167,7 +167,7 @@ class DepthFrame:
             rgb_image=self.rgb_image,
             depth_image=self.depth_image,
             mask=mask,
-            camera_intrinsics=self.camera_intrinsics,
+            camera_model=self.camera_model,
             mask_true_value=self.mask_foreground,
             **cloud_settings,
         )
@@ -351,12 +351,12 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
     def _depth_frame(self) -> DepthFrame:
         """
         Collect the depth measurements of the CAS and scale the color image and the
-        camera intrinsics to the depth image resolution.
+        camera model to the depth image resolution.
 
         :return: The depth measurements of the CAS with the matching color image.
         """
         cas = self.get_cas()
-        color_to_depth_ratio = cas.get(CASViews.COLOR_TO_DEPTH_RATIO)
+        color_to_depth_ratio = cas.color_to_depth_ratio
         scaled_color = get_scaled_color_image_for_depth_image(
             cas, cas.get(CASViews.COLOR_IMAGE)
         )
@@ -364,10 +364,9 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
             depth_image=cas.get(CASViews.DEPTH_IMAGE),
             rgb_image=cv2.cvtColor(scaled_color, cv2.COLOR_BGR2RGB),
             color_to_depth_ratio=color_to_depth_ratio,
-            camera_intrinsics=scale_o3d_camera_intrinsics(
-                cas.get(CASViews.CAMERA_INTRINSIC),
-                color_to_depth_ratio.horizontal,
-                color_to_depth_ratio.vertical,
+            camera_model=cas.require_camera_observation().effective_camera_model.scaled(
+                scale_x=color_to_depth_ratio.horizontal,
+                scale_y=color_to_depth_ratio.vertical,
             ),
         )
 
@@ -487,7 +486,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
                     )
                     if keypoint.confidence
                     >= parameters.keypoint_confidence_threshold_for_clouds
-                    else o3d.geometry.PointCloud()
+                    else open3d.geometry.PointCloud()
                 ),
             )
             for keypoint in keypoints

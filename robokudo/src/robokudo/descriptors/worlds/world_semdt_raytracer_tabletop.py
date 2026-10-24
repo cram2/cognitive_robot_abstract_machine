@@ -1,8 +1,18 @@
+# %% Imports
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraModality,
+    CameraRange,
+    PinholeCameraModel,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
+from semantic_digital_twin.robots.robot_parts import Camera
 from importlib.util import find_spec
 from pathlib import Path
 
 from robokudo.world_descriptor import (
     BaseWorldDescriptor,
+    CameraPlacement,
     ObjectSpec,
     PredefinedObject,
     RegionSpec,
@@ -14,9 +24,13 @@ from semantic_digital_twin.world_description.geometry import Color, Mesh, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
+# %% World descriptor
+
 
 class WorldDescriptor(BaseWorldDescriptor):
-    """A compact tabletop world for SemDT RayTracer-based camera simulation."""
+    """
+    A compact tabletop world for SemDT RayTracer-based camera simulation.
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -148,3 +162,33 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
 
         self.build_regions(root, region_specs)
+        camera_name = PrefixedName(name="semdt_camera_optical_frame")
+        self.build_camera(
+            root,
+            CameraPlacement(
+                camera=Camera(
+                    name=camera_name,
+                    root=Body(name=camera_name),
+                    camera_model=PinholeCameraModel.from_field_of_view(
+                        resolution=CameraResolution(), field_of_view=FieldOfView()
+                    ),
+                    camera_range=CameraRange(
+                        minimum_distance=0.05, maximum_distance=8.0
+                    ),
+                    modalities=(
+                        CameraModality.COLOR,
+                        CameraModality.DEPTH,
+                        CameraModality.SEGMENTATION,
+                    ),
+                ),
+                parent_T_camera=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-1.20,
+                    y=0.40,
+                    z=1.05,
+                    roll=-2.2689280275926285,
+                    pitch=0.0,
+                    yaw=-0.2707963267948965,
+                    reference_frame=root,
+                ),
+            ),
+        )
