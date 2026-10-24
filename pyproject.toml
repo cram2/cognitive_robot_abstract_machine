@@ -43,7 +43,7 @@ dev = [
     "treon",
     "bokeh",
     "mypy>=1.8",
-    "docformatter",
+    "krrood[development-tools]",
 ]
 
 doc = [
@@ -131,9 +131,3 @@ package-dir = {"" = "."}
 
 [tool.setuptools.dynamic]
 version = {attr = "cognitive_robot_abstract_machine._version.__version__"}
-
-[tool.docformatter]
-make-summary-multi-line = true
-pre-summary-newline = true
-close-quotes-on-newline = true
-black = true

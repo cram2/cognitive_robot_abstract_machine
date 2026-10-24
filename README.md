@@ -188,7 +188,7 @@ Example:
 
 4. 📐 Adhere to Code Style and Principles
 
-    - Code Formatting: We use Black, which is fully PEP 8 compliant. All code must be automatically formatted with Black before submission.
+    - Code Formatting: We use ruff, which is fully PEP 8 compliant, followed by docformatter for docstrings. The `krrood-format` pre-commit hook formats every modified file before submission.
 
     - SOLID Principles: Read and understand the SOLID principles for writing robust, maintainable, and scalable software. This article is a great resource: https://realpython.com/solid-principles-python/
 
@@ -247,7 +247,7 @@ PR Checklist Summary
 
     [ ] AI (Copilot/PyCharm) has reviewed the code.
 
-    [ ] Black has formatted the code (PEP 8 compliant).
+    [ ] The pre-commit hooks have formatted the code (PEP 8 compliant).
 
     [ ] New features/logic have tests (Beyoncé Rule).
 

@@ -88,6 +88,15 @@ jobs:
           bazel build //test:test_all
           bazel test //test:test_all
 
+      - name: Check the generated rules in AGENTS.md
+        # AGENTS.md is generated from the rules krrood ships and agent_rules.py; a hand
+        # edit or a forgotten regeneration fails here.
+        if: ${{ inputs.lib == 'krrood' }}
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          cd cognitive_robot_abstract_machine
+          krrood agents-md --check
+
       - name: Run tests
         run: |
           source /opt/ros/cram-env/bin/activate
