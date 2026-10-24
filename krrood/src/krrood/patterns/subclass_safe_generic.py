@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from copy import copy
 from dataclasses import dataclass, Field
+from functools import lru_cache
 from inspect import isclass
 from typing import Tuple, Union, List
 
@@ -139,6 +140,7 @@ class SubClassSafeGeneric(ABC):
         return get_generic_type_parameters(cls, SubClassSafeGeneric)
 
     @classmethod
+    @lru_cache(maxsize=None)
     def get_type_of_generic_parameter(cls, parameter: TypeVar) -> ResolvableType:
         """
         Read back the type this class binds one type parameter to.
