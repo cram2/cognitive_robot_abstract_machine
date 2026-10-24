@@ -1184,6 +1184,31 @@ class UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
 
 
 @dataclass
+class UnboundPatternVariable(UsageError):
+    """
+    Raised when an instance is constructed from bindings that leave a variable of the
+    match's pattern without a value, and the pattern states none for it either.
+    """
+
+    attribute_match: AttributeMatch
+    """
+    The attribute match whose assigned variable the bindings do not bind.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The bindings give no value to the variable assigned to "
+            f"'{self.attribute_match}', so the instance cannot be constructed."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Bind every variable of the pattern, keyed by the identifier of the "
+            "variable assigned to its attribute."
+        )
+
+
+@dataclass
 class CausesEffectRequiresEqualityComparator(UsageError):
     """
     Raised when a :func:`~krrood.entity_query_language.query.match.Match.causes_effect`

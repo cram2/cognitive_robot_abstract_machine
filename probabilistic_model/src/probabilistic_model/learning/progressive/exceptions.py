@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from typing_extensions import TYPE_CHECKING
 
-from krrood.exceptions import DataclassException
+from probabilistic_model.exceptions import ProbabilisticModelException
 
 if TYPE_CHECKING:
     from probabilistic_model.learning.progressive.progressive_circuit import (
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ColumnStructureMismatchError(DataclassException, ValueError):
+class ColumnStructureMismatchError(ProbabilisticModelException, ValueError):
     """
     Exception raised when two columns of a progressive circuit differ in structure.
     """
@@ -46,7 +46,7 @@ class ColumnStructureMismatchError(DataclassException, ValueError):
 
 
 @dataclass
-class EarlierColumnShareOutOfRangeError(DataclassException, ValueError):
+class EarlierColumnShareOutOfRangeError(ProbabilisticModelException, ValueError):
     """
     Exception raised when the start weight share of earlier columns is not in
     ``[0, 1)``.
@@ -68,7 +68,7 @@ class EarlierColumnShareOutOfRangeError(DataclassException, ValueError):
 
 
 @dataclass
-class UnregisteredColumnError(DataclassException, ValueError):
+class UnregisteredColumnError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a column is used with a progressive circuit it does not belong
     to.

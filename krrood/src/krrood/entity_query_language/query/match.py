@@ -37,8 +37,10 @@ from typing_extensions import (
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.core.base_expressions import (
+    Bindings,
     HasExpression,
     MatchAssignedValue,
+    OperationResult,
     Selectable,
     SymbolicExpression,
 )
@@ -53,8 +55,6 @@ from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
     CanBehaveLikeAVariable,
     HasSymbolicOperations,
-    MappedVariable,
-    IndexByValue,
 )
 from krrood.entity_query_language.core.variable import Literal, DomainType, Variable
 from krrood.entity_query_language.evaluable import Evaluable
@@ -63,7 +63,7 @@ from krrood.entity_query_language.exceptions import (
     CalledMatchMultipleTimes,
     MatchTypeCannotBeDetermined,
     PositionalArgumentsInMatchPattern,
-    ReadOnlyMapping,
+    UnboundPatternVariable,
 )
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
@@ -545,6 +545,50 @@ class Match(
             selection = selection.where(*conditions)
         return selection
 
+    def _construct_instance_from_bindings_(self, bindings: Bindings) -> T:
+        """
+        Construct an instance of the matched type from the values the bindings give the
+        variables of this match's pattern, leaving the pattern itself unchanged.
+
+        An attribute whose assigned variable the bindings do not bind takes the value
+        the pattern states for it.
+
+        :param bindings: The values of the pattern's variables, keyed by the identifier
+            of the variable assigned to each attribute.
+        :return: The constructed instance.
+        :raises UnboundPatternVariable: If the bindings do not bind a variable that
+            states no value of its own.
+        """
+        self.resolve()
+        return self._factory_(
+            **{
+                keyword: self._construct_argument_from_bindings_(keyword, bindings)
+                for keyword in self._factory_keyword_arguments_
+            }
+        )
+
+    def _construct_argument_from_bindings_(
+        self, keyword: str, bindings: Bindings
+    ) -> Any:
+        """
+        :param keyword: A keyword argument of the pattern that is passed to the factory.
+        :param bindings: The values of the pattern's variables, keyed by the identifier
+            of the variable assigned to each attribute.
+        :return: The value the keyword's attribute takes under the bindings; a list-like
+            value whose elements are matched one by one is rebuilt from its elements.
+        """
+        attribute_matches = [
+            attribute_match
+            for attribute_match in self._children_
+            if attribute_match.attribute_name == keyword
+        ]
+        if attribute_matches[0].index_access is None:
+            return attribute_matches[0].construct_value_from_bindings(bindings)
+        return type(self._kwargs_[keyword])(
+            attribute_match.construct_value_from_bindings(bindings)
+            for attribute_match in attribute_matches
+        )
+
     @property
     def _conditions_on_stated_values_(self) -> Iterator[ConditionType]:
         """
@@ -781,32 +825,6 @@ class Match(
         self._create_or_update_variable_()
         return self
 
-    def _update_kwargs_from_literal_values(self):
-        """
-        Update the kwargs dictionary with values from this statements leaves.
-        """
-        for attribute_match in self._matches_with_variables_:
-            attribute_match._update_kwargs_from(self)
-
-    def _get_mapped_variable_by_name(self, name: str) -> Optional[MappedVariable]:
-        """
-        Get a mapped variable by its name in the path.
-
-        :param name: The name
-        :return: The mapped variable
-        """
-        result = [
-            attribute_match.assigned_variable
-            for attribute_match in self._matches_with_variables_
-            if attribute_match.name_from_variable_access_path == name
-        ]
-        if len(result) == 0:
-            return None
-        elif len(result) == 1:
-            return result[0]
-        else:
-            raise KeyError(f"Multiple variables with name {name}")
-
 
 @dataclass(eq=False)
 class AttributeMatch(AbstractMatchExpression[T]):
@@ -927,31 +945,24 @@ class AttributeMatch(AbstractMatchExpression[T]):
     def __str__(self):
         return self._name_
 
-    def _update_kwargs_from(self, match: Match[T]):
+    def construct_value_from_bindings(self, bindings: Bindings) -> Any:
         """
-        Update the kwargs of the parent match with the values of the assigned variable.
-
-        Only works if this is a variable assignment.
+        :param bindings: The values of the pattern's variables, keyed by the identifier
+            of the variable assigned to each attribute.
+        :return: The value this attribute takes under the bindings: an instance
+            constructed from them for a nested match, otherwise the value of the
+            assigned variable evaluated under them.
+        :raises UnboundPatternVariable: If the bindings do not bind the assigned
+            variable and it states no value of its own.
         """
-        current_value = match
-        for step in self._variable_._access_path_[:-1]:
-            if isinstance(step, Attribute):
-                current_value = current_value._kwargs_[step._attribute_name_]
-            elif isinstance(step, IndexByValue):
-                current_value = current_value[step._key_]
-            else:
-                raise ReadOnlyMapping(step)
-
-        final_step = self._variable_._access_path_[-1]
-
-        if isinstance(final_step, Attribute):
-            current_value._kwargs_[final_step._attribute_name_] = (
-                self.assigned_variable._value_
-            )
-        else:
-            final_step._set_child_instance_value_(
-                current_value, self.assigned_variable._value_
-            )
+        if isinstance(self.assigned_value, Match):
+            return self.assigned_value._construct_instance_from_bindings_(bindings)
+        if (
+            not isinstance(self.assigned_variable, Literal)
+            and self.assigned_variable._id_ not in bindings
+        ):
+            raise UnboundPatternVariable(self)
+        return next(self.assigned_variable._evaluate_(OperationResult(bindings))).value
 
     @property
     def _stating_match_(self) -> Match:

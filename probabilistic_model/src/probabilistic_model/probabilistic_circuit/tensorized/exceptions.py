@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 from typing_extensions import TYPE_CHECKING, Tuple, Type
 
-from krrood.exceptions import DataclassException
+from probabilistic_model.exceptions import ProbabilisticModelException
 
 if TYPE_CHECKING:
     from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class UndefinedCumulativeDistributionError(DataclassException, TypeError):
+class UndefinedCumulativeDistributionError(ProbabilisticModelException, TypeError):
     """
     Exception raised when the cumulative distribution function of a layer over an
     unordered variable is queried.
@@ -36,7 +36,7 @@ class UndefinedCumulativeDistributionError(DataclassException, TypeError):
 
 
 @dataclass
-class NonPositiveScaleError(DataclassException, ValueError):
+class NonPositiveScaleError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a layer has a scale that is not positive.
     """
@@ -54,7 +54,7 @@ class NonPositiveScaleError(DataclassException, ValueError):
 
 
 @dataclass
-class CopiesNotAlignedError(DataclassException, ValueError):
+class CopiesNotAlignedError(ProbabilisticModelException, ValueError):
     """
     Exception raised when copies of a layer graph that are to be stacked differ in their
     structure.

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC
 from dataclasses import dataclass
 from typing import Any, Callable, List, Type, TYPE_CHECKING
 
@@ -12,7 +13,14 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class UnboundedEventError(DataclassException):
+class ProbabilisticModelException(DataclassException, ABC):
+    """
+    Raised when a probabilistic model, or a query of one, is in an illegal state.
+    """
+
+
+@dataclass
+class UnboundedEventError(ProbabilisticModelException):
     """
     Raised when a uniform measure is asked for over an event that does not bound one of
     its continuous variables from below and above.
@@ -34,7 +42,7 @@ class UnboundedEventError(DataclassException):
 
 
 @dataclass
-class IntractableError(DataclassException):
+class IntractableError(ProbabilisticModelException):
     """
     Exception raised when an inference is intractable for a model.
 
@@ -51,7 +59,7 @@ class IntractableError(DataclassException):
 
 
 @dataclass
-class UndefinedOperationError(DataclassException):
+class UndefinedOperationError(ProbabilisticModelException):
     """
     Exception raised when an operation is not defined for a model.
 
@@ -68,7 +76,7 @@ class UndefinedOperationError(DataclassException):
 
 
 @dataclass
-class ProbabilisticCircuitRequiredError(DataclassException):
+class ProbabilisticCircuitRequiredError(ProbabilisticModelException):
     """
     Exception raised when a distribution is asked for something whose answer only a
     probabilistic circuit can represent.
@@ -115,7 +123,7 @@ class EventIsNotABoxError(ProbabilisticCircuitRequiredError):
 
 
 @dataclass
-class ShapeMismatchError(DataclassException, ValueError):
+class ShapeMismatchError(ProbabilisticModelException, ValueError):
     """
     Exception raised when the shape of two objects does not match.
     """
@@ -138,7 +146,7 @@ class ShapeMismatchError(DataclassException, ValueError):
 
 
 @dataclass
-class VariableNotInDistributionError(DataclassException):
+class VariableNotInDistributionError(ProbabilisticModelException):
     """
     Exception raised when a variable is named that a distribution is not over.
 
@@ -167,7 +175,7 @@ class VariableNotInDistributionError(DataclassException):
 
 
 @dataclass
-class NonContinuousVariableError(DataclassException, ValueError):
+class NonContinuousVariableError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a model that only fits continuous variables is given others.
     """
@@ -188,7 +196,7 @@ class NonContinuousVariableError(DataclassException, ValueError):
 
 
 @dataclass
-class NoClosedFormError(DataclassException, NotImplementedError):
+class NoClosedFormError(ProbabilisticModelException, NotImplementedError):
     """
     Exception raised when a query has no answer that the model or layer that was asked
     can represent in closed form.
@@ -212,7 +220,7 @@ class NoClosedFormError(DataclassException, NotImplementedError):
 
 
 @dataclass
-class InvalidMomentOrderError(DataclassException, ValueError):
+class InvalidMomentOrderError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a moment is asked for an order that is not a whole number or
     is negative.
@@ -231,7 +239,7 @@ class InvalidMomentOrderError(DataclassException, ValueError):
 
 
 @dataclass
-class EventMixesPointsAndIntervalsError(DataclassException, ValueError):
+class EventMixesPointsAndIntervalsError(ProbabilisticModelException, ValueError):
     """
     Exception raised when an event is to be measured uniformly while one of its
     continuous variables takes points and intervals at once.
@@ -256,7 +264,7 @@ class EventMixesPointsAndIntervalsError(DataclassException, ValueError):
 
 
 @dataclass
-class MixtureOverDifferentVariablesError(DataclassException, ValueError):
+class MixtureOverDifferentVariablesError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a mixture is built of components that are not over the same
     variables.
@@ -281,7 +289,7 @@ class MixtureOverDifferentVariablesError(DataclassException, ValueError):
 
 
 @dataclass
-class ProductOverSharedVariablesError(DataclassException, ValueError):
+class ProductOverSharedVariablesError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a product is built of factors that share a variable.
 
@@ -306,7 +314,7 @@ class ProductOverSharedVariablesError(DataclassException, ValueError):
 
 
 @dataclass
-class EmptyCompositionError(DataclassException, ValueError):
+class EmptyCompositionError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a mixture or a product is built of no components at all.
     """
@@ -324,7 +332,7 @@ class EmptyCompositionError(DataclassException, ValueError):
 
 
 @dataclass
-class NumberOfWeightsMismatchError(DataclassException, ValueError):
+class NumberOfWeightsMismatchError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a mixture does not get exactly one weight per component.
     """

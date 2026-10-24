@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Set
 
-from krrood.exceptions import DataclassException
+from probabilistic_model.exceptions import ProbabilisticModelException
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.variable import Variable
 from typing_extensions import Generic
@@ -14,11 +14,12 @@ from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representat
 
 
 @dataclass
-class SupportDeterminismViolation(DataclassException):
+class SupportDeterminismViolation(ProbabilisticModelException):
     """
     Base class for all violations produced by verify_support_determinism().
 
-    Inherits from DataclassException so each violation is also a raiseable exception.
+    Each violation is also a raiseable
+    :class:`~probabilistic_model.exceptions.ProbabilisticModelException`.
     Subclasses implement error_message().
     """
 
@@ -117,7 +118,7 @@ class OverlappingComponentsViolation(
 
 
 @dataclass
-class SupportDeterminismVerificationResult(DataclassException):
+class SupportDeterminismVerificationResult(ProbabilisticModelException):
     """
     Result of verifying support determinism of a circuit against its Marginal
     Determinism Variable Tree.
@@ -174,7 +175,7 @@ class SupportDeterminismVerificationResult(DataclassException):
 
 
 @dataclass
-class UnregisteredVariableError(DataclassException):
+class UnregisteredVariableError(ProbabilisticModelException):
     """
     Raised when a Variable passed to backdoor_adjustment or diagnose_failure is not
     registered as a cause or effect Variable in the CausalCircuit.
@@ -206,7 +207,7 @@ class UnregisteredVariableError(DataclassException):
 
 
 @dataclass
-class EmptyInterventionalCircuitError(DataclassException):
+class EmptyInterventionalCircuitError(ProbabilisticModelException):
     """
     Raised when backdoor_adjustment produces no ProductUnit components, meaning the
     interventional circuit is empty.
@@ -241,7 +242,7 @@ class EmptyInterventionalCircuitError(DataclassException):
 
 
 @dataclass
-class NoCauseVariablesError(DataclassException):
+class NoCauseVariablesError(ProbabilisticModelException):
     """
     Raised when diagnose_failure finds no numeric cause Variables in observed_values
     that match any registered cause Variable.

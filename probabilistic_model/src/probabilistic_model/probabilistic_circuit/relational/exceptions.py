@@ -4,14 +4,14 @@ from dataclasses import dataclass
 
 from typing_extensions import TYPE_CHECKING, Any, List, Type
 
-from krrood.exceptions import DataclassException
+from probabilistic_model.exceptions import ProbabilisticModelException
 
 if TYPE_CHECKING:
     from random_events.variable import Variable
 
 
 @dataclass
-class CircuitNotFittedError(DataclassException):
+class CircuitNotFittedError(ProbabilisticModelException):
     """
     Raised when a RelationalProbabilisticCircuit is grounded before it has been fitted.
     """
@@ -26,7 +26,7 @@ class CircuitNotFittedError(DataclassException):
 
 
 @dataclass
-class ClassCircuitGroundingFailedError(DataclassException):
+class ClassCircuitGroundingFailedError(ProbabilisticModelException):
     """
     Raised when conditioning the class circuit on aggregation statistics leaves it with
     no nodes at all.
@@ -49,7 +49,7 @@ class ClassCircuitGroundingFailedError(DataclassException):
 
 
 @dataclass
-class MixedCircuitTypesError(DataclassException):
+class MixedCircuitTypesError(ProbabilisticModelException):
     """
     Raised when the template of an exchangeable relation is fitted in another circuit
     type than the class circuit, which grounding cannot combine.
@@ -90,7 +90,7 @@ class MixedCircuitTypesError(DataclassException):
 
 
 @dataclass
-class UnknownExchangeablePartsError(DataclassException):
+class UnknownExchangeablePartsError(ProbabilisticModelException):
     """
     Raised when learning methods are given for parts that are not exchangeable parts of
     the class.
@@ -120,7 +120,7 @@ class UnknownExchangeablePartsError(DataclassException):
 
 
 @dataclass
-class NotAnAttributeAccessError(DataclassException):
+class NotAnAttributeAccessError(ProbabilisticModelException):
     """
     Raised when a part learning method is keyed by something other than an attribute
     access on an EQL variable.
@@ -142,7 +142,7 @@ class NotAnAttributeAccessError(DataclassException):
 
 
 @dataclass
-class MissingPartLearningMethodError(DataclassException):
+class MissingPartLearningMethodError(ProbabilisticModelException):
     """
     Raised when an exchangeable part has no learning method and there is no default.
     """
@@ -162,7 +162,7 @@ class MissingPartLearningMethodError(DataclassException):
 
 
 @dataclass
-class PartCircuitGroundingFailedError(DataclassException):
+class PartCircuitGroundingFailedError(ProbabilisticModelException):
     """
     Raised when grounding one exchangeable part leaves its circuit with no nodes at all.
     """
@@ -184,7 +184,7 @@ class PartCircuitGroundingFailedError(DataclassException):
 
 
 @dataclass
-class InvalidMonteCarloSampleCountError(DataclassException):
+class InvalidMonteCarloSampleCountError(ProbabilisticModelException):
     """
     Raised when grounding must integrate out undetermined aggregation statistics but the
     configured Monte-Carlo sample count is not positive.
@@ -206,7 +206,7 @@ class InvalidMonteCarloSampleCountError(DataclassException):
 
 
 @dataclass
-class UndeterminedLatentsNotModeledError(DataclassException):
+class UndeterminedLatentsNotModeledError(ProbabilisticModelException):
     """
     Raised when the conditioned class circuit does not model the undetermined
     aggregation statistics, so they cannot be sampled and integrated out.
@@ -232,7 +232,7 @@ class UndeterminedLatentsNotModeledError(DataclassException):
 
 
 @dataclass
-class UndeterminedLatentsNotPartitionedError(DataclassException):
+class UndeterminedLatentsNotPartitionedError(ProbabilisticModelException):
     """
     Raised when the undetermined latents' marginal support -- grouped by the fitted
     circuit's own mixture branches -- is not a genuine, pairwise-disjoint partition:
@@ -266,7 +266,7 @@ class UndeterminedLatentsNotPartitionedError(DataclassException):
 
 
 @dataclass
-class VariableNotFoundError(DataclassException):
+class VariableNotFoundError(ProbabilisticModelException):
     """
     Raised when a dotted access path does not match any variable in a grounded circuit.
     """
@@ -295,7 +295,7 @@ class VariableNotFoundError(DataclassException):
 
 
 @dataclass
-class AmbiguousVariablePathError(DataclassException):
+class AmbiguousVariablePathError(ProbabilisticModelException):
     """
     Raised when a dotted access path matches more than one variable in a grounded
     circuit.
@@ -320,10 +320,10 @@ class AmbiguousVariablePathError(DataclassException):
 
 
 @dataclass
-class NoCommonSuperclassError(DataclassException):
+class NoCommonSuperclassError(ProbabilisticModelException):
     """
-    Raised when the instances a relational circuit is fitted on share no superclass
-    but ``object``.
+    Raised when the instances a relational circuit is fitted on share no superclass but
+    ``object``.
     """
 
     classes: List[Type]
@@ -342,7 +342,7 @@ class NoCommonSuperclassError(DataclassException):
 
 
 @dataclass
-class InstanceNotOfClassError(DataclassException):
+class InstanceNotOfClassError(ProbabilisticModelException):
     """
     Raised when a relational circuit is fitted for a class on an instance of another
     class.
