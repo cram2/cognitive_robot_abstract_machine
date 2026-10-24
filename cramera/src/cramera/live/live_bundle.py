@@ -21,16 +21,17 @@ from pathlib import Path
 
 from typing_extensions import Any, Dict, Iterable, List, Optional
 
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Camera
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from cramera import paths
-from cramera.generated_json import GeneratedJson
+from cramera.knowledge.scene_bundle import SceneBundle
 from cramera.live.bridge import Bridge
 from cramera.world_objects import WorldObjects
 from cramera.onboard.bundle_urdf import BundledModel, BundleReport
 from cramera.onboard.world_to_urdf import UrdfDocument
+from cramera.recording_fields import SceneField
 from cramera.robot_parts import RobotPartAnnotation
 
 ENVIRONMENT_MODEL_NAME = "environment"
@@ -145,21 +146,10 @@ def build_live_scene(bridge: Bridge) -> Optional[str]:
     output_directory = paths.local_scenes_directory() / paths.LIVE_SCENE_NAME
     with bridge.bundle_lock:
         signature = bridge.bundle_signature()
-        if _existing_signature(output_directory) == signature:
+        cached = SceneBundle.of_directory(output_directory, include_trajectory=False)
+        if cached.matches_live_content(signature, has_robot=bridge.robot is not None):
             return paths.LIVE_SCENE_NAME
         return _write_bundle(bridge, output_directory, signature)
-
-
-def _existing_signature(output_directory: Path) -> Optional[str]:
-    """
-    The signature the existing bundle was built from, or None without a readable one.
-
-    :param output_directory: Directory the previous bundle was written to.
-    """
-    scene = GeneratedJson(output_directory / "scene.json").read()
-    if not isinstance(scene, dict):
-        return None
-    return scene.get("bundleSignature")
 
 
 def _write_bundle(bridge: Bridge, output_directory: Path, signature: str) -> str:
@@ -186,7 +176,7 @@ def _write_bundle(bridge: Bridge, output_directory: Path, signature: str) -> str
     scene = {
         "name": paths.LIVE_SCENE_NAME,
         "models": geometry.models,
-        "robot": geometry.robot,
+        SceneField.ROBOT: geometry.robot,
         "objects": [],
         "segments": [],
         "missingAssets": geometry.missing_assets,
@@ -195,7 +185,7 @@ def _write_bundle(bridge: Bridge, output_directory: Path, signature: str) -> str
         "worldBound": True,
         # what this bundle was built from; while it is unchanged, /live_scene leaves
         # the bundle untouched instead of deleting files a viewer may be downloading
-        "bundleSignature": signature,
+        SceneField.BUNDLE_SIGNATURE: signature,
     }
     (output_directory / "scene.json").write_text(json.dumps(scene, indent=1))
     return paths.LIVE_SCENE_NAME
@@ -230,12 +220,18 @@ def _model_payload(report: BundleReport, is_robot: bool) -> Dict[str, Any]:
 
 def _robot_payload(robot: Optional[AbstractRobot]) -> Optional[Dict[str, Any]]:
     """
-    The scene's ``robot`` field, or None if no robot is bound.
+    The scene's ``robot`` field, with camera values read under their native world lock.
 
     :param robot: The robot's semantic annotation, or None if no robot is bound.
     """
     if robot is None:
         return None
+    with robot.root._world.state.world_lock:
+        cameras = [
+            sensor.to_json()
+            for sensor in robot.all_sensors
+            if isinstance(sensor, Camera)
+        ]
     root_name = str(robot.root.name)
     part_annotations = RobotPartAnnotation.of_robot(robot)
     return {
@@ -244,4 +240,5 @@ def _robot_payload(robot: Optional[AbstractRobot]) -> Optional[Dict[str, Any]]:
         "baseBody": root_name.split("/", 1)[-1],
         "parts": {annotation.name: annotation.links for annotation in part_annotations},
         "partAnnotations": [annotation.to_payload() for annotation in part_annotations],
+        SceneField.CAMERAS: cameras,
     }

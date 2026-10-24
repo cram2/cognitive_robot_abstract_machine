@@ -16,6 +16,7 @@ from urdf_parser_py.urdf import URDF
 from cramera import paths
 from cramera.generated_json import GeneratedJson
 from cramera.logging_setup import get_logger
+from cramera.recording_fields import SceneField
 
 logger = get_logger(__name__)
 
@@ -111,13 +112,47 @@ class SceneBundle:
         directory = cls.directory_of(scene)
         if not directory:
             return cls({}, {})
+        return cls.of_directory(directory)
+
+    @classmethod
+    def of_directory(
+        cls, directory: Path, *, include_trajectory: bool = True
+    ) -> SceneBundle:
+        """
+        Read a bundle from its exact directory without resolving the active scene.
+
+        :param directory: Directory containing the scene and optional trajectory.
+        :param include_trajectory: Whether to read the recording's trajectory data.
+        :return: Parsed bundle, or an empty bundle without readable scene metadata.
+        """
         scene = GeneratedJson(directory / "scene.json").read()
         if not isinstance(scene, dict):
             return cls({}, {})
+        if not include_trajectory:
+            return cls(scene, {})
         trajectory = GeneratedJson(
             directory / scene.get("trajectory", "trajectory.json")
         ).read()
         return cls(scene, trajectory if isinstance(trajectory, dict) else {})
+
+    def matches_live_content(self, content_digest: str, has_robot: bool) -> bool:
+        """
+        Check whether this bundle can be reused for the current live model.
+
+        The digest identifies body topology, robot type and camera descriptions. Joint
+        poses and independently tracked overlay objects are excluded.
+
+        :param content_digest: Comparison hash published by the live model.
+        :param has_robot: Whether the current model requires robot camera metadata.
+        :return: Whether the metadata is complete and its model digest matches.
+        """
+        if has_robot:
+            robot = self.scene.get(SceneField.ROBOT)
+            if not isinstance(robot, dict) or not isinstance(
+                robot.get(SceneField.CAMERAS), list
+            ):
+                return False
+        return self.scene.get(SceneField.BUNDLE_SIGNATURE) == content_digest
 
     @classmethod
     def declared_presets(cls, scene: Optional[str] = None) -> List[Dict[str, Any]]:
