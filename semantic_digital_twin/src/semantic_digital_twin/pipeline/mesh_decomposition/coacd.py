@@ -1,4 +1,3 @@
-import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -151,11 +150,6 @@ class COACDMeshDecomposer(MeshDecomposer):
         new_geometry = []
 
         trimesh_mesh = mesh.mesh
-        if mesh.scale.x == mesh.scale.y == mesh.scale.z:
-            trimesh_mesh.apply_scale(mesh.scale.x)
-        else:
-            logging.warning("Ambiguous scale for mesh, using uniform scale only.")
-
         coacd_mesh = coacd.Mesh(trimesh_mesh.vertices, trimesh_mesh.faces)
         if self.max_convex_hull is not None:
             max_convex_hull = self.max_convex_hull

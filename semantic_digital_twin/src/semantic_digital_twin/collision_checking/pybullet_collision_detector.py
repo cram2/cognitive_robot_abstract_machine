@@ -286,6 +286,8 @@ def load_convex_mesh_shape(
         obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(
             mesh=mesh, mesh_decomposer=mesh_decomposer
         )
+        # The decomposition is made from the already scaled mesh.
+        scale = Scale()
     elif (
         np.allclose(mesh.file_T_mesh.to_np(), np.eye(4))
         and mesh.local_file.suffix.removeprefix(".").lower() in BulletMeshFileFormat

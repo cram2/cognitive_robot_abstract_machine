@@ -10,6 +10,7 @@ import os
 from dataclasses import dataclass, field, replace
 
 import giskardpy_bullet_bindings as pb
+import numpy as np
 import pytest
 import trimesh
 from pathlib import Path
@@ -63,6 +64,13 @@ def non_convex_mesh():
     world_with_stl = STLParser(stl_path).create_world()
     body: Body = world_with_stl.root
     return body.collision[0]
+
+
+@pytest.fixture
+def scaled_non_convex_mesh(non_convex_mesh):
+    return Mesh.from_trimesh(
+        mesh=non_convex_mesh.mesh, scale=Scale(x=0.5, y=0.5, z=0.5)
+    )
 
 
 @pytest.fixture
@@ -368,3 +376,36 @@ def test_a_mesh_turned_within_its_file_collides_like_its_turned_vertices(monkeyp
     assert bounds_of(turned_shape) == bounds_of(
         create_shape_from_geometry(geometry=turned_vertices)
     )
+
+
+# %% scaled meshes
+
+
+def test_decomposition_of_scaled_mesh_has_the_scaled_size(
+    clean_cache, cache_dir, scaled_non_convex_mesh, mesh_decomposer
+):
+    """
+    The convex parts a decomposer writes cover the mesh with its scale applied once.
+    """
+    scaled_extents = scaled_non_convex_mesh.mesh.extents.copy()
+    output_path = convert_to_decomposed_obj_and_save_in_tmp(
+        scaled_non_convex_mesh, mesh_decomposer=mesh_decomposer, cache_dir=cache_dir
+    )
+    decomposition = trimesh.load(output_path, force="mesh", process=False)
+    assert decomposition.extents == pytest.approx(scaled_extents, abs=0.005)
+
+
+def test_collision_shape_of_scaled_non_convex_mesh_has_the_scaled_size(
+    scaled_non_convex_mesh, monkeypatch
+):
+    """
+    The collision shape of a decomposed mesh is as large as the mesh with its scale
+    applied once.
+    """
+    monkeypatch.setattr(pybullet_collision_detector, "_shape_cache", {})
+    shape = create_shape_from_geometry(
+        geometry=scaled_non_convex_mesh, mesh_decomposer=VHACDMeshDecomposer()
+    )
+    lower, upper = shape.get_aabb(pb.Transform.identity())
+    extents = np.array([upper.x - lower.x, upper.y - lower.y, upper.z - lower.z])
+    assert extents == pytest.approx(scaled_non_convex_mesh.mesh.extents, abs=0.005)
