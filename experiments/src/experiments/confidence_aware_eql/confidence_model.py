@@ -19,7 +19,7 @@ from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.dao import get_dao_schema
 from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
 from typing_extensions import Any
@@ -125,10 +125,7 @@ class PerClassConfidenceModel:
 
     @classmethod
     def fit(
-        cls,
-        domain_class: type,
-        instances: list[Any],
-        minimum_instances_per_leaf: int = 2,
+        cls, instances: list[Any], minimum_instances_per_leaf: int = 2
     ) -> PerClassConfidenceModel:
         """Fit a relational probabilistic circuit and calibrate its threshold.
 
@@ -140,17 +137,15 @@ class PerClassConfidenceModel:
         instances' own log-likelihoods, so an instance less likely than almost every
         familiar one is judged unfamiliar.
 
-        :param domain_class: The class every instance belongs to.
-        :param instances: The familiar instances of ``domain_class`` to learn from.
+        :param instances: The familiar instances of one class to learn from.
         :param minimum_instances_per_leaf: Fewest training instances a leaf of the
             class circuit describes.
         :return: A fitted per-class confidence model.
         """
         circuit = RelationalProbabilisticCircuit(
-            domain_class,
             learning_method=JointProbabilityTree(
                 min_samples_per_leaf=minimum_instances_per_leaf
-            ),
+            )
         )
         circuit.fit(
             instances, dataframe_from_parent=extract_feature_dataframe(instances)
@@ -218,7 +213,7 @@ class ConfidenceModel:
             instances_by_class.setdefault(type(instance), []).append(instance)
         models_by_class = {
             domain_class: PerClassConfidenceModel.fit(
-                domain_class, class_instances, minimum_instances_per_leaf
+                class_instances, minimum_instances_per_leaf
             )
             for domain_class, class_instances in instances_by_class.items()
         }
