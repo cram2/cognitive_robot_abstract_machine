@@ -15,12 +15,12 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleNodeValues,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.continuous_layer_with_density import (
-    ContinuousLayerWithFiniteSupport,
+    ContinuousLayerWithConstrainedSupport,
 )
 
 
 @dataclass(eq=False, repr=False)
-class UniformLayer(ContinuousLayerWithFiniteSupport):
+class UniformLayer(ContinuousLayerWithConstrainedSupport):
     """
     A layer of uniform distributions over one continuous variable.
     """

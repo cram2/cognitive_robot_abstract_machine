@@ -325,8 +325,8 @@ class Pose2DMapping(AlternativeMapping[Pose2D]):
         return result
 
     def to_domain_object(self) -> Pose2D:
-        return Pose2D.from_position_and_yaw(
-            self.position,
+        return Pose2D(
+            position=self.position,
             yaw=self.yaw,
             reference_frame=self.reference_frame,
         )

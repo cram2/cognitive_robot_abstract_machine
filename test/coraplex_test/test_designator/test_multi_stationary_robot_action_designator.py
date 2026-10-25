@@ -40,15 +40,13 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.grasping.grasp_candidates import (
-    GraspCandidate,
-    HasGraspCandidates,
-)
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ...conftest import SAMPLING_SEED
-from ..conftest import left_or_only_arm, right_or_only_arm
+from ..conftest import grasp_point_of, left_or_only_arm, right_or_only_arm
 from ..world_snapshot import WorldSnapshot
 
 
@@ -196,12 +194,11 @@ def test_reach_action_multi(stationary_block_context):
         plan.perform()
 
     end_effector_pose = left_arm.end_effector.tool_frame.global_transform
-    end_effector_position = end_effector_pose.position.to_np()
     end_effector_orientation = end_effector_pose.quaternion.to_np()
 
     target_orientation = left_arm.end_effector.tool_frame_goal(grasp_pose).quaternion
 
-    assert end_effector_position[:3] == pytest.approx(position[:3], abs=0.01)
+    assert grasp_point_of(left_arm) == pytest.approx(position[:3], abs=0.01)
     compare_orientations(
         end_effector_orientation, target_orientation.to_np(), decimal=2
     )
@@ -260,10 +257,10 @@ def test_grasping(stationary_block_context):
     with kinematically_simulated_robot:
         plan.perform()
 
-    # The grasp sits at the box's own origin, so that is where the tool frame ends up.
+    # The grasp sits at the box's own origin, so that is where the fingers end up.
     assert np.allclose(
-        box_body.global_pose.position.to_np(),
-        left_arm.end_effector.tool_frame.global_pose.position.to_np(),
+        box_body.global_pose.position.to_np().flatten()[:3],
+        grasp_point_of(left_arm),
         atol=0.01,
     )
 

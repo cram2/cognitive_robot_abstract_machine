@@ -2,13 +2,15 @@
 Coverage for the scaffolding demonstrations share.
 
 The pieces exercised here are the ones a second demonstration would otherwise re-derive:
-which world a run acts on, whether it has to spawn its scene, and who owns the ROS
-context. None of it needs a controller.
+which world a run acts on, whether its scene is merged into it, and who owns the ROS
+context. None of it needs a controller; a real run is handed the world a controller
+would serve.
 """
 
 import logging
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from uuid import UUID
 
 import pytest
 import rclpy
@@ -21,6 +23,8 @@ from coraplex.plans.factories import code
 from coraplex.plans.plan_node import PlanNode
 from coraplex.demonstrations import RobotDemonstration, RobotDemonstrationRosSession
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world import World
 
 from ..conftest import SAMPLING_SEED
@@ -32,15 +36,40 @@ class PlanDeliberatelyFailed(Exception):
     """
 
 
+@dataclass
+class RecordingRobotSpecification(RobotSpecification):
+    """
+    A robot that records the worlds it is put into instead of being put into them.
+    """
+
+    spawned_into: list[World] = field(default_factory=list)
+    """
+    The worlds the robot was put into, in order.
+    """
+
+    def spawn(self, world: World) -> None:
+        self.spawned_into.append(world)
+
+
 @dataclass(kw_only=True)
 class RecordingDemonstration(RobotDemonstration):
     """
     A demonstration that records which of its hooks ran and in which environment.
     """
 
-    world: World
+    world: World | None = None
     """
-    World handed to this demonstration instead of one it builds itself.
+    World a simulated run is handed instead of one it builds itself, and ``None`` to
+    build it.
+    """
+
+    robot: RecordingRobotSpecification = field(
+        default_factory=lambda: RecordingRobotSpecification(
+            semantic_annotation_type=MinimalRobot
+        )
+    )
+    """
+    The robot a simulated run puts into the scene it builds.
     """
 
     scene_already_populated: bool = False
@@ -53,9 +82,9 @@ class RecordingDemonstration(RobotDemonstration):
     Whether the plan raises :class:`PlanDeliberatelyFailed` instead of recording.
     """
 
-    populate_scene_calls: int = 0
+    populated_scene_roots: list[UUID] = field(default_factory=list)
     """
-    How often the scene was spawned.
+    The ids of the roots of the scenes that were built, in order.
     """
 
     tear_down_calls: int = 0
@@ -88,14 +117,22 @@ class RecordingDemonstration(RobotDemonstration):
     Whether the events of the run were being segmented while the plan ran.
     """
 
+    def scene_specification(self) -> WorldSpecification:
+        return WorldSpecification()
+
+    def robot_specification(self) -> RobotSpecification:
+        return self.robot
+
     def build_simulated_world(self) -> World:
-        return self.world
+        if self.world is not None:
+            return self.world
+        return super().build_simulated_world()
 
     def is_scene_populated(self, world: World) -> bool:
         return self.scene_already_populated
 
     def populate_scene(self, world: World) -> None:
-        self.populate_scene_calls += 1
+        self.populated_scene_roots.append(world.root.id)
 
     def build_context(self, world: World) -> Context:
         self.built_context = Context(
@@ -152,33 +189,73 @@ def test_simulated_run_still_builds_its_own_world(cylinder_bot_world):
     demonstration.tear_down()
 
 
+def test_simulated_run_puts_the_robot_into_the_scene_it_builds():
+    demonstration = RecordingDemonstration(used_robot=MinimalRobot)
+
+    world = demonstration.build_simulated_world()
+
+    assert demonstration.populated_scene_roots == [world.root.id]
+    assert demonstration.robot.spawned_into == [world]
+
+
 # %% scene population
 
 
-def test_scene_is_spawned_when_the_world_does_not_have_it(cylinder_bot_world):
-    demonstration = RecordingDemonstration(
-        world=cylinder_bot_world, used_robot=MinimalRobot
+def serve_from_the_controller(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
+    """
+    Make every fetch of a real run return `world`, as if a controller served it.
+    """
+    monkeypatch.setattr(
+        RobotDemonstrationRosSession,
+        "fetch_world",
+        lambda session, timeout_seconds=None: world,
     )
 
-    demonstration.run()
 
-    assert demonstration.populate_scene_calls == 1
+def test_real_run_merges_the_scene_into_a_world_that_does_not_have_it(
+    cylinder_bot_world, monkeypatch
+):
+    serve_from_the_controller(monkeypatch, cylinder_bot_world)
+    demonstration = RecordingDemonstration(
+        used_robot=MinimalRobot, execution_type=ExecutionType.REAL
+    )
+    controller_root = cylinder_bot_world.root
+
+    try:
+        acquired_world = demonstration.acquire_world()
+    finally:
+        demonstration.tear_down()
+
+    [scene_root_id] = demonstration.populated_scene_roots
+    scene_root = cylinder_bot_world.get_kinematic_structure_entity_by_id(scene_root_id)
+    assert acquired_world is cylinder_bot_world
+    assert cylinder_bot_world.root is controller_root
+    assert scene_root.parent_connection.parent is controller_root
+    assert demonstration.robot.spawned_into == []
 
 
-def test_scene_is_not_spawned_again_into_a_world_that_has_it(cylinder_bot_world):
+def test_real_run_does_not_merge_the_scene_into_a_world_that_has_it(
+    cylinder_bot_world, monkeypatch
+):
     """
     A run against a controller receives a world that may already hold this
-    demonstration's objects, and must not spawn a second copy of them.
+    demonstration's scene, and must not merge in a second copy of it.
     """
+    serve_from_the_controller(monkeypatch, cylinder_bot_world)
     demonstration = RecordingDemonstration(
-        world=cylinder_bot_world,
         used_robot=MinimalRobot,
+        execution_type=ExecutionType.REAL,
         scene_already_populated=True,
     )
+    bodies_before = len(cylinder_bot_world.kinematic_structure_entities)
 
-    demonstration.run()
+    try:
+        demonstration.acquire_world()
+    finally:
+        demonstration.tear_down()
 
-    assert demonstration.populate_scene_calls == 0
+    assert demonstration.populated_scene_roots == []
+    assert len(cylinder_bot_world.kinematic_structure_entities) == bodies_before
 
 
 # %% execution environment

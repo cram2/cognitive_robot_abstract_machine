@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
@@ -23,52 +22,27 @@ class MonteCarloEstimator:
     The number of samples to use for the estimation.
     """
 
-    def l1_metric_but_with_uniform_measure(self, other: ProbabilisticModel):
+    def total_variation_distance(self, other: ProbabilisticModel) -> float:
         """
-        Calculate the L1 metric between the model and another model using a uniform
-        measure over the union of both distributions to sample from.
+        Estimate the total variation distance :math:`\\frac{1}{2} \\int |p(x) - q(x)| dx`
+        between the model :math:`p` and another model :math:`q`.
+
+        The estimate is the importance sampling estimate under the equal mixture
+        :math:`m = (p + q) / 2`, which draws :attr:`sample_size` samples from each model
+        and averages :math:`|p(x) - q(x)| / (p(x) + q(x))`. This is the balance
+        heuristic of multiple importance sampling
+        :cite:p:`veach1995optimally,elvira2019generalized`. It is unbiased and always
+        lies in :math:`[0, 1]`.
 
         :param other: The other model to compare to.
-        :return: The L1 metric between the two models.
+        :return: The estimated total variation distance between the two models.
         """
-        # get the union of both supports
-        supp_of_self = self.model.support
-        supp_of_other = other.support
-        union_of_supports = supp_of_other | supp_of_self
-
-        # construct uniform measure over the union of both supports
-        uniform_model = uniform_measure_of_event(union_of_supports)
-
-        # draw samples from the uniform measure
-        samples = uniform_model.sample(self.sample_size)
-
-        # get the density of the uniform model
-        density_of_uniform_model = uniform_model.likelihood(samples[:1])[0]
-
-        # compare the likelihoods of the two models on the samples of the uniform model
-        p_self = self.model.likelihood(samples)
-        p_other = other.likelihood(samples)
-
-        # calculate the L1 metric
-        l1_metric = np.mean(np.abs(p_self - p_other)) / density_of_uniform_model
-        return l1_metric
-
-    def l1_metric(self, other: ProbabilisticModel, tolerance: float = 10e-8) -> float:
-        """
-        Estimates the L1 metric between to models.
-
-        :other: the other model. :tolerance: Tolerance to use for the comparison of
-        likelihoods. Samples that have a likelihood in both models that differs by less
-        than this tolerance are considered to have an equal likelihood.
-        """
-        samples_p = self.model.sample(self.sample_size)
-        l_p = self.model.likelihood(samples_p)
-        l_q = other.likelihood(samples_p)
-        diff = l_p - l_q
-        p = (diff > tolerance).mean()
-        samples_q = other.sample(self.sample_size)
-        l_p = self.model.likelihood(samples_q)
-        l_q = other.likelihood(samples_q)
-        diff = l_p - l_q
-        q = (diff > tolerance).mean()
-        return 2 * (p - q)
+        samples = np.concatenate(
+            [self.model.sample(self.sample_size), other.sample(self.sample_size)]
+        )
+        likelihood_of_model = self.model.likelihood(samples)
+        likelihood_of_other = other.likelihood(samples)
+        return np.mean(
+            np.abs(likelihood_of_model - likelihood_of_other)
+            / (likelihood_of_model + likelihood_of_other)
+        )

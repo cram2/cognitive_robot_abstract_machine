@@ -66,6 +66,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.uniform_la
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
+    LayerNode,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
     RowGroupedSparseArray,
@@ -314,23 +315,6 @@ class ConvertedCircuit:
             if node is not None:
                 return LayerNode(converted_layer.layer, node)
         raise UnitNotConvertedError(unit)
-
-
-@dataclass
-class LayerNode:
-    """
-    One node of a layer.
-    """
-
-    layer: Layer
-    """
-    The layer.
-    """
-
-    node: int
-    """
-    The index of the node in the layer.
-    """
 
 
 class RustworkxCircuitToLayeredCircuitConverter(

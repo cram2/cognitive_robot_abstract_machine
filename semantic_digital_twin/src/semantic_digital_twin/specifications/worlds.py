@@ -89,6 +89,7 @@ class WorldSpecification:
         *,
         prefix: str | None = None,
         mimic_joints: dict[str, str] | None = None,
+        use_visual_as_collision_backup: bool = False,
         robots: list[RobotSpecification] | None = None,
         objects: list[SpawnSpecification] | None = None,
     ) -> Self:
@@ -100,6 +101,8 @@ class WorldSpecification:
             description; robots are supplied through ``robots``.
         :param prefix: Optional name prefix for the parsed environment.
         :param mimic_joints: Mapping of joint names to the joints they mimic.
+        :param use_visual_as_collision_backup: Whether a body with no geom that takes
+            part in contact collides with the geoms it does have.
         :param robots: The robots merged into the environment.
         :param objects: Specifications spawned once the robots are in place.
         :return: The created specification.
@@ -110,6 +113,7 @@ class WorldSpecification:
             file_path=file_path,
             mimic_joints=mimic_joints or {},
             prefix=prefix,
+            use_visual_as_collision_backup=use_visual_as_collision_backup,
         )
         return cls(
             world_parser=world_parser,

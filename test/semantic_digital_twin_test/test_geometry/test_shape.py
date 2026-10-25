@@ -1,11 +1,15 @@
 import math
 import os
+import tracemalloc
 from importlib.resources import files
 from pathlib import Path
 
 import numpy as np
 import pytest
 import trimesh
+from PIL import Image
+from trimesh.visual import TextureVisuals
+from trimesh.visual.material import SimpleMaterial
 
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -538,3 +542,115 @@ def test_a_shape_survives_a_json_round_trip(shape):
 
     assert restored == shape
     assert restored.to_json() == payload
+
+
+# %% a prism of equilateral cross-section
+
+PRISM_SIDE = 0.04
+"""
+Side of the triangular cross-section of the prism a test builds.
+"""
+
+PRISM_HEIGHT = 0.03
+"""
+Height of the prism a test builds.
+"""
+
+MESH_FILE_PRECISION = 1e-6
+"""
+How closely a mesh written to a file keeps its coordinates, in metres.
+"""
+
+
+def test_a_triangular_prism_has_the_side_and_height_it_is_built_with():
+    prism = Mesh.triangular_prism(side=PRISM_SIDE, height=PRISM_HEIGHT)
+    lower, upper = prism.mesh.bounds
+
+    np.testing.assert_allclose(
+        upper[1] - lower[1], PRISM_SIDE, atol=MESH_FILE_PRECISION
+    )
+    np.testing.assert_allclose(
+        upper[2] - lower[2], PRISM_HEIGHT, atol=MESH_FILE_PRECISION
+    )
+    np.testing.assert_allclose(
+        upper[0] - lower[0], PRISM_SIDE * math.sqrt(3) / 2, atol=MESH_FILE_PRECISION
+    )
+
+
+def test_a_triangular_prism_is_centred_on_its_bounding_box():
+    """
+    Centred on its bounding box rather than its centroid, the flat face and the apex
+    stand equally far from the middle, so two fingers closing along x meet both.
+    """
+    prism = Mesh.triangular_prism(side=PRISM_SIDE, height=PRISM_HEIGHT)
+    lower, upper = prism.mesh.bounds
+
+    np.testing.assert_allclose(
+        (lower + upper) / 2, np.zeros(3), atol=MESH_FILE_PRECISION
+    )
+
+
+def test_a_triangular_prism_points_its_apex_along_x():
+    prism = Mesh.triangular_prism(side=PRISM_SIDE, height=PRISM_HEIGHT)
+    vertices = prism.mesh.vertices
+    apex_x = vertices[:, 0].max()
+    face_x = vertices[:, 0].min()
+
+    assert np.sum(np.isclose(vertices[:, 0], apex_x)) < np.sum(
+        np.isclose(vertices[:, 0], face_x)
+    )
+
+
+# %% whether a mesh file is textured
+
+
+@pytest.fixture
+def two_textured_parts(tmp_path) -> Path:
+    """
+    :return: A file holding two boxes, each painted with a texture of its own.
+    """
+    scene = trimesh.Scene()
+    for index in range(2):
+        box = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
+        box.apply_translation((2.0 * index, 0.0, 0.0))
+        generator = np.random.default_rng(index)
+        image = Image.fromarray(
+            generator.integers(0, 255, (1024, 1024, 3), dtype=np.uint8)
+        )
+        box.visual = TextureVisuals(
+            uv=generator.random((len(box.vertices), 2)),
+            material=SimpleMaterial(image=image),
+        )
+        scene.add_geometry(box, geom_name=f"part_{index}")
+    path = tmp_path / "two_textured_parts.glb"
+    scene.export(path)
+    return path
+
+
+def test_a_file_painting_its_parts_with_textures_is_textured(two_textured_parts):
+    assert Mesh(filename=str(two_textured_parts)).is_textured
+
+
+def test_a_file_without_textures_is_not_textured(tmp_path):
+    path = tmp_path / "box.stl"
+    trimesh.creation.box(extents=(1.0, 1.0, 1.0)).export(path)
+
+    assert not Mesh(filename=str(path)).is_textured
+
+
+def test_telling_a_file_textured_does_not_merge_the_textures_of_its_parts(
+    two_textured_parts,
+):
+    """
+    Merging the parts of a file into one mesh packs their textures into one image, so
+    telling whether the file is textured must not merge them.
+    """
+    tracemalloc.start()
+    trimesh.load_mesh(str(two_textured_parts), process=False)
+    _, merging_peak = tracemalloc.get_traced_memory()
+    tracemalloc.reset_peak()
+    Mesh(filename=str(two_textured_parts)).is_textured
+    _, checking_peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert checking_peak < merging_peak / 2

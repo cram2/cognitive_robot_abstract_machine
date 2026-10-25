@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
     from robokudo.types.core import Annotation
+    from robokudo.types.cv import ColorToDepthRatio
 
 
 class CASViews(StrEnum):
@@ -62,10 +63,10 @@ class CASViews(StrEnum):
     DEPTH_IMAGE = "depth_image"
     """Depth image data"""
 
-    COLOR2DEPTH_RATIO = "color2depth_ratio"
-    """Scale factor to scale the `COLOR_IMAGE` to the resolution of the `DEPTH_IMAGE` in x, y format.
-    
-    Example: 1280x960 RGB, 640x480 DEPTH -> 0.5 along X and Y
+    COLOR_TO_DEPTH_RATIO = "color_to_depth_ratio"
+    """
+    Size of the :attr:`DEPTH_IMAGE` relative to the :attr:`COLOR_IMAGE`, as a
+    :class:`~robokudo.types.cv.ColorToDepthRatio`.
     """
 
     CAMERA_INFO = "cam_info"
@@ -179,12 +180,15 @@ class CAS:
         self.views[CASViews.DEPTH_IMAGE] = value
 
     @property
-    def color2depth_ratio(self) -> Optional[Tuple[float, float]]:
-        return self.views.get(CASViews.COLOR2DEPTH_RATIO)
+    def color_to_depth_ratio(self) -> ColorToDepthRatio | None:
+        """
+        Size of the depth image relative to the color image, or None without depth.
+        """
+        return self.views.get(CASViews.COLOR_TO_DEPTH_RATIO)
 
-    @color2depth_ratio.setter
-    def color2depth_ratio(self, value: Tuple[float, float]) -> None:
-        self.views[CASViews.COLOR2DEPTH_RATIO] = value
+    @color_to_depth_ratio.setter
+    def color_to_depth_ratio(self, value: ColorToDepthRatio | None) -> None:
+        self.views[CASViews.COLOR_TO_DEPTH_RATIO] = value
 
     @property
     def camera_info(self) -> Optional[CameraInfo]:

@@ -8,6 +8,7 @@ import numpy.typing as npt
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import (
+    Any,
     Dict,
     Iterable,
     List,
@@ -31,9 +32,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     VariableIndices,
     VariableMask,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
-    NumberOfWeightsMismatchError,
-)
+from probabilistic_model.exceptions import NumberOfWeightsMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
@@ -46,6 +45,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_laye
 )
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.node_component_supports import (
+    NodeComponentSupports,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
     QueryCache,
@@ -248,6 +250,38 @@ class SumLayer(InnerLayer):
             child_layer_indices,
             columns - offsets[child_layer_indices],
         )
+
+    def nodes_with_components(self) -> NodeMask:
+        result = np.zeros(self.number_of_nodes, dtype=bool)
+        result[self.log_weights.rows] = True
+        return result
+
+    def component_supports(
+        self, variables: SortedSet, cache: Optional[QueryCache] = None
+    ) -> List[NodeComponentSupports]:
+        child_supports = [
+            child_layer.support_of_nodes(variables, cache=cache)
+            for child_layer in self.child_layers
+        ]
+        result = [
+            NodeComponentSupports(node, []) for node in range(self.number_of_nodes)
+        ]
+        for edge in self.iterate_edges():
+            result[edge.node].supports.append(
+                child_supports[edge.child_layer_index][edge.child_node]
+            )
+        return result
+
+    def mixture_components(self) -> List[Tuple[Layer, int]]:
+        if self.number_of_nodes != 1:
+            return []
+        edges = self.inner_layer_edges
+        return [
+            (self.child_layers[child_layer_index], int(child_node))
+            for child_layer_index, child_node in zip(
+                edges.child_layer_indices, edges.child_nodes
+            )
+        ]
 
     def values_of_edges(self, child_results: List[npt.NDArray]) -> npt.NDArray:
         """
@@ -550,18 +584,6 @@ class SumLayer(InnerLayer):
             for index, event in enumerate(events)
             for other in events[index + 1 :]
         )
-
-    def __deepcopy__(self, memo=None) -> SumLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        child_layers = [
-            child_layer.__deepcopy__(memo) for child_layer in self.child_layers
-        ]
-        result = self.__class__(child_layers, self.log_weights.copy())
-        memo[id(self)] = result
-        return result
 
     # %% structural
 

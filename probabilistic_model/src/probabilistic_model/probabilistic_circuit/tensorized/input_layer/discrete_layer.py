@@ -304,8 +304,10 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
     def has_equal_parameters(self, other: Self) -> bool:
         """
         Like :meth:`LeafLayer.has_equal_parameters`, but tables stored in different
-        types count as different, whatever they hold. The states are compared too,
-        since equal tables over different states are different distributions.
+        types count as different, whatever they hold.
+
+        The states are compared too, since equal tables over different states are
+        different distributions.
         """
         return (
             np.array_equal(self.states, other.states)
@@ -318,15 +320,6 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         return np.where(
             indices >= 0, self.states[np.maximum(indices, 0)].astype(float), np.nan
         )
-
-    def __deepcopy__(self, memo: Optional[Dict[int, Any]] = None) -> Self:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        result = self.with_table(self.table.copy())
-        memo[id(self)] = result
-        return result
 
 
 @dataclass(eq=False, repr=False)
@@ -371,12 +364,13 @@ class SymbolicLayer(DiscreteLayer):
         }
 
     def node_distribution(self, index: int, variable: Variable) -> SymbolicDistribution:
+        domain_elements = variable.domain.simple_sets
         return SymbolicDistribution(
             variable=variable,
             probabilities=MissingDict(
                 float,
                 {
-                    int(self.domain_hashes[state]): probability
+                    hash(domain_elements[state]): probability
                     for state, probability in self.probabilities_of_node(index).items()
                 },
             ),

@@ -1,152 +1,155 @@
-import unittest
-from krrood.adapters.json_serializer import to_json, from_json
+from __future__ import annotations
+
+import numpy as np
+import pytest
 from random_events.interval import closed
-from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
+from random_events.product_algebra import Event, SimpleEvent
+from sortedcontainers import SortedSet
+
+from krrood.adapters.json_serializer import from_json, to_json
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    LeafUnit,
+    ProbabilisticCircuit,
+    SumUnit,
+)
+
+from ..circuit_building import uniform_leaf
+
+# %% fixtures
 
 
-class NormalizationTestCase(unittest.TestCase):
-    x: Continuous = Continuous("x")
-
-    def test_normalization(self):
-        pc = ProbabilisticCircuit()
-        u1 = leaf(
-            UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]),
-            pc,
-        )
-        u2 = leaf(
-            UniformDistribution(variable=self.x, interval=closed(3, 4).simple_sets[0]),
-            pc,
-        )
-        sum_unit = SumUnit(probabilistic_circuit=pc)
-        sum_unit.add_subcircuit(u1, np.log(0.5))
-        sum_unit.add_subcircuit(u2, np.log(0.3))
-        sum_unit.normalize()
-        self.assertAlmostEqual(sum_unit.log_weights[1], np.log(0.5 / 0.8))
-        self.assertAlmostEqual(sum_unit.log_weights[0], np.log(0.3 / 0.8))
-        traces = sum_unit.probabilistic_circuit.plot()
-        self.assertGreater(len(traces), 0)
-        # go.Figure(traces, sum_unit.probabilistic_circuit.plotly_layout()).show()
+@pytest.fixture
+def mixture(x) -> ProbabilisticCircuit:
+    """
+    A mixture of a uniform distribution over [0, 1] weighted 0.6 and one over [3, 4]
+    weighted 0.4.
+    """
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    root.add_subcircuit(uniform_leaf(x, 0, 1, circuit), np.log(0.6))
+    root.add_subcircuit(uniform_leaf(x, 3, 4, circuit), np.log(0.4))
+    return circuit
 
 
-class SumUnitTestCase(unittest.TestCase):
-    x: Continuous = Continuous("x")
-    model: ProbabilisticCircuit
+@pytest.fixture
+def lower_half_of_the_first_component(x) -> Event:
+    """
+    The lower half of the support of the first component.
+    """
+    return SimpleEvent.from_data({x: closed(0, 0.5)}).as_composite_set()
 
-    def setUp(self):
-        pc = ProbabilisticCircuit()
-        u1 = leaf(
-            UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]),
-            pc,
-        )
-        u2 = leaf(
-            UniformDistribution(variable=self.x, interval=closed(3, 4).simple_sets[0]),
-            pc,
-        )
 
-        model = SumUnit(probabilistic_circuit=pc)
-        model.add_subcircuit(u1, np.log(0.6))
-        model.add_subcircuit(u2, np.log(0.4))
-        self.model = model.probabilistic_circuit
+# %% structure
 
-    def test_setup(self):
-        self.assertEqual(len(list(self.model.nodes())), 3)
-        self.assertEqual(len(self.model.edges()), 2)
 
-    def test_variables(self):
-        self.assertEqual(self.model.variables, SortedSet([self.x]))
+def test_structure(mixture, x):
+    assert len(list(mixture.nodes())) == 3
+    assert len(mixture.edges()) == 2
+    assert mixture.variables == SortedSet([x])
 
-    def test_latent_variable(self):
-        self.assertEqual(len(self.model.root.latent_variable.domain.simple_sets), 2)
 
-    def test_domain(self):
-        domain = self.model.support
-        domain_by_hand = SimpleEvent.from_data(
-            {self.x: closed(0, 1) | closed(3, 4)}
-        ).as_composite_set()
-        self.assertEqual(domain, domain_by_hand)
+def test_latent_variable_has_a_state_per_component(mixture):
+    assert len(mixture.root.latent_variable.domain.simple_sets) == 2
 
-    def test_weighted_subcircuits(self):
-        weighted_subcircuits = self.model.root.log_weighted_subcircuits
-        self.assertEqual(len(weighted_subcircuits), 2)
-        self.assertEqual(
-            [weighted_subcircuit[0] for weighted_subcircuit in weighted_subcircuits],
-            [np.log(0.4), np.log(0.6)],
-        )
 
-    def test_likelihood(self):
-        event = np.array([[0.5]])
-        result = self.model.likelihood(event)
-        self.assertEqual(result, 0.6)
+def test_log_weighted_subcircuits(mixture):
+    log_weights = [
+        log_weight for log_weight, _ in mixture.root.log_weighted_subcircuits
+    ]
+    assert log_weights == [np.log(0.4), np.log(0.6)]
 
-    def test_probability(self):
-        event = SimpleEvent.from_data({self.x: closed(0, 3.5)}).as_composite_set()
-        result = self.model.probability(event)
-        self.assertEqual(result, 0.8)
 
-    def test_conditional(self):
-        event = SimpleEvent.from_data({self.x: closed(0, 0.5)}).as_composite_set()
-        result, probability = self.model.truncated(event)
-        self.assertAlmostEqual(probability, 0.3)
-        self.assertEqual(len(list(result.nodes())), 1)
-        self.assertIsInstance(result.root, LeafUnit)
+def test_support_is_the_union_of_the_supports(mixture, x):
+    assert (
+        mixture.support
+        == SimpleEvent.from_data({x: closed(0, 1) | closed(3, 4)}).as_composite_set()
+    )
 
-    def test_conditional_impossible(self):
-        event = SimpleEvent.from_data({self.x: closed(5, 6)}).as_composite_set()
-        result, probability = self.model.truncated(event)
-        self.assertEqual(probability, 0.0)
-        self.assertIsNone(result)
 
-    def test_sample(self):
-        samples = self.model.sample(100)
-        likelihoods = self.model.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
+def test_mixture_of_disjoint_supports_is_deterministic(mixture):
+    assert mixture.is_deterministic()
 
-    def test_moment(self):
-        expectation = self.model.expectation(self.model.variables)
-        self.assertEqual(expectation[self.x], 0.5 * 0.6 + 0.4 * 3.5)
 
-    def test_marginal(self):
-        marginal = self.model.marginal([self.x])
-        self.assertEqual(len(marginal.edges()), len(self.model.edges()))
-        self.assertEqual(len(marginal.nodes()), len(self.model.nodes()))
+def test_normalize(x):
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    root.add_subcircuit(uniform_leaf(x, 0, 1, circuit), np.log(0.5))
+    root.add_subcircuit(uniform_leaf(x, 3, 4, circuit), np.log(0.3))
+    root.normalize()
+    assert root.log_weights[1] == pytest.approx(np.log(0.5 / 0.8))
+    assert root.log_weights[0] == pytest.approx(np.log(0.3 / 0.8))
 
-    def test_mode(self):
-        mode, likelihood = self.model.mode()
-        self.assertEqual(likelihood, 0.6)
-        self.assertEqual(
-            mode, SimpleEvent.from_data({self.x: closed(0, 1)}).as_composite_set()
-        )
 
-    def test_serialization(self):
-        event = SimpleEvent.from_data({self.x: closed(0, 0.5)}).as_composite_set()
-        serialized = to_json(self.model)
-        deserialized = from_json(serialized)
-        self.assertEqual(self.model.probability(event), deserialized.probability(event))
+def test_plot_has_traces(mixture):
+    assert len(mixture.plot()) > 0
 
-    def test_conditional_inference(self):
-        event = SimpleEvent.from_data({self.x: closed(0, 0.5)}).as_composite_set()
-        result, probability = self.model.truncated(event)
-        self.assertEqual(result.probability(event), 1)
 
-    def test_deep_mount(self):
-        pc = ProbabilisticCircuit()
-        s1 = SumUnit(probabilistic_circuit=ProbabilisticCircuit())
-        s2 = SumUnit(probabilistic_circuit=pc)
-        s3 = SumUnit(probabilistic_circuit=pc)
-        u1 = leaf(
-            UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]),
-            pc,
-        )
-        s2.probabilistic_circuit.add_nodes_from([s2, s3, u1])
-        s2.probabilistic_circuit.add_edges_from([(s2, s3, 1.0), (s3, u1, 1.0)])
-        s1.probabilistic_circuit.mount(s2)
-        self.assertEqual(len(list(s1.probabilistic_circuit.nodes())), 4)
+def test_mounting_a_circuit_brings_all_its_nodes(x):
+    circuit = ProbabilisticCircuit()
+    top = SumUnit(probabilistic_circuit=circuit)
+    middle = SumUnit(probabilistic_circuit=circuit)
+    bottom = uniform_leaf(x, 0, 1, circuit)
+    circuit.add_edges_from([(top, middle, 1.0), (middle, bottom, 1.0)])
+    target = SumUnit(probabilistic_circuit=ProbabilisticCircuit())
+    target.probabilistic_circuit.mount(top)
+    assert len(list(target.probabilistic_circuit.nodes())) == 4
 
-    def test_sample_not_equal(self):
-        samples = self.model.sample(10)
-        uniques = np.unique(samples, axis=0)
-        self.assertEqual(len(samples), len(uniques))
 
-    def test_determinism(self):
-        self.assertTrue(self.model.is_deterministic())
+# %% inference
+
+
+def test_likelihood(mixture):
+    assert mixture.likelihood(np.array([[0.5]])) == 0.6
+
+
+def test_probability(mixture, x):
+    event = SimpleEvent.from_data({x: closed(0, 3.5)}).as_composite_set()
+    assert mixture.probability(event) == 0.8
+
+
+def test_distinct_samples_lie_in_the_support(mixture):
+    samples = mixture.sample(100)
+    assert np.all(mixture.likelihood(samples) > 0)
+    assert len(np.unique(samples, axis=0)) == len(samples)
+
+
+def test_expectation(mixture, x):
+    assert mixture.expectation(mixture.variables)[x] == 0.5 * 0.6 + 0.4 * 3.5
+
+
+def test_marginal_over_all_variables_keeps_the_circuit(mixture, x):
+    marginal = mixture.marginal([x])
+    assert len(marginal.edges()) == len(mixture.edges())
+    assert len(marginal.nodes()) == len(mixture.nodes())
+
+
+def test_mode_is_the_support_of_the_heavier_component(mixture, x):
+    mode = mixture.mode()
+    assert mode.likelihood == 0.6
+    assert mode.event == SimpleEvent.from_data({x: closed(0, 1)}).as_composite_set()
+
+
+def test_truncation_to_one_component_leaves_its_leaf(
+    mixture, lower_half_of_the_first_component
+):
+    truncation = mixture.truncated(lower_half_of_the_first_component)
+    assert truncation.probability == pytest.approx(0.3)
+    assert len(list(truncation.distribution.nodes())) == 1
+    assert isinstance(truncation.distribution.root, LeafUnit)
+    assert truncation.distribution.probability(lower_half_of_the_first_component) == 1
+
+
+def test_truncation_to_an_impossible_event(mixture, x):
+    event = SimpleEvent.from_data({x: closed(5, 6)}).as_composite_set()
+    truncation = mixture.truncated(event)
+    assert truncation.probability == 0.0
+    assert truncation.distribution is None
+
+
+def test_serialization_keeps_the_probability(
+    mixture, lower_half_of_the_first_component
+):
+    deserialized = from_json(to_json(mixture))
+    assert deserialized.probability(
+        lower_half_of_the_first_component
+    ) == mixture.probability(lower_half_of_the_first_component)

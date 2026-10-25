@@ -1,5 +1,5 @@
 """
-Validation of RSPN fitting against the CTU Mutagenesis dataset
+Validation of relational circuit fitting against the CTU Mutagenesis dataset
 (https://relational.fel.cvut.cz/dataset/Mutagenesis), covering steps 1-4 of
 ``Documents/mutagenesis_pipeline_test_plan.md``: download, class mapping, fitting, and
 the predictive/structural sanity checks required before grounding any causal query on
@@ -30,11 +30,8 @@ from experiments.causal_reasoning.mutagenesis.dataset import (
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
 )
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
-)
-from probabilistic_model.probabilistic_circuit.relational.rustworkx_grounding import (
-    RustworkxExchangeablePartGrounder,
 )
 
 CHLORINE_COUNT_VARIABLE_NAME = "MutagenesisMoleculeAggregations.chlorine_count()"
@@ -50,7 +47,7 @@ def synthetic_molecules():
 
 @pytest.fixture
 def synthetic_rpc(synthetic_molecules) -> RelationalProbabilisticCircuit:
-    model = RelationalProbabilisticCircuit(MutagenesisMolecule)
+    model = RelationalProbabilisticCircuit()
     model.fit(synthetic_molecules)
     return model
 
@@ -92,7 +89,7 @@ def mutagenesis_split(mutagenesis_molecules):
 @pytest.fixture(scope="module")
 def mutagenesis_rpc(mutagenesis_split) -> RelationalProbabilisticCircuit:
     train_molecules, _ = mutagenesis_split
-    model = RelationalProbabilisticCircuit(MutagenesisMolecule)
+    model = RelationalProbabilisticCircuit()
     model.fit(train_molecules)
     return model
 
@@ -142,15 +139,15 @@ def _predict_mutagenic(
         when ``molecule``'s evidence is unsupported by the fitted circuit.
     """
     evidence = _evidence_for(molecule, circuit)
-    conditioned, log_likelihood = circuit.log_conditional(evidence)
-    if conditioned is None:
+    conditioning = circuit.log_conditional(evidence)
+    if conditioning.distribution is None:
         return majority_label
     true_event = (
         SimpleEvent.from_data({mutagenic_variable: True})
         .as_composite_set()
-        .fill_missing_variables_pure(conditioned.variables)
+        .fill_missing_variables_pure(conditioning.distribution.variables)
     )
-    return conditioned.probability(true_event) > 0.5
+    return conditioning.distribution.probability(true_event) > 0.5
 
 
 @requires_mutagenesis_dataset
@@ -184,24 +181,17 @@ def test_mutagenesis_predictive_accuracy_beats_the_majority_baseline(
 
 
 @requires_mutagenesis_dataset
-def test_mutagenesis_chlorine_count_is_not_a_split_feature(mutagenesis_rpc):
+def test_mutagenesis_chlorine_count_is_partitioned(mutagenesis_rpc):
     """
-    Structural check from the plan: whether ``chlorine_count`` is actually split on by
-    the fitted tree, the precondition ``GroundingMode.EXACT`` needs to avoid silently
-    falling back to ``SAMPLED``.
-
-    On ``mutagenesis_188``, chlorine is rare (23 atoms out of 4893, ~0.12 per molecule),
-    so the fitted tree does not pick it as a split feature -- this is a property of the
-    real dataset, not a pipeline defect; a later causal-query change building on this
-    fit should use ``GroundingMode.SAMPLED`` for ``chlorine_count`` accordingly, exactly
-    the fallback the plan anticipates for this case.
+    ``GroundingMode.EXACT`` applies to ``chlorine_count``: the leaves of the fitted tree
+    separate molecules by many other variables, but over ``chlorine_count`` they have
+    only a few distinct, pairwise disjoint regions.
     """
     circuit = mutagenesis_rpc.class_probabilistic_circuit
     chlorine_count_variable = next(
         v for v in circuit.variables if v.name == CHLORINE_COUNT_VARIABLE_NAME
     )
     marginal = circuit.marginal([chlorine_count_variable])
-    branches = RustworkxExchangeablePartGrounder.partition_branches(marginal)
-    assert not ExchangeablePartGrounder._undetermined_latents_partition_disjointly(
-        [branch.support for branch in branches]
+    assert ExchangeablePartGrounder._undetermined_latents_partition_disjointly(
+        ExchangeablePartGrounder._distinct_component_regions(marginal)
     )

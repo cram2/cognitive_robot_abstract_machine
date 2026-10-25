@@ -480,6 +480,10 @@ class GiskardExecutable(Executable):
                     executor.tick()
                     pacer.sleep()
                     ticks += 1
+                # The controller stops commanding, so a velocity-servoed base stops too.
+                executor.set_velocity_acceleration_jerk_to_zero()
+                executor.context.world.notify_state_change()
+                pacer.wait_for_standstill()
                 history.end_active_motions()
             except BaseException as error:
                 history.end_active_motions(

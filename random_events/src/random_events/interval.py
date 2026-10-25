@@ -193,7 +193,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
 
         yield from range(rounded_lower, rounded_upper + 1)
 
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         return SimpleInterval.from_data(self.lower, self.upper, self.left, self.right)
 
 

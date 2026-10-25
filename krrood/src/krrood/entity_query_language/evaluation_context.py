@@ -352,6 +352,12 @@ class EvaluationContext:
     Caches each nested subquery's result stream for the current evaluation pass.
     """
 
+    has_running_evaluation: bool = field(default=False, init=False)
+    """
+    Whether an evaluation is running in this context, from its first result until it is
+    exhausted or closed.
+    """
+
     def is_child_of_truth_value_operator(self, expression: SymbolicExpression) -> bool:
         """
         :param expression: The symbolic expression to test.
@@ -387,6 +393,7 @@ class EvaluationContext:
         :return: The same results.
         """
         results_exhausted = object()
+        self.has_running_evaluation = True
         try:
             while True:
                 with self.as_current():
@@ -397,6 +404,7 @@ class EvaluationContext:
         finally:
             with self.as_current():
                 results.close()
+            self.has_running_evaluation = False
 
     def on_evaluate_enter(
         self,

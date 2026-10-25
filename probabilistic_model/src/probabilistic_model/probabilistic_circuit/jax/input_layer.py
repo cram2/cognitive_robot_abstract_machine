@@ -21,11 +21,11 @@ class DifferentiableContinuousLayer(DifferentiableInputLayer, ABC):
     """
 
 
-class DifferentiableContinuousLayerWithFiniteSupport(
+class DifferentiableContinuousLayerWithConstrainedSupport(
     DifferentiableContinuousLayer, ABC
 ):
     """
-    Abstract class for continuous univariate input units with finite support.
+    Abstract class for continuous univariate input units with constrained support.
     """
 
     interval: jax.Array = eqx.field(static=True)
@@ -80,15 +80,8 @@ class DifferentiableContinuousLayerWithFiniteSupport(
         result["interval"] = self.interval.tolist()
         return result
 
-    def __deepcopy__(self, memo: Optional[Dict[int, Any]] = None):
-        if memo is None:
-            memo = {}
-        id_self = id(self)
-        if id_self in memo:
-            return memo[id_self]
-        result = self.__class__(self.variables[0].item(), self.interval.copy())
-        memo[id_self] = result
-        return result
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        return self.__class__(self.variables[0].item(), self.interval.copy())
 
 
 class DifferentiableDiracDeltaLayer(DifferentiableContinuousLayer):

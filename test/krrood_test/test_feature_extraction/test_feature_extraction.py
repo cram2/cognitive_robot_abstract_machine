@@ -6,7 +6,7 @@ from krrood.entity_query_language.factories import a, an
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
@@ -105,7 +105,7 @@ def test_features_extraction():
 
 def test_feature_extraction_with_aggregations(scenario):
     room, room2, feature_extractor = scenario
-    relational_probabilistic_circuit = RelationalProbabilisticCircuit(SceneRoom)
+    relational_probabilistic_circuit = RelationalProbabilisticCircuit()
     relational_probabilistic_circuit.fit([room, room2])
 
     room_query = a(SceneRoom)(

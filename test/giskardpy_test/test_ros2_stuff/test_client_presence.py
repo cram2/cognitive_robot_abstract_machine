@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import timedelta
 from threading import Event
 from typing import Callable
 
@@ -390,3 +391,79 @@ class TestHeartbeatWhileNodeIsBusy:
             publisher.stop()
             rospy.executor.remove_node(client_node)
             client_node.destroy_node()
+
+
+# %% heartbeats while nothing serves the node
+
+
+class TestHeartbeatWithoutItsNodeBeingSpun:
+    """
+    The executor of a node can be out of free threads for seconds, for example while it
+    reads a large world model and waits for a goal to end, which must not look like a
+    client that left.
+    """
+
+    def test_giskard_receives_heartbeats_while_nothing_spins_its_node(
+        self, rclpy_node: Node
+    ):
+        giskard_node = rclpy.create_node("giskard_nothing_spins")
+        presence = HeartbeatPresence(node=giskard_node)
+        client = create_client()
+        sender = rclpy_node.create_publisher(
+            std_msgs.msg.String,
+            ClientHeartbeatPublisher.topic_name(giskard_node.get_name()),
+            10,
+        )
+        try:
+            assert wait_until(
+                lambda: sender.publish(heartbeat_of(client))
+                or client in presence.last_heartbeat
+            )
+        finally:
+            presence.stop()
+            giskard_node.destroy_node()
+
+    def test_a_client_announces_itself_while_nothing_spins_its_node(
+        self, rclpy_node: Node
+    ):
+        presence = HeartbeatPresence(node=rclpy_node)
+        client_node = rclpy.create_node("client_nothing_spins")
+        client = MetaData(node_name=client_node.get_name(), process_id=7)
+        publisher = ClientHeartbeatPublisher(
+            node=client_node,
+            client=client,
+            giskard_node_name=rclpy_node.get_name(),
+            period=timedelta(milliseconds=10),
+        )
+        try:
+            assert wait_until(lambda: client in presence.last_heartbeat)
+        finally:
+            publisher.stop()
+            presence.stop()
+            client_node.destroy_node()
+
+    def test_a_stopped_presence_check_leaves_no_thread_behind(self, rclpy_node: Node):
+        presence = HeartbeatPresence(node=rclpy_node)
+
+        presence.stop()
+
+        assert not presence.heartbeat_node.thread.is_alive()
+
+    def test_a_stopped_client_leaves_no_thread_behind(self, rclpy_node: Node):
+        publisher = ClientHeartbeatPublisher(
+            node=rclpy_node,
+            client=create_client(),
+            giskard_node_name=rclpy_node.get_name(),
+        )
+
+        publisher.stop()
+
+        assert not publisher.heartbeat_node.thread.is_alive()
+
+    def test_stopping_a_presence_check_does_nothing_the_second_time(
+        self, rclpy_node: Node
+    ):
+        presence = HeartbeatPresence(node=rclpy_node)
+
+        presence.stop()
+        presence.stop()

@@ -24,6 +24,7 @@ from typing_extensions import (
 
 from krrood.entity_query_language.factories import variable_from
 from krrood.exceptions import UnboundGenericParameter
+from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from ..dataset.classes_with_generic import (
@@ -48,6 +49,7 @@ from dataclasses import dataclass
 from typing_extensions import TypeVar
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
+from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
 
@@ -788,3 +790,63 @@ def test_a_parameter_only_renamed_by_a_subclass_is_rejected():
 
     with pytest.raises(UnboundGenericParameter):
         RenamingContainer.get_type_of_generic_parameter(ContentType)
+
+
+# %% attributes an interface declares
+
+
+def test_an_attribute_an_interface_declares_is_not_made_a_field():
+    """
+    A subclass that computes an attribute its interface declares keeps it a property
+    when a further subclass binds the parameter.
+    """
+    CornerType = TypeVar("CornerType")
+
+    class Region(Generic[CornerType], SubClassSafeGeneric, Interface):
+        lower: CornerType
+
+    @dataclass
+    class ShiftedRegion(Region[CornerType]):
+        @property
+        def lower(self) -> CornerType:
+            return self.offset
+
+    @dataclass
+    class IntegerShiftedRegion(ShiftedRegion[int]):
+        offset: int
+
+    shift = 3
+    assert [region_field.name for region_field in fields(IntegerShiftedRegion)] == [
+        "offset"
+    ]
+    assert IntegerShiftedRegion(shift).lower == shift
+
+
+def test_a_field_redeclaring_an_interface_attribute_is_narrowed():
+    CornerType = TypeVar("CornerType")
+
+    class Region(Generic[CornerType], SubClassSafeGeneric, Interface):
+        lower: CornerType
+
+    @dataclass
+    class StoredRegion(Region[CornerType]):
+        lower: CornerType
+
+    @dataclass
+    class IntegerStoredRegion(StoredRegion[int]): ...
+
+    [lower_field] = fields(IntegerStoredRegion)
+    assert lower_field.type is int
+
+
+# %% identity of classes that keep identity comparison
+
+
+def test_a_subclass_compared_by_identity_is_not_equal_to_another_instance():
+    assert CombinedClass() != CombinedClass()
+
+
+def test_a_subclass_compared_by_identity_is_hashable():
+    instance = CombinedClass()
+
+    assert instance in {instance}

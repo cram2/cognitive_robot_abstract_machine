@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import itertools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -293,7 +294,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         """
         if not hyperrectangles:
             return LayerWithLogProbabilities(
-                self.__deepcopy__(), np.full(self.number_of_nodes, -np.inf)
+                copy.deepcopy(self), np.full(self.number_of_nodes, -np.inf)
             )
         pieces = [
             self.log_truncated_of_hyperrectangle(hyperrectangle)
@@ -387,7 +388,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         if len(fixed) == 0:
             return query.log_probabilities.record(
                 LayerWithLogProbabilities(
-                    self.__deepcopy__(), np.zeros(self.number_of_nodes)
+                    copy.deepcopy(self), np.zeros(self.number_of_nodes)
                 )
             )
 
@@ -442,7 +443,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         if len(positions) == 0:
             return None
         if len(positions) == self.number_of_scope_variables:
-            return self.__deepcopy__()
+            return copy.deepcopy(self)
         return self.marginal_over(positions)
 
     @abstractmethod

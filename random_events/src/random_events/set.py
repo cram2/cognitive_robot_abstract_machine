@@ -123,7 +123,7 @@ class SetElement(AbstractSimpleSet):
     def as_composite_set(self) -> AbstractCompositeSet:
         return Set.from_simple_sets(self)
 
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         return SetElement.from_data(self.element, self.all_elements)
 
 
@@ -186,3 +186,9 @@ class Set(AbstractCompositeSet):
         :return: A map that maps the hashes of each element in all_elements to the element.
         """
         return {hash(elem): elem for elem in self.all_elements}
+
+    def is_singleton(self) -> bool:
+        """
+        :return: Whether the set contains exactly one element.
+        """
+        return len(self.simple_sets) == 1

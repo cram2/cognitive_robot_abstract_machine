@@ -57,7 +57,7 @@ class HasGraspChoice:
     The grasp to take hold by.
 
     One of the object's own
-    :meth:`~semantic_digital_twin.grasping.grasp_candidates.HasGraspCandidates.grasp_candidates`.
+    :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.grasp_candidates`.
     """
 
     arm: Arm
@@ -85,7 +85,7 @@ class ReachAction(
 
     grasp: GraspCandidate
     """
-    The grasp the tool frame should reach, which also names the object it is on.
+    The grasp the fingers should close on, which also names the object it is on.
     """
 
     reverse_reach_order: bool = False

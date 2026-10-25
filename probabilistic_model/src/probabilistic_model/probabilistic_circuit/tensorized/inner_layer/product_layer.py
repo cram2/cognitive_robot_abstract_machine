@@ -10,6 +10,7 @@ from random_events.product_algebra import Event, SimpleEvent
 from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 from typing_extensions import (
+    Any,
     Dict,
     List,
     Optional,
@@ -209,6 +210,24 @@ class ProductLayer(InnerLayer):
         # how many factors of every node have every variable in their scope
         occurrences = factors_of_node.T @ scope_of_child_layer
         return occurrences.max(axis=1, initial=0) <= 1
+
+    def products_over(self, variables: VariableIndices) -> NodeMask:
+        edges = self.inner_layer_edges
+        result = np.ones(self.number_of_nodes, dtype=bool)
+        for variable in variables:
+            child_layer_models_variable = np.array(
+                [
+                    variable in child_layer.variables
+                    for child_layer in self.child_layers
+                ],
+                dtype=bool,
+            )
+            models_variable = np.zeros(self.number_of_nodes, dtype=bool)
+            models_variable[
+                edges.nodes[child_layer_models_variable[edges.child_layer_indices]]
+            ] = True
+            result &= models_variable
+        return result
 
     # %% queries
 
@@ -616,15 +635,3 @@ class ProductLayer(InnerLayer):
             np.array_equal(self.edges.data.astype(np.int64), self.edges.col)
             and len(np.unique(self.edges.col)) == self.number_of_nodes
         )
-
-    def __deepcopy__(self, memo=None) -> ProductLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        child_layers = [
-            child_layer.__deepcopy__(memo) for child_layer in self.child_layers
-        ]
-        result = self.__class__(child_layers, self.edges.copy())
-        memo[id(self)] = result
-        return result

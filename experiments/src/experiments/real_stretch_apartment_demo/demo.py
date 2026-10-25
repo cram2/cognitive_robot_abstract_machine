@@ -101,21 +101,21 @@ class StretchApartmentDemonstration(RobotDemonstration):
 
     ros_node_name: str = "stretch_demo_node"
 
-    def build_simulated_world(self) -> World:
+    def scene_specification(self) -> WorldSpecification:
         """
-        Put the Stretch on its drive in a world holding nothing but a map body.
+        :return: A world holding nothing but a map body, which :meth:`populate_scene`
+            furnishes.
         """
-        return WorldSpecification(
-            world_parser=None,
-            robots=[
-                RobotSpecification(
-                    semantic_annotation_type=self.used_robot,
-                    odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        1, 1
-                    ),
-                )
-            ],
-        ).to_domain_object()
+        return WorldSpecification(world_parser=None)
+
+    def robot_specification(self) -> RobotSpecification:
+        """
+        :return: The Stretch on its drive, between the shelf and the bedside table.
+        """
+        return RobotSpecification(
+            semantic_annotation_type=self.used_robot,
+            odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
+        )
 
     def is_scene_populated(self, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(CEREAL_NAME)

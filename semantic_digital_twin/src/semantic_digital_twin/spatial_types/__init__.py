@@ -4,6 +4,8 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Point,
     Point2,
     Point3,
+    Line3,
+    OrthogonalProjection,
     HomogeneousTransformationMatrix,
     SpatialType,
     Quaternion,

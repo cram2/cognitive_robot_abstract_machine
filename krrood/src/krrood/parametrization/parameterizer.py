@@ -23,6 +23,7 @@ from typing_extensions import (
 )
 from krrood.parametrization.exceptions import (
     AmbiguousVariableName,
+    AttributeNotParameterized,
     DomainElementsIndistinguishableInSamples,
     EmptyVariableDomain,
     InvalidEllipsis,
@@ -81,6 +82,19 @@ class ModelQueryParameters(ABC):
         :return: A dictionary that maps variable names to the random events variables
             this query references.
         """
+
+    def variable_of(self, attribute: MappedVariable) -> random_events.variable.Variable:
+        """
+        :param attribute: An attribute of the query, such as
+            ``query.pose.position.x``.
+        :return: The random events variable that stands for the attribute.
+        :raises AttributeNotParameterized: If the query has no variable for the
+            attribute.
+        """
+        name = attribute._variable_rooted_._name_
+        if name not in self.variables:
+            raise AttributeNotParameterized(attribute)
+        return self.variables[name]
 
     @property
     @abstractmethod
@@ -314,16 +328,16 @@ class UnderspecifiedParameters(ModelQueryParameters):
         :param model: The model to condition and truncate.
         :return: The resulting model, or ``None`` if any step leaves no solution.
         """
-        conditioned, _ = model.conditional(
+        conditioned = model.conditional(
             self.conditioning_assignments_from_literal_values
-        )
+        ).distribution
         if conditioned is None:
             return None
 
         if self.truncation_assignments_from_where_conditions:
-            truncated, _ = conditioned.truncated(
+            truncated = conditioned.truncated(
                 self.truncation_assignments_from_where_conditions
-            )
+            ).distribution
         else:
             truncated = conditioned
         if truncated is None:
@@ -348,8 +362,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
         complete_event.fill_missing_variables(self.variables.values())
         for event in self.truncation_assignments_from_krrood_variables[1:]:
             complete_event = complete_event.intersection_with(event)
-        truncated, _ = model.truncated(complete_event, singleton_allowed=True)
-        return truncated
+        return model.truncated(complete_event, singleton_allowed=True).distribution
 
     def _extract_variables_from_attribute_match(
         self, attribute_match: AttributeMatch

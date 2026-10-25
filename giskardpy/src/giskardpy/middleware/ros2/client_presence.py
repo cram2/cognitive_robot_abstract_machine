@@ -4,11 +4,12 @@ import json
 import time
 from dataclasses import dataclass, field
 from datetime import timedelta
-from threading import Lock
+from threading import Lock, Thread
 from typing import Callable, Dict, Optional
 
+import rclpy
 import std_msgs.msg
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.subscription import Subscription
@@ -17,6 +18,66 @@ from rclpy.timer import Timer
 from giskardpy.middleware.ros2.exceptions import NoWatchedClientError
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.adapters.ros.messages import MetaData
+
+# %% where heartbeats are sent and received
+
+
+@dataclass
+class HeartbeatNode:
+    """
+    A node that carries nothing but heartbeats and is spun by a thread of its own.
+
+    Heartbeats must keep flowing while the node they speak for is busy: its executor
+    can be out of free threads for seconds, and a heartbeat that waits behind its other
+    callbacks makes a present client look gone.
+    """
+
+    owner: Node
+    """
+    The node the heartbeats speak for.
+    """
+
+    node: Node = field(init=False)
+    """
+    The node the heartbeats are sent or received on.
+    """
+
+    executor: SingleThreadedExecutor = field(init=False)
+    """
+    Executor that serves nothing but :attr:`node`.
+    """
+
+    thread: Thread = field(init=False)
+    """
+    Thread that spins :attr:`executor`.
+    """
+
+    def __post_init__(self):
+        self.node = rclpy.create_node(
+            f"{self.owner.get_name()}_heartbeat",
+            context=self.owner.context,
+            namespace=self.owner.get_namespace(),
+            start_parameter_services=False,
+        )
+        self.executor = SingleThreadedExecutor(context=self.owner.context)
+        self.executor.add_node(self.node)
+        self.thread = Thread(
+            target=self.executor.spin,
+            daemon=True,
+            name=f"{self.node.get_name()} spin",
+        )
+        self.thread.start()
+
+    def stop(self) -> None:
+        """
+        Stop the thread and destroy the node with everything created on it.
+
+        Does nothing if already stopped.
+        """
+        self.executor.shutdown()
+        self.thread.join()
+        self.node.destroy_node()
+
 
 # %% the heartbeat a client sends
 
@@ -48,6 +109,11 @@ class ClientHeartbeatPublisher:
     Time between two heartbeats.
     """
 
+    heartbeat_node: HeartbeatNode = field(init=False)
+    """
+    Sends the heartbeats, so that one is not held back while :attr:`node` is busy.
+    """
+
     publisher: Publisher = field(init=False)
     """
     Publisher the heartbeats go out on.
@@ -56,14 +122,6 @@ class ClientHeartbeatPublisher:
     timer: Timer = field(init=False)
     """
     Timer that sends the heartbeats.
-    """
-
-    callback_group: MutuallyExclusiveCallbackGroup = field(
-        init=False, default_factory=MutuallyExclusiveCallbackGroup
-    )
-    """
-    Group of its own for the timer, so that a heartbeat is not held back while the other
-    callbacks of the node are busy.
     """
 
     message: std_msgs.msg.String = field(init=False)
@@ -78,22 +136,21 @@ class ClientHeartbeatPublisher:
 
     _lock: Lock = field(init=False, default_factory=Lock, repr=False)
     """
-    Keeps :meth:`publish` and :meth:`stop` apart: the timer fires on an executor thread
-    while the client stops on its own, and a heartbeat sent on a destroyed publisher
-    raises on that executor thread.
+    Keeps :meth:`publish` and :meth:`stop` apart: the timer fires on the thread of
+    :attr:`heartbeat_node` while the client stops on its own, and a heartbeat sent on a
+    destroyed publisher raises on that thread.
     """
 
     def __post_init__(self):
         self.message = std_msgs.msg.String(data=json.dumps(to_json(self.client)))
-        self.publisher = self.node.create_publisher(
+        self.heartbeat_node = HeartbeatNode(owner=self.node)
+        self.publisher = self.heartbeat_node.node.create_publisher(
             std_msgs.msg.String,
             topic=self.topic_name(self.giskard_node_name),
             qos_profile=10,
         )
-        self.timer = self.node.create_timer(
-            self.period.total_seconds(),
-            self.publish,
-            callback_group=self.callback_group,
+        self.timer = self.heartbeat_node.node.create_timer(
+            self.period.total_seconds(), self.publish
         )
 
     @staticmethod
@@ -125,8 +182,7 @@ class ClientHeartbeatPublisher:
                 return
             self._stopped = True
             self.timer.cancel()
-            self.node.destroy_timer(self.timer)
-            self.node.destroy_publisher(self.publisher)
+        self.heartbeat_node.stop()
 
 
 # %% whether a client is still there
@@ -151,9 +207,9 @@ class HeartbeatPresence:
     """
     Time without a heartbeat after which a client counts as gone.
 
-    Heartbeats are received on a ros executor thread while the control loop runs on its
+    Heartbeats are received on a thread of their own while the control loop runs on its
     own, so this has to stay well above the heartbeat period: a value close to it would
-    turn a busy executor into a stopped robot.
+    turn a busy process into a stopped robot.
     """
 
     clock: Callable[[], float] = field(default=time.monotonic, kw_only=True, repr=False)
@@ -174,18 +230,14 @@ class HeartbeatPresence:
     When each client announced itself last.
     """
 
+    heartbeat_node: HeartbeatNode = field(init=False)
+    """
+    Receives the heartbeats, so that one is not held back while :attr:`node` is busy.
+    """
+
     subscription: Subscription = field(init=False)
     """
     Subscription the heartbeats arrive on.
-    """
-
-    callback_group: MutuallyExclusiveCallbackGroup = field(
-        init=False, default_factory=MutuallyExclusiveCallbackGroup
-    )
-    """
-    Group of its own for the subscription, so that heartbeats are not held back while
-    Giskard's node is busy with other callbacks, such as applying world updates, which
-    would make a present client look gone.
     """
 
     @property
@@ -206,13 +258,21 @@ class HeartbeatPresence:
         self.watched_client = None
 
     def __post_init__(self):
-        self.subscription = self.node.create_subscription(
+        self.heartbeat_node = HeartbeatNode(owner=self.node)
+        self.subscription = self.heartbeat_node.node.create_subscription(
             std_msgs.msg.String,
             topic=ClientHeartbeatPublisher.topic_name(self.node.get_name()),
             callback=self.receive_heartbeat,
             qos_profile=10,
-            callback_group=self.callback_group,
         )
+
+    def stop(self) -> None:
+        """
+        Stop receiving heartbeats.
+
+        Does nothing if already stopped.
+        """
+        self.heartbeat_node.stop()
 
     def receive_heartbeat(self, message: std_msgs.msg.String) -> None:
         """

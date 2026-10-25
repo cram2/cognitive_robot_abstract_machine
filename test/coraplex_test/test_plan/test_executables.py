@@ -36,7 +36,6 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     ThreadedPredicateMonitor,
 )
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tiago import Tiago
@@ -145,11 +144,6 @@ def test_parsing_populates_the_chart_with_the_motions(reach_action_executable):
     assert reach_action_executable.root_node in chart.nodes
     for task in tasks:
         assert task in _nodes_below(reach_action_executable.root_node)
-        # A reach that frees its gripper carries its Cartesian goal alongside the
-        # collision rules, so the mapped node is the pair rather than the goal itself.
-        assert (
-            len([node for node in task.nodes if isinstance(node, CartesianPose)]) == 1
-        )
 
 
 def test_parsing_mirrors_the_plan_tree_as_nested_goals(reach_action_executable):
@@ -506,3 +500,23 @@ def test_a_physically_simulated_place_is_released_by_its_own_grip(
         plan.perform()
 
     assert milk.parent_connection.parent is gripper
+
+
+# %% which execution types let an object push back
+
+
+def test_only_a_real_or_physically_simulated_robot_meets_resistance():
+    """
+    Whether contact decides what is held is what tells the two simulated types apart,
+    and a plan that depends on contact has to be able to ask.
+    """
+    pushing_back = {
+        execution_type
+        for execution_type in ExecutionType
+        if execution_type.objects_push_back
+    }
+
+    assert pushing_back == {
+        ExecutionType.REAL,
+        ExecutionType.PHYSICALLY_SIMULATED,
+    }

@@ -158,11 +158,15 @@ def distribution_of(
     return Distribution(match=match, marginalize_for=marginalize_for)
 
 
-def probability_of(condition: ConditionType) -> Probability:
+def probability_of(
+    condition: ConditionType, evidence: ConditionType | None = None
+) -> Probability:
     """
-    Request the probability of a condition, e.g. ``probability_of(x.A > 5)`` for
-    ``x = variable(MyClass)``. The condition may be any expression a ``.where(...)``
-    condition already accepts.
+    Request the probability of a condition, optionally given evidence, e.g.
+    ``probability_of(x.A > 5)`` or ``probability_of(x.A > 5, x.B < 2)`` for
+    ``x = variable(MyClass)``. Condition and evidence may be any expression a
+    ``.where(...)`` condition already accepts; several conditions are joined
+    explicitly with :py:func:`and_`.
 
     Like :py:func:`distribution_of`, this never resolves to rows: it must be evaluated
     with a
@@ -174,12 +178,14 @@ def probability_of(condition: ConditionType) -> Probability:
     already recognizes a bare ``average(...)`` selection and answers it in closed form.
 
     :param condition: The condition to compute the probability of.
+    :param evidence: The condition to condition the probability on, or ``None`` for
+        the unconditional probability.
     :return: Probability descriptor.
     """
     # Local import: avoids a circular import through operators/probabilistic_queries.py.
     from krrood.entity_query_language.operators.probabilistic_queries import Probability
 
-    return Probability(condition=condition)
+    return Probability(condition=condition, evidence=evidence)
 
 
 # %% Variable Declaration

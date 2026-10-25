@@ -5,6 +5,10 @@ from ``RelationalProbabilisticCircuit`` grounding to ``CausalCircuit`` construct
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from typing_extensions import TYPE_CHECKING
+
 import numpy as np
 import pytest
 
@@ -17,6 +21,9 @@ from probabilistic_model.probabilistic_circuit.causal.exceptions import (
     SupportDeterminismVerificationResult,
 )
 from probabilistic_model.learning.learning_method import StratifiedLearning
+from probabilistic_model.probabilistic_circuit.relational.part_learning_methods import (
+    PartLearningMethods,
+)
 from probabilistic_model.probabilistic_circuit.relational.causal import (
     RelationalCausalCircuit,
 )
@@ -24,20 +31,37 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     AmbiguousVariablePathError,
     VariableNotFoundError,
 )
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     GroundingMode,
     RelationalProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import SumUnit
+from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
+    RustworkxCircuitToLayeredCircuitConverter,
+)
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit,
+    SumUnit,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
+)
 from random_events.product_algebra import SimpleEvent
+from random_events.variable import Variable
 from ..dataset.example_classes import SceneRoom, SceneRoomAggregations
-from .test_rspns import (  # noqa: F401
+from ...probabilistic_model_test.test_causal.test_causal_circuit_types import (
+    events_over,
+    probabilities_of,
+)
+from .test_relational_probabilistic_circuit import (  # noqa: F401
     _room_with_chair_count,
     correlated_room_query,
     relational_probabilistic_circuit,
     room_query_4,
     scenario,
 )
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.query.match import Match
 
 # %% resolve_variable
 
@@ -211,8 +235,8 @@ def test_relational_causal_circuit_ground_warns_on_expensive_adjustment_set(
 ):
     """
     Under GroundingMode.EXACT, registering more than one relational adjustment variable
-    together must warn once their leaf-region product exceeds the configured threshold,
-    rather than waiting to discover the cost at query time.
+    together must warn once the product of their region counts exceeds the configured
+    threshold, rather than waiting to discover the cost at query time.
     """
     object_type_0, object_type_1, chair_count_variable, table_count_variable = (
         _resolve_against_a_fresh_grounding(
@@ -237,7 +261,7 @@ def test_relational_causal_circuit_ground_warns_on_expensive_adjustment_set(
             adjustment_variables=[chair_count_variable, table_count_variable],
             grounding_mode=GroundingMode.EXACT,
         )
-    assert any("leaf regions" in message for message in caplog.messages)
+    assert any("Cartesian product" in message for message in caplog.messages)
 
 
 def test_relational_causal_circuit_ground_does_not_warn_below_threshold(
@@ -268,7 +292,7 @@ def test_relational_causal_circuit_ground_does_not_warn_below_threshold(
             adjustment_variables=[chair_count_variable, table_count_variable],
             grounding_mode=GroundingMode.EXACT,
         )
-    assert not any("leaf regions" in message for message in caplog.messages)
+    assert not any("Cartesian product" in message for message in caplog.messages)
 
 
 # %% RelationalCausalCircuit.fit
@@ -290,7 +314,6 @@ def many_chair_count_rooms():
 def test_fit_stratifies_the_class_circuit_by_the_given_variable(many_chair_count_rooms):
     chair_count_variable = variable(SceneRoomAggregations).chair_count()
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
         learning_method=StratifiedLearning(
             variables=[chair_count_variable._name_], method=JointProbabilityTree()
         ),
@@ -331,7 +354,6 @@ def test_verify_support_determinism_survives_a_stratified_partitions_own_further
     """
     chair_count_variable = variable(SceneRoomAggregations).chair_count()
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
         learning_method=StratifiedLearning(
             variables=[chair_count_variable._name_], method=JointProbabilityTree()
         ),
@@ -376,7 +398,6 @@ def test_fit_stratifies_the_class_circuit_by_every_given_variable(
     """
     aggregations = variable(SceneRoomAggregations)
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
         learning_method=StratifiedLearning(
             variables=[
                 aggregations.chair_count()._name_,
@@ -405,15 +426,17 @@ def test_fit_stratifies_an_exchangeable_parts_template_by_the_given_variable(
     """
     chair_count_variable = variable(SceneRoomAggregations).chair_count()
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
         learning_method=StratifiedLearning(
             variables=[chair_count_variable._name_], method=JointProbabilityTree()
         ),
-        part_learning_methods={
-            "objects": StratifiedLearning(
-                variables=["type"], method=JointProbabilityTree()
-            )
-        },
+        part_learning_methods=PartLearningMethods.from_methods_and_default(
+            {
+                variable(SceneRoom).objects: StratifiedLearning(
+                    variables=["type"], method=JointProbabilityTree()
+                )
+            },
+            JointProbabilityTree(),
+        ),
     )
     model.fit(many_chair_count_rooms)
     object_types = {
@@ -444,7 +467,6 @@ def test_plain_fit_honours_the_minimum_samples_per_leaf(many_chair_count_rooms):
     all, so every variable is modeled by exactly one leaf.
     """
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
         learning_method=JointProbabilityTree(
             min_samples_per_leaf=len(many_chair_count_rooms)
         ),
@@ -461,7 +483,6 @@ def test_stratified_fit_honours_the_minimum_samples_per_leaf(many_chair_count_ro
     """
     chair_count_variable = variable(SceneRoomAggregations).chair_count()
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
         learning_method=StratifiedLearning(
             variables=[chair_count_variable._name_],
             method=JointProbabilityTree(min_samples_per_leaf=20),
@@ -478,10 +499,14 @@ def test_minimum_samples_per_leaf_reaches_an_exchangeable_parts_template(
 ):
     object_count = sum(len(room.objects) for room in many_chair_count_rooms)
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
-        part_learning_methods={
-            "objects": JointProbabilityTree(min_samples_per_leaf=object_count)
-        },
+        part_learning_methods=PartLearningMethods.from_methods_and_default(
+            {
+                variable(SceneRoom).objects: JointProbabilityTree(
+                    min_samples_per_leaf=object_count
+                )
+            },
+            JointProbabilityTree(),
+        ),
     )
     model.fit(many_chair_count_rooms)
 
@@ -505,7 +530,6 @@ def test_sampled_grounding_gives_every_stratum_its_own_latent_value(
     """
     chair_count_variable = variable(SceneRoomAggregations).chair_count()
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
         monte_carlo_sample_count=1,
         learning_method=StratifiedLearning(
             variables=[chair_count_variable._name_], method=JointProbabilityTree()
@@ -558,14 +582,16 @@ def _part_attribute_causal_circuit(rooms, correlated_room_query) -> CausalCircui
     whose object template is stratified by type.
     """
     model = RelationalProbabilisticCircuit(
-        SceneRoom,
         learning_method=JointProbabilityTree(min_samples_per_leaf=5),
-        part_learning_methods={
-            "objects": StratifiedLearning(
-                variables=["type"],
-                method=JointProbabilityTree(min_samples_per_leaf=5),
-            )
-        },
+        part_learning_methods=PartLearningMethods.from_methods_and_default(
+            {
+                variable(SceneRoom).objects: StratifiedLearning(
+                    variables=["type"],
+                    method=JointProbabilityTree(min_samples_per_leaf=5),
+                )
+            },
+            JointProbabilityTree(),
+        ),
     )
     model.fit(rooms)
 
@@ -614,3 +640,174 @@ def test_a_part_attribute_whose_support_depends_on_the_sampled_count_is_no_cause
     """
     with pytest.raises(SupportDeterminismVerificationResult):
         _part_attribute_causal_circuit(many_chair_count_rooms, correlated_room_query)
+
+
+# %% the circuit type a grounding is wrapped in
+
+
+@dataclass
+class GroundingInBothCircuitTypes:
+    """
+    One grounding of a relational circuit, wrapped as a causal circuit of each circuit
+    type, with the variables both of them registered.
+    """
+
+    units: CausalCircuit[ProbabilisticCircuit]
+    """
+    The causal circuit over the grounding as a graph of units.
+    """
+
+    layers: CausalCircuit[LayeredProbabilisticCircuit]
+    """
+    The causal circuit over the same grounding, converted into layers.
+    """
+
+    cause: Variable
+    """
+    The registered cause Variable.
+    """
+
+    effect: Variable
+    """
+    The registered effect Variable.
+    """
+
+
+def _wrapped_in_both_circuit_types(
+    relational_circuit: RelationalProbabilisticCircuit,
+    query: Match,
+    cause_path: str,
+    effect_path: str,
+    seed: int = 0,
+) -> GroundingInBothCircuitTypes:
+    """
+    Ground a relational circuit once and wrap that one grounding twice, so that the two
+    causal circuits differ in nothing but how their nodes are stored.
+
+    :param relational_circuit: The relational circuit to ground.
+    :param query: The grounding query.
+    :param cause_path: The access path of the cause variable.
+    :param effect_path: The access path of the effect variable.
+    :param seed: The seed the undetermined statistics are sampled under.
+    :return: Both causal circuits and the variables they registered.
+    """
+    np.random.seed(seed)
+    grounded = relational_circuit.ground(query, GroundingMode.SAMPLED)
+    cause = RelationalCausalCircuit.resolve_variable(grounded, cause_path)
+    effect = RelationalCausalCircuit.resolve_variable(grounded, effect_path)
+    layered = RustworkxCircuitToLayeredCircuitConverter.convert(grounded)
+    bridge = RelationalCausalCircuit()
+    return GroundingInBothCircuitTypes(
+        bridge.from_grounded_circuit(grounded, [cause], [effect]),
+        bridge.from_grounded_circuit(layered, [cause], [effect]),
+        cause,
+        effect,
+    )
+
+
+def test_a_grounding_is_support_deterministic_in_both_circuit_types(
+    relational_probabilistic_circuit, room_query_4
+):
+    """
+    A grounding passes the support-determinism check whichever circuit type it is read
+    in.
+    """
+    both = _wrapped_in_both_circuit_types(
+        relational_probabilistic_circuit,
+        room_query_4,
+        "chair_count()",
+        "objects[0].type",
+    )
+    assert both.layers.verify_support_determinism().passed is True
+    assert both.units.verify_support_determinism().passed is True
+
+
+def test_the_interventional_circuit_of_a_layered_grounding_is_layered(
+    relational_probabilistic_circuit, room_query_4
+):
+    """
+    Intervening on a layered grounding gives back a layered circuit.
+    """
+    both = _wrapped_in_both_circuit_types(
+        relational_probabilistic_circuit,
+        room_query_4,
+        "chair_count()",
+        "objects[0].type",
+    )
+    assert isinstance(
+        both.layers.backdoor_adjustment(both.cause, both.effect),
+        LayeredProbabilisticCircuit,
+    )
+
+
+def test_both_circuit_types_intervene_on_a_grounding_the_same(
+    relational_probabilistic_circuit, room_query_4
+):
+    """
+    Both circuit types give the interventional distribution of one grounding the same
+    probabilities.
+    """
+    both = _wrapped_in_both_circuit_types(
+        relational_probabilistic_circuit,
+        room_query_4,
+        "chair_count()",
+        "objects[0].type",
+    )
+    events = events_over([both.cause, both.effect], 20)
+    assert probabilities_of(
+        both.layers.backdoor_adjustment(both.cause, both.effect), events
+    ) == pytest.approx(
+        probabilities_of(
+            both.units.backdoor_adjustment(both.cause, both.effect), events
+        )
+    )
+
+
+def test_trimming_a_layered_grounding_keeps_only_the_registered_variables(
+    relational_probabilistic_circuit, room_query_4
+):
+    """
+    Trimming a layered grounding leaves exactly the cause and the effect.
+    """
+    np.random.seed(0)
+    grounded = relational_probabilistic_circuit.ground(
+        room_query_4, GroundingMode.SAMPLED
+    )
+    cause = RelationalCausalCircuit.resolve_variable(grounded, "chair_count()")
+    effect = RelationalCausalCircuit.resolve_variable(grounded, "objects[0].type")
+    trimmed = RelationalCausalCircuit().from_grounded_circuit(
+        RustworkxCircuitToLayeredCircuitConverter.convert(grounded),
+        [cause],
+        [effect],
+        trim_to_registered_variables=True,
+    )
+    assert list(trimmed.probabilistic_circuit.variables) == sorted(
+        [cause, effect], key=lambda circuit_variable: circuit_variable.name
+    )
+
+
+def test_the_adjustment_warning_counts_the_regions_of_a_layered_grounding(
+    relational_probabilistic_circuit, room_query_4, caplog
+):
+    """
+    The warning about an expensive adjustment set also fires for a layered grounding.
+    """
+    np.random.seed(0)
+    grounded = relational_probabilistic_circuit.ground(
+        room_query_4, GroundingMode.EXACT
+    )
+    layered = RustworkxCircuitToLayeredCircuitConverter.convert(grounded)
+    resolve = RelationalCausalCircuit.resolve_variable
+    with caplog.at_level("WARNING"):
+        RelationalCausalCircuit(
+            adjustment_region_count_warning_threshold=0
+        ).from_grounded_circuit(
+            layered,
+            [resolve(layered, "objects[0].type")],
+            [resolve(layered, "objects[1].type")],
+            adjustment_variables=[
+                resolve(layered, "chair_count()"),
+                resolve(layered, "table_count()"),
+            ],
+        )
+    assert any("Cartesian product" in message for message in caplog.messages)

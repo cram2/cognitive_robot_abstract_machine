@@ -305,7 +305,10 @@ class RayTracer:
             raise ValueError("Origin and target points must have the same shape.")
 
         ray_directions = target_points - origin_points
-        points, index_ray, index_tri = self.scene.to_mesh().ray.intersects_location(
+        scene_geometry = trimesh.Trimesh(
+            **trimesh.triangles.to_kwargs(self.scene.triangles), process=False
+        )
+        points, index_ray, index_tri = scene_geometry.ray.intersects_location(
             origin_points, ray_directions, multiple_hits=multiple_hits
         )
         dist = np.linalg.norm(points - origin_points[index_ray], axis=1)

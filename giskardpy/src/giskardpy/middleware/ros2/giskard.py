@@ -233,6 +233,7 @@ class Giskard:
         if self.model_reload_synchronizer is not None:
             self.model_reload_synchronizer.close()
         self.world_fetcher.close()
+        self.motion_server.client_watchdog.presence.stop()
         self.tf_publisher.stop()
         self.viz_marker_publisher.stop()
 

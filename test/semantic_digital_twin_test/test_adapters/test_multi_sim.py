@@ -42,6 +42,7 @@ from semantic_digital_twin.world_description.geometry import (
     Mesh,
     Texture,
 )
+from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -129,13 +130,32 @@ def test_mjcf_2_world():
     return MJCFParser(TEST_MJCF_2).parse()
 
 
+def test_every_simulation_saves_its_world_to_a_file_of_its_own(tmp_path):
+    """
+    Simulations built at the same time, e.g. by parallel test workers, never overwrite
+    each other's scene, and a temporary scene goes away with its simulation.
+    """
+    first = MujocoSim(world=World(), headless=True)
+    second = MujocoSim(world=World(), headless=True)
+    chosen = MujocoSim(world=World(), headless=True, file_path=tmp_path / "chosen.xml")
+
+    assert first.file_path != second.file_path
+    assert first.file_path.is_file() and second.file_path.is_file()
+    assert chosen.file_path == tmp_path / "chosen.xml"
+    assert chosen.file_path.is_file()
+
+    first_scene_directory = first.file_path.parent
+    first._scene_directory.cleanup()
+    assert not first_scene_directory.exists()
+
+
 def test_empty_multi_sim_in_5s():
     world = World()
     multi_sim = MujocoSim(world=world, headless=headless)
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
+        assert multi_sim.simulator.file_path == str(multi_sim.file_path)
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -154,7 +174,7 @@ def test_world_multi_sim_in_5s(test_urdf_1_world):
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
+        assert multi_sim.simulator.file_path == str(multi_sim.file_path)
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -178,7 +198,7 @@ def test_apartment_multi_sim_in_5s():
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
+        assert multi_sim.simulator.file_path == str(multi_sim.file_path)
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -197,7 +217,7 @@ def test_world_multi_sim_with_change(test_urdf_1_world):
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
+        assert multi_sim.simulator.file_path == str(multi_sim.file_path)
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -533,9 +553,11 @@ def test_builder_writes_a_geoms_contact_bitmasks(tmp_path):
         root = Body(name=PrefixedName("root"))
         world.add_body(root)
         box_shape = Box(scale=Scale(1, 1, 1))
-        box_shape.add_simulator_property(MujocoGeom(
-            contact_type=ContactCategories(2), contact_affinity=ContactCategories(4)
-        ))
+        box_shape.add_simulator_property(
+            MujocoGeom(
+                contact_type=ContactCategories(2), contact_affinity=ContactCategories(4)
+            )
+        )
         link = Body(
             name=PrefixedName("link"),
             visual=ShapeCollection([box_shape]),
@@ -555,6 +577,55 @@ def test_builder_writes_a_geoms_contact_bitmasks(tmp_path):
     ]
     assert geom.contype == 2
     assert geom.conaffinity == 4
+
+
+def _world_with_one_cylinder(cylinder: Cylinder) -> World:
+    """
+    A world whose only link is shaped as ``cylinder``.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        link = Body(name=PrefixedName("link"), collision=ShapeCollection([cylinder]))
+        world.add_kinematic_structure_entity(link)
+        world.add_connection(FixedConnection(parent=root, child=link))
+    return world
+
+
+def test_builder_sizes_a_cylinder_by_its_radius_and_half_its_height(tmp_path):
+    """
+    MuJoCo sizes a cylinder by its radius and half its length, so a cylinder written
+    with its whole height stands twice as tall in the simulation as in the world.
+    """
+    cylinder = Cylinder(width=0.028, height=0.03)
+    builder = MujocoBuilder()
+    builder.build_world(
+        world=_world_with_one_cylinder(cylinder), file_path=str(tmp_path / "scene.xml")
+    )
+
+    [geom] = [
+        geom
+        for body in builder.spec.bodies
+        for geom in body.geoms
+        if body.name == "link"
+    ]
+    assert list(geom.size[:2]) == [cylinder.radius, cylinder.height / 2]
+
+
+def test_a_cylinder_keeps_its_size_through_a_round_trip(tmp_path):
+    cylinder = Cylinder(width=0.028, height=0.03)
+    builder = MujocoBuilder()
+    builder.build_world(
+        world=_world_with_one_cylinder(cylinder), file_path=str(tmp_path / "scene.xml")
+    )
+
+    parsed_world = MJCFParser(str(tmp_path / "scene.xml")).parse()
+
+    [parsed_cylinder] = parsed_world.get_body_by_name("link").collision.shapes
+    assert (parsed_cylinder.width, parsed_cylinder.height) == pytest.approx(
+        (cylinder.width, cylinder.height)
+    )
 
 
 def test_contact_declarations_and_gravity_compensation_survive_a_round_trip(tmp_path):
@@ -587,6 +658,33 @@ def test_contact_declarations_and_gravity_compensation_survive_a_round_trip(tmp_
     assert parsed_shape.get_simulator_property_of_type(ContactParameters) == contact
 
 
+def test_a_simulated_body_weighs_what_its_inertial_says_not_what_its_shapes_would():
+    """
+    A body's mass comes from its inertial; its shapes only stand in for a body that has
+    none.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        link = Body(
+            name=PrefixedName("link"),
+            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            inertial=Inertial(mass=2.0),
+        )
+        world.add_kinematic_structure_entity(link)
+        world.add_connection(FixedConnection(parent=root, child=link))
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        simulated_mass = simulation.simulator._mj_model.body("link").mass[0]
+    finally:
+        simulation.stop_simulation()
+
+    assert simulated_mass == pytest.approx(link.inertial.mass)
+
+
 def test_builder_keeps_a_visual_only_geom_contactless_despite_its_bitmasks(tmp_path):
     """
     A shape that is visual only never collides, whatever ``MujocoGeom`` bitmasks it
@@ -598,9 +696,11 @@ def test_builder_keeps_a_visual_only_geom_contactless_despite_its_bitmasks(tmp_p
         root = Body(name=PrefixedName("root"))
         world.add_body(root)
         box_shape = Box(scale=Scale(1, 1, 1))
-        box_shape.add_simulator_property(MujocoGeom(
-            contact_type=ContactCategories(2), contact_affinity=ContactCategories(4)
-        ))
+        box_shape.add_simulator_property(
+            MujocoGeom(
+                contact_type=ContactCategories(2), contact_affinity=ContactCategories(4)
+            )
+        )
         link = Body(name=PrefixedName("link"), visual=ShapeCollection([box_shape]))
         world.add_kinematic_structure_entity(link)
         world.add_connection(FixedConnection(parent=root, child=link))
@@ -679,7 +779,7 @@ def test_mujoco_with_tracy_dae_files():
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
+        assert multi_sim.simulator.file_path == str(multi_sim.file_path)
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -717,7 +817,7 @@ def test_mujocosim_world_with_added_objects(test_urdf_1_world):
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
+        assert multi_sim.simulator.file_path == str(multi_sim.file_path)
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -1216,6 +1316,117 @@ def test_thicken_if_near_planar_regenerates_instead_of_reusing_a_stale_file(tmp_
     # A correctly thickened quad has its 4 corners duplicated (front/back), not the
     # stale triangle's 3.
     assert len(trimesh.load(thickened_path, force="mesh").vertices) == 8
+
+
+# %% meshes sharing a file name
+
+
+def _write_box_mesh(directory, file_name: str, edge_length: float) -> str:
+    """
+    Writes a cube mesh into its own directory.
+
+    :param directory: The directory to write the mesh into.
+    :param file_name: The mesh file's name; its extension picks the format.
+    :param edge_length: The length of the cube's edges, in metres.
+    :return: The path of the written mesh.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    mesh_file = str(directory / file_name)
+    trimesh.creation.box(extents=(edge_length,) * 3).export(mesh_file)
+    return mesh_file
+
+
+def _world_with_meshes(visual_file: str, collision_file: str) -> World:
+    """
+    :return: A world with one body showing one mesh and colliding with another.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        body = Body(
+            name=PrefixedName("body"),
+            visual=ShapeCollection([Mesh(filename=visual_file, scale=Scale(1, 1, 1))]),
+            collision=ShapeCollection(
+                [Mesh(filename=collision_file, scale=Scale(1, 1, 1))]
+            ),
+        )
+        world.add_kinematic_structure_entity(body)
+        world.add_connection(FixedConnection(parent=root, child=body))
+    return world
+
+
+def _compiled_mesh_extents(builder: MujocoBuilder) -> list[list[float]]:
+    """
+    :return: The extents of the mesh file each geom of the built body compiles from, in
+        the order the geoms were added.
+    """
+    body = next(body for body in builder.spec.bodies if body.name == "body")
+    return [
+        list(trimesh.load(builder.spec.mesh(geom.meshname).file, force="mesh").extents)
+        for geom in body.geoms
+    ]
+
+
+def test_a_visual_and_a_collision_mesh_sharing_a_file_stem_each_compile_from_their_own_file(
+    tmp_path,
+):
+    world = _world_with_meshes(
+        visual_file=_write_box_mesh(tmp_path / "visual", "base.obj", edge_length=1.0),
+        collision_file=_write_box_mesh(
+            tmp_path / "collision", "base.stl", edge_length=0.1
+        ),
+    )
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    assert _compiled_mesh_extents(builder) == [
+        pytest.approx([1.0] * 3),
+        pytest.approx([0.1] * 3),
+    ]
+
+
+def test_two_collada_meshes_sharing_a_file_name_each_compile_from_their_own_file(
+    tmp_path,
+):
+    world = _world_with_meshes(
+        visual_file=_write_box_mesh(tmp_path / "visual", "base.dae", edge_length=1.0),
+        collision_file=_write_box_mesh(
+            tmp_path / "collision", "base.dae", edge_length=0.1
+        ),
+    )
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    assert _compiled_mesh_extents(builder) == [
+        pytest.approx([1.0] * 3),
+        pytest.approx([0.1] * 3),
+    ]
+
+
+def test_a_collada_mesh_converted_by_an_earlier_build_is_not_reused_for_another_file_of_the_same_name(
+    tmp_path,
+):
+    """
+    Two robots built into the same asset folder, one after the other, may both ship a
+    Collada mesh called ``base.dae``.
+    """
+    large_base = _write_box_mesh(tmp_path / "large", "base.dae", edge_length=1.0)
+    small_base = _write_box_mesh(tmp_path / "small", "base.dae", edge_length=0.1)
+    MujocoBuilder().build_world(
+        world=_world_with_meshes(visual_file=large_base, collision_file=large_base),
+        file_path=str(tmp_path / "first_scene.xml"),
+    )
+
+    builder = MujocoBuilder()
+    builder.build_world(
+        world=_world_with_meshes(visual_file=small_base, collision_file=small_base),
+        file_path=str(tmp_path / "second_scene.xml"),
+    )
+
+    assert _compiled_mesh_extents(builder) == [pytest.approx([0.1] * 3)] * 2
 
 
 @dataclass

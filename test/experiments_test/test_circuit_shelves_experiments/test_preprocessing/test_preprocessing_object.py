@@ -46,7 +46,7 @@ def _object_2d() -> RelationalCircuitExperimentObject2D:
     return RelationalCircuitExperimentObject2D(
         object_type=ObjectType.VASE,
         scale=Scale(x=0.3, y=0.3, z=0.5),
-        pose=Pose2D(x=0.0, y=0.0, yaw=0.0),
+        pose=Pose2D.from_xy_yaw(x=0.0, y=0.0, yaw=0.0),
         source_id="test_object",
     )
 

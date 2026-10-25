@@ -13,6 +13,7 @@ from semantic_digital_twin.spatial_types import (
     Quaternion,
 )
 from semantic_digital_twin.spatial_types.spatial_types import RotationMatrix
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -24,24 +25,31 @@ class TestPose2DConstruction:
         assert p.yaw.to_np() == pytest.approx(0)
 
     def test_explicit_values(self):
-        p = Pose2D(x=1.0, y=2.0, yaw=math.pi / 2)
+        p = Pose2D.from_xy_yaw(x=1.0, y=2.0, yaw=math.pi / 2)
         assert p.x.to_np() == pytest.approx(1.0)
         assert p.y.to_np() == pytest.approx(2.0)
         assert p.yaw.to_np() == pytest.approx(math.pi / 2)
 
-    def test_fixed_z_roll_pitch(self):
-        p = Pose2D(x=1, y=2, yaw=0.5)
-        assert p.z == 0
-        assert p.roll == 0
-        assert p.pitch == 0
+    def test_has_no_height_or_tilt(self):
+        """
+        A 2D pose has no height or tilt of its own, so :class:`Pose2D` does not carry
+        ``z``, ``roll`` or ``pitch`` at all.
+        """
+        p = Pose2D.from_xy_yaw(x=1, y=2, yaw=0.5)
+        with pytest.raises(AttributeError):
+            p.z
+        with pytest.raises(AttributeError):
+            p.roll
+        with pytest.raises(AttributeError):
+            p.pitch
 
     def test_shape(self):
-        p = Pose2D(x=1, y=2, yaw=0.5)
+        p = Pose2D.from_xy_yaw(x=1, y=2, yaw=0.5)
         assert p.shape == (3, 1)
 
     def test_reference_frame(self):
         frame = Body(name=PrefixedName("world"))
-        p = Pose2D(x=1, y=2, yaw=0, reference_frame=frame)
+        p = Pose2D.from_xy_yaw(x=1, y=2, yaw=0, reference_frame=frame)
         assert p.reference_frame is frame
 
     def test_setters(self):
@@ -56,7 +64,7 @@ class TestPose2DConstruction:
 
 class TestPose2DToPose:
     def test_to_pose_position(self):
-        p2 = Pose2D(x=3.0, y=-1.5, yaw=0)
+        p2 = Pose2D.from_xy_yaw(x=3.0, y=-1.5, yaw=0)
         pose = p2.pose
         assert isinstance(pose, Pose)
         assert pose.x.to_np() == pytest.approx(3.0)
@@ -65,13 +73,13 @@ class TestPose2DToPose:
 
     def test_to_pose_yaw_only(self):
         yaw = math.pi / 4
-        p2 = Pose2D(x=0, y=0, yaw=yaw)
+        p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=yaw)
         pose = p2.pose
         _, _, actual_yaw = pose.rotation_matrix.rpy
         assert actual_yaw.to_np() == pytest.approx(yaw, abs=1e-6)
 
     def test_to_pose_roll_pitch_zero(self):
-        p2 = Pose2D(x=1, y=2, yaw=1.0)
+        p2 = Pose2D.from_xy_yaw(x=1, y=2, yaw=1.0)
         pose = p2.pose
         roll, pitch, _ = pose.rotation_matrix.rpy
         assert roll.to_np() == pytest.approx(0.0, abs=1e-6)
@@ -79,11 +87,11 @@ class TestPose2DToPose:
 
     def test_to_pose_reference_frame_propagated(self):
         frame = Body(name=PrefixedName("map"))
-        p2 = Pose2D(x=1, y=2, yaw=0, reference_frame=frame)
+        p2 = Pose2D.from_xy_yaw(x=1, y=2, yaw=0, reference_frame=frame)
         assert p2.pose.reference_frame is frame
 
     def test_position_of_its_pose(self):
-        p2 = Pose2D(x=2.0, y=-3.0, yaw=0)
+        p2 = Pose2D.from_xy_yaw(x=2.0, y=-3.0, yaw=0)
         pt = p2.pose.position
         assert isinstance(pt, Point3)
         assert pt.x.to_np() == pytest.approx(2.0)
@@ -91,7 +99,7 @@ class TestPose2DToPose:
         assert pt.z.to_np() == pytest.approx(0.0)
 
     def test_quaternion(self):
-        p2 = Pose2D(x=0, y=0, yaw=0)
+        p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=0)
         q = p2.quaternion
         assert isinstance(q, Quaternion)
         # identity quaternion: x=0, y=0, z=0, w=1
@@ -99,7 +107,7 @@ class TestPose2DToPose:
         assert np.allclose(q.to_np().flatten(), expected, atol=1e-6)
 
     def test_to_rotation_matrix(self):
-        p2 = Pose2D(x=0, y=0, yaw=0)
+        p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=0)
         r = p2.rotation_matrix
         assert isinstance(r, RotationMatrix)
         assert np.allclose(r.to_np()[:3, :3], np.eye(3), atol=1e-6)
@@ -107,14 +115,14 @@ class TestPose2DToPose:
     def test_to_homogeneous_matrix(self):
         from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
-        p2 = Pose2D(x=1, y=2, yaw=0)
+        p2 = Pose2D.from_xy_yaw(x=1, y=2, yaw=0)
         m = p2.homogeneous_matrix
         assert isinstance(m, HomogeneousTransformationMatrix)
         assert m[0, 3].to_np() == pytest.approx(1.0)
         assert m[1, 3].to_np() == pytest.approx(2.0)
 
     def test_position_property(self):
-        p2 = Pose2D(x=5, y=6, yaw=0.3)
+        p2 = Pose2D.from_xy_yaw(x=5, y=6, yaw=0.3)
         pt = p2.position
         assert isinstance(pt, Point2)
         assert pt.x.to_np() == pytest.approx(5.0)
@@ -122,19 +130,19 @@ class TestPose2DToPose:
 
     def test_position_property_reference_frame_propagated(self):
         frame = Body(name=PrefixedName("world"))
-        p2 = Pose2D(x=5, y=6, yaw=0, reference_frame=frame)
+        p2 = Pose2D.from_xy_yaw(x=5, y=6, yaw=0, reference_frame=frame)
         assert p2.position.reference_frame is frame
 
     def test_orientation_property(self):
-        p2 = Pose2D(x=0, y=0, yaw=0)
+        p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=0)
         q = p2.orientation
         assert isinstance(q, Quaternion)
 
 
-class TestPose2DFromPositionAndYaw:
+class TestPose2DFromPosition:
     def test_composes_position_and_yaw(self):
         position = Point2(x=1.5, y=-2.5)
-        p2 = Pose2D.from_position_and_yaw(position, yaw=0.7)
+        p2 = Pose2D(position, yaw=0.7)
         assert p2.x.to_np() == pytest.approx(1.5)
         assert p2.y.to_np() == pytest.approx(-2.5)
         assert p2.yaw.to_np() == pytest.approx(0.7)
@@ -142,22 +150,20 @@ class TestPose2DFromPositionAndYaw:
     def test_inherits_position_reference_frame(self):
         frame = Body(name=PrefixedName("world"))
         position = Point2(x=1.0, y=2.0, reference_frame=frame)
-        p2 = Pose2D.from_position_and_yaw(position, yaw=0.0)
+        p2 = Pose2D(position, yaw=0.0)
         assert p2.reference_frame is frame
 
     def test_override_reference_frame(self):
         frame = Body(name=PrefixedName("world"))
         other_frame = Body(name=PrefixedName("other"))
         position = Point2(x=1.0, y=2.0, reference_frame=frame)
-        p2 = Pose2D.from_position_and_yaw(
-            position, yaw=0.0, reference_frame=other_frame
-        )
+        p2 = Pose2D(position, yaw=0.0, reference_frame=other_frame)
         assert p2.reference_frame is other_frame
 
 
 class TestPose2DFromPose:
     def test_roundtrip(self):
-        original = Pose2D(x=1.5, y=-2.5, yaw=0.7)
+        original = Pose2D.from_xy_yaw(x=1.5, y=-2.5, yaw=0.7)
         pose3d = original.pose
         recovered = Pose2D.from_pose(pose3d)
         assert recovered.x.to_np() == pytest.approx(1.5, abs=1e-6)
@@ -170,12 +176,23 @@ class TestPose2DFromPose:
         p2 = Pose2D.from_pose(pose)
         assert p2.reference_frame is frame
 
-    def test_from_pose_override_reference_frame(self):
-        frame1 = Body(name=PrefixedName("a"))
-        frame2 = Body(name=PrefixedName("b"))
-        pose = Pose.from_xyz_rpy(0, 0, 0, 0, 0, 0, reference_frame=frame1)
-        p2 = Pose2D.from_pose(pose, reference_frame=frame2)
-        assert p2.reference_frame is frame2
+    def test_from_pose_transforms_into_another_frame(self, mini_world: World):
+        """
+        Asking for another frame expresses the pose in that frame instead of attaching
+        the frame to the pose's own coordinates.
+        """
+        mini_world.connections[0].position = math.pi / 2
+        root, tip = mini_world.root, mini_world.bodies[1]
+        tip_pose = Pose.from_xyz_rpy(1, 0, 2, 0, 0, 0.3, reference_frame=tip)
+
+        p2 = Pose2D.from_pose(tip_pose, plane_frame=root)
+
+        assert p2.reference_frame is root
+        np.testing.assert_allclose(
+            p2.to_np(),
+            Pose2D.from_pose(mini_world.transform(tip_pose, root)).to_np(),
+            atol=1e-12,
+        )
 
 
 class TestPose2DSymbolic:
@@ -183,13 +200,13 @@ class TestPose2DSymbolic:
         x_var = sm.FloatVariable(name="x")
         y_var = sm.FloatVariable(name="y")
         yaw_var = sm.FloatVariable(name="yaw")
-        p2 = Pose2D(x=x_var, y=y_var, yaw=yaw_var)
+        p2 = Pose2D.from_xy_yaw(x=x_var, y=y_var, yaw=yaw_var)
         assert not p2.is_constant()
 
     def test_deepcopy(self):
         from copy import deepcopy
 
-        p2 = Pose2D(x=1.0, y=2.0, yaw=0.5)
+        p2 = Pose2D.from_xy_yaw(x=1.0, y=2.0, yaw=0.5)
         p2_copy = deepcopy(p2)
         assert p2_copy.x.to_np() == pytest.approx(1.0)
         assert p2_copy.y.to_np() == pytest.approx(2.0)
@@ -200,7 +217,7 @@ class TestPose2DJSON:
     def test_to_json_roundtrip(self):
         from krrood.adapters.json_serializer import to_json, from_json
 
-        p2 = Pose2D(x=1.0, y=-2.0, yaw=0.3)
+        p2 = Pose2D.from_xy_yaw(x=1.0, y=-2.0, yaw=0.3)
         data = to_json(p2)
         p2_restored = from_json(data)
         assert p2_restored.x.to_np() == pytest.approx(1.0, abs=1e-6)
@@ -208,7 +225,7 @@ class TestPose2DJSON:
         assert p2_restored.yaw.to_np() == pytest.approx(0.3, abs=1e-6)
 
     def test_to_json_contains_data_key(self):
-        p2 = Pose2D(x=1.0, y=2.0, yaw=0.5)
+        p2 = Pose2D.from_xy_yaw(x=1.0, y=2.0, yaw=0.5)
         j = p2.to_json()
         assert "data" in j
         assert len(j["data"]) == 3
@@ -216,11 +233,11 @@ class TestPose2DJSON:
 
 class TestPose2DHash:
     def test_hash_equal_objects(self):
-        p1 = Pose2D(x=1.0, y=2.0, yaw=0.5)
-        p2 = Pose2D(x=1.0, y=2.0, yaw=0.5)
+        p1 = Pose2D.from_xy_yaw(x=1.0, y=2.0, yaw=0.5)
+        p2 = Pose2D.from_xy_yaw(x=1.0, y=2.0, yaw=0.5)
         assert hash(p1) == hash(p2)
 
     def test_hash_different_objects(self):
-        p1 = Pose2D(x=1.0, y=2.0, yaw=0.5)
-        p2 = Pose2D(x=1.0, y=2.0, yaw=0.6)
+        p1 = Pose2D.from_xy_yaw(x=1.0, y=2.0, yaw=0.5)
+        p2 = Pose2D.from_xy_yaw(x=1.0, y=2.0, yaw=0.6)
         assert hash(p1) != hash(p2)

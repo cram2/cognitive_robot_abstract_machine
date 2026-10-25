@@ -1,4 +1,5 @@
 import pytest
+import rclpy
 from sqlalchemy import select
 
 # The alternative mapping needs to be imported for the stretch to work properly

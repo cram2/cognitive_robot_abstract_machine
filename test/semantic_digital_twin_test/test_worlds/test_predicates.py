@@ -1,9 +1,11 @@
+import tracemalloc
 from copy import deepcopy
 from dataclasses import dataclass, fields
 from typing import List
 from uuid import UUID
 
 import numpy as np
+import trimesh
 
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
@@ -54,6 +56,7 @@ from semantic_digital_twin.world_description.geometry import (
     Box,
     Scale,
     Color,
+    Mesh,
     Sphere,
     VolumetricBoundingBox,
 )
@@ -1264,6 +1267,87 @@ def test_the_threshold_is_what_turns_the_measurement_into_a_verdict(two_block_wo
 
     assert InsideOf(top, center, minimum_containment_ratio=measured)()
     assert not InsideOf(top, center, minimum_containment_ratio=measured + 0.01)()
+
+
+# %% measuring containment
+
+
+def test_containment_is_the_fraction_of_vertices_within_the_other_s_bounding_box():
+    """
+    A crate sunk halfway into a box has the four corners of its lower half inside it.
+    """
+    world = World()
+    box = _box_body("box", Scale(1.0, 1.0, 1.0))
+    crate = _box_body("crate", Scale(0.5, 0.5, 0.5))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(box)
+    _fix_to(box, crate, HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5))
+
+    assert InsideOf(crate, box).compute_containment_ratio() == 0.5
+
+
+def test_containment_is_measured_against_the_world_aligned_bounding_box():
+    """
+    A box turned by 45° about the vertical spans its diagonal along the world's axes, so
+    a crate beside one of its faces but within that diagonal counts as inside.
+    """
+    world = World()
+    room = Body(name=PrefixedName("room"))
+    box = _box_body("box", Scale(1.0, 1.0, 1.0))
+    crate = _box_body("crate", Scale(0.1, 0.1, 0.1))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(room)
+    _fix_to(room, box, HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 4))
+    _fix_to(room, crate, HomogeneousTransformationMatrix.from_xyz_rpy(x=0.6, y=0.6))
+
+    assert InsideOf(crate, box).compute_containment_ratio() == 1.0
+
+
+def _sphere_body(name: str, radius: float, subdivisions: int) -> Body:
+    """
+    A body shaped as one finely tessellated sphere about its own origin.
+    """
+    body = Body(name=PrefixedName(name))
+    body.collision = ShapeCollection(
+        [
+            Mesh.from_trimesh(
+                mesh=trimesh.creation.icosphere(
+                    subdivisions=subdivisions, radius=radius
+                ),
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=body
+                ),
+            )
+        ],
+        reference_frame=body,
+    )
+    return body
+
+
+def test_measuring_containment_allocates_less_than_a_copy_of_both_meshes():
+    """
+    Containment is measured many times a second while events are segmented, so it must
+    not copy the meshes it compares.
+    """
+    world = World()
+    bowl = _sphere_body("bowl", radius=1.0, subdivisions=6)
+    ball = _sphere_body("ball", radius=0.2, subdivisions=5)
+    with world.modify_world():
+        world.add_kinematic_structure_entity(bowl)
+    _fix_to(bowl, ball, HomogeneousTransformationMatrix.from_xyz_rpy())
+    relation = InsideOf(ball, bowl)
+    relation.compute_containment_ratio()
+    geometry_size = sum(
+        mesh.vertices.nbytes + mesh.faces.nbytes
+        for mesh in (bowl.combined_mesh, ball.combined_mesh)
+    )
+
+    tracemalloc.start()
+    relation.compute_containment_ratio()
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert peak < geometry_size
 
 
 def test_support_relates_the_supported_thing_to_what_holds_it_up():

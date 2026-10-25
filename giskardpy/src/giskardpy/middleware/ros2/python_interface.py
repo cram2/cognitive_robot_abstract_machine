@@ -56,9 +56,18 @@ class GiskardWrapper:
     Keeps this world in step with the world Giskard controls around a goal.
     """
 
-    heartbeat_publisher: ClientHeartbeatPublisher = field(init=False, default=None)
+    announces_presence: bool = field(default=False, kw_only=True)
     """
-    Announces to Giskard that this client is still waiting for its goal.
+    Whether this client announces itself to Giskard from the start, see
+    :meth:`announce_presence`.
+    """
+
+    heartbeat_publisher: ClientHeartbeatPublisher | None = field(
+        init=False, default=None
+    )
+    """
+    Announces to Giskard that this client is still waiting for its goal, or ``None``
+    while this client does not announce itself.
     """
 
     _motion_statechart: MotionStatechart | None = field(
@@ -76,11 +85,8 @@ class GiskardWrapper:
         self.world_updates = ClientWorldUpdates(
             world_synchronizer=WorldSynchronizer.of_world(self.world)
         )
-        self.heartbeat_publisher = ClientHeartbeatPublisher(
-            node=self.node_handle,
-            client=self.client,
-            giskard_node_name=self.giskard_node_name,
-        )
+        if self.announces_presence:
+            self.announce_presence()
         giskard_topic = f"{self.giskard_node_name}/command"
         self._client = MyActionClient(self.node_handle, JsonAction, giskard_topic)
         sleep(0.3)
@@ -91,6 +97,25 @@ class GiskardWrapper:
         Who this client is, as it names itself in its goals and its heartbeats.
         """
         return self.world_updates.world_synchronizer.meta_data
+
+    def announce_presence(self) -> None:
+        """
+        Start announcing to Giskard that this client is still there.
+
+        Giskard only watches clients that announce themselves. It stops the goal of one
+        whose announcements stop arriving, so that a robot does not finish a motion
+        nobody is waiting for any more. This is off unless asked for, because a client
+        on a machine too busy to announce itself in time looks just like one that died.
+
+        Does nothing if this client already announces itself.
+        """
+        if self.heartbeat_publisher is not None:
+            return
+        self.heartbeat_publisher = ClientHeartbeatPublisher(
+            node=self.node_handle,
+            client=self.client,
+            giskard_node_name=self.giskard_node_name,
+        )
 
     @property
     def robot_name(self) -> PrefixedName:
@@ -212,11 +237,13 @@ class GiskardWrapper:
 
     def close(self) -> None:
         """
-        Stop announcing this client's heartbeat to Giskard.
+        Stop announcing this client's heartbeat to Giskard, if it announces one.
 
         Does not touch :attr:`node_handle`: it was given to this wrapper by its caller,
         who owns its lifecycle.
         """
+        if self.heartbeat_publisher is None:
+            return
         self.heartbeat_publisher.stop()
 
 

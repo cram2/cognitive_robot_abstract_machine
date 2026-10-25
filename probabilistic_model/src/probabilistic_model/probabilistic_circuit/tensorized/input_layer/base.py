@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -155,8 +156,8 @@ class UnivariateInputLayer(LeafLayer, ABC):
             distribution.log_mode()
             for distribution in self.node_distributions(variable)
         ]
-        return [mode for mode, _ in modes], np.array(
-            [value for _, value in modes], dtype=float
+        return [mode.event for mode in modes], np.array(
+            [mode.log_likelihood for mode in modes], dtype=float
         )
 
     @memoized
@@ -264,8 +265,8 @@ class UnivariateInputLayer(LeafLayer, ABC):
 
         :param assignment: The assignment of the variable of this layer.
         :param singleton_allowed: Whether singletons are allowed.
-        :return: The truncated layer, with as many nodes as this one, and the
-            log-probabilities of its nodes.
+        :return: The truncated layer, with as many nodes as this one, and the log-
+            probabilities of its nodes.
         """
         raise NotImplementedError
 
@@ -334,8 +335,8 @@ class UnivariateInputLayer(LeafLayer, ABC):
         Condition every node of this layer on a value of its variable at once.
 
         :param value: The value.
-        :return: The conditioned layer, with as many nodes as this one, and the
-            log-likelihoods of the value under its nodes.
+        :return: The conditioned layer, with as many nodes as this one, and the log-
+            likelihoods of the value under its nodes.
         """
         raise NotImplementedError
 
@@ -349,7 +350,7 @@ class UnivariateInputLayer(LeafLayer, ABC):
         variable = query.variables[self.variable]
         if variable not in point:
             result = LayerWithLogProbabilities(
-                self.__deepcopy__(), np.zeros(self.number_of_nodes)
+                copy.deepcopy(self), np.zeros(self.number_of_nodes)
             )
         else:
             result = self.log_conditional_of_value(point[variable])
@@ -370,7 +371,7 @@ class UnivariateInputLayer(LeafLayer, ABC):
     ) -> Optional[Layer]:
         if not kept[self.variable]:
             return None
-        return self.__deepcopy__()
+        return copy.deepcopy(self)
 
 
 @dataclass(eq=False, repr=False)

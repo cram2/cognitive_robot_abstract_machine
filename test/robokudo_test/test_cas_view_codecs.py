@@ -1,7 +1,9 @@
 import pytest
 from std_msgs.msg import String
 
+from robokudo.cas import CASViews
 from robokudo.io.cas_view_codecs import CASViewCodecRegistry
+from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.tf import StampedTransform
 
 
@@ -55,6 +57,15 @@ def test_stamped_transform_codec_roundtrip():
     assert decoded_transform.child_frame == transform.child_frame
     assert decoded_transform.timestamp.sec == transform.timestamp.sec
     assert decoded_transform.timestamp.nanosec == transform.timestamp.nanosec
+
+
+def test_color_to_depth_ratio_roundtrip():
+    registry = CASViewCodecRegistry()
+    ratio = ColorToDepthRatio(horizontal=0.5, vertical=0.25)
+
+    encoded = registry.encode_view(CASViews.COLOR_TO_DEPTH_RATIO, ratio)
+
+    assert registry.decode_view(encoded) == (CASViews.COLOR_TO_DEPTH_RATIO, ratio)
 
 
 def test_decode_view_unknown_serializer_raises():

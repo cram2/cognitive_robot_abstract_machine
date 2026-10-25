@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import math
 from abc import abstractmethod, ABC
 import equinox as eqx
@@ -78,9 +79,7 @@ class DifferentiableLayer(eqx.Module, SubclassJSONSerializer, ABC):
         """
         return [(depth, self)]
 
-    def __deepcopy__(
-        self, memo: Optional[Dict[int, Any]] = None
-    ) -> "DifferentiableLayer":
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         """
         Create a deep copy of the layer.
 
@@ -312,19 +311,12 @@ class DifferentiableSparseSumLayer(DifferentiableSumLayer):
         )
         return jnp.log(shifted_sum) + shift - self.log_normalization_constants
 
-    def __deepcopy__(self, memo: Optional[Dict[int, Any]] = None):
-        if memo is None:
-            memo = {}
-        id_self = id(self)
-        if id_self in memo:
-            return memo[id_self]
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         child_layers = [
-            child_layer.__deepcopy__(memo) for child_layer in self.child_layers
+            copy.deepcopy(child_layer, memo) for child_layer in self.child_layers
         ]
         log_weights = [copy_bcoo(log_weight) for log_weight in self.log_weights]
-        result = self.__class__(child_layers, log_weights)
-        memo[id_self] = result
-        return result
+        return self.__class__(child_layers, log_weights)
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
@@ -410,19 +402,12 @@ class DifferentiableDenseSumLayer(DifferentiableSumLayer):
             - self.log_normalization_constants
         )
 
-    def __deepcopy__(self, memo: Optional[Dict[int, Any]] = None):
-        if memo is None:
-            memo = {}
-        id_self = id(self)
-        if id_self in memo:
-            return memo[id_self]
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         child_layers = [
-            child_layer.__deepcopy__(memo) for child_layer in self.child_layers
+            copy.deepcopy(child_layer, memo) for child_layer in self.child_layers
         ]
         log_weights = [jnp.copy(log_weight) for log_weight in self.log_weights]
-        result = self.__class__(child_layers, log_weights)
-        memo[id_self] = result
-        return result
+        return self.__class__(child_layers, log_weights)
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
@@ -520,19 +505,12 @@ class DifferentiableProductLayer(DifferentiableInnerLayer):
 
         return result
 
-    def __deepcopy__(self, memo: Optional[Dict[int, Any]] = None):
-        if memo is None:
-            memo = {}
-        id_self = id(self)
-        if id_self in memo:
-            return memo[id_self]
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         child_layers = [
-            child_layer.__deepcopy__(memo) for child_layer in self.child_layers
+            copy.deepcopy(child_layer, memo) for child_layer in self.child_layers
         ]
         edges = copy_bcoo(self.edges)
-        result = self.__class__(child_layers, edges)
-        memo[id_self] = result
-        return result
+        return self.__class__(child_layers, edges)
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()

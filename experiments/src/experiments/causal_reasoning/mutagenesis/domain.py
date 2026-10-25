@@ -1,7 +1,7 @@
 """
 Domain classes mirroring the CTU relational-learning repository's Mutagenesis
 dataset (https://relational.fel.cvut.cz/dataset/Mutagenesis), used to validate the
-RSPN grounding and causal-query pipeline against a real, external, standard
+relational grounding and causal-query pipeline against a real, external, standard
 relational-learning benchmark rather than only the ``SceneRoom``/``SceneObject`` toy
 fixture.
 """
@@ -92,7 +92,7 @@ class MutagenesisBond:
 
     A real bond connects exactly two atoms, and the CTU dataset's own ``bonds`` table
     records which ones (``atom1_id``, ``atom2_id``). This class itself does not carry
-    that connectivity, since the RSPN grounding this domain feeds fits and grounds
+    that connectivity, since the relational grounding this domain feeds fits and grounds
     ``atoms`` and ``bonds`` as two independent exchangeable parts of the parent
     molecule, and a bond referencing specific atom objects would cross that independence
     boundary. The connectivity is not discarded, though:

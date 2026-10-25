@@ -8,15 +8,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Type, cast
 from uuid import uuid4
 
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import DriveVelocityLimitsOnUndrivenRobot
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     FixedConnection,
+    WheeledDrive,
 )
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import Body, Connection
 
 if TYPE_CHECKING:
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -55,16 +56,30 @@ class RobotSpecification:
     If None, identity is used.
     """
 
+    drive_translation_velocity_limits: float | None = None
+    """
+    Velocity limit of the drive's translational degrees of freedom, in meter per second.
+
+    If None, the drive connection's own default is kept.
+    """
+
+    drive_rotation_velocity_limits: float | None = None
+    """
+    Velocity limit of the drive's rotational degrees of freedom, in radian per second.
+
+    If None, the drive connection's own default is kept.
+    """
+
     def spawn(self, world: World) -> AbstractRobot:
         """
-        Parse the robot from its own description and merge it into ``world`` as
-        ``world.root -> odom -> connection -> robot``.
+        Parse the robot from its own description, as the robot reads it, and merge it
+        into ``world`` as ``world.root -> odom -> connection -> robot``.
 
         The ``odom`` is fixed to the world root at the localization pose. The connection
         attaching the robot to it is the drive declared by the robot's mobile base, or a
         fixed connection when the robot has no mobile base. An active drive is marked as
-        controlled and its start pose is applied afterwards, that of a fixed one at
-        creation.
+        controlled, driven by the servos its mobile base declares, and its start pose is
+        applied afterwards, that of a fixed one at creation.
 
         The robot is annotated while it still owns the world it was parsed into, so that
         the annotation's name-based lookups cannot be confused by an equally named joint
@@ -72,14 +87,16 @@ class RobotSpecification:
 
         :param world: The world the robot is merged into.
         :return: The semantic annotation of the merged robot.
+        :raises DriveVelocityLimitsOnUndrivenRobot: If a drive velocity limit is given
+            for a robot that has no drive.
         """
         connection_type = self.semantic_annotation_type.get_drive_connection_type()
         is_active = issubclass(connection_type, ActiveConnection)
+        drive_velocity_limits = self._drive_velocity_limits(connection_type)
 
-        robot_world = URDFParser.from_file(
-            self.semantic_annotation_type.get_ros_file_path()
-        ).parse()
-        robot_id = self.semantic_annotation_type.from_world(robot_world).id
+        described_robot = self.semantic_annotation_type.from_description()
+        robot_world = described_robot._world
+        robot_id = described_robot.id
 
         with world.modify_world():
             odom_body = self._create_odom_body()
@@ -106,16 +123,45 @@ class RobotSpecification:
                 parent_T_connection_expression=(
                     None if is_active else self.odom_T_robot_start
                 ),
+                **drive_velocity_limits,
             )
             world.merge_world(robot_world, root_connection=odom_C_robot)
+            robot = cast("AbstractRobot", world.get_semantic_annotation_by_id(robot_id))
             if is_active:
                 odom_C_robot.has_hardware_interface = True
+                robot.mobile_base.declare_drive_servos(odom_C_robot)
 
         # The start pose touches DoF state, so it is set after the modification block.
         if is_active and self.odom_T_robot_start is not None:
             odom_C_robot.origin = self.odom_T_robot_start
 
-        return cast("AbstractRobot", world.get_semantic_annotation_by_id(robot_id))
+        return robot
+
+    def _drive_velocity_limits(
+        self, connection_type: Type[Connection]
+    ) -> dict[str, float]:
+        """
+        Collect the velocity limits to create the drive connection with.
+
+        :param connection_type: The connection the robot attaches to its ``odom`` with.
+        :return: The limits that were set, keyed by the keyword ``create_with_dofs``
+            takes them under.
+        :raises DriveVelocityLimitsOnUndrivenRobot: If a limit is set but the connection
+            carries no velocity limits.
+        """
+        limits = {
+            "translation_velocity_limits": self.drive_translation_velocity_limits,
+            "rotation_velocity_limits": self.drive_rotation_velocity_limits,
+        }
+        given_limits = {
+            keyword: limit for keyword, limit in limits.items() if limit is not None
+        }
+        if given_limits and not issubclass(connection_type, WheeledDrive):
+            raise DriveVelocityLimitsOnUndrivenRobot(
+                robot_type_name=self.semantic_annotation_type.__name__,
+                connection_type_name=connection_type.__name__,
+            )
+        return given_limits
 
     @staticmethod
     def _create_odom_body() -> Body:

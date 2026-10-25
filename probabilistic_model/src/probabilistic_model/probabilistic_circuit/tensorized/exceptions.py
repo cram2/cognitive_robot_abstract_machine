@@ -14,32 +14,6 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class NumberOfWeightsMismatchError(DataclassException, ValueError):
-    """
-    Exception raised when a mixture does not get exactly one weight per component.
-    """
-
-    number_of_weights: int
-    """
-    The number of weights given.
-    """
-
-    number_of_components: int
-    """
-    The number of components to mix.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Got {self.number_of_weights} weights for "
-            f"{self.number_of_components} components."
-        )
-
-    def suggest_correction(self) -> str:
-        return "Pass exactly one weight per component."
-
-
-@dataclass
 class UndefinedCumulativeDistributionError(DataclassException, TypeError):
     """
     Exception raised when the cumulative distribution function of a layer over an
@@ -95,7 +69,9 @@ class CopiesNotAlignedError(DataclassException, ValueError):
     path: Tuple[int, ...]
     """
     The index of the child layer taken at every step from the roots of the copies down
-    to :attr:`copies`. Empty if the roots themselves differ.
+    to :attr:`copies`.
+
+    Empty if the roots themselves differ.
     """
 
     @property

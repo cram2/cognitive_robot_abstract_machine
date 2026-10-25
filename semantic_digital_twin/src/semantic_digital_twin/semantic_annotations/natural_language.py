@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
 
 @dataclass(eq=False)

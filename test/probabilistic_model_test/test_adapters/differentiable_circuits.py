@@ -1,7 +1,9 @@
 """
-Variables, layers and circuits that the tests of the conversions between
-differentiable circuits and layered circuits share.
+Layers and circuits that the tests of the conversions between differentiable circuits
+and layered circuits share.
 """
+
+from __future__ import annotations
 
 from enum import IntEnum
 
@@ -9,11 +11,9 @@ import jax.numpy as jnp
 import numpy as np
 from jax.experimental.sparse import BCOO
 from random_events.interval import Bound
-from random_events.set import Set
-from random_events.variable import Continuous, Integer, Symbolic
+from random_events.variable import Continuous, Symbolic
 from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
-from typing_extensions import List, Tuple
 
 from probabilistic_model.learning.region_graph.region_graph import RegionGraph
 from probabilistic_model.probabilistic_circuit.jax.gaussian_layer import (
@@ -61,6 +61,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding impo
 
 
 class Color(IntEnum):
+    """
+    The categories of a symbolic variable.
+    """
+
     RED = 0
     GREEN = 1
     BLUE = 2
@@ -76,23 +80,11 @@ class Size(IntEnum):
     MEDIUM = 1
 
 
-w = Continuous("w")
-x = Continuous("x")
-y = Continuous("y")
-z = Continuous("z")
-color = Symbolic(name="color", domain=Set.from_iterable(Color))
-size = Symbolic(name="size", domain=Set.from_iterable(Size))
-count = Integer("count")
-
-# differentiable circuits evaluate in single precision
-single_precision_tolerance = 1e-4
-
-
 # %% sparse matrices
 
 
 def sparse_matrix(
-    entries: List[Tuple[int, int, float]], shape: Tuple[int, int]
+    entries: list[tuple[int, int, float]], shape: tuple[int, int]
 ) -> BCOO:
     """
     :param entries: The ``(row, column, value)`` of every stored entry.
@@ -101,15 +93,6 @@ def sparse_matrix(
     """
     rows, columns, values = zip(*entries)
     return BCOO((jnp.array(values), jnp.array(list(zip(rows, columns)))), shape=shape)
-
-
-def product_edges(entries: List[Tuple[int, int, int]], shape: Tuple[int, int]) -> BCOO:
-    """
-    :param entries: The ``(child layer, node, child node)`` of every edge.
-    :param shape: The number of child layers and the number of nodes.
-    :return: The edges of a differentiable product layer.
-    """
-    return sparse_matrix(entries, shape)
 
 
 def dense_log_weights(layer: SumLayer) -> np.ndarray:
@@ -142,24 +125,30 @@ def region_graph_circuit(variables: SortedSet) -> DifferentiableLayeredCircuit:
 
 
 def mixture_of_products(
-    x_layer: DifferentiableInputLayer, y_layer: DifferentiableInputLayer
+    first_layer: DifferentiableInputLayer,
+    second_layer: DifferentiableInputLayer,
+    variables: SortedSet,
 ) -> DifferentiableLayeredCircuit:
     """
-    :return: A circuit over x and y whose root mixes two products of the nodes of the
-        layers with unnormalized weights, as training leaves them.
+    :param first_layer: The layer over the first variable.
+    :param second_layer: The layer over the second variable.
+    :param variables: The two variables.
+    :return: A circuit whose root mixes two products of the nodes of the layers with
+        unnormalized weights, as training leaves them.
     """
     product = DifferentiableProductLayer(
-        [x_layer, y_layer],
-        product_edges([(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0)], (2, 2)),
+        [first_layer, second_layer],
+        sparse_matrix([(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0)], (2, 2)),
     )
     root = DifferentiableSparseSumLayer(
         [product], [sparse_matrix([(0, 0, 0.3), (0, 1, -1.2)], (1, 2))]
     )
-    return DifferentiableLayeredCircuit(SortedSet([x, y]), root)
+    return DifferentiableLayeredCircuit(variables, root)
 
 
 def gaussian_layer(variable: int) -> DifferentiableGaussianLayer:
     """
+    :param variable: The index of the variable of the layer.
     :return: A differentiable Gaussian layer with two nodes over the variable.
     """
     return DifferentiableGaussianLayer(
@@ -173,10 +162,12 @@ def gaussian_layer(variable: int) -> DifferentiableGaussianLayer:
 # %% layered circuits
 
 
-def layered_circuit_over_color_and_x() -> LayeredProbabilisticCircuit:
+def layered_circuit_over(color: Symbolic, x: Continuous) -> LayeredProbabilisticCircuit:
     """
-    :return: A layered circuit over a symbolic and a continuous variable that uses
-        every input layer a differentiable circuit supports.
+    :param color: A symbolic variable over :class:`Color`.
+    :param x: A continuous variable.
+    :return: A layered circuit over the variables that uses every input layer a
+        differentiable circuit supports.
     """
     colors = SymbolicLayer(
         0,

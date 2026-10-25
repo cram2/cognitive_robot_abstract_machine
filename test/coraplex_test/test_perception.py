@@ -446,16 +446,23 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
         and isinstance(node.designator, MoveToolCenterPointMotion)
     ]
 
-    def distances_to(position) -> list[float]:
-        return [
-            float(
-                np.linalg.norm(
-                    world.transform(target, world.root).position.to_np().flatten()[:3]
-                    - np.array(position)
-                )
-            )
-            for target in targets
+    tool_P_grasp = (
+        context.robot.right_arm.end_effector.tool_P_grasp_when_closed.to_np().flatten()[
+            :3
         ]
+    )
+
+    def distances_to(position) -> list[float]:
+        """
+        How far each motion puts the point the fingers meet at from a position: that is
+        the point a goal is aimed at, not the tool frame.
+        """
+        distances = []
+        for target in targets:
+            root_T_tool = world.transform(target, world.root).to_np()
+            fingers = root_T_tool[:3, :3] @ tool_P_grasp + root_T_tool[:3, 3]
+            distances.append(float(np.linalg.norm(fingers - np.array(position))))
+        return distances
 
     # Planned against the wrong prior, one motion sits exactly on the believed object.
     assert min(distances_to(wrong_prior)) < 1e-9

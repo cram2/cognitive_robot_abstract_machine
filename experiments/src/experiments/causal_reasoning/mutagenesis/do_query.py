@@ -34,7 +34,7 @@ from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.relational.causal import (
     RelationalCausalCircuit,
 )
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
 
@@ -536,7 +536,6 @@ class MutagenesisDoQuery:
         :return: The grounded circuit, with its cause and effect registered.
         """
         model = RelationalProbabilisticCircuit(
-            MutagenesisMolecule,
             monte_carlo_sample_count=self.monte_carlo_sample_count,
             learning_method=StratifiedLearning(
                 variables=[self.question.cause_variable_name],
@@ -573,9 +572,10 @@ class MutagenesisDoQuery:
         :param effect_variable: The effect's variable.
         :return: The truncated circuit's probability of the effect's value.
         """
-        truncated_circuit, _ = interventional_circuit.truncated(
+        truncated_circuit = interventional_circuit.truncated(
             region.fill_missing_variables_pure(interventional_circuit.variables)
-        )
+        ).distribution
+
         effect = (
             SimpleEvent.from_data({effect_variable: self.question.effect_value})
             .as_composite_set()

@@ -624,41 +624,33 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
 
     def compute_containment_ratio(self) -> float:
         """
-        Compute the containment ratio of self.body inside self.other.
+        :return: The fraction of the vertices of :attr:`body` that lie within the
+            world-aligned bounding box of :attr:`other`, or 0 when either has no mesh or
+            that box encloses no volume.
         """
-        if self.other.combined_mesh is None:
-            return 0.0
-
-        # Get meshes in their local (body) frames
-        mesh_a_local = self.body.combined_mesh
-        mesh_b_local = self.other.combined_mesh
-
-        # Check if either mesh is empty
+        body_mesh = self.body.combined_mesh
+        other_mesh = self.other.combined_mesh
         if (
-            mesh_a_local is None
-            or mesh_a_local.is_empty
-            or mesh_b_local is None
-            or mesh_b_local.is_empty
+            body_mesh is None
+            or body_mesh.is_empty
+            or other_mesh is None
+            or other_mesh.is_empty
         ):
             return 0.0
 
-        # Transform meshes from body frame to world frame
-        mesh_a = mesh_a_local.copy()
-        mesh_a.apply_transform(self.body.global_transform.to_np())
-
-        mesh_b = mesh_b_local.copy()
-        mesh_b.apply_transform(self.other.global_transform.to_np())
-
-        # Use bounding box of mesh_b to check if mesh_a is inside mesh_b
-        mesh_b_bbox = mesh_b.bounding_box
-
-        if not mesh_b_bbox.is_watertight:
+        other_vertices = trimesh.transform_points(
+            other_mesh.vertices, self.other.global_transform.to_np()
+        )
+        lower = other_vertices.min(axis=0)
+        upper = other_vertices.max(axis=0)
+        if np.any(upper <= lower):
             return 0.0
 
-        inside = mesh_b_bbox.contains(mesh_a.vertices)
-        if len(inside) == 0:
-            return 0.0
-        return sum(inside) / len(inside)
+        body_vertices = trimesh.transform_points(
+            body_mesh.vertices, self.body.global_transform.to_np()
+        )
+        inside = np.all((body_vertices >= lower) & (body_vertices <= upper), axis=1)
+        return float(inside.mean())
 
     @classmethod
     def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
