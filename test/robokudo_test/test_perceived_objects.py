@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import timedelta
+from threading import Thread
 from uuid import UUID
 
 import numpy as np
@@ -25,7 +28,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.annotators.cluster_color import ClusterColorAnnotator, Color
 from robokudo.cas import CAS
-from robokudo.perceived_objects import PerceivedObjects
+from robokudo.perceived_objects import Detection, ObjectMatcher, PerceivedObjects
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
     Cylinder,
@@ -126,6 +129,57 @@ def add_perceivable_object(
     if not fixed:
         body.parent_connection.origin = world_T_object
     return body
+
+
+@dataclass
+class MatcherFacingAConcurrentChange(ObjectMatcher):
+    """
+    Matches while another thread tries to add a body to :attr:`world`, as a process
+    sharing the world does when its changes arrive.
+    """
+
+    world: World = field(kw_only=True)
+    """
+    The world the other thread changes.
+    """
+
+    patience: timedelta = timedelta(milliseconds=500)
+    """
+    How long matching waits for the other thread's change.
+    """
+
+    change: Thread | None = field(init=False, default=None)
+    """
+    The thread changing :attr:`world`; None until matching started.
+    """
+
+    change_was_made_while_matching: bool | None = field(init=False, default=None)
+    """
+    Whether the other thread changed :attr:`world` before matching went on; None until
+    matching started.
+    """
+
+    def match(
+        self, detections: list[Detection], known_objects: list[IsPerceivable]
+    ) -> dict[Detection, IsPerceivable]:
+        self.change = Thread(target=self._add_a_body, daemon=True)
+        self.change.start()
+        self.change.join(timeout=self.patience.total_seconds())
+        self.change_was_made_while_matching = not self.change.is_alive()
+        return super().match(detections, known_objects)
+
+    def _add_a_body(self) -> None:
+        """
+        Add a body below the root of :attr:`world`.
+        """
+        with self.world.modify_world():
+            self.world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    world=self.world,
+                    parent=self.world.root,
+                    child=Body(name=PrefixedName("added_by_another_process")),
+                )
+            )
 
 
 # %% new objects
@@ -739,3 +793,21 @@ class TestWorldPoses:
         perceived_objects.apply(cas_holding(CAS(), hypothesis))
 
         assert world_poses_of(hypothesis) == []
+
+
+# %% concurrent changes
+
+
+class TestConcurrentChanges:
+    def test_no_other_thread_changes_the_world_while_a_pass_is_put_into_it(
+        self, world: World
+    ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        matcher = MatcherFacingAConcurrentChange(world=world)
+
+        PerceivedObjects(world=world, matcher=matcher).apply(
+            cas_holding(cas, make_object_hypothesis())
+        )
+
+        matcher.change.join()
+        assert matcher.change_was_made_while_matching is False

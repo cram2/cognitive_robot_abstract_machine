@@ -290,33 +290,35 @@ class PerceivedObjects:
         new body with the shape and color it was seen with, annotated with the semantic
         annotation a confident classification names, or as a :class:`PerceivedObject`.
         An object that cannot be located in :attr:`world`, because ``cas`` holds no
-        camera pose in it or the object has no 3D bounding box, gets no body.
+        camera pose in it or the object has no 3D bounding box, gets no body. No other
+        thread changes :attr:`world` while a pass is put into it.
 
         :param cas: The CAS of the finished pass.
         :return: The ids of the bodies of the found objects, in the order of the objects
             in ``cas``; None for an object that got no body.
         """
-        hypotheses = cas.filter_annotations_by_type(ObjectHypothesis)
-        self._annotate_world_poses(hypotheses, cas)
-        detections = [self._locate(hypothesis, cas) for hypothesis in hypotheses]
-        matches = self.matcher.match(
-            [detection for detection in detections if detection is not None],
-            self._perceivable_objects(),
-        )
+        with self.world._world_lock:
+            hypotheses = cas.filter_annotations_by_type(ObjectHypothesis)
+            self._annotate_world_poses(hypotheses, cas)
+            detections = [self._locate(hypothesis, cas) for hypothesis in hypotheses]
+            matches = self.matcher.match(
+                [detection for detection in detections if detection is not None],
+                self._perceivable_objects(),
+            )
 
-        body_ids = []
-        for detection in detections:
-            if detection is None:
-                body_ids.append(None)
-                continue
-            known_object = matches.get(detection)
-            if known_object is None:
-                body_ids.append(self._add_object(detection).root.id)
-                continue
-            self._move(known_object.root, detection)
-            self._classify(known_object, detection)
-            body_ids.append(known_object.root.id)
-        return body_ids
+            body_ids = []
+            for detection in detections:
+                if detection is None:
+                    body_ids.append(None)
+                    continue
+                known_object = matches.get(detection)
+                if known_object is None:
+                    body_ids.append(self._add_object(detection).root.id)
+                    continue
+                self._move(known_object.root, detection)
+                self._classify(known_object, detection)
+                body_ids.append(known_object.root.id)
+            return body_ids
 
     # %% locating
 
