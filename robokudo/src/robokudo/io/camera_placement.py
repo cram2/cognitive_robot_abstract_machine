@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import trimesh.creation
+from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -60,8 +61,10 @@ class CameraPlacement:
 
     A camera :attr:`world` already holds under the measured camera frame, such as the
     camera of a robot whose joints another process keeps current, is located by the
-    world. Any other camera hangs below its world frame on a connection perception owns,
-    and moves to where it was measured.
+    world. Any other camera is located by its measured pose relative to its world frame.
+    In a world of its own, perception hangs such a camera below its world frame on a
+    connection perception owns and moves it to where it was measured. A world other
+    processes share gets no camera body.
     """
 
     world: World
@@ -81,7 +84,7 @@ class CameraPlacement:
         """
         world_T_camera = self._bound_camera_pose(measured_pose)
         cas.world_frame = world_T_camera.reference_frame.name.name
-        cas.camera_frame = world_T_camera.child_frame.name.name
+        cas.camera_frame = measured_pose.camera_frame
         cas.camera_to_world_transform = world_T_camera
 
     def _bound_camera_pose(
@@ -91,7 +94,8 @@ class CameraPlacement:
         :param measured_pose: Where the camera was measured to be.
         :return: The pose of the camera, bound to the bodies of :attr:`world`: the one
             :attr:`world` holds for a camera it locates itself, otherwise the measured
-            one, with the camera moved there.
+            one relative to the world frame body, with the camera moved there unless
+            :attr:`world` is shared.
         """
         camera_bodies = self.world.get_bodies_by_name(name=measured_pose.camera_frame)
         if camera_bodies and not self._is_attached_by_perception(camera_bodies[0]):
@@ -103,6 +107,10 @@ class CameraPlacement:
             )
 
         world_body = self._world_frame_body(measured_pose.world_frame)
+        if WorldSynchronizer.all_callbacks_of_this_type_from_world(self.world):
+            return HomogeneousTransformationMatrix(
+                data=measured_pose.world_T_camera, reference_frame=world_body
+            )
         camera_body = (
             camera_bodies[0]
             if camera_bodies

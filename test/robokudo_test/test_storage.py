@@ -440,4 +440,4 @@ class TestStorage:
         }
 
         with pytest.raises(StoredCameraTransformFrameMetadataMissing):
-            reader._decode_recorded_camera_pose(view_document)
+            reader._decode_recorded_camera_pose(view_document, {"views": {}})

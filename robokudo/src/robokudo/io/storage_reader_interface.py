@@ -163,7 +163,7 @@ class StorageReaderInterface(CameraInterface):
             )
 
         if view_document["serializer_id"] == "semdt_homogeneous_transform_v1":
-            return self._decode_recorded_camera_pose(view_document)
+            return self._decode_recorded_camera_pose(view_document, cas_frame)
 
         decoded_view_name, decoded_view_value = Storage.decode_view_document(
             view_document, world
@@ -172,17 +172,23 @@ class StorageReaderInterface(CameraInterface):
             cas_frame["views"][CASViews.CAMERA_TO_WORLD_TRANSFORM] = decoded_view_value
         return None
 
-    def _decode_recorded_camera_pose(self, view_document: dict) -> MeasuredCameraPose:
+    def _decode_recorded_camera_pose(
+        self, view_document: dict, cas_frame: dict
+    ) -> MeasuredCameraPose:
         """
         :param view_document: The stored document of the camera transform.
+        :param cas_frame: The stored CAS frame the transform belongs to, with its views
+            loaded.
         :return: The camera pose the document recorded, named by the frame names in its
-            metadata.
-        :raises StoredCameraTransformFrameMetadataMissing: If the metadata names no
-            frames.
+            metadata, or by the camera frame stored with ``cas_frame`` for a transform
+            recorded without a camera body.
+        :raises StoredCameraTransformFrameMetadataMissing: If neither names the frames.
         """
         metadata = view_document.get("metadata", {})
         world_frame = metadata.get("reference_frame_name")
-        camera_frame = metadata.get("child_frame_name")
+        camera_frame = metadata.get("child_frame_name") or cas_frame["views"].get(
+            CASViews.CAMERA_FRAME
+        )
 
         if world_frame is None or camera_frame is None:
             raise StoredCameraTransformFrameMetadataMissing()

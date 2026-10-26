@@ -12,8 +12,6 @@ from py_trees.blackboard import Blackboard
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
-from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
-from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -25,7 +23,7 @@ from robokudo.descriptors.camera_configs.config_mongodb_playback import (
 )
 from robokudo.identifier import BBIdentifier
 
-from ._perception_world import FrameName, SharedWorld
+from ._perception_world import FrameName, SharedWorld, world_with_a_head_camera
 
 # %% Mongo storage preservation
 
@@ -171,10 +169,19 @@ def shared_world(other_process_node: Node) -> Iterator[SharedWorld]:
     world = World()
     with world.modify_world():
         world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
-    served_world = SharedWorld(
-        world=world,
-        server=FetchWorldServer(node=other_process_node, world=world),
-        synchronizer=WorldSynchronizer(node=other_process_node, _world=world),
+    served_world = SharedWorld.served_through(other_process_node, world)
+    yield served_world
+    served_world.close()
+
+
+@pytest.fixture
+def shared_world_with_a_robot(other_process_node: Node) -> Iterator[SharedWorld]:
+    """
+    A world another process serves and synchronizes, holding a robot whose camera hangs
+    below its head, which that process moves.
+    """
+    served_world = SharedWorld.served_through(
+        other_process_node, world_with_a_head_camera()
     )
     yield served_world
     served_world.close()

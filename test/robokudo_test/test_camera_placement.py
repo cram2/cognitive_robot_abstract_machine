@@ -5,17 +5,18 @@ import pytest
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    Connection6DoF,
-    FixedConnection,
-)
 from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CAS
 from robokudo.exceptions import UnknownWorldFrameError
 
-from ._perception_world import FrameName, camera_pose
+from ._perception_world import (
+    FrameName,
+    SharedWorld,
+    camera_pose,
+    world_with_a_head_camera,
+)
 
 
 def measured_at(world_T_camera: HomogeneousTransformationMatrix) -> MeasuredCameraPose:
@@ -28,29 +29,6 @@ def measured_at(world_T_camera: HomogeneousTransformationMatrix) -> MeasuredCame
         camera_frame=FrameName.CAMERA,
         world_T_camera=world_T_camera,
     )
-
-
-def world_with_a_head_camera() -> World:
-    """
-    :return: A world whose camera hangs below a head, as on a robot, 1.5 m above the
-        world frame.
-    """
-    world = World()
-    world_body = Body(name=PrefixedName(FrameName.WORLD))
-    head_body = Body(name=PrefixedName("head"))
-    camera_body = Body(name=PrefixedName(FrameName.CAMERA))
-    with world.modify_world():
-        world.add_body(world_body)
-        world.add_connection(
-            Connection6DoF.create_with_dofs(
-                parent=world_body, child=head_body, world=world
-            )
-        )
-        world.add_connection(FixedConnection(parent=head_body, child=camera_body))
-    head_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        z=1.5, reference_frame=world_body
-    )
-    return world
 
 
 # %% world frame
@@ -160,4 +138,50 @@ class TestCameraOfTheWorld:
 
         assert cas.camera_to_world_transform.child_frame is world.get_body_by_name(
             FrameName.CAMERA
+        )
+
+
+# %% camera of a shared world
+
+
+class TestCameraOfASharedWorld:
+    def test_shared_world_gets_no_camera_body(self, shared_world: SharedWorld) -> None:
+        body_ids_before = [body.id for body in shared_world.world.bodies]
+
+        CameraPlacement(shared_world.world).place(
+            CAS(), measured_at(camera_pose(x=1.0))
+        )
+
+        assert [body.id for body in shared_world.world.bodies] == body_ids_before
+
+    def test_camera_of_a_shared_world_is_located_by_its_measured_pose(
+        self, shared_world: SharedWorld
+    ) -> None:
+        cas = CAS()
+        measured_pose = measured_at(camera_pose(x=1.0))
+
+        CameraPlacement(shared_world.world).place(cas, measured_pose)
+
+        assert (
+            cas.camera_to_world_transform.reference_frame
+            is shared_world.world.get_body_by_name(measured_pose.world_frame)
+        )
+        assert np.allclose(
+            cas.camera_to_world_transform.to_np(),
+            measured_pose.world_T_camera.to_np(),
+        )
+        assert cas.camera_frame == measured_pose.camera_frame
+
+    def test_camera_of_a_robot_in_a_shared_world_is_located_by_the_world(
+        self, shared_world_with_a_robot: SharedWorld
+    ) -> None:
+        world = shared_world_with_a_robot.world
+        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        cas = CAS()
+
+        CameraPlacement(world).place(cas, measured_at(camera_pose(x=4.0)))
+
+        assert cas.camera_to_world_transform.child_frame is camera_body
+        assert np.allclose(
+            cas.camera_to_world_transform.to_np(), camera_body.global_transform.to_np()
         )

@@ -10,10 +10,17 @@ from dataclasses import dataclass
 from datetime import timedelta
 from enum import StrEnum
 
+from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    FixedConnection,
+)
+from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.cas import CAS
 from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
@@ -34,6 +41,11 @@ class FrameName(StrEnum):
     CAMERA = "camera"
     """
     The frame of the camera.
+    """
+
+    HEAD = "head"
+    """
+    The frame of the head a robot's camera is mounted on.
     """
 
 
@@ -111,6 +123,32 @@ def place_camera_of(
     )
 
 
+# %% robot camera
+
+
+def world_with_a_head_camera() -> World:
+    """
+    :return: A world whose camera hangs below a head, as on a robot, 1.5 m above the
+        world frame.
+    """
+    world = World()
+    world_body = Body(name=PrefixedName(FrameName.WORLD))
+    head_body = Body(name=PrefixedName(FrameName.HEAD))
+    camera_body = Body(name=PrefixedName(FrameName.CAMERA))
+    with world.modify_world():
+        world.add_body(world_body)
+        world.add_connection(
+            Connection6DoF.create_with_dofs(
+                parent=world_body, child=head_body, world=world
+            )
+        )
+        world.add_connection(FixedConnection(parent=head_body, child=camera_body))
+    head_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        z=1.5, reference_frame=world_body
+    )
+    return world
+
+
 # %% shared world
 
 
@@ -135,6 +173,19 @@ class SharedWorld:
     """
     Keeps the served world in sync with the processes that joined.
     """
+
+    @classmethod
+    def served_through(cls, node: Node, world: World) -> SharedWorld:
+        """
+        :param node: The node of the process serving ``world``.
+        :param world: The world to serve.
+        :return: ``world``, served and synchronized through ``node``.
+        """
+        return cls(
+            world=world,
+            server=FetchWorldServer(node=node, world=world),
+            synchronizer=WorldSynchronizer(node=node, _world=world),
+        )
 
     def close(self) -> None:
         """
