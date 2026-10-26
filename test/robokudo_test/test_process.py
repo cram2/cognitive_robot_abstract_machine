@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import timedelta
-from threading import Thread
+from threading import Thread, Timer
 
 import numpy as np
 import pytest
@@ -437,6 +437,36 @@ class TestJoiningAWorldWithARobot:
                 expected_pose,
             )
         )
+
+
+# %% discovering a shared world
+
+
+class TestDiscoveringASharedWorld:
+    def test_joins_a_world_served_while_it_is_still_looking(
+        self, node: Node, other_process_node: Node, engine: EngineRunningABehaviour
+    ) -> None:
+        world = World()
+        with world.modify_world():
+            world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
+        served_worlds = []
+        serving = Timer(
+            1.0,
+            lambda: served_worlds.append(
+                SharedWorld.served_through(other_process_node, world)
+            ),
+        )
+        serving.start()
+
+        robokudo = robokudo_joining_a_shared_world(node, engine)
+
+        serving.join()
+        assert robokudo.synchronizer is not None
+        assert [body.id for body in robokudo.world.bodies] == [
+            body.id for body in world.bodies
+        ]
+        robokudo.close()
+        served_worlds[0].close()
 
 
 # %% one RoboKudo per process

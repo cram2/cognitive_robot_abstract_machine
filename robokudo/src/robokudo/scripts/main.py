@@ -8,6 +8,7 @@ import argparse
 import logging
 import os
 import sys
+from datetime import timedelta
 from threading import Thread
 
 import rclpy
@@ -89,6 +90,16 @@ def main() -> None:
         help="Rate (Hz) to tick the Behavior Tree.",
     )
     parser.add_argument(
+        "_world_discovery_timeout",
+        dest="world_discovery_timeout",
+        type=float,
+        default=RoboKudo.world_discovery_timeout.total_seconds(),
+        help=(
+            "Seconds to look for a process serving a shared world, such as Giskard, "
+            "before perceiving into a world of its own."
+        ),
+    )
+    parser.add_argument(
         "_debugmode",
         action="store_true",
         help="If set, the rcply root logger will be set to DEBUG log level which will yield many ROS-related debug messages.",
@@ -158,7 +169,11 @@ def main() -> None:
 
     # 8. Create RoboKudo, which serves the main node and joins the world another
     #    process shares if one does
-    robokudo = RoboKudo(node=node1, analysis_engine=loaded_ae)
+    robokudo = RoboKudo(
+        node=node1,
+        analysis_engine=loaded_ae,
+        world_discovery_timeout=timedelta(seconds=args.world_discovery_timeout),
+    )
 
     # 9. Build the Behavior Tree of the loaded AE
     visualizer_types = None
