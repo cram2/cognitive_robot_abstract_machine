@@ -572,32 +572,30 @@ class KinectCameraInterface(ROSCameraInterface):
         if not self.has_new_data():
             return
 
-        self.lock.acquire()
-        if self.camera_config.hi_res_mode:
-            self.color = self.color[0:960, 0:1280]
+        with self.lock:
+            if self.camera_config.hi_res_mode:
+                self.color = self.color[0:960, 0:1280]
 
-        self.camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
-        width = self.camera_info.width
-        height = self.camera_info.height
-        if self.camera_config.hi_res_mode:
-            height = 960
+            self.camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
+            width = self.camera_info.width
+            height = self.camera_info.height
+            if self.camera_config.hi_res_mode:
+                height = 960
 
-        fx = self.camera_info.k[0]
-        cx = self.camera_info.k[2]
-        fy = self.camera_info.k[4]
-        cy = self.camera_info.k[5]
-        self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
+            fx = self.camera_info.k[0]
+            cx = self.camera_info.k[2]
+            fy = self.camera_info.k[4]
+            cy = self.camera_info.k[5]
+            self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
 
-        self.color_to_depth_ratio = self.camera_config.color_to_depth_ratio
+            self.color_to_depth_ratio = self.camera_config.color_to_depth_ratio
 
-        cas.set(CASViews.COLOR_IMAGE, self.color)
-        cas.set(CASViews.DEPTH_IMAGE, self.depth)
-        cas.set(CASViews.CAMERA_INFO, self.camera_info)
-        cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
+            cas.set(CASViews.COLOR_IMAGE, self.color)
+            cas.set(CASViews.DEPTH_IMAGE, self.depth)
+            cas.set(CASViews.CAMERA_INFO, self.camera_info)
+            cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
+            cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
 
-        self.place_camera_from_tf(cas, world, self.timestamp)
+            self.place_camera_from_tf(cas, world, self.timestamp)
 
-        self._has_new_data = False
-
-        self.lock.release()
+            self._has_new_data = False
