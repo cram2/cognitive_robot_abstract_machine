@@ -2396,6 +2396,42 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return RotationMatrix.from_axis_angle(self)
 
 
+@dataclass
+class Twist:
+    """
+    How a rigid body moved: a translation and a rotation, both along the axes of one
+    frame.
+    """
+
+    translation: Vector3
+    """
+    How far and in which direction the body moved, in meters.
+    """
+
+    rotation: AxisAngle
+    """
+    How the body turned, by an angle in [0, pi].
+    """
+
+    @classmethod
+    def from_transformation(cls, start_T_end: HomogeneousTransformationMatrix) -> Twist:
+        """
+        :param start_T_end: Where the body ended up, relative to where it started.
+        :return: The motion from the start to the end. No rotation is the angle zero
+            about the z-axis.
+        """
+        start_Q_end = start_T_end.quaternion
+        if float(start_Q_end.w) < 0:
+            start_Q_end = -start_Q_end
+        rotation = AxisAngle.from_quaternion(start_Q_end)
+        return cls(
+            translation=Vector3(*start_T_end.to_np()[:3, 3]),
+            rotation=AxisAngle(
+                axis=Vector3(*rotation.axis.to_np()[:3]), angle=float(rotation.angle)
+            ),
+        )
+
+
 @dataclass(eq=False, init=False, repr=False)
 class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
