@@ -207,6 +207,7 @@ class NavigateActionServerTask(
             )
         return ObservationStateValues.UNKNOWN
 
+
 @dataclass(eq=False, repr=False)
 class RobotiqGripperActionServerTask(
     ActionServerTask[
