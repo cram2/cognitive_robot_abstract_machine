@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import math
 from dataclasses import dataclass
 
@@ -8,7 +9,7 @@ from random_events.interval import singleton
 from random_events.product_algebra import Event, SimpleEvent
 from scipy.stats import multivariate_normal
 from sortedcontainers import SortedSet
-from typing_extensions import List, Optional, Self, Tuple, Type
+from typing_extensions import Any, List, Optional, Self, Tuple, Type
 
 from probabilistic_model.distributions.multivariate_gaussian import (
     MultivariateGaussianDistribution,
@@ -209,7 +210,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             is MultivariateGaussianLayer
         ):
             return LayerWithLogProbabilities(
-                self.__deepcopy__(), np.zeros(self.number_of_nodes)
+                copy.deepcopy(self), np.zeros(self.number_of_nodes)
             )
         hyperrectangles = hyperrectangle.broadcast_to(self.number_of_nodes)
         log_probabilities = (
@@ -234,7 +235,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         gaussians = self.untruncated_gaussians
         log_likelihood = gaussians.marginal(fixed).log_density(values[None, :])[0]
         if len(free) == 0:
-            return LayerWithLogProbabilities(self.__deepcopy__(), log_likelihood)
+            return LayerWithLogProbabilities(copy.deepcopy(self), log_likelihood)
         return LayerWithLogProbabilities(
             self.over(free, gaussians.conditional(fixed, free, values)),
             log_likelihood,
@@ -256,16 +257,3 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             mean=gaussians.mean,
             covariance=gaussians.covariance,
         )
-
-    def __deepcopy__(self, memo=None) -> MultivariateGaussianLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        result = self.__class__(
-            scope=self.scope.copy(),
-            mean=self.mean.copy(),
-            covariance=self.covariance.copy(),
-        )
-        memo[id(self)] = result
-        return result

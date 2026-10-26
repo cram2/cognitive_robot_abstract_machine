@@ -22,10 +22,6 @@ from krrood.utils import (
     T,
 )
 
-try:
-    from krrood.rustworkx_utils.rxnode import RWXNode
-except ImportError:
-    RWXNode = None
 from typing_extensions import (
     List,
     Optional,

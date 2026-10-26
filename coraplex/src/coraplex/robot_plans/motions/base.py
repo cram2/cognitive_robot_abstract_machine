@@ -4,16 +4,18 @@ import logging
 from abc import abstractmethod
 from dataclasses import dataclass
 from inspect import signature
-from typing_extensions import TypeVar, Type, Optional
+from typing_extensions import List, TypeVar, Type, Optional
 
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.graph_node import Task, MotionStatechartNode
+from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from coraplex.plans.designator import Designator
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
 )
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from coraplex.alternative_motion_mapping import AlternativeMotion
 
@@ -68,6 +70,31 @@ class BaseMotion(Designator):
         return AlternativeMotion.check_for_alternative(
             self.context.alternative_motion_mappings, self.robot, self.__class__
         )
+
+    def keep_base_still(self) -> List[MotionStatechartNode]:
+        """
+        :return: The task holding the robot's base where it stands, empty when the robot
+            may move its whole body.
+
+        A base that is not full body controlled stands still while the rest of the robot
+        moves, so it is held rather than left for another task to command. A motion's
+        goal is bound relative to the robot when the motion starts, so a base that moves
+        afterwards carries the goal with it. Collision avoidance is what otherwise moves
+        it, buying clearance by drifting the base.
+        """
+        robot = self.robot
+        if (
+            not isinstance(robot, HasMobileBase)
+            or robot.mobile_base.full_body_controlled
+        ):
+            return []
+        return [
+            HoldPose(
+                name="hold base",
+                root_link=self.world.root,
+                tip_link=robot.root,
+            )
+        ]
 
     def _only_allow_gripper_collision_rules(
         self, end_effector: EndEffector

@@ -26,11 +26,23 @@ class WorldModelParser(ABC):
     Base for every parser that turns a world description format into a
     :class:`~semantic_digital_twin.world.World`.
 
-    Declares no fields, so each format keeps its own payload field (the description text
-    or the path it is read from) as its first constructor parameter.
+    Declares only keyword-only fields, so each format keeps its own payload field (the
+    description text or the path it is read from) as its first constructor parameter.
 
     Every parse produces freshly created world entities, so a parser is the way to obtain
     a world that shares no identifiers with any previously parsed one.
+    """
+
+    use_visual_as_collision_backup: bool = field(default=False, kw_only=True)
+    """
+    Whether a body that the description gives no collision geometry collides with its
+    visual geometry instead.
+
+    Cosmetic parts such as covers are often drawn but never described for contact, and
+    some scenes keep their collision geometry in a file that is not loaded; either way
+    the drawn geometry is the best stand-in for the real shape. A body that already has
+    collision geometry is left alone, and each format decides what counts as having
+    none.
     """
 
     @classmethod

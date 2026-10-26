@@ -30,7 +30,8 @@ if TYPE_CHECKING:
         HasRootBody,
         HasSupportingSurface,
     )
-    from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
+    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+    from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         AbstractRobotPart,
@@ -547,6 +548,49 @@ class MissingConnectionAxisError(UsageError):
 
 
 @dataclass
+class MissingURDFJointAxisError(UsageError):
+    """
+    Raised when a movable URDF joint declares no axis to move along.
+    """
+
+    joint_name: str
+    """
+    The name of the joint that declares no axis.
+    """
+
+    joint_type: str
+    """
+    The URDF type of the joint.
+    """
+
+    def error_message(self) -> str:
+        return f"The {self.joint_type} URDF joint '{self.joint_name}' declares no axis."
+
+    def suggest_correction(self) -> str:
+        return (
+            'declare the axis the joint moves along with an <axis xyz="..."/> element.'
+        )
+
+
+@dataclass
+class ZeroLengthURDFJointAxisError(UsageError):
+    """
+    Raised when a URDF joint declares an axis of zero length, which names no direction.
+    """
+
+    joint_name: str
+    """
+    The name of the joint whose axis has zero length.
+    """
+
+    def error_message(self) -> str:
+        return f"The URDF joint '{self.joint_name}' declares an axis of zero length."
+
+    def suggest_correction(self) -> str:
+        return "declare a non-zero axis for the joint."
+
+
+@dataclass
 class MimicDofLimitOverwriteError(UsageError):
     """
     Raised when trying to overwrite the limits of a mimic degree of freedom.
@@ -700,6 +744,66 @@ class UnknownPartWholeRelationshipField(UsageError):
 
 
 @dataclass
+class CollisionDiffersFromVisualError(UsageError):
+    """
+    Raised when a part is split off a body whose collision shapes are not its visual
+    shapes, such as a convex decomposition, which cutting the visual shapes would throw
+    away.
+    """
+
+    body_name: PrefixedName
+    """
+    The name of the body.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The collision shapes of '{self.body_name}' differ from its visual shapes, "
+            f"so splitting a part off would replace them by pieces of the visual shapes."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "split the parts off before decomposing the collision shapes, or give the "
+            "PartSplitter a decomposer that decomposes each piece again."
+        )
+
+
+@dataclass
+class NoSinglePartWholeRelationshipField(UsageError):
+    """
+    Raised when the part-whole relationship field a part goes to is chosen by the part's
+    type alone, but not exactly one field of the annotation holds parts of that type.
+    """
+
+    annotation: Type[HasRootBody]
+    """
+    The annotation type the part is for.
+    """
+
+    part_type: Type[HasRootBody]
+    """
+    The type of the part.
+    """
+
+    matching_fields: List[str]
+    """
+    The names of the annotation's part-whole relationship fields that hold parts of that
+    type.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.annotation.__name__} has {len(self.matching_fields)} part-whole "
+            f"relationship fields for a {self.part_type.__name__}: "
+            f"{', '.join(self.matching_fields) or '(none)'}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "name the field the part goes to."
+
+
+@dataclass
 class PartWholeCardinalityError(UsageError):
     """
     Raised when a part specification supplies a list of parts for a singular (non-to-
@@ -759,36 +863,6 @@ class PartWholeFieldInAnnotationKwargs(UsageError):
 
 
 @dataclass
-class MechanicalJointAlreadyMounted(UsageError):
-    """
-    Raised when a mechanical joint that already connects a child is mounted onto a
-    different whole.
-
-    If you think a single Mechanical Joint should be able to have multiple children,
-    contact @LucaKro.
-    """
-
-    joint: SemanticAnnotation
-    """
-    The mechanical joint being mounted.
-    """
-
-    main_has_root_body_annotation: SemanticAnnotation
-    """
-    The annotation (the whole) the joint was being mounted onto.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"{type(self.joint).__name__} already connects a child and cannot be mounted onto "
-            f"{type(self.main_has_root_body_annotation).__name__}: a mechanical joint connects exactly one child."
-        )
-
-    def suggest_correction(self) -> str:
-        return f"if you think that you found a case where this error does not apply, please contact @LucaKro"
-
-
-@dataclass
 class SemanticAnnotationCircularDependencyError(UsageError):
     """
     Raised when a circular dependency between semantic annotations is detected.
@@ -804,6 +878,31 @@ class SemanticAnnotationCircularDependencyError(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class MissingMovableJointError(UsageError):
+    """
+    Raised when a part is to be moved, but nothing moves it: its root is fixed to its
+    parent.
+    """
+
+    semantic_annotation: SemanticAnnotation
+    """
+    The part that has no movable joint.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.semantic_annotation).__name__} {self.semantic_annotation.name} "
+            f"has no movable joint: its root is fixed to its parent."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "create it with an active parent_connection_specification, or mount it on "
+            "one with mount_on_movable_joint."
+        )
 
 
 @dataclass
@@ -889,7 +988,7 @@ class InvalidHingeActiveAxis(UsageError):
         return f"Axis {self.axis} provided when trying to calculate the hinge position is invalid."
 
     def suggest_correction(self) -> str:
-        return "if you think this is incorrect, consider extending Door.calculate_world_T_hinge_based_on_handle."
+        return "if you think this is incorrect, consider extending Door.calculate_self_T_movable_joint."
 
 
 @dataclass
@@ -1228,14 +1327,14 @@ class InsufficientVectorsError(SpatialTypesError):
 
 @dataclass
 class ReferenceFrameMismatchError(SpatialTypesError):
-    expected_frame: KinematicStructureEntity
+    expected_frame: KinematicStructureEntity | None
     """
-    The frame the operation requires.
+    The frame the operation requires, or ``None`` if it requires no frame.
     """
 
-    actual_frame: KinematicStructureEntity
+    actual_frame: KinematicStructureEntity | None
     """
-    The frame that was found instead.
+    The frame that was found instead, or ``None`` if the value has no frame.
     """
 
     context: Optional[str] = None
@@ -1246,9 +1345,20 @@ class ReferenceFrameMismatchError(SpatialTypesError):
     def error_message(self) -> str:
         checked_value = self.context or "the given value"
         return (
-            f"Expected {checked_value} to be expressed in frame '{self.expected_frame.name}', "
-            f"but it is expressed in frame '{self.actual_frame.name}'."
+            f"Expected {checked_value} to be expressed in "
+            f"{self._describe(self.expected_frame)}, "
+            f"but it is expressed in {self._describe(self.actual_frame)}."
         )
+
+    @staticmethod
+    def _describe(frame: KinematicStructureEntity | None) -> str:
+        """
+        :param frame: The frame to describe.
+        :return: The frame as it reads in the error message.
+        """
+        if frame is None:
+            return "no frame"
+        return f"frame '{frame.name}'"
 
     def suggest_correction(self) -> str:
         return (
@@ -2021,6 +2131,36 @@ class ExerciseVerificationFailed(UsageError):
 
 
 @dataclass
+class DriveVelocityLimitsOnUndrivenRobot(UsageError):
+    """
+    Raised when drive velocity limits are given for a robot that is attached to its
+    localization frame rigidly rather than by a drive.
+    """
+
+    robot_type_name: str
+    """
+    The name of the robot type the limits were given for.
+    """
+
+    connection_type_name: str
+    """
+    The name of the connection type that robot attaches to its localization frame with.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.robot_type_name}' attaches to its localization frame with a "
+            f"'{self.connection_type_name}', which carries no velocity limits."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "leave the drive velocity limits unset, or give the robot a mobile base "
+            "whose drive can carry them."
+        )
+
+
+@dataclass
 class NothingHeld(UsageError):
     """
     Raised when the grasp of a gripper that holds nothing is asked for.
@@ -2063,6 +2203,36 @@ class NoGraspGeometry(UsageError):
         return (
             "give the root body collision geometry, or annotate the object with a type "
             "whose grasps do not depend on its shape."
+        )
+
+
+@dataclass
+class SurfaceGraspNotOnSurfaceError(UsageError):
+    """
+    Raised when a surface grasp names a point the object's grasp surface does not reach.
+    """
+
+    surface_grasp: SurfaceGrasp
+    """
+    The grasp that missed.
+    """
+
+    graspable: HasGraspCandidates
+    """
+    The object it was meant for.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"No surface of '{self.graspable.name}' lies at azimuth "
+            f"{self.surface_grasp.azimuth:.3f} rad and height "
+            f"{self.surface_grasp.height:.3f} of its bounding box."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "keep the height of a surface grasp between 0 and 1, and check with "
+            "SurfaceGrasp.reaches_surface_of before asking for its grasp candidate."
         )
 
 
@@ -2213,3 +2383,22 @@ class SimulationAlreadyRunningError(UsageError):
 
     def suggest_correction(self) -> str:
         return "Stop the simulation before starting it again."
+
+
+@dataclass
+class ObjectHasNoWidthWithoutCollision(UsageError):
+    """
+    Raised when the width of an object is asked for, while the object carries no
+    collision geometry to measure.
+    """
+
+    object_name: PrefixedName
+    """
+    Name of the body whose width was asked for.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.object_name} has no collision geometry to measure a width on."
+
+    def suggest_correction(self) -> str:
+        return "Give the body collision geometry, or state the width yourself."

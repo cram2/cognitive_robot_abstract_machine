@@ -10,7 +10,7 @@ from coraplex.datastructures.enums import (
     InsertionPosition,
     ReachFraction,
 )
-from coraplex.exceptions import ReachHasNoFinalApproach
+from coraplex.exceptions import GraspHasNoClosingMotion, ReachHasNoFinalApproach
 from coraplex.locations.locations import ReachabilityLocation
 from coraplex.plans.plan_node import ActionLike, ActionNode, MotionNode, PlanNode
 from coraplex.plans.underspecified import UnderspecifiedNode
@@ -20,7 +20,12 @@ from coraplex.plans.plan_transformation import (
     MatchedType,
     PlanTransformation,
 )
+from coraplex.plans.executables import GiskardExecutable
 from coraplex.robot_plans import MoveToolCenterPointMotion
+from coraplex.robot_plans.motions.gripper import (
+    MoveFingersToWidthMotion,
+    MoveGripperMotion,
+)
 from coraplex.robot_plans.actions.composite.facing import FaceAndLookAtAction
 from coraplex.robot_plans.actions.composite.transporting import (
     MoveAndOpenAction,
@@ -34,17 +39,21 @@ from coraplex.robot_plans.actions.core.navigation import (
     LookAtAction,
     NavigateAction,
 )
-from coraplex.robot_plans.actions.core.pick_up import PickUpAction, ReachAction
+from coraplex.robot_plans.actions.core.pick_up import (
+    GraspingAction,
+    PickUpAction,
+    ReachAction,
+)
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import a, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.reasoning.predicates import InsideOf
-from semantic_digital_twin.grasping.grasp_candidates import (
-    GraspCandidate,
-    HasGraspCandidates,
-)
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
@@ -375,3 +384,70 @@ class ParkArmsBeforeFirstAction(InsertionTransformation[ActionNode]):
 
     def nodes_to_insert(self, plan_node: PlanNode) -> List[ActionLike]:
         return [ParkArmsAction(plan_node.action.robot.all_arms)]
+
+
+# %% holding an object at its own width
+
+
+@dataclass
+class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
+    """
+    Closes a grasp onto the width of the object it takes hold of, instead of shutting
+    the gripper onto it.
+
+    Shutting the gripper all the way onto an object that is not centred between the
+    fingers wedges it sideways instead of holding it, so a robot whose grasp holds by
+    contact alone meets the object at its own width. The width is measured on the
+    object, so nothing has to be told per object.
+    """
+
+    squeeze: float = 0.0
+    """
+    How far past the object's width each finger is sent, in metres, so the fingers press
+    into it rather than merely touching it.
+    """
+
+    def is_applicable(self, plan_node: ActionNode) -> bool:
+        execution_type = GiskardExecutable.execution_type
+        grasp = cast(GraspingAction, plan_node.action)
+        return (
+            execution_type is not None
+            and execution_type.objects_push_back
+            and isinstance(grasp.arm.end_effector, HasTwoFingers)
+            and grasp.grasp.graspable.root.has_collision()
+        )
+
+    def apply(self, plan_node: ActionNode) -> None:
+        grasp = cast(GraspingAction, plan_node.action)
+        shutting = self.closing_motion(plan_node)
+        plan = plan_node.plan
+        plan.insert_before(
+            shutting,
+            make_node(
+                MoveFingersToWidthMotion(
+                    gripper=grasp.arm.end_effector,
+                    width=grasp.grasp.width_along_closing_axis,
+                    squeeze=self.squeeze,
+                )
+            ),
+        )
+        plan.remove_node(shutting)
+
+    @staticmethod
+    def closing_motion(plan_node: ActionNode) -> MotionNode:
+        """
+        :param plan_node: The node of the grasp.
+        :raises GraspHasNoClosingMotion: If no motion shutting the gripper lies below
+            the grasp's node.
+        :return: The motion the grasp shuts its gripper with.
+        """
+        motions = [
+            node
+            for node in plan_node.descendants
+            if isinstance(node, MotionNode)
+            and isinstance(node.motion, MoveGripperMotion)
+            and node.motion.motion is GripperState.CLOSE
+        ]
+        if not motions:
+            raise GraspHasNoClosingMotion(plan_node)
+        return motions[-1]

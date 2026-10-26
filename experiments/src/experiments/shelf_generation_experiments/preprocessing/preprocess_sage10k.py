@@ -517,7 +517,9 @@ class ShelfExtractor:
         return RelationalCircuitExperimentObject2D(
             object_type=object_.object_type,
             scale=object_.scale,
-            pose=Pose2D(x=local_offset.x, y=local_offset.y, yaw=yaw_radians),
+            pose=Pose2D.from_xy_yaw(
+                x=local_offset.x, y=local_offset.y, yaw=yaw_radians
+            ),
             source_id=object_.source_id,
         )
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import math
 from dataclasses import dataclass
 
@@ -8,7 +9,7 @@ from random_events.interval import SimpleInterval, reals
 from random_events.variable import Variable
 from scipy.stats import norm, truncnorm
 from sortedcontainers import SortedSet
-from typing_extensions import List, Self, Type
+from typing_extensions import Any, List, Self, Type
 
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
@@ -29,7 +30,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.continuous_layer_with_density import (
     ContinuousLayerWithDensity,
-    ContinuousLayerWithFiniteSupport,
+    ContinuousLayerWithConstrainedSupport,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
     LayerWithLogProbabilities,
@@ -64,6 +65,15 @@ class HasLocationAndScale:
         non_positive = ~(self.scale > 0)
         if non_positive.any():
             raise NonPositiveScaleError(self.scale[non_positive])
+
+    def has_equal_parameters(self, other: Self) -> bool:
+        """
+        :param other: A layer that :meth:`LeafLayer.concatenate` may join with this one.
+        :return: Whether every node of both layers has the same location and scale.
+        """
+        return np.array_equal(self.location, other.location) and np.array_equal(
+            self.scale, other.scale
+        )
 
 
 @dataclass(eq=False, repr=False)
@@ -200,7 +210,7 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
         )
 
         if self.type_of_layer_truncated_to_interval(interval) is GaussianLayer:
-            return LayerWithLogProbabilities(self.__deepcopy__(), log_probabilities)
+            return LayerWithLogProbabilities(copy.deepcopy(self), log_probabilities)
 
         interval_of_nodes = np.tile([lower, upper], (self.number_of_nodes, 1))
         bounds_of_nodes = np.tile(
@@ -218,18 +228,11 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
             log_probabilities,
         )
 
-    def __deepcopy__(self, memo=None) -> GaussianLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        result = self.__class__(self.variable, self.location.copy(), self.scale.copy())
-        memo[id(self)] = result
-        return result
-
 
 @dataclass(eq=False, repr=False)
-class TruncatedGaussianLayer(HasLocationAndScale, ContinuousLayerWithFiniteSupport):
+class TruncatedGaussianLayer(
+    HasLocationAndScale, ContinuousLayerWithConstrainedSupport
+):
     """
     A layer of truncated Gaussian distributions over one continuous variable.
 
@@ -241,7 +244,12 @@ class TruncatedGaussianLayer(HasLocationAndScale, ContinuousLayerWithFiniteSuppo
 
     def validate_own(self):
         HasLocationAndScale.validate_own(self)
-        ContinuousLayerWithFiniteSupport.validate_own(self)
+        ContinuousLayerWithConstrainedSupport.validate_own(self)
+
+    def has_equal_parameters(self, other: Self) -> bool:
+        return HasLocationAndScale.has_equal_parameters(
+            self, other
+        ) and ContinuousLayerWithConstrainedSupport.has_equal_parameters(self, other)
 
     @property
     def number_of_own_parameters(self) -> int:
@@ -359,18 +367,3 @@ class TruncatedGaussianLayer(HasLocationAndScale, ContinuousLayerWithFiniteSuppo
         super().apply_scaling_own(scaling)
         self.location = self.location * scaling[self.variable]
         self.scale = self.scale * scaling[self.variable]
-
-    def __deepcopy__(self, memo=None) -> TruncatedGaussianLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        result = self.__class__(
-            self.variable,
-            self.interval.copy(),
-            self.bounds.copy(),
-            self.location.copy(),
-            self.scale.copy(),
-        )
-        memo[id(self)] = result
-        return result

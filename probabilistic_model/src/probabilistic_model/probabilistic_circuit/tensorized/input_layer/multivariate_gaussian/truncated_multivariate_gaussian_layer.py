@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 
 import numpy as np
 from random_events.product_algebra import Event, SimpleEvent
 from scipy.stats import multivariate_normal, truncnorm
 from sortedcontainers import SortedSet
-from typing_extensions import List, Optional, Self, Tuple, Type
+from typing_extensions import Any, List, Optional, Self, Tuple, Type
 
 from probabilistic_model.distributions.truncated_multivariate_gaussian import (
     MomentIntegration,
@@ -187,6 +188,20 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             ),
         )
 
+    def has_equal_parameters(self, other: Self) -> bool:
+        return (
+            super().has_equal_parameters(other)
+            and np.array_equal(
+                self.hyperrectangles.interval, other.hyperrectangles.interval
+            )
+            and np.array_equal(
+                self.hyperrectangles.bounds, other.hyperrectangles.bounds
+            )
+            and np.array_equal(
+                self.log_normalizing_constant, other.log_normalizing_constant
+            )
+        )
+
     # %% queries
 
     @memoized
@@ -248,8 +263,8 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             distribution.log_mode()
             for distribution in self.node_distributions(variables)
         ]
-        return [mode for mode, _ in modes], np.array(
-            [value for _, value in modes], dtype=float
+        return [mode.event for mode in modes], np.array(
+            [mode.log_likelihood for mode in modes], dtype=float
         )
 
     @memoized
@@ -360,7 +375,7 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         log_density = gaussians.marginal(fixed).log_density(values[None, :])[0]
         if len(free) == 0:
             return LayerWithLogProbabilities(
-                self.__deepcopy__(),
+                copy.deepcopy(self),
                 np.where(inside, log_density - self.log_normalizing_constant, -np.inf),
             )
 
@@ -404,13 +419,3 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         super().apply_scaling_own(scaling)
         self.hyperrectangles = self.hyperrectangles.scaled(scaling[self.scope])
         # the hyperrectangle scales with the Gaussian, so its probability stays the same
-
-    def __deepcopy__(self, memo=None) -> TruncatedMultivariateGaussianLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        # selecting by an index array copies every parameter array
-        result = self.with_nodes(np.arange(self.number_of_nodes))
-        memo[id(self)] = result
-        return result

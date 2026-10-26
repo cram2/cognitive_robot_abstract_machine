@@ -27,14 +27,13 @@ from robokudo.exceptions import (
     WorldDescriptorLoadError,
 )
 from robokudo.utils.cv_helper import (
-    get_scale_coordinates,
     get_scaled_color_image_for_depth_image,
 )
 
 
 class _FakeCAS:
     def get(self, key):
-        if key == CASViews.COLOR2DEPTH_RATIO:
+        if key == CASViews.COLOR_TO_DEPTH_RATIO:
             return None
         raise KeyError(key)
 
@@ -43,7 +42,7 @@ class TestRoboKudoExceptions:
     def test_color_to_depth_ratio_missing_message(self):
         exception = ColorToDepthRatioMissing(operation="scale coordinates")
 
-        assert "COLOR2DEPTH_RATIO is missing from the CAS" in str(exception)
+        assert "The color-to-depth ratio is missing from the CAS" in str(exception)
         assert "Can't scale coordinates" in str(exception)
         assert "Suggestion:" in str(exception)
 
@@ -202,7 +201,3 @@ class TestRoboKudoExceptions:
 
         with pytest.raises(ColorToDepthRatioMissing):
             get_scaled_color_image_for_depth_image(_FakeCAS(), color_image)
-
-    def test_get_scale_coordinates_raises_color_to_depth_ratio_missing(self):
-        with pytest.raises(ColorToDepthRatioMissing):
-            get_scale_coordinates(None, (1, 2))

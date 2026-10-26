@@ -1,4 +1,5 @@
 from probabilistic_model.distributions.distributions import *
+from probabilistic_model.query_results import LogTruncation, UnivariateLogMode
 from probabilistic_model.constants import (
     PADDING_FACTOR_FOR_X_AXIS_IN_PLOT,
     EXPECTATION_TRACE_NAME,
@@ -12,19 +13,19 @@ from probabilistic_model.constants import (
 
 
 @dataclass(eq=False)
-class UniformDistribution(ContinuousDistributionWithFiniteSupport):
+class UniformDistribution(ContinuousDistributionWithConstrainedSupport):
     """
     Class for uniform distributions over the half-open interval [lower, upper).
     """
 
     def log_conditional_from_simple_interval_if_not_singleton(
         self, interval: SimpleInterval
-    ) -> Tuple[Optional[ContinuousDistribution], float]:
+    ) -> LogTruncation[Self]:
         # construct new interval
         new_interval = self.interval.intersection_with(interval)
 
         if new_interval.is_empty():
-            return None, -np.inf
+            return LogTruncation.impossible()
 
         # the probability of the interval, computed directly from the CDF to avoid
         # constructing a SimpleEvent (the dominant cost when truncating many leaves,
@@ -34,10 +35,11 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
         )
         probability = cdf_values[1] - cdf_values[0]
         if probability <= 0.0:
-            return None, -np.inf
+            return LogTruncation.impossible()
 
-        return self.__class__(variable=self.variable, interval=new_interval), np.log(
-            probability
+        return LogTruncation(
+            self.__class__(variable=self.variable, interval=new_interval),
+            np.log(probability),
         )
 
     def log_likelihood_without_bounds_check(self, x: npt.NDArray) -> npt.NDArray:
@@ -48,8 +50,8 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
         result = np.minimum(1, np.maximum(0, result))
         return result[:, 0]
 
-    def univariate_log_mode(self) -> Tuple[AbstractCompositeSet, float]:
-        return (
+    def univariate_log_mode(self) -> UnivariateLogMode:
+        return UnivariateLogMode(
             self.interval.as_composite_set(),
             self.log_probability_density_function_value(),
         )
@@ -101,22 +103,6 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
 
     def __repr__(self):
         return f"U({self.variable.name})"
-
-    def __copy__(self):
-        return self.__class__(variable=self.variable, interval=self.interval)
-
-    def __deepcopy__(self, memo=None):
-        if memo is None:
-            memo = {}
-        id_self = id(self)
-        if id_self in memo:
-            return memo[id_self]
-
-        variable = Continuous(self.variable.name)
-        interval = self.interval.__deepcopy__()
-        result = self.__class__(variable=variable, interval=interval)
-        memo[id_self] = result
-        return result
 
     def x_axis_points_for_plotly(self) -> List[Union[None, float]]:
         interval_size = self.upper - self.lower
@@ -188,7 +174,8 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
             * SCALING_FACTOR_FOR_EXPECTATION_IN_PLOT
         )
 
-        mode_trace = self.univariate_mode_traces(self.mode()[0], height)
+        mode_trace = self.univariate_mode_traces(self.mode().event, height)
+
         expectation_trace = self.univariate_expectation_trace(height)
         return [
             probability_density_trace,

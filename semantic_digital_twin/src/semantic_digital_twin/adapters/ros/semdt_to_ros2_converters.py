@@ -6,7 +6,6 @@ import geometry_msgs.msg as geometry_msgs
 import std_msgs.msg as std_msgs
 import visualization_msgs.msg as visualization_msgs
 from std_msgs.msg import ColorRGBA
-from trimesh.visual import TextureVisuals
 from visualization_msgs.msg import Marker
 
 from semantic_digital_twin.adapters.ros.msg_converter import (
@@ -221,7 +220,7 @@ class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
         marker.scale.x = data.scale.x
         marker.scale.y = data.scale.y
         marker.scale.z = data.scale.z
-        if data.mesh.visual.kind == TextureVisuals().kind:
+        if data.is_textured:
             marker.mesh_use_embedded_materials = True
             marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
         else:

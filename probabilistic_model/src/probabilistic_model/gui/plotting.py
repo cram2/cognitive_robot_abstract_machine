@@ -262,7 +262,9 @@ class ProbabilisticModelPlotWidget(QWidget):
 
         # Mode and Expectation
         try:
-            mode_event, max_likelihood = model.mode()
+            mode = model.mode()
+            mode_event, max_likelihood = mode.event, mode.likelihood
+
         except Exception:
             max_likelihood = np.max(pdf)
             mode_event = None

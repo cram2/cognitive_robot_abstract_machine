@@ -29,8 +29,8 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import Attribute
-    from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-        ProbabilisticCircuit,
+    from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
+        ProbabilisticCircuitRepresentation,
     )
 
 
@@ -203,9 +203,11 @@ class ScoredIntervention:
     that region happens to cover: the higher one is the better explanation.
     """
 
-    narrowed_circuit: ProbabilisticCircuit
+    narrowed_circuit: ProbabilisticCircuitRepresentation
     """
     The interventional joint, truncated to the effect condition and this candidate's
     best region -- what the query samples from if this candidate turns out to be the
     primary cause.
+
+    Of the circuit type the causal circuit was read from.
     """

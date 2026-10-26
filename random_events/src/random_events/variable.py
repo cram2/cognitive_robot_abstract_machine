@@ -1,3 +1,4 @@
+import copy
 import enum
 from abc import abstractmethod
 from dataclasses import dataclass, field
@@ -42,6 +43,15 @@ class Variable(CPPWrapper):
 
     def __hash__(self) -> int:
         return self.name.__hash__()
+
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        """
+        Variables are immutable, so a deep copy shares them.
+
+        :param memo: The objects already copied during this deep copy, by their id.
+        :return: This variable.
+        """
+        return self
 
     def __eq__(self, other):
         return self.cpp_object == other.cpp_object
@@ -131,7 +141,7 @@ class Symbolic(Variable):
     domain: Set = field(kw_only=True)
 
     def __post_init__(self):
-        self.domain = self.domain.__deepcopy__()
+        self.domain = copy.deepcopy(self.domain)
         self.cpp_object = rl.Symbolic(self.name, self.domain.cpp_object)
 
     @property

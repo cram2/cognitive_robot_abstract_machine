@@ -44,17 +44,10 @@ class DifferentiableGaussianLayer(DifferentiableContinuousLayer):
         self.log_scale = log_scale
         self.minimum_scale = minimum_scale
 
-    def __deepcopy__(self, memo: Optional[Dict[int, Any]] = None):
-        if memo is None:
-            memo = {}
-        id_self = id(self)
-        if id_self in memo:
-            return memo[id_self]
-        result = DifferentiableGaussianLayer(
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        return DifferentiableGaussianLayer(
             self.variable, self.location, self.log_scale, self.minimum_scale
         )
-        memo[id_self] = result
-        return result
 
     def validate(self):
         if not self.location.shape == self.log_scale.shape:

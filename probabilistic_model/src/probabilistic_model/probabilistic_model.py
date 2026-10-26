@@ -36,6 +36,14 @@ from random_events.interval import closed, SimpleInterval, Interval
 from abc import abstractmethod, ABC
 
 from probabilistic_model.exceptions import IntractableError, UndefinedOperationError
+from probabilistic_model.query_results import (
+    Conditioning,
+    LogConditioning,
+    LogMode,
+    LogTruncation,
+    Mode,
+    Truncation,
+)
 from probabilistic_model.utils import neighbouring_points
 from random_events.plotting import EventPlotter, SimpleEventPlotter
 from random_events.product_algebra import VariableMap, Event, SimpleEvent
@@ -175,7 +183,7 @@ class ProbabilisticModel(ABC):
         :return: The probability of the event.
         """
 
-    def mode(self) -> Tuple[Event, float]:
+    def mode(self) -> Mode:
         """
         Calculate the mode of the model.
 
@@ -188,11 +196,10 @@ class ProbabilisticModel(ABC):
 
                 :return: The mode and its likelihood.
         """
-        mode, log_likelihood = self.log_mode()
-        return mode, np.exp(log_likelihood)
+        return self.log_mode().exponentiated()
 
     @abstractmethod
-    def log_mode(self) -> Tuple[Event, float]:
+    def log_mode(self) -> LogMode:
         """
         Calculate the mode of the model.
 
@@ -212,7 +219,7 @@ class ProbabilisticModel(ABC):
 
     def truncated(
         self, event: Event, singleton_allowed: bool = False
-    ) -> Tuple[Optional[ProbabilisticModel], float]:
+    ) -> Truncation[ProbabilisticModel]:
         """
         Calculate the truncated distribution P(*| event) and the probability of the
         event.
@@ -232,13 +239,12 @@ class ProbabilisticModel(ABC):
         :return: The truncated distribution and the probability of the event.
         """
         event.fill_missing_variables(set(self.variables))
-        conditional, log_probability = self.log_truncated(event, singleton_allowed)
-        return conditional, np.exp(log_probability)
+        return self.log_truncated(event, singleton_allowed).exponentiated()
 
     @abstractmethod
     def log_truncated(
         self, event: Event, singleton_allowed: bool = False
-    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
+    ) -> LogTruncation[ProbabilisticModel]:
         """
         Calculate the truncated distribution P(*| event) and the probability of the
         event.
@@ -250,27 +256,24 @@ class ProbabilisticModel(ABC):
         :return: The truncated distribution and the log-probability of the event.
         """
 
-    def conditional(self, point: PartialPointType) -> Tuple[Optional[Self], float]:
+    def conditional(self, point: PartialPointType) -> Conditioning[Self]:
         """
         Calculate the conditioned distribution P(*| point) and the probability of the
         event.
 
         :param point: A partial point to calculate the conditioned distribution on.
-        :return: The conditioned distribution and the log-probability of the point.
+        :return: The conditioned distribution and the likelihood of the point.
         """
-        conditional, log_probability = self.log_conditional(point)
-        return conditional, np.exp(log_probability)
+        return self.log_conditional(point).exponentiated()
 
     @abstractmethod
-    def log_conditional(
-        self, point: PartialPointType
-    ) -> Tuple[Optional[Self], float]:
+    def log_conditional(self, point: PartialPointType) -> LogConditioning[Self]:
         """
         Calculate the conditioned distribution P(*| point) and the probability of the
         event. Check the documentation of `conditional` for more information.
 
         :param point: A partial point to calculate the conditioned distribution on.
-        :return: The conditioned distribution and the log-probability of the point.
+        :return: The conditioned distribution and the log-likelihood of the point.
         """
 
     @abstractmethod
@@ -366,9 +369,6 @@ class ProbabilisticModel(ABC):
 
         :param scaling: The variable value pairs to scale the model by.
         """
-        raise NotImplementedError
-
-    def __copy__(self):
         raise NotImplementedError
 
     def plotly_layout(self) -> Dict[str, Any]:
@@ -538,7 +538,8 @@ class ProbabilisticModel(ABC):
         # plot the mode if possible
         if mode:
             try:
-                mode, maximum_likelihood = self.mode()
+                most_likely = self.mode()
+                mode, maximum_likelihood = most_likely.event, most_likely.likelihood
             except IntractableError:
                 mode, maximum_likelihood = None, max(pdf)
         else:
@@ -843,8 +844,7 @@ class ProbabilisticModel(ABC):
         :return: traces for the mode of a multivariate model.
         """
         try:
-            mode, _ = self.mode()
-            mode_traces = EventPlotter(mode).plot(color=MODE_TRACE_COLOR)
+            mode_traces = EventPlotter(self.mode().event).plot(color=MODE_TRACE_COLOR)
             for trace in mode_traces:
                 trace.update(name=MODE_TRACE_NAME, mode="lines+markers")
         except IntractableError:

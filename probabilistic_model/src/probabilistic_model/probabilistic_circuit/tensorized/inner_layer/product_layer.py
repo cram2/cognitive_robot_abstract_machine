@@ -10,6 +10,7 @@ from random_events.product_algebra import Event, SimpleEvent
 from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 from typing_extensions import (
+    Any,
     Dict,
     List,
     Optional,
@@ -20,6 +21,7 @@ from typing_extensions import (
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    NodeIndices,
     NodeMask,
     NodeValues,
     NodeVariableValues,
@@ -108,6 +110,62 @@ class ProductLayer(InnerLayer):
         ).to_coo_array((number_of_child_layers, number_of_nodes))
         return cls(child_layers, edges)
 
+    @classmethod
+    def from_edges(
+        cls, child_layers: List[Layer], edges: InnerLayerEdges, number_of_nodes: int
+    ) -> Self:
+        """
+        :param child_layers: The child layers.
+        :param edges: The edges from the nodes of the new layer into the child layers,
+            at most one per node and child layer.
+        :param number_of_nodes: The number of nodes of the new layer.
+        :return: The product layer with these edges.
+        """
+        return cls(
+            child_layers,
+            SparseEntries(
+                edges.child_nodes, edges.child_layer_indices, edges.nodes
+            ).to_coo_array((len(child_layers), number_of_nodes)),
+        )
+
+    def with_edges(
+        self, child_layers: List[Layer], edges: InnerLayerEdges, copies: List[Self]
+    ) -> Self:
+        return self.from_edges(child_layers, edges, len(copies) * self.number_of_nodes)
+
+    def attach_child_layer(
+        self, child_layer: Layer, nodes: NodeIndices, child_nodes: NodeIndices
+    ):
+        """
+        Make some nodes of this layer multiply a node of another layer as well, in
+        place.
+
+        :param child_layer: The layer to add as a child layer.
+        :param nodes: The nodes of this layer that get a new factor.
+        :param child_nodes: The node of ``child_layer`` every one of ``nodes``
+            multiplies.
+        """
+        self.child_layers = self.child_layers + [child_layer]
+        entries = SparseEntries.concatenate(
+            [
+                SparseEntries(self.edges.data, self.edges.row, self.edges.col),
+                SparseEntries(
+                    np.asarray(child_nodes, dtype=np.int64),
+                    np.full(len(nodes), len(self.child_layers) - 1, dtype=np.int64),
+                    np.asarray(nodes, dtype=np.int64),
+                ),
+            ]
+        )
+        self.edges = entries.to_coo_array(
+            (len(self.child_layers), self.number_of_nodes)
+        )
+        self.reset_variables()
+        for cached in (
+            ProductLayer.inner_layer_edges,
+            ProductLayer.edges_per_child_layer,
+        ):
+            self.__dict__.pop(cached.attrname, None)
+
     @property
     def number_of_nodes(self) -> int:
         return self.edges.shape[1]
@@ -152,6 +210,24 @@ class ProductLayer(InnerLayer):
         # how many factors of every node have every variable in their scope
         occurrences = factors_of_node.T @ scope_of_child_layer
         return occurrences.max(axis=1, initial=0) <= 1
+
+    def products_over(self, variables: VariableIndices) -> NodeMask:
+        edges = self.inner_layer_edges
+        result = np.ones(self.number_of_nodes, dtype=bool)
+        for variable in variables:
+            child_layer_models_variable = np.array(
+                [
+                    variable in child_layer.variables
+                    for child_layer in self.child_layers
+                ],
+                dtype=bool,
+            )
+            models_variable = np.zeros(self.number_of_nodes, dtype=bool)
+            models_variable[
+                edges.nodes[child_layer_models_variable[edges.child_layer_indices]]
+            ] = True
+            result &= models_variable
+        return result
 
     # %% queries
 
@@ -559,15 +635,3 @@ class ProductLayer(InnerLayer):
             np.array_equal(self.edges.data.astype(np.int64), self.edges.col)
             and len(np.unique(self.edges.col)) == self.number_of_nodes
         )
-
-    def __deepcopy__(self, memo=None) -> ProductLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        child_layers = [
-            child_layer.__deepcopy__(memo) for child_layer in self.child_layers
-        ]
-        result = self.__class__(child_layers, self.edges.copy())
-        memo[id(self)] = result
-        return result

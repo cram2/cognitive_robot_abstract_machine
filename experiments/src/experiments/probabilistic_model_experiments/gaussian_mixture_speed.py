@@ -339,12 +339,12 @@ class GaussianMixtureBenchmark:
             lambda: rustworkx_circuit.truncated(box.__deepcopy__())
         )
         layered_call = TimedCall.of(lambda: layered.truncated(box.__deepcopy__()))
-        rustworkx_truncated, rustworkx_probability = rustworkx_call.result
-        layered_truncated, layered_probability = layered_call.result
+        rustworkx_truncated = rustworkx_call.result.distribution
+        layered_truncated = layered_call.result.distribution
         raise_if_answers_disagree(
             GaussianMixtureQuery.TRUNCATION_TO_A_BOX.value,
-            rustworkx_probability,
-            layered_probability,
+            rustworkx_call.result.probability,
+            layered_call.result.probability,
             self.configuration.numerical_integration_tolerance,
         )
         results = [
@@ -369,8 +369,8 @@ class GaussianMixtureBenchmark:
         )
         raise_if_answers_disagree(
             GaussianMixtureQuery.TRUNCATION_TO_SEVERAL_BOXES.value,
-            rustworkx_call.result[1],
-            layered_call.result[1],
+            rustworkx_call.result.probability,
+            layered_call.result.probability,
             self.configuration.numerical_integration_tolerance,
         )
         results.append(
@@ -434,7 +434,9 @@ class GaussianMixtureBenchmark:
             )
             layered_call = TimedCall.of(lambda: layered.log_conditional(point))
             raise_if_answers_disagree(
-                query.value, rustworkx_call.result[1], layered_call.result[1]
+                query.value,
+                rustworkx_call.result.log_likelihood,
+                layered_call.result.log_likelihood,
             )
             results.append(self.result_of(query, rustworkx_call, layered_call))
         return results

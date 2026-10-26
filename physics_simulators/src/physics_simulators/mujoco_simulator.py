@@ -112,8 +112,9 @@ class MujocoSimulator(BaseSimulator):
         root = ET.parse(file_path).getroot()
         self._name = root.attrib.get("model", self.name)
         self._mj_spec: mujoco.MjSpec = mujoco.MjSpec.from_file(filename=self._file_path)
+        # A body's own inertial wins; its geoms only stand in for one it lacks.
         self._mj_spec.compiler.inertiafromgeom = self.config.get(
-            "inertiafromgeom", mujoco.mjtInertiaFromGeom.mjINERTIAFROMGEOM_TRUE
+            "inertiafromgeom", mujoco.mjtInertiaFromGeom.mjINERTIAFROMGEOM_AUTO
         )
         self._mj_spec.option.integrator = self.config.get(
             "integrator", mujoco.mjtIntegrator.mjINT_RK4
@@ -772,6 +773,33 @@ class MujocoSimulator(BaseSimulator):
             type=SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
             info=f"Getting actuator {actuator_name}",
             result=actuator,
+        )
+
+    @BaseSimulator.simulator_callback
+    def get_actuators_lengths(
+        self, actuator_names: List[str]
+    ) -> SimulatorCallbackResult:
+        """
+        Get the lengths of actuators by their names: for an actuator driving a joint,
+        the joint's position scaled by the actuator's gear.
+
+        :param actuator_names: The names of the actuators
+        :return: A SimulatorCallbackResult with the length per actuator name as the
+            result
+        """
+        result = {}
+        for actuator_name in actuator_names:
+            get_actuator = self.get_actuator(actuator_name)
+            if (
+                get_actuator.type
+                != SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION
+            ):
+                return get_actuator
+            result[actuator_name] = float(get_actuator.result.length[0])
+        return SimulatorCallbackResult(
+            type=SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+            info=f"Getting actuators lengths of {actuator_names}",
+            result=result,
         )
 
     @BaseSimulator.simulator_callback

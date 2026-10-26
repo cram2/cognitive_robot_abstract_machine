@@ -20,17 +20,9 @@ The module is used for:
 
 from __future__ import annotations
 
-import logging
 
 import numpy as np
-from py_trees.behaviour import Behaviour
-from py_trees.blackboard import Blackboard
-from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING, Any, Dict, List
-
-import robokudo.pipeline
-from robokudo.defs import PACKAGE_NAME
-from robokudo.utils.tree import find_parent_of_type
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -119,33 +111,3 @@ class AnnotatorOutputPerPipelineMap:
 
         self.map: Dict[str, AnnotatorOutputs] = {}
         """Dictionary mapping pipeline names to their annotator outputs"""
-
-
-class ClearAnnotatorOutputs(Behaviour):
-    """Put directly in the corresponding RK Pipeline"""
-
-    def __init__(self, name: str = "ClearAnnotatorOutputs") -> None:
-        super().__init__(name)
-        self.rk_logger = logging.getLogger(PACKAGE_NAME)
-
-    def update(self) -> Status:
-        self.rk_logger.debug("%s.update()" % (self.__class__.__name__))
-        blackboard = Blackboard()
-        annotator_output_pipeline_map_buffer = blackboard.get(
-            "annotator_output_pipeline_map_buffer"
-        )
-        assert isinstance(
-            annotator_output_pipeline_map_buffer,
-            AnnotatorOutputPerPipelineMap,
-        )
-
-        pipeline = find_parent_of_type(self, robokudo.pipeline.Pipeline)
-        if pipeline is None:
-            self.feedback_message = "No parent pipeline found!"
-            return Status.FAILURE
-
-        annotator_outputs = annotator_output_pipeline_map_buffer.map[pipeline.name]
-        assert isinstance(annotator_outputs, AnnotatorOutputs)
-        annotator_outputs.clear_outputs()
-
-        return Status.SUCCESS

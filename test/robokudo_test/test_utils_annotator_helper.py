@@ -4,6 +4,7 @@ import numpy as np
 import open3d as o3d
 import pytest
 
+from robokudo.types.cv import ColorToDepthRatio
 import robokudo.types.tf
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -377,7 +378,10 @@ class TestUtilsAnnotatorHelper(object):
         scalex, scaley = scale_factor
 
         cas = annotator_in_pipeline.get_cas()
-        cas.set(robokudo.cas.CASViews.COLOR2DEPTH_RATIO, (scalex, scaley))
+        cas.set(
+            robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
+            ColorToDepthRatio(horizontal=scalex, vertical=scaley),
+        )
         annotator_in_pipeline.camera_intrinsics = copy.deepcopy(kinect_intrinsics)
 
         scale_camera_intrinsics(annotator_in_pipeline)
@@ -420,7 +424,10 @@ class TestUtilsAnnotatorHelper(object):
             robokudo.cas.CASViews.COLOR_IMAGE,
             np.zeros((height, width, 3), dtype=np.uint8),
         )
-        cas.set(robokudo.cas.CASViews.COLOR2DEPTH_RATIO, (scalex, scaley))
+        cas.set(
+            robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
+            ColorToDepthRatio(horizontal=scalex, vertical=scaley),
+        )
 
         annotator_in_pipeline.camera_intrinsics = copy.deepcopy(kinect_intrinsics)
 
@@ -457,7 +464,7 @@ class TestUtilsAnnotatorHelper(object):
         image = np.zeros((height, width, 3), dtype=np.uint8)
 
         cas.set(robokudo.cas.CASViews.COLOR_IMAGE, image)
-        cas.set(robokudo.cas.CASViews.COLOR2DEPTH_RATIO, None)
+        cas.set(robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO, None)
 
         assert get_color_image(annotator_in_pipeline) == None
 
@@ -482,7 +489,10 @@ class TestUtilsAnnotatorHelper(object):
         width, height = kinect_intrinsics.width, kinect_intrinsics.height
         scalex, scaley = scale_factor
 
-        cas.set(robokudo.cas.CASViews.COLOR2DEPTH_RATIO, (scalex, scaley))
+        cas.set(
+            robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
+            ColorToDepthRatio(horizontal=scalex, vertical=scaley),
+        )
         mask = np.zeros((int(height * scaley), int(width * scalex), 3), dtype=np.uint8)
         mask = resize_mask(annotator_in_pipeline, mask)
         assert mask.shape[:2] == (
@@ -494,7 +504,7 @@ class TestUtilsAnnotatorHelper(object):
         annotator_in_pipeline.descriptor.parameters.global_with_depth = True
 
         cas = annotator_in_pipeline.get_cas()
-        cas.set(robokudo.cas.CASViews.COLOR2DEPTH_RATIO, None)
+        cas.set(robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO, None)
 
         mask = np.zeros((640, 480, 3), dtype=np.uint8)
         assert pytest.raises(RuntimeError, resize_mask, annotator_in_pipeline, mask)

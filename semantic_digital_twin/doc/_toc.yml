@@ -26,6 +26,7 @@ parts:
         - file: examples/physics_simulators
         - file: examples/adding_robots
         - file: datasets
+        - file: part_finding
 
 - caption: Developer Guide
   chapters:

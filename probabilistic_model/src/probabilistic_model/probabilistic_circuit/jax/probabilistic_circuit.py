@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Dict, Any
 
@@ -142,7 +143,7 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
         if class_probabilities is None:
             class_probabilities = jnp.ones(number_of_classes) / number_of_classes
 
-        copied_root = self.root.__deepcopy__()
+        copied_root = copy.deepcopy(self.root)
         # update variable indices
         for layer in copied_root.all_layers():
             if isinstance(layer, DifferentiableInputLayer):

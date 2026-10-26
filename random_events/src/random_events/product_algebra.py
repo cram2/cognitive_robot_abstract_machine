@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import itertools
 import math
 import textwrap
@@ -46,7 +47,6 @@ class VariableMap(VariableMapSuperClassType):
         :param key: The variable or its name.
         :return: The matching variable.
         """
-
         if isinstance(key, Variable):
             return key
 
@@ -123,6 +123,12 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
                 return False
         return True
 
+    def is_singleton(self) -> bool:
+        """
+        :return: Whether the event assigns exactly one value to each of its variables.
+        """
+        return all(assignment.is_singleton() for assignment in self.values())
+
     @property
     def size(self) -> float:
         """
@@ -147,8 +153,9 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
     def __setitem__(self, key: VariableMapKey, value: Any):
         """
         Set the value of a variable in the event.
-        Also allows for assigning variables to values outside the classes of this package.
-        If this is the case, this tries to convert the value to a CompositeSet.
+
+        Also allows for assigning variables to values outside the classes of this
+        package. If this is the case, this tries to convert the value to a CompositeSet.
 
         :param key: The variable (or its name) to set the value for
         :param value: The value to set
@@ -234,8 +241,9 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
 
     def update_variables(self, new_variables: Dict[Variable, Variable]) -> Self:
         """
-        Construct a new simple event where the own variables are replaced with the new variables.
-        If the new variables are missing mappings, the old variables are kept for the missing updates.
+        Construct a new simple event where the own variables are replaced with the new
+        variables. If the new variables are missing mappings, the old variables are kept
+        for the missing updates.
 
         :param new_variables: A dictionary mapping current variables to new variables
         :return: A new SimpleEvent with the updated variables
@@ -264,16 +272,17 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
     def fill_missing_variables_pure(self, variables: Iterable[Variable]):
         """
         Fill this with the variables that are not in self but in `variables`.
+
         The variables are mapped to their domain.
         """
         return SimpleEvent.from_data(
             {variable: self.get(variable, variable.domain) for variable in variables}
         )
 
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         return SimpleEvent.from_data(
             {
-                variable: assignment.__deepcopy__()
+                variable: copy.deepcopy(assignment, memo)
                 for variable, assignment in self.items()
             }
         )
@@ -363,7 +372,6 @@ class Event(AbstractCompositeSet):
         :param key: The variable or its name.
         :return: The matching variable.
         """
-
         if isinstance(key, Variable):
             return key
 
@@ -375,6 +383,7 @@ class Event(AbstractCompositeSet):
     def update_simple_set_example(self):
         """
         Update the simple set example to the first simple set in the event.
+
         Use this whenever the simple sets change in-place
         """
         simple_sets = self.simple_sets
@@ -386,7 +395,8 @@ class Event(AbstractCompositeSet):
         """
         Fill all simple sets with the missing variables in-place.
 
-        :param variables: The variables to fill the event with. If None, all variables are used.
+        :param variables: The variables to fill the event with. If None, all variables
+            are used.
         """
         if variables is None:
             variables = set()
@@ -415,7 +425,6 @@ class Event(AbstractCompositeSet):
 
         :param variables: The variables to fill the event with.
         """
-
         if variables is None:
             variables = set()
 
@@ -472,11 +481,18 @@ class Event(AbstractCompositeSet):
             len(assignment.simple_sets) == 1 for assignment in simple_event.values()
         )
 
+    def is_singleton(self) -> bool:
+        """
+        :return: Whether the event contains exactly one point.
+        """
+        return len(self.simple_sets) == 1 and self.simple_sets[0].is_singleton()
+
     def bounding_box(self) -> SimpleEvent:
         """
         Compute the bounding box of the event.
-        The bounding box is the smallest simple event that contains this event. It is computed by taking the union
-        of all simple events variable wise.
+
+        The bounding box is the smallest simple event that contains this event. It is
+        computed by taking the union of all simple events variable wise.
 
         :return: The bounding box as a simple event
         """
@@ -495,7 +511,7 @@ class Event(AbstractCompositeSet):
 
     def update_variables(self, new_variables: Dict[Variable, Variable]) -> Event:
         """
-        see :func:`~random_events.product_algebra.SimpleEvent.update_variables`
+        See :func:`~random_events.product_algebra.SimpleEvent.update_variables`
         """
         return Event.from_simple_sets(
             *[

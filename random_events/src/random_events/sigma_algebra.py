@@ -1,4 +1,5 @@
 from __future__ import annotations
+import copy
 import math
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field, InitVar
@@ -126,7 +127,11 @@ class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        """
+        :param memo: The objects already copied during this deep copy, by their id.
+        :return: An equal set that shares no mutable state with this one.
+        """
         raise NotImplementedError
 
 
@@ -361,9 +366,13 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
             ]
         )
 
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        """
+        :param memo: The objects already copied during this deep copy, by their id.
+        :return: An equal set that shares no mutable state with this one.
+        """
         return self.__class__.from_simple_sets(
-            *[ss.__deepcopy__() for ss in self.simple_sets]
+            *[copy.deepcopy(simple_set, memo) for simple_set in self.simple_sets]
         )
 
 

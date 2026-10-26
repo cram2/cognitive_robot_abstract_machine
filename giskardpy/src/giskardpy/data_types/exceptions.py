@@ -20,6 +20,34 @@ class SetupException(GiskardException):
 
 
 @dataclass
+class UnpairedKinematicChainParametersError(SetupException):
+    """
+    Raised when the ``root_links`` and ``tip_links`` parameters differ in length, so
+    their entries cannot be paired into kinematic chains.
+    """
+
+    root_links: list[str]
+    """
+    The root link names that were declared.
+    """
+
+    tip_links: list[str]
+    """
+    The tip link names that were declared.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "root_links and tip_links must have the same length; "
+            f"got {len(self.root_links)} root links {self.root_links} and "
+            f"{len(self.tip_links)} tip links {self.tip_links}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Declare one tip link for every root link, in the same order."
+
+
+@dataclass
 class PlanningException(GiskardException):
     """
     Base class for errors that occur while planning a motion.

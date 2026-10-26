@@ -1,202 +1,173 @@
-import unittest
+from __future__ import annotations
 
+import equinox as eqx
 import jax
+import jax.numpy as jnp
 import numpy as np
-from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
-from equinox import tree_flatten_one_level
-from jax.tree_util import tree_flatten, tree_map
+import optax
+import pytest
+from jax.experimental.sparse import BCOO
+from jax.tree_util import tree_map
 
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.probabilistic_circuit.jax.uniform_layer import (
-    DifferentiableUniformLayer,
-)
-from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
-    DifferentiableSparseSumLayer,
-)
+from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from probabilistic_model.probabilistic_circuit.jax.coupling_circuit import (
     Conditioner,
     CouplingCircuit,
     LinearConditioner,
 )
-
-import equinox as eqx
-import jax.numpy as jnp
-from jax.experimental.sparse import BCOO
-import pandas as pd
-import optax
-import plotly.graph_objects as go
-import tqdm
-
-
+from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
+    DifferentiableSparseSumLayer,
+)
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
     DifferentiableLayeredCircuit,
 )
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-    ProbabilisticCircuit as NXProbabilisticCircuit,
+from probabilistic_model.probabilistic_circuit.jax.uniform_layer import (
+    DifferentiableUniformLayer,
 )
 
+from ..circuit_building import correlated_gaussian_samples, fit_joint_probability_tree
 
-class TrivialConditioner(Conditioner):
 
-    def generate_parameters(self, x):
+class ConstantConditioner(Conditioner):
+    """
+    A conditioner that weighs two components 0.2 and 0.8, whatever it conditions on.
+    """
+
+    def generate_parameters(self, x: jax.Array) -> jax.Array:
         return jnp.log(jnp.array([0.2, 0.8]).repeat(x.shape[0], 0))
 
     @property
-    def output_length(self):
+    def output_length(self) -> int:
         return 2
 
 
-class LessTrivialConditioner(Conditioner):
+class LinearLayerConditioner(Conditioner):
+    """
+    A conditioner whose log weights are a linear function of what it conditions on.
+    """
 
     linear = eqx.nn.Linear(1, 2, key=jax.random.PRNGKey(0))
 
-    def generate_parameters(self, x):
+    def generate_parameters(self, x: jax.Array) -> jax.Array:
         return self.linear(x)
 
     @property
-    def output_length(self):
+    def output_length(self) -> int:
         return self.linear.out_features
 
 
-class CouplingCircuitTestCase(unittest.TestCase):
+# %% a coupling circuit of one variable
 
-    data = jnp.array(
+
+@pytest.fixture
+def data() -> jax.Array:
+    """
+    100 samples in [0, 1] followed by 200 samples in [2, 3].
+    """
+    return jnp.array(
         np.vstack(
             (np.random.uniform(0, 1, (100, 1)), np.random.uniform(2, 3, (200, 1)))
         )
     )
+
+
+@pytest.fixture
+def mixture_of_uniforms() -> DifferentiableSparseSumLayer:
+    """
+    An equally weighted mixture of uniform distributions slightly wider than [0, 1] and
+    [2, 3].
+    """
     uniform_layer = DifferentiableUniformLayer(
         0, jnp.array([[-0.01, 1.01], [1.99, 3.01]])
     )
-    sum_layer = DifferentiableSparseSumLayer(
+    return DifferentiableSparseSumLayer(
         [uniform_layer],
         [BCOO((jnp.array([0.0, 0.0]), jnp.array([[0, 0], [0, 1]])), shape=(1, 2))],
     )
 
-    cc: CouplingCircuit
 
-    def setUp(self):
-        self.cc = CouplingCircuit(
-            TrivialConditioner(), jnp.array([0]), self.sum_layer, jnp.array([0])
-        )
-        self.cc.validate()
-
-    def test_log_likelihood(self):
-        ll = self.cc.conditional_log_likelihood(self.data)
-        ll1 = ll[0, 0]
-        ll2 = ll[-1, 0]
-        self.assertAlmostEqual(ll1, jnp.log(jnp.array([0.2 / 1.02])), delta=10e-4)
-        self.assertAlmostEqual(ll2, jnp.log(jnp.array([0.8 / 1.02])), delta=10e-4)
-
-    def test_vmap(self):
-        cc = CouplingCircuit(
-            LessTrivialConditioner(), jnp.array([0]), self.sum_layer, jnp.array([0])
-        )
-        r = cc.conditional_log_likelihood(self.data)
-        p1 = jnp.exp(cc.conditioner.generate_parameters(self.data[0]))
-        p1 /= jnp.sum(p1)
-        p2 = jnp.exp(cc.conditioner.generate_parameters(self.data[1]))
-        p2 /= jnp.sum(p2)
-        r1 = r[0]
-        r2 = r[1]
-
-        # check that if the probability of the first uniform is higher than also,
-        # the probability of the sample is higher
-        self.assertEqual(p1[0] > p2[0], r1 > r2)
-
-    def test_parameter_count(self):
-        self.assertEqual(self.cc.circuit.number_of_trainable_parameters, 2)
-
-    def test_create_circuit(self):
-        cc = CouplingCircuit(
-            LinearConditioner(1, 2), jnp.array([0]), self.sum_layer, jnp.array([0])
-        )
-        params = cc.conditioner.generate_parameters(jnp.array([0.1]))
-        cc.create_circuit_from_parameters(params)
+def couple(
+    conditioner: Conditioner, circuit: DifferentiableSparseSumLayer
+) -> CouplingCircuit:
+    """
+    :param conditioner: The conditioner of the coupling circuit.
+    :param circuit: The circuit the conditioner parameterizes.
+    :return: A coupling circuit that conditions the first variable on itself.
+    """
+    return CouplingCircuit(conditioner, jnp.array([0]), circuit, jnp.array([0]))
 
 
-class CouplingCircuit4DTestCase(unittest.TestCase):
+def test_conditional_log_likelihood_uses_the_conditioner_weights(
+    data, mixture_of_uniforms
+):
+    coupling_circuit = couple(ConstantConditioner(), mixture_of_uniforms)
+    coupling_circuit.validate()
+    log_likelihood = coupling_circuit.conditional_log_likelihood(data)
+    assert log_likelihood[0, 0] == pytest.approx(np.log(0.2 / 1.02), abs=1e-3)
+    assert log_likelihood[-1, 0] == pytest.approx(np.log(0.8 / 1.02), abs=1e-3)
 
+
+def test_conditional_log_likelihood_follows_the_conditioner_per_sample(
+    data, mixture_of_uniforms
+):
+    coupling_circuit = couple(LinearLayerConditioner(), mixture_of_uniforms)
+    log_likelihood = coupling_circuit.conditional_log_likelihood(data)
+    first_weights = jax.nn.softmax(
+        coupling_circuit.conditioner.generate_parameters(data[0])
+    )
+    second_weights = jax.nn.softmax(
+        coupling_circuit.conditioner.generate_parameters(data[1])
+    )
+    assert (first_weights[0] > second_weights[0]) == (
+        log_likelihood[0] > log_likelihood[1]
+    )
+
+
+def test_trainable_parameters_are_the_weights(mixture_of_uniforms):
+    coupling_circuit = couple(ConstantConditioner(), mixture_of_uniforms)
+    assert coupling_circuit.circuit.number_of_trainable_parameters == 2
+
+
+def test_circuit_from_parameters_carries_them(mixture_of_uniforms):
+    coupling_circuit = couple(LinearConditioner(1, 2), mixture_of_uniforms)
+    parameters = coupling_circuit.conditioner.generate_parameters(jnp.array([0.1]))
+    circuit = coupling_circuit.create_circuit_from_parameters(parameters)
+    assert jnp.allclose(circuit.log_weights[0].data, parameters)
+
+
+# %% a coupling circuit of four variables
+
+
+def test_training_lowers_the_negative_log_likelihood():
     number_of_variables = 4
-    number_of_samples = 1000
-    cc: CouplingCircuit
-    data: jax.Array
-    jpt: NXProbabilisticCircuit
-    non_marginalized_jpt: NXProbabilisticCircuit
+    half = number_of_variables // 2
+    dataframe = correlated_gaussian_samples(number_of_variables)
+    tree = fit_joint_probability_tree(dataframe, min_samples_per_quantile=30)
+    marginal = tree.marginal(tree.variables[half:])
+    layered = CircuitRepresentations().convert(marginal, DifferentiableLayeredCircuit)
+    model = CouplingCircuit(
+        LinearConditioner(half, layered.root.number_of_trainable_parameters),
+        jnp.arange(half),
+        layered.root,
+        jnp.arange(half, number_of_variables),
+    )
+    model.validate()
+    data = jnp.array(dataframe)
 
-    @classmethod
-    def setUpClass(cls):
-        np.random.seed(69)
-        mean = np.full(cls.number_of_variables, 0)
-        cov = np.random.uniform(
-            0, 1, (cls.number_of_variables, cls.number_of_variables)
-        )
-        cov = np.dot(cov, cov.T)
-        samples = np.random.multivariate_normal(mean, cov, cls.number_of_samples)
-        df = pd.DataFrame(
-            samples, columns=[f"x_{i}" for i in range(cls.number_of_variables)]
-        )
-        variables = infer_variables_from_dataframe(df, min_samples_per_quantile=30)
-        jpt = JointProbabilityTree(
-            annotated_variables=variables, min_samples_per_leaf=0.1
-        )
-        cls.non_marginalized_jpt = jpt.fit(df)
+    @eqx.filter_jit
+    def loss(model, data) -> jax.Array:
+        """
+        :return: The mean negative conditional log-likelihood of the data under the
+            model.
+        """
+        return -jnp.mean(model.conditional_log_likelihood(data))
 
-        cls.jpt = cls.non_marginalized_jpt.marginal(
-            jpt.variables[cls.number_of_variables // 2 :]
-        )
-        circuit = CircuitRepresentations().convert(
-            cls.jpt, DifferentiableLayeredCircuit
-        )
-        conditioner = LinearConditioner(
-            cls.number_of_variables // 2, circuit.root.number_of_trainable_parameters
-        )
-        cls.cc = CouplingCircuit(
-            conditioner,
-            jnp.array(list(range(cls.number_of_variables // 2))),
-            circuit.root,
-            jnp.array(
-                list(range(cls.number_of_variables // 2, cls.number_of_variables))
-            ),
-        )
-        cls.cc.validate()
-        cls.data = jnp.array(df)
-
-    def test_learning(self):
-
-        @eqx.filter_jit
-        def loss(model, x):
-            cll = model.conditional_log_likelihood(x)
-            return -jnp.mean(cll)
-
-        nll = loss(self.cc, self.data)
-        ll_og = self.cc.circuit.log_likelihood_of_nodes(
-            self.data[:, self.cc.circuit_columns]
-        )
-
-        optim = optax.adamw(0.01)
-        opt_state = optim.init(eqx.filter(self.cc, eqx.is_inexact_array))
-
-        model = self.cc
-        pbar = tqdm.trange(10)
-
-        losses = []
-
-        for i in pbar:
-            loss_value, grads = eqx.filter_value_and_grad(loss)(model, self.data)
-
-            grads = tree_map(lambda x: jnp.nan_to_num(x), grads)
-
-            updates, opt_state = optim.update(grads, opt_state, model)
-            model = eqx.apply_updates(model, updates)
-            pbar.set_postfix({"loss": loss_value})
-            losses.append(loss_value)
-        self.assertLess(loss_value, nll)
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(y=losses))
-        # fig.show()
-
-
-if __name__ == "__main__":
-    unittest.main()
+    initial_loss = loss(model, data)
+    optimizer = optax.adamw(0.01)
+    optimizer_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+    for _ in range(10):
+        loss_value, gradients = eqx.filter_value_and_grad(loss)(model, data)
+        gradients = tree_map(jnp.nan_to_num, gradients)
+        updates, optimizer_state = optimizer.update(gradients, optimizer_state, model)
+        model = eqx.apply_updates(model, updates)
+    assert loss_value < initial_loss

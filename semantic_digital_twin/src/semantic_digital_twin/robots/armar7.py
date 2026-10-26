@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Self, List
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
+    JointName,
     GripperState,
     StaticJointState,
     TorsoState,
@@ -37,7 +37,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-class Armar7Joint(StrEnum):
+class Armar7Joint(JointName):
     """
     Names of the Armar7's commandable connections, as spelled in its URDF.
 

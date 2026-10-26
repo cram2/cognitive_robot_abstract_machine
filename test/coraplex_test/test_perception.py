@@ -34,7 +34,7 @@ from coraplex.exceptions import (
     UnidentifiedDetections,
     UnknownExecutionType,
 )
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.perception import (
     ROBOKUDO_QUERY_ACTION_NAME,
     Detection,
@@ -91,7 +91,8 @@ class SpecializedMilk(Milk):
 @pytest.mark.parametrize(
     "execution_type, expected_source",
     [
-        (ExecutionType.SIMULATED, WorldPerception),
+        (ExecutionType.KINEMATICALLY_SIMULATED, WorldPerception),
+        (ExecutionType.PHYSICALLY_SIMULATED, WorldPerception),
         (ExecutionType.NO_EXECUTION, WorldPerception),
         (ExecutionType.REAL, RoboKudoPerception),
     ],
@@ -445,16 +446,23 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
         and isinstance(node.designator, MoveToolCenterPointMotion)
     ]
 
-    def distances_to(position) -> list[float]:
-        return [
-            float(
-                np.linalg.norm(
-                    world.transform(target, world.root).position.to_np().flatten()[:3]
-                    - np.array(position)
-                )
-            )
-            for target in targets
+    tool_P_grasp = (
+        context.robot.right_arm.end_effector.tool_P_grasp_when_closed.to_np().flatten()[
+            :3
         ]
+    )
+
+    def distances_to(position) -> list[float]:
+        """
+        How far each motion puts the point the fingers meet at from a position: that is
+        the point a goal is aimed at, not the tool frame.
+        """
+        distances = []
+        for target in targets:
+            root_T_tool = world.transform(target, world.root).to_np()
+            fingers = root_T_tool[:3, :3] @ tool_P_grasp + root_T_tool[:3, 3]
+            distances.append(float(np.linalg.norm(fingers - np.array(position))))
+        return distances
 
     # Planned against the wrong prior, one motion sits exactly on the believed object.
     assert min(distances_to(wrong_prior)) < 1e-9
@@ -813,7 +821,9 @@ def test_perception_task_reports_a_failed_query_as_itself(
     """
     world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
-    task = PerceptionTask(query=query, execution_type=ExecutionType.SIMULATED)
+    task = PerceptionTask(
+        query=query, execution_type=ExecutionType.KINEMATICALLY_SIMULATED
+    )
     build_context = build_perception_task(task, world, rclpy_node)
     task.perception_source = UnanswerablePerception(
         PerceptionSourceUnavailable(ROBOKUDO_QUERY_ACTION_NAME)
@@ -907,12 +917,12 @@ def test_detecting_motion_takes_the_execution_type_of_the_environment(
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     plan = execute_single(DetectingMotion(query=query), context=context)
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         executable = plan.parse()
 
     tasks = list(executable.motion_mappings.values())
     assert [type(task) for task in tasks] == [PerceptionTask]
-    assert tasks[0].execution_type is ExecutionType.SIMULATED
+    assert tasks[0].execution_type is ExecutionType.KINEMATICALLY_SIMULATED
 
 
 def test_perception_task_survives_a_chart_round_trip(

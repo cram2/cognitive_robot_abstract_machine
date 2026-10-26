@@ -488,12 +488,12 @@ def measure_truncation_scaling(
             lambda: rustworkx_circuit.truncated(event.__deepcopy__())
         )
         layered_call = TimedCall.of(lambda: layered.truncated(event.__deepcopy__()))
-        rustworkx_truncated, rustworkx_probability = rustworkx_call.result
-        layered_truncated, layered_probability = layered_call.result
+        rustworkx_truncated = rustworkx_call.result.distribution
+        layered_truncated = layered_call.result.distribution
         raise_if_answers_disagree(
             f"truncation to {truncation.number_of_simple_sets} simple sets",
-            rustworkx_probability,
-            layered_probability,
+            rustworkx_call.result.probability,
+            layered_call.result.probability,
         )
 
         if truncation is largest:
@@ -578,11 +578,10 @@ def measure_conditioning(
         layered_call = TimedCall.of(
             lambda: layered.__deepcopy__().log_conditional_in_place(point), repeats=5
         )
-        _, layered_log_probability = layered_call.result
         raise_if_answers_disagree(
             f"conditioning on {number_of_conditioned} variables",
             expected_log_probability,
-            layered_log_probability,
+            layered_call.result.log_likelihood,
         )
 
         results.append(

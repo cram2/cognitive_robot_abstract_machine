@@ -1,139 +1,117 @@
-import unittest
+from __future__ import annotations
 
 import numpy as np
 import plotly.graph_objects as go
-
-from random_events.interval import *
-from random_events.product_algebra import *
+import pytest
+from random_events.interval import Bound, SimpleInterval, closed, singleton
+from random_events.product_algebra import SimpleEvent, VariableMap
 
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+
+# %% fixtures
 
 
-class UniformDistributionTestCase(unittest.TestCase):
-    x: Continuous = Continuous("x")
-    distribution: UniformDistribution = UniformDistribution(
+@pytest.fixture
+def uniform(x) -> UniformDistribution:
+    """
+    A uniform distribution over [0, 2).
+    """
+    return UniformDistribution(
         variable=x, interval=SimpleInterval.from_data(0, 2, Bound.CLOSED, Bound.OPEN)
     )
 
-    def test_domain(self):
-        self.assertEqual(
-            self.distribution.univariate_support,
-            self.distribution.interval.as_composite_set(),
-        )
 
-    def test_likelihood(self):
-        pdf = self.distribution.likelihood(np.array([-1, 1, 2]).reshape(-1, 1))
-        self.assertEqual(pdf[0], 0)
-        self.assertEqual(pdf[1], 0.5)
-        self.assertEqual(pdf[2], 0)
+# %% density and probability
 
-    def test_probability_of_domain(self):
-        self.assertEqual(self.distribution.probability(self.distribution.support), 1)
 
-    def test_cdf(self):
-        cdf = self.distribution.cumulative_distribution_function(
-            np.array([-1, 1, 2]).reshape(-1, 1)
-        )
-        self.assertEqual(cdf[0], 0)
-        self.assertEqual(cdf[1], 0.5)
-        self.assertEqual(cdf[2], 1)
+def test_support_is_the_interval(uniform):
+    assert uniform.univariate_support == uniform.interval.as_composite_set()
+    assert uniform.probability(uniform.support) == 1
 
-    def test_probability(self):
-        event = SimpleEvent.from_data(
-            {self.x: closed(0, 1) | closed(1.5, 2)}
-        ).as_composite_set()
-        self.assertEqual(self.distribution.probability(event), 0.75)
 
-    def test_mode(self):
-        modes, likelihood = self.distribution.mode()
-        self.assertEqual(modes, self.distribution.support)
-        self.assertEqual(likelihood, 0.5)
+def test_likelihood(uniform):
+    assert list(uniform.likelihood(np.array([[-1], [1], [2]]))) == [0, 0.5, 0]
 
-    def test_sample(self):
-        samples = self.distribution.sample(100)
-        self.assertEqual(len(samples), 100)
-        likelihoods = self.distribution.likelihood(samples)
-        self.assertTrue(all(likelihoods == 0.5))
 
-    def test_conditional_no_intersection(self):
-        event = SimpleEvent.from_data({self.x: closed(3, 4)}).as_composite_set()
-        conditional, probability = self.distribution.truncated(event)
-        self.assertIsNone(conditional)
-        self.assertEqual(probability, 0)
+def test_cumulative_distribution_function(uniform):
+    cdf = uniform.cumulative_distribution_function(np.array([[-1], [1], [2]]))
+    assert list(cdf) == [0, 0.5, 1]
 
-    def test_conditional_singleton_intersection(self):
-        event = SimpleEvent.from_data(
-            {self.distribution.variable: singleton(1)}
-        ).as_composite_set()
-        conditional, probability = self.distribution.truncated(event)
-        self.assertIsNone(conditional)
-        self.assertEqual(probability, 0.0)
 
-        point = {self.distribution.variable: 1.0}
-        conditional, probability = self.distribution.conditional(point)
-        self.assertIsInstance(conditional, DiracDeltaDistribution)
-        self.assertEqual(probability, 0.5)
+def test_probability(uniform, x):
+    event = SimpleEvent.from_data({x: closed(0, 1) | closed(1.5, 2)}).as_composite_set()
+    assert uniform.probability(event) == 0.75
 
-    def test_conditional_simple_intersection(self):
-        event = SimpleEvent.from_data(
-            {self.distribution.variable: closed(1, 2)}
-        ).as_composite_set()
-        conditional, probability = self.distribution.truncated(event)
-        conditional_by_hand = UniformDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(1, 2, Bound.CLOSED, Bound.OPEN),
-        )
-        self.assertEqual(conditional, conditional_by_hand)
-        self.assertEqual(probability, 0.5)
 
-    def test_moment(self):
-        expectation = self.distribution.moment(
-            VariableMap({self.distribution.variable: 1}),
-            VariableMap({self.distribution.variable: 0}),
-        )
-        self.assertEqual(expectation[self.distribution.variable], 1)
-        variance = self.distribution.moment(
-            VariableMap({self.distribution.variable: 2}), expectation
-        )
-        self.assertEqual(variance[self.distribution.variable], 1 / 3)
+def test_mode_is_the_support(uniform):
+    mode = uniform.mode()
+    assert mode.event == uniform.support
+    assert mode.likelihood == 0.5
 
-    def test_plot(self):
-        fig = go.Figure(data=self.distribution.plot())
-        self.assertIsNotNone(fig)
-        # fig.show()
 
-    def test_variable_setting(self):
-        distribution = UniformDistribution(
-            variable=Continuous("x"), interval=closed(0, 1).simple_sets[0]
-        )
-        self.assertEqual(distribution.variable, Continuous("x"))
-        distribution.variable = Continuous("y")
-        self.assertEqual(distribution.variable, Continuous("y"))
+def test_samples_have_the_density(uniform):
+    samples = uniform.sample(100)
+    assert len(samples) == 100
+    assert np.all(uniform.likelihood(samples) == 0.5)
 
-    def test_translation(self):
-        distribution = UniformDistribution(
-            variable=self.x, interval=SimpleInterval.from_data(0, 1)
-        )
-        distribution.apply_translation({self.x: 2.0})
-        expected_distribution = UniformDistribution(
-            variable=self.x, interval=SimpleInterval.from_data(2, 3)
-        )
-        self.assertEqual(distribution, expected_distribution)
 
-    def test_uniform_distribution_singleton(self):
-        x = Continuous("x")
-        dist = UniformDistribution(variable=x, interval=SimpleInterval.from_data(0, 2))
+def test_moments(uniform, x):
+    expectation = uniform.moment(VariableMap({x: 1}), VariableMap({x: 0}))
+    assert expectation[x] == 1
+    assert uniform.moment(VariableMap({x: 2}), expectation)[x] == 1 / 3
 
-        # singleton_allowed=False (default)
-        event = SimpleEvent.from_data({x: singleton(1)}).as_composite_set()
-        conditional, probability = dist.truncated(event)
-        self.assertIsNone(conditional)
-        self.assertEqual(probability, 0.0)
 
-        # singleton_allowed=True
-        conditional, probability = dist.truncated(event, singleton_allowed=True)
-        self.assertIsInstance(conditional, DiracDeltaDistribution)
-        self.assertEqual(conditional.location, 1.0)
-        self.assertAlmostEqual(probability, 0.5)  # exp(log(0.5)) = 0.5
+def test_plot_builds_a_figure(uniform):
+    assert len(go.Figure(data=uniform.plot()).data) > 0
+
+
+# %% truncation
+
+
+def test_truncation_to_a_disjoint_event(uniform, x):
+    event = SimpleEvent.from_data({x: closed(3, 4)}).as_composite_set()
+    truncation = uniform.truncated(event)
+    assert truncation.distribution is None
+    assert truncation.probability == 0
+
+
+def test_truncation_to_an_interval(uniform, x):
+    event = SimpleEvent.from_data({x: closed(1, 2)}).as_composite_set()
+    truncation = uniform.truncated(event)
+    assert truncation.distribution == UniformDistribution(
+        variable=x, interval=SimpleInterval.from_data(1, 2, Bound.CLOSED, Bound.OPEN)
+    )
+    assert truncation.probability == 0.5
+
+
+def test_truncation_to_a_singleton(uniform, x):
+    event = SimpleEvent.from_data({x: singleton(1)}).as_composite_set()
+
+    truncation = uniform.truncated(event)
+    assert truncation.distribution is None
+    assert truncation.probability == 0.0
+
+    truncation = uniform.truncated(event, singleton_allowed=True)
+    assert isinstance(truncation.distribution, DiracDeltaDistribution)
+    assert truncation.distribution.location == 1.0
+    assert truncation.probability == pytest.approx(0.5)
+
+
+def test_conditioning_on_a_point(uniform, x):
+    conditioning = uniform.conditional({x: 1.0})
+    assert isinstance(conditioning.distribution, DiracDeltaDistribution)
+    assert conditioning.likelihood == 0.5
+
+
+# %% translation
+
+
+def test_translation_shifts_the_interval(x):
+    distribution = UniformDistribution(
+        variable=x, interval=SimpleInterval.from_data(0, 1)
+    )
+    distribution.apply_translation({x: 2.0})
+    assert distribution == UniformDistribution(
+        variable=x, interval=SimpleInterval.from_data(2, 3)
+    )

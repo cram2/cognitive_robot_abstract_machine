@@ -8,11 +8,11 @@ from probabilistic_model.exceptions import ShapeMismatchError
 from typing_extensions import Self
 
 from probabilistic_model.probabilistic_circuit.jax.input_layer import (
-    DifferentiableContinuousLayerWithFiniteSupport,
+    DifferentiableContinuousLayerWithConstrainedSupport,
 )
 
 
-class DifferentiableUniformLayer(DifferentiableContinuousLayerWithFiniteSupport):
+class DifferentiableUniformLayer(DifferentiableContinuousLayerWithConstrainedSupport):
     """
     A layer that represents uniform distributions over a single variable.
     """

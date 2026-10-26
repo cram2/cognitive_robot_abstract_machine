@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing_extensions import Any, Iterator, Tuple, TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import (
@@ -31,9 +32,10 @@ from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     BackendCannotEvaluateProbabilisticQuery,
+    EvidenceHasZeroProbability,
     NoSolutionFound,
 )
-from krrood.entity_query_language.factories import count, entity
+from krrood.entity_query_language.factories import and_, count, entity
 from krrood.parametrization.exceptions import JointQueryAcrossClassesNotSupported
 from krrood.parametrization.parameterizer import (
     ConditionParameters,
@@ -81,8 +83,10 @@ class ProbabilisticQuery(Evaluable, HasExpression, ABC):
 @dataclass(eq=False, repr=False)
 class Probability(ProbabilisticQuery):
     """
-    The probability of a condition, e.g. ``probability_of(x.A > 5)`` for
-    ``x = variable(MyClass)``. Accepts any condition a ``.where(...)`` clause does.
+    The probability of a condition, optionally given evidence, e.g.
+    ``probability_of(x.A > 5)`` or ``probability_of(x.A > 5, evidence=x.B < 2)`` for
+    ``x = variable(MyClass)``. Condition and evidence accept anything a
+    ``.where(...)`` clause does.
 
     Resolves two ways: exactly via :meth:`_resolve_` under a
     :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, or by
@@ -95,40 +99,84 @@ class Probability(ProbabilisticQuery):
     The condition to compute the probability of.
     """
 
+    evidence: SymbolicExpression | None = None
+    """
+    The condition the probability is conditioned on, or ``None`` for the unconditional
+    probability.
+    """
+
     def __post_init__(self):
         if not isinstance(self.condition, SymbolicExpression):
             self.condition = Literal(_value_=self.condition)
+        if self.evidence is not None and not isinstance(
+            self.evidence, SymbolicExpression
+        ):
+            self.evidence = Literal(_value_=self.evidence)
+
+    @cached_property
+    def condition_and_evidence(self) -> SymbolicExpression:
+        """
+        :return: The conjunction of :attr:`condition` and :attr:`evidence`, or just
+            :attr:`condition` without evidence.
+        """
+        if self.evidence is None:
+            return self.condition
+        return and_(self.condition, self.evidence)
 
     def _evaluate_natively_(self) -> Iterator[float]:
         """
-        Counts matching rows via ``entity(count(root)).where(condition)`` instead of
-        resolving a model -- works under any backend with an enumerable domain.
+        Counts the rows that satisfy :attr:`condition_and_evidence` and divides by the
+        rows that satisfy :attr:`evidence` (all rows without evidence) -- works under
+        any backend with an enumerable domain.
 
-        :raises JointQueryAcrossClassesNotSupported: If the condition references
-            attributes reached from more than one ``variable(...)`` root, or none.
+        :raises JointQueryAcrossClassesNotSupported: If the condition and evidence
+            reference attributes reached from more than one ``variable(...)`` root, or
+            none.
+        :raises EvidenceHasZeroProbability: If no row satisfies the evidence.
         """
         referenced_attributes = WhereExpressionToRandomEventTranslator(
-            self.condition
+            self.condition_and_evidence
         ).variables.keys()
         roots = {attribute._chain_root_ for attribute in referenced_attributes}
         if len(roots) != 1:
             raise JointQueryAcrossClassesNotSupported({root._type_ for root in roots})
         [root_variable] = roots
 
-        matching_count = entity(count(root_variable)).where(self.condition).first()
-        total_count = entity(count(root_variable)).first()
-        yield matching_count / total_count
+        matching_count = (
+            entity(count(root_variable)).where(self.condition_and_evidence).first()
+        )
+        evidence_query = entity(count(root_variable))
+        if self.evidence is not None:
+            evidence_query = evidence_query.where(self.evidence)
+        evidence_count = evidence_query.first()
+        if evidence_count == 0:
+            raise EvidenceHasZeroProbability(self)
+        yield matching_count / evidence_count
 
     def _resolve_(self, model_registry: ModelRegistry) -> float:
-        parameters = ConditionParameters(self.condition)
+        """
+        :raises EvidenceHasZeroProbability: If the model assigns the evidence zero
+            probability.
+        """
+        parameters = ConditionParameters(self.condition_and_evidence)
         model = model_registry.get_model(parameters)
-        return model.probability(parameters.event)
+        probability = model.probability(parameters.event)
+        if self.evidence is None:
+            return probability
+
+        evidence_probability = model.probability(
+            ConditionParameters(self.evidence).event
+        )
+        if evidence_probability == 0:
+            raise EvidenceHasZeroProbability(self)
+        return probability / evidence_probability
 
     def _get_expression_(self) -> SymbolicExpression:
-        return self.condition
+        return self.condition_and_evidence
 
     def __repr__(self) -> str:
-        return f"probability_of({self.condition!r})"
+        evidence = "" if self.evidence is None else f", evidence={self.evidence!r}"
+        return f"probability_of({self.condition!r}{evidence})"
 
 
 @dataclass(eq=False, repr=False)

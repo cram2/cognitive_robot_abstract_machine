@@ -17,7 +17,7 @@ from coraplex.datastructures.dataclasses import Context
 
 from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
 from semantic_digital_twin.spatial_types.spatial_types import Pose
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
@@ -54,20 +54,7 @@ ALTERNATIVE_MOTION_MAPPINGS = [
 
 @pytest.fixture(
     scope="module",
-    params=[
-        # TODO Garmi commented out until we get access to the robot description in CI
-        # pytest.param(
-        #     "garmi",
-        #     marks=pytest.mark.skipif(
-        #         Garmi is None,
-        #         reason="GARMI semantic annotation not installed",
-        #     ),
-        # ),
-        "hsrb",
-        "stretch",
-        "tiago",
-        "pr2",
-    ],
+    params=["hsrb", "stretch", "tiago", "pr2", "garmi"],
 )
 def setup_multi_robot_simple_apartment(
     request,
@@ -125,14 +112,11 @@ def setup_multi_robot_simple_apartment(
         return apartment_copy, view
 
     elif request.param == "garmi":
-        if Garmi is None:
-            pytest.skip("GARMI semantic annotation not installed")
-        garmi_world_setup = request.getfixturevalue("garmi_world_setup")
-        garmi_copy = deepcopy(garmi_world_setup)
+        garmi_copy = deepcopy(request.getfixturevalue("_garmi_world_setup"))
         apartment_copy.merge_world(
             garmi_copy,
         )
-        view = Garmi.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(Garmi)[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -184,7 +168,7 @@ def test_new_reachability_location_body(
         [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
         world.notify_state_change()
@@ -209,7 +193,7 @@ def test_visibility_location_pose(multiple_robot_simple_apartment_context):
         [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
         world.notify_state_change()
@@ -231,7 +215,7 @@ def test_visibility_location_body(multiple_robot_simple_apartment_context):
         [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
         context,
     )
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
         world.notify_state_change()

@@ -50,14 +50,14 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.robot_plans.plan_transformations import DetectBeforeGrasp
 from krrood.entity_query_language.factories import a
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.connections import Connection6DoFSpecification
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    Connection6DoFSpecification,
-    RobotSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.predetermined_maps.apartment_environment import (
+from semantic_digital_twin.predefined_maps.apartment_environment import (
     ApartmentEnvironment,
 )
 from semantic_digital_twin.robots.stretch import Stretch
@@ -101,21 +101,21 @@ class StretchApartmentDemonstration(RobotDemonstration):
 
     ros_node_name: str = "stretch_demo_node"
 
-    def build_simulated_world(self) -> World:
+    def scene_specification(self) -> WorldSpecification:
         """
-        Put the Stretch on its drive in a world holding nothing but a map body.
+        :return: A world holding nothing but a map body, which :meth:`populate_scene`
+            furnishes.
         """
-        return WorldSpecification(
-            world_parser=None,
-            robots=[
-                RobotSpecification(
-                    semantic_annotation_type=self.used_robot,
-                    odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        1, 1
-                    ),
-                )
-            ],
-        ).to_domain_object()
+        return WorldSpecification(world_parser=None)
+
+    def robot_specification(self) -> RobotSpecification:
+        """
+        :return: The Stretch on its drive, between the shelf and the bedside table.
+        """
+        return RobotSpecification(
+            semantic_annotation_type=self.used_robot,
+            odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
+        )
 
     def is_scene_populated(self, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(CEREAL_NAME)
@@ -254,7 +254,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
 
 
 def main(
-    execution_type: ExecutionType = ExecutionType.SIMULATED, repetitions: int = 1
+    execution_type: ExecutionType = ExecutionType.KINEMATICALLY_SIMULATED, repetitions: int = 1
 ) -> None:
     """
     Run the demonstration.

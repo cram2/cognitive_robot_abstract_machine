@@ -292,5 +292,5 @@ class RGBDFileReaderInterface(FileReaderInterface):
             CASViews.CAMERA_INTRINSIC,
             o3d_camera_intrinsics_from_ros_camera_info(data[CASViews.CAMERA_INFO]),
         )
-        cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
+        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.camera_config.color_to_depth_ratio)
         self.store_static_camera_transform_if_configured(cas)

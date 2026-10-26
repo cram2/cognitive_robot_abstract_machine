@@ -16,7 +16,7 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.utils import get_generic_type_parameters, recursive_subclasses
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
-from semantic_digital_twin.api import RobotSpecification
+from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, MobileBase

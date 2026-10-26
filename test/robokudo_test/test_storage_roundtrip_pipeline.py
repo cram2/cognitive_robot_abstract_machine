@@ -8,6 +8,7 @@ import numpy as np
 import py_trees
 from rclpy.node import Node
 
+from robokudo.types.cv import ColorToDepthRatio
 import robokudo.defs
 from robokudo import world as rk_world
 import robokudo.descriptors.camera_configs.config_filereader_playback
@@ -15,16 +16,15 @@ import robokudo.descriptors.camera_configs.config_mongodb_playback
 import robokudo.utils.data_downloader
 import robokudo.utils.tree_execution
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
-from robokudo.annotators.outputs import ClearAnnotatorOutputs
 from robokudo.annotators.storage import StorageWriter
 from robokudo.cas import CASViews
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.io.storage import Storage
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
-
 
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",
@@ -44,7 +44,7 @@ def _build_writer_pipeline(db_name: str) -> Pipeline:
         loop=False,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
         kinect_height_fix_mode=True,
-        color2depth_ratio=(0.5, 0.5),
+        color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
     )
 
     writer_descriptor = StorageWriter.Descriptor()
@@ -145,8 +145,8 @@ class TestStorageRoundtripPipeline:
                 reader_camera_intrinsic.intrinsic_matrix,
             )
 
-            assert writer_pipeline.cas.get(CASViews.COLOR2DEPTH_RATIO) == (
-                reader_pipeline.cas.get(CASViews.COLOR2DEPTH_RATIO)
+            assert writer_pipeline.cas.get(CASViews.COLOR_TO_DEPTH_RATIO) == (
+                reader_pipeline.cas.get(CASViews.COLOR_TO_DEPTH_RATIO)
             )
         finally:
             writer_node.destroy_node()

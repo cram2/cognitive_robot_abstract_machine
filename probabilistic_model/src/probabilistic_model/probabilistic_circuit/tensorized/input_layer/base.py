@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -35,7 +36,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
+    Layer,
+    LeafLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
 )
@@ -50,9 +54,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 
 
 @dataclass(eq=False, repr=False)
-class InputLayer(Layer, ABC):
+class UnivariateInputLayer(LeafLayer, ABC):
     """
-    Abstract base class for the input layers of a layered circuit.
+    Abstract base class for the univariate input layers of a layered circuit.
 
     An input layer holds univariate distributions of one single type over one single
     variable, so that the likelihood of all of its nodes is evaluated without any
@@ -63,13 +67,6 @@ class InputLayer(Layer, ABC):
     """
     The index of the variable of this layer.
     """
-
-    @property
-    def child_layers(self) -> List[Layer]:
-        """
-        :return: An empty list. An input layer is a leaf of the layer graph.
-        """
-        return []
 
     @property
     def variables(self) -> VariableIndices:
@@ -129,21 +126,6 @@ class InputLayer(Layer, ABC):
         """
         raise NotImplementedError
 
-    @classmethod
-    @abstractmethod
-    def concatenate(cls, layers: List[Self]) -> Self:
-        """
-        Join layers of this type over the same variable into one layer.
-
-        The nodes keep the order of the layers, so the nodes of ``layers[k]`` occupy one
-        contiguous block. Only layers that were truncated from the same layer are
-        concatenated, which is why the shared parameters may be taken from the first one.
-
-        :param layers: The layers to join.
-        :return: The joined layer.
-        """
-        raise NotImplementedError
-
     def node_distributions(self, variable: Variable) -> List[UnivariateDistribution]:
         """
         :param variable: The variable of this layer.
@@ -174,8 +156,8 @@ class InputLayer(Layer, ABC):
             distribution.log_mode()
             for distribution in self.node_distributions(variable)
         ]
-        return [mode for mode, _ in modes], np.array(
-            [value for _, value in modes], dtype=float
+        return [mode.event for mode in modes], np.array(
+            [mode.log_likelihood for mode in modes], dtype=float
         )
 
     @memoized
@@ -283,8 +265,8 @@ class InputLayer(Layer, ABC):
 
         :param assignment: The assignment of the variable of this layer.
         :param singleton_allowed: Whether singletons are allowed.
-        :return: The truncated layer, with as many nodes as this one, and the
-            log-probabilities of its nodes.
+        :return: The truncated layer, with as many nodes as this one, and the log-
+            probabilities of its nodes.
         """
         raise NotImplementedError
 
@@ -325,7 +307,7 @@ class InputLayer(Layer, ABC):
             self.type_of_truncated_layer(event[variable], query.singleton_allowed)
             for event in events
         }
-        return len(types) == 1 and issubclass(types.pop(), InputLayer)
+        return len(types) == 1 and issubclass(types.pop(), UnivariateInputLayer)
 
     @memoized
     def log_truncated_of_simple_events(
@@ -353,8 +335,8 @@ class InputLayer(Layer, ABC):
         Condition every node of this layer on a value of its variable at once.
 
         :param value: The value.
-        :return: The conditioned layer, with as many nodes as this one, and the
-            log-likelihoods of the value under its nodes.
+        :return: The conditioned layer, with as many nodes as this one, and the log-
+            likelihoods of the value under its nodes.
         """
         raise NotImplementedError
 
@@ -368,7 +350,7 @@ class InputLayer(Layer, ABC):
         variable = query.variables[self.variable]
         if variable not in point:
             result = LayerWithLogProbabilities(
-                self.__deepcopy__(), np.zeros(self.number_of_nodes)
+                copy.deepcopy(self), np.zeros(self.number_of_nodes)
             )
         else:
             result = self.log_conditional_of_value(point[variable])
@@ -389,11 +371,11 @@ class InputLayer(Layer, ABC):
     ) -> Optional[Layer]:
         if not kept[self.variable]:
             return None
-        return self.__deepcopy__()
+        return copy.deepcopy(self)
 
 
 @dataclass(eq=False, repr=False)
-class AbstractContinuousLayer(InputLayer, ABC):
+class AbstractContinuousLayer(UnivariateInputLayer, ABC):
     """
     Abstract base class for the input layers of continuous univariate distributions.
     """

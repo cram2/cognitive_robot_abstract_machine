@@ -261,9 +261,9 @@ class ModeWidget(QWidget):
             self.next_button.setEnabled(False)
             return
 
-        mode_event, likelihood = result
-        self.modes = mode_event.simple_sets
-        self.likelihood = likelihood
+        self.modes = result.event.simple_sets
+        self.likelihood = result.likelihood
+
         self.current_mode_index = 0
         self.update_mode_display()
 

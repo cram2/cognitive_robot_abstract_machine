@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         AttributeMatch,
     )
     from krrood.entity_query_language.operators.probabilistic_queries import (
+        Probability,
         ProbabilisticQuery,
     )
 
@@ -1033,6 +1034,30 @@ class BackendCannotEvaluateProbabilisticQuery(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Evaluate with a ProbabilisticBackend backed by a model registry, e.g. .evaluate(backend=ProbabilisticBackend(...))."
+
+
+@dataclass
+class EvidenceHasZeroProbability(DataclassException):
+    """
+    Raised when a
+    :class:`~krrood.entity_query_language.operators.probabilistic_queries.Probability`
+    is conditioned on evidence that has zero probability, which leaves the conditional
+    probability undefined.
+    """
+
+    expression: Probability
+    """
+    The probability query whose evidence has zero probability.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.expression} is undefined: its evidence has zero probability, so "
+            f"there is nothing to condition on."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Condition on evidence that the model or the domain can satisfy."
 
 
 @dataclass

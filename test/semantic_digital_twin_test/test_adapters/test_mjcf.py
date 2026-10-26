@@ -1,9 +1,12 @@
 import os.path
+import shutil
 
+import mujoco
+import numpy
 import pytest
 
 from semantic_digital_twin.adapters.mjcf import MJCFParser
-from semantic_digital_twin.adapters.multi_sim import MujocoLight
+from semantic_digital_twin.adapters.multi_sim import MujocoLight, MujocoTendon
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 MJCF_DIR = os.path.join(
@@ -15,6 +18,8 @@ MJCF_DIR = os.path.join(
     "resources",
     "mjcf",
 )
+
+DATASET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset")
 
 
 @pytest.fixture
@@ -170,6 +175,67 @@ def test_light_is_parsed_and_attached_to_its_parent_body():
     assert light.cast_shadow is False
 
 
+VISUAL_ONLY_GEOM_SCENE = os.path.join(DATASET_DIR, "visual_only_geom_scene.xml")
+"""
+Scene whose only geom is excluded from contact by ``contype=0`` and ``conaffinity=0``.
+"""
+
+MIXED_GEOM_SCENE = os.path.join(DATASET_DIR, "mixed_geom_scene.xml")
+"""
+Scene whose single body carries one geom that takes part in contact and one that is
+excluded from it.
+"""
+
+
+def test_visual_only_geom_is_not_a_collision_shape_by_default():
+    world = MJCFParser.from_file(VISUAL_ONLY_GEOM_SCENE).parse()
+
+    [shelf] = [
+        body for body in world.kinematic_structure_entities if body.name.name == "shelf"
+    ]
+    assert len(shelf.visual.shapes) == 1
+    assert len(shelf.collision.shapes) == 0
+
+
+def test_visual_geometry_stands_in_when_a_body_has_no_collision_geometry():
+    world = MJCFParser.from_file(
+        VISUAL_ONLY_GEOM_SCENE, use_visual_as_collision_backup=True
+    ).parse()
+
+    [shelf] = [
+        body for body in world.kinematic_structure_entities if body.name.name == "shelf"
+    ]
+    assert len(shelf.collision.shapes) == 1
+
+
+def test_visual_geometry_is_left_out_where_the_body_already_collides():
+    """
+    The visual geometry is a stand-in, not an addition: a body that takes part in
+    contact keeps exactly the geometry the scene gave it to collide with, so the geoms
+    the scene deliberately excluded from contact stay out of it.
+    """
+    without_backup = MJCFParser.from_file(MIXED_GEOM_SCENE).parse()
+    with_backup = MJCFParser.from_file(
+        MIXED_GEOM_SCENE, use_visual_as_collision_backup=True
+    ).parse()
+
+    [contact_only] = [
+        body
+        for body in without_backup.kinematic_structure_entities
+        if body.name.name == "shelf"
+    ]
+    [backed_up] = [
+        body
+        for body in with_backup.kinematic_structure_entities
+        if body.name.name == "shelf"
+    ]
+    assert len(backed_up.visual.shapes) == 2
+    assert len(contact_only.collision.shapes) == 1
+    assert [shape.scale for shape in backed_up.collision.shapes] == [
+        shape.scale for shape in contact_only.collision.shapes
+    ]
+
+
 TEXTURED_BOX_MJCF_TEMPLATE = """
 <mujoco>
   <asset>
@@ -183,6 +249,99 @@ TEXTURED_BOX_MJCF_TEMPLATE = """
   </worldbody>
 </mujoco>
 """
+
+
+# %% frame tag parsing
+
+FRAME_ROTATION_ABOUT_Z = numpy.array(
+    [
+        [0.0, -1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ]
+)
+"""
+Rotation matrix of the fixture frame's 90 degree rotation about the z axis.
+"""
+
+
+@pytest.fixture
+def frame_wrapped_parser():
+    """
+    Parser for a scene whose geom and child bodies are wrapped in an MJCF
+    ``<frame pos="1 2 3" quat="0.7071068 0 0 0.7071068">`` element.
+    """
+    return MJCFParser(os.path.join(DATASET_DIR, "frame_wrapped_scene.xml"))
+
+
+@pytest.fixture
+def frame_wrapped_world(frame_wrapped_parser):
+    """
+    World parsed from the frame wrapped scene.
+    """
+    return frame_wrapped_parser.parse()
+
+
+def test_frame_transform_is_applied_to_the_geoms_it_wraps(frame_wrapped_world):
+    [base] = [
+        body
+        for body in frame_wrapped_world.kinematic_structure_entities
+        if body.name.name == "base"
+    ]
+    [geom] = base.visual.shapes
+
+    origin = geom.origin.to_np()
+
+    assert origin[:3, 3] == pytest.approx([1.0, 2.5, 3.0])
+    assert origin[:3, :3] == pytest.approx(FRAME_ROTATION_ABOUT_Z)
+
+
+def test_frame_transform_is_applied_to_a_fixed_child_body(frame_wrapped_world):
+    [shelf] = [
+        body
+        for body in frame_wrapped_world.kinematic_structure_entities
+        if body.name.name == "shelf"
+    ]
+
+    root_transform = frame_wrapped_world.compute_forward_kinematics_np(
+        frame_wrapped_world.root, shelf
+    )
+
+    assert root_transform[:3, 3] == pytest.approx([1.0, 2.5, 3.0])
+    assert root_transform[:3, :3] == pytest.approx(FRAME_ROTATION_ABOUT_Z)
+
+
+def test_joint_velocity_limit_is_symmetric_about_zero(frame_wrapped_parser):
+    """
+    A one-sided velocity limit would stop the hinge moving towards its own range, which
+    runs from a negative angle to zero.
+    """
+    world = frame_wrapped_parser.parse()
+
+    hinge = world.get_degree_of_freedom_by_name("door_hinge")
+
+    assert (
+        hinge.limits.lower.velocity
+        == -frame_wrapped_parser.default_joint_velocity_limit
+    )
+    assert (
+        hinge.limits.upper.velocity == frame_wrapped_parser.default_joint_velocity_limit
+    )
+
+
+def test_frame_transform_is_applied_to_a_jointed_child_body(frame_wrapped_world):
+    [door] = [
+        body
+        for body in frame_wrapped_world.kinematic_structure_entities
+        if body.name.name == "door"
+    ]
+
+    root_transform = frame_wrapped_world.compute_forward_kinematics_np(
+        frame_wrapped_world.root, door
+    )
+
+    assert root_transform[:3, 3] == pytest.approx([0.5, 2.0, 3.0])
+    assert root_transform[:3, :3] == pytest.approx(FRAME_ROTATION_ABOUT_Z)
 
 
 def test_primitive_box_geom_resolves_its_material_texture(tmp_path):
@@ -215,3 +374,76 @@ def test_primitive_box_geom_resolves_its_material_texture(tmp_path):
     assert box_shape.texture.file_path == str(texture_file_path)
     assert box_shape.texture.repeat == pytest.approx([3.0, 3.0])
     assert box_shape.texture.uniform is True
+
+
+# %% descriptions in ROS packages
+
+
+def test_a_scene_named_by_a_package_uri_is_read_from_that_package(
+    tmp_path, monkeypatch
+):
+    scene_file_name = "frame_wrapped_scene.xml"
+    package_directory = tmp_path / "scene_package"
+    package_directory.mkdir()
+    shutil.copy(os.path.join(DATASET_DIR, scene_file_name), package_directory)
+    monkeypatch.setenv("ROS_PACKAGE_PATH", str(package_directory))
+
+    from_package = MJCFParser(f"package://scene_package/{scene_file_name}").parse()
+
+    from_file = MJCFParser(os.path.join(DATASET_DIR, scene_file_name)).parse()
+    assert [body.name for body in from_package.kinematic_structure_entities] == [
+        body.name for body in from_file.kinematic_structure_entities
+    ]
+
+
+# %% tendons
+
+
+def test_a_fixed_tendon_couples_the_joints_with_the_coefficients_mujoco_reads():
+    file_path = os.path.join(MJCF_DIR, "mjx_single_cube_no_mesh.xml")
+    model = mujoco.MjModel.from_xml_path(file_path)
+    tendon = model.tendon("finger")
+    first_wrap = model.tendon_adr[tendon.id]
+    wraps = range(first_wrap, first_wrap + model.tendon_num[tendon.id])
+    expected = {
+        model.joint(model.wrap_objid[wrap]).name: float(model.wrap_prm[wrap])
+        for wrap in wraps
+    }
+
+    world = MJCFParser(file_path).parse()
+
+    (parsed,) = [
+        simulator_property
+        for simulator_property in world.simulator_additional_properties
+        if isinstance(simulator_property, MujocoTendon)
+        and simulator_property.name == "finger"
+    ]
+    assert parsed.joints == expected
+
+
+class SceneCompiled(Exception):
+    """
+    Raised in place of compiling a MuJoCo scene, to show that it was compiled.
+    """
+
+
+def refuse_to_compile(spec: mujoco.MjSpec) -> None:
+    """
+    :raises SceneCompiled: Always.
+    """
+    raise SceneCompiled()
+
+
+def test_parsing_a_scene_without_tendons_does_not_compile_it(monkeypatch):
+    """
+    Compiling a scene loads every mesh and texture it refers to, which only reading a
+    tendon needs.
+    """
+    file_path = os.path.join(MJCF_DIR, "table.xml")
+    root_name = mujoco.MjSpec.from_file(file_path).worldbody.name
+    monkeypatch.setattr(mujoco.MjSpec, "to_xml", refuse_to_compile)
+    monkeypatch.setattr(mujoco.MjSpec, "compile", refuse_to_compile)
+
+    world = MJCFParser(file_path).parse()
+
+    assert world.root.name.name == root_name

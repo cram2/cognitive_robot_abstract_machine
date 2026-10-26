@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
+from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from krrood.adapters import json_serializer
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from random_events.product_algebra import Event, SimpleEvent
@@ -43,6 +44,12 @@ from probabilistic_model.probabilistic_circuit.tensorized.layer_with_depth impor
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.node_component_supports import (
+    NodeComponentSupports,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.stacked_copies import (
+    StackedLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
     QueryCache,
     memoized,
@@ -54,13 +61,13 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 )
 
 
-class Layer(SubclassJSONSerializer, ABC):
+class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
 
-    A layer groups nodes that have the same scope and stores their parameters in
-    arrays, so that every query is evaluated for all nodes of the layer at once.
-    Variables are referred to by their index in the variables of the circuit.
+    A layer groups nodes that have the same scope and stores their parameters in arrays,
+    so that every query is evaluated for all nodes of the layer at once. Variables are
+    referred to by their index in the variables of the circuit.
     """
 
     # %% structure
@@ -134,9 +141,9 @@ class Layer(SubclassJSONSerializer, ABC):
         Append the layers of the circuit rooted here to ``result``, every layer after
         all of its descendants and each exactly once.
 
-        Reversed, this order has every layer after all of its parents, which a
-        breadth-first or a pre-order traversal does not guarantee for a layer that
-        several parents share.
+        Reversed, this order has every layer after all of its parents, which a breadth-
+        first or a pre-order traversal does not guarantee for a layer that several
+        parents share.
 
         :param result: The list to append to.
         :param visited: The ids of the layers already visited.
@@ -160,6 +167,35 @@ class Layer(SubclassJSONSerializer, ABC):
         return result
 
     # %% queries
+
+    @property
+    def log_normalization_constants(self) -> NodeValues:
+        """
+        :return: Zero for every node, shape (#nodes,), since a layer without weights
+            has nothing to normalize. A layer that mixes answers what each node's
+            weights sum to.
+        """
+        return np.zeros(self.number_of_nodes)
+
+    def nodes_with_components(self) -> NodeMask:
+        """
+        :return: One flag per node of this layer, all unset, since a layer that does
+            not mix has no node that mixes. A layer that mixes sets the flag of every
+            node that does.
+        """
+        return np.zeros(self.number_of_nodes, dtype=bool)
+
+    def component_supports(
+        self, variables: SortedSet, cache: Optional[QueryCache] = None
+    ) -> List[NodeComponentSupports]:
+        """
+        :param variables: The variables of the circuit.
+        :param cache: The shared cache of the current pass.
+        :return: No components for any node of this layer, since a layer that does not
+            mix has none to describe. A layer that mixes answers what every component of
+            every node models.
+        """
+        return [NodeComponentSupports(node, []) for node in range(self.number_of_nodes)]
 
     @abstractmethod
     def log_likelihood_of_nodes(
@@ -322,8 +358,8 @@ class Layer(SubclassJSONSerializer, ABC):
         :meth:`prune` pass.
 
         :param event: The simple event to truncate to.
-        :param query: The arguments of the truncation, which records the
-            log-probabilities of the new layers.
+        :param query: The arguments of the truncation, which records the log-
+            probabilities of the new layers.
         :param cache: The shared cache of the current query.
         :return: The truncated layer and the log-probabilities of its nodes.
         """
@@ -383,8 +419,8 @@ class Layer(SubclassJSONSerializer, ABC):
         See :meth:`log_truncated_of_simple_event` for the contract of the result.
 
         :param point: The partial point.
-        :param query: The arguments of the conditioning, which records the
-            log-probabilities of the new layers.
+        :param query: The arguments of the conditioning, which records the log-
+            probabilities of the new layers.
         :param cache: The shared cache of the current query.
         :return: The conditioned layer and the log-probabilities of its nodes.
         """
@@ -422,8 +458,8 @@ class Layer(SubclassJSONSerializer, ABC):
         """
         Remove every impossible and every unreachable node of the circuit rooted here.
 
-        The pass first propagates liveness downwards, parents before children, so that
-        a layer shared by several parents is pruned once against the union of what its
+        The pass first propagates liveness downwards, parents before children, so that a
+        layer shared by several parents is pruned once against the union of what its
         parents need, and then rebuilds the layers bottom-up.
 
         :param log_probabilities: The log-probabilities of the structural query that
@@ -533,8 +569,51 @@ class Layer(SubclassJSONSerializer, ABC):
         Scale the parameters of this layer alone in-place.
         """
 
+    # %% structure
+
     @abstractmethod
-    def __deepcopy__(self, memo=None) -> Layer:
+    def nodes_with_child_in(self, nodes_of_layers: Dict[int, NodeMask]) -> NodeMask:
+        """
+        :param nodes_of_layers: Nodes of the layers below this layer, by the id of the
+            layer. Every child layer must be a key.
+        :return: The nodes of this layer that have one of these nodes as a child.
+        """
+        raise NotImplementedError
+
+    def products_over(self, variables: VariableIndices) -> NodeMask:
+        """
+        :param variables: Indices of variables.
+        :return: The product nodes of this layer that model all of the variables.
+        """
+        return np.zeros(self.number_of_nodes, dtype=bool)
+
+    def mixture_components(self) -> List[Tuple[Layer, int]]:
+        """
+        :return: The child layer and node of every component this layer mixes, if it
+            is a single sum node, otherwise nothing.
+        """
+        return []
+
+    def reset_variables(self):
+        """
+        Drop the cached scope of this layer so that it is recomputed on the next access.
+
+        A layer that caches no scope has nothing to drop.
+        """
+
+    @classmethod
+    @abstractmethod
+    def stacked(
+        cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
+    ) -> StackedLayer:
+        """
+        Join the copies of this layer from aligned copies of a layer graph into one
+        layer.
+
+        :param copies: The copies of this layer, one per copy of the graph.
+        :param stacked_child_layers: The stacked copies of every child layer.
+        :return: The copies as one layer.
+        """
         raise NotImplementedError
 
     def __repr__(self):
@@ -602,9 +681,6 @@ class InnerLayer(Layer, ABC):
     """
 
     def reset_variables(self):
-        """
-        Drop the cached scope of this layer so that it is recomputed on the next access.
-        """
         self._variables_cache = None
 
     @memoized
@@ -614,6 +690,38 @@ class InnerLayer(Layer, ABC):
         for child_layer in self.child_layers:
             child_layer.remap_variables(remap, cache=cache)
         self.reset_variables()
+
+    @classmethod
+    def stacked(
+        cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
+    ) -> StackedLayer:
+        return StackedLayer.of_inner_layer_copies(copies, stacked_child_layers)
+
+    def has_equal_edges(self, other: Self) -> bool:
+        """
+        :param other: A layer of the same type and shape.
+        :return: Whether both layers have the same edges, with the same weights.
+        """
+        own, others = self.inner_layer_edges, other.inner_layer_edges
+        return (
+            np.array_equal(own.nodes, others.nodes)
+            and np.array_equal(own.child_layer_indices, others.child_layer_indices)
+            and np.array_equal(own.child_nodes, others.child_nodes)
+        )
+
+    @abstractmethod
+    def with_edges(
+        self, child_layers: list[Layer], edges: InnerLayerEdges, copies: list[Self]
+    ) -> Self:
+        """
+        :param child_layers: The child layers of the new layer.
+        :param edges: The edges of the new layer, those of every copy as one block in
+            the order of ``copies``.
+        :param copies: The layers whose edges are joined, this one among them, which
+            give the weights of the edges.
+        :return: A layer of this type with these edges and one block of nodes per copy.
+        """
+        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -629,3 +737,62 @@ class InnerLayer(Layer, ABC):
         :return: Yields every edge of :attr:`inner_layer_edges` one by one.
         """
         return iter(self.inner_layer_edges)
+
+    def nodes_with_child_in(self, nodes_of_layers: Dict[int, NodeMask]) -> NodeMask:
+        edges = self.inner_layer_edges
+        child_in = np.zeros(len(edges.nodes), dtype=bool)
+        for child_layer_index, child_layer in enumerate(self.child_layers):
+            into_child_layer = edges.child_layer_indices == child_layer_index
+            child_in[into_child_layer] = nodes_of_layers[id(child_layer)][
+                edges.child_nodes[into_child_layer]
+            ]
+        result = np.zeros(self.number_of_nodes, dtype=bool)
+        result[edges.nodes[child_in]] = True
+        return result
+
+
+@dataclass(eq=False, repr=False)
+class LeafLayer(Layer, ABC):
+    """
+    Abstract base class for the layers without child layers, which hold the input
+    distributions of a layered circuit.
+    """
+
+    @property
+    def child_layers(self) -> list[Layer]:
+        """
+        :return: An empty list. A leaf layer has no child layers.
+        """
+        return []
+
+    @classmethod
+    def stacked(
+        cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
+    ) -> StackedLayer:
+        return StackedLayer.of_leaf_layer_copies(copies)
+
+    def nodes_with_child_in(self, nodes_of_layers: Dict[int, NodeMask]) -> NodeMask:
+        return np.zeros(self.number_of_nodes, dtype=bool)
+
+    @classmethod
+    @abstractmethod
+    def concatenate(cls, layers: list[Self]) -> Self:
+        """
+        Join layers of this type over the same variables into one layer, the nodes of
+        ``layers[k]`` as one contiguous block.
+
+        Only layers that were truncated from the same layer are concatenated, which is
+        why the parameters that all nodes share may be taken from the first one.
+
+        :param layers: The layers to join.
+        :return: The joined layer.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def has_equal_parameters(self, other: Self) -> bool:
+        """
+        :param other: A layer that :meth:`concatenate` may join with this one.
+        :return: Whether every node of both layers has the same parameters.
+        """
+        raise NotImplementedError

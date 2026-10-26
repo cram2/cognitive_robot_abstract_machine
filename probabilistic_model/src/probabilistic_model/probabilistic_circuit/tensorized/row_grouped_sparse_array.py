@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 from scipy.sparse import coo_array
-from typing_extensions import List, Self, Tuple
+from typing_extensions import Any, List, Self, Tuple
 
 
 @dataclass
@@ -198,5 +198,5 @@ class RowGroupedSparseArray:
         """
         return self.__class__(self.array.copy())
 
-    def __deepcopy__(self, memo=None) -> Self:
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         return self.copy()

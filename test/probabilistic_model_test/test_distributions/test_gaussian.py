@@ -1,7 +1,11 @@
-import unittest
+from __future__ import annotations
 
 import numpy as np
+import plotly.graph_objects as go
+import pytest
 from scipy.stats import truncnorm
+from random_events.interval import Bound, SimpleInterval, closed, reals, singleton
+from random_events.product_algebra import SimpleEvent, VariableMap
 
 from krrood.adapters.json_serializer import from_json, to_json
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
@@ -9,464 +13,280 @@ from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
     TruncatedGaussianDistribution,
 )
-from random_events.interval import closed, reals, singleton, SimpleInterval, Bound
-from random_events.product_algebra import SimpleEvent, VariableMap
-import plotly.graph_objects as go
 
-from random_events.variable import Continuous
+# %% fixtures
 
 
-class GaussianDistributionTestCase(unittest.TestCase):
-    x = Continuous("x")
-    distribution: GaussianDistribution = GaussianDistribution(
-        location=2, scale=2, variable=x
+@pytest.fixture
+def gaussian(x) -> GaussianDistribution:
+    """
+    A Gaussian with location two and scale two.
+    """
+    return GaussianDistribution(variable=x, location=2, scale=2)
+
+
+@pytest.fixture
+def truncated_gaussian(x) -> TruncatedGaussianDistribution:
+    """
+    A Gaussian with location two and scale two, truncated to [-2, 2].
+    """
+    return TruncatedGaussianDistribution(
+        variable=x,
+        interval=SimpleInterval.from_data(-2, 2, Bound.CLOSED, Bound.CLOSED),
+        location=2,
+        scale=2.0,
     )
 
-    def test_domain(self):
-        self.assertEqual(self.distribution.univariate_support, reals())
 
-    def test_probability_of_domain(self):
-        self.assertEqual(self.distribution.probability(self.distribution.support), 1)
-
-    def test_mode(self):
-        mode, likelihood = self.distribution.univariate_log_mode()
-        self.assertEqual(mode, singleton(2))
-
-    def test_sample(self):
-        samples = self.distribution.sample(100)
-        self.assertEqual(len(samples), 100)
-        likelihoods = self.distribution.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
-
-    def test_conditional_simple_intersection(self):
-        event = SimpleEvent.from_data(
-            {self.distribution.variable: closed(1, 2)}
-        ).as_composite_set()
-        conditional, probability = self.distribution.truncated(event)
-        self.assertIsInstance(conditional, TruncatedGaussianDistribution)
-        cdf = self.distribution.cumulative_distribution_function(
-            np.array([1, 2]).reshape(-1, 1)
-        )
-        self.assertAlmostEqual(probability, cdf[1] - cdf[0])
-        self.assertEqual(conditional.lower, 1)
-        self.assertEqual(conditional.upper, 2)
-
-    def test_raw_moment(self):
-        self.assertEqual(self.distribution.raw_moment(0), 1)
-        self.assertEqual(self.distribution.raw_moment(1), self.distribution.location)
-        self.assertEqual(
-            self.distribution.raw_moment(2),
-            self.distribution.location**2 + self.distribution.scale**2,
-        )
-
-    def test_centered_moment(self):
-        expectation = self.distribution.moment(
-            VariableMap({self.distribution.variable: 1}),
-            VariableMap({self.distribution.variable: 0}),
-        )
-        self.assertEqual(expectation[self.distribution.variable], 2)
-        variance = self.distribution.moment(
-            VariableMap({self.distribution.variable: 2}), expectation
-        )
-        self.assertEqual(variance[self.distribution.variable], 4)
-
-        third_order_moment = self.distribution.moment(
-            VariableMap({self.distribution.variable: 3}), expectation
-        )
-        self.assertEqual(third_order_moment[self.distribution.variable], 0)
-
-        fourth_order_moment = self.distribution.moment(
-            VariableMap({self.distribution.variable: 4}), expectation
-        )
-        self.assertEqual(fourth_order_moment[self.distribution.variable], 48)
-
-    def test_moment_with_different_center_than_expectation(self):
-        center = VariableMap({self.distribution.variable: 2.5})
-
-        expectation = self.distribution.moment(
-            VariableMap({self.distribution.variable: 1}), center
-        )
-        self.assertEqual(expectation[self.distribution.variable], -0.5)
-        variance = self.distribution.moment(
-            VariableMap({self.distribution.variable: 2}), center
-        )
-        self.assertEqual(variance[self.distribution.variable], 4.25)
-
-        third_order_moment = self.distribution.moment(
-            VariableMap({self.distribution.variable: 3}), center
-        )
-        self.assertEqual(third_order_moment[self.distribution.variable], -6.125)
-
-    def test_likelihood_shape(self):
-        samples = self.distribution.sample(100)
-        self.assertEqual(samples.shape, (100, 1))
-        likelihoods = self.distribution.log_likelihood(samples)
-        self.assertEqual(likelihoods.shape, (100,))
-
-    def test_plot(self):
-        fig = go.Figure(self.distribution.plot())
-        self.assertIsNotNone(fig)
-        # fig.show()
-
-    def test_serialization(self):
-        serialized = to_json(self.distribution)
-        deserialized = from_json(serialized)
-        self.assertEqual(self.distribution, deserialized)
-        self.assertIsInstance(deserialized, GaussianDistribution)
-
-    def test_variance(self):
-        variance = self.distribution.variance([self.x])
-        self.assertEqual(
-            variance[self.distribution.variable], self.distribution.scale**2
-        )
+@pytest.fixture
+def standard_gaussian(x) -> GaussianDistribution:
+    """
+    The standard normal distribution.
+    """
+    return GaussianDistribution(variable=x, location=0, scale=1)
 
 
-class TruncatedGaussianDistributionTestCase(unittest.TestCase):
-    x: Continuous = Continuous("x")
-    distribution: TruncatedGaussianDistribution
-
-    def setUp(self):
-        self.distribution = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(-2, 2, Bound.CLOSED, Bound.CLOSED),
-            location=2,
-            scale=2.0,
-        )
-
-    def test_init(self):
-        self.assertEqual(self.distribution.location, 2.0)
-
-    def test_cdf(self):
-        cdf = self.distribution.cumulative_distribution_function(
-            np.array([0, 3, -3]).reshape(-1, 1)
-        )
-        self.assertAlmostEqual(cdf[0], 0.285, places=3)
-        self.assertEqual(cdf[1], 1)
-        self.assertEqual(cdf[2], 0)
-
-    def test_mode(self):
-        mode, likelihood = self.distribution.univariate_log_mode()
-        self.assertEqual(mode, singleton(2))
-        self.assertEqual(
-            likelihood,
-            self.distribution.log_likelihood_without_bounds_check(np.array([[2]])),
-        )
-
-    def test_raw_moment(self):
-        expectation = self.distribution.moment(
-            VariableMap({self.x: 1}), VariableMap({self.x: 0})
-        )
-        self.assertAlmostEqual(expectation[self.x], 0.5544205, places=7)
-
-    def test_centered_moment(self):
-        gauss_distribution: GaussianDistribution = GaussianDistribution(
-            variable=self.x, location=0, scale=1
-        )
-        untruncated_distribution = GaussianDistribution(
-            variable=self.x,
-            location=self.distribution.location,
-            scale=self.distribution.scale,
-        )
-        normalizing_constant = untruncated_distribution.probability(
-            self.distribution.support
-        )
-        beta = (
-            self.distribution.upper - self.distribution.location
-        ) / self.distribution.scale
-        alpha = (
-            self.distribution.lower - self.distribution.location
-        ) / self.distribution.scale
-        center = VariableMap({self.x: self.distribution.location})
-        expectation = self.distribution.moment(VariableMap({self.x: 1}), center)
-        likelihood_alpha, likelihood_beta = gauss_distribution.likelihood(
-            np.array([[alpha], [beta]])
-        )
-        offset_term = (
-            -self.distribution.scale
-            * (likelihood_beta - likelihood_alpha)
-            / normalizing_constant
-        )
-        self.assertAlmostEqual(
-            expectation[self.distribution.variable], 0 + offset_term, places=7
-        )
-
-    def test_moment_with_different_center_than_expectation(self):
-        center = VariableMap({self.distribution.variable: 2.5})
-        expectation = self.distribution.moment(
-            VariableMap({self.distribution.variable: 1}),
-            VariableMap({self.distribution.variable: 0}),
-        )
-        first_moment = self.distribution.moment(
-            VariableMap({self.distribution.variable: 1}), center
-        )
-        self.assertAlmostEqual(
-            first_moment[self.distribution.variable],
-            expectation[self.distribution.variable]
-            - center[self.distribution.variable],
-            places=7,
-        )
-        second_moment = self.distribution.moment(
-            VariableMap({self.distribution.variable: 2}), center
-        )
-        second_raw_moment = self.distribution.moment(
-            VariableMap({self.distribution.variable: 2}),
-            VariableMap({self.distribution.variable: 0}),
-        )
-        self.assertAlmostEqual(
-            second_moment[self.distribution.variable],
-            second_raw_moment[self.distribution.variable]
-            + center[self.distribution.variable] ** 2
-            - 2
-            * center[self.distribution.variable]
-            * expectation[self.distribution.variable],
-            places=7,
-        )
-
-    def test_conditional_simple_intersection(self):
-        event = SimpleEvent.from_data({self.x: closed(1, 2)}).as_composite_set()
-        conditional, probability = self.distribution.truncated(event)
-        self.assertIsInstance(conditional, TruncatedGaussianDistribution)
-        cdf = self.distribution.cumulative_distribution_function(
-            np.array([1, 2]).reshape(-1, 1)
-        )
-        self.assertEqual(probability, cdf[1] - cdf[0])
-        self.assertEqual(conditional.lower, 1)
-        self.assertEqual(conditional.upper, 2)
-
-    def test_conditional_on_an_interval_reaching_beyond_the_support(self):
-        event = SimpleEvent.from_data({self.x: closed(-5, 1)}).as_composite_set()
-        conditional, probability = self.distribution.truncated(event)
-        self.assertEqual(conditional.interval, closed(-2, 1).simple_sets[0])
-        points = np.linspace(-2, 1, 7).reshape(-1, 1)
-        np.testing.assert_allclose(
-            conditional.likelihood(points),
-            self.distribution.likelihood(points) / probability,
-        )
-
-    def test_conditional_on_mode(self):
-        mode, _ = self.distribution.mode()
-        conditional, probability = self.distribution.truncated(mode)
-        self.assertIsNone(conditional)
-
-        point_value = (
-            mode.simple_sets[0][self.distribution.variable].simple_sets[0].lower
-        )
-        conditional, probability = self.distribution.log_conditional(
-            {self.distribution.variable: point_value}
-        )
-        self.assertIsInstance(conditional, DiracDeltaDistribution)
-        self.assertTrue(probability > -np.inf)
-
-    def test_copy(self):
-        copy = self.distribution.__copy__()
-        self.assertEqual(self.distribution, copy)
-        copy.interval = copy.interval.intersection_with(
-            SimpleInterval.from_data(-1, 1, Bound.CLOSED, Bound.CLOSED)
-        )
-        self.assertNotEqual(self.distribution, copy)
-
-    def test_sample(self):
-        samples = self.distribution.sample(100)
-        self.assertEqual(samples.shape, (100, 1))
-        likelihoods = self.distribution.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
-
-    def test_plot(self):
-        fig = go.Figure(data=self.distribution.plot())
-        self.assertIsNotNone(fig)
-        # fig.show()
-
-    def test_serialization(self):
-        serialized = to_json(self.distribution)
-        deserialized = from_json(serialized)
-        self.assertEqual(self.distribution, deserialized)
-        self.assertIsInstance(deserialized, GaussianDistribution)
+# %% every Gaussian
 
 
-class TruncatedGaussianDistributionJapaneseManTestCase(unittest.TestCase):
-    distribution = GaussianDistribution(variable=Continuous("x"), location=0, scale=1)
-    example_2: TruncatedGaussianDistribution
-    example_3: TruncatedGaussianDistribution
-
-    @classmethod
-    def setUpClass(cls):
-        cls.example_2, _ = cls.distribution.truncated(
-            SimpleEvent.from_data(
-                {cls.distribution.variable: closed(0.5, np.inf)}
-            ).as_composite_set()
-        )
-
-        cls.example_3, _ = cls.distribution.truncated(
-            SimpleEvent.from_data(
-                {cls.distribution.variable: closed(-1, 1)}
-            ).as_composite_set()
-        )
-
-    def test_raw_expectation_example_2(self):
-        center = VariableMap({self.distribution.variable: 0})
-        order = VariableMap({self.distribution.variable: 1})
-        result = self.example_2.moment(order, center)
-        expectation = result[self.distribution.variable]
-        self.assertAlmostEqual(expectation, 1.14, delta=0.01)
-
-    def test_raw_expectation_example_3(self):
-        center = VariableMap({self.distribution.variable: 0})
-        order = VariableMap({self.distribution.variable: 1})
-        result = self.example_3.moment(order, center)
-        expectation = result[self.distribution.variable]
-        self.assertAlmostEqual(expectation, 0, delta=0.01)
-
-    def test_raw_second_moment_example_2(self):
-        center = VariableMap({self.distribution.variable: 0})
-        order = VariableMap({self.distribution.variable: 2})
-        result = self.example_2.moment(order, center)
-        raw_moment = result[self.distribution.variable]
-        self.assertAlmostEqual(raw_moment, 1.57, delta=0.01)
-
-    def test_raw_second_moment_example_3(self):
-        center = VariableMap({self.distribution.variable: 0})
-        order = VariableMap({self.distribution.variable: 2})
-        result = self.example_3.moment(order, center)
-        raw_moment = result[self.distribution.variable]
-        self.assertAlmostEqual(raw_moment, 0.291, delta=0.01)
-
-    def test_raw_third_moment_example_2(self):
-        center = VariableMap({self.distribution.variable: 0})
-        order = VariableMap({self.distribution.variable: 3})
-        result = self.example_2.moment(order, center)
-        raw_moment = result[self.distribution.variable]
-        self.assertAlmostEqual(raw_moment, 2.57, delta=0.01)
-
-    def test_raw_third_moment_example_3(self):
-        center = VariableMap({self.distribution.variable: 0})
-        order = VariableMap({self.distribution.variable: 3})
-        result = self.example_3.moment(order, center)
-        raw_moment = result[self.distribution.variable]
-        self.assertAlmostEqual(raw_moment, 0, delta=0.01)
+@pytest.mark.parametrize("distribution_fixture", ["gaussian", "truncated_gaussian"])
+def test_samples_lie_in_the_support(distribution_fixture, request):
+    distribution = request.getfixturevalue(distribution_fixture)
+    samples = distribution.sample(100)
+    assert samples.shape == (100, 1)
+    likelihoods = distribution.likelihood(samples)
+    assert likelihoods.shape == (100,)
+    assert np.all(likelihoods > 0)
 
 
-class TruncatedGaussianFarTailMomentTestCase(unittest.TestCase):
-    x = Continuous("x")
+@pytest.mark.parametrize("distribution_fixture", ["gaussian", "truncated_gaussian"])
+def test_serialization_round_trip(distribution_fixture, request):
+    distribution = request.getfixturevalue(distribution_fixture)
+    deserialized = from_json(to_json(distribution))
+    assert isinstance(deserialized, type(distribution))
+    assert deserialized == distribution
+
+
+@pytest.mark.parametrize("distribution_fixture", ["gaussian", "truncated_gaussian"])
+def test_plot_builds_a_figure(distribution_fixture, request):
+    distribution = request.getfixturevalue(distribution_fixture)
+    assert len(go.Figure(distribution.plot()).data) > 0
+
+
+@pytest.mark.parametrize("distribution_fixture", ["gaussian", "truncated_gaussian"])
+def test_truncation_to_an_interval_inside_the_support(distribution_fixture, request, x):
+    distribution = request.getfixturevalue(distribution_fixture)
+    event = SimpleEvent.from_data({x: closed(1, 2)}).as_composite_set()
+    truncation = distribution.truncated(event)
+    assert isinstance(truncation.distribution, TruncatedGaussianDistribution)
+    cdf = distribution.cumulative_distribution_function(np.array([[1], [2]]))
+    assert truncation.probability == pytest.approx(cdf[1] - cdf[0])
+    assert truncation.distribution.lower == 1
+    assert truncation.distribution.upper == 2
+
+
+@pytest.mark.parametrize("distribution_fixture", ["gaussian", "truncated_gaussian"])
+def test_mode_is_the_location(distribution_fixture, request):
+    distribution = request.getfixturevalue(distribution_fixture)
+    mode = distribution.univariate_log_mode().assignment
+    assert mode == singleton(distribution.location)
+
+
+# %% Gaussian
+
+
+def test_gaussian_support_is_the_reals(gaussian):
+    assert gaussian.univariate_support == reals()
+    assert gaussian.probability(gaussian.support) == 1
+
+
+def test_gaussian_raw_moments(gaussian):
+    assert gaussian.raw_moment(0) == 1
+    assert gaussian.raw_moment(1) == gaussian.location
+    assert gaussian.raw_moment(2) == gaussian.location**2 + gaussian.scale**2
+
+
+def test_gaussian_expectation_is_the_location(gaussian, x):
+    expectation = gaussian.moment(VariableMap({x: 1}), VariableMap({x: 0}))
+    assert expectation[x] == gaussian.location
+
+
+@pytest.mark.parametrize("order, expected", [(2, 4), (3, 0), (4, 48)])
+def test_gaussian_moment_around_the_expectation(gaussian, x, order, expected):
+    expectation = VariableMap({x: gaussian.location})
+    assert gaussian.moment(VariableMap({x: order}), expectation)[x] == expected
+
+
+@pytest.mark.parametrize("order, expected", [(1, -0.5), (2, 4.25), (3, -6.125)])
+def test_gaussian_moment_around_another_center(gaussian, x, order, expected):
+    center = VariableMap({x: 2.5})
+    assert gaussian.moment(VariableMap({x: order}), center)[x] == expected
+
+
+def test_gaussian_variance(gaussian, x):
+    assert gaussian.variance([x])[x] == gaussian.scale**2
+
+
+def test_gaussian_truncation_to_a_singleton(standard_gaussian, x):
+    event = SimpleEvent.from_data({x: singleton(0)}).as_composite_set()
+
+    conditional = standard_gaussian.truncated(event).distribution
+    assert conditional is None
+
+    truncation = standard_gaussian.truncated(event, singleton_allowed=True)
+    assert isinstance(truncation.distribution, DiracDeltaDistribution)
+    assert truncation.distribution.location == 0.0
+    assert truncation.probability == pytest.approx(
+        np.exp(standard_gaussian.log_likelihood(np.array([[0]]))[0])
+    )
+
+
+# %% truncated Gaussian
+
+
+def test_truncated_cumulative_distribution_function(truncated_gaussian):
+    cdf = truncated_gaussian.cumulative_distribution_function(
+        np.array([[0], [3], [-3]])
+    )
+    assert cdf[0] == pytest.approx(0.285, abs=1e-3)
+    assert cdf[1] == 1
+    assert cdf[2] == 0
+
+
+def test_truncated_mode_likelihood(truncated_gaussian):
+    log_likelihood = truncated_gaussian.univariate_log_mode().log_likelihood
+    assert log_likelihood == truncated_gaussian.log_likelihood_without_bounds_check(
+        np.array([[2]])
+    )
+
+
+def test_truncated_expectation(truncated_gaussian, x):
+    expectation = truncated_gaussian.moment(VariableMap({x: 1}), VariableMap({x: 0}))
+    assert expectation[x] == pytest.approx(0.5544205, abs=1e-7)
+
+
+def test_truncated_first_moment_around_the_location(
+    truncated_gaussian, standard_gaussian, x
+):
+    untruncated = GaussianDistribution(
+        variable=x,
+        location=truncated_gaussian.location,
+        scale=truncated_gaussian.scale,
+    )
+    normalizing_constant = untruncated.probability(truncated_gaussian.support)
+    alpha = (
+        truncated_gaussian.lower - truncated_gaussian.location
+    ) / truncated_gaussian.scale
+    beta = (
+        truncated_gaussian.upper - truncated_gaussian.location
+    ) / truncated_gaussian.scale
+    likelihood_alpha, likelihood_beta = standard_gaussian.likelihood(
+        np.array([[alpha], [beta]])
+    )
+    expected = (
+        -truncated_gaussian.scale
+        * (likelihood_beta - likelihood_alpha)
+        / normalizing_constant
+    )
+
+    center = VariableMap({x: truncated_gaussian.location})
+    moment = truncated_gaussian.moment(VariableMap({x: 1}), center)
+    assert moment[x] == pytest.approx(expected, abs=1e-7)
+
+
+def test_truncated_moments_around_another_center(truncated_gaussian, x):
+    center = VariableMap({x: 2.5})
+    origin = VariableMap({x: 0})
+    expectation = truncated_gaussian.moment(VariableMap({x: 1}), origin)[x]
+    second_raw_moment = truncated_gaussian.moment(VariableMap({x: 2}), origin)[x]
+
+    first_moment = truncated_gaussian.moment(VariableMap({x: 1}), center)[x]
+    assert first_moment == pytest.approx(expectation - center[x], abs=1e-7)
+
+    second_moment = truncated_gaussian.moment(VariableMap({x: 2}), center)[x]
+    assert second_moment == pytest.approx(
+        second_raw_moment + center[x] ** 2 - 2 * center[x] * expectation, abs=1e-7
+    )
+
+
+def test_truncated_truncation_to_an_interval_reaching_beyond_the_support(
+    truncated_gaussian, x
+):
+    event = SimpleEvent.from_data({x: closed(-5, 1)}).as_composite_set()
+    truncation = truncated_gaussian.truncated(event)
+    assert truncation.distribution.interval == closed(-2, 1).simple_sets[0]
+    points = np.linspace(-2, 1, 7).reshape(-1, 1)
+    np.testing.assert_allclose(
+        truncation.distribution.likelihood(points),
+        truncated_gaussian.likelihood(points) / truncation.probability,
+    )
+
+
+def test_truncated_conditioning_on_the_mode(truncated_gaussian, x):
+    mode = truncated_gaussian.mode().event
+    conditional = truncated_gaussian.truncated(mode).distribution
+    assert conditional is None
+
+    location = mode.simple_sets[0][x].simple_sets[0].lower
+    log_conditioning = truncated_gaussian.log_conditional({x: location})
+    assert isinstance(log_conditioning.distribution, DiracDeltaDistribution)
+    assert log_conditioning.log_likelihood > -np.inf
+
+
+@pytest.mark.parametrize(
+    "lower, upper, order, expected",
+    [
+        (0.5, np.inf, 1, 1.14),
+        (0.5, np.inf, 2, 1.57),
+        (0.5, np.inf, 3, 2.57),
+        (-1, 1, 1, 0),
+        (-1, 1, 2, 0.291),
+        (-1, 1, 3, 0),
+    ],
+)
+def test_truncated_standard_gaussian_raw_moments(
+    standard_gaussian, x, lower, upper, order, expected
+):
+    truncated = standard_gaussian.truncated(
+        SimpleEvent.from_data({x: closed(lower, upper)}).as_composite_set()
+    ).distribution
+    raw_moment = truncated.moment(VariableMap({x: order}), VariableMap({x: 0}))[x]
+    assert raw_moment == pytest.approx(expected, abs=0.01)
+
+
+def test_truncated_variance_is_precise_far_in_the_tail(x):
+    distribution = TruncatedGaussianDistribution(
+        variable=x, interval=SimpleInterval.from_data(5, 6), location=0, scale=1
+    )
+    # a standard normal, so the interval already is in scipy's standardized units
+    lower, upper = distribution.lower, distribution.upper
+    variance = distribution.moment(
+        VariableMap({x: 2}), VariableMap({x: truncnorm.mean(lower, upper)})
+    )[x]
+    expected_variance = truncnorm.var(lower, upper)
+    # far in the tail the variance is small compared to the squared mean, so this
+    # tolerance fails any computation that cancels large raw moments
+    assert variance == pytest.approx(expected_variance, abs=1e-10 * expected_variance)
+
+
+@pytest.mark.parametrize(
+    "lower, upper, scale",
+    [
+        (-1, np.inf, 1.0),
+        (1, np.inf, 1.0),
+        (-np.inf, -1, 1.0),
+        (-0.62, 0.0, 0.5),
+        (11, np.inf, 1.0),
+    ],
+)
+def test_truncated_samples_average_to_the_expectation(x, lower, upper, scale):
     distribution = TruncatedGaussianDistribution(
         variable=x,
-        interval=SimpleInterval.from_data(5, 6),
+        interval=SimpleInterval.from_data(lower, upper),
         location=0,
-        scale=1,
+        scale=scale,
     )
-
-    def test_variance_is_precise_far_in_the_tail(self):
-        # a standard normal, so the interval already is in scipy's standardized units
-        lower, upper = self.distribution.lower, self.distribution.upper
-        mean = truncnorm.mean(lower, upper)
-        variance = self.distribution.moment(
-            VariableMap({self.x: 2}), VariableMap({self.x: mean})
-        )[self.x]
-        expected_variance = truncnorm.var(lower, upper)
-        # far in the tail the variance is small compared to the squared mean, so
-        # this tolerance fails any computation that cancels large raw moments
-        self.assertAlmostEqual(
-            variance, expected_variance, delta=1e-10 * expected_variance
-        )
-
-
-class TruncatedGaussianSamplingTestCase(unittest.TestCase):
-    x = Continuous("x")
-
-    @classmethod
-    def setUpClass(cls):
-        np.random.seed(69)
-
-    def test_sampling_with_infinite_bounds_smaller_0(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(-1, float("inf")),
-            location=0,
-            scale=1,
-        )
-        samples = model.sample(1000)
-
-        self.assertEqual(len(samples), 1000)
-        likelihoods = model.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
-        self.assertAlmostEqual(
-            model.expectation(model.variables)[model.variable],
-            np.array(samples).mean(),
-            delta=0.1,
-        )
-
-    def test_sampling_with_infinite_bounds_greater_0(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(1, float("inf")),
-            location=0,
-            scale=1,
-        )
-        samples = model.sample(1000)
-        likelihoods = model.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
-        self.assertAlmostEqual(
-            model.expectation(model.variables)[model.variable],
-            np.array(samples).mean(),
-            delta=0.1,
-        )
-
-    def test_sampling_with_infinite_bounds_and_flipping(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(-float("inf"), -1),
-            location=0,
-            scale=1,
-        )
-        samples = model.sample(1000)
-        likelihoods = model.likelihood(samples)
-        self.assertTrue(all(likelihoods > 0))
-        self.assertAlmostEqual(
-            model.expectation(model.variables)[model.variable],
-            np.array(samples).mean(),
-            delta=0.1,
-        )
-
-    def test_with_zero_in_bound(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(-0.62, 0.0),
-            location=0.0,
-            scale=0.5,
-        )
-        samples = model.sample(1000)
-        self.assertEqual(len(samples), 1000)
-        mean = samples.mean()
-        expectation = model.expectation(model.variables)[model.variable]
-        self.assertAlmostEqual(mean, expectation, delta=0.1)
-
-    def test_with_far_right_interval(self):
-        model = TruncatedGaussianDistribution(
-            variable=self.x,
-            interval=SimpleInterval.from_data(11, np.inf),
-            location=0,
-            scale=1,
-        )
-        samples = model.sample(1000)
-        self.assertEqual(len(samples), 1000)
-
-    def test_gaussian_distribution_singleton(self):
-        x = Continuous("x")
-        dist = GaussianDistribution(variable=x, location=0, scale=1)
-
-        event = SimpleEvent.from_data({x: singleton(0)}).as_composite_set()
-
-        # singleton_allowed=False
-        conditional, probability = dist.truncated(event)
-        self.assertIsNone(conditional)
-
-        # singleton_allowed=True
-        conditional, probability = dist.truncated(event, singleton_allowed=True)
-        self.assertIsInstance(conditional, DiracDeltaDistribution)
-        self.assertEqual(conditional.location, 0.0)
-        self.assertAlmostEqual(
-            probability, np.exp(dist.log_likelihood(np.array([[0]]))[0])
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()
+    samples = distribution.sample(1000)
+    assert samples.shape == (1000, 1)
+    assert np.all(distribution.likelihood(samples) > 0)
+    assert samples.mean() == pytest.approx(distribution.expectation([x])[x], abs=0.1)

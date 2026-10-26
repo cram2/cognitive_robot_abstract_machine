@@ -307,13 +307,13 @@ class PerceptionInterface(ABC):
             one; None when nothing is executing the plan.
         :param ros_node: Node a real source reaches its perception pipeline through.
         :return: The source to answer queries with.
-        :raises UnknownExecutionType: If the execution type has no source.
+        :raises UnknownExecutionType: If nothing is executing the plan.
         """
-        if execution_type in (ExecutionType.SIMULATED, ExecutionType.NO_EXECUTION):
-            return WorldPerception()
+        if execution_type is None:
+            raise UnknownExecutionType(execution_type)
         if execution_type == ExecutionType.REAL:
             return RoboKudoPerception(ros_node=ros_node)
-        raise UnknownExecutionType(execution_type)
+        return WorldPerception()
 
 
 @dataclass

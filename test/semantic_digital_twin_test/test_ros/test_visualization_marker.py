@@ -143,13 +143,16 @@ def test_visualization_marker_tracy(rclpy_node, tracy_world, ros_publishers):
     else:
         assert False, "Callback timed out"
 
-    # table has no texture, so white should be used
+    # table has no texture, so the color its URDF material gives it should be used
+    table = tracy_world.get_body_by_name("table")
+    table_color = table.visual.shapes[0].color
+    assert table_color != Color()
     for marker in callback.last_msg.markers:
-        if marker.ns == str(tracy_world.get_body_by_name("table").name):
-            assert marker.color.r == 1.0
-            assert marker.color.g == 1.0
-            assert marker.color.b == 1.0
-            assert marker.color.a == 1.0
+        if marker.ns == str(table.name):
+            assert marker.color.r == pytest.approx(table_color.R)
+            assert marker.color.g == pytest.approx(table_color.G)
+            assert marker.color.b == pytest.approx(table_color.B)
+            assert marker.color.a == pytest.approx(table_color.A)
             break
     else:
         assert False, "Marker not found"

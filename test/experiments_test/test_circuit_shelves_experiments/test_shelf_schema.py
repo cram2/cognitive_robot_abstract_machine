@@ -86,7 +86,7 @@ def _make_layer(relative_height: float = 0.0) -> RelationalCircuitExperimentShel
             RelationalCircuitExperimentObject2D(
                 object_type=ObjectType.BOOK,
                 scale=Scale(x=0.05, y=0.1, z=0.2),
-                pose=Pose2D(x=0.0, y=0.0, yaw=0.0),
+                pose=Pose2D.from_xy_yaw(x=0.0, y=0.0, yaw=0.0),
                 source_id="chair_src",
             )
         ],
@@ -301,7 +301,7 @@ def test_slabs_are_evenly_spaced_whatever_heights_were_drawn() -> None:
 def test_each_slab_is_placed_at_its_own_layers_height_rank() -> None:
     """
     ``_layer_heights`` computes the evenly-spaced grid by walking ``layers`` sorted by
-    ``relative_height``, but a shelf's ``layers`` are drawn from an exchangeable RSPN
+    ``relative_height``, but a shelf's ``layers`` are drawn from an exchangeable relational circuit
     template and come back in no particular order.
 
     A slab must land at the height rank of the layer it was built for, not at whichever

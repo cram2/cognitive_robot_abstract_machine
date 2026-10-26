@@ -17,7 +17,7 @@ from krrood.parametrization.feature_extraction.aggregations import (
 )
 
 
-@dataclass
+@dataclass(eq=False)
 class RelationalCircuitExperimentShelfLayerAggregations(
     AggregationStatistic[RelationalCircuitExperimentShelfLayer]
 ):
@@ -25,7 +25,7 @@ class RelationalCircuitExperimentShelfLayerAggregations(
     Aggregation statistics over the objects on an RelationalCircuitExperimentShelfLayer.
     """
 
-    @aggregation_statistic("objects")
+    @aggregation_statistic(variable(RelationalCircuitExperimentShelfLayer).objects)
     def total_count(self) -> int:
         """
         Number of objects placed on the shelf layer.
@@ -36,12 +36,12 @@ class RelationalCircuitExperimentShelfLayerAggregations(
             objects merely end up independent.
         """
         [object_count] = count(
-            variable(RelationalCircuitExperimentObject2D, self.instance.objects)
+            variable(RelationalCircuitExperimentObject2D, self.objects)
         ).tolist()
         return object_count
 
 
-@dataclass
+@dataclass(eq=False)
 class RelationalCircuitExperimentShelfAggregations(
     AggregationStatistic[RelationalCircuitExperimentShelf]
 ):
@@ -53,12 +53,12 @@ class RelationalCircuitExperimentShelfAggregations(
     that models the shelf's own dimensions but nothing about what it holds.
     """
 
-    @aggregation_statistic("layers")
+    @aggregation_statistic(variable(RelationalCircuitExperimentShelf).layers)
     def layer_count(self) -> int:
         """
         Number of layers the shelf has.
         """
         [count_of_layers] = count(
-            variable(RelationalCircuitExperimentShelfLayer, self.instance.layers)
+            variable(RelationalCircuitExperimentShelfLayer, self.layers)
         ).tolist()
         return count_of_layers

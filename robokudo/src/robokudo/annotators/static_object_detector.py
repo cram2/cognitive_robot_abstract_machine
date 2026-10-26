@@ -30,7 +30,7 @@ from robokudo.types.annotation import (
     Classification,
     PoseAnnotation,
 )
-from robokudo.types.cv import ImageROI
+from robokudo.types.cv import ImageROI, Point2D, Rect
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.types.tf import Pose
 from robokudo.utils.annotator_helper import (
@@ -39,7 +39,6 @@ from robokudo.utils.annotator_helper import (
 )
 from robokudo.utils.cv_helper import (
     clamp_bounding_rect,
-    get_scale_coordinates,
     get_scaled_color_image_for_depth_image,
     rect_outside_image,
 )
@@ -517,23 +516,28 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
     def get_cloud_from_2d_bb_roi(
         self, color_rgb: npt.NDArray
     ) -> o3d.geometry.PointCloud:
+        """
+        Build the point cloud of the depth measurements inside the configured bounding
+        box.
+
+        :param color_rgb: The color image in RGB order, scaled to the depth image
+            resolution.
+        :return: The colored point cloud of the depth measurements inside the box.
+        """
+        parameters = self.descriptor.parameters
+        box = Rect(
+            pos=Point2D(x=parameters.bounding_box_x, y=parameters.bounding_box_y),
+            width=parameters.bounding_box_width,
+            height=parameters.bounding_box_height,
+        )
+        left, top, right, bottom = (
+            self.get_cas()
+            .get(CASViews.COLOR_TO_DEPTH_RATIO)
+            .depth_region(box)
+            .get_corner_points()
+        )
         mask = np.zeros_like(self.depth, dtype=np.uint8)
-        x1 = self.descriptor.parameters.bounding_box_x
-        x2 = (
-            self.descriptor.parameters.bounding_box_x
-            + self.descriptor.parameters.bounding_box_width
+        mask[top:bottom, left:right] = 255
+        return get_cloud_from_rgb_depth_and_mask(
+            color_rgb, self.depth, mask, self.camera_intrinsics, mask_true_value=255
         )
-        y1 = self.descriptor.parameters.bounding_box_y
-        y2 = (
-            self.descriptor.parameters.bounding_box_y
-            + self.descriptor.parameters.bounding_box_height
-        )
-        # Respect possible color2depth scaling also for BoundingBox coordinates
-        color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-        sx1, sy1 = get_scale_coordinates(color2depth_ratio, (x1, y1))
-        sx2, sy2 = get_scale_coordinates(color2depth_ratio, (x2, y2))
-        mask[int(sy1) : int(sy2), int(sx1) : int(sx2)] = 255
-        cloud = get_cloud_from_rgb_depth_and_mask(
-            color_rgb, self.depth, mask, self.camera_intrinsics, mask_true_val=255
-        )
-        return cloud

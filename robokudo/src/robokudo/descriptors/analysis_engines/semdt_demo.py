@@ -8,7 +8,6 @@ from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
-from robokudo.annotators.simple_yolo_annotator import SimpleYoloAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
