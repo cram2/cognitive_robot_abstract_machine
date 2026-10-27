@@ -230,13 +230,13 @@ class RobotiqGripperActionServerTask(
 
     target_velocity: float = 10.0
     """
-    Desired linear velocity of the gripper fingers in millimeters per second or
-    percentage, depending on driver calibration.
+    Desired gripper joint velocity in radians per second.
     """
 
     target_effort: float = 50.0
     """
-    Maximum gripping force or effort applied by the fingers (in Newtons or percentage).
+    Maximum gripping force or effort applied by the fingers (in Newtons / effort units,
+    up to 125.0).
     """
 
     _goal_accepted: bool = field(init=False, default=False)
