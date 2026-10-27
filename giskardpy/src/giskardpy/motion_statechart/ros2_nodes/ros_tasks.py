@@ -223,8 +223,21 @@ class RobotiqGripperActionServerTask(
     """
 
     target_position: float
+    """
+    Desired gripper opening width in meters (e.g., 0.0 for fully open, 0.7 for fully
+    closed).
+    """
+
     target_velocity: float = 10.0
+    """
+    Desired linear velocity of the gripper fingers in millimeters per second or
+    percentage, depending on driver calibration.
+    """
+
     target_effort: float = 50.0
+    """
+    Maximum gripping force or effort applied by the fingers (in Newtons or percentage).
+    """
 
     _goal_accepted: bool = field(init=False, default=False)
     _done: bool = field(init=False, default=False)
@@ -262,12 +275,18 @@ class RobotiqGripperActionServerTask(
             )
 
     def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
+        # If goal was rejected, fail immediately
         if self._done and not self._goal_accepted:
             return ObservationStateValues.FALSE
 
+        # If action has completed and we have a result object
         if self._done and self._result and hasattr(self._result, "result"):
-            res = self._result.result
-            if res.reached_goal or res.stalled:
+            # Extract the ParallelGripperCommand.Result from the action response
+            action_result = self._result.result
+
+            # The action succeeds if the target width is reached, or if the fingers
+            # stalled against an object (grasp established) or mechanical limit.
+            if action_result.reached_goal or action_result.stalled:
                 return ObservationStateValues.TRUE
             return ObservationStateValues.FALSE
 
