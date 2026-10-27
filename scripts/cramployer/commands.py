@@ -77,7 +77,7 @@ class ContainerCommand(DeploymentCommand, ABC):
                 *self.build_arguments(arguments),
             ]
         )
-        return self.configuration.run(command).returncode
+        return self.configuration.run(command, check=False).returncode
 
 
 @dataclass
@@ -138,8 +138,10 @@ class EnvironmentSetup(DeploymentCommand):
         self.prepare_sources()
         self.build_development_image()
         self.check_native_extension()
-        RobotWorkspaceBuild(self.configuration).execute(())
-        InterfaceGeneration(self.configuration).execute(())
+        for command_type in (RobotWorkspaceBuild, InterfaceGeneration):
+            exit_status = command_type(self.configuration).execute(())
+            if exit_status:
+                return exit_status
         print(
             "Setup complete. Open the development environment with ./cramployer shell"
         )
@@ -273,7 +275,11 @@ class RootShell(DeploymentCommand):
                 DeploymentName.CONTAINER_NAMES,
             ],
             capture_output=True,
+            check=False,
         )
+        if result.returncode:
+            print(result.stderr, end="", file=sys.stderr)
+            return result.returncode
         container_names = result.stdout.strip().splitlines()
         if not container_names:
             print(
@@ -309,7 +315,8 @@ class RootShell(DeploymentCommand):
                 ContainerArgument.STARTUP_FILE,
                 DeploymentName.ENVIRONMENT,
                 ContainerArgument.INTERACTIVE,
-            ]
+            ],
+            check=False,
         ).returncode
 
 
@@ -322,7 +329,8 @@ class ConfigurationDisplay(DeploymentCommand):
 
     def execute(self, arguments: tuple[str, ...]) -> int:
         return self.configuration.run(
-            [*self.configuration.build_compose_command(), DockerArgument.CONFIGURATION]
+            [*self.configuration.build_compose_command(), DockerArgument.CONFIGURATION],
+            check=False,
         ).returncode
 
 

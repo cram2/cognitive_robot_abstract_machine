@@ -9,7 +9,7 @@ import os
 import sys
 import tarfile
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 from pathlib import Path
 
 
@@ -37,6 +37,19 @@ class EnvironmentVariable(StrEnum):
     """Executable search directories."""
     MIDDLEWARE = "RMW_IMPLEMENTATION"
     """ROS middleware selection."""
+    FAILURE_ARGUMENT = "DOCKER_FAILURE_ARGUMENT"
+    """Argument selecting an invocation that should fail."""
+    FAILURE_STATUS = "DOCKER_FAILURE_STATUS"
+    """Exit status returned by the selected invocation."""
+
+
+class RecordedExitStatus(IntEnum):
+    """Process outcomes supplied by the Docker recorder."""
+
+    SUCCESS = 0
+    """Invocation completed successfully."""
+    FAILURE = 23
+    """Invocation failed with a distinguishable nonzero status."""
 
 
 class RecordedCommandName(StrEnum):
@@ -64,11 +77,17 @@ class CommandRecorder:
     """Directory containing source files to archive."""
     container_name: str = "source-container"
     """Name returned when creating a source container."""
+    failure_argument: str = ""
+    """Argument identifying a failing invocation."""
+    failure_status: int = RecordedExitStatus.FAILURE
+    """Exit status returned by a failing invocation."""
 
-    def record(self, arguments: list[str]) -> None:
-        """Append an invocation and answer container-listing requests."""
+    def record(self, arguments: list[str]) -> int:
+        """Record an invocation and return its configured output and exit status."""
         with self.command_log.open("a") as stream:
             stream.write(json.dumps(arguments) + "\n")
+        if self.failure_argument in arguments:
+            return self.failure_status
         if arguments[:1] == [RecordedCommandName.LIST]:
             print(self.running_containers)
         if arguments[:1] == [RecordedCommandName.CREATE]:
@@ -76,12 +95,21 @@ class CommandRecorder:
         if arguments[:1] == [RecordedCommandName.COPY]:
             with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as archive:
                 archive.add(self.source_directory, arcname=".")
+        return RecordedExitStatus.SUCCESS
 
 
 # %% Executable
 if __name__ == "__main__":
-    CommandRecorder(
-        Path(os.environ[EnvironmentVariable.COMMAND_LOG]),
-        os.environ.get(EnvironmentVariable.RUNNING_CONTAINERS, ""),
-        os.environ.get(EnvironmentVariable.SOURCE_DIRECTORY, ""),
-    ).record(sys.argv[1:])
+    raise SystemExit(
+        CommandRecorder(
+            Path(os.environ[EnvironmentVariable.COMMAND_LOG]),
+            os.environ.get(EnvironmentVariable.RUNNING_CONTAINERS, ""),
+            os.environ.get(EnvironmentVariable.SOURCE_DIRECTORY, ""),
+            failure_argument=os.environ.get(EnvironmentVariable.FAILURE_ARGUMENT, ""),
+            failure_status=int(
+                os.environ.get(
+                    EnvironmentVariable.FAILURE_STATUS, str(RecordedExitStatus.FAILURE)
+                )
+            ),
+        ).record(sys.argv[1:])
+    )

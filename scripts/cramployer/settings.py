@@ -137,9 +137,11 @@ class DeploymentSettings:
         arguments: list[str],
         capture_output: bool = False,
         input_text: str | None = None,
+        *,
+        check: bool = True,
     ) -> subprocess.CompletedProcess[str]:
         """
-        Run a deployment process with the configured environment and directory.
+        Run a deployment process, raising on failure unless checking is disabled.
         """
         return subprocess.run(
             arguments,
@@ -148,5 +150,5 @@ class DeploymentSettings:
             text=True,
             capture_output=capture_output,
             input=input_text,
-            check=True,
+            check=check,
         )
