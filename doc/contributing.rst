@@ -19,12 +19,13 @@ clone needs before it can persist anything and a changed mapped datastructure ne
 again; CI generates them the same way for its tests.
 
 A test run builds them for itself, and a build takes about a minute, so by default it
-only pays for one when the checkout has not built its interfaces since the sources they
-are generated from changed. ``--orm-build`` overrides that:
+only pays for one when an interface of the checkout can no longer be imported -- because
+it is missing, or because the classes it maps have been renamed or removed since it was
+generated. ``--orm-build`` overrides that:
 
 .. code:: bash
 
-  pytest --orm-build=auto     # the default: build only what the sources have outrun
+  pytest --orm-build=auto     # the default: build only what no longer imports
   pytest --orm-build=always   # build every run, whatever the checkout holds
   pytest --orm-build=never    # build nothing, and read whatever the checkout holds
 
