@@ -43,14 +43,10 @@ services:
 # %% Persistent data
 volumes:
   ros-build:
-    external: ${VOLUMES_EXTERNAL:-false}
     name: ${VOLUME_PREFIX:-cramployer}_ros-build
   ros-install:
-    external: ${VOLUMES_EXTERNAL:-false}
     name: ${VOLUME_PREFIX:-cramployer}_ros-install
   ros-log:
-    external: ${VOLUMES_EXTERNAL:-false}
     name: ${VOLUME_PREFIX:-cramployer}_ros-log
   user-cache:
-    external: ${VOLUMES_EXTERNAL:-false}
     name: ${VOLUME_PREFIX:-cramployer}_user-cache

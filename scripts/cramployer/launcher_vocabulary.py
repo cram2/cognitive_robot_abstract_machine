@@ -68,8 +68,6 @@ class CommandName(StrEnum):
     """Prepare the development environment."""
     SHELL = "shell"
     """Open a development shell or run an application command."""
-    OFFLINE_SHELL = "shell-offline"
-    """Compatibility alias for a development shell."""
     ROOT_SHELL = "root-shell"
     """Attach a privileged shell to a running container."""
     BUILD_ROBOT_WORKSPACE = "ros-build"

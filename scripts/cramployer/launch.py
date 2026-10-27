@@ -43,7 +43,6 @@ class DeploymentLauncher:
         default_factory=lambda: {
             CommandName.SETUP: EnvironmentSetup,
             CommandName.SHELL: DevelopmentShell,
-            CommandName.OFFLINE_SHELL: DevelopmentShell,
             CommandName.ROOT_SHELL: RootShell,
             CommandName.BUILD_ROBOT_WORKSPACE: RobotWorkspaceBuild,
             CommandName.GENERATE_INTERFACES: InterfaceGeneration,
