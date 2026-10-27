@@ -59,13 +59,13 @@ def test_default_installation_removes_processor_index(repository: Path) -> None:
     """
     Allow the package index to supply GPU-capable PyTorch wheels.
     """
+    processor_commands = Installation(
+        repository, DependencySource.PROCESSOR_ONLY
+    ).build_commands()
+    assert ShellSyntax.PROCESSOR_INDEX in processor_commands
     assert Installation(
         repository, DependencySource.DEFAULT
-    ).build_commands() == Installation(
-        repository, DependencySource.PROCESSOR_ONLY
-    ).build_commands().replace(
-        ShellSyntax.PROCESSOR_INDEX, ""
-    )
+    ).build_commands() == processor_commands.replace(ShellSyntax.PROCESSOR_INDEX, "")
 
 
 def test_missing_workflow_step_fails_before_installation(tmp_path: Path) -> None:
