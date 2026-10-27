@@ -18,7 +18,7 @@ except ModuleNotFoundError:
 from rclpy.action import ActionClient
 from std_msgs.msg import Header
 from typing_extensions import Type, TypeVar, Generic
-
+from control_msgs.action import ParallelGripperCommand
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
@@ -205,4 +205,89 @@ class NavigateActionServerTask(
                 if self._result.error_code == NavigateToPose.Result.NONE
                 else ObservationStateValues.FALSE
             )
+        return ObservationStateValues.UNKNOWN
+
+
+@dataclass(eq=False, repr=False)
+class RobotiqGripperActionServerTask(
+    ActionServerTask[
+        ParallelGripperCommand,
+        ParallelGripperCommand.Goal,
+        ParallelGripperCommand.Result,
+        ParallelGripperCommand.Feedback,
+    ]
+):
+    """
+    Node for calling a Robotiq ROS2 action server using the
+    control_msgs/ParallelGripperCommand interface.
+    """
+
+    target_position: float
+    """
+    Desired gripper opening width in meters (e.g., 0.0 for fully open, 0.7 for fully
+    closed).
+    """
+
+    target_velocity: float = 10.0
+    """
+    Desired gripper joint velocity in radians per second.
+    """
+
+    target_effort: float = 50.0
+    """
+    Maximum gripping force or effort applied by the fingers (in Newtons / effort units,
+    up to 125.0).
+    """
+
+    _goal_accepted: bool = field(init=False, default=False)
+    _done: bool = field(init=False, default=False)
+
+    def build_msg(self, context: MotionStatechartContext):
+        self._msg = ParallelGripperCommand.Goal()
+        self._msg.command.position = [float(self.target_position)]
+        self._msg.command.velocity = [float(self.target_velocity)]
+        self._msg.command.effort = [float(self.target_effort)]
+        self._goal_accepted = False
+        self._done = False
+
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            logger.error("Gripper goal rejected by action server")
+            self._goal_accepted = False
+            self._done = True
+            return
+
+        self._goal_accepted = True
+        logger.info("Gripper goal accepted, waiting for result...")
+
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self.result_callback)
+
+    def result_callback(self, future):
+        super().result_callback(future)
+        self._done = True
+        if self._result and hasattr(self._result, "result"):
+            logger.info(
+                f"Gripper action finished. "
+                f"Reached goal: {self._result.result.reached_goal}, "
+                f"Stalled: {self._result.result.stalled}"
+            )
+
+    def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
+        # If goal was rejected, fail immediately
+        if self._done and not self._goal_accepted:
+            return ObservationStateValues.FALSE
+
+        # If action has completed and we have a result object
+        if self._done and self._result and hasattr(self._result, "result"):
+            # Extract the ParallelGripperCommand.Result from the action response
+            action_result = self._result.result
+
+            # The action succeeds if the target width is reached, or if the fingers
+            # stalled against an object (grasp established) or mechanical limit.
+            if action_result.reached_goal or action_result.stalled:
+                return ObservationStateValues.TRUE
+            return ObservationStateValues.FALSE
+
         return ObservationStateValues.UNKNOWN
