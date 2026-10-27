@@ -132,7 +132,7 @@ def test_common_installation_can_skip_package_specific_steps(repository: Path) -
     )
 
 
-def test_semantic_digital_twin_selects_its_installationation(repository: Path) -> None:
+def test_semantic_digital_twin_selects_its_installation(repository: Path) -> None:
     """
     Reuse Drake's installation commands from the current CI workflow.
     """
