@@ -99,6 +99,27 @@ class MalformedHexColor(DataclassException):
 
 
 @dataclass
+class NoShapesToProject(DataclassException):
+    """
+    Raised when the footprint of a shape collection that holds no shapes is asked for.
+    """
+
+    reference_frame: Optional[KinematicStructureEntity]
+    """
+    The entity the empty collection belongs to, if any.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The shape collection of '{self.reference_frame}' holds no shapes, so it "
+            f"covers nothing to project."
+        )
+
+    def suggest_correction(self) -> str:
+        return "add the shapes of the body before asking for its footprint."
+
+
+@dataclass
 class UnknownWorldModification(DataclassException):
     """
     Raised when an unknown world modification is attempted.
