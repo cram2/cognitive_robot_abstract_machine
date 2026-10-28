@@ -1,5 +1,5 @@
 import unittest
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import pytest
@@ -252,6 +252,29 @@ class TestFactories(unittest.TestCase):
 
         self.assertIs(door.handle, first_handle)
         self.assertEqual(door.handles, [first_handle])
+
+    def test_has_handle_dataclass_replace(self):
+        world = World.create_with_root_body("root")
+        with world.modify_world():
+            door = Door.create_with_new_body_in_world(
+                name="door",
+                scale=Scale(0.03, 1, 2),
+                world=world,
+            )
+            handle = Handle.create_with_new_body_in_world(
+                name="handle",
+                world=world,
+            )
+
+        with world.modify_world():
+            door.add(handle)
+
+        copied_door = replace(door)
+
+        assert copied_door.handle is handle
+        assert copied_door.handles == [handle]
+        assert door.handle is handle
+        assert door.handles == [handle]
 
     def test_has_handle_factory(self):
         world = World.create_with_root_body("root")

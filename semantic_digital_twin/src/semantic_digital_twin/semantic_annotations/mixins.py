@@ -1037,6 +1037,8 @@ class HasHandle(HasHandles, HasGraspCandidates):
 
         if handle is not None:
             if self.handles:
+                if len(self.handles) == 1 and self.handles[0] is handle:
+                    return
                 raise ValueError("Specify either handle or handles, not both.")
             self.handles.append(handle)
 
