@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import dataclasses
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from typing import Tuple
 
 import numpy as np
@@ -673,10 +673,21 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, Mixin):
             raise AmbiguousPart(self, part, [match.field for match in matches])
 
         [match] = matches
-        part._mount_strategy(self, IsPartWholeRelationship.of_wrapped_field(match))
         if match.is_many_to_many_relationship:
-            getattr(self, match.field.name).append(part)
+            collection = getattr(self, match.field.name)
+
+            # Reject a second handle before mounting it.
+            if (
+                isinstance(self, HasHandle)
+                and match.field.name == "handles"
+                and collection
+            ):
+                raise ValueError("HasHandle can contain at most one handle.")
+
+            part._mount_strategy(self, IsPartWholeRelationship.of_wrapped_field(match))
+            collection.append(part)
         else:
+            part._mount_strategy(self, IsPartWholeRelationship.of_wrapped_field(match))
             setattr(self, match.field.name, part)
 
     @property
@@ -825,30 +836,6 @@ class HasDoors(PartWholeRelationship, Mixin):
     The doors of the semantic annotation.
     """
 
-
-@dataclass(eq=False)
-class HasHandle(HasGraspCandidates, PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that have a handle, and are grasped at it
-    when they have one.
-    """
-
-    handle: Optional[Handle] = field(
-        default=None,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The handle of the semantic annotation.
-    """
-
-    def grasped_part(self) -> HasGraspCandidates:
-        """
-        :return: The handle; without a handle, the part the annotation is grasped at
-            otherwise.
-        """
-        if self.handle is None:
-            return super().grasped_part()
-        return self.handle
 
 
 @dataclass(eq=False)
@@ -1020,6 +1007,42 @@ THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)
 A type variable for HasRootBody.
 """
 
+@dataclass(eq=False)
+class HasHandle(HasHandles, HasGraspCandidates):
+    """
+    A mixin class for semantic annotations that have zero or one handle.
+    """
+
+    handle: InitVar[Optional[Handle]] = None
+
+    def __post_init__(self, handle: Optional[Handle]) -> None:
+        if len(self.handles) > 1:
+            raise ValueError("HasHandle can contain at most one handle.")
+
+        if handle is not None:
+            if self.handles:
+                raise ValueError("Specify either handle or handles, not both.")
+            self.handles.append(handle)
+
+    def grasped_part(self) -> HasGraspCandidates:
+        handle = self.handle
+        if handle is None:
+            return super().grasped_part()
+        return handle
+
+
+def _get_handle(self) -> Optional[Handle]:
+    return self.handles[0] if self.handles else None
+
+
+def _set_handle(self, handle: Optional[Handle]) -> None:
+    if handle is None:
+        self.handles.clear()
+    else:
+        self.handles[:] = [handle]
+
+
+HasHandle.handle = property(_get_handle, _set_handle)
 
 @dataclass(eq=False)
 class HasLegs(PartWholeRelationship, Mixin):

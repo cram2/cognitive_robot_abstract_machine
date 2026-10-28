@@ -224,6 +224,36 @@ class TestFactories(unittest.TestCase):
         assert bottle_cap.movable_joint.screw_pitch == screw_pitch
         assert bottle_cap.movable_joint.parent == world.root
 
+    def test_has_handle_rejects_a_second_handle(self):
+        world = World.create_with_root_body("root")
+        with world.modify_world():
+            door = Door.create_with_new_body_in_world(
+                name="door",
+                scale=Scale(0.03, 1, 2),
+                world=world,
+            )
+            first_handle = Handle.create_with_new_body_in_world(
+                name="first_handle",
+                world=world,
+            )
+            second_handle = Handle.create_with_new_body_in_world(
+                name="second_handle",
+                world=world,
+            )
+
+        with world.modify_world():
+            door.add(first_handle)
+
+        self.assertIs(door.handle, first_handle)
+        self.assertEqual(door.handles, [first_handle])
+
+        with world.modify_world():
+            with self.assertRaises(ValueError):
+                door.add(second_handle)
+
+        self.assertIs(door.handle, first_handle)
+        self.assertEqual(door.handles, [first_handle])
+
     def test_has_handle_factory(self):
         world = World.create_with_root_body("root")
         root = world.root
@@ -246,6 +276,14 @@ class TestFactories(unittest.TestCase):
 
         assert door.root == handle.root.parent_kinematic_structure_entity
         assert door.handle == handle
+        assert door.handles == [handle]
+
+        from semantic_digital_twin.semantic_annotations.mixins import (
+            HasHandle,
+            HasHandles,
+        )
+        assert isinstance(door, HasHandles)
+        assert isinstance(door, HasHandle)
 
     def test_case_factory(self):
         world = World.create_with_root_body("root")

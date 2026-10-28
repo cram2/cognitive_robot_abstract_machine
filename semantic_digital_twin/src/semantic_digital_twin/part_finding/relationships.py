@@ -17,6 +17,7 @@ from semantic_digital_twin.exceptions import (
     UnknownPartWholeRelationshipField,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
+    HasHandle,
     HasRootBody,
     PartWholeRelationship,
 )
@@ -39,6 +40,9 @@ class PartRelationshipInspector:
     """
     The field of the annotation type that holds the parts.
     """
+    name_override: str | None = None
+    holds_many_override: bool | None = None
+    may_be_empty_override: bool | None = None
 
     @classmethod
     def all_of_type(
@@ -49,13 +53,34 @@ class PartRelationshipInspector:
         :return: Its part-whole relationships whose parts have a body of their own, in
             declaration order.
         """
-        return [
-            cls(relationship_field=wrapped_field)
-            for wrapped_field in WrappedClass(whole_type).fields_with_metadata(
-                IsPartWholeRelationship
-            )
-            if issubclass(wrapped_field.type_endpoint, HasRootBody)
-        ]
+        relationships = []
+
+        for wrapped_field in WrappedClass(whole_type).fields_with_metadata(
+            IsPartWholeRelationship
+        ):
+            if not issubclass(wrapped_field.type_endpoint, HasRootBody):
+                continue
+
+            # HasHandle stores its handle in the inherited `handles` list,
+            # but exposes a singular optional `handle` relationship.
+            if (
+                issubclass(whole_type, HasHandle)
+                and wrapped_field.field.name == "handles"
+            ):
+                relationships.append(
+                    cls(
+                        relationship_field=wrapped_field,
+                        name_override="handle",
+                        holds_many_override=False,
+                        may_be_empty_override=True,
+                    )
+                )
+            else:
+                relationships.append(
+                    cls(relationship_field=wrapped_field)
+                )
+
+        return relationships
 
     @classmethod
     def named(
@@ -108,6 +133,8 @@ class PartRelationshipInspector:
         """
         :return: The name of the field that holds the parts.
         """
+        if self.name_override is not None:
+            return self.name_override
         return self.relationship_field.field.name
 
     @property
@@ -129,6 +156,9 @@ class PartRelationshipInspector:
         """
         :return: Whether the relationship holds any number of parts rather than one.
         """
+        if self.holds_many_override is not None:
+            return self.holds_many_override
+
         return self.relationship_field.is_many_to_many_relationship
 
     @property
@@ -137,6 +167,9 @@ class PartRelationshipInspector:
         :return: Whether an annotation may lack the parts of this relationship, which is
             the case for an optional part and for any number of parts.
         """
+        if self.may_be_empty_override is not None:
+            return self.may_be_empty_override
+
         return self.relationship_field.is_optional or self.holds_many
 
     def parts_of(self, whole: PartWholeRelationship) -> list[HasRootBody]:

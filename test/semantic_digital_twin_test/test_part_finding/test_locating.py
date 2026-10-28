@@ -35,7 +35,11 @@ from semantic_digital_twin.part_finding.vision_language import (
     PartBoxPrompt,
     VisionLanguagePartLocator,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasHandle,
+    HasHandles,
+    HasRootBody,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DiningTable,
     Handle,
@@ -148,6 +152,22 @@ def test_a_mug_calls_for_one_optional_handle_and_one_optional_rim():
         assert relationship.part_name == name
         assert relationship.may_be_empty
         assert not relationship.holds_many
+
+
+def test_has_handle_inherits_has_handles():
+    assert issubclass(HasHandle, HasHandles)
+
+
+def test_a_mug_exposes_its_handle_as_an_optional_singular_relationship():
+    [relationship] = [
+        relationship
+        for relationship in PartRelationshipInspector.all_of_type(Mug)
+        if relationship.name == "handle"
+    ]
+
+    assert relationship.part_type is Handle
+    assert relationship.may_be_empty
+    assert not relationship.holds_many
 
 
 def test_a_dining_table_calls_for_any_number_of_legs():
