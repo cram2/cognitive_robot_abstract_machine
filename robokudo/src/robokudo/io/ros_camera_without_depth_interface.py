@@ -36,6 +36,7 @@ from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+    from semantic_digital_twin.world import World
 
 
 # TODO Needs to be migrated to ROS2 for new RGB-only use cases
@@ -212,59 +213,47 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self._has_new_data = True
         self.lock.release()
 
-    def set_data(self, cas: CAS) -> None:
-        """
-        Update the Common Analysis Structure with latest camera data.
-
-        This method:
-        * Applies any configured image rotation
-        * Updates camera intrinsics accordingly
-        * Sets RGB image, camera info, and transform data in the CAS
-        * Handles thread synchronization
-
-        :param cas: Common Analysis Structure to update
-        """
+    def set_data(self, cas: CAS, world: World) -> None:
         if not self.has_new_data():
             return
 
-        self.lock.acquire()
+        with self.lock:
 
-        # Construct o3d camera intrinsics from camera info in CAS
-        self.camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
-        width = self.camera_info.width
-        height = self.camera_info.height
+            # Construct o3d camera intrinsics from camera info in CAS
+            self.camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
+            width = self.camera_info.width
+            height = self.camera_info.height
 
-        fx = self.camera_info.K[0]
-        cx = self.camera_info.K[2]
-        fy = self.camera_info.K[4]
-        cy = self.camera_info.K[5]
-        if self.camera_config.rotate_image is None:
-            self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
-        else:
-            # Rotate the image as desired AND fix camera parameters.
-            K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
-            # 1) calculate camera intrinsics
-            # 2) modify ROS camera info setting
-            rotated_img, K_rotated, new_size = self.rotate_image_and_intrinsics(
-                self.color, K=K, rotation=self.camera_config.rotate_image
-            )
-            self.color = rotated_img
-            k_flat = K_rotated.flatten()
-            fx = k_flat[0]
-            cx = k_flat[2]
-            fy = k_flat[4]
-            cy = k_flat[5]
-            width, height = new_size
-            # K is an immutable Tuple, so we have to override it completely
-            self.camera_info.K = (fx, 0, cx, 0, fy, cy, 0, 0, 1)
-            self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
+            fx = self.camera_info.K[0]
+            cx = self.camera_info.K[2]
+            fy = self.camera_info.K[4]
+            cy = self.camera_info.K[5]
+            if self.camera_config.rotate_image is None:
+                self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
+            else:
+                # Rotate the image as desired AND fix camera parameters.
+                K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+                # 1) calculate camera intrinsics
+                # 2) modify ROS camera info setting
+                rotated_img, K_rotated, new_size = self.rotate_image_and_intrinsics(
+                    self.color, K=K, rotation=self.camera_config.rotate_image
+                )
+                self.color = rotated_img
+                k_flat = K_rotated.flatten()
+                fx = k_flat[0]
+                cx = k_flat[2]
+                fy = k_flat[4]
+                cy = k_flat[5]
+                width, height = new_size
+                # K is an immutable Tuple, so we have to override it completely
+                self.camera_info.K = (fx, 0, cx, 0, fy, cy, 0, 0, 1)
+                self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
 
-        cas.set(CASViews.COLOR_IMAGE, self.color)
-        cas.set(CASViews.DEPTH_IMAGE, None)
-        cas.set(CASViews.CAMERA_INFO, self.camera_info)
-        cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
-        self.store_camera_to_world_transform_from_tf(cas, self.timestamp)
+            cas.set(CASViews.COLOR_IMAGE, self.color)
+            cas.set(CASViews.DEPTH_IMAGE, None)
+            cas.set(CASViews.CAMERA_INFO, self.camera_info)
+            cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
+            cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
+            self.place_camera_from_tf(cas, world, self.timestamp)
 
-        self._has_new_data = False
-        self.lock.release()
+            self._has_new_data = False

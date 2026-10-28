@@ -20,8 +20,10 @@ from __future__ import annotations
 import os
 
 from pymongo import MongoClient
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from typing_extensions import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
-from robokudo import world
 
 from robokudo.cas import CAS
 from robokudo.io.cas_annotation_codecs import (
@@ -33,6 +35,7 @@ from robokudo.io.cas_view_codecs import CASViewCodecRegistry
 if TYPE_CHECKING:
     from pymongo.results import InsertOneResult
     from pymongo.synchronous.database import Database
+    from semantic_digital_twin.world import World
 
 
 class Storage:
@@ -179,11 +182,19 @@ class Storage:
         return document
 
     @staticmethod
-    def decode_view_document(view_document: Dict[str, Any]) -> tuple[str, Any]:
+    def decode_view_document(
+        view_document: Dict[str, Any], world: World
+    ) -> tuple[str, Any]:
         """
         Decode one serialized view document into a CAS view value.
+
+        :param view_document: The serialized view document.
+        :param world: The world whose entities the view refers to.
         """
-        return Storage.cas_view_codecs.decode_view(view_document)
+        return Storage.cas_view_codecs.decode_view(
+            view_document,
+            **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        )
 
     def store_views_in_mongo(self, cas_dict: Dict[str, Any]) -> None:
         """
@@ -210,6 +221,7 @@ class Storage:
     def load_views_from_mongo_in_cas(
         self,
         cas_document: Dict[str, Any],
+        world: World,
         excluded_view_names: Optional[set[str]] = None,
     ) -> None:
         """
@@ -218,6 +230,7 @@ class Storage:
         Retrieve and decode each persisted view referenced in ``view_ids``.
 
         :param cas_document: CAS document to update with loaded views
+        :param world: The world whose entities the views refer to
         :param excluded_view_names: View names to leave undecoded for caller-specific
             handling.
         """
@@ -233,7 +246,7 @@ class Storage:
                     f"Couldn't find view '{expected_view_name}' with id={view_id}."
                 )
             decoded_view_name, decoded_view_value = Storage.decode_view_document(
-                view_document
+                view_document, world
             )
             if decoded_view_name != expected_view_name:
                 raise RuntimeError(
@@ -244,7 +257,7 @@ class Storage:
 
     @staticmethod
     def load_annotations_from_mongo_in_cas(
-        cas_document: Dict[str, Any], cas: CAS
+        cas_document: Dict[str, Any], cas: CAS, world: World
     ) -> None:
         """
         Load annotations from MongoDB into a CAS.
@@ -255,12 +268,12 @@ class Storage:
         :param cas_document: A dict representing a frame of a CAS in the database
         :param cas: The 'robokudo.cas.CAS' instance where the annotations shall be
             inserted to
+        :param world: The world whose entities the annotations refer to
         """
         if cas_document["annotations"]:
-            tracker = world.get_world_entity_tracker()
-            kwargs = tracker.create_kwargs() if tracker is not None else {}
             cas.annotations = deserialize_annotations(
-                cas_document["annotations"], **kwargs
+                cas_document["annotations"],
+                **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
             )
 
     @staticmethod

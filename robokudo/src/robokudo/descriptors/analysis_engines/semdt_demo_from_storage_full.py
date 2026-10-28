@@ -1,6 +1,3 @@
-from robokudo.world import world_instance
-from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.clip_annotator import (
     CLIPAnnotator,
@@ -13,7 +10,6 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -30,10 +26,6 @@ class AnalysisEngine(AnalysisEngineInterface):
         Create a pipeline that does tabletop segmentation and integrates primary
         navigation using a YOLO annotator.
         """
-        tf_publisher = TFPublisher(
-            _world=world_instance(), node=ROSNodeRegistry().get()
-        )
-
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
             "mongo", loop=False
         )
@@ -51,7 +43,6 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClusterColorHistogramAnnotator(),
                 ClusterPoseBBAnnotator(),
                 CLIPAnnotator(),
-                SemanticDigitalTwinConnector(),
                 # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
             ]
         )

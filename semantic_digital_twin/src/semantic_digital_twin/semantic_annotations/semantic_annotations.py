@@ -1150,6 +1150,13 @@ class SaltContainer(Container, IsPerceivable):
 
 
 @dataclass(eq=False)
+class PerceivedObject(HasRootBody, IsPerceivable):
+    """
+    An object perception found that no more specific semantic annotation describes.
+    """
+
+
+@dataclass(eq=False)
 class Produce(Food):
     """
     In American English, produce generally refers to fresh fruits and vegetables

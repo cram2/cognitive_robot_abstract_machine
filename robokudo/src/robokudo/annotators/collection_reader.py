@@ -28,7 +28,6 @@ from py_trees.display import unicode_tree
 from typing_extensions import TYPE_CHECKING, List, Optional
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.descriptors.camera_configs.components import TfComponent
 
 if TYPE_CHECKING:
     from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
@@ -174,18 +173,14 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 f"{self.__class__.__name__}.update(): New CAS id={pipeline.cas.cas_id}"
             )
 
-            camera_config = self.descriptor.parameters.camera_config
-            if issubclass(type(camera_config), TfComponent):
-                cas = self.get_cas()
-                cas.world_frame = camera_config.tf_to
-                cas.camera_frame = camera_config.tf_from
-
             # Restore any existing queries
             if query:
                 pipeline.cas.query = query
 
             for collection_reader in self.collection_readers:
-                collection_reader.parameters.camera_interface.set_data(self.get_cas())
+                collection_reader.parameters.camera_interface.set_data(
+                    self.get_cas(), self.world
+                )
 
             self.feedback_message = (
                 f"Got sensor data... Waited for {time_difference} seconds"

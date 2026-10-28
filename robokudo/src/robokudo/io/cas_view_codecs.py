@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from typing_extensions import Any, Dict, Iterable, List, Optional
-from robokudo import world
 from robokudo.io.cas_annotation_codecs import krrood_to_json, krrood_from_json
 from robokudo.io.open3d_codec_utils import (
     o3d,
@@ -180,9 +179,13 @@ class ViewCodec:
         """
         raise NotImplementedError
 
-    def decode(self, payload: ViewPayload) -> Any:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> Any:
         """
         Decode a persisted payload back into a runtime value.
+
+        :param payload: The persisted payload.
+        :param kwargs: The keyword arguments that resolve world entities the payload
+            refers to.
         """
         raise NotImplementedError
 
@@ -210,7 +213,7 @@ class JsonLikeCodec(ViewCodec):
             type_name=_full_type_name(value),
         )
 
-    def decode(self, payload: ViewPayload) -> Any:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> Any:
         """
         Return the raw payload value.
         """
@@ -240,7 +243,7 @@ class TupleCodec(ViewCodec):
             type_name=_full_type_name(value),
         )
 
-    def decode(self, payload: ViewPayload) -> tuple[Any, ...]:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> tuple[Any, ...]:
         """
         Decode list payload data back to a tuple.
         """
@@ -271,7 +274,7 @@ class BytesCodec(ViewCodec):
             type_name=_full_type_name(value),
         )
 
-    def decode(self, payload: ViewPayload) -> bytes:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> bytes:
         """
         Decode base64 text payload into raw bytes.
         """
@@ -304,7 +307,7 @@ class NumpyCodec(ViewCodec):
             metadata={"dtype": str(value.dtype), "shape": list(value.shape)},
         )
 
-    def decode(self, payload: ViewPayload) -> np.ndarray:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> np.ndarray:
         """
         Decode base64 encoded ``.npy`` payload data.
         """
@@ -336,7 +339,7 @@ class RosMessageCodec(ViewCodec):
             type_name=_full_type_name(value),
         )
 
-    def decode(self, payload: ViewPayload) -> Any:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> Any:
         """
         Decode dictionary payload data to a ROS message object.
         """
@@ -367,7 +370,7 @@ class Open3DPointCloudCodec(ViewCodec):
             type_name=_full_type_name(value),
         )
 
-    def decode(self, payload: ViewPayload) -> Any:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> Any:
         """
         Decode base64-encoded PCD data to an Open3D point cloud.
         """
@@ -406,7 +409,7 @@ class Open3DPinholeCameraIntrinsicCodec(ViewCodec):
             type_name=_full_type_name(value),
         )
 
-    def decode(self, payload: ViewPayload) -> Any:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> Any:
         """
         Decode payload data to an Open3D pinhole intrinsic object.
         """
@@ -469,7 +472,7 @@ class StampedTransformCodec(ViewCodec):
             type_name=_full_type_name(value),
         )
 
-    def decode(self, payload: ViewPayload) -> StampedTransform:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> StampedTransform:
         """
         Decode plain dictionary data to a ``StampedTransform``.
         """
@@ -519,12 +522,12 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
             },
         )
 
-    def decode(self, payload: ViewPayload) -> HomogeneousTransformationMatrix:
+    def decode(
+        self, payload: ViewPayload, **kwargs: Any
+    ) -> HomogeneousTransformationMatrix:
         """
-        Decode matrix payload data using the active world entity tracker.
+        Decode matrix payload data, resolving its frames with ``kwargs``.
         """
-        tracker = world.get_world_entity_tracker()
-        kwargs = tracker.create_kwargs() if tracker is not None else {}
         return HomogeneousTransformationMatrix.from_json(payload.payload, **kwargs)
 
 
@@ -555,11 +558,12 @@ class KrroodCodec(ViewCodec):
             type_name=_full_type_name(value),
         )
 
-    def decode(self, payload: ViewPayload) -> Any:
+    def decode(self, payload: ViewPayload, **kwargs: Any) -> Any:
         """
-        Decode a value using KRROOD JSON deserialization.
+        Decode a value using KRROOD JSON deserialization, resolving the world entities
+        it refers to with ``kwargs``.
         """
-        return krrood_from_json(payload.payload)
+        return krrood_from_json(payload.payload, **kwargs)
 
 
 @dataclass
@@ -624,14 +628,18 @@ class CASViewCodecRegistry:
             return None
         return codec.encode(value).to_document(view_name=view_name)
 
-    def decode_view(self, document: Dict[str, Any]) -> tuple[str, Any]:
+    def decode_view(self, document: Dict[str, Any], **kwargs: Any) -> tuple[str, Any]:
         """
         Decode a single storage document into one CAS view.
+
+        :param document: The storage document.
+        :param kwargs: The keyword arguments that resolve world entities the view refers
+            to.
         """
         view_name = document["view_name"]
         payload = ViewPayload.from_document(document)
         codec = self._find_decoder(payload.serializer_id)
-        return view_name, codec.decode(payload)
+        return view_name, codec.decode(payload, **kwargs)
 
     def encode_views(
         self, views: Dict[str, Any], strict: bool = True
@@ -646,12 +654,18 @@ class CASViewCodecRegistry:
                 documents.append(document)
         return documents
 
-    def decode_views(self, documents: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    def decode_views(
+        self, documents: Iterable[Dict[str, Any]], **kwargs: Any
+    ) -> Dict[str, Any]:
         """
         Decode storage documents into CAS view values.
+
+        :param documents: The storage documents.
+        :param kwargs: The keyword arguments that resolve world entities the views refer
+            to.
         """
         result: Dict[str, Any] = {}
         for document in documents:
-            view_name, view_value = self.decode_view(document)
+            view_name, view_value = self.decode_view(document, **kwargs)
             result[view_name] = view_value
         return result

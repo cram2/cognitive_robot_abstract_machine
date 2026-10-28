@@ -41,19 +41,16 @@ from sensor_msgs.msg import CompressedImage, CameraInfo, Image
 from tf2_ros import Buffer
 from typing_extensions import Optional, List, Any, TYPE_CHECKING, Union
 
+from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import CameraDataMissing
 from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.types.tf import StampedTransform
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
-from robokudo.world import (
-    setup_world_for_camera_frame,
-    update_connection_transform,
-    world_instance,
-)
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -96,80 +93,37 @@ class CameraInterface(object):
         """
         return self._has_new_data
 
-    @staticmethod
-    def store_camera_to_world_transform_in_cas(
-        cas: CAS,
-        world_frame: str,
-        camera_frame: str,
-        world_T_camera: HomogeneousTransformationMatrix,
-        timestamp_ns: Optional[int] = None,
-    ) -> None:
-        """Write a camera-to-world transform to the CAS and runtime world."""
-        setup_world_for_camera_frame(world_frame=world_frame, camera_frame=camera_frame)
+    def place_static_camera(self, cas: CAS, world: World) -> None:
+        """
+        Place the camera of ``cas`` in ``world`` at the pose the configuration fixes, if
+        it fixes one.
 
-        world = world_instance()
-        camera_body = world.get_body_by_name(name=camera_frame)
-        world_body = world.get_body_by_name(name=world_frame)
-
-        runtime_world_T_camera = HomogeneousTransformationMatrix(
-            data=world_T_camera,
-            reference_frame=world_body,
-            child_frame=camera_body,
-        )
-
-        cas.world_frame = world_frame
-        cas.camera_frame = camera_frame
-        cas.camera_to_world_transform = runtime_world_T_camera
-        if timestamp_ns is not None:
-            cas.data_timestamp = timestamp_ns
-
-        update_connection_transform(
-            to_name=world_body.name,
-            from_name=camera_body.name,
-            transform=runtime_world_T_camera,
-        )
-
-    def store_camera_to_world_transform(
-        self,
-        cas: CAS,
-        world_frame: str,
-        camera_frame: str,
-        world_T_camera: HomogeneousTransformationMatrix,
-        timestamp_ns: Optional[int] = None,
-    ) -> None:
-        """Write a camera-to-world transform to the CAS and runtime world."""
-        self.store_camera_to_world_transform_in_cas(
-            cas=cas,
-            world_frame=world_frame,
-            camera_frame=camera_frame,
-            world_T_camera=world_T_camera,
-            timestamp_ns=timestamp_ns,
-        )
-
-    def store_static_camera_transform_if_configured(
-        self, cas: CAS, timestamp_ns: Optional[int] = None
-    ) -> bool:
-        """Write the configured static camera transform, if enabled."""
+        :param cas: The CAS of the data the camera recorded.
+        :param world: The world perception perceives into.
+        """
         if not self.camera_config.static_camera_transform_enabled:
-            return False
-
-        self.store_camera_to_world_transform(
-            cas=cas,
-            world_frame=self.camera_config.static_world_frame,
-            camera_frame=self.camera_config.static_camera_frame,
-            world_T_camera=self.camera_config.static_world_T_camera,
-            timestamp_ns=timestamp_ns,
+            return
+        CameraPlacement(world).place(
+            cas,
+            MeasuredCameraPose(
+                world_frame=self.camera_config.static_world_frame,
+                camera_frame=self.camera_config.static_camera_frame,
+                world_T_camera=self.camera_config.static_world_T_camera,
+            ),
         )
-        return True
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, cas: CAS, world: World) -> None:
         """
         This method is supposed to read in, convert (if needed) and put the data into
         the CAS. If you are running a CameraInterface which is getting data via callback
         methods, please make sure to keep callbacks light and do the main conversion
         work here! Callbacks should be short.
 
+        The camera is placed in ``world`` where it was when it recorded the data, if
+        that is known.
+
         :param cas: The CAS where the data should be placed in
+        :param world: The world perception perceives into
         """
         raise NotImplementedError
 
@@ -255,33 +209,37 @@ class ROSCameraInterface(CameraInterface):
                 return False
         return True
 
-    def store_camera_to_world_transform_from_tf(
-        self, cas: CAS, timestamp: builtin_interfaces.msg.Time
+    def place_camera_from_tf(
+        self, cas: CAS, world: World, timestamp: builtin_interfaces.msg.Time
     ) -> None:
         """
-        If the camera is configured to look up transforms, store the camera transform in
-        the CAS.
+        Place the camera of ``cas`` in ``world`` at the pose last looked up from TF, for
+        the data received at ``timestamp``, which is stored in ``cas`` as the time of the
+        data. A camera that does not look up its pose is not placed.
 
-        :param cas: The CAS to store the transform in
-        :param timestamp: The timestamp of the transform
+        :param cas: The CAS of the data.
+        :param world: The world perception perceives into.
+        :param timestamp: When the data was received.
         """
-        if self.lookup_viewpoint:
-            world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-                pos_x=self.camera_translation[0],
-                pos_y=self.camera_translation[1],
-                pos_z=self.camera_translation[2],
-                quat_x=self.camera_quaternion[0],
-                quat_y=self.camera_quaternion[1],
-                quat_z=self.camera_quaternion[2],
-                quat_w=self.camera_quaternion[3],
-            )
-            super().store_camera_to_world_transform(
-                cas=cas,
+        if not self.lookup_viewpoint:
+            return
+        cas.data_timestamp = timestamp.sec * 1_000_000_000 + timestamp.nanosec
+        CameraPlacement(world).place(
+            cas,
+            MeasuredCameraPose(
                 world_frame=self.tf_to,
                 camera_frame=self.tf_from,
-                world_T_camera=world_T_camera,
-                timestamp_ns=timestamp.sec * 1_000_000_000 + timestamp.nanosec,
-            )
+                world_T_camera=HomogeneousTransformationMatrix.from_xyz_quaternion(
+                    pos_x=self.camera_translation[0],
+                    pos_y=self.camera_translation[1],
+                    pos_z=self.camera_translation[2],
+                    quat_x=self.camera_quaternion[0],
+                    quat_y=self.camera_quaternion[1],
+                    quat_z=self.camera_quaternion[2],
+                    quat_w=self.camera_quaternion[3],
+                ),
+            ),
+        )
 
     @staticmethod
     def store_legacy_camera_to_world_transform_from_cas(cas: CAS) -> None:
@@ -610,36 +568,34 @@ class KinectCameraInterface(ROSCameraInterface):
         self._has_new_data = True
         self.lock.release()
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, cas: CAS, world: World) -> None:
         if not self.has_new_data():
             return
 
-        self.lock.acquire()
-        if self.camera_config.hi_res_mode:
-            self.color = self.color[0:960, 0:1280]
+        with self.lock:
+            if self.camera_config.hi_res_mode:
+                self.color = self.color[0:960, 0:1280]
 
-        self.camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
-        width = self.camera_info.width
-        height = self.camera_info.height
-        if self.camera_config.hi_res_mode:
-            height = 960
+            self.camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
+            width = self.camera_info.width
+            height = self.camera_info.height
+            if self.camera_config.hi_res_mode:
+                height = 960
 
-        fx = self.camera_info.k[0]
-        cx = self.camera_info.k[2]
-        fy = self.camera_info.k[4]
-        cy = self.camera_info.k[5]
-        self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
+            fx = self.camera_info.k[0]
+            cx = self.camera_info.k[2]
+            fy = self.camera_info.k[4]
+            cy = self.camera_info.k[5]
+            self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
 
-        self.color_to_depth_ratio = self.camera_config.color_to_depth_ratio
+            self.color_to_depth_ratio = self.camera_config.color_to_depth_ratio
 
-        cas.set(CASViews.COLOR_IMAGE, self.color)
-        cas.set(CASViews.DEPTH_IMAGE, self.depth)
-        cas.set(CASViews.CAMERA_INFO, self.camera_info)
-        cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
+            cas.set(CASViews.COLOR_IMAGE, self.color)
+            cas.set(CASViews.DEPTH_IMAGE, self.depth)
+            cas.set(CASViews.CAMERA_INFO, self.camera_info)
+            cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
+            cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
 
-        self.store_camera_to_world_transform_from_tf(cas, self.timestamp)
+            self.place_camera_from_tf(cas, world, self.timestamp)
 
-        self._has_new_data = False
-
-        self.lock.release()
+            self._has_new_data = False
