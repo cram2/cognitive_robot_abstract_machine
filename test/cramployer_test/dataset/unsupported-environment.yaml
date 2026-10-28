@@ -1,0 +1,8 @@
+# %% Environment requiring runner expression evaluation
+jobs:
+  test:
+    steps:
+      - name: Install dependencies
+        env:
+          INSTALLATION_DIRECTORY: ${{ github.workspace }}
+        run: pwd

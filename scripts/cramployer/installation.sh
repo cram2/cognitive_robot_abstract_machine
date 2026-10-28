@@ -1,0 +1,2 @@
+# %% Image installation environment
+sudo() { "$@"; }

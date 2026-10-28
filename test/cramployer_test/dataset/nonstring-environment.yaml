@@ -1,0 +1,8 @@
+# %% Environment not expressed as strings
+jobs:
+  test:
+    steps:
+      - name: Install dependencies
+        env:
+          INSTALLATION_ATTEMPTS: 2
+        run: pwd

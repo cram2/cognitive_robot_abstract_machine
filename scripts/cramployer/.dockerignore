@@ -1,0 +1,15 @@
+# %% Build inputs
+*
+!Dockerfile
+!installation.py
+!environment.sh
+!entrypoint.sh
+!apt-packages.txt
+
+!exceptions.py
+!vocabulary.py
+!workflow.py
+!workspace.py
+!installation.sh
+!workspace-extra.sh
+!dependency_index.py

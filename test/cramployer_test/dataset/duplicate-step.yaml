@@ -1,0 +1,8 @@
+# %% Ambiguous installation steps
+jobs:
+  test:
+    steps:
+      - name: Install dependencies
+        run: pwd
+      - name: Install dependencies
+        run: pwd

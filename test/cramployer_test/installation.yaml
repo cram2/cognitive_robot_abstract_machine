@@ -1,0 +1,16 @@
+# %% Independent CI working directories
+jobs:
+  test:
+    steps:
+      - name: Install dependencies
+        env:
+          DEPLOYMENT_FIRST_STEP: first
+        run: |
+          cd cognitive_robot_abstract_machine
+          printf '%s' "$DEPLOYMENT_FIRST_STEP" > first-output
+      - name: Install robokudo optional requirements
+        env:
+          DEPLOYMENT_SECOND_STEP: second
+        run: |
+          cd cognitive_robot_abstract_machine
+          printf '%s' "$DEPLOYMENT_SECOND_STEP" > second-output

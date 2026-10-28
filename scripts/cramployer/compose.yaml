@@ -1,0 +1,56 @@
+# %% CRAM development environment
+name: cramployer
+services:
+  cram:
+    image: cramployer:local
+    init: true
+    command: ["bash"]
+    network_mode: host
+    # Fast DDS can use shared memory between host and container participants.
+    ipc: host
+    mem_limit: ${CONTAINER_MEMORY:-16g}
+    cpus: ${CONTAINER_CPUS:-4}
+    env_file:
+      - path: container.env
+        required: false
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      ROS_AUTOMATIC_DISCOVERY_RANGE: ${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}
+      OVERLAY_WS: /workspace/ros_ws
+      BUILD_PARALLEL_WORKERS: ${BUILD_PARALLEL_WORKERS:-2}
+    volumes:
+      - type: bind
+        source: ${CRAM_SOURCE}
+        target: /workspace/cram
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ROS_SOURCE}
+        target: /workspace/ros_ws/src
+        bind:
+          create_host_path: false
+      - .:/deployment:ro
+      - ros-build:/workspace/ros_ws/build
+      - ros-install:/workspace/ros_ws/install
+      - ros-log:/workspace/ros_ws/log
+      - user-cache:/home/cramployer/.cache
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+# %% Persistent data
+volumes:
+  ros-build:
+    external: ${VOLUMES_EXTERNAL:-false}
+    name: ${VOLUME_PREFIX:-cramployer}_ros-build
+  ros-install:
+    external: ${VOLUMES_EXTERNAL:-false}
+    name: ${VOLUME_PREFIX:-cramployer}_ros-install
+  ros-log:
+    external: ${VOLUMES_EXTERNAL:-false}
+    name: ${VOLUME_PREFIX:-cramployer}_ros-log
+  user-cache:
+    external: ${VOLUMES_EXTERNAL:-false}
+    name: ${VOLUME_PREFIX:-cramployer}_user-cache

@@ -1,0 +1,6 @@
+# %% Workflow requiring runner expression evaluation
+jobs:
+  test:
+    steps:
+      - name: Install dependencies
+        run: echo '${{ github.workspace }}'
