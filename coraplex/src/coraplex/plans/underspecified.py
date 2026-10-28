@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field, fields, replace
-from typing import Optional, Tuple, Type, TYPE_CHECKING, Iterator
+from typing_extensions import TYPE_CHECKING, Iterator
 
 from coraplex.datastructures.enums import ActionTrialVisualization, ExecutionType
 from coraplex.execution_environment import ExecutionEnvironment
@@ -53,13 +53,13 @@ class ActionTrial:
     executed for real afterwards.
     """
 
-    _copied_context: Optional[Context] = field(default=None, init=False, repr=False)
+    _copied_context: Context | None = field(default=None, init=False, repr=False)
     """
     The context pointing at the copy candidates are tried against, kept until that copy
     no longer matches the world it was taken from.
     """
 
-    _source_versions: Optional[Tuple[int, int]] = field(
+    _source_versions: tuple[int, int] | None = field(
         default=None, init=False, repr=False
     )
     """
@@ -78,7 +78,7 @@ class ActionTrial:
     world it copies where the two overlap.
     """
 
-    _visualization: Optional[RvizVisualization] = field(
+    _visualization: RvizVisualization | None = field(
         default=None, init=False, repr=False
     )
     """
@@ -250,7 +250,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
     The underspecified statement that can be used to generate actions.
     """
 
-    _action_iterator: Optional[Iterator[ActionDescription]] = field(
+    _action_iterator: Iterator[ActionDescription] | None = field(
         default=None, kw_only=True
     )
     """
@@ -259,9 +259,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
     Only available after the first call to notify.
     """
 
-    current_candidate: Optional[ActionNode] = field(
-        default=None, init=False, repr=False
-    )
+    current_candidate: ActionNode | None = field(default=None, init=False, repr=False)
     """
     The action candidate this node currently resolves to, set by `advance` at execution
     time.
@@ -269,7 +267,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
     On failure, `advance` replaces it with the next candidate.
     """
 
-    current_candidate_sequence: Optional[SequentialNode] = field(
+    current_candidate_sequence: SequentialNode | None = field(
         default=None, init=False, repr=False
     )
     """
@@ -292,7 +290,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
     """
 
     @property
-    def designator_type(self) -> Type:
+    def designator_type(self) -> type:
         return self.underspecified_action._type_
 
     @property
@@ -324,7 +322,7 @@ class UnderspecifiedNode(ExecutionBoundaryNode):
             self.plan.action_trial = ActionTrial(context=self.context)
         return self.plan.action_trial
 
-    def _pull_next_action(self) -> Optional[ActionDescription]:
+    def _pull_next_action(self) -> ActionDescription | None:
         """
         Pull the next grounded action from the iterator, without attaching it anywhere.
 

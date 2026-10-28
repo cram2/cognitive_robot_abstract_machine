@@ -4,16 +4,12 @@ from __future__ import annotations
 
 import enum
 import inspect
-from typing import (
+from typing_extensions import (
     Any,
     Callable,
     Dict,
     ForwardRef,
-    List,
-    Optional,
-    Set,
     Tuple,
-    Type,
     get_args,
     get_origin,
 )
@@ -24,7 +20,7 @@ from krrood.utils import is_builtin_type, is_typing_type
 # %%
 # Type-hint serialisation
 
-def _extract_types(type_hint: Any, seen: Optional[Set[type]] = None) -> Set[type]:
+def _extract_types(type_hint: Any, seen: set[type] | None = None) -> set[type]:
     """Recursively extract all base types from a type hint."""
     if seen is None:
         seen = set()
@@ -99,7 +95,7 @@ def value_to_source(value: object) -> str:
     return repr(value)
 
 
-def get_types_to_import_from_type_hints(hints: List[Type]) -> List[Type]:
+def get_types_to_import_from_type_hints(hints: list[type]) -> list[type]:
     """Extract importable types from a list of type hints.
 
     :param hints: A list of type hints to extract types from.
@@ -109,7 +105,7 @@ def get_types_to_import_from_type_hints(hints: List[Type]) -> List[Type]:
     for hint in hints:
         _extract_types(hint, seen_types)
 
-    to_import: List[Type] = []
+    to_import: list[type] = []
     for type_ in seen_types:
         if isinstance(type_, ForwardRef) or isinstance(type_, str):
             continue
@@ -119,7 +115,7 @@ def get_types_to_import_from_type_hints(hints: List[Type]) -> List[Type]:
     return to_import
 
 
-def get_types_to_import_from_function_type_hints(function: Callable) -> List[Type]:
+def get_types_to_import_from_function_type_hints(function: Callable) -> list[type]:
     """Extract importable types from a function's annotations.
 
     :param function: The function to extract type hints from.

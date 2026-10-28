@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, List
+from typing_extensions import Any, List
 
 from probabilistic_model.adapters.rustworkx_tensorized.converter import (
     TensorizedToRustworkxConverter,
@@ -50,12 +50,12 @@ class RustworkxCircuitBuilder:
     The circuit the units are created in.
     """
 
-    units_by_layer: Dict[int, List[Unit]] = field(default_factory=dict)
+    units_by_layer: dict[int, list[Unit]] = field(default_factory=dict)
     """
     The units created for every layer converted so far, keyed by the id of the layer.
     """
 
-    def units_of(self, layer: Layer) -> List[Unit]:
+    def units_of(self, layer: Layer) -> list[Unit]:
         """
         :param layer: A layer of the circuit.
         :return: One unit per node of the layer, in the order of its nodes.
@@ -72,7 +72,7 @@ class SumLayerToSumUnitsConverter(
 ):
 
     @classmethod
-    def convert(cls, data: SumLayer, builder: RustworkxCircuitBuilder) -> List[SumUnit]:
+    def convert(cls, data: SumLayer, builder: RustworkxCircuitBuilder) -> list[SumUnit]:
         units = [
             SumUnit(probabilistic_circuit=builder.circuit)
             for _ in range(data.number_of_nodes)
@@ -96,7 +96,7 @@ class ProductLayerToProductUnitsConverter(
     @classmethod
     def convert(
         cls, data: ProductLayer, builder: RustworkxCircuitBuilder
-    ) -> List[ProductUnit]:
+    ) -> list[ProductUnit]:
         units = [
             ProductUnit(probabilistic_circuit=builder.circuit)
             for _ in range(data.number_of_nodes)
@@ -126,7 +126,7 @@ class UnivariateInputLayerToLeavesConverter(
     @classmethod
     def convert(
         cls, data: UnivariateInputLayer, builder: RustworkxCircuitBuilder
-    ) -> List[Unit]:
+    ) -> list[Unit]:
         return [
             leaf(distribution, builder.circuit)
             for distribution in data.node_distributions(
@@ -150,7 +150,7 @@ class MultivariateGaussianLayerToLeavesConverter(
     @classmethod
     def convert(
         cls, data: AbstractMultivariateGaussianLayer, builder: RustworkxCircuitBuilder
-    ) -> List[Unit]:
+    ) -> list[Unit]:
         return [
             leaf(distribution, builder.circuit)
             for distribution in data.node_distributions(builder.variables)

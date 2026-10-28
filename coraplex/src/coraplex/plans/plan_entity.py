@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from coraplex.plans.plan import Plan
@@ -13,4 +13,4 @@ class PlanEntity:
     A base class for entities that are managed by a plan.
     """
 
-    plan: Optional[Plan] = field(kw_only=True, default=None)
+    plan: Plan | None = field(kw_only=True, default=None)

@@ -1,21 +1,5 @@
-"""Sensor data collection and CAS initialization.
-
-This module provides an annotator for:
-
-* Reading sensor data from multiple interfaces
-* Initializing the CAS with sensor data
-* Managing multiple collection readers
-* Handling data synchronization
-
-The module uses:
-
-* Camera interface abstraction
-* Pipeline CAS management
-* Data availability monitoring
-* Query preservation
-
-.. note::
-   This is typically the first annotator in a pipeline.
+"""
+Acquire sensor data from one camera interface and initialize the pipeline data structures.
 """
 
 from __future__ import annotations
@@ -25,7 +9,7 @@ from timeit import default_timer as timer
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from py_trees.display import unicode_tree
-from typing_extensions import TYPE_CHECKING, List, Optional
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.descriptors.camera_configs.components import TfComponent
@@ -51,28 +35,37 @@ class CollectionReaderAnnotator(BaseAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for collection reader."""
+        """
+        Configuration descriptor for collection reader.
+        """
 
         def __init__(
             self,
             camera_config: BaseCameraConfig,
             camera_interface: CameraInterface,
         ) -> None:
-            """Initialize descriptor with camera configuration.
+            """
+            Initialize descriptor with camera configuration.
 
             :param camera_config: Configuration for camera interface
             :param camera_interface: Interface for reading camera data
             """
 
             class Parameters:
-                """Parameters for configuring collection reader."""
+                """
+                Parameters for configuring collection reader.
+                """
 
                 def __init__(self) -> None:
                     self.camera_config: BaseCameraConfig = camera_config
-                    """Configuration for camera interface"""
+                    """
+                    Configuration for camera interface
+                    """
 
                     self.camera_interface: CameraInterface = camera_interface
-                    """Interface for reading camera data"""
+                    """
+                    Interface for reading camera data
+                    """
 
             self.parameters = Parameters()
 
@@ -89,12 +82,18 @@ class CollectionReaderAnnotator(BaseAnnotator):
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.collection_readers: List[CollectionReaderAnnotator.Descriptor] = [
+        self.collection_readers: list[CollectionReaderAnnotator.Descriptor] = [
             descriptor
         ]
-        self.start_timer: Optional[float] = None
+        self.start_timer: float | None = None
         self.iterations_since_last_data: int = 0
+        """
+        Number of consecutive ticks waiting for camera data.
+        """
         self.iterations_since_last_data_warn_threshold: int = 40
+        """
+        Number of waiting ticks between camera availability warnings.
+        """
 
     def initialise(self) -> None:
         """Initialize the collection reader.

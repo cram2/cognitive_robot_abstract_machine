@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Optional, List
 
 import numpy as np
 import trimesh.sample
@@ -63,9 +62,9 @@ from semantic_digital_twin.world_description.world_entity import (
 @symbolic_function
 def robot_in_collision(
     robot: AbstractRobot,
-    ignore_collision_with: Optional[List[Body]] = None,
+    ignore_collision_with: list[Body] | None = None,
     threshold: float = 0.001,
-) -> List[ClosestPoints]:
+) -> list[ClosestPoints]:
     """
     Check if the robot collides with any object in the world at the given pose.
 
@@ -126,7 +125,7 @@ def blocking(
     pose: HomogeneousTransformationMatrix,
     root: Body,
     tip: Body,
-) -> List[ClosestPoints]:
+) -> list[ClosestPoints]:
     """
     Get the bodies that are blocking the robot from reaching a given position.
 
@@ -156,7 +155,7 @@ def blocking(
 
 
 @symbolic_function
-def bodies_in_gripper(gripper: HasTwoFingers, sample_size: int = 100) -> List[Body]:
+def bodies_in_gripper(gripper: HasTwoFingers, sample_size: int = 100) -> list[Body]:
     """
     Gets all bodies which are between the finger of the gripper.
 
@@ -248,7 +247,7 @@ def is_pose_free_for_robot(robot: AbstractRobot, pose: Pose) -> bool:
 
 
 @symbolic_function
-def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
+def get_visible_bodies(camera: Camera) -> list[KinematicStructureEntity]:
     """
     Get all bodies and regions that are visible from the given camera using a
     segmentation mask.
@@ -316,7 +315,7 @@ class VisibleTo(Triple[TKinematicStructureEntity, TCamera]):
 
 
 @symbolic_function
-def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
+def occluding_bodies(camera: Camera, body: Body) -> list[Body]:
     """
     Determines the bodies that occlude a given body in the scene as seen from a
     specified camera.

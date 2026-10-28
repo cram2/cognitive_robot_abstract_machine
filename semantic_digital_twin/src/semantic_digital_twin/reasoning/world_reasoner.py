@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from os.path import dirname
 
-from typing_extensions import Optional, List, Dict, Any, ClassVar
+from typing_extensions import Any, ClassVar
 
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
@@ -18,7 +18,7 @@ class WorldReasoner:
     """
     The world instance to reason on.
     """
-    _last_world_model_version: Optional[int] = field(init=False, default=None)
+    _last_world_model_version: int | None = field(init=False, default=None)
     """
     The last world model version of the world used when :py:meth:`reason` was last
     called.
@@ -37,7 +37,7 @@ class WorldReasoner:
     def __post_init__(self):
         self.reasoner = CaseReasoner(self.world, model_directory=self.model_directory)
 
-    def infer_semantic_annotations(self) -> List[SemanticAnnotation]:
+    def infer_semantic_annotations(self) -> list[SemanticAnnotation]:
         """
         Infer the semantic annotations of the world by calling the :py:meth:`reason`
         method and extracting all inferred semantic annotations.
@@ -48,7 +48,7 @@ class WorldReasoner:
             result = self.reason()
         return result.get("semantic_annotations", [])
 
-    def reason(self) -> Dict[str, Any]:
+    def reason(self) -> dict[str, Any]:
         """
         Perform rule-based reasoning on the current world and infer all possible
         concepts.

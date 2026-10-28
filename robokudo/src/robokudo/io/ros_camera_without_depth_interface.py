@@ -27,7 +27,7 @@ import numpy as np
 import open3d as o3d
 from message_filters import Subscriber
 from sensor_msgs.msg import CameraInfo, Image
-from typing_extensions import Any, Tuple, TYPE_CHECKING, Optional, List
+from typing_extensions import Any, TYPE_CHECKING
 
 from robokudo.cas import CASViews
 from robokudo.io.camera_interface import ROSCameraInterface
@@ -63,8 +63,9 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.color_subscriber: Subscriber = message_filters.Subscriber(
             camera_config.topic_color, Image
         )
-        """Subscriber for RGB image topic"""
-
+        """
+        Subscriber for RGB image topic.
+        """
         self.camera_info_subscriber: Subscriber = message_filters.Subscriber(
             camera_config.topic_camera_info, CameraInfo
         )
@@ -82,13 +83,13 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.rk_logger.info(f"  {camera_config.topic_color}")
         self.rk_logger.info(f"  {camera_config.topic_camera_info}")
 
-        self.color: Optional[Tuple[npt.NDArray]] = None
+        self.color: tuple[npt.NDArray] | None = None
         """Latest RGB image data"""
 
-        self.camera_info: Optional[CameraInfo] = None
+        self.camera_info: CameraInfo | None = None
         """Latest camera calibration info"""
 
-        self.camera_intrinsic: Optional[o3d.camera.PinholeCameraIntrinsic] = None
+        self.camera_intrinsic: o3d.camera.PinholeCameraIntrinsic | None = None
         """Camera intrinsic parameters in Open3D format"""
 
         self.color_to_depth_ratio: ColorToDepthRatio = ColorToDepthRatio()
@@ -96,26 +97,27 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         The identity, since there is no depth image.
         """
 
-        self.camera_translation: Optional[List[float]] = None
+        self.camera_translation: list[float] | None = None
         """Camera translation from TF"""
 
-        self.camera_quaternion: Optional[List[float]] = None
+        self.camera_quaternion: list[float] | None = None
         """Camera rotation as quaternion from TF"""
 
-        self.timestamp: Optional[builtin_interfaces.msg.Time] = None
+        self.timestamp: builtin_interfaces.msg.Time | None = None
         """Timestamp of latest data"""
 
         self.lock: Lock = Lock()
-        """Thread synchronization lock"""
-
+        """
+        Thread synchronization lock.
+        """
         self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
         """NumPy-compatible replacement for cv_bridge."""
 
         print("ROSCameraWithoutDepthInterface initialized")
 
     def rotate_camera_intrinsics(
-        self, K: npt.NDArray, image_size: Tuple[int, int], rotation: str = "90_ccw"
-    ) -> Tuple[npt.NDArray, Tuple[int, int]]:
+        self, K: npt.NDArray, image_size: tuple[int, int], rotation: str = "90_ccw"
+    ) -> tuple[npt.NDArray, tuple[int, int]]:
         """
         Adjust camera intrinsics matrix for image rotation.
 
@@ -156,7 +158,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
 
     def rotate_image_and_intrinsics(
         self, img: npt.NDArray, K: npt.NDArray, rotation: str = "90_ccw"
-    ) -> Tuple[npt.NDArray, npt.NDArray, Tuple[int, int]]:
+    ) -> tuple[npt.NDArray, npt.NDArray, tuple[int, int]]:
         """
         Rotate an image and adjust its camera intrinsics accordingly.
 
@@ -182,15 +184,10 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
     def callback(
         self,
         color_data: Image,
-        camera_info: Optional[CameraInfo] = None,
+        camera_info: CameraInfo | None = None,
     ) -> None:
         """
         Process synchronized RGB image and camera info messages.
-
-        TODO make this generic. handle the encoding and order properly. For standard and
-        compressed images. this might also depend on the fix of image_transport_plugins
-        being published as a package. Startpoint can be found at the bottom of this
-        method.
 
         :param color_data: RGB image message
         :param camera_info: Camera calibration info message, defaults to None

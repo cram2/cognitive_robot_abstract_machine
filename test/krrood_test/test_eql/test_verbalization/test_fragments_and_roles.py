@@ -10,8 +10,7 @@ They complement the plain-text regression tests in test_verbalization.py.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
-from typing_extensions import List
+from typing_extensions import List, Any
 
 import pytest
 

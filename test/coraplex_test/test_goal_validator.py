@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from typing_extensions import Optional, List
 
 from coraplex.datastructures.enums import JointType
 from coraplex.tf_transformations import quaternion_from_euler
@@ -196,7 +195,7 @@ def test_single_revolute_joint_position_goal(goal_validator_world):
 
 
 def validate_revolute_joint_position_goal(
-    goal_validator, joint_type: Optional[JointType] = None, world=None
+    goal_validator, joint_type: JointType | None = None, world=None
 ):
     goal_joint_position = -np.pi / 8
     joint_name = PR2Joint.LEFT_SHOULDER_LIFT
@@ -248,7 +247,7 @@ def test_single_prismatic_joint_position_goal(goal_validator_world):
 
 
 def validate_prismatic_joint_position_goal(
-    goal_validator, joint_type: Optional[JointType] = None, world=None
+    goal_validator, joint_type: JointType | None = None, world=None
 ):
     goal_joint_position = 0.2
     torso = PR2Joint.TORSO_LIFT
@@ -309,7 +308,7 @@ def test_multi_joint_goal(goal_validator_world):
 
 
 def validate_multi_joint_goal(
-    goal_validator, joint_types: Optional[List[JointType]] = None, world=None
+    goal_validator, joint_types: list[JointType] | None = None, world=None
 ):
     goal_joint_positions = np.array([0.2, -np.pi / 4])
     achieved_percentage = [0.48474, 1]
@@ -601,7 +600,7 @@ def test_list_of_revolute_joint_positions_goal(goal_validator_world):
 
 
 def validate_list_of_revolute_joint_positions_goal(
-    goal_validator, joint_types: Optional[List[JointType]] = None, world=None
+    goal_validator, joint_types: list[JointType] | None = None, world=None
 ):
     goal_joint_position = -np.pi / 4
     goal_joint_positions = np.array([goal_joint_position, goal_joint_position])

@@ -7,7 +7,6 @@ from time import perf_counter
 import numpy as np
 
 import pytest
-from typing_extensions import Dict, List
 
 from giskardpy.data_types.exceptions import NonPositiveRealTimeFactorError
 from giskardpy.executor import (
@@ -195,7 +194,7 @@ class ActuatorLengthsRead:
     What a simulator answers a bulk read of actuator lengths with.
     """
 
-    result: Dict[str, float]
+    result: dict[str, float]
     """
     The length read per actuator name.
     """
@@ -208,7 +207,7 @@ class SimulationOfSettlingJoints:
     without any physics being computed.
     """
 
-    joints: Dict[str, JointThatStopsAfterAWhile]
+    joints: dict[str, JointThatStopsAfterAWhile]
     """
     The joints it reports, by name.
     """
@@ -248,7 +247,7 @@ class SimulationOfSettlingJoints:
         for joint in self.joints.values():
             joint.step()
 
-    def get_actuators_lengths(self, actuator_names: List[str]) -> ActuatorLengthsRead:
+    def get_actuators_lengths(self, actuator_names: list[str]) -> ActuatorLengthsRead:
         """
         :param actuator_names: The servos to read, each named after its joint.
         :return: Where the joint of each of them stands.

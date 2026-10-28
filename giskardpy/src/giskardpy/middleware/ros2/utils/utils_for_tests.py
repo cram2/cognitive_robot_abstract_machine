@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from time import sleep
-from typing import Tuple, Iterable
+from typing_extensions import Iterable
 
 import numpy as np
 
@@ -187,7 +187,7 @@ class GiskardTester(ABC):
     def add_box_to_world(
         self,
         name: str,
-        size: Tuple[float, float, float],
+        size: tuple[float, float, float],
         pose: HomogeneousTransformationMatrix,
         parent_link: KinematicStructureEntity | None = None,
     ) -> None:

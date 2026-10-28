@@ -39,20 +39,7 @@ from uuid import UUID, uuid4
 import casadi as ca
 import numpy as np
 from scipy import sparse as sp
-from typing_extensions import (
-    ClassVar,
-    Iterable,
-    Tuple,
-    Sequence,
-    Self,
-    Callable,
-    List,
-    Optional,
-    Dict,
-    TypeVar,
-    Type,
-    Any,
-)
+from typing_extensions import ClassVar, Iterable, Sequence, Self, Callable, TypeVar, Any
 
 from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
@@ -105,9 +92,9 @@ class CasadiLock:
 
     def __exit__(
         self,
-        exception_type: Optional[Type[BaseException]],
-        exception: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        exception_type: type[BaseException] | None,
+        exception: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         """
         Lets the next thread into CasADi.
@@ -121,7 +108,7 @@ class VariableGroup:
     A homogeneous, ordered group of variables that forms one input block.
     """
 
-    variables: Tuple[FloatVariable, ...]
+    variables: tuple[FloatVariable, ...]
 
     def __len__(self) -> int:
         return len(self.variables)
@@ -133,16 +120,16 @@ class VariableParameters:
     A collection of variable groups that define the input blocks of a compiled function.
     """
 
-    groups: Tuple[VariableGroup, ...]
+    groups: tuple[VariableGroup, ...]
 
     def __len__(self) -> int:
         return len(self.groups)
 
-    def flatten(self) -> Tuple[FloatVariable, ...]:
+    def flatten(self) -> tuple[FloatVariable, ...]:
         return tuple(v for g in self.groups for v in g.variables)
 
     @classmethod
-    def from_lists(cls, *args: List[FloatVariable]) -> VariableParameters:
+    def from_lists(cls, *args: list[FloatVariable]) -> VariableParameters:
         """
         Creates a new instance of VariableParameters from multiple lists.
 
@@ -152,7 +139,7 @@ class VariableParameters:
         """
         return cls(groups=tuple(VariableGroup(tuple(g)) for g in args))
 
-    def to_casadi_parameters(self) -> List[ca.SX]:
+    def to_casadi_parameters(self) -> list[ca.SX]:
         casadi_parameters = []
         if len(self) > 0:
             # create an array for each VariableGroup
@@ -175,7 +162,7 @@ class _Layout(ABC):
         return len(self.compiled.expression) == 0
 
     @abstractmethod
-    def compile(self, casadi_parameters: List[ca.SX]) -> None: ...
+    def compile(self, casadi_parameters: list[ca.SX]) -> None: ...
 
     @abstractmethod
     def setup_output(self) -> None: ...
@@ -187,7 +174,7 @@ class _DenseLayout(_Layout):
     Strategy for dense compiled function setup.
     """
 
-    def compile(self, casadi_parameters: List[ca.SX]) -> None:
+    def compile(self, casadi_parameters: list[ca.SX]) -> None:
         self.compiled.expression.casadi_sx = ca.densify(
             self.compiled.expression.casadi_sx
         )
@@ -214,7 +201,7 @@ class _SparseLayout(_Layout):
     Strategy for sparse compiled function setup.
     """
 
-    def compile(self, casadi_parameters: List[ca.SX]) -> None:
+    def compile(self, casadi_parameters: list[ca.SX]) -> None:
         self.compiled.expression.casadi_sx = ca.sparsify(
             self.compiled.expression.casadi_sx
         )
@@ -258,7 +245,7 @@ class CompiledFunction:
     The symbolic expression to compile.
     """
 
-    variable_parameters: Optional[VariableParameters] = None
+    variable_parameters: VariableParameters | None = None
     """
     The input parameters for the compiled symbolic expression.
     """
@@ -471,7 +458,7 @@ class CompiledFunctionWithViews:
     np.concatenate([expr1_result, expr2_result])[start:end]]
     """
 
-    expressions: List[SymbolicMathType]
+    expressions: list[SymbolicMathType]
     """
     The list of expressions to be compiled.
     """
@@ -481,7 +468,7 @@ class CompiledFunctionWithViews:
     The input parameters for the compiled symbolic expression.
     """
 
-    additional_views: Optional[List[slice]] = field(default_factory=list)
+    additional_views: list[slice] | None = field(default_factory=list)
     """
     If additional views are required that don't correspond to the expressions directly.
     """
@@ -491,7 +478,7 @@ class CompiledFunctionWithViews:
     Reference to the compiled function.
     """
 
-    split_out_view: List[np.ndarray] = field(init=False)
+    split_out_view: list[np.ndarray] = field(init=False)
     """
     Views to the out buffer of the compiled function.
     """
@@ -511,7 +498,7 @@ class CompiledFunctionWithViews:
         for expression_slice in self.additional_views:
             self.split_out_view.append(self.compiled_function._out[expression_slice])
 
-    def __call__(self, *args: np.ndarray) -> List[np.ndarray]:
+    def __call__(self, *args: np.ndarray) -> list[np.ndarray]:
         """
         :param args: A numpy array for each List[FloatVariable] in self.variable_parameters.
         :return: A np array for each expression, followed by arrays corresponding to the additional views.
@@ -532,7 +519,7 @@ class SymbolicMathType(ABC):
     Reference to the casadi data structure of type casadi.SX.
     """
 
-    pinned_free_variables: List[FloatVariable] = field(
+    pinned_free_variables: list[FloatVariable] = field(
         kw_only=True,
         repr=False,
         default_factory=list,
@@ -582,7 +569,7 @@ class SymbolicMathType(ABC):
     def __hash__(self) -> int:
         return hash(self.casadi_sx)
 
-    def pretty_str(self) -> List[List[str]]:
+    def pretty_str(self) -> list[list[str]]:
         """
         Turns a symbolic type into a more or less readable string.
         """
@@ -610,7 +597,7 @@ class SymbolicMathType(ABC):
         return f"{self.__class__.__name__}({repr(self.casadi_sx)[3:-1]})"
 
     def __getitem__(
-        self, item: np.ndarray | int | slice | Tuple[int | slice, int | slice]
+        self, item: np.ndarray | int | slice | tuple[int | slice, int | slice]
     ) -> Scalar | Vector:
         """
         Gives this class the getitem behavior of numpy.
@@ -626,7 +613,7 @@ class SymbolicMathType(ABC):
 
     def __setitem__(
         self,
-        key: int | slice | Tuple[int | slice, int | slice],
+        key: int | slice | tuple[int | slice, int | slice],
         value: ScalarData | VectorData | MatrixData,
     ):
         """
@@ -635,7 +622,7 @@ class SymbolicMathType(ABC):
         self.casadi_sx[key] = value.casadi_sx if hasattr(value, "casadi_sx") else value
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self) -> tuple[int, int]:
         return self.casadi_sx.shape
 
     def flatten(self) -> Vector:
@@ -652,7 +639,7 @@ class SymbolicMathType(ABC):
     def __len__(self) -> int:
         return self.shape[0]
 
-    def free_variables(self) -> List[FloatVariable]:
+    def free_variables(self) -> list[FloatVariable]:
         return [
             FloatVariable._registry[symbol.element_hash()]
             for symbol in ca.symvar(self.casadi_sx)
@@ -694,7 +681,7 @@ class SymbolicMathType(ABC):
     def safe_division(
         self,
         other: GenericSymbolicType,
-        if_nan: Optional[ScalarData] = None,
+        if_nan: ScalarData | None = None,
     ) -> GenericSymbolicType:
         """
         A version of division where no sub-expression is ever NaN.
@@ -713,7 +700,7 @@ class SymbolicMathType(ABC):
 
     def compile(
         self,
-        parameters: Optional[VariableParameters] = None,
+        parameters: VariableParameters | None = None,
         sparse: bool = False,
     ) -> CompiledFunction:
         """
@@ -747,8 +734,8 @@ class SymbolicMathType(ABC):
 
     def substitute(
         self,
-        old_variables: List[FloatVariable],
-        new_variables: List[ScalarData] | Vector,
+        old_variables: list[FloatVariable],
+        new_variables: list[ScalarData] | Vector,
     ) -> Self:
         """
         Replace variables in an expression with new variables or expressions.
@@ -975,12 +962,12 @@ class SerializableSymbolicMathType(SymbolicMathType, SubclassJSONSerializer):
     :class:`ExpressionGraph` computing it.
     """
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         result = super().to_json(**kwargs)
         result.update(self._value_to_json(**kwargs))
         return result
 
-    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+    def _value_to_json(self, **kwargs) -> dict[str, Any]:
         """
         :param kwargs: Keyword arguments to hand on to nested ``to_json`` calls.
         :return: The JSON entries describing the value itself.
@@ -994,7 +981,7 @@ class SerializableSymbolicMathType(SymbolicMathType, SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         if SymbolicMathJSONKey.EXPRESSION in data:
             return ExpressionGraph.from_json(
                 data[SymbolicMathJSONKey.EXPRESSION], **kwargs
@@ -1008,7 +995,7 @@ class ExpressionGraph(SubclassJSONSerializer):
     The computation of a symbolic math value from the variables it depends on.
     """
 
-    free_variables: List[FloatVariable]
+    free_variables: list[FloatVariable]
     """
     The variables the value depends on, in the order :attr:`casadi_function` takes them.
     """
@@ -1033,7 +1020,7 @@ class ExpressionGraph(SubclassJSONSerializer):
         return cls(free_variables=free_variables, casadi_function=casadi_function)
 
     def to_expression(
-        self, expression_type: Type[GenericSymbolicType]
+        self, expression_type: type[GenericSymbolicType]
     ) -> GenericSymbolicType:
         """
         :param expression_type: The type of the value this graph computes.
@@ -1046,7 +1033,7 @@ class ExpressionGraph(SubclassJSONSerializer):
         result.pinned_free_variables = list(self.free_variables)
         return result
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         result = super().to_json(**kwargs)
         result[SymbolicMathJSONKey.FREE_VARIABLES] = [
             variable.to_json(**kwargs) for variable in self.free_variables
@@ -1055,7 +1042,7 @@ class ExpressionGraph(SubclassJSONSerializer):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         # registers the tracker in kwargs, so every variable below shares it
         FloatVariableTracker.from_kwargs(kwargs)
         return cls(
@@ -1390,7 +1377,7 @@ class FloatVariable(Scalar):
     Subclasses should set it to return the current float value for this variable.
     """
 
-    def __init__(self, name: str, id: Optional[UUID] = None):
+    def __init__(self, name: str, id: UUID | None = None):
         """
         :param name: The name of the variable.
         :param id: The id of the variable, a new one if None.
@@ -1403,14 +1390,14 @@ class FloatVariable(Scalar):
         self.casadi_sx = casadi_sx
         self.pinned_free_variables = [self]
 
-    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+    def _value_to_json(self, **kwargs) -> dict[str, Any]:
         return {
             SymbolicMathJSONKey.ID: to_json(self.id),
             SymbolicMathJSONKey.NAME: self.name,
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
         :return: The variable with the serialized id, if one was already deserialized
             from this document or is alive in this process, else a new one.
@@ -1483,7 +1470,7 @@ class Vector(SerializableSymbolicMathType):
 
     def __init__(
         self,
-        data: Optional[VectorData] = None,
+        data: VectorData | None = None,
     ):
         if data is None:
             data = []
@@ -1615,7 +1602,7 @@ class Matrix(SerializableSymbolicMathType):
 
     def __init__(
         self,
-        data: Optional[VectorData | MatrixData] = None,
+        data: VectorData | MatrixData | None = None,
     ):
         if data is None:
             data = []
@@ -1623,7 +1610,7 @@ class Matrix(SerializableSymbolicMathType):
         super().__post_init__()
 
     @classmethod
-    def create_filled_with_variables(cls, shape: Tuple[int, int], name: str) -> Self:
+    def create_filled_with_variables(cls, shape: tuple[int, int], name: str) -> Self:
         data = []
         for row in range(shape[0]):
             row_data = []
@@ -1856,7 +1843,7 @@ class Matrix(SerializableSymbolicMathType):
             column_counter += matrix.shape[1]
         return combined_matrix
 
-    def remove(self, rows: List[int], columns: List[int]):
+    def remove(self, rows: list[int], columns: list[int]):
         """
         Removes the specified rows and columns from the matrix.
 
@@ -1912,7 +1899,7 @@ class Matrix(SerializableSymbolicMathType):
         """
         return Matrix.from_casadi_sx(self.casadi_sx.T)
 
-    def reshape(self, new_shape: Tuple[int, int]) -> Self:
+    def reshape(self, new_shape: tuple[int, int]) -> Self:
         """
         See numpy.reshape.
         """
@@ -1951,7 +1938,7 @@ class Matrix(SerializableSymbolicMathType):
         return Matrix(ca.kron(m1, m2))
 
 
-def _create_return_type(input_type: SymbolicMathType) -> Type[SymbolicMathType]:
+def _create_return_type(input_type: SymbolicMathType) -> type[SymbolicMathType]:
     """
     Determines the return type based on the given input type.
 
@@ -2096,8 +2083,8 @@ def _binary_function_wrapper(
 
 
 def create_float_variables(
-    names: List[str] | int,
-) -> List[FloatVariable]:
+    names: list[str] | int,
+) -> list[FloatVariable]:
     """
     Generates a list of symbolic objects based on the input names or an integer value.
 
@@ -2170,7 +2157,7 @@ abs = _unary_function_wrapper(ca.OP_FABS, "fabs")
 
 
 def max(
-    arg1: GenericSymbolicType, arg2: Optional[GenericSymbolicType] = None
+    arg1: GenericSymbolicType, arg2: GenericSymbolicType | None = None
 ) -> GenericSymbolicType:
     """
     Returns the maximum element-wise value.
@@ -2190,7 +2177,7 @@ def max(
 
 
 def min(
-    arg1: GenericSymbolicType, arg2: Optional[GenericSymbolicType] = None
+    arg1: GenericSymbolicType, arg2: GenericSymbolicType | None = None
 ) -> GenericSymbolicType:
     """
     Returns the minimum element-wise value.
@@ -2730,7 +2717,7 @@ def if_eq(
 
 def if_eq_cases(
     a: ScalarData,
-    b_result_cases: Iterable[Tuple[ScalarData, GenericSymbolicType]],
+    b_result_cases: Iterable[tuple[ScalarData, GenericSymbolicType]],
     else_result: GenericSymbolicType,
 ) -> GenericSymbolicType:
     """
@@ -2756,7 +2743,7 @@ def if_eq_cases(
 
 
 def if_cases(
-    cases: Sequence[Tuple[ScalarData, GenericSymbolicType]],
+    cases: Sequence[tuple[ScalarData, GenericSymbolicType]],
     else_result: GenericSymbolicType,
 ) -> GenericSymbolicType:
     """
@@ -2782,7 +2769,7 @@ def if_cases(
 
 def if_less_eq_cases(
     a: ScalarData,
-    b_result_cases: Sequence[Tuple[ScalarData, GenericSymbolicType]],
+    b_result_cases: Sequence[tuple[ScalarData, GenericSymbolicType]],
     else_result: GenericSymbolicType,
 ) -> GenericSymbolicType:
     """

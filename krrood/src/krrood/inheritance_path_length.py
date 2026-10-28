@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass
 from functools import lru_cache
 from inspect import isclass
-from typing import Type, Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Type
 
 from krrood.entity_query_language.predicate import (
     RenderedFields,
@@ -39,7 +39,7 @@ class InheritancePathLength(SymbolicFunction):
     The parent class.
     """
 
-    def __call__(self) -> Optional[int]:
+    def __call__(self) -> int | None:
         if not (
             isclass(self.child_class)
             and isclass(self.parent_class)
@@ -73,7 +73,7 @@ inheritance_path_length = lru_cache(
 
 
 def _inheritance_path_length(
-    child_class: Type, parent_class: Type, current_length: int = 0
+    child_class: type, parent_class: type, current_length: int = 0
 ) -> int:
     """
     Helper function for :func:`inheritance_path_length`.
@@ -110,8 +110,8 @@ def inheritance_distance(child_class: type, parent_class: type) -> int:
     return path_length if path_length is not None else math.inf
 
 def nearest_common_ancestor(
-    child_class: Type, parent_class: Type
-) -> Type:
+    child_class: type, parent_class: type
+) -> type:
     """
     Return the most specific class in ``parent_class``'s MRO that ``child_class``
     also derives from — i.e. the closest common ancestor reached by generalizing

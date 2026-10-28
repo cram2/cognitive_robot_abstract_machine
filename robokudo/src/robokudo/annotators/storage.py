@@ -41,17 +41,25 @@ class StorageWriter(BaseAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for storage writer."""
+        """
+        Configuration descriptor for storage writer.
+        """
 
         class Parameters:
-            """Parameter container for storage configuration."""
+            """
+            Parameter container for storage configuration.
+            """
 
             def __init__(self) -> None:
                 self.db_name: str = "rk_scenes"
-                """Database name"""
+                """
+                Database name
+                """
 
                 self.drop_database_on_storage: bool = True
-                """Whether to clear database before recording"""
+                """
+                Whether to clear database before recording
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -61,7 +69,8 @@ class StorageWriter(BaseAnnotator):
         name: str = "StorageWriter",
         descriptor: StorageWriter.Descriptor | None = None,
     ) -> None:
-        """Initialize the storage writer. Minimal one-time init!
+        """
+        Initialize the storage writer. Minimal one-time init!
 
         :param name: Annotator name
         :param descriptor: Configuration descriptor

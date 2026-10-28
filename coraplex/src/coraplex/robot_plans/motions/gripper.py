@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing_extensions import Optional, List
 
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
@@ -63,7 +63,7 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
     The gripper that should be moved.
     """
 
-    allow_gripper_collision: Optional[bool] = None
+    allow_gripper_collision: bool | None = None
     """
     If the gripper is allowed to collide with something.
     """
@@ -94,7 +94,7 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
                 [joint_task, stall_monitor], minimum_success=1, name=name
             )
 
-        accompanying_nodes: List[MotionStatechartNode] = []
+        accompanying_nodes: list[MotionStatechartNode] = []
         if self.finger_velocity is not None:
             accompanying_nodes.append(
                 JointVelocityLimit(
@@ -190,12 +190,12 @@ class MoveToolCenterPointMotion(
     Arm with the TCP that should be moved to the target.
     """
 
-    allow_gripper_collision: Optional[bool] = None
+    allow_gripper_collision: bool | None = None
     """
     If the gripper can collide with something.
     """
 
-    movement_type: Optional[MovementType] = MovementType.CARTESIAN
+    movement_type: MovementType | None = MovementType.CARTESIAN
     """
     The type of movement that should be performed.
     """
@@ -203,7 +203,7 @@ class MoveToolCenterPointMotion(
     def perform(self):
         return
 
-    def _velocity_limit_nodes(self, root: Body, tip: Body) -> List[Task]:
+    def _velocity_limit_nodes(self, root: Body, tip: Body) -> list[Task]:
         """
         :return: The :class:`CartesianPositionVelocityLimit`/
             :class:`CartesianRotationVelocityLimit` nodes requested via
@@ -259,7 +259,7 @@ class MoveToolCenterPointMotion(
                 translation_threshold=self.resolved_position_threshold(),
                 orientation_threshold=self.resolved_orientation_threshold(),
             )
-        accompanying_nodes: List[MotionStatechartNode] = list(
+        accompanying_nodes: list[MotionStatechartNode] = list(
             self._velocity_limit_nodes(root, tip)
         )
         accompanying_nodes.extend(self.keep_base_still())
@@ -278,7 +278,7 @@ class MoveTCPWaypointsMotion(BaseMotion, HasTcpGoalThresholds):
     Moves the Tool center point (TCP) of the robot.
     """
 
-    waypoints: List[Pose]
+    waypoints: list[Pose]
     """
     Waypoints the TCP should move along.
     """
@@ -288,7 +288,7 @@ class MoveTCPWaypointsMotion(BaseMotion, HasTcpGoalThresholds):
     Arm with the TCP that should be moved to the target.
     """
 
-    allow_gripper_collision: Optional[bool] = None
+    allow_gripper_collision: bool | None = None
     """
     If the gripper can collide with something.
     """
@@ -338,7 +338,7 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion, HasTcpGoalThresholds):
     given plane alignments.
     """
 
-    waypoints: List[Point3]
+    waypoints: list[Point3]
     """
     Waypoints the TCP should move along.
     """
@@ -348,17 +348,17 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion, HasTcpGoalThresholds):
     Arm with the TCP that should be moved along the waypoints.
     """
 
-    alignment_pairs: List[AlignmentPair] = field(default_factory=list)
+    alignment_pairs: list[AlignmentPair] = field(default_factory=list)
     """
     Normal pairs kept aligned during the motion.
     """
 
-    allow_gripper_collision: Optional[bool] = None
+    allow_gripper_collision: bool | None = None
     """
     If the gripper can collide with something.
     """
 
-    tip: Optional[Body] = None
+    tip: Body | None = None
     """
     The body that should follow the waypoints.
 

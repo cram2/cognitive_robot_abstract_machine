@@ -96,7 +96,7 @@ def _detected_plane(annotator: PlaneAnnotator) -> Plane:
     return plane
 
 
-def test_a_seeded_annotator_finds_the_same_plane_every_time():
+def test_a_seeded_annotator_finds_the_same_plane_every_time() -> None:
     first = _detected_plane(_plane_annotator_in_pipeline(SEED))
     second = _detected_plane(_plane_annotator_in_pipeline(SEED))
 
@@ -104,5 +104,5 @@ def test_a_seeded_annotator_finds_the_same_plane_every_time():
     assert first.inliers == second.inliers
 
 
-def test_the_seed_is_off_by_default():
+def test_the_seed_is_off_by_default() -> None:
     assert PlaneAnnotator.Descriptor().parameters.random_seed is None

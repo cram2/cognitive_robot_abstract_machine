@@ -2,14 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field, replace
-from typing_extensions import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    List,
-    Optional,
-    TypeVar,
-)
+from typing_extensions import TYPE_CHECKING, Any, Callable, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import (
     Selectable,
@@ -50,7 +43,7 @@ class VerbalizationFragment:
     composition (``PhraseFragment``), and block structure (``BlockFragment``).
     """
 
-    source: Optional[FoldNode] = field(
+    source: FoldNode | None = field(
         default=None, kw_only=True, compare=False, repr=False
     )
     """The EQL node (or synthetic coordination artifact) this fragment was built from, recorded so a
@@ -114,7 +107,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
     role: SemanticRole
     """Semantic role that determines this token's colour markup."""
 
-    source_reference: Optional[SourceReference] = None
+    source_reference: SourceReference | None = None
     """Optional reference to the Python class or attribute this fragment represents."""
 
     @classmethod
@@ -147,11 +140,11 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
     @classmethod
     def for_attribute(
         cls,
-        owner: Optional[type],
+        owner: type | None,
         attribute_name: str,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         *,
-        text: Optional[str] = None,
+        text: str | None = None,
     ) -> RoleFragment:
         """
         Build a fragment for an attribute access, linked to its owner class.
@@ -185,7 +178,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         )
 
     @staticmethod
-    def _display_name(owner: Optional[type], attribute_name: str) -> str:
+    def _display_name(owner: type | None, attribute_name: str) -> str:
         """:return: the field's registered display name when *owner* declares one for
         *attribute_name*, else *attribute_name* unchanged."""
         if owner is None:
@@ -201,7 +194,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         type_: Any,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         *,
-        text: Optional[str] = None,
+        text: str | None = None,
     ) -> RoleFragment:
         """
         Build a fragment for a type rendered as a noun (*"Robot"*), with the ``VARIABLE`` role.
@@ -315,7 +308,7 @@ class NounPhrase(HasNumber, VerbalizationFragment):
     head: VerbalizationFragment
     """The noun leaf or sub-phrase the determiner attaches to."""
 
-    additional_heads: List[VerbalizationFragment] = field(default_factory=list)
+    additional_heads: list[VerbalizationFragment] = field(default_factory=list)
     """Further disjunctive alternatives to :attr:`head`, each joined with *"or"* and given its
     own indefinite article from its own phonology (*"a Body or a Region"*). Empty for an
     ordinary single-headed noun phrase."""
@@ -323,7 +316,7 @@ class NounPhrase(HasNumber, VerbalizationFragment):
     definiteness: Definiteness = Definiteness.INDEFINITE
     """Determiner-system feature — selects *"a/an"* / *"the"* / no determiner."""
 
-    modifiers: List[VerbalizationFragment] = field(default_factory=list)
+    modifiers: list[VerbalizationFragment] = field(default_factory=list)
     """Post-modifiers following the head (e.g. *"of the Root"*, *"where … such that …"*)."""
 
     modifier_separator: Separator = Separator.SPACE
@@ -331,7 +324,7 @@ class NounPhrase(HasNumber, VerbalizationFragment):
     :attr:`Separator.SPACE` (*"drawers of Cabinets"*); :attr:`Separator.NONE` lets an appositive
     clause attach without a spurious space (*"a Robot, where …"*)."""
 
-    referent_id: Optional[uuid.UUID] = None
+    referent_id: uuid.UUID | None = None
     """When set, this noun phrase is a referring expression for that entity, and its
     definiteness holds the first-mention form."""
 
@@ -341,7 +334,7 @@ class NounPhrase(HasNumber, VerbalizationFragment):
     for a quantity whose modifiers are a complement rooted elsewhere (*"the sum of the amount of its
     revenue"* — the complement keeps the outer subject, so it must not be re-scoped to the sum)."""
 
-    pre_head: Optional[VerbalizationFragment] = None
+    pre_head: VerbalizationFragment | None = None
     """A qualifier placed between the determiner and the head (*"the [first two] Robots"*), e.g. a
     ``limit`` ranking phrase. Pre-nominal, so distinct from the post-nominal :attr:`modifiers`."""
 
@@ -358,7 +351,7 @@ class NounPhrase(HasNumber, VerbalizationFragment):
     coreference reduction (:meth:`~…rendering.coreference_processor.CoreferenceProcessor._reduced`)
     — it is part of the referent's identity, not a descriptive qualifier."""
 
-    ordinal: Optional[int] = None
+    ordinal: int | None = None
     """When set, this noun phrase is one of ≥ 3 same-noun distinct referents, and the value is its
     position in the group, counting the first member as 1 — realised as an ordinal word in the
     pre-head slot (*"a second Robot"*, later *"the second Robot"*). Mutually exclusive with
@@ -374,17 +367,17 @@ class PossessiveChain(VerbalizationFragment):
     BankTransaction"*).
     """
 
-    parts: List[PathStep]
+    parts: list[PathStep]
     """The chain's navigation path (:class:`PathStep` hops), innermost-last."""
 
     root_fragment: VerbalizationFragment
     """The referring noun phrase for the chain root."""
 
-    root_referent_id: Optional[uuid.UUID] = None
+    root_referent_id: uuid.UUID | None = None
     """The root variable's referent id — the chain pronominalises only when this is the current
     subject (and the root is not a numbered label)."""
 
-    node_id: Optional[uuid.UUID] = None
+    node_id: uuid.UUID | None = None
     """The chain's own terminal node id. When the chain is a query's selected / measured quantity,
     a later mention of that same quantity (a WHERE on the very attribute being aggregated) reduces
     to a bare *"the <attribute>"* instead of repeating the whole possessive."""
@@ -404,7 +397,7 @@ class OwnedAttributes(VerbalizationFragment):
     """The referring phrase for the owner, rendered by the normal recursion; used in the genitive
     (non-subject) branch (*"… of the position"* / *"… of its position"*)."""
 
-    owner_referent_id: Optional[uuid.UUID] = None
+    owner_referent_id: uuid.UUID | None = None
     """The owner's referent id — the surface pronominalises only when this is the current subject
     (and the owner is not a numbered label)."""
 
@@ -415,13 +408,13 @@ class BlockFragment(VerbalizationFragment):
     A named structural block with an optional header and a list of sub-items.
     """
 
-    header: Optional[VerbalizationFragment]
+    header: VerbalizationFragment | None
     """Optional lead fragment (e.g. ``"Find Robot"`` or ``"If"``)."""
 
     items: list[VerbalizationFragment] = field(default_factory=list)
     """Ordered list of sub-item fragments."""
 
-    conjunction: Optional[VerbalizationFragment] = None
+    conjunction: VerbalizationFragment | None = None
     """When set, the items are coordinated by this conjunction: paragraph rendering joins them
     Oxford-style (*"a, b, and c"*) and hierarchical rendering prefixes the last bullet with it
     (*"… and c"*). ``None`` ⇒ the items are an uncoordinated list (comma-joined / plain bullets)."""
@@ -439,8 +432,8 @@ def fold_fragment(
     fragment: VerbalizationFragment,
     *,
     word: Callable[[str], _T],
-    role: Callable[[str, SemanticRole, Optional[SourceReference]], _T],
-    phrase: Callable[[List[_T], str], _T],
+    role: Callable[[str, SemanticRole, SourceReference | None], _T],
+    phrase: Callable[[list[_T], str], _T],
     block: Callable[[BlockFragment], _T],
 ) -> _T:
     """
@@ -495,7 +488,7 @@ def fold_fragment(
 def map_structural_children(
     fragment: VerbalizationFragment,
     recurse: Callable[[VerbalizationFragment], VerbalizationFragment],
-) -> Optional[VerbalizationFragment]:
+) -> VerbalizationFragment | None:
     """
     Rebuild a structural container (``PhraseFragment``, ``BlockFragment`` — the nodes that merely
     hold children) by applying *recurse* to each child, or return ``None`` for anything else (a

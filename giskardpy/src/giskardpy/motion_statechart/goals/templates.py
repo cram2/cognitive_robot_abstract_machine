@@ -2,9 +2,7 @@ from __future__ import division
 
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import List
 
-from typing_extensions import Optional
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import (
@@ -38,7 +36,7 @@ class NodeListGoal(Goal):
     compilation, so a node handed over before that is serialized once, inside this goal.
     """
 
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
+    nodes: list[MotionStatechartNode] = field(default_factory=list, init=True)
     """
     The nodes this goal runs, in the order they were handed over.
     """
@@ -79,7 +77,7 @@ class Sequence(NodeListGoal):
         there.
         """
         self._check_has_children()
-        last_node: Optional[MotionStatechartNode] = None
+        last_node: MotionStatechartNode | None = None
         for node in self.nodes:
             self._add_child_to_motion_statechart(node)
             if last_node is not None:
@@ -127,7 +125,7 @@ class Parallel(NodeListGoal):
     their goals.
     """
 
-    minimum_success: Optional[int] = field(default=None, kw_only=True)
+    minimum_success: int | None = field(default=None, kw_only=True)
     """
     How many nodes must have reached their goals for this goal to be achieved.
 
@@ -195,7 +193,7 @@ class RepeatUntil(Goal):
     and set it themselves in :meth:`__post_init__`.
     """
 
-    exception: Optional[DataclassException] = field(default=None, kw_only=True)
+    exception: DataclassException | None = field(default=None, kw_only=True)
     """
     The failure that ends the motion once :attr:`stop_retry_monitor` calls the retrying
     off, or None to only observe False then.
@@ -377,7 +375,7 @@ class TryInOrder(NodeListGoal):
     .. note:: corresponds to the RPL's TRY-IN-ORDER. (McDermott, Drew. A reactive plan language, 1991)
     """
 
-    _alternatives: List[MotionStatechartNode] = field(default_factory=list, init=False)
+    _alternatives: list[MotionStatechartNode] = field(default_factory=list, init=False)
     """
     The nodes that were passed in, captured before :meth:`expand` adds a progress
     monitor per alternative to :attr:`nodes` alongside them.
@@ -404,7 +402,7 @@ class TryInOrder(NodeListGoal):
         """
         self._check_has_children()
         self._alternatives = list(self.nodes)
-        previous_node: Optional[MotionStatechartNode] = None
+        previous_node: MotionStatechartNode | None = None
         for node in self._alternatives:
             self._add_child_to_motion_statechart(node)
             if previous_node is not None:

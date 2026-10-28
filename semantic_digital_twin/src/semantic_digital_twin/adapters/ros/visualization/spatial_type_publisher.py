@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile

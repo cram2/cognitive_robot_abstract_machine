@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from random_events.product_algebra import Event
-from typing_extensions import List
 
 
 @dataclass
@@ -17,7 +16,7 @@ class NodeComponentSupports:
     Which node of the layer it is.
     """
 
-    supports: List[Event]
+    supports: list[Event]
     """
     What each of that node's components models, one event per component.
     """

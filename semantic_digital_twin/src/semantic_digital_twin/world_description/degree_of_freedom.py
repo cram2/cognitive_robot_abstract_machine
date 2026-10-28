@@ -4,7 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from typing_extensions import Any, ClassVar, Dict, Generic, Self, TypeVar
+from typing_extensions import Any, ClassVar, Generic, Self, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
@@ -57,7 +57,7 @@ class DegreeOfFreedomVariable(sm.FloatVariable):
     def resolve(self) -> float:
         return self.dof._world.state[self.dof.id][self.derivative]
 
-    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+    def _value_to_json(self, **kwargs) -> dict[str, Any]:
         result = {}
         WorldEntityReference(DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM).write(
             result, self.dof
@@ -65,7 +65,7 @@ class DegreeOfFreedomVariable(sm.FloatVariable):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         dof = WorldEntityReference(
             DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM
         ).resolve(data, **kwargs)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field, InitVar
-from typing import List, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 import numpy as np
 
@@ -31,19 +31,19 @@ class QPController:
     """
 
     config: QPControllerConfig
-    degrees_of_freedom: InitVar[List[DegreeOfFreedom]]
-    active_degrees_of_freedom: List[DegreeOfFreedom] = field(init=False)
+    degrees_of_freedom: InitVar[list[DegreeOfFreedom]]
+    active_degrees_of_freedom: list[DegreeOfFreedom] = field(init=False)
     constraint_collection: ConstraintCollection
-    world_state_symbols: List[sm.FloatVariable]
-    life_cycle_variables: List[sm.FloatVariable]
-    float_variables: List[sm.FloatVariable]
+    world_state_symbols: list[sm.FloatVariable]
+    life_cycle_variables: list[sm.FloatVariable]
+    float_variables: list[sm.FloatVariable]
 
     qp_data_factory: QPDataFactory = field(default=None, init=False)
     qp_solver: QPSolver = field(default=None, init=False)
     debugger: QuadraticProgramDebugger = field(default=None, init=False)
     dof_filter: np.ndarray = field(default=None, init=False)
 
-    def __post_init__(self, degrees_of_freedom: List[DegreeOfFreedom]):
+    def __post_init__(self, degrees_of_freedom: list[DegreeOfFreedom]):
         self.qp_solver = self.config.qp_solver_class()
         if self.config.verbose:
             logger.info(
@@ -73,7 +73,7 @@ class QPController:
             qp_data_symbolic=self.qp_data_factory.qp_data
         )
 
-    def _set_active_dofs(self, degrees_of_freedom: List[DegreeOfFreedom]) -> None:
+    def _set_active_dofs(self, degrees_of_freedom: list[DegreeOfFreedom]) -> None:
         all_active_float_variables = set().union(
             *[
                 {

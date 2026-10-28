@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 import pytest
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from krrood.exceptions import DataclassException
-from typing_extensions import List
 
 from segmind.datastructures.events import (
     DetectionEvent,
@@ -182,7 +181,7 @@ class DetectorCountingItsTicks(AbstractDetector):
     How often this detector was ticked.
     """
 
-    tick_threads: List[int] = field(default_factory=list, init=False)
+    tick_threads: list[int] = field(default_factory=list, init=False)
     """
     The identifier of the thread each tick ran on, in order.
     """
@@ -196,8 +195,8 @@ class DetectorCountingItsTicks(AbstractDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         self.ticks += 1
         self.tick_threads.append(threading.get_ident())
         self.ticked.set()
@@ -219,8 +218,8 @@ class DetectorTakingItsTime(AbstractDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         time.sleep(self.seconds_per_tick)
         return []
 

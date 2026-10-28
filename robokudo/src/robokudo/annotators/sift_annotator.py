@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, List, Sequence
+from typing_extensions import TYPE_CHECKING, Sequence
 
 from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
@@ -44,7 +44,7 @@ class SIFTAnnotator(ThreadedAnnotator):
         """
         cas = self.get_cas()
 
-        ohs: List[ObjectHypothesis] = cas.filter_annotations_by_type(ObjectHypothesis)
+        ohs: list[ObjectHypothesis] = cas.filter_annotations_by_type(ObjectHypothesis)
         if len(ohs) == 0:
             return Status.FAILURE
 
@@ -62,7 +62,7 @@ class SIFTAnnotator(ThreadedAnnotator):
 
         vis_image = color_image.copy()
 
-        all_keypoints: List[cv2.KeyPoint] = []
+        all_keypoints: list[cv2.KeyPoint] = []
         for i, oh in enumerate(ohs):
             roi = oh.roi.roi.get_corner_points()
 
@@ -123,7 +123,7 @@ class SIFTAnnotator(ThreadedAnnotator):
 
     def _keypoints_to_point_cloud(
         self,
-        keypoints: List[cv2.KeyPoint],
+        keypoints: list[cv2.KeyPoint],
         depth_image: npt.NDArray,
         intrinsics: o3d.camera.PinholeCameraIntrinsic,
         color_to_depth_ratio: ColorToDepthRatio,
@@ -172,7 +172,7 @@ class SIFTAnnotator(ThreadedAnnotator):
 
     @staticmethod
     def _keypoint_colors(
-        keypoints: List[cv2.KeyPoint],
+        keypoints: list[cv2.KeyPoint],
         responses: npt.NDArray,
     ) -> npt.NDArray[np.float64]:
         """

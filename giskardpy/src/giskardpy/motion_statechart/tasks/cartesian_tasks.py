@@ -5,7 +5,7 @@ from dataclasses import field, dataclass
 from functools import cached_property
 
 import numpy as np
-from typing_extensions import ClassVar, List
+from typing_extensions import ClassVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import (
@@ -965,7 +965,7 @@ class CartesianVelocityLimit(Parallel):
     """Optimization weight determining how strongly both velocity
     limits are enforced. Higher weights give these constraints soft priority
     over lower weighted constraints when conflicts occur."""
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=False)
+    nodes: list[MotionStatechartNode] = field(default_factory=list, init=False)
     """List of motion nodes that run in parallel and enforce the velocity limits.
     Contains a CartesianPositionVelocityLimit and CartesianRotationVelocityLimit node 
     by default. Populated in __post_init__()."""

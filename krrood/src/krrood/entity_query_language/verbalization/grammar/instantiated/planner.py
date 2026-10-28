@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import List
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import InstantiatedVariable
@@ -44,7 +43,7 @@ class InstantiatedPlan:
     Display name of the instantiated type (e.g. ``"Drawer"``).
     """
 
-    bindings: List[BindingPlan]
+    bindings: list[BindingPlan]
     """
     Ordered field bindings.
     """
@@ -85,7 +84,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
         """
         return getattr(self.node._type_, "__name__", str(self.node._type_))
 
-    def _bindings(self) -> List[BindingPlan]:
+    def _bindings(self) -> list[BindingPlan]:
         """:return: One :class:`BindingPlan` per field binding, in construction order.
 
         >>> connection = variable(FixedConnection, [])

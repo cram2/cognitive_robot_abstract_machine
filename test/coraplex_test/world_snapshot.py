@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import numpy as np
-from typing_extensions import Dict, Self
+from typing_extensions import Self
 
 from semantic_digital_twin.world import World
 
@@ -26,7 +26,7 @@ class WorldSnapshot:
     The model version of :attr:`world` when the snapshot was captured.
     """
 
-    degree_of_freedom_states: Dict[UUID, np.ndarray]
+    degree_of_freedom_states: dict[UUID, np.ndarray]
     """
     The position, velocity, acceleration and jerk of every degree of freedom of
     :attr:`world` when the snapshot was captured.

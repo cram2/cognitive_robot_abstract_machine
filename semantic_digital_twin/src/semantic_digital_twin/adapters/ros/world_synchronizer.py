@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
-from typing import ClassVar, Optional, Type, List, Dict
+from typing_extensions import ClassVar
 from uuid import UUID
 
 import numpy as np
@@ -99,7 +99,7 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     The rclpy node used to create the publishers and subscribers.
     """
 
-    topic_name: Optional[str] = None
+    topic_name: str | None = None
     """
     The topic name of the publisher and subscriber.
     """
@@ -119,17 +119,17 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     How long to wait between two looks at the subscribers of the topic while connecting.
     """
 
-    publisher: Optional[Publisher] = field(init=False, default=None)
+    publisher: Publisher | None = field(init=False, default=None)
     """
     The publisher used to publish the world state.
     """
 
-    subscriber: Optional[Subscription] = field(default=None, init=False)
+    subscriber: Subscription | None = field(default=None, init=False)
     """
     The subscriber to the world state.
     """
 
-    message_type: ClassVar[Optional[Type[Message]]] = None
+    message_type: ClassVar[type[Message] | None] = None
     """
     The type of the message that is sent and received.
     """
@@ -139,7 +139,7 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     Position of the message this synchronizer published last.
     """
 
-    _applied_sequence_numbers: Dict[MetaData, int] = field(
+    _applied_sequence_numbers: dict[MetaData, int] = field(
         default_factory=dict, init=False, repr=False
     )
     """
@@ -324,7 +324,7 @@ class ModelReloadSynchronizer(Synchronizer):
     Note that this may take a couple of seconds.
     """
 
-    message_type: ClassVar[Type[Message]] = LoadModel
+    message_type: ClassVar[type[Message]] = LoadModel
 
     session: Session = None
     """
@@ -343,7 +343,7 @@ class ModelReloadSynchronizer(Synchronizer):
     running motion.
     """
 
-    pending_reload: Optional[LoadModel] = field(default=None, init=False, repr=False)
+    pending_reload: LoadModel | None = field(default=None, init=False, repr=False)
     """
     The reload that was received but not applied yet.
 
@@ -418,7 +418,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     messages arrive before the model update that introduced the referenced DOF UUIDs.
     """
 
-    message_type: ClassVar[Optional[Type[Message]]] = WorldUpdate
+    message_type: ClassVar[type[Message] | None] = WorldUpdate
 
     topic_name: str = "/semantic_digital_twin/world_sync"
 
@@ -432,7 +432,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     example a controller that must not have the world changed under a running motion.
     """
 
-    missed_messages: List[WorldUpdate] = field(
+    missed_messages: list[WorldUpdate] = field(
         default_factory=list, init=False, repr=False
     )
     """
@@ -477,7 +477,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         Synchronizer.__post_init__(self)
         ModelChangeCallback.__post_init__(self)
 
-    def on_model_change(self, publish_changes: Optional[bool] = None, **kwargs):
+    def on_model_change(self, publish_changes: bool | None = None, **kwargs):
         """
         Send the modification block the world just recorded to the other synchronizers.
 
@@ -504,7 +504,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
 
     def on_state_change(
         self,
-        publish_changes: Optional[bool] = None,
+        publish_changes: bool | None = None,
         force_republish: bool = False,
         **kwargs,
     ):
@@ -561,7 +561,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         else:
             self.publish(update)
 
-    def compute_state_changes(self) -> Dict[UUID, float]:
+    def compute_state_changes(self) -> dict[UUID, float]:
         """
         Return only DOF positions that changed since the last snapshot.
         """

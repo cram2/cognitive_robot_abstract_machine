@@ -1,13 +1,13 @@
+from __future__ import annotations
+
 import sys
 import logging
 from threading import Lock, RLock
-from typing import Any
+from typing_extensions import Callable, Any
 
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from coraplex.ros import create_action_client
 from coraplex.ros import get_node_names
-
-from typing_extensions import List, Callable, Optional
 
 
 logger = logging.getLogger(__name__)
@@ -99,9 +99,9 @@ def init_robokudo_interface(func: Callable) -> Callable:
 
 @init_robokudo_interface
 def send_query(
-    obj_type: Optional[str] = None,
-    region: Optional[str] = None,
-    attributes: Optional[List[str]] = None,
+    obj_type: str | None = None,
+    region: str | None = None,
+    attributes: list[str] | None = None,
 ) -> Any:
     """
     Generic function to send a query to RoboKudo.
@@ -166,7 +166,7 @@ def query_object(obj_desc: Any) -> dict:
 
 
 @init_robokudo_interface
-def query_human() -> "PointStamped":
+def query_human() -> PointStamped:
     """
     Query RoboKudo for human detection and return the detected human's pose.
     """

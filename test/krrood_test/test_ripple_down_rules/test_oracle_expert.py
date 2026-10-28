@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from enum import Enum
 
 import pytest
-from typing_extensions import Optional
 
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.exceptions import (
@@ -34,7 +33,7 @@ class Animal:
     name: str
     has_fur: bool
     leg_count: int
-    animal_class: Optional[AnimalClass] = None
+    animal_class: AnimalClass | None = None
 
 
 @dataclass

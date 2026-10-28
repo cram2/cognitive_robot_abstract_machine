@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import torch
-from typing_extensions import Any, Dict, List, Optional
+from typing_extensions import Any
 from ultralytics.engine.results import Results
 
 from robokudo.types.human import BodyKeypoint
@@ -45,7 +45,7 @@ class NormalizedBox:
     Fraction of the image height above the box's bottom edge.
     """
 
-    def corners_in(self, image: np.ndarray) -> List[float]:
+    def corners_in(self, image: np.ndarray) -> list[float]:
         """
         :return: The corners (x1, y1, x2, y2) of the box in pixels of the given image.
         """
@@ -122,22 +122,22 @@ class MockDetectionModel:
     YOLO mock reporting its predefined detections on any image.
     """
 
-    names: Dict[int, str]
+    names: dict[int, str]
     """
     Name of each class the model detects, by class id.
     """
 
-    detections: List[MockDetection] = field(default_factory=list)
+    detections: list[MockDetection] = field(default_factory=list)
     """
     The detections reported on every image.
     """
 
-    received_confidence: Optional[float] = None
+    received_confidence: float | None = None
     """
     The confidence threshold of the last prediction.
     """
 
-    received_image_shape: Optional[tuple] = None
+    received_image_shape: tuple | None = None
     """
     Shape of the image of the last prediction.
     """
@@ -201,7 +201,7 @@ class TopHalfSegmentationModel:
     SAM mock segmenting the upper half of every prompted bounding box.
     """
 
-    def segment(self, image: np.ndarray, corners: List[float]) -> np.ndarray:
+    def segment(self, image: np.ndarray, corners: list[float]) -> np.ndarray:
         """
         :return: A mask on the image covering the upper half of the box.
         """
@@ -210,7 +210,7 @@ class TopHalfSegmentationModel:
         mask[y1 : (y1 + y2) // 2, x1:x2] = 1.0
         return mask
 
-    def predict(self, image: np.ndarray, bboxes: List[List[float]]) -> List[Results]:
+    def predict(self, image: np.ndarray, bboxes: list[list[float]]) -> list[Results]:
         """
         :return: The segmentation of the first prompted box.
         """
@@ -239,12 +239,12 @@ class MockModelLoader:
     The segmentation model handed out for every SAM model location.
     """
 
-    loaded_model_locations: List[str] = field(default_factory=list)
+    loaded_model_locations: list[str] = field(default_factory=list)
     """
     The locations the detection model was loaded from.
     """
 
-    loaded_segmentation_model_locations: List[str] = field(default_factory=list)
+    loaded_segmentation_model_locations: list[str] = field(default_factory=list)
     """
     The locations the segmentation model was loaded from.
     """

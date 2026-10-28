@@ -1,4 +1,5 @@
-"""Plane detection and visualization in point clouds.
+"""
+Plane detection and visualization in point clouds.
 
 This module provides an annotator for:
 
@@ -23,7 +24,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
 from timeit import default_timer
-from typing import Optional
 
 import numpy as np
 import open3d as o3d
@@ -74,22 +74,30 @@ class PlaneAnnotator(ThreadedAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for plane detection."""
+        """
+        Configuration descriptor for plane detection.
+        """
 
         class Parameters:
-            """Parameters for configuring plane detection."""
+            """
+            Parameters for configuring plane detection.
+            """
 
             def __init__(self) -> None:
                 self.visualize_plane_model: bool = True
-                """Show plane model mesh"""
+                """
+                Show plane model mesh
+                """
 
                 self.distance_threshold: float = 0.02
-                """"""
+                """
+
+                """
 
                 self.num_iterations: int = 50
                 """"""
 
-                self.random_seed: Optional[int] = None
+                self.random_seed: int | None = None
                 """
                 Seed for the random samples RANSAC draws, so that the same cloud gives
                 the same plane every time; ``None`` leaves the samples unseeded.
@@ -103,7 +111,8 @@ class PlaneAnnotator(ThreadedAnnotator):
         name: str = "PlaneAnnotator",
         descriptor: PlaneAnnotator.Descriptor | None = None,
     ) -> None:
-        """Initialize the plane detector.
+        """
+        Initialize the plane detector.
 
         :param name: Name of this annotator instance
         :param descriptor: Configuration descriptor

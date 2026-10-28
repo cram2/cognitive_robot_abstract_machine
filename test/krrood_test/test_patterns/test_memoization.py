@@ -9,7 +9,7 @@ import pickle
 import weakref
 from copy import deepcopy
 from dataclasses import dataclass
-from typing_extensions import Any, ClassVar, Dict, Generic, Tuple, TypeVar, get_origin
+from typing_extensions import Any, ClassVar, Generic, TypeVar, get_origin
 
 import pytest
 
@@ -54,7 +54,7 @@ class SelfReferencingOwner:
 
 
 @memoize
-def name_tokens(name: str) -> Tuple[str, ...]:
+def name_tokens(name: str) -> tuple[str, ...]:
     """
     A memoized function whose receiver is a ``str``, which cannot carry a cache.
     """
@@ -130,7 +130,7 @@ def test_clearing_a_subclass_cache_leaves_the_base_class_cache_intact():
     """
 
     class TokenCountingBase:
-        computation_counts: ClassVar[Dict[type, int]] = {}
+        computation_counts: ClassVar[dict[type, int]] = {}
 
         @classmethod
         @memoize

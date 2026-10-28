@@ -16,7 +16,7 @@ import sys
 from enum import StrEnum
 from functools import cache
 
-from typing_extensions import Optional, Sequence, Tuple
+from typing_extensions import Sequence
 
 from cognitive_robot_abstract_machine.exceptions import (
     MissingORMBuildChoiceError,
@@ -78,7 +78,7 @@ class OrmBuild(StrEnum):
     """
 
     @classmethod
-    def choices(cls) -> Tuple[str, ...]:
+    def choices(cls) -> tuple[str, ...]:
         """
         The choices a run can state, in the order the help of the option lists them.
         """
@@ -99,7 +99,7 @@ class OrmBuild(StrEnum):
         return cls(choice)
 
     @classmethod
-    def stated_on(cls, arguments: Sequence[str]) -> Optional[OrmBuild]:
+    def stated_on(cls, arguments: Sequence[str]) -> OrmBuild | None:
         """
         Read the choice a command line states, in either of the spellings argparse
         accepts.

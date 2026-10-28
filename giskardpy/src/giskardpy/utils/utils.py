@@ -6,14 +6,14 @@ import logging
 import os
 import sys
 from functools import cached_property
-from typing import Type, Optional, Dict, Any
+from typing_extensions import Any
 
 logger = logging.getLogger(__name__)
 
 
 def get_all_classes_in_module(
-    module_name: str, parent_class: Optional[Type] = None
-) -> Dict[str, Type]:
+    module_name: str, parent_class: type | None = None
+) -> dict[str, type]:
     """
     :param module_name: e.g. giskardpy.goals
     :param parent_class: e.g. Goal

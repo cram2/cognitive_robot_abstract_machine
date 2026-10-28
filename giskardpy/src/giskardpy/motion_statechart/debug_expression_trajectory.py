@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING, List
+from typing_extensions import TYPE_CHECKING
 
 from krrood.symbolic_math.symbolic_math import VariableParameters
 from semantic_digital_twin.exceptions import NonMonotonicTimeError
@@ -26,7 +26,7 @@ class RecordedDebugExpression:
     debug_expression: DebugExpression
     """The debug expression whose value is recorded."""
 
-    _free_variables: List[FloatVariable] = field(init=False)
+    _free_variables: list[FloatVariable] = field(init=False)
     """
     The free variables of the expression, resolved against the live world state.
     """
@@ -36,7 +36,7 @@ class RecordedDebugExpression:
     The expression compiled once for efficient per-cycle evaluation.
     """
 
-    _values: List[np.ndarray] = field(init=False, default_factory=list)
+    _values: list[np.ndarray] = field(init=False, default_factory=list)
     """
     The flattened expression value recorded for each control cycle.
     """
@@ -77,19 +77,19 @@ class DebugExpressionTrajectory:
     Time series of all debug expressions recorded during a motion statechart execution.
     """
 
-    recorded_debug_expressions: List[RecordedDebugExpression]
+    recorded_debug_expressions: list[RecordedDebugExpression]
     """
     One recorder per debug expression that is tracked.
     """
 
-    _times: List[float] = field(init=False, default_factory=list)
+    _times: list[float] = field(init=False, default_factory=list)
     """
     The simulation time in seconds of each recorded control cycle.
     """
 
     @classmethod
     def from_debug_expressions(
-        cls, debug_expressions: List[DebugExpression]
+        cls, debug_expressions: list[DebugExpression]
     ) -> DebugExpressionTrajectory:
         """
         Create a trajectory that records the given debug expressions.

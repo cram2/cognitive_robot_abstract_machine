@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Self, Dict, List, Optional, Type, TypeVar, TYPE_CHECKING
+from typing_extensions import Self, TypeVar, TYPE_CHECKING
 
 from krrood.symbolic_math.float_variable_data import FloatVariableData
 from krrood.symbolic_math.symbolic_math import FloatVariable
@@ -64,7 +64,7 @@ class MotionStatechartContext:
     Is only needed when constraints are present in the motion statechart.
     """
 
-    extensions: Dict[Type[ContextExtension], ContextExtension] = field(
+    extensions: dict[type[ContextExtension], ContextExtension] = field(
         default_factory=dict, repr=False, init=False
     )
     """
@@ -74,14 +74,14 @@ class MotionStatechartContext:
     Ros2Executor.
     """
 
-    _self_collision_manager: Optional[SelfCollisionVariableManager] = field(
+    _self_collision_manager: SelfCollisionVariableManager | None = field(
         init=False, default=None, repr=False, compare=False
     )
     """
     Backs :attr:`self_collision_manager`, None until a node requests it.
     """
 
-    _external_collision_manager: Optional[ExternalCollisionVariableManager] = field(
+    _external_collision_manager: ExternalCollisionVariableManager | None = field(
         init=False, default=None, repr=False, compare=False
     )
     """
@@ -123,7 +123,7 @@ class MotionStatechartContext:
     @property
     def _registered_collision_variable_managers(
         self,
-    ) -> List[BaseCollisionVariableManager]:
+    ) -> list[BaseCollisionVariableManager]:
         """
         :return: The collision variable managers that nodes have requested so far.
         """
@@ -145,7 +145,7 @@ class MotionStatechartContext:
         return len(self._registered_collision_variable_managers) > 0
 
     def require_extension(
-        self, extension_type: Type[GenericContextExtension]
+        self, extension_type: type[GenericContextExtension]
     ) -> GenericContextExtension:
         """
         Return an extension instance or raise ``MissingContextExtensionError``.

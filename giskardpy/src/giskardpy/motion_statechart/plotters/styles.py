@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, StrEnum
 
-from typing_extensions import Dict
 
 from semantic_digital_twin.world_description.geometry import Color
 from giskardpy.motion_statechart.data_types import (
@@ -155,7 +154,7 @@ class ObservationDrawingStyle:
     """
 
 
-OBSERVATION_DRAWING_STYLES: Dict[ObservationStateValues, ObservationDrawingStyle] = {
+OBSERVATION_DRAWING_STYLES: dict[ObservationStateValues, ObservationDrawingStyle] = {
     ObservationStateValues.TRUE: ObservationDrawingStyle(
         color=Color.from_hex("#2E7D32"), line_width=DRAWING_METRICS.line_width * 1.25
     ),
@@ -176,7 +175,7 @@ thin, so it recedes instead of presenting itself as a third value color.
 # %% how far apart a dependency pushes its endpoints
 
 
-MINIMUM_RANK_DISTANCES: Dict[TransitionKind, int] = {
+MINIMUM_RANK_DISTANCES: dict[TransitionKind, int] = {
     TransitionKind.START: 1,
     TransitionKind.PAUSE: 0,
     TransitionKind.END: 1,

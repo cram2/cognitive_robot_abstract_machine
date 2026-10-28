@@ -5,7 +5,7 @@ Tests for the synchronizers that write ROS topics and tf frames into the world s
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import Any, Optional
+from typing_extensions import Any, Optional
 
 import pytest
 from geometry_msgs.msg import PoseStamped

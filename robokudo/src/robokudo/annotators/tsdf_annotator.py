@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing_extensions import TYPE_CHECKING, Any
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
@@ -25,7 +25,9 @@ if TYPE_CHECKING:
 
 
 class TSDFAnnotatorVisualizationModes(Enum):
-    """Enumeration of supported visualization modes for TSDF volumes."""
+    """
+    Enumeration of supported visualization modes for TSDF volumes.
+    """
 
     NONE = "none"
     MESH = "mesh"
@@ -42,28 +44,42 @@ class TSDFAnnotator(ThreadedAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for the TSDF annotator."""
+        """
+        Configuration descriptor for the TSDF annotator.
+        """
 
         class Parameters(BaseAnnotator.Descriptor.Parameters):
-            """Parameters for configuring the TSDF annotator."""
+            """
+            Parameters for configuring the TSDF annotator.
+            """
 
             def __init__(self) -> None:
                 self.voxel_length: float = 0.005
-                """Voxel length for the TSDF volume of each object."""
+                """
+                Voxel length for the TSDF volume of each object.
+                """
 
                 self.sdf_trunc: float = 0.04
-                """SDF truncation distance for the TSDF volume of each object."""
+                """
+                SDF truncation distance for the TSDF volume of each object.
+                """
 
                 self.depth_scale: float = 1000.0
-                """Depth scale for the TSDF volume integration."""
+                """
+                Depth scale for the TSDF volume integration.
+                """
 
                 self.depth_trunc: float = 3.0
-                """Depth truncation distance for the TSDF volume integration."""
+                """
+                Depth truncation distance for the TSDF volume integration.
+                """
 
                 self.geometry_visualization_mode: TSDFAnnotatorVisualizationModes = (
                     TSDFAnnotatorVisualizationModes.MESH
                 )
-                """Whether to visualize the TSDF as a mesh or a point cloud. """
+                """
+                Whether to visualize the TSDF as a mesh or a point cloud.
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -78,22 +94,27 @@ class TSDFAnnotator(ThreadedAnnotator):
         self.translation_comparator = TranslationComparator(
             weight=1.0, max_distance=0.4
         )
-        """Translation comparator for comparing world positions between pipeline iterations."""
+        """
+        Translation comparator for comparing world positions between pipeline iterations.
+        """
 
-        self.tracked_objects: List[Dict[str, Any]] = []
-        """A list of tracked object data, including the bounding box and the TSDF volume."""
+        self.tracked_objects: list[dict[str, Any]] = []
+        """
+        A list of tracked object data, including the bounding box and the TSDF volume.
+        """
 
     def find_tracked_object(
         self, pose: PoseAnnotation, threshold: float = 0.75
-    ) -> Optional[Dict[str, Any]]:
-        """Check whether the given bounding box is similar to one that has been seen before.
+    ) -> dict[str, Any] | None:
+        """
+        Check whether the given bounding box is similar to one that has been seen before.
 
         :param pose: The pose to check
         :param threshold: The similarity threshold between 0.0 and 1.0 for considering the bounding box similar.
         :return: The most similar tracked object or none if no similar object was found.
         """
         best_sim: float = 0.0
-        best_object: Optional[Dict[str, Any]] = None
+        best_object: dict[str, Any] | None = None
         for tracked_object in self.tracked_objects:
             sim = self.translation_comparator.compute_similarity(
                 pose.translation, tracked_object["pose"].translation
@@ -112,20 +133,20 @@ class TSDFAnnotator(ThreadedAnnotator):
         if cas is None:
             return Status.FAILURE
 
-        ohs: List[ObjectHypothesis] = cas.filter_annotations_by_type(ObjectHypothesis)
+        ohs: list[ObjectHypothesis] = cas.filter_annotations_by_type(ObjectHypothesis)
         if len(ohs) == 0:
             return Status.FAILURE
 
         color_to_depth_ratio: ColorToDepthRatio = cas.get(CASViews.COLOR_TO_DEPTH_RATIO)
 
         # Only process ohs with pose
-        oh_data: List[
-            Tuple[ObjectHypothesis, PoseAnnotation, Tuple[int, int, int, int]]
+        oh_data: list[
+            tuple[ObjectHypothesis, PoseAnnotation, tuple[int, int, int, int]]
         ] = []
         for oh in ohs:
             poses = cas.filter_by_type(PoseAnnotation, oh.annotations)
             if len(poses) > 0:
-                roi: Tuple[int, int, int, int] = color_to_depth_ratio.depth_region(
+                roi: tuple[int, int, int, int] = color_to_depth_ratio.depth_region(
                     oh.roi.roi
                 ).get_corner_points()
                 oh_data.append((oh, poses[0], roi))
@@ -149,8 +170,8 @@ class TSDFAnnotator(ThreadedAnnotator):
             self.get_cas().get(CASViews.DEPTH_IMAGE)
         )
 
-        geometries: List[o3d.geometry.Geometry] = []
-        masks: List[npt.NDArray[np.uint8]] = []
+        geometries: list[o3d.geometry.Geometry] = []
+        masks: list[npt.NDArray[np.uint8]] = []
         for i, (oh, pose, roi) in enumerate(oh_data):
             mask: npt.NDArray[np.uint8] = oh.roi.mask
             if mask is None:
@@ -247,10 +268,10 @@ class TSDFAnnotator(ThreadedAnnotator):
     def get_visualization_image(
         self,
         image: npt.NDArray[np.uint8],
-        oh_data: List[
-            Tuple[ObjectHypothesis, PoseAnnotation, Tuple[int, int, int, int]]
+        oh_data: list[
+            tuple[ObjectHypothesis, PoseAnnotation, tuple[int, int, int, int]]
         ],
-        masks: List[npt.NDArray[np.uint8]],
+        masks: list[npt.NDArray[np.uint8]],
     ) -> npt.NDArray[np.uint8]:
         """Get an image containing the bounding boxes and masks of objects.
 
@@ -282,7 +303,7 @@ class TSDFAnnotator(ThreadedAnnotator):
 
     def get_visualization_geometries(
         self, volume: TSDFAnnotation
-    ) -> List[o3d.geometry.Geometry]:
+    ) -> list[o3d.geometry.Geometry]:
         """Get visualization geometries for the TSDF volume depending on the visualization mode.
 
         :param volume: The TSDF volume annotation to visualize.

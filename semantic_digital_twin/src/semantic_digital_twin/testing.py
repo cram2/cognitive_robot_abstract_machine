@@ -51,7 +51,7 @@ class StateChangeCounter(StateChangeCallback):
     Number of state changes announced since this callback was registered.
     """
 
-    publish_changes_of_last_call: Optional[bool] = field(default=None, init=False)
+    publish_changes_of_last_call: bool | None = field(default=None, init=False)
     """
     The ``publish_changes`` the most recent announcement carried.
     """
@@ -65,7 +65,7 @@ class StateChangeCounter(StateChangeCallback):
 
 
 @pytest.fixture
-def world_setup() -> Tuple[
+def world_setup() -> tuple[
     World,
     Body,
     Body,

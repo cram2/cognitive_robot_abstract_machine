@@ -5,13 +5,7 @@ import logging
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import (
-    Any,
-    Callable,
-    List,
-    Optional,
-    Type,
-)
+from typing_extensions import Any, Callable
 
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import (
@@ -59,7 +53,7 @@ class LanguageNode(PlanNode, BuildsMotionStateChart, ABC):
     of their children in a certain way.
     """
 
-    motion_state_chart_template: Type[NodeListGoal] = field(
+    motion_state_chart_template: type[NodeListGoal] = field(
         kw_only=True, default=Sequence
     )
     """
@@ -113,7 +107,7 @@ class ExecutesInParallel(LanguageNode, ABC):
     """
 
     @classmethod
-    def _perform_parallel(cls, nodes: List[PlanNode]):
+    def _perform_parallel(cls, nodes: list[PlanNode]):
         """
         Open threads for all nodes and wait for them to finish.
 
@@ -139,7 +133,7 @@ class SequentialNode(ExecutesSequentially):
     Any failure is immediately raised.
     """
 
-    motion_state_chart_template: Type[NodeListGoal] = field(
+    motion_state_chart_template: type[NodeListGoal] = field(
         kw_only=True, default=Sequence
     )
 
@@ -153,7 +147,7 @@ class ParallelNode(ExecutesInParallel):
     All exceptions are raised after all children have finished.
     """
 
-    motion_state_chart_template: Type[NodeListGoal] = field(
+    motion_state_chart_template: type[NodeListGoal] = field(
         kw_only=True, default=Parallel
     )
 
@@ -194,7 +188,7 @@ class RepeatNode(ExecutesSequentially):
     timeout=timedelta(seconds=1))``.
     """
 
-    failure_monitor: Optional[MotionStatechartNode] = field(default=None, kw_only=True)
+    failure_monitor: MotionStatechartNode | None = field(default=None, kw_only=True)
     """
     Node whose True observation means an attempt failed.
 
@@ -252,7 +246,7 @@ class TryInOrderNode(ExecutesSequentially):
     Tries all children in order sequentially and fails if all children fail.
     """
 
-    motion_state_chart_template: Type[NodeListGoal] = field(
+    motion_state_chart_template: type[NodeListGoal] = field(
         kw_only=True, default=TryInOrder
     )
 
@@ -277,7 +271,7 @@ class TryAllNode(ExecutesInParallel):
     Only raise a failure if all children fail.
     """
 
-    motion_state_chart_template: Type[NodeListGoal] = field(
+    motion_state_chart_template: type[NodeListGoal] = field(
         kw_only=True, default=TryAll
     )
 

@@ -3,10 +3,9 @@ from __future__ import annotations
 import enum
 import math
 from dataclasses import dataclass, field, InitVar
-from typing import Dict, Any, Tuple, Union, Optional
+from typing_extensions import Self, Iterable, Dict, Any, Tuple, Union, Optional
 
 import random_events_lib as rl
-from typing_extensions import Self, Iterable
 
 from random_events import sigma_algebra
 
@@ -141,7 +140,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         right_bracket = "]" if self.right == Bound.CLOSED else ")"
         return f"{left_bracket}{self.lower}, {self.upper}{right_bracket}"
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {
             **super().to_json(),
             "lower": self.lower,
@@ -151,7 +150,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls.from_data(
             data["lower"], data["upper"], Bound[data["left"]], Bound[data["right"]]
         )
@@ -215,7 +214,7 @@ class Interval(sigma_algebra.AbstractCompositeSet):
 
     @classmethod
     def from_simple_sets(
-        cls, *simple_sets: Union[Tuple[SimpleInterval, ...], SimpleInterval]
+        cls, *simple_sets: tuple[SimpleInterval, ...] | SimpleInterval
     ) -> Self:
         """
         Create an interval from a list of simple intervals.

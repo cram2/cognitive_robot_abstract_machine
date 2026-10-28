@@ -16,7 +16,7 @@ import trimesh
 from py_trees.common import Status
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import TYPE_CHECKING, Dict, List, Tuple
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -81,13 +81,13 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self._mesh_cache: Dict[Tuple[object, ...], o3d.geometry.TriangleMesh] = {}
+        self._mesh_cache: dict[tuple[object, ...], o3d.geometry.TriangleMesh] = {}
 
-    def _iter_mesh_visuals(self, body: Body) -> List[Mesh]:
+    def _iter_mesh_visuals(self, body: Body) -> list[Mesh]:
         """Return mesh-based visual shapes for a body."""
         return [shape for shape in body.visual if isinstance(shape, Mesh)]
 
-    def _mesh_cache_key(self, shape: Mesh) -> Tuple[object, ...]:
+    def _mesh_cache_key(self, shape: Mesh) -> tuple[object, ...]:
         """Create a stable cache key for mesh conversion results."""
         filename = shape.filename
         if filename:
@@ -112,7 +112,7 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
         self,
         image: npt.NDArray[np.uint8],
         text: str,
-        color: Tuple[int, int, int] = (0, 0, 255),
+        color: tuple[int, int, int] = (0, 0, 255),
         font: int = cv2.FONT_HERSHEY_SIMPLEX,
         font_scale: float = 1.0,
         thickness: int = 2,

@@ -1,4 +1,5 @@
-"""Point cloud clustering and object detection.
+"""
+Point cloud clustering and object detection.
 
 This module provides annotators for:
 
@@ -24,7 +25,7 @@ import open3d as o3d
 from matplotlib import pyplot as plt
 from py_trees.common import Status
 from scipy.spatial.transform import Rotation as R
-from typing_extensions import TYPE_CHECKING, List, Tuple
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
@@ -55,7 +56,7 @@ def generate_roi_with_mask_from_points(
     pointcloud_camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
     cloud: o3d.geometry.PointCloud,
     color_to_depth_ratio: ColorToDepthRatio,
-) -> Tuple[ImageROI, npt.NDArray]:
+) -> tuple[ImageROI, npt.NDArray]:
     """Generate ROI and mask from projected point cloud points.
 
     Projects 3D points to image plane and creates:
@@ -105,8 +106,9 @@ def cluster_points(
     eps: float,
     min_points: int,
     rk_logger: logging.Logger,
-) -> List[int]:
-    """Cluster points using DBSCAN algorithm.
+) -> list[int]:
+    """
+    Cluster points using DBSCAN algorithm.
 
     :param input_cloud: Point cloud to cluster
     :param eps: DBSCAN epsilon parameter (density threshold)
@@ -153,23 +155,35 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for point cloud clustering."""
+        """
+        Configuration descriptor for point cloud clustering.
+        """
 
         class Parameters:
-            """Parameters for configuring cluster extraction."""
+            """
+            Parameters for configuring cluster extraction.
+            """
 
-            def __init__(self):
+            def __init__(self) -> None:
                 self.dbscan_min_cluster_count: int = 90
-                """Minimum points for DBSCAN cluster"""
+                """
+                Minimum points for DBSCAN cluster
+                """
 
                 self.min_cluster_count: int = 1000
-                """Minimum total points for valid cluster"""
+                """
+                Minimum total points for valid cluster
+                """
 
                 self.min_on_plane_point_count: int = 90
-                """Minimum points above plane"""
+                """
+                Minimum points above plane
+                """
 
                 self.eps: float = 0.04
-                """DBSCAN epsilon parameter (density threshold)"""
+                """
+                DBSCAN epsilon parameter (density threshold)
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -179,7 +193,8 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         name: str = "PointCloudClusterExtractor",
         descriptor: PointCloudClusterExtractor.Descriptor | None = None,
     ) -> None:
-        """Initialize the cluster extractor.
+        """
+        Initialize the cluster extractor.
 
         :param name: The name of this annotator instance
         :param descriptor: Configuration descriptor
@@ -190,11 +205,11 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         self,
         plane_model: Plane,
         cloud: o3d.geometry.PointCloud,
-    ) -> Tuple[
+    ) -> tuple[
         o3d.geometry.OrientedBoundingBox,
         o3d.geometry.OrientedBoundingBox,
         o3d.geometry.PointCloud,
-        List[int],
+        list[int],
         o3d.geometry.PointCloud,
     ]:
         """Extract points above a detected plane.
@@ -446,23 +461,35 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for naive point cloud clustering."""
+        """
+        Configuration descriptor for naive point cloud clustering.
+        """
 
         class Parameters:
-            """Parameters for configuring cluster extraction."""
+            """
+            Parameters for configuring cluster extraction.
+            """
 
             def __init__(self) -> None:
                 self.dbscan_min_cluster_count: int = 90
-                """Minimum points for DBSCAN cluster"""
+                """
+                Minimum points for DBSCAN cluster
+                """
 
                 self.min_cluster_count: int = 1000
-                """Minimum total points for valid cluster"""
+                """
+                Minimum total points for valid cluster
+                """
 
                 self.min_on_plane_point_count: int = 90
-                """Minimum points above plane"""
+                """
+                Minimum points above plane
+                """
 
                 self.eps: float = 0.04
-                """DBSCAN epsilon parameter (density threshold)"""
+                """
+                DBSCAN epsilon parameter (density threshold)
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -472,7 +499,8 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         name: str = "NaivePointCloudClusterExtractor",
         descriptor: NaivePointCloudClusterExtractor.Descriptor | None = None,
     ) -> None:
-        """Initialize the naive cluster extractor.
+        """
+        Initialize the naive cluster extractor.
 
         :param name: The name of this annotator instance
         :param descriptor: Configuration descriptor

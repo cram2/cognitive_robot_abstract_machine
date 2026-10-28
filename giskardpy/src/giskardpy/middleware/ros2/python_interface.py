@@ -4,7 +4,6 @@ import json
 from dataclasses import dataclass, field
 from threading import Thread
 from time import sleep
-from typing import Dict, List
 
 import rclpy
 from json_msgs.action import JsonAction
@@ -222,7 +221,7 @@ class GiskardWrapper:
 
     def get_end_motion_reason(
         self, move_result: JsonAction_Result | None = None, show_all: bool = False
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """
         Analyzes a MoveResult msg to return a list of all monitors that hindered the
         EndMotion Monitors from becoming active.
@@ -254,12 +253,12 @@ class GiskardWrapperNode(GiskardWrapper):
     giskard_node_name: str = "giskard"
     avoid_name_conflict: bool = True
     context: Context | None = field(kw_only=True, default=None)
-    cli_args: List[str] | None = field(kw_only=True, default=None)
+    cli_args: list[str] | None = field(kw_only=True, default=None)
     namespace: str | None = field(kw_only=True, default=None)
     use_global_arguments: bool = field(kw_only=True, default=True)
     enable_rosout: bool = field(kw_only=True, default=True)
     start_parameter_services: bool = field(kw_only=True, default=True)
-    parameter_overrides: List[Parameter] | None = field(kw_only=True, default=None)
+    parameter_overrides: list[Parameter] | None = field(kw_only=True, default=None)
     allow_undeclared_parameters: bool = field(kw_only=True, default=False)
     automatically_declare_parameters_from_overrides: bool = field(
         kw_only=True, default=False

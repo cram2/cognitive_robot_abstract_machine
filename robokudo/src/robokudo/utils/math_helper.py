@@ -8,13 +8,13 @@ RoboKudo Team
 """
 
 from robokudo.utils.transform import get_rotation_matrix_from_q
-from typing_extensions import Iterable, Optional, Tuple, List
+from typing_extensions import Iterable
 import numpy as np
 
 
 def intersection_point(
-    point1: Tuple[float, float, float], point2: Tuple[float, float, float], t: float
-) -> Tuple[float, float, float]:
+    point1: tuple[float, float, float], point2: tuple[float, float, float], t: float
+) -> tuple[float, float, float]:
     """Calculate point along line segment using parameter t.
 
     :param point1: Start point (x,y,z)
@@ -45,7 +45,7 @@ def intersection_point(
 
 
 def distance(
-    point1: Tuple[float, float, float], point2: Tuple[float, float, float]
+    point1: tuple[float, float, float], point2: tuple[float, float, float]
 ) -> float:
     """Calculate Euclidean distance between two 3D points.
 
@@ -67,11 +67,11 @@ def distance(
 
 
 def intersecting_spheres(
-    point1: Tuple[float, float, float],
-    point2: Tuple[float, float, float],
-    spheres: Iterable[Tuple[str, Tuple[float, float, float], float]],
-) -> List[
-    Tuple[float, str, Tuple[float, float, float], float, Tuple[float, float, float]]
+    point1: tuple[float, float, float],
+    point2: tuple[float, float, float],
+    spheres: Iterable[tuple[str, tuple[float, float, float], float]],
+) -> list[
+    tuple[float, str, tuple[float, float, float], float, tuple[float, float, float]]
 ]:
     """
     Check where the first intersection between the line segment described by P1 and P2
@@ -117,11 +117,11 @@ def intersecting_spheres(
 
 
 def compute_line_intersection_point(
-    point1: Tuple[float, float, float],
-    point2: Tuple[float, float, float],
-    sphere_center: Tuple[float, float, float],
+    point1: tuple[float, float, float],
+    point2: tuple[float, float, float],
+    sphere_center: tuple[float, float, float],
     sphere_radius: float,
-) -> Optional[List[float]]:
+) -> list[float] | None:
     """
     Compute the intersection points between a sphere and a line segment.
 
@@ -191,9 +191,9 @@ def compute_line_intersection_point(
 
 
 def does_line_intersect_sphere(
-    point1: Tuple[float, float, float],
-    point2: Tuple[float, float, float],
-    sphere_center: Tuple[float, float, float],
+    point1: tuple[float, float, float],
+    point2: tuple[float, float, float],
+    sphere_center: tuple[float, float, float],
     sphere_radius: float,
 ) -> bool:
     """Test if line segment intersects sphere.
@@ -253,17 +253,17 @@ def compute_direction_vector_angle(
 
 
 def intersecting_cuboids(
-    point1: Tuple[float, float, float],
-    point2: Tuple[float, float, float],
-    cuboids: List[
-        Tuple[
+    point1: tuple[float, float, float],
+    point2: tuple[float, float, float],
+    cuboids: list[
+        tuple[
             str,
-            Tuple[float, float, float],
-            Tuple[float, float, float, float],
-            Tuple[float, float, float],
+            tuple[float, float, float],
+            tuple[float, float, float, float],
+            tuple[float, float, float],
         ]
     ],
-) -> List[Tuple[float, str, np.ndarray, np.ndarray, np.ndarray]]:
+) -> list[tuple[float, str, np.ndarray, np.ndarray, np.ndarray]]:
     """
     Check where the first intersection between the line segment described by P1 and P2
     and the cuboids in our parameters happens. The intersection problem is solved using the slab method (see

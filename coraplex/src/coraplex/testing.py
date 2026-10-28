@@ -9,7 +9,7 @@ import time
 import unittest
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List
+from typing_extensions import Callable
 
 import numpy as np
 import pytest
@@ -270,7 +270,7 @@ class StandaloneProcess:
     node to look from.
     """
 
-    arguments: List[str] = field(default_factory=list)
+    arguments: list[str] = field(default_factory=list)
     """
     Command-line arguments passed to the script.
     """

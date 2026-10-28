@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import Optional
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
@@ -31,7 +30,7 @@ class GeometricConstraintBuilder:
     """
 
     @staticmethod
-    def _indexed_constraint_name(name: Optional[str], index: int) -> Optional[str]:
+    def _indexed_constraint_name(name: str | None, index: int) -> str | None:
         """
         Builds a per-axis constraint name, or None so the collection assigns an index-
         based name.
@@ -46,7 +45,7 @@ class GeometricConstraintBuilder:
         frame_P_goal: Point3,
         reference_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Adds three constraints to move frame_P_current to frame_P_goal.
@@ -73,7 +72,7 @@ class GeometricConstraintBuilder:
         expression_goal: sm.ScalarData,
         reference_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         A wrapper around add_constraint.
@@ -100,7 +99,7 @@ class GeometricConstraintBuilder:
         frame_V_goal: Vector3,
         reference_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Adds constraints to align frame_V_current with frame_V_goal.
@@ -136,7 +135,7 @@ class GeometricConstraintBuilder:
         frame_R_goal: RotationMatrix,
         reference_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Adds constraints to move frame_R_current to frame_R_goal.
@@ -173,7 +172,7 @@ class GeometricConstraintBuilder:
         max_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         max_violation: sm.ScalarData = np.inf,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Adds constraints to limit the translational velocity of frame_P_current.
@@ -204,7 +203,7 @@ class GeometricConstraintBuilder:
         max_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         max_violation: sm.ScalarData = LargeNumber,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Add velocity constraints to limit the velocity of frame_R_current.

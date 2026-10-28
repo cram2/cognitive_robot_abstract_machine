@@ -15,14 +15,7 @@ import itertools
 from dataclasses import dataclass, field
 
 import pandas as pd
-from typing_extensions import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Hashable,
-    Optional,
-    Type,
-)
+from typing_extensions import TYPE_CHECKING, Any, Callable, Hashable
 
 from krrood.class_diagrams.utils import common_base_class
 from krrood.ormatic.data_access_objects.dao import (
@@ -130,14 +123,14 @@ class RelationalProbabilisticCircuit:
     A probabilistic circuit that jointly models a class and its relational structure.
     """
 
-    class_: Optional[Type] = field(
+    class_: type | None = field(
         init=False, default=None, metadata=JSONMetadata(serialize=True).as_dict()
     )
     """
     The domain class whose instances this distribution models, set by ``fit``.
     """
 
-    class_probabilistic_circuit: Optional[GroundableCircuit] = None
+    class_probabilistic_circuit: GroundableCircuit | None = None
     """
     The fitted joint distribution over the class's scalar attributes and aggregation
     statistics, populated by ``fit``.
@@ -177,15 +170,13 @@ class RelationalProbabilisticCircuit:
     Its default must fit the same circuit type as :attr:`learning_method`.
     """
 
-    schema_information: Optional[DataAccessObjectSchema] = field(
-        init=False, default=None
-    )
+    schema_information: DataAccessObjectSchema | None = field(init=False, default=None)
     """
     The :class:`~krrood.ormatic.data_access_objects.dao.DataAccessObjectSchema`
     describing the DAO class's columns and relationships.
     """
 
-    feature_extractor: Optional[FeatureExtractor] = field(init=False, default=None)
+    feature_extractor: FeatureExtractor | None = field(init=False, default=None)
     """
     Feature extractor built from the training instances.
 
@@ -198,7 +189,7 @@ class RelationalProbabilisticCircuit:
     def _build_class_dataframe(
         feature_extractor: FeatureExtractor,
         instances: list[Any],
-        dataframe_from_parent: Optional[pd.DataFrame],
+        dataframe_from_parent: pd.DataFrame | None,
     ) -> pd.DataFrame:
         """
         Build the preprocessed dataframe used to fit the class-level JPT.
@@ -339,7 +330,7 @@ class RelationalProbabilisticCircuit:
         return template
 
     @staticmethod
-    def _class_of(instances: list[Any], class_: Optional[Type]) -> Type:
+    def _class_of(instances: list[Any], class_: type | None) -> type:
         """
         :param instances: Training instances.
         :param class_: The class the circuit models, or ``None`` for the lowest common
@@ -360,8 +351,8 @@ class RelationalProbabilisticCircuit:
     def fit(
         self,
         instances: list[Any],
-        class_: Optional[Type] = None,
-        dataframe_from_parent: Optional[pd.DataFrame] = None,
+        class_: type | None = None,
+        dataframe_from_parent: pd.DataFrame | None = None,
     ):
         """
         Fit the relational probabilistic circuit from a list of domain objects.

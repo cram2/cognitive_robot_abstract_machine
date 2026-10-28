@@ -4,14 +4,7 @@ import re
 from dataclasses import dataclass, field
 
 import pydot
-from typing_extensions import (
-    List,
-    Dict,
-    Optional,
-    Tuple,
-    Union,
-    TYPE_CHECKING,
-)
+from typing_extensions import TYPE_CHECKING
 
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
@@ -54,7 +47,7 @@ class ConditionDependency:
     The node those conditions read.
     """
 
-    conditions: List[TrinaryCondition] = field(default_factory=list)
+    conditions: list[TrinaryCondition] = field(default_factory=list)
     """
     The conditions of :attr:`condition_owner` that read :attr:`observed_node`.
     """
@@ -127,7 +120,7 @@ class MotionStatechartGraphviz:
     Whether nodes are drawn without their conditions and with tighter spacing.
     """
 
-    _cluster_map: Dict[MotionStatechartNode, pydot.Cluster] = field(
+    _cluster_map: dict[MotionStatechartNode, pydot.Cluster] = field(
         init=False, default_factory=dict
     )
     """
@@ -352,8 +345,8 @@ class MotionStatechartGraphviz:
         return f'"{name}"'
 
     def _get_cluster_of_node(
-        self, node_name: str, graph: Union[pydot.Graph, pydot.Cluster]
-    ) -> Optional[pydot.Cluster]:
+        self, node_name: str, graph: pydot.Graph | pydot.Cluster
+    ) -> pydot.Cluster | None:
         """
         :param node_name: The name of the node to look for.
         :param graph: The graph whose direct subgraphs are searched.
@@ -471,8 +464,8 @@ class MotionStatechartGraphviz:
 
     def _add_nodes(
         self,
-        parent_cluster: Union[pydot.Graph, pydot.Cluster],
-        nodes: List[MotionStatechartNode],
+        parent_cluster: pydot.Graph | pydot.Cluster,
+        nodes: list[MotionStatechartNode],
     ):
         """
         Draws the given nodes, recursing into the children of every goal that does not
@@ -507,7 +500,7 @@ class MotionStatechartGraphviz:
     def _add_cluster(
         self,
         node: MotionStatechartNode,
-        parent_cluster: Union[pydot.Graph, pydot.Cluster],
+        parent_cluster: pydot.Graph | pydot.Cluster,
     ):
         """
         Opens the cluster that a goal and its children are drawn in.
@@ -537,14 +530,14 @@ class MotionStatechartGraphviz:
         for dependency in self._dependencies_to_draw():
             self._add_dependency_edge(dependency)
 
-    def _dependencies_to_draw(self) -> List[ConditionDependency]:
+    def _dependencies_to_draw(self) -> list[ConditionDependency]:
         """
         :return: Every dependency the drawing shows, once per pair of nodes however many
             of the owner's conditions read it, leaving out those with an endpoint that is
             not drawn or that sits in another cluster.
         """
-        dependencies: Dict[
-            Tuple[MotionStatechartNode, MotionStatechartNode], ConditionDependency
+        dependencies: dict[
+            tuple[MotionStatechartNode, MotionStatechartNode], ConditionDependency
         ] = {}
         condition: TrinaryCondition
         for (
@@ -585,10 +578,10 @@ class MotionStatechartGraphviz:
 
     def _edge_clusters_kwargs(
         self,
-        graph: Union[pydot.Graph, pydot.Cluster],
+        graph: pydot.Graph | pydot.Cluster,
         src_name: str,
         dst_name: str,
-    ) -> Dict[str, object]:
+    ) -> dict[str, object]:
         """
         Determines the edge attributes that clip an edge at a cluster border instead of
         letting it reach into the cluster.
@@ -599,7 +592,7 @@ class MotionStatechartGraphviz:
         :return: The ``ltail`` and ``lhead`` attributes for the endpoints that sit in a
             cluster.
         """
-        kwargs: Dict[str, object] = {}
+        kwargs: dict[str, object] = {}
         dst_cluster = self._get_cluster_of_node(dst_name, graph)
         src_cluster = self._get_cluster_of_node(src_name, graph)
         if dst_cluster is not None:

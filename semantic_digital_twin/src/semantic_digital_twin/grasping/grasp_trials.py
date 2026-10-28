@@ -12,7 +12,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import Iterator, List
+from typing_extensions import Iterator
 
 from krrood.parametrization.model_registries import (
     ModelRegistry,
@@ -105,7 +105,7 @@ class GraspTrials:
         """
         return self.graspable.grasped_part()
 
-    def drawn_grasps(self) -> List[SurfaceGrasp]:
+    def drawn_grasps(self) -> list[SurfaceGrasp]:
         """
         :return: :attr:`number_of_trials` grasps answering the statement of where
             :attr:`grasped_part` may be grasped.

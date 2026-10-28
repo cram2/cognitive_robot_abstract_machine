@@ -571,7 +571,7 @@ class MissingContextExtensionError(MotionStatechartError):
     Raised when a context extension is requested that was never added to the context.
     """
 
-    expected_extension: Type
+    expected_extension: type
     """
     The type of the requested extension.
     """
@@ -589,7 +589,7 @@ class DuplicateContextExtensionError(MotionStatechartError):
     Raised when an extension is added to a context that already holds one of that type.
     """
 
-    extension_type: Type
+    extension_type: type
     """
     The type of the extension that is already present.
     """
@@ -613,12 +613,12 @@ class ActionClientTypeMismatchError(MotionStatechartError):
     The action topic that was requested with two different message types.
     """
 
-    existing_message_type: Type
+    existing_message_type: type
     """
     The message type the cached action client for this topic was created with.
     """
 
-    requested_message_type: Type
+    requested_message_type: type
     """
     The message type that was requested for this topic instead.
     """

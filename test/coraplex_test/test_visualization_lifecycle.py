@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 import rclpy
 from rclpy.node import Node
-from typing_extensions import Self, Type
+from typing_extensions import Self
 
 import coraplex.visualization as visualization_module
 from coraplex.datastructures.enums import VisualizationBackend, VisualizationOption
@@ -81,7 +81,7 @@ def test_failed_plugin_start_stops_partially_started_provider(
 # %% cleanup failures and reuse
 @pytest.mark.parametrize("failure_type", [RuntimeError, KeyboardInterrupt])
 def test_collision_setup_failure_closes_publisher_and_owned_ros(
-    monkeypatch: pytest.MonkeyPatch, failure_type: Type[BaseException]
+    monkeypatch: pytest.MonkeyPatch, failure_type: type[BaseException]
 ) -> None:
     failure = failure_type()
     publisher = Mock()

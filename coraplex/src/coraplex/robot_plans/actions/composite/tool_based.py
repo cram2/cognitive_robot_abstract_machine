@@ -7,7 +7,7 @@ from functools import cached_property
 
 import numpy as np
 from scipy.spatial.transform import Rotation
-from typing_extensions import Any, List, Optional, Tuple, Union
+from typing_extensions import Any
 
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
@@ -77,7 +77,7 @@ class FullBodyControlledAction(ActionDescription, ABC):
         """
         self.add_subplan(self.action_plan).perform()
 
-    def _enable_full_body_control(self) -> Optional[bool]:
+    def _enable_full_body_control(self) -> bool | None:
         """
         :return: The previous full-body-control state, or None if the robot has no
             mobile base.
@@ -88,7 +88,7 @@ class FullBodyControlledAction(ActionDescription, ABC):
         self.robot.mobile_base.full_body_controlled = True
         return previous
 
-    def _restore_full_body_control(self, previous: Optional[bool]) -> None:
+    def _restore_full_body_control(self, previous: bool | None) -> None:
         """
         :param previous: The full-body-control state to restore, or None if the robot
             has no mobile base.
@@ -134,13 +134,13 @@ class ToolMotionAction(FullBodyControlledAction, ABC, HasTcpGoalThresholds):
 
     @property
     @abstractmethod
-    def _alignment_target(self) -> Optional[Union[Body, Pose]]:
+    def _alignment_target(self) -> Body | Pose | None:
         """
         :return: The target the tool is aligned with during the motion.
         """
 
     @cached_property
-    def _waypoints(self) -> List[Point3]:
+    def _waypoints(self) -> list[Point3]:
         """
         :return: The sampled waypoints of the tool path in the world frame.
         """
@@ -155,7 +155,7 @@ class ToolMotionAction(FullBodyControlledAction, ABC, HasTcpGoalThresholds):
         return waypoints
 
     @property
-    def _alignment_pairs(self) -> List[AlignmentPair]:
+    def _alignment_pairs(self) -> list[AlignmentPair]:
         """
         :return: The normal pairs that keep the tool aligned with its target during
             the motion, or an empty list if there is no alignment target.
@@ -217,7 +217,7 @@ class MixingAction(ToolMotionAction):
         return self.container.global_pose.homogeneous_matrix
 
     @property
-    def _alignment_target(self) -> Optional[Union[Body, Pose]]:
+    def _alignment_target(self) -> Body | Pose | None:
         return self.container
 
 
@@ -237,14 +237,14 @@ class CuttingAction(ToolMotionAction):
     The cutting technique to use.
     """
 
-    slice_thickness: Optional[float] = None
+    slice_thickness: float | None = None
     """
     Target slice thickness in meters, controlling the spacing between cut anchors.
 
     Derived from ``number_of_cuts_on_local_x_axis`` and the object size if None.
     """
 
-    number_of_cuts_on_local_x_axis: Optional[int] = None
+    number_of_cuts_on_local_x_axis: int | None = None
     """
     Number of cut passes along the object's local X axis.
 
@@ -270,7 +270,7 @@ class CuttingAction(ToolMotionAction):
         return self.object_to_cut.global_pose.homogeneous_matrix
 
     @property
-    def _alignment_target(self) -> Optional[Union[Body, Pose]]:
+    def _alignment_target(self) -> Body | Pose | None:
         return self.object_to_cut
 
 
@@ -280,14 +280,14 @@ class WipingAction(ToolMotionAction):
     Wipe a surface or a patch around a target pose with a tool.
     """
 
-    surface: Optional[Body] = None
+    surface: Body | None = None
     """
     The surface body to wipe.
 
     If None, ``target_pose`` is used instead.
     """
 
-    target_pose: Optional[Pose] = None
+    target_pose: Pose | None = None
     """
     Center pose of the wiping patch.
 
@@ -359,7 +359,7 @@ class WipingAction(ToolMotionAction):
         return self.target_pose.homogeneous_matrix
 
     @property
-    def _alignment_target(self) -> Optional[Union[Body, Pose]]:
+    def _alignment_target(self) -> Body | Pose | None:
         if self.surface is not None:
             return self.surface
         return self.target_pose
@@ -418,7 +418,7 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
     Tilt angle in radians applied to the source container while pouring.
     """
 
-    pour_side: Optional[PouringSide] = None
+    pour_side: PouringSide | None = None
     """
     Robot-relative side of the target container to pour from.
 
@@ -478,7 +478,7 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
 
     def _approach_direction(
         self, target_pose: Pose, robot_pose: Pose
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         :return: The XY unit vector from the robot toward the target container,
             snapped to the target's nearest local axis so the pour never aims at a
@@ -507,7 +507,7 @@ class PouringAction(FullBodyControlledAction, HasTcpGoalThresholds):
             return approach_x, approach_y
         return float(best[0]) / snapped_norm, float(best[1]) / snapped_norm
 
-    def _pour_poses(self) -> Tuple[Pose, Pose]:
+    def _pour_poses(self) -> tuple[Pose, Pose]:
         """
         :return: The pre-pour pose next to the target container's rim and the tilted
             pouring pose.

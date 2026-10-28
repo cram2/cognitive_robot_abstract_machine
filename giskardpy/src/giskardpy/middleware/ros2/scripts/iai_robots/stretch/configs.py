@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Union
 
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
@@ -26,7 +25,7 @@ class StretchStandaloneInterface(StandAloneRobotInterfaceConfig):
     Simulates the arm, gripper, head and drive of Stretch without talking to hardware.
     """
 
-    joint_names: List[StretchJoint] = field(init=False, default_factory=list)
+    joint_names: list[StretchJoint] = field(init=False, default_factory=list)
     """
     The arm, gripper, wheel and head joints of Stretch, without the base drive.
     """
@@ -47,7 +46,7 @@ class StretchStandaloneInterface(StandAloneRobotInterfaceConfig):
             StretchJoint.HEAD_TILT,
         ]
 
-    def controlled_joint_names(self, world: World) -> List[Union[str, PrefixedName]]:
+    def controlled_joint_names(self, world: World) -> list[str | PrefixedName]:
         """
         The joints to control, with the base drive resolved from ``world``.
 
@@ -67,7 +66,7 @@ class StretchVelocityInterface(RobotInterfaceConfig):
     """
 
     @staticmethod
-    def velocity_controlled_joint_names() -> List[StretchJoint]:
+    def velocity_controlled_joint_names() -> list[StretchJoint]:
         """
         The joints driven by the velocity group controller.
 

@@ -1,0 +1,22 @@
+# Hooks for krrood's development tools (krrood/src/krrood/development_tools). They run the
+# installed `krrood` command, so the repository using them installs
+# `krrood[development-tools]` in its development environment; see
+# krrood/doc/development_tools.md.
+- id: krrood-format
+  name: Format Python (ruff, then docformatter where it doesn't conflict with ruff)
+  description: >
+    Runs ruff format, then docformatter on top of it, keeping docformatter's docstring
+    changes only when a subsequent ruff pass leaves them unchanged.
+  entry: krrood format
+  language: system
+  types: [python]
+
+- id: krrood-agents-md
+  name: Update the rules in AGENTS.md
+  description: >
+    Generates AGENTS.md from the rules krrood ships and the repository's own rules
+    in agent_rules.py.
+  entry: krrood agents-md
+  language: system
+  pass_filenames: false
+  always_run: true

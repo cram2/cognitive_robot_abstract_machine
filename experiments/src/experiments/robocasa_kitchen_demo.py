@@ -29,7 +29,7 @@ import logging
 import math
 import threading
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing_extensions import Callable
 
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
@@ -117,7 +117,7 @@ class KitchenSceneSummary:
     Total number of bodies in the parsed world.
     """
 
-    annotated_bodies: List[AnnotatedBody]
+    annotated_bodies: list[AnnotatedBody]
     """
     The semantically annotated bodies, one entry per attached annotation.
     """
@@ -168,7 +168,7 @@ def _start_rviz_publisher(
     world: World,
     tf_period_seconds: float = 0.1,
     marker_period_seconds: float = 2.0,
-) -> Optional[threading.Thread]:
+) -> threading.Thread | None:
     """
     Start publishing the world to RViz on a background thread and return immediately, so
     the caller can keep driving the world (for example while a robot performs a plan)

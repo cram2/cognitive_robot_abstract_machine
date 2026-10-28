@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 from giskardpy.model.world_config import WorldWithFixedRobot
 from giskardpy.middleware.ros2.robot_interface_config import (
@@ -61,7 +60,7 @@ class WorldWithTracyConfig(WorldWithFixedRobot):
     Semantic view that is applied to the parsed urdf.
     """
 
-    def setup_world(self, robot_name: Optional[str] = None) -> None:
+    def setup_world(self, robot_name: str | None = None) -> None:
         super().setup_world()
         self.robot = self.world.get_semantic_annotations_by_type(Tracy)[0]
 
@@ -78,7 +77,7 @@ class TracyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
     Simulates both arms of Tracy without talking to hardware.
     """
 
-    joint_names: List[str] = field(
+    joint_names: list[str] = field(
         init=False,
         default_factory=lambda: [
             TracyJoint.LEFT_SHOULDER_PAN,

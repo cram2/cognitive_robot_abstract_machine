@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Set
+from typing_extensions import Generic
 
 from probabilistic_model.exceptions import ProbabilisticModelException
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.variable import Variable
-from typing_extensions import Generic
 
 from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
     NodeType,
@@ -32,10 +31,10 @@ class MissingQueryVariableViolation(SupportDeterminismViolation):
     Produced by Check 1 of verify_support_determinism().
     """
 
-    missing_variables: List[Variable]
+    missing_variables: list[Variable]
     """Variables present in the query_set but not in the circuit."""
 
-    available_variables: List[Variable]
+    available_variables: list[Variable]
     """
     All Variables currently registered in the circuit.
     """
@@ -138,19 +137,19 @@ class SupportDeterminismVerificationResult(ProbabilisticModelException):
     True if all three checks passed with no violations.
     """
 
-    violations: List[SupportDeterminismViolation]
+    violations: list[SupportDeterminismViolation]
     """
     Typed violations found, in check order.
 
     Empty when passed is True.
     """
 
-    checked_query_sets: List[Set[Variable]]
+    checked_query_sets: list[set[Variable]]
     """
     All non-empty query_sets from the Marginal Determinism Variable Tree.
     """
 
-    circuit_variables: List[Variable]
+    circuit_variables: list[Variable]
     """
     All Variables present in the circuit at verification time.
     """
@@ -186,7 +185,7 @@ class UnregisteredVariableError(ProbabilisticModelException):
     Name of the unregistered Variable.
     """
 
-    registered_names: List[str]
+    registered_names: list[str]
     """
     Names of all Variables registered in the relevant role.
     """
@@ -221,7 +220,7 @@ class EmptyInterventionalCircuitError(ProbabilisticModelException):
     Name of the cause Variable for which the circuit is empty.
     """
 
-    adjustment_variable_names: List[str]
+    adjustment_variable_names: list[str]
     """
     Names of adjustment Variables used, empty list if no adjustment was applied.
     """
@@ -248,7 +247,7 @@ class NoCauseVariablesError(ProbabilisticModelException):
     that match any registered cause Variable.
     """
 
-    registered_cause_names: List[str]
+    registered_cause_names: list[str]
     """
     Names of all cause Variables registered in the CausalCircuit.
     """

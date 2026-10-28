@@ -1,7 +1,7 @@
 import json
 import signal
 import sys
-from typing import List, Dict, Optional, Any
+from typing_extensions import Any
 
 from PyQt5.QtCore import QMutex, QMutexLocker
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
@@ -78,9 +78,9 @@ class SvgGrahpicsView(QGraphicsView):
 class DotGraphViewer(QWidget):
     # Add this signal to communicate between threads
     new_message_signal: pyqtSignal = pyqtSignal(object)
-    last_goal_id: Optional[int]
-    graphs_by_goal: Dict[int, List[Any]]
-    motion_statechart: Optional[MotionStatechart]
+    last_goal_id: int | None
+    graphs_by_goal: dict[int, list[Any]]
+    motion_statechart: MotionStatechart | None
 
     def __init__(self):
         super().__init__()
@@ -290,13 +290,13 @@ class DotGraphViewer(QWidget):
         graph = MotionStatechartGraphviz(self.motion_statechart).to_dot_graph()
         self.graphs_by_goal[goal_id].append(graph)
 
-    def parse_new_motion_statechart(self, json_data: Dict[str, Any]):
+    def parse_new_motion_statechart(self, json_data: dict[str, Any]):
         motion_statechart_data = json_data.get("motion_statechart")
         if motion_statechart_data is not None:
             self.motion_statechart = MotionStatechart.from_json(motion_statechart_data)
             self.motion_statechart._add_transitions()
 
-    def parse_state(self, json_data: Dict[str, Any]):
+    def parse_state(self, json_data: dict[str, Any]):
         life_cycle_data = json_data.get("life_cycle_state")
         life_cycle_state = LifeCycleState.from_json(
             life_cycle_data, motion_statechart=self.motion_statechart

@@ -1,7 +1,6 @@
 from copy import deepcopy
 import operator
 from itertools import islice
-from typing_extensions import Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -525,7 +524,7 @@ def _sparsely_rated_map(world) -> RingCostmap:
 
 
 def _stand_off_distances(
-    costmap: Costmap, seed: Optional[int], count: int
+    costmap: Costmap, seed: int | None, count: int
 ) -> NDArray[np.float64]:
     """
     :return: How far the first ``count`` candidates stand from the map's origin.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing_extensions import Optional, Tuple, List, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 import numpy as np
 import trimesh
@@ -62,12 +62,9 @@ class RayTracer:
         self.scene = Scene()
         self.update_scene()
 
-    def update_scene(self):
+    def update_scene(self) -> None:
         """
-        Updates the ray tracer scene with the current state of the world.
-
-        This method should be called whenever the world changes to ensure the ray tracer
-        has the latest information.
+        Keep collision geometry and poses consistent with the current world.
         """
         if self._last_world_model != self.world.get_world_model_manager().version:
             self.add_missing_bodies()
@@ -76,7 +73,7 @@ class RayTracer:
             self.update_transforms()
             self._last_world_state = self.world.state.version
 
-    def add_missing_bodies(self):
+    def add_missing_bodies(self) -> None:
         """
         Adds all bodies from the world to the ray tracer scene that are not already
         present.
@@ -103,7 +100,7 @@ class RayTracer:
                 self.scene_to_index[body.name.name + f"_collision_{i}"] = body.index
                 self.index_to_body[body.index] = body
 
-    def update_transforms(self):
+    def update_transforms(self) -> None:
         """
         Updates the transforms of all bodies in the ray tracer scene.
 
@@ -121,10 +118,10 @@ class RayTracer:
     def create_segmentation_mask(
         self,
         camera_pose: GenericSpatialType,
-        resolution: Optional[CameraResolution] = None,
+        resolution: CameraResolution | None = None,
         min_distance: float = 0,
         max_distance: float = np.inf,
-        field_of_view: Optional[FieldOfView] = None,
+        field_of_view: FieldOfView | None = None,
     ) -> np.ndarray:
         """
         Creates a segmentation mask for the ray tracer scene from the camera position to
@@ -176,10 +173,10 @@ class RayTracer:
     def create_depth_map(
         self,
         camera_pose: GenericSpatialType,
-        resolution: Optional[CameraResolution] = None,
+        resolution: CameraResolution | None = None,
         min_distance: float = 0,
         max_distance: float = np.inf,
-        field_of_view: Optional[FieldOfView] = None,
+        field_of_view: FieldOfView | None = None,
     ) -> np.ndarray:
         """
         Creates a depth map for the ray tracer scene from the camera position to the
@@ -237,9 +234,9 @@ class RayTracer:
     def create_camera_rays(
         self,
         camera_pose: GenericSpatialType,
-        resolution: Optional[CameraResolution] = None,
-        field_of_view: Optional[FieldOfView] = None,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        resolution: CameraResolution | None = None,
+        field_of_view: FieldOfView | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Creates camera rays for the ray tracer scene from the camera position to the
         target position.
@@ -283,7 +280,7 @@ class RayTracer:
         multiple_hits=False,
         min_distance: float = 0,
         max_distance: float = np.inf,
-    ) -> Tuple[np.ndarray, np.ndarray, List[Body]]:
+    ) -> tuple[np.ndarray, np.ndarray, list[Body]]:
         """
         Performs a ray test from the origin point to the target point in the ray tracer
         scene.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import doctest
 from dataclasses import is_dataclass, dataclass, field
-from typing import Type
+from typing_extensions import Generic
 
 import pytest
 
@@ -20,7 +20,6 @@ from krrood.patterns.exceptions import DelegatedFactoryMethodError
 from krrood.patterns.role import Role
 from krrood.patterns.role_predicates import IsSameSemanticEntity
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from typing_extensions import Generic
 from ..dataset.role_and_ontology import (
     university_ontology_like_classes,
     university_ontology_like_classes_without_descriptors,
@@ -35,6 +34,7 @@ from ..dataset.role_and_ontology.university_ontology_like_classes_without_descri
     RepresentativeAsSecondRole,
     DelegateAsThirdRole,
 )
+import builtins
 
 
 def test_role_class_docstring_examples_execute_with_documented_results():
@@ -381,7 +381,7 @@ def test_wrapped_class_exposes_factory_methods():
 @dataclass
 class EntityAndType(Generic[T], SubClassSafeGeneric):
     entity: T
-    type: Type[T] = field(init=False)
+    type: builtins.type[T] = field(init=False)
 
     def __post_init__(self):
         self.type = type(self.entity)

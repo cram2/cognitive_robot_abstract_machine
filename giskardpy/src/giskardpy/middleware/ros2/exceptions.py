@@ -5,7 +5,6 @@ Exceptions raised while executing a trajectory on a robot.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Type
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
@@ -25,7 +24,7 @@ class UnknownMinimumVelocityJointError(SetupException):
     The joint the override was written for.
     """
 
-    commanded_joint_names: List[str]
+    commanded_joint_names: list[str]
     """
     The joints the publisher actually commands.
     """
@@ -117,7 +116,7 @@ class NoWatchedClientError(GiskardException):
     Raised when a presence check is asked about a client while it watches none.
     """
 
-    check_type: Type
+    check_type: type
     """
     The check that was asked.
     """

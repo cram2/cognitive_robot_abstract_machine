@@ -3,10 +3,9 @@ from __future__ import annotations
 import threading
 import uuid
 from dataclasses import dataclass, field
-from typing import Union, Iterator, Optional
+from typing_extensions import MutableMapping, Self, TYPE_CHECKING, Iterator
 from uuid import UUID
 
-from typing_extensions import MutableMapping, List, Dict, Self, TYPE_CHECKING
 
 import numpy as np
 
@@ -105,10 +104,10 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     _data: np.ndarray = field(default_factory=lambda: np.zeros((4, 0), dtype=float))
 
     # list of dof ids in column order
-    _ids: List[UUID] = field(default_factory=list)
+    _ids: list[UUID] = field(default_factory=list)
 
     # maps dof ids -> column index
-    _index: Dict[UUID, int] = field(default_factory=dict)
+    _index: dict[UUID, int] = field(default_factory=dict)
 
     version: int = 0
     """
@@ -118,7 +117,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     triggered by updating connection values.
     """
 
-    state_change_callbacks: List[StateChangeCallback] = field(
+    state_change_callbacks: list[StateChangeCallback] = field(
         default_factory=list, repr=False
     )
     """
@@ -219,23 +218,23 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
                 equal_nan=True,
             )
 
-    def keys(self) -> List[UUID]:
+    def keys(self) -> list[UUID]:
         with self.world_lock:
             # return a copy so that callers cannot corrupt the internal bookkeeping
             return list(self._ids)
 
-    def items(self) -> List[tuple[UUID, np.ndarray]]:
+    def items(self) -> list[tuple[UUID, np.ndarray]]:
         with self.world_lock:
             return [
                 (dof_id, self._data[:, self._index[dof_id]].copy())
                 for dof_id in self._ids
             ]
 
-    def values(self) -> List[np.ndarray]:
+    def values(self) -> list[np.ndarray]:
         with self.world_lock:
             return [self._data[:, self._index[dof_id]].copy() for dof_id in self._ids]
 
-    def __contains__(self, dof_or_uuid: Union[DegreeOfFreedom, UUID]) -> bool:
+    def __contains__(self, dof_or_uuid: DegreeOfFreedom | UUID) -> bool:
         with self.world_lock:
             dof_id = (
                 dof_or_uuid.id
@@ -260,7 +259,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         """
         return {dof_id: self[dof_id].position for dof_id in self._ids}
 
-    def to_position_dict(self) -> Dict[PrefixedName, float]:
+    def to_position_dict(self) -> dict[PrefixedName, float]:
         with self.world_lock:
             return {
                 self._world.get_degree_of_freedom_by_id(dof_id)
@@ -274,7 +273,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         return self._world._world_lock
 
     @property
-    def data(self) -> List[float]:
+    def data(self) -> list[float]:
         """
         :return: The derivatives of all degrees of freedom as one flat list, one
             derivative after the other.
@@ -282,7 +281,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         return self._data.ravel().tolist()
 
     @property
-    def ids(self) -> List[UUID]:
+    def ids(self) -> list[UUID]:
         """
         :return: The ids of the degrees of freedom, in column order.
         """
@@ -304,7 +303,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     def jerks(self) -> np.ndarray:
         return self.get_derivative(Derivatives.jerk)
 
-    def column_indices(self, dofs: List[DegreeOfFreedom]) -> List[int]:
+    def column_indices(self, dofs: list[DegreeOfFreedom]) -> list[int]:
         """
         Retrieve the columns of the given degrees of freedom in the state data.
 
@@ -368,7 +367,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
             self._add_dof(dof.id)
             self[dof.id].position = initial_position
 
-    def get_variables(self) -> List[FloatVariable]:
+    def get_variables(self) -> list[FloatVariable]:
         """
         Constructs and returns a list of variables representing the state of the system.
 
@@ -401,7 +400,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
             return positions + velocities + accelerations + jerks
 
     @property
-    def position_float_variables(self) -> List[FloatVariable]:
+    def position_float_variables(self) -> list[FloatVariable]:
         return [v.variables.position for v in self._world.degrees_of_freedom]
 
     def _apply_control_commands(
@@ -468,12 +467,12 @@ class WorldStateView:
     shape (4, N), view into trajectory.
     """
 
-    _ids: List[UUID]
+    _ids: list[UUID]
     """
     List of DOF ids in column order.
     """
 
-    _index: Dict[UUID, int]
+    _index: dict[UUID, int]
     """
     Maps DOF ids to column indices.
     """
@@ -525,34 +524,34 @@ class WorldStateTrajectory:
     The world instance associated with this trajectory.
     """
 
-    _ids: List[UUID] = field(default_factory=list)
+    _ids: list[UUID] = field(default_factory=list)
     """
     List of DOF ids in column order.
     """
 
-    _index: Dict[UUID, int] = field(default_factory=dict)
+    _index: dict[UUID, int] = field(default_factory=dict)
     """
     Maps DOF ids to column indices.
     """
 
-    _times: List[float] = field(default_factory=list, repr=False)
+    _times: list[float] = field(default_factory=list, repr=False)
     """
     List of timestamps corresponding to the recorded world states.
     """
 
-    _data: List[np.ndarray] = field(default_factory=list, repr=False)
+    _data: list[np.ndarray] = field(default_factory=list, repr=False)
     """
     List containing the recorded world state data as numpy arrays.
 
     Each array has shape (4, N).
     """
 
-    _times_cache: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+    _times_cache: np.ndarray | None = field(default=None, init=False, repr=False)
     """
     Cache for the numpy array of timestamps.
     """
 
-    _data_cache: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+    _data_cache: np.ndarray | None = field(default=None, init=False, repr=False)
     """
     Cache for the numpy array of world state data.
     """

@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing_extensions import TYPE_CHECKING, Iterable, Any
 
 import numpy as np
 import trimesh.boolean
 from trimesh.collision import CollisionManager
-from typing_extensions import List, TYPE_CHECKING, Iterable, Type
 
 from krrood.entity_query_language.predicate import (
     Predicate,
@@ -89,7 +88,7 @@ class InContactWith(Triple[TBody, TBody]):
         distance = self.compute_distance()
         return distance is not None and distance < self.maximum_distance
 
-    def compute_distance(self) -> Optional[float]:
+    def compute_distance(self) -> float | None:
         """
         :return: How far apart the two bodies' collision geometry is, or ``None`` when
             the collision detector reports no result for the pair at all.
@@ -232,14 +231,16 @@ class SupportedBy(Triple[TBody, TBody]):
 
     maximum_intersection_height: float = 0.1
     """
-    How deep, in metres, the two may sink into each other. Sunk deeper, they are a
-    clipping the simulation did not resolve, and the reading is refused.
+    How deep, in metres, the two may sink into each other.
+
+    Sunk deeper, they are a clipping the simulation did not resolve, and the reading is
+    refused.
     """
 
     contact_tolerance: float = 0.005
     """
-    How far apart, in metres, the two may be and still count as touching, and so how
-    far above the supporting body the supported body may stand and still rest on it.
+    How far apart, in metres, the two may be and still count as touching, and so how far
+    above the supporting body the supported body may stand and still rest on it.
 
     A body is set down by a motion that stops where it can rather than exactly on the
     surface, so a support read from overlapping volume alone would hold for almost no
@@ -678,7 +679,7 @@ class ContainsType(Predicate):
     Iterable to check for objects of the given type.
     """
 
-    obj_type: Type
+    obj_type: type
     """
     Object type to check for.
     """
@@ -721,7 +722,7 @@ class PlaceIsOccupied(Predicate):
     The world whose collidable bodies are tested against it.
     """
 
-    allowed_bodies: Optional[List[Body]] = None
+    allowed_bodies: list[Body] | None = None
     """
     Bodies that may stand there without the place counting as occupied.
     """

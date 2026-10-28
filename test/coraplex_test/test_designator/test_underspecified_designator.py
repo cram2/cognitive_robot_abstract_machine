@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import pytest
 from uuid import UUID, uuid4
 
-from typing_extensions import Callable, Dict, Iterator, List, Optional
+from typing_extensions import Callable, Iterator
 
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
@@ -68,10 +68,10 @@ class TrialProbe:
     """
 
     def __init__(self):
-        self.calls: List[TrialCall] = []
+        self.calls: list[TrialCall] = []
 
 
-_registered_probes: Dict[UUID, TrialProbe] = {}
+_registered_probes: dict[UUID, TrialProbe] = {}
 """
 `TrialProbe` instances, keyed by the id a `RecordingAction` carries as `probe_key`.
 
@@ -125,7 +125,7 @@ class RecordingExecutionNode(ExecutionBoundaryNode):
     changes observable.
     """
 
-    fail_on_attempt_number: Optional[int] = field(kw_only=True, default=None)
+    fail_on_attempt_number: int | None = field(kw_only=True, default=None)
     """
     Report :attr:`reported_failure` once the probe has recorded this many calls; never
     fail if None.
@@ -157,7 +157,7 @@ class RecordingExecutable(Executable):
 
     probe_key: UUID = field(kw_only=True)
     dof_id: UUID = field(kw_only=True)
-    fail_on_attempt_number: Optional[int] = field(kw_only=True)
+    fail_on_attempt_number: int | None = field(kw_only=True)
     reported_failure: Callable[[], Exception] = field(kw_only=True, default=PlanFailure)
 
     def execute(self) -> None:
@@ -184,7 +184,7 @@ class RecordingAction(ActionDescription):
 
     probe_key: UUID = field(kw_only=True)
     dof_id: UUID = field(kw_only=True)
-    fail_on_attempt_number: Optional[int] = field(kw_only=True, default=None)
+    fail_on_attempt_number: int | None = field(kw_only=True, default=None)
     reported_failure: Callable[[], Exception] = field(kw_only=True, default=PlanFailure)
 
     @property

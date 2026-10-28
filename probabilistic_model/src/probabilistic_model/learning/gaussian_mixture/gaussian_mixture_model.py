@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 from random_events.variable import Continuous
 from sklearn.mixture import GaussianMixture
-from typing_extensions import Iterable, Optional, Sequence
+from typing_extensions import Iterable, Sequence
 
 from probabilistic_model.exceptions import NonContinuousVariableError
 from probabilistic_model.learning.gaussian_mixture.covariance_type import (
@@ -38,7 +38,7 @@ class GaussianMixtureModel(GaussianMixtureLearningMethod):
     def fit(
         self,
         data: pd.DataFrame,
-        variables: Optional[Iterable[AnnotatedVariable]] = None,
+        variables: Iterable[AnnotatedVariable] | None = None,
     ) -> ProbabilisticCircuit:
         """
         :raises NonContinuousVariableError: If a variable is not continuous.

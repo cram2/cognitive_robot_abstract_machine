@@ -11,7 +11,6 @@ import experiments.orm.ormatic_interface  # type: ignore  # noqa: F401
 import numpy as np
 import pytest
 from krrood.entity_query_language.factories import variable
-from typing_extensions import List
 
 from experiments.causal_reasoning.mutagenesis.dataset import (
     synthetic_mutagenesis_molecules,
@@ -50,7 +49,7 @@ def molecule_count() -> int:
 
 
 @pytest.fixture(scope="module")
-def molecules(molecule_count: int) -> List[MutagenesisMolecule]:
+def molecules(molecule_count: int) -> list[MutagenesisMolecule]:
     """
     Synthetic molecules, the same ones for every test in the module.
     """
@@ -90,7 +89,7 @@ def test_every_count_and_attribute_reads_as_words() -> None:
 
 
 def test_the_atom_count_is_how_many_atoms_the_molecule_holds(
-    molecules: List[MutagenesisMolecule],
+    molecules: list[MutagenesisMolecule],
 ) -> None:
     """
     The statistic counts every atom, whatever its element, so it is the length of the
@@ -144,7 +143,7 @@ def test_the_catalogue_asks_each_question_once() -> None:
 
 
 @pytest.fixture(scope="module")
-def branching_atoms_answer(molecules: List[MutagenesisMolecule]) -> DoQueryAnswer:
+def branching_atoms_answer(molecules: list[MutagenesisMolecule]) -> DoQueryAnswer:
     """
     The answer to the branching-atom-count question, read once.
     """
@@ -163,7 +162,7 @@ def test_the_answer_reports_the_question_it_was_asked(
 
 
 def test_one_region_per_value_the_molecules_take(
-    branching_atoms_answer: DoQueryAnswer, molecules: List[MutagenesisMolecule]
+    branching_atoms_answer: DoQueryAnswer, molecules: list[MutagenesisMolecule]
 ) -> None:
     """
     The cause is split into one region per value the training molecules give it, read
@@ -218,7 +217,7 @@ def test_the_shift_from_adjusting_is_the_distance_between_the_two_answers(
 
 
 def test_adjusting_for_nothing_leaves_the_conditioned_answer_alone(
-    molecules: List[MutagenesisMolecule],
+    molecules: list[MutagenesisMolecule],
 ) -> None:
     """
     With no confounder to adjust for, the adjusted circuit is the conditioned one, so
@@ -241,7 +240,7 @@ def test_adjusting_for_nothing_leaves_the_conditioned_answer_alone(
 )
 def test_every_question_of_the_catalogue_is_answered(
     question: MutagenesisQuestion,
-    molecules: List[MutagenesisMolecule],
+    molecules: list[MutagenesisMolecule],
     probability_tolerance: float,
 ) -> None:
     """

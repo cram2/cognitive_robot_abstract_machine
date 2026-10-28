@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
@@ -245,12 +245,12 @@ class ConstraintTypeMismatchError(QPSolverException):
     The name of the enforcement strategy that received the constraint.
     """
 
-    expected_type: Type[GiskardConstraint]
+    expected_type: type[GiskardConstraint]
     """
     The constraint type the strategy expected.
     """
 
-    actual_type: Type[GiskardConstraint]
+    actual_type: type[GiskardConstraint]
     """
     The constraint type that was actually received.
     """
@@ -276,7 +276,7 @@ class NoFactoryForQPDataTypeError(QPSolverException):
     Raised when no registered factory handles the requested QPData type.
     """
 
-    qp_data_type: Type[QPData]
+    qp_data_type: type[QPData]
     """
     The QPData type for which no factory is registered.
     """

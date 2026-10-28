@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from huggingface_hub import HfApi, hf_hub_download
-from typing_extensions import Optional
 
 from semantic_digital_twin.adapters.artvip_dataset.exceptions import (
     ArtVipMainStageFileAmbiguousError,
@@ -55,7 +54,7 @@ class ArtVipDatasetLoader:
     The directory object files are downloaded to.
     """
 
-    token: Optional[str] = field(default_factory=lambda: os.environ.get("HF_TOKEN"))
+    token: str | None = field(default_factory=lambda: os.environ.get("HF_TOKEN"))
     """
     The Hugging Face access token used to download the dataset.
 
@@ -68,7 +67,7 @@ class ArtVipDatasetLoader:
     The Hugging Face dataset repository ID.
     """
 
-    _repository_files: Optional[tuple[str, ...]] = field(
+    _repository_files: tuple[str, ...] | None = field(
         default=None, init=False, repr=False
     )
     """

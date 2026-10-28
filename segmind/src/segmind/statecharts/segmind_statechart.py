@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
 
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from segmind.detectors.atomic_event_detectors_nodes import ContactDetector, TranslationDetector, \
@@ -23,7 +22,7 @@ class SegmindStatechart(MotionStatechart):
     """
 
 
-    def build_statechart(self, detectors:List[AbstractDetector]=None) -> DetectorStateChart:
+    def build_statechart(self, detectors:list[AbstractDetector]=None) -> DetectorStateChart:
         """
         Build a statechart with various detector nodes.
 

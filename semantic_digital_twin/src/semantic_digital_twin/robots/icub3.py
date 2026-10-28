@@ -4,7 +4,7 @@ from abc import ABC
 
 import numpy as np
 from dataclasses import dataclass
-from typing import Self, Union, List
+from typing_extensions import Self, Union
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
@@ -136,10 +136,10 @@ class ICub3Joint(JointName):
 @dataclass(eq=False)
 class ICub3LeftThumb(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -159,10 +159,10 @@ class ICub3LeftThumb(Finger):
 @dataclass(eq=False)
 class ICub3LeftIndexFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -182,10 +182,10 @@ class ICub3LeftIndexFinger(Finger):
 @dataclass(eq=False)
 class ICub3LeftMiddleFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -205,10 +205,10 @@ class ICub3LeftMiddleFinger(Finger):
 @dataclass(eq=False)
 class ICub3LeftRingFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -228,10 +228,10 @@ class ICub3LeftRingFinger(Finger):
 @dataclass(eq=False)
 class ICub3LeftLittleFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -251,10 +251,10 @@ class ICub3LeftLittleFinger(Finger):
 @dataclass(eq=False)
 class ICub3RightThumb(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -274,10 +274,10 @@ class ICub3RightThumb(Finger):
 @dataclass(eq=False)
 class ICub3RightIndexFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -297,10 +297,10 @@ class ICub3RightIndexFinger(Finger):
 @dataclass(eq=False)
 class ICub3RightMiddleFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -320,10 +320,10 @@ class ICub3RightMiddleFinger(Finger):
 @dataclass(eq=False)
 class ICub3RightRingFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -343,10 +343,10 @@ class ICub3RightRingFinger(Finger):
 @dataclass(eq=False)
 class ICub3RightLittleFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -375,10 +375,10 @@ class ICub3LeftHand(
     ],
 ):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
@@ -450,10 +450,10 @@ class ICub3RightHand(
     ],
 ):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
@@ -516,10 +516,10 @@ class ICub3RightHand(
 @dataclass(eq=False)
 class ICub3LeftArm(Arm[ICub3LeftHand]):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
             name=PrefixedName("left_arm_park", prefix=self.name.name),
             mapping=dict(
@@ -542,10 +542,10 @@ class ICub3LeftArm(Arm[ICub3LeftHand]):
 @dataclass(eq=False)
 class ICub3RightArm(Arm[ICub3RightHand]):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
             name=PrefixedName("right_arm_park", prefix=self.name.name),
             mapping=dict(
@@ -584,20 +584,20 @@ class ICub3Camera(Camera):
             default_camera=True,
         )
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
 
 @dataclass(eq=False)
 class ICub3Neck(Neck[ICub3Camera]):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -615,10 +615,10 @@ class ICub3Torso(
     Torso, HasLeftRightArm[ICub3LeftArm, ICub3RightArm], HasNeck[ICub3Neck]
 ):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -646,10 +646,10 @@ class ICub3MobileBase(MobileBase[OmniDrive]):
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "l_hip_1"),
         )
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
 

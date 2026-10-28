@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing_extensions import Any
 
 from json_msgs.action import JsonAction
 
@@ -71,7 +71,7 @@ class ActionFeedbackPublisher:
         data["goal_id"] = self.action_server.goal_id
         self.send(data)
 
-    def create_states(self) -> Dict[str, Any]:
+    def create_states(self) -> dict[str, Any]:
         """
         Collect the life cycle and observation state of the motion statechart.
         """
@@ -90,7 +90,7 @@ class ActionFeedbackPublisher:
             self.last_history_length = history_length
         return has_changed
 
-    def send(self, data: Dict[str, Any]) -> None:
+    def send(self, data: dict[str, Any]) -> None:
         """
         Publish the given data as action feedback.
         """

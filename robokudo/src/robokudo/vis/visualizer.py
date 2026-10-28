@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 from py_trees.blackboard import Blackboard
-from typing_extensions import Any, List, Optional, Set, Type
+from typing_extensions import Any
 
 from robokudo.annotators.outputs import AnnotatorOutputs
 from robokudo.defs import PACKAGE_NAME
@@ -47,7 +47,7 @@ class Visualizer(object):
 
         def __init__(self) -> None:
             """Initialize the observable object."""
-            self._observers: List[Visualizer.Observer] = []
+            self._observers: list[Visualizer.Observer] = []
 
         def register_observer(self, observer: Visualizer.Observer) -> None:
             """Register an observer to receive notifications.
@@ -96,21 +96,19 @@ class Visualizer(object):
             """Initialize shared state."""
             super().__init__()
 
-            self.active_annotator: Optional[robokudo.annotators.core.BaseAnnotator] = (
-                None
-            )
+            self.active_annotator: robokudo.annotators.core.BaseAnnotator | None = None
             """ Currently active annotator."""
 
             self.active_annotator_i: int = 0
             """ Index of currently active annotator """
 
-    instances: List[Visualizer] = []
+    instances: list[Visualizer] = []
     """List of all active visualizer instances"""
 
     def __init__(
         self,
         pipeline: Pipeline,
-        shared_visualizer_state: Optional[Visualizer.SharedState] = None,
+        shared_visualizer_state: Visualizer.SharedState | None = None,
     ) -> None:
         """Initialize the visualizer.
 
@@ -126,7 +124,7 @@ class Visualizer(object):
         self.indicate_termination_var: bool = False
         """Flag indicating if visualization should terminate"""
 
-        self.shared_visualizer_state: Optional[Visualizer.SharedState] = (
+        self.shared_visualizer_state: Visualizer.SharedState | None = (
             shared_visualizer_state
         )
         """Shared state object for coordinating between visualizers"""
@@ -189,7 +187,7 @@ class Visualizer(object):
     def new_visualizer_instance(
         cls,
         pipeline: Pipeline,
-        shared_visualizer_state: Optional[Visualizer.SharedState] = None,
+        shared_visualizer_state: Visualizer.SharedState | None = None,
     ) -> Visualizer:
         """Create and register a new visualizer instance.
 
@@ -236,7 +234,7 @@ class Visualizer(object):
         return self.indicate_termination_var
 
     @staticmethod
-    def get_unique_types_of_visualizer_instances() -> Set[Type]:
+    def get_unique_types_of_visualizer_instances() -> set[type]:
         """Get set of unique visualizer types.
 
         :returns: Set of visualizer classes that have instances

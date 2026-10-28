@@ -4,7 +4,6 @@ import logging
 import os
 import traceback
 from dataclasses import dataclass, field
-from typing import List
 
 import rclpy
 from json_msgs.action import JsonAction
@@ -157,14 +156,14 @@ class Giskard:
             post_goal_plotters=self.create_post_goal_plotters(),
         )
 
-    def create_post_goal_plotters(self) -> List[PostGoalPlotter]:
+    def create_post_goal_plotters(self) -> list[PostGoalPlotter]:
         """
         Create the debug plotters that are configured and let them record what they
         need.
         """
         if not self.server_config.debug_mode:
             return []
-        plotters: List[PostGoalPlotter] = []
+        plotters: list[PostGoalPlotter] = []
         if self.server_config.plot_trajectory:
             plotters.append(GoalTrajectoryPlotter(executor=self.executor))
         if self.server_config.plot_gantt_chart:
@@ -245,7 +244,7 @@ class Giskard:
         return self.robots[0]
 
     @property
-    def robots(self) -> List[AbstractRobot]:
+    def robots(self) -> list[AbstractRobot]:
         return self.world_config.world.get_semantic_annotations_by_type(AbstractRobot)
 
     def _controlled_joints_sanity_check(self):

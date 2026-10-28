@@ -1,6 +1,5 @@
 import pydot
 import pytest
-from typing_extensions import List, Optional, Set, Union
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -68,14 +67,14 @@ def draw(motion_statechart: MotionStatechart) -> pydot.Graph:
     return MotionStatechartGraphviz(motion_statechart).to_dot_graph()
 
 
-def direct_node_names(graph: Union[pydot.Graph, pydot.Cluster]) -> Set[str]:
+def direct_node_names(graph: pydot.Graph | pydot.Cluster) -> set[str]:
     """
     :return: The names of the nodes declared on `graph` itself, ignoring its subgraphs.
     """
     return {node.get_name().strip('"') for node in graph.get_nodes()}
 
 
-def all_node_names(graph: Union[pydot.Graph, pydot.Cluster]) -> Set[str]:
+def all_node_names(graph: pydot.Graph | pydot.Cluster) -> set[str]:
     """
     :return: The names of the nodes declared anywhere in `graph`, subgraphs included.
     """
@@ -85,7 +84,7 @@ def all_node_names(graph: Union[pydot.Graph, pydot.Cluster]) -> Set[str]:
     return names
 
 
-def all_edge_endpoints(graph: Union[pydot.Graph, pydot.Cluster]) -> Set[str]:
+def all_edge_endpoints(graph: pydot.Graph | pydot.Cluster) -> set[str]:
     """
     :return: The source and destination names of every edge in `graph`, subgraphs included.
     """
@@ -100,7 +99,7 @@ def all_edge_endpoints(graph: Union[pydot.Graph, pydot.Cluster]) -> Set[str]:
 
 def find_cluster_of(
     graph: pydot.Graph, node: MotionStatechartNode
-) -> Optional[pydot.Cluster]:
+) -> pydot.Cluster | None:
     """
     :return: The cluster `node` owns as a goal, or None if it has none.
     """
@@ -111,7 +110,7 @@ def find_cluster_of(
 
 
 def find_node(
-    graph: Union[pydot.Graph, pydot.Cluster], node: MotionStatechartNode
+    graph: pydot.Graph | pydot.Cluster, node: MotionStatechartNode
 ) -> pydot.Node:
     """
     :return: The pydot node drawn for `node`.
@@ -128,10 +127,10 @@ def find_node(
 
 
 def find_edges(
-    graph: Union[pydot.Graph, pydot.Cluster],
+    graph: pydot.Graph | pydot.Cluster,
     source: MotionStatechartNode,
     destination: MotionStatechartNode,
-) -> List[pydot.Edge]:
+) -> list[pydot.Edge]:
     """
     :return: Every edge drawn from `source` to `destination`, searching subgraphs too,
         because an edge between two children of a goal is declared on that goal's cluster.

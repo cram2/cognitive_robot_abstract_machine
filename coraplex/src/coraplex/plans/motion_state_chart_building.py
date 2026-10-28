@@ -4,7 +4,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from itertools import groupby
 
-from typing_extensions import TYPE_CHECKING, List
+from typing_extensions import TYPE_CHECKING
 
 from coraplex.plans.executables import Executable, GiskardExecutable
 from giskardpy.motion_statechart.goals.templates import NodeListGoal, Sequence
@@ -74,7 +74,7 @@ class BuildsMotionStateChart:
     def add_children_to_motion_state_chart(
         self,
         goal: NodeListGoal,
-        children: List[BuildsMotionStateChart],
+        children: list[BuildsMotionStateChart],
         executable: GiskardExecutable,
     ) -> None:
         """
@@ -87,7 +87,7 @@ class BuildsMotionStateChart:
                 continue
             child.add_to_motion_state_chart(goal, executable)
 
-    def parse_children(self, children: List[PlanNode]) -> Executable:
+    def parse_children(self, children: list[PlanNode]) -> Executable:
         """
         Parse `children` into one executable, building one motion state chart per run of
         children that no execution boundary separates.
@@ -114,7 +114,7 @@ class BuildsMotionStateChart:
         return Executable(execution_list=execution_list, context=self.context)
 
     def create_giskard_executable(
-        self, nodes: List[BuildsMotionStateChart]
+        self, nodes: list[BuildsMotionStateChart]
     ) -> GiskardExecutable:
         """
         Create an executable holding a single motion state chart, populated by adding

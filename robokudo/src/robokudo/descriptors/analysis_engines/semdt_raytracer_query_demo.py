@@ -1,10 +1,14 @@
-"""Analysis engine for simulated RGB-D input from SemDT RayTracer with query functionality.
+"""
+Analysis engine for simulated RGB-D input from SemDT RayTracer with query functionality.
 
 This pipeline mirrors the standard tabletop segmentation flow but uses the
-`semdt_raytracer` camera descriptor, which renders color/depth images from a
+``ray_tracing`` camera descriptor, which renders color/depth images from a
 world descriptor instead of reading a physical camera stream.
 """
 
+from __future__ import annotations
+
+# %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator

@@ -22,7 +22,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing_extensions import Any, Iterator, Tuple, TYPE_CHECKING
+from typing_extensions import Any, Iterator, TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import (
     HasExpression,
@@ -206,7 +206,7 @@ class Distribution(ProbabilisticQuery):
     The match whose conditions describe the distribution.
     """
 
-    marginalize_for: Tuple[Attribute, ...] = field(default_factory=tuple)
+    marginalize_for: tuple[Attribute, ...] = field(default_factory=tuple)
     """
     The match's variables to narrow the result to.
 

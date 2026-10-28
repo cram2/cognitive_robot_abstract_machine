@@ -3,10 +3,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Any, Self
+from typing_extensions import assert_never, Any, Self
 
 import numpy as np
-from typing_extensions import Optional, Tuple, assert_never
 
 from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json
@@ -103,7 +102,7 @@ class HasXYZ(Sage10kBase):
     y: float
     z: float
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "x": self.x,
@@ -112,7 +111,7 @@ class HasXYZ(Sage10kBase):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(x=data["x"], y=data["y"], z=data["z"])
 
 
@@ -124,7 +123,7 @@ class Sage10kRotation(HasXYZ):
     The format is roll(x), pitch (y), and yaw (z). They are given in degrees.
     """
 
-    def as_roll_pitch_yaw_in_radians(self) -> Tuple[float, float, float]:
+    def as_roll_pitch_yaw_in_radians(self) -> tuple[float, float, float]:
         conversion_factor = math.pi / 180
         return (
             self.x * conversion_factor,
@@ -175,7 +174,7 @@ class Sage10kSize(Sage10kBase):
     def z(self) -> float:
         return self.height
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "height": self.height,
@@ -184,7 +183,7 @@ class Sage10kSize(Sage10kBase):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(height=data["height"], length=data["length"], width=data["width"])
 
 
@@ -201,7 +200,7 @@ class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
     metallic: float
     roughness: float
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "metallic": self.metallic,
@@ -210,7 +209,7 @@ class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(
-        cls, data: Dict[str, Any], **kwargs
+        cls, data: dict[str, Any], **kwargs
     ) -> Sage10kPhysicallyBasedRendering:
         return cls(metallic=data["metallic"], roughness=data["roughness"])
 
@@ -250,7 +249,7 @@ class Sage10kWall(Sage10kWithID):
     The thickness of the wall.
     """
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "id": self.id,
@@ -262,7 +261,7 @@ class Sage10kWall(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Sage10kWall:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kWall:
         return cls(
             id=data["id"],
             start_point=Sage10kPosition._from_json(data["start_point"], **kwargs),
@@ -273,7 +272,7 @@ class Sage10kWall(Sage10kWithID):
         )
 
     @property
-    def wall_length_and_yaw(self) -> Tuple[float, float]:
+    def wall_length_and_yaw(self) -> tuple[float, float]:
         """
         :return: The length of the wall and the yaw that can be used for creating it with
         `Wall.create_with_new_body_in_world`.
@@ -475,7 +474,7 @@ class Sage10kObject(Sage10kWithID):
 
         return body
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "id": self.id,
@@ -494,7 +493,7 @@ class Sage10kObject(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Sage10kObject:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kObject:
         place_guidance = data["place_guidance"]
         if isinstance(place_guidance, dict):
             import json
@@ -568,7 +567,7 @@ class Sage10kDoor(Sage10kWithID):
     The door materials filename found in the `materials` folder.
     """
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "id": self.id,
@@ -583,7 +582,7 @@ class Sage10kDoor(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Sage10kDoor:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kDoor:
         return cls(
             id=data["id"],
             wall_id=data["wall_id"],
@@ -758,17 +757,17 @@ class Sage10kRoom(Sage10kWithID):
     The floor materials filename found in the `materials` folder.
     """
 
-    objects: List[Sage10kObject] = field(default_factory=list)
+    objects: list[Sage10kObject] = field(default_factory=list)
     """
     Objects found in this room.
     """
 
-    walls: List[Sage10kWall] = field(default_factory=list)
+    walls: list[Sage10kWall] = field(default_factory=list)
     """
     Walls of this room.
     """
 
-    doors: List[Sage10kDoor] = field(default_factory=list)
+    doors: list[Sage10kDoor] = field(default_factory=list)
     """
     The doors of the room.
     """
@@ -902,7 +901,7 @@ class Sage10kRoom(Sage10kWithID):
 
         return world.root
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             JSONField.TYPE: get_full_class_name(self.__class__),
             "id": self.id,
@@ -916,7 +915,7 @@ class Sage10kRoom(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Sage10kRoom:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kRoom:
         return cls(
             id=data["id"],
             room_type=data["room_type"],
@@ -957,19 +956,19 @@ class Sage10kScene(Sage10kWithID):
     The total area of the scene in square meters.
     """
 
-    rooms: List[Sage10kRoom] = field(default_factory=list)
+    rooms: list[Sage10kRoom] = field(default_factory=list)
     """
     The rooms of the scene.
     """
 
-    directory: Optional[Path] = None
+    directory: Path | None = None
     """
     The directory of the scenes json file.
 
     The layout files are named like `layout*.json`.
     """
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "id": self.id,
@@ -981,7 +980,7 @@ class Sage10kScene(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Sage10kScene:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kScene:
         return cls(
             id=data["id"],
             building_style=data["building_style"],

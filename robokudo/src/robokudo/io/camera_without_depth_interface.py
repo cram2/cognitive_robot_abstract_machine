@@ -19,7 +19,7 @@ The module is used for:
 """
 
 from __future__ import annotations
-from typing_extensions import Optional, TYPE_CHECKING, Any
+from typing_extensions import TYPE_CHECKING, Any
 
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.cas import CASViews
@@ -100,7 +100,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
         Only works on video/image files.
         """
-        self._backup_color: Optional[npt.NDArray] = None
+        self._backup_color: npt.NDArray | None = None
         """
         Backup of image for single-image file mode.
         """

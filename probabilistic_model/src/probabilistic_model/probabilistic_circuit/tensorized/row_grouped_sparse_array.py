@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 from scipy.sparse import coo_array
-from typing_extensions import Any, List, Self, Tuple
+from typing_extensions import Any, Self
 
 
 @dataclass
@@ -33,7 +33,7 @@ class SparseEntries:
     """
 
     @classmethod
-    def concatenate(cls, parts: List[SparseEntries]) -> Self:
+    def concatenate(cls, parts: list[SparseEntries]) -> Self:
         """
         :param parts: The entries to join, in order.
         :return: All entries of the parts.
@@ -44,7 +44,7 @@ class SparseEntries:
             np.concatenate([part.columns for part in parts]),
         )
 
-    def to_coo_array(self, shape: Tuple[int, int]) -> coo_array:
+    def to_coo_array(self, shape: tuple[int, int]) -> coo_array:
         """
         :param shape: The shape of the dense array.
         :return: The sparse array that stores these entries.
@@ -79,7 +79,7 @@ class RowGroupedSparseArray:
     """
 
     @classmethod
-    def from_entries(cls, entries: SparseEntries, shape: Tuple[int, int]) -> Self:
+    def from_entries(cls, entries: SparseEntries, shape: tuple[int, int]) -> Self:
         """
         :param entries: The stored entries.
         :param shape: The shape of the dense array.
@@ -88,7 +88,7 @@ class RowGroupedSparseArray:
         return cls(entries.to_coo_array(shape))
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self) -> tuple[int, int]:
         return self.array.shape
 
     @property

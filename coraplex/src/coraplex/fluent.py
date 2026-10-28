@@ -6,7 +6,7 @@ import operator
 from enum import Enum
 from threading import Condition, Lock
 from uuid import uuid4
-from typing_extensions import Any, Optional, List, Callable
+from typing_extensions import Any, Callable
 
 
 class Behavior(Enum):
@@ -48,7 +48,7 @@ class Fluent:
     by passing a function as the fluents value.
     """
 
-    def __init__(self, value: Optional[Any] = None, name: str = None):
+    def __init__(self, value: Any | None = None, name: str = None):
         """
         Create a new fluent.
 
@@ -59,7 +59,7 @@ class Fluent:
         self._cv: Condition = Condition()
         self._mutex: Lock = Lock()
         self._pulses: int = 0
-        self._children: List[Fluent] = []
+        self._children: list[Fluent] = []
         self._handle_missed = Behavior.NEVER
         self._value: Any = value
         self._whenever_cbs = []
@@ -159,7 +159,7 @@ class Fluent:
 
         self.pulse()
 
-    def wait_for(self, timeout: Optional[float] = None):
+    def wait_for(self, timeout: float | None = None):
         """
         Block the current thread if the value of the fluent is None, until it is not
         None or until it timed out.

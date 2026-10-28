@@ -1,8 +1,10 @@
 import copy
 import os
+from dataclasses import dataclass, field
 
 import giskardpy_bullet_bindings as pb
 import pytest
+import trimesh
 from importlib.resources import files
 from pathlib import Path
 
@@ -13,8 +15,10 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
     clear_cache,
     convert_to_decomposed_obj_and_save_in_tmp,
     create_shape_from_geometry,
+    trimesh_quantized_hash,
 )
 from semantic_digital_twin.utils import create_cache_dir
+from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd import (
     BulletVHACDMeshDecomposer,
 )
@@ -22,7 +26,7 @@ from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDec
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.testing import world_setup_simple
-from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.world_description.geometry import Mesh, Shape
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -193,3 +197,56 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
     )
 
     assert collision_b_after.distance == pytest.approx(baseline_distance_b)
+
+
+# %% reading the cache while a mesh is decomposed
+
+
+@dataclass
+class DecomposerWatchingTheCache(MeshDecomposer):
+    """
+    A decomposer that notes, whenever it decomposes, whether the decomposition's cache
+    file can already be read, and splits every mesh into two boxes.
+    """
+
+    cache_file: Path = field(kw_only=True)
+    """
+    The file the finished decomposition is cached in.
+    """
+
+    cache_file_existed: list[bool] = field(default_factory=list)
+    """
+    Whether :attr:`cache_file` existed, at each decomposition.
+    """
+
+    def apply_to_mesh(self, mesh: Mesh) -> list[Shape]:
+        return [Mesh.box(extents=(1, 1, 1)), Mesh.box(extents=(2, 1, 1))]
+
+    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
+        self.cache_file_existed.append(self.cache_file.exists())
+        trimesh.Scene([part.mesh for part in self.apply_to_mesh(mesh)]).export(
+            output_path, file_type="obj"
+        )
+        return output_path
+
+
+def test_a_decomposition_appears_in_the_cache_only_once_it_is_finished(
+    clean_cache, cache_dir, non_convex_mesh
+):
+    """
+    A process that finds a mesh's cache file reads it as the finished decomposition, so
+    the file must not exist while the mesh is still being decomposed.
+    """
+    decomposer = DecomposerWatchingTheCache(
+        cache_file=cache_dir / f"{trimesh_quantized_hash(non_convex_mesh.mesh)}.obj"
+    )
+
+    cached = convert_to_decomposed_obj_and_save_in_tmp(
+        non_convex_mesh, mesh_decomposer=decomposer, cache_dir=cache_dir
+    )
+
+    assert decomposer.cache_file_existed == [False]
+    assert cached == str(decomposer.cache_file)
+    assert sum(1 for line in open(cached) if line.startswith("o ")) == len(
+        decomposer.apply_to_mesh(non_convex_mesh)
+    )

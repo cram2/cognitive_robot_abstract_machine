@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from typing_extensions import List, Optional
 
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -117,8 +116,8 @@ class DeterminerProcessor(RewritePass):
         self,
         noun_phrase: NounPhrase,
         head: VerbalizationFragment,
-        pre_head: List[VerbalizationFragment],
-        leading_fragment: Optional[VerbalizationFragment],
+        pre_head: list[VerbalizationFragment],
+        leading_fragment: VerbalizationFragment | None,
     ) -> VerbalizationFragment:
         """
         Build one determiner-and-head group: *head*, number-tagged and processed,
@@ -171,7 +170,7 @@ class DeterminerProcessor(RewritePass):
         article_anchor: VerbalizationFragment,
         *,
         alternative: bool = False,
-    ) -> Optional[VerbalizationFragment]:
+    ) -> VerbalizationFragment | None:
         """:return: The determiner fragment for *(definiteness, number)*, or ``None`` (bare). The
         indefinite *a/an* agrees phonologically with *article_anchor* (the first surface word — the
         ordinal distinguisher or pre-head when present, else the head).

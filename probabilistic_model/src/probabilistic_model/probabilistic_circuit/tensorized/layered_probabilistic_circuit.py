@@ -7,7 +7,7 @@ import numpy as np
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Symbolic, Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, Iterable, List, Optional, Self, Tuple, Type
+from typing_extensions import Any, Iterable, Self
 
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.distributions.distributions import (
@@ -148,7 +148,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
     """
 
     @property
-    def variable_to_index_map(self) -> Dict[Variable, int]:
+    def variable_to_index_map(self) -> dict[Variable, int]:
         """
         :return: A map from every variable of the circuit to its column index.
         """
@@ -169,7 +169,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         return self.root.number_of_parameters
 
     @property
-    def layers(self) -> List[Layer]:
+    def layers(self) -> list[Layer]:
         """
         :return: Every layer of the circuit, parents before children.
         """
@@ -197,7 +197,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
     # %% symbolic values
 
     @property
-    def symbolic_encodings(self) -> Dict[int, SymbolicEncoding]:
+    def symbolic_encodings(self) -> dict[int, SymbolicEncoding]:
         """
         :return: The encoding of every symbolic variable, keyed by its column.
         """
@@ -250,7 +250,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         }
 
     def store_discrete_probabilities_as(
-        self, table_type: Type[ProbabilityTable]
+        self, table_type: type[ProbabilityTable]
     ) -> Self:
         """
         Store the probabilities of every discrete layer in a table of the given type, in
@@ -427,7 +427,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         return LogTruncation(root, log_probability)
 
     def can_truncate_in_one_batch(
-        self, events: List[SimpleEvent], singleton_allowed: bool = False
+        self, events: list[SimpleEvent], singleton_allowed: bool = False
     ) -> bool:
         """
         :param events: The simple events to truncate to.
@@ -441,7 +441,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         )
 
     def truncated_root_of_simple_events(
-        self, events: List[SimpleEvent], singleton_allowed: bool = False
+        self, events: list[SimpleEvent], singleton_allowed: bool = False
     ) -> LogTruncation[Layer]:
         """
         Build the root of this circuit truncated to several simple events in one pass.
@@ -547,7 +547,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         original_variables = self.variables
         remaining = [variable for variable in self.variables if variable not in point]
 
-        children: List[Layer] = []
+        children: list[Layer] = []
         if remaining:
             if self.marginal_in_place(remaining) is None:
                 return LogConditioning.impossible()
@@ -567,7 +567,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     @staticmethod
     def point_masses_layer(
-        variable_index: int, distributions: List[UnivariateDistribution]
+        variable_index: int, distributions: list[UnivariateDistribution]
     ) -> UnivariateInputLayer:
         """
         The layer of several point masses on one variable, such as the one a conditioned
@@ -604,13 +604,13 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         self.root.remap_variables(remap)
         self.variables = variables
 
-    def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
+    def marginal(self, variables: Iterable[Variable]) -> Self | None:
         result = copy.deepcopy(self)
         if result.marginal_in_place(variables) is None:
             return None
         return result
 
-    def marginal_in_place(self, variables: Iterable[Variable]) -> Optional[Self]:
+    def marginal_in_place(self, variables: Iterable[Variable]) -> Self | None:
         """
         Restrict this circuit to a subset of its variables in place.
 
@@ -621,13 +621,13 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             return None
         return self.simplify()
 
-    def restrict_to_variables(self, variables: Iterable[Variable]) -> Optional[Self]:
+    def restrict_to_variables(self, variables: Iterable[Variable]) -> Self | None:
         result = copy.deepcopy(self)
         return result.restrict_to_variables_in_place(variables)
 
     def restrict_to_variables_in_place(
         self, variables: Iterable[Variable]
-    ) -> Optional[Self]:
+    ) -> Self | None:
         """
         Restrict this circuit to a subset of its variables in place, without
         :meth:`simplify`'s removal of the identity layers.
@@ -716,13 +716,13 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             )
         )
 
-    def apply_translation(self, translation: Dict[Variable, float]):
+    def apply_translation(self, translation: dict[Variable, float]):
         values = np.zeros(len(self.variables))
         for variable, value in translation.items():
             values[self.variables.index(variable)] = value
         self.root.apply_translation(values)
 
-    def apply_scaling(self, scaling: Dict[Variable, float]):
+    def apply_scaling(self, scaling: dict[Variable, float]):
         values = np.ones(len(self.variables))
         for variable, value in scaling.items():
             values[self.variables.index(variable)] = value
@@ -732,7 +732,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     def unnormalized_mixtures(
         self, tolerance: float = 1e-6
-    ) -> List[UnnormalizedMixture[LayerNode]]:
+    ) -> list[UnnormalizedMixture[LayerNode]]:
         return [
             report
             for layer in self.layers
@@ -741,7 +741,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     def _unnormalized_mixtures_of_layer(
         self, layer: Layer, tolerance: float
-    ) -> List[UnnormalizedMixture[LayerNode]]:
+    ) -> list[UnnormalizedMixture[LayerNode]]:
         """
         :param layer: The layer to read.
         :param tolerance: How far a mixture's logarithmic weights may sum from zero.
@@ -760,7 +760,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     def mixtures_over(
         self, variables: SortedSet[Variable]
-    ) -> List[MixtureOverVariable[LayerNode]]:
+    ) -> list[MixtureOverVariable[LayerNode]]:
         cache = QueryCache()
         return [
             report
@@ -770,7 +770,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     def _mixtures_of_layer_over(
         self, layer: Layer, variables: SortedSet[Variable], cache: QueryCache
-    ) -> List[MixtureOverVariable[LayerNode]]:
+    ) -> list[MixtureOverVariable[LayerNode]]:
         """
         :param layer: The layer to read.
         :param variables: The variables to read it through.
@@ -794,7 +794,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     def _variables_of_layer(
         self, layer: Layer, variables: SortedSet[Variable]
-    ) -> List[Variable]:
+    ) -> list[Variable]:
         """
         :param layer: The layer to ask about.
         :param variables: The variables of interest.
@@ -810,7 +810,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
     # %% composition
 
     @classmethod
-    def mixture_of(cls, components: List[Self], log_weights: Iterable[float]) -> Self:
+    def mixture_of(cls, components: list[Self], log_weights: Iterable[float]) -> Self:
         log_weights = list(log_weights)
         ProbabilisticCircuitRepresentation.validate_mixture(components, log_weights)
         copies = [copy.deepcopy(component) for component in components]
@@ -819,7 +819,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         return cls(SortedSet(components[0].variables), root)
 
     @classmethod
-    def product_of(cls, factors: List[Self]) -> Self:
+    def product_of(cls, factors: list[Self]) -> Self:
         ProbabilisticCircuitRepresentation.validate_product(factors)
         variables = SortedSet()
         for factor in factors:
@@ -856,10 +856,10 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     def lowest_product_nodes_over(
         self, variables: SortedSet[Variable]
-    ) -> List[LayerNode]:
+    ) -> list[LayerNode]:
         variable_indices = [self.variables.index(variable) for variable in variables]
         result = []
-        found_at_or_below: Dict[int, NodeMask] = {}
+        found_at_or_below: dict[int, NodeMask] = {}
         # children before parents
         for layer in reversed(self.layers):
             below = layer.nodes_with_child_in(found_at_or_below)
@@ -872,8 +872,8 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         return node.as_circuit(self.variables)
 
     def remove_variables_in_place(
-        self, variables: SortedSet[Variable], nodes: List[LayerNode]
-    ) -> List[LayerNode]:
+        self, variables: SortedSet[Variable], nodes: list[LayerNode]
+    ) -> list[LayerNode]:
         kept = np.array([variable not in variables for variable in self.variables])
         cache = QueryCache()
         self.root = self.root.marginal(kept, cache=cache)
@@ -882,7 +882,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             for node in nodes
         ]
 
-    def root_mixture_components(self) -> List[Self]:
+    def root_mixture_components(self) -> list[Self]:
         return [
             LayerNode(layer, node).as_circuit(self.variables)
             for layer, node in self.root.mixture_components()
@@ -890,9 +890,9 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     def multiply_nodes_by_mixtures(
         self,
-        nodes: List[LayerNode],
+        nodes: list[LayerNode],
         products: ProductsOfCopies,
-        log_weights: Optional[DenseEdgeValues],
+        log_weights: DenseEdgeValues | None,
     ):
         layered_products = LayeredProducts(products)
         variables = SortedSet(self.variables) | layered_products.variables
@@ -918,7 +918,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             attached.normalize_own()
             child_nodes = np.arange(number_of_nodes)
 
-        nodes_per_layer: Dict[int, Tuple[ProductLayer, List[int], List[int]]] = {}
+        nodes_per_layer: dict[int, tuple[ProductLayer, list[int], list[int]]] = {}
         for index, node in enumerate(nodes):
             layer, layer_nodes, children = nodes_per_layer.setdefault(
                 id(node.layer), (node.layer, [], [])

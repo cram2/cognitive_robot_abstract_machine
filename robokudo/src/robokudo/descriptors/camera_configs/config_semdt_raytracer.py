@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from typing_extensions import ClassVar, Optional
+from typing_extensions import ClassVar
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.types.cv import ColorToDepthRatio
@@ -26,7 +26,7 @@ class SemDTRayTracerCameraConfig(BaseCameraConfig):
     Module name in descriptors/worlds that defines class WorldDescriptor.
     """
 
-    world_frame: Optional[str] = None
+    world_frame: str | None = None
     """
     World frame to use as camera pose reference.
 

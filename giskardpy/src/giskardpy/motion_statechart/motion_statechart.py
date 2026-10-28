@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import rustworkx as rx
-from typing_extensions import Any, Dict, List, MutableMapping, ClassVar, Self, Type
+from typing_extensions import Any, MutableMapping, ClassVar, Self
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
@@ -79,13 +79,13 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
         """
         self.data = np.append(self.data, self.default_value)
 
-    def life_cycle_symbols(self) -> List[LifeCycleVariable]:
+    def life_cycle_symbols(self) -> list[LifeCycleVariable]:
         """
         :return: The life cycle variable of every node, in node order.
         """
         return [node.life_cycle_variable for node in self.motion_statechart.nodes]
 
-    def observation_symbols(self) -> List[ObservationVariable]:
+    def observation_symbols(self) -> list[ObservationVariable]:
         """
         :return: The observation variable of every node, in node order.
         """
@@ -125,19 +125,19 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
     def __len__(self) -> int:
         return self.data.shape[0]
 
-    def keys(self) -> List[MotionStatechartNode]:
+    def keys(self) -> list[MotionStatechartNode]:
         """
         :return: All nodes of the motion statechart, i.e. the keys of this mapping.
         """
         return self.motion_statechart.nodes
 
-    def items(self) -> List[tuple[MotionStatechartNode, float]]:
+    def items(self) -> list[tuple[MotionStatechartNode, float]]:
         """
         :return: (node, value) pairs for every node of the motion statechart.
         """
         return [(node, self[node]) for node in self.motion_statechart.nodes]
 
-    def values(self) -> List[float]:
+    def values(self) -> list[float]:
         """
         :return: The value of every node, in node order.
         """
@@ -384,12 +384,12 @@ class NextLifeCycle:
     The motion statechart whose nodes the expressions are built for.
     """
 
-    _expressions: Dict[int, sm.Scalar] = field(default_factory=dict, init=False)
+    _expressions: dict[int, sm.Scalar] = field(default_factory=dict, init=False)
     """
     The expression already built per node index.
     """
 
-    _nodes_being_built: List[MotionStatechartNode] = field(
+    _nodes_being_built: list[MotionStatechartNode] = field(
         default_factory=list, init=False
     )
     """
@@ -543,7 +543,7 @@ class StateHistory:
     :class:`MotionStatechart`.
     """
 
-    history: List[StateHistoryItem] = field(default_factory=list)
+    history: list[StateHistoryItem] = field(default_factory=list)
     """
     The snapshots in the order in which they were recorded, without consecutive
     duplicates.
@@ -697,7 +697,7 @@ class MotionStatechart(SubclassJSONSerializer):
     The history of how the state of the motion statechart changed over time.
     """
 
-    _nodes: List[MotionStatechartNode] = field(
+    _nodes: list[MotionStatechartNode] = field(
         default_factory=list, init=False, repr=False
     )
     """
@@ -707,7 +707,7 @@ class MotionStatechart(SubclassJSONSerializer):
     keeps :meth:`tick` cheap.
     """
 
-    _cancel_motion_nodes: List[CancelMotion] = field(
+    _cancel_motion_nodes: list[CancelMotion] = field(
         default_factory=list, init=False, repr=False
     )
     """
@@ -715,7 +715,7 @@ class MotionStatechart(SubclassJSONSerializer):
     :meth:`_raise_if_cancel_motion`.
     """
 
-    _end_motion_nodes: List[EndMotion] = field(
+    _end_motion_nodes: list[EndMotion] = field(
         default_factory=list, init=False, repr=False
     )
     """
@@ -775,13 +775,13 @@ class MotionStatechart(SubclassJSONSerializer):
         return motion_statechart_copy
 
     @property
-    def nodes(self) -> List[MotionStatechartNode]:
+    def nodes(self) -> list[MotionStatechartNode]:
         """
         :return: All nodes of the motion statechart.
         """
         return list(self._nodes)
 
-    def collect_debug_expressions(self) -> List[DebugExpression]:
+    def collect_debug_expressions(self) -> list[DebugExpression]:
         """
         Gather the debug expressions registered by every node into a single flat list.
 
@@ -794,14 +794,14 @@ class MotionStatechart(SubclassJSONSerializer):
         ]
 
     @property
-    def top_level_nodes(self) -> List[MotionStatechartNode]:
+    def top_level_nodes(self) -> list[MotionStatechartNode]:
         """
         :return: All nodes that don't belong to a Goal.
         """
         return [node for node in self.nodes if node.parent_node is None]
 
     @property
-    def edges(self) -> List[TrinaryCondition]:
+    def edges(self) -> list[TrinaryCondition]:
         """
         The edges of the underlying graph.
 
@@ -812,7 +812,7 @@ class MotionStatechart(SubclassJSONSerializer):
         return self.rx_graph.edges()
 
     @property
-    def unique_edges(self) -> List[TrinaryCondition]:
+    def unique_edges(self) -> list[TrinaryCondition]:
         """
         :return: The edges of the motion statechart, without duplicates.
         """
@@ -835,7 +835,7 @@ class MotionStatechart(SubclassJSONSerializer):
         if isinstance(node, EndMotion):
             self._end_motion_nodes.append(node)
 
-    def add_nodes(self, nodes: List[MotionStatechartNode]):
+    def add_nodes(self, nodes: list[MotionStatechartNode]):
         """
         Adds every node in `nodes` to the motion statechart, see :meth:`add_node`.
 
@@ -844,7 +844,7 @@ class MotionStatechart(SubclassJSONSerializer):
         for node in nodes:
             self.add_node(node)
 
-    def condition_variables(self) -> List[NodeStateVariable]:
+    def condition_variables(self) -> list[NodeStateVariable]:
         """
         Every variable a rendered condition can name, so a serialized condition can be
         resolved back into an expression. Reading a node's predicates here also creates
@@ -853,7 +853,7 @@ class MotionStatechart(SubclassJSONSerializer):
         :return: The observation variable, the goal reached variable and every life
             cycle predicate of every node.
         """
-        variables: List[NodeStateVariable] = list(
+        variables: list[NodeStateVariable] = list(
             self.observation_state.observation_symbols()
         )
         for node in self.nodes:
@@ -942,7 +942,7 @@ class MotionStatechart(SubclassJSONSerializer):
         node: MotionStatechartNode,
         context: MotionStatechartContext,
         built_node_indices: set[int],
-        dependency_chain: List[MotionStatechartNode],
+        dependency_chain: list[MotionStatechartNode],
     ):
         """
         Builds `node`, recursively building the nodes it depends on and, if it is a
@@ -985,7 +985,7 @@ class MotionStatechart(SubclassJSONSerializer):
     def _check_no_dependency_cycle(
         self,
         node: MotionStatechartNode,
-        dependency_chain: List[MotionStatechartNode],
+        dependency_chain: list[MotionStatechartNode],
     ) -> None:
         """
         Raises if `node` already appears in the chain of nodes currently being expanded
@@ -1038,7 +1038,7 @@ class MotionStatechart(SubclassJSONSerializer):
         goal: Goal,
         context: MotionStatechartContext,
         expanded_goal_indices: set[int],
-        dependency_chain: List[MotionStatechartNode],
+        dependency_chain: list[MotionStatechartNode],
     ):
         """
         Expands the goals `goal` depends on, then `goal` itself, then recursively every
@@ -1170,8 +1170,8 @@ class MotionStatechart(SubclassJSONSerializer):
             self._raise_if_cancel_motion()
 
     def get_nodes_by_type(
-        self, node_type: Type[GenericMotionStatechartNode]
-    ) -> List[GenericMotionStatechartNode]:
+        self, node_type: type[GenericMotionStatechartNode]
+    ) -> list[GenericMotionStatechartNode]:
         """
         :param node_type: The node type to filter for.
         :return: All nodes that are an instance of `node_type`.

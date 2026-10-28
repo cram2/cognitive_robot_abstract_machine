@@ -8,14 +8,14 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import (
-    Optional,
+from typing_extensions import (
+    get_origin,
+    get_args,
+    Generic,
+    TypeVar,
+    Unpack,
     Self,
     TYPE_CHECKING,
-    Set,
-    List,
-    DefaultDict,
-    Type,
     Union,
     Any,
     cast,
@@ -24,7 +24,6 @@ from uuid import UUID
 
 import numpy as np
 
-from typing_extensions import get_origin, get_args, Generic, TypeVar, Unpack
 
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.class_diagrams.attribute_introspector import (
@@ -149,7 +148,7 @@ class HasRobotParts(ABC):
         """
         return self._aggregate_robot_parts(set())
 
-    def _aggregate_robot_parts(self, seen: Set[UUID]) -> list[AbstractRobotPart]:
+    def _aggregate_robot_parts(self, seen: set[UUID]) -> list[AbstractRobotPart]:
         """
         Recursively aggregates all robot parts assigned to this robot part, including
         itself if it is a robot part.
@@ -179,7 +178,7 @@ class HasRobotParts(ABC):
 
         return robot_parts
 
-    def setup_robot_part_semantic_annotations(self):
+    def setup_robot_part_semantic_annotations(self) -> None:
         """
         Automatically discovers and initializes sub-parts by introspecting dataclass
         fields.
@@ -287,7 +286,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         """
 
     @abstractmethod
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         Sets up default joint states for this robot part.
 
@@ -338,9 +337,9 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         cls,
         name: str,
         world: World,
-        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        parent_connection_specification: Optional[ConnectionSpecification] = None,
-        scale: Optional[Scale] = None,
+        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_connection_specification: ConnectionSpecification | None = None,
+        scale: Scale | None = None,
     ) -> Self:
         """
         Robot-part bodies originate from the parsed URDF, so they cannot be spawned from
@@ -356,9 +355,9 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        name: str | None = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> BodySpecification:
         """
         Robot-part geometry comes from the parsed URDF, not from a scale, so a default
@@ -372,7 +371,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         )
 
     @property
-    def _robot(self) -> Optional[AbstractRobot]:
+    def _robot(self) -> AbstractRobot | None:
         """
         Computes backreference to the robot this robot part belongs to.
         """
@@ -547,7 +546,7 @@ class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC
         )
 
     def _kinematic_structure_entities(
-        self, visited: Set[int]
+        self, visited: set[int]
     ) -> list[KinematicStructureEntity]:
         """
         Computes the kinematic structure entities of this kinematic chain, which are the
@@ -677,7 +676,7 @@ class Finger(KinematicChain, ABC):
     A finger is a kinematic chain attached to a gripper to manipulate objects.
     """
 
-    finger_tip_frame: Optional[Body] = None
+    finger_tip_frame: Body | None = None
     """
     The frame of the finger tip.
 
@@ -777,7 +776,7 @@ class EndEffector(AbstractRobotPart, ABC):
         )
 
     @property
-    def held_body(self) -> Optional[Body]:
+    def held_body(self) -> Body | None:
         """
         The body hanging off the tool frame.
 
@@ -869,7 +868,7 @@ class MountingTable(Table, AbstractRobotPart, ABC):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -998,7 +997,7 @@ class MobileBase(
         ).pose
 
     @classmethod
-    def get_drive_connection_type(cls) -> Type[TGenericDrive]:
+    def get_drive_connection_type(cls) -> type[TGenericDrive]:
         """
         The connection type attaching this mobile base to its ``odom`` frame.
 
@@ -1160,7 +1159,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         """
 
     @classmethod
-    def get_drive_connection_type(cls) -> Type[Connection]:
+    def get_drive_connection_type(cls) -> type[Connection]:
         """
         The connection type attaching this robot to its ``odom`` frame.
 
@@ -1174,7 +1173,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         )
         return mobile_base_type.get_drive_connection_type()
 
-    def setup_robot_part_semantic_annotations(self):
+    def setup_robot_part_semantic_annotations(self) -> None:
         """
         Sets up the semantic annotations for all robot parts of this robot.
         """
@@ -1225,7 +1224,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         ]
 
     @property
-    def degrees_of_freedom_with_hardware_interface(self) -> List[DegreeOfFreedom]:
+    def degrees_of_freedom_with_hardware_interface(self) -> list[DegreeOfFreedom]:
         """
         The number of degrees of freedom of the robot, which is the sum of the degrees
         of freedom of all its end_effectors.
@@ -1271,7 +1270,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
 
         return True
 
-    def _setup_velocity_limits(self):
+    def _setup_velocity_limits(self) -> None:
         """
         Sets up velocity limits for 1-DOF connections in the robot.
         """
@@ -1281,7 +1280,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         self.tighten_dof_velocity_limits_proportionally(maximum_velocity=1)
 
     @property
-    def drive(self) -> Optional[WheeledDrive]:
+    def drive(self) -> WheeledDrive | None:
         """
         The connection which the robot uses for driving.
         """
@@ -1328,8 +1327,8 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
 
     def tighten_dof_velocity_limits_of_1dof_connections(
         self,
-        new_limits: DefaultDict[ActiveConnection1DOF, float],
-    ):
+        new_limits: defaultdict[ActiveConnection1DOF, float],
+    ) -> None:
         """
         Convenience method for tightening the velocity limits of all one degree-of-
         freedom (1DOF) active connections in the system.
@@ -1460,11 +1459,11 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             if isinstance(robot_part.source, InputSynchronizer)
         ]
 
-    def get_torso(self):
+    def get_torso(self) -> Torso:
         [torso] = [p for p in self._robot_parts if isinstance(p, Torso)]
         return torso
 
-    def get_torso_if_specified(self) -> Optional[Torso]:
+    def get_torso_if_specified(self) -> Torso | None:
         """
         :return: The robot's torso, or None for a robot built without one.
         """
@@ -1473,7 +1472,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
                 return part
         return None
 
-    def get_left_arm_if_specified(self) -> Optional[Arm]:
+    def get_left_arm_if_specified(self) -> Arm | None:
         if isinstance(self, HasLeftRightArm):
             return self.left_arm
         for part in self._robot_parts:
@@ -1481,7 +1480,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
                 return part.left_arm
         return None
 
-    def get_right_arm_if_specified(self) -> Optional[Arm]:
+    def get_right_arm_if_specified(self) -> Arm | None:
         if isinstance(self, HasLeftRightArm):
             return self.right_arm
         for part in self._robot_parts:
@@ -1499,7 +1498,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         raise MissingDefaultCameraError(type(self))
 
     @abstractmethod
-    def _setup_collision_rules(self):
+    def _setup_collision_rules(self) -> None:
         """
         Sets up collision rules for the robot.
         """

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Union
+from typing_extensions import TYPE_CHECKING
 
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
@@ -114,7 +114,7 @@ class RobotInterfaceConfig(ABC):
     def sync_odometry_topic(
         self,
         odometry_topic: str | None = None,
-        joint: Union[OmniDrive, DifferentialDrive] = None,
+        joint: OmniDrive | DifferentialDrive = None,
         sync_in_control_loop: bool = True,
     ):
         """
@@ -199,7 +199,7 @@ class RobotInterfaceConfig(ABC):
     def add_base_cmd_velocity(
         self,
         cmd_vel_topic: str | None = None,
-        joint: Union[OmniDrive, DifferentialDrive] = None,
+        joint: OmniDrive | DifferentialDrive = None,
         minimum_linear_velocity: float = 0.0,
         minimum_angular_velocity: float = 0.0,
     ):
@@ -231,9 +231,9 @@ class RobotInterfaceConfig(ABC):
 
     def add_joint_velocity_controller(
         self,
-        namespaces: List[str],
+        namespaces: list[str],
         minimum_valid_velocity: float = 0.0,
-        minimum_velocity_overrides: Dict[str, float] | None = None,
+        minimum_velocity_overrides: dict[str, float] | None = None,
     ):
         """
         For closed loop mode.
@@ -259,9 +259,9 @@ class RobotInterfaceConfig(ABC):
     def add_joint_velocity_group_controller(
         self,
         cmd_topic: str,
-        connections: List[str],
+        connections: list[str],
         minimum_valid_velocity: float = 0.0,
-        minimum_velocity_overrides: Dict[str, float] | None = None,
+        minimum_velocity_overrides: dict[str, float] | None = None,
         command_format: GroupCommandFormat | None = None,
     ):
         """
@@ -275,7 +275,7 @@ class RobotInterfaceConfig(ABC):
         :param command_format: message format the controller consumes; defaults to
             :class:`~giskardpy.middleware.ros2.command_publishing.Float64MultiArrayFormat`.
         """
-        controlled_connections: List[ActiveConnection1DOF] = [
+        controlled_connections: list[ActiveConnection1DOF] = [
             self.world.get_connection_by_name(connection_name)
             for connection_name in connections
         ]
@@ -291,9 +291,7 @@ class RobotInterfaceConfig(ABC):
             )
         )
 
-    def register_controlled_joints(
-        self, joint_names: List[Union[str, PrefixedName]]
-    ) -> None:
+    def register_controlled_joints(self, joint_names: list[str | PrefixedName]) -> None:
         """
         Flag the given joints as controlled by Giskard itself.
 
@@ -315,7 +313,7 @@ class RobotInterfaceConfig(ABC):
     def discover_interfaces_from_controller_manager(
         self,
         controller_manager_name: str = "controller_manager",
-        whitelist: List[str] | None = None,
+        whitelist: list[str] | None = None,
     ) -> None:
         """
         :param whitelist: list all controllers that should get added, if None, giskard will search automatically
@@ -359,11 +357,11 @@ class RobotInterfaceConfig(ABC):
                     self.add_base_cmd_velocity(controller.name)
 
     def __filter_controllers_with_whitelist(
-        self, controllers: list, whitelist: List[str] | None
+        self, controllers: list, whitelist: list[str] | None
     ) -> list:
         from controller_manager_msgs.msg import ControllerState
 
-        controllers_to_add: List[ControllerState]
+        controllers_to_add: list[ControllerState]
         if whitelist is None:
             return controllers
         else:
@@ -388,7 +386,7 @@ class StandAloneRobotInterfaceConfig(RobotInterfaceConfig):
     Controls the given joints without talking to any hardware.
     """
 
-    joint_names: List[str]
+    joint_names: list[str]
     """
     The joints Giskard is allowed to control.
     """

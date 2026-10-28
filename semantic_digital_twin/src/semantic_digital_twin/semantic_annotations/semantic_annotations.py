@@ -2,12 +2,20 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, Optional, Self, Tuple, TYPE_CHECKING, Union
+from typing_extensions import (
+    List,
+    Iterable,
+    Iterator,
+    Optional,
+    Self,
+    Tuple,
+    TYPE_CHECKING,
+    Union,
+)
 
 import math
 
 import numpy as np
-from typing_extensions import List
 
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math import symbolic_math
@@ -107,7 +115,7 @@ class Handle(HasGraspCandidates):
     open or close an object.
     """
 
-    def default_grasp_candidates(self) -> List[GraspCandidate]:
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
         :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
         """
@@ -172,9 +180,9 @@ class Handle(HasGraspCandidates):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        name: str | None = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
         *,
         thickness: float = 0.005,
     ) -> BodySpecification:
@@ -234,7 +242,7 @@ class Aperture(HasRootRegion):
         name: str,
         world: World,
         body: Body,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> Self:
         world.update_forward_kinematics()
         body_scale = (
@@ -288,9 +296,9 @@ class Aperture(HasRootRegion):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        name: str | None = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> RegionSpecification:
         """
         Build the default region specification whose ``area`` geometry matches what
@@ -323,11 +331,11 @@ class EntryWay(Aperture):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        name: str | None = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
         *,
-        color: Optional[Color] = None,
+        color: Color | None = None,
     ) -> RegionSpecification:
         """
         Build the default entry way region specification: a box coextensive with the
@@ -355,7 +363,7 @@ class Door(HasHandle, HasMovableJoint):
     handle.
     """
 
-    entry_way: Optional[EntryWay] = field(
+    entry_way: EntryWay | None = field(
         default=None, metadata=IsPartWholeRelationship().as_dict()
     )
     """
@@ -379,9 +387,9 @@ class Door(HasHandle, HasMovableJoint):
         name: str,
         root_specification: KinematicStructureEntitySpecification,
         *,
-        parent_connection_specification: Optional[ConnectionSpecification] = None,
-        annotation_kwargs: Optional[dict] = None,
-        part_specifications: Optional[dict] = None,
+        parent_connection_specification: ConnectionSpecification | None = None,
+        annotation_kwargs: dict | None = None,
+        part_specifications: dict | None = None,
     ) -> SemanticAnnotationWithRootSpecification[Self]:
         """
         Extend the door specification with its entry way, declared as a nested part so a
@@ -421,9 +429,9 @@ class Door(HasHandle, HasMovableJoint):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        name: str | None = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> BodySpecification:
         """
         Build the default door body specification.
@@ -508,7 +516,7 @@ class DoubleDoor(SemanticAnnotation):
 
     def calculate_left_right_door_from_view_point(
         self, world_T_view_point: HomogeneousTransformationMatrix
-    ) -> Tuple[Door, Door]:
+    ) -> tuple[Door, Door]:
         """
         Calculate which door is the left and which is the right door based on a given
         view point.
@@ -692,8 +700,8 @@ class Floor(HasSupportingSurface):
         cls,
         name: str,
         world: World,
-        floor_polytope: List[Point3],
-        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        floor_polytope: list[Point3],
+        world_root_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> Self:
         """
         Create a Floor semantic annotation with a new body defined by the given list of
@@ -710,9 +718,9 @@ class Floor(HasSupportingSurface):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        name: str | None = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> BodySpecification:
         """
         Build the default floor body specification, matching the convex-hull polytope
@@ -768,7 +776,7 @@ class Level(HasRootRegion):
     """
 
     @property
-    def floor_plane(self) -> Tuple[Point3, Point3]:
+    def floor_plane(self) -> tuple[Point3, Point3]:
         """
         The floor plane of a level, expressed as two points
 
@@ -846,9 +854,9 @@ class Wall(HasApertures):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        name: str | None = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> BodySpecification:
         """
         Build the default wall body specification, matching the geometry generated by
@@ -1019,7 +1027,7 @@ class Rim(HasPinchableWall):
     The upper edge of an open container's wall, which a gripper pinches from above.
     """
 
-    def default_grasp_candidates(self) -> List[GraspCandidate]:
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
         :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
         """
@@ -1394,7 +1402,7 @@ class Book(HasGraspCandidates):
     A book.
     """
 
-    book_front: Optional[BookFront] = None
+    book_front: BookFront | None = None
 
 
 @dataclass(eq=False)
@@ -1414,7 +1422,7 @@ class Cutlery(HasHandle, Tableware):
     A piece of cutlery, lying flat, grasped from above and across its length.
     """
 
-    def default_grasp_candidates(self) -> List[GraspCandidate]:
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
         :return: The grasp from above that closes across the piece, which lies flat.
         :raises NoGraspGeometry: If the root body has no collision geometry to tell
@@ -1548,7 +1556,7 @@ class ShapeSortingPiece(HasGraspCandidates):
     point they are brought to.
     """
 
-    def default_grasp_candidates(self) -> List[GraspCandidate]:
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
         :return: The grasp from above, on the piece's vertical axis at
             :attr:`grasp_height`, closing along the piece's own x.
@@ -1645,7 +1653,7 @@ class SemanticEnvironmentAnnotation(HasRootBody):
 
     def obstacle_entities(
         self, search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3]
-    ) -> List[Body]:
+    ) -> list[Body]:
         """
         Collect the obstacle bodies to consider within ``search_space``.
 
@@ -1666,7 +1674,7 @@ class SemanticEnvironmentAnnotation(HasRootBody):
     def build_bloated_obstacle_collection(
         self,
         search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
-        semantic_wall_annotation: Optional[Wall] = None,
+        semantic_wall_annotation: Wall | None = None,
         bloat_obstacles: float = 0.0,
         bloat_walls: float = 0.0,
         obstacle_height_clearance: float = 0.01,
@@ -1727,17 +1735,17 @@ class RoomWithWallsAndDoors(Room):
     A room with a type description (e.g., Ktichen) and walls and doors.
     """
 
-    room_type: Optional[str] = field(kw_only=True, default=None)
+    room_type: str | None = field(kw_only=True, default=None)
     """
     Description of the type of the room in natural language.
     """
 
-    walls: List[Wall] = field(kw_only=True, default_factory=list)
+    walls: list[Wall] = field(kw_only=True, default_factory=list)
     """
     The walls enclosing this room.
     """
 
-    doors: List[Door] = field(kw_only=True, default_factory=list)
+    doors: list[Door] = field(kw_only=True, default_factory=list)
     """
     The doors of the room.
     """
@@ -1749,7 +1757,7 @@ class DoorWithType(Door):
     A Door that has a type description, e.g. "main entrance".
     """
 
-    type_description: Optional[str] = field(kw_only=True, default=None)
+    type_description: str | None = field(kw_only=True, default=None)
 
 
 @dataclass(eq=False)
@@ -1780,7 +1788,7 @@ class Tool(HasGraspCandidates, ABC):
         root_name = self.root.name
         return PrefixedName(f"{root_name.name}_end_effector", root_name.prefix)
 
-    def _find_end_effector_body(self) -> Optional[Body]:
+    def _find_end_effector_body(self) -> Body | None:
         if self.root._world is None:
             return None
 
@@ -1804,7 +1812,7 @@ class Tool(HasGraspCandidates, ABC):
         return end_effector
 
     @abstractmethod
-    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
         """
         :param target: The body or pose the tool acts on.
         :return: The normal pairs that must stay aligned while the tool acts on the
@@ -1854,7 +1862,7 @@ class Whisk(ToolWithHandle):
     A whisk for mixing the contents of containers.
     """
 
-    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
                 tip_normal=Vector3(-1, 0, 0, reference_frame=self.root),
@@ -1869,7 +1877,7 @@ class CuttingKnife(ToolWithHandle):
     A knife for cutting food objects.
     """
 
-    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
                 tip_normal=Vector3(1, 0, 0, reference_frame=self.root),
@@ -1888,7 +1896,7 @@ class PouringCup(Tool, Container):
     A cup for pouring liquids into containers.
     """
 
-    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
@@ -1906,7 +1914,7 @@ class Sponge(Tool):
         which is why its alignments use negative Z normals unlike the other tools.
     """
 
-    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
         if isinstance(target, Body):
             return [
                 AlignmentPair(

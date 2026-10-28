@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING, Tuple, Type
+from typing_extensions import TYPE_CHECKING
 
 from probabilistic_model.exceptions import ProbabilisticModelException
 
@@ -20,7 +20,7 @@ class UndefinedCumulativeDistributionError(ProbabilisticModelException, TypeErro
     unordered variable is queried.
     """
 
-    layer_type: Type
+    layer_type: type
     """
     The type of the layer.
     """
@@ -60,13 +60,13 @@ class CopiesNotAlignedError(ProbabilisticModelException, ValueError):
     structure.
     """
 
-    copies: Tuple[Layer, ...]
+    copies: tuple[Layer, ...]
     """
     The layer at the same position in every copy of the layer graph, in the order of
     the copies.
     """
 
-    path: Tuple[int, ...]
+    path: tuple[int, ...]
     """
     The index of the child layer taken at every step from the roots of the copies down
     to :attr:`copies`.
@@ -75,7 +75,7 @@ class CopiesNotAlignedError(ProbabilisticModelException, ValueError):
     """
 
     @property
-    def misaligned_copies(self) -> Tuple[int, ...]:
+    def misaligned_copies(self) -> tuple[int, ...]:
         """
         :return: The index of every copy whose layer differs from the one of the first
             copy in its type, its number of nodes or its number of child layers.

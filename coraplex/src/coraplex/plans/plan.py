@@ -6,16 +6,7 @@ from dataclasses import field, dataclass
 
 import rustworkx as rx
 import rustworkx.visualization
-from typing_extensions import (
-    Optional,
-    Any,
-    List,
-    Iterable,
-    TYPE_CHECKING,
-    Tuple,
-    TypeVar,
-    Type,
-)
+from typing_extensions import Any, Iterable, TYPE_CHECKING, TypeVar
 
 from coraplex.exceptions import CannotInsertBesideRoot, ContextIsUnavailable
 from coraplex.plans.plan_entity import PlanEntity
@@ -62,22 +53,22 @@ class Plan:
     perform each PlanNode
     """
 
-    context: Optional[Context] = None
+    context: Context | None = None
     """
     The context where the plan can extract information from.
     """
 
-    initial_world: Optional[World] = field(repr=False, kw_only=True, default=None)
+    initial_world: World | None = field(repr=False, kw_only=True, default=None)
     """
     A deepcopy of the world before the first perform was called.
     """
 
-    node_callbacks: List[PlanCallback] = field(default_factory=list)
+    node_callbacks: list[PlanCallback] = field(default_factory=list)
     """
     A list of callbacks that are called when a node is started or ended.
     """
 
-    action_trial: Optional[ActionTrial] = field(default=None, init=False, repr=False)
+    action_trial: ActionTrial | None = field(default=None, init=False, repr=False)
     """
     The trial the underspecified nodes of this plan try their candidates in, shared so
     that they use one copy of the world, and released once the plan has run.
@@ -120,7 +111,7 @@ class Plan:
         return self.context.robot
 
     @property
-    def nodes(self) -> List[PlanNode]:
+    def nodes(self) -> list[PlanNode]:
         """
         All nodes of the plan in depth first order.
 
@@ -133,7 +124,7 @@ class Plan:
         return [self.root] + self.root.descendants
 
     @property
-    def all_nodes(self) -> List[PlanNode]:
+    def all_nodes(self) -> list[PlanNode]:
         """
         All nodes that are part of this plan.
         """
@@ -190,7 +181,7 @@ class Plan:
             node.layer_index = 0
 
     def add_edge(
-        self, source: PlanNode, target: PlanNode, target_index: Optional[int] = None
+        self, source: PlanNode, target: PlanNode, target_index: int | None = None
     ):
         """
         Adds an edge to the plan.
@@ -231,7 +222,7 @@ class Plan:
 
     def add_edges_from(
         self,
-        edges: Iterable[Tuple[PlanNode, PlanNode]],
+        edges: Iterable[tuple[PlanNode, PlanNode]],
     ):
         """
         Adds edges to the plan from an iterable of tuples.
@@ -295,7 +286,7 @@ class Plan:
         self.add_edge(reference_node.parent, node, layer_index)
 
     @property
-    def plan_transformations(self) -> List[PlanTransformation]:
+    def plan_transformations(self) -> list[PlanTransformation]:
         """
         The transformations that rewrite this plan while it is expanded.
 
@@ -306,7 +297,7 @@ class Plan:
             raise ContextIsUnavailable()
         return self.context.plan_transformations
 
-    def applicable_transformations(self, node: PlanNode) -> List[PlanTransformation]:
+    def applicable_transformations(self, node: PlanNode) -> list[PlanTransformation]:
         """
         :param node: The node that was just expanded
         :return: The transformations that rewrite the plan around the given node.
@@ -375,11 +366,11 @@ class Plan:
                 child.perform()
 
     @property
-    def actions(self) -> List[ActionNode]:
+    def actions(self) -> list[ActionNode]:
         return [node for node in self.nodes if isinstance(node, ActionNode)]
 
     @property
-    def layers(self) -> List[List[PlanNode]]:
+    def layers(self) -> list[list[PlanNode]]:
         """
         Returns the nodes of the plan layer by layer starting from the root node.
 
@@ -405,7 +396,7 @@ class Plan:
 
         return root_ref
 
-    def get_nodes_by_designator_type(self, *args: Type[Designator]):
+    def get_nodes_by_designator_type(self, *args: type[Designator]):
         return [
             node
             for node in self.nodes

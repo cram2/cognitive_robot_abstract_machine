@@ -5,7 +5,6 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Optional
 
 from semantic_digital_twin.exceptions import (
     ParsingError,
@@ -68,12 +67,12 @@ class PrefixPathPackageLocator(PackageLocator):
     tooling installed.
     """
 
-    additional_prefixes: List[str] = field(default_factory=list)
+    additional_prefixes: list[str] = field(default_factory=list)
     """
     Extra install prefixes to search before the environment and workspace prefixes.
     """
 
-    def _environment_prefixes(self) -> List[str]:
+    def _environment_prefixes(self) -> list[str]:
         """
         :return: Prefixes named by ``AMENT_PREFIX_PATH`` and ``CMAKE_PREFIX_PATH``.
         """
@@ -84,7 +83,7 @@ class PrefixPathPackageLocator(PackageLocator):
             ]
         return prefixes
 
-    def _workspace_prefixes(self) -> List[str]:
+    def _workspace_prefixes(self) -> list[str]:
         """
         :return: Install directories of common workspace layouts under the home
             directory and ``/opt/ros``.
@@ -96,7 +95,7 @@ class PrefixPathPackageLocator(PackageLocator):
             *glob.glob("/opt/ros/*"),
         ]
 
-    def search_prefixes(self) -> List[str]:
+    def search_prefixes(self) -> list[str]:
         """
         :return: Every install prefix searched, in order of precedence.
         """
@@ -128,7 +127,7 @@ class ROSPackageLocator(PackageLocator):
     Tries multiple package locators in order.
     """
 
-    locators: List[PackageLocator] = field(
+    locators: list[PackageLocator] = field(
         default_factory=lambda: [
             AmentPackageLocator(),
             ROSPackagePathLocator(),
@@ -193,7 +192,7 @@ class FileUriResolver(PathResolver):
     Resolves file:// URIs and plain filesystem paths.
     """
 
-    base_directory: Optional[str] = None
+    base_directory: str | None = None
     """
     The base directory to resolve relative paths from.
     """
@@ -227,7 +226,7 @@ class SearchPathFileResolver(PathResolver):
     them, so the root has to be searched for.
     """
 
-    root_directories: List[str] = field(default_factory=list)
+    root_directories: list[str] = field(default_factory=list)
     """
     The directories that relative paths are resolved against, in order of precedence.
     """
@@ -260,7 +259,7 @@ class ModelUriResolver(PathResolver):
     ``model.config`` inside that directory is left to the format parser.
     """
 
-    model_directories: List[str] = field(default_factory=list)
+    model_directories: list[str] = field(default_factory=list)
     """
     Directories that are searched for models before the environment is consulted.
     """
@@ -268,7 +267,7 @@ class ModelUriResolver(PathResolver):
     def supports(self, uri: str) -> bool:
         return uri.startswith("model://")
 
-    def search_directories(self) -> List[str]:
+    def search_directories(self) -> list[str]:
         """
         :return: All directories searched for models, in order of precedence.
         """
@@ -302,7 +301,7 @@ class CompositePathResolver(PathResolver):
     Tries multiple path resolvers in order.
     """
 
-    resolvers: List[PathResolver] = field(
+    resolvers: list[PathResolver] = field(
         default_factory=lambda: [
             FileUriResolver(),
             PackageUriResolver(),

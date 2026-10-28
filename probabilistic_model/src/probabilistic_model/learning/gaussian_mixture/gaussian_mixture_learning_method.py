@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import numpy.typing as npt
 import pandas as pd
 from random_events.variable import Continuous, Variable
-from typing_extensions import Iterable, List, Optional, Sequence
+from typing_extensions import Iterable, Sequence
 
 from probabilistic_model.distributions.distributions import DiscreteDistribution
 from probabilistic_model.distributions.multivariate_gaussian import (
@@ -43,8 +43,8 @@ class GaussianMixtureLearningMethod(LearningMethod, ABC):
 
     @staticmethod
     def _variables(
-        data: pd.DataFrame, variables: Optional[Iterable[AnnotatedVariable]]
-    ) -> List[Variable]:
+        data: pd.DataFrame, variables: Iterable[AnnotatedVariable] | None
+    ) -> list[Variable]:
         """
         :return: The given variables, or those inferred from the data.
         """
@@ -66,8 +66,8 @@ class GaussianMixtureLearningMethod(LearningMethod, ABC):
         covariance_type: CovarianceType,
         continuous: Sequence[Continuous],
         weights: npt.NDArray,
-        means: Optional[npt.NDArray],
-        covariances: Optional[npt.NDArray],
+        means: npt.NDArray | None,
+        covariances: npt.NDArray | None,
         discrete_distributions: Sequence[Sequence[DiscreteDistribution]],
     ) -> ProbabilisticCircuit:
         """

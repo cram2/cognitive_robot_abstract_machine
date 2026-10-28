@@ -10,7 +10,7 @@ from pathlib import Path
 
 import psutil
 from krrood.singleton import SingletonMeta
-from typing_extensions import ClassVar, List
+from typing_extensions import ClassVar
 
 from semantic_digital_twin.adapters.package_resolver import PathResolver
 
@@ -32,7 +32,7 @@ class MeshFileSources(metaclass=SingletonMeta):
         exist.
     """
 
-    sources: List[PathResolver] = field(default_factory=list)
+    sources: list[PathResolver] = field(default_factory=list)
     """
     The sources consulted, in order of precedence.
     """

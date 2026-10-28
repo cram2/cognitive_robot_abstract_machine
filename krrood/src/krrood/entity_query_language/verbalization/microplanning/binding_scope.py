@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing_extensions import TYPE_CHECKING, Dict, List
+from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -24,14 +24,14 @@ class BindingScope:
     constraints reuse them instead of re-verbalizing.
     """
 
-    constraint_frames: List[List[SymbolicExpression]] = field(default_factory=list)
+    constraint_frames: list[list[SymbolicExpression]] = field(default_factory=list)
     """
     Stack of deferred-expression frames.
 
     Each frame belongs to one nesting level of InstantiatedVariable verbalization.
     """
 
-    binding_overrides: Dict[uuid.UUID, VerbalizationFragment] = field(
+    binding_overrides: dict[uuid.UUID, VerbalizationFragment] = field(
         default_factory=dict
     )
     """
@@ -46,7 +46,7 @@ class BindingScope:
         """
         self.constraint_frames.append([])
 
-    def pop_constraint_frame(self) -> List[SymbolicExpression]:
+    def pop_constraint_frame(self) -> list[SymbolicExpression]:
         """
         Close the current frame and return its deferred expressions (empty when none
         open).

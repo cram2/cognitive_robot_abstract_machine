@@ -31,8 +31,9 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
     class Descriptor(BaseAnnotator.Descriptor):
         class Parameters:
             def __init__(self) -> None:
-                """Initialize a new set of parameters for the descriptor."""
-
+                """
+                Initialize a new set of parameters for the descriptor.
+                """
                 self.confidence_threshold = 0.05
 
         # Overwrite the parameters explicitly to enable auto-completion
@@ -43,7 +44,11 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         name: str = "SemanticDigitalTwinSynchronization",
         descriptor: SemanticDigitalTwinConnector.Descriptor | None = None,
     ) -> None:
-        """Default construction. Minimal one-time init!"""
+        """
+        Default construction.
+
+        Minimal one-time init!
+        """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
@@ -55,7 +60,9 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         )
 
     def compute(self) -> Status:
-        """Synchronise the current RoboKudo state with the current semdt state."""
+        """
+        Synchronise the current RoboKudo state with the current semdt state.
+        """
         start_timer = default_timer()
 
         cas = self.get_cas()
@@ -80,7 +87,9 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         object_beliefs: list[ObjectBeliefState],
         cas: CAS,
     ) -> list[tuple[ObjectHypothesis, ObjectBeliefState]]:
-        """Associate current object hypotheses with existing or new object beliefs."""
+        """
+        Associate current object hypotheses with existing or new object beliefs.
+        """
         if len(object_hypotheses) == 0:
             return []
 
@@ -138,7 +147,9 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
     def get_latest_pose_annotation(
         object_hypothesis: ObjectHypothesis,
     ) -> PoseAnnotation | None:
-        """Return the latest plain pose annotation for a hypothesis."""
+        """
+        Return the latest plain pose annotation for a hypothesis.
+        """
         for annotation in reversed(object_hypothesis.annotations):
             if type(annotation) is PoseAnnotation:
                 return annotation
@@ -149,7 +160,9 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         object_hypotheses: list[ObjectHypothesis],
         object_beliefs: list[ObjectBeliefState],
     ) -> np.ndarray:
-        """Create a negative-similarity cost matrix for Hungarian assignment."""
+        """
+        Create a negative-similarity cost matrix for Hungarian assignment.
+        """
         cost_matrix = np.full((len(object_hypotheses), len(object_beliefs)), 1e9)
         for hypothesis_idx, object_hypothesis in enumerate(object_hypotheses):
             for belief_idx, object_belief in enumerate(object_beliefs):
@@ -168,7 +181,9 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         belief_indices: np.ndarray,
         cas: CAS,
     ) -> list[tuple[ObjectHypothesis, ObjectBeliefState]]:
-        """Update matched beliefs or create new beliefs for low-confidence matches."""
+        """
+        Update matched beliefs or create new beliefs for low-confidence matches.
+        """
         associated_hypotheses: list[tuple[ObjectHypothesis, ObjectBeliefState]] = []
         threshold = self.descriptor.parameters.confidence_threshold
 
@@ -192,7 +207,9 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
     def create_new_beliefs_for_hypotheses(
         self, object_hypotheses: list[ObjectHypothesis], cas: CAS
     ) -> list[tuple[ObjectHypothesis, ObjectBeliefState]]:
-        """Create object beliefs for all given hypotheses."""
+        """
+        Create object beliefs for all given hypotheses.
+        """
         return [
             (
                 object_hypothesis,
@@ -207,7 +224,9 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         matched_hypothesis_indices: set[int],
         cas: CAS,
     ) -> list[tuple[ObjectHypothesis, ObjectBeliefState]]:
-        """Create object beliefs for hypotheses not returned by Hungarian assignment."""
+        """
+        Create object beliefs for hypotheses not returned by Hungarian assignment.
+        """
         unmatched_hypotheses = [
             object_hypothesis
             for hypothesis_idx, object_hypothesis in enumerate(object_hypotheses)
@@ -217,7 +236,9 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         return self.create_new_beliefs_for_hypotheses(unmatched_hypotheses, cas)
 
     def log_world_state(self) -> None:
-        """Log a compact summary of the current SemDT world contents."""
+        """
+        Log a compact summary of the current SemDT world contents.
+        """
         rk_world = world_instance()
         self.rk_logger.debug(
             f"SemDT \nKS Entities: {len(rk_world.kinematic_structure_entities)}\nViews: {len(rk_world.semantic_annotations)}\nConnections: {len(rk_world.connections)}"
@@ -248,5 +269,7 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
 
     @staticmethod
     def get_object_belief_label(object_belief: ObjectBeliefState) -> str:
-        """Return a compact display label for an object belief UUID."""
+        """
+        Return a compact display label for an object belief UUID.
+        """
         return f"{str(object_belief.uuid)[:10]}..."

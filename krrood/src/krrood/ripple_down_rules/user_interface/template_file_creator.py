@@ -8,7 +8,7 @@ from functools import cached_property
 from textwrap import indent, dedent
 
 from colorama import Fore, Style
-from typing_extensions import Optional, Type, List, Callable, Tuple, Dict, Any, Union
+from typing_extensions import Optional, List, Callable, Tuple, Dict, Any, Union
 
 from krrood.ripple_down_rules.datastructures.case import Case
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
@@ -25,7 +25,7 @@ from krrood.code_generation.type_hints import stringify_type_hint
 from krrood.utils import get_scope_from_imports
 
 
-def detect_available_editor() -> Optional[Editor]:
+def detect_available_editor() -> Editor | None:
     """
     Detect the available editor on the system.
 
@@ -69,7 +69,7 @@ class TemplateFileCreator:
     edit it.
     """
 
-    temp_file_path: Optional[str] = None
+    temp_file_path: str | None = None
     """
     The path to the temporary file that is created for the user to edit.
     """
@@ -79,12 +79,12 @@ class TemplateFileCreator:
     The port to use for the code-server.
     """
 
-    process: Optional[subprocess.Popen] = None
+    process: subprocess.Popen | None = None
     """
     The process of the code-server.
     """
 
-    all_code_lines: Optional[List[str]] = None
+    all_code_lines: list[str] | None = None
     """
     The list of all code lines in the function in the temporary file.
     """
@@ -93,7 +93,7 @@ class TemplateFileCreator:
         self,
         case_query: CaseQuery,
         prompt_for: PromptFor,
-        code_to_modify: Optional[str] = None,
+        code_to_modify: str | None = None,
         print_func: Callable[[str], None] = print,
     ):
         self.print_func = print_func
@@ -105,14 +105,14 @@ class TemplateFileCreator:
         self.func_name: str = self.get_func_name(self.prompt_for, self.case_query)
         self.func_doc: str = self.get_func_doc()
         self.function_signature: str = self.get_function_signature()
-        self.editor: Optional[Editor] = detect_available_editor()
-        self.editor_cmd: Optional[str] = os.environ.get("RDR_EDITOR_CMD")
+        self.editor: Editor | None = detect_available_editor()
+        self.editor_cmd: str | None = os.environ.get("RDR_EDITOR_CMD")
         self.workspace: str = os.environ.get(
             "RDR_EDITOR_WORKSPACE", os.path.dirname(self.case_query.scope["__file__"])
         )
         self.temp_file_path: str = os.path.join(self.workspace, "edit_code_here.py")
 
-    def get_output_type(self) -> List[Type]:
+    def get_output_type(self) -> list[type]:
         """
         :return: The output type of the function as a list of types.
         """
@@ -134,7 +134,7 @@ class TemplateFileCreator:
 
         self.open_file_in_editor()
 
-    def open_file_in_editor(self, file_path: Optional[str] = None):
+    def open_file_in_editor(self, file_path: str | None = None):
         """
         Open the file in the available editor.
         """
@@ -285,7 +285,7 @@ class TemplateFileCreator:
         return "\n".join(imports)
 
     @staticmethod
-    def get_core_attribute_types(case_query: CaseQuery) -> List[Type]:
+    def get_core_attribute_types(case_query: CaseQuery) -> list[type]:
         """
         Get the core attribute types of the case query.
 
@@ -298,7 +298,7 @@ class TemplateFileCreator:
         ]
         return attr_types
 
-    def get_func_doc(self) -> Optional[str]:
+    def get_func_doc(self) -> str | None:
         """
         :return: A string containing the function docstring.
         """
@@ -312,7 +312,7 @@ class TemplateFileCreator:
             return f"Get possible value(s) for {self.case_query.name} {type_data}."
 
     @staticmethod
-    def get_func_name(prompt_for, case_query) -> Optional[str]:
+    def get_func_name(prompt_for, case_query) -> str | None:
         func_name = ""
         if prompt_for == PromptFor.Conditions:
             func_name = f"{prompt_for.value.lower()}_for_"
@@ -327,7 +327,7 @@ class TemplateFileCreator:
         return str_to_snake_case(func_name)
 
     @cached_property
-    def case_type(self) -> Type:
+    def case_type(self) -> type:
         """
         Get the type of the case object in the current scope.
 

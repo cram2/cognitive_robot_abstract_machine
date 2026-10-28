@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+# %% Imports
 import sys
 
 import numpy as np
@@ -130,7 +133,7 @@ class TestUtilsTypeConversion(object):
         assert pose_msg.orientation.z == 0.0
         assert pose_msg.orientation.w == 1.0
 
-    def test_get_geometry_msgs_pose_from_pose_annotation(self):
+    def test_get_geometry_msgs_pose_from_pose_annotation(self) -> None:
         pose_ann = PoseAnnotation()
         pose_ann.translation = np.random.rand(3)
         pose_ann.rotation = np.random.rand(4)
@@ -146,7 +149,7 @@ class TestUtilsTypeConversion(object):
         assert pose_msg.orientation.z == pose_ann.rotation[2]
         assert pose_msg.orientation.w == pose_ann.rotation[3]
 
-    def test_get_geometry_msgs_pose_stamped_from_pose_annotation(self):
+    def test_get_geometry_msgs_pose_stamped_from_pose_annotation(self) -> None:
         pose_ann = PoseAnnotation()
         pose_ann.translation = np.random.rand(3)
         pose_ann.rotation = np.random.rand(4)
@@ -171,7 +174,7 @@ class TestUtilsTypeConversion(object):
         assert pose_msg.pose.orientation.z == pose_ann.rotation[2]
         assert pose_msg.pose.orientation.w == pose_ann.rotation[3]
 
-    def test_get_geometry_msgs_pose_stamped_from_position_annotation(self):
+    def test_get_geometry_msgs_pose_stamped_from_position_annotation(self) -> None:
         position_ann = PositionAnnotation()
         position_ann.translation = np.random.rand(3)
 
@@ -197,7 +200,7 @@ class TestUtilsTypeConversion(object):
         assert pose_msg.pose.orientation.z == 0.0
         assert pose_msg.pose.orientation.w == 1.0
 
-    def test_get_transform_matrix_from_pose_annotation(self):
+    def test_get_transform_matrix_from_pose_annotation(self) -> None:
         pose_ann = PoseAnnotation()
         pose_ann.translation = np.random.rand(3)
         pose_ann.rotation = [0.707, 0.0, 0.707, 0.0]

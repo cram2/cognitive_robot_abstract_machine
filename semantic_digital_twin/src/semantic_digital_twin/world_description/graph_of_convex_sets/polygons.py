@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING, List, Optional, Sequence, Tuple
+from typing_extensions import TYPE_CHECKING, Sequence
 
 from krrood.class_diagrams.mocking import MockedClass
 from semantic_digital_twin.exceptions import PointOccupiedError
@@ -181,7 +181,7 @@ class IrisSeedingSettings:
     Options forwarded to every :func:`pydrake.geometry.optimization.Iris` call.
     """
 
-    def coverage_grid_seeds(self, lower: Point3, upper: Point3) -> List[Point3]:
+    def coverage_grid_seeds(self, lower: Point3, upper: Point3) -> list[Point3]:
         """
         Build a regular grid of candidate seed points strictly inside the axis-aligned
         box spanned by ``lower`` and ``upper``.
@@ -304,7 +304,7 @@ class GraphOfConvexPolygons(
     and removed rather than rebuilding the whole graph.
     """
 
-    obstacles: List[ConvexSet] = field(default_factory=list)
+    obstacles: list[ConvexSet] = field(default_factory=list)
     """
     The obstacle convex sets every region was grown to avoid, expressed relative to
     ``world.root``.
@@ -313,7 +313,7 @@ class GraphOfConvexPolygons(
     with a non-convex mesh fall back to an axis-aligned bounding box (``HPolyhedron``).
     """
 
-    regions: List[HPolyhedron] = field(default_factory=list)
+    regions: list[HPolyhedron] = field(default_factory=list)
     """
     The IRIS regions covering the search space.
     """
@@ -326,13 +326,13 @@ class GraphOfConvexPolygons(
     while a query is in flight, its source/target point subgraphs.
     """
 
-    _region_subgraph: Optional[Subgraph] = None
+    _region_subgraph: Subgraph | None = None
     """
     The subgraph spanning ``regions``, built once in :meth:`from_world` and reused by
     every :meth:`path_from_to` query.
     """
 
-    _query_subgraphs: Optional[Tuple[Subgraph, Subgraph]] = None
+    _query_subgraphs: tuple[Subgraph, Subgraph] | None = None
     """
     The current query's ``(source, target)`` point subgraphs, or None between queries.
     """
@@ -350,7 +350,7 @@ class GraphOfConvexPolygons(
         world: World,
         search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         bloat_obstacles: float = 0.0,
-        seeding_settings: Optional[IrisSeedingSettings] = None,
+        seeding_settings: IrisSeedingSettings | None = None,
         extra_seed_points: Sequence[Point3] = (),
     ) -> GraphOfConvexPolygons:
         """
@@ -388,7 +388,7 @@ class GraphOfConvexPolygons(
             search_box.lower, search_box.upper
         )
 
-        regions: List[HPolyhedron] = []
+        regions: list[HPolyhedron] = []
         for seed_point in seeds:
             if len(regions) >= settings.max_regions:
                 break
@@ -406,7 +406,7 @@ class GraphOfConvexPolygons(
         result._trajectory_optimization.AddPathLengthCost()
         return result
 
-    def path_from_to(self, start: Point3, goal: Point3) -> Optional[List[Point3]]:
+    def path_from_to(self, start: Point3, goal: Point3) -> list[Point3] | None:
         """
         Calculate a connected path from a start pose to a goal pose.
 

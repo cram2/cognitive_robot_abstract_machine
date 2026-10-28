@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING
 
 from semantic_digital_twin.part_finding.annotation_part_finder import (
     AnnotationPartFinder,
@@ -27,7 +27,7 @@ class FindParts(Step):
     it does not have yet.
     """
 
-    whole_type: Type[PartWholeRelationship]
+    whole_type: type[PartWholeRelationship]
     """
     The type of annotation whose parts are found.
     """
@@ -50,7 +50,7 @@ class SplitPartFromShape(Step):
     as a body of its own.
     """
 
-    whole_type: Type[PartWholeRelationship]
+    whole_type: type[PartWholeRelationship]
     """
     The type of annotation whose shapes are split.
     """

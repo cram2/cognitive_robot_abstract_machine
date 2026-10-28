@@ -6,7 +6,6 @@ watches, so one body's relations are never reported lost by the detector of anot
 from __future__ import annotations
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from typing_extensions import List, Type
 
 from segmind.datastructures.events import (
     ContactEvent,
@@ -40,7 +39,7 @@ How many ticks a test runs while nothing in the world moves.
 
 
 def _ticked_while_nothing_moves(
-    world: World, detector_types: List[Type[AbstractDetector]], watched: List[Body]
+    world: World, detector_types: list[type[AbstractDetector]], watched: list[Body]
 ) -> SegmindContext:
     """
     Tick every detector type for every watched body a few times, with nothing moving.
@@ -63,8 +62,8 @@ def _ticked_while_nothing_moves(
 
 
 def _events_of(
-    segmind_context: SegmindContext, event_type: Type[DetectionEvent], body: Body
-) -> List[DetectionEvent]:
+    segmind_context: SegmindContext, event_type: type[DetectionEvent], body: Body
+) -> list[DetectionEvent]:
     return [
         event
         for event in segmind_context.logger.get_events()

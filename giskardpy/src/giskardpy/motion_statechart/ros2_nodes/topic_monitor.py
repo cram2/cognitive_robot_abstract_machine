@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing_extensions import Generic
 
 from rclpy.node import MsgType, Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile
 from rclpy.subscription import Subscription
-from typing_extensions import Generic, Type
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -27,7 +26,7 @@ class TopicNode(MotionStatechartNode, Generic[MsgType]):
     Name of the ROS topic to subscribe to.
     """
 
-    msg_type: Type[MsgType] = field(kw_only=True)
+    msg_type: type[MsgType] = field(kw_only=True)
     """
     Type of the ROS message.
     """
@@ -94,7 +93,7 @@ class TopicSubscriberNode(TopicNode[MsgType]):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         """
         .. warning:: If you override this method, make sure to call `super().on_tick(context)`.
         """
@@ -135,7 +134,7 @@ class WaitForMessage(TopicSubscriberNode[MsgType]):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         super().on_tick(context)
         if self.has_msg():
             return ObservationStateValues.TRUE
@@ -156,7 +155,7 @@ class PublishOnStart(TopicPublisherNode[MsgType]):
     Message to publish.
     """
 
-    msg_type: Type[MsgType] = field(init=False)
+    msg_type: type[MsgType] = field(init=False)
     """
     Init=False, because we can figure out the type from the msg parameter.
     """

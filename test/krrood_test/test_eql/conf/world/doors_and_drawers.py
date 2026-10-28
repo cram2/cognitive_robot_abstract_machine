@@ -1,7 +1,7 @@
 # ===================== Possible World Configurations ========================
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Callable
+from typing_extensions import Callable
 
 from .base_config import (
     WorldConf,
@@ -67,8 +67,8 @@ def bodies():
 
 @dataclass
 class DoorsAndDrawersWorld(WorldConf):
-    bodies: List[BodyConf] = field(default_factory=bodies, init=False)
-    connections: List[ConnectionConf] = field(
+    bodies: list[BodyConf] = field(default_factory=bodies, init=False)
+    connections: list[ConnectionConf] = field(
         default_factory=lambda: [
             FixedConnectionConf(parent=Container1(), child=Handle1()),
             FixedConnectionConf(parent=Body2(), child=Handle2()),

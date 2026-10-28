@@ -1,7 +1,6 @@
 from __future__ import division
 
 from dataclasses import field, dataclass
-from typing import Optional, Type, Tuple
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -51,14 +50,14 @@ class SetOdometry(MotionStatechartNode):
     The pose of the robot base.
     """
 
-    odom_connection: Optional[OmniDrive] = field(default=None, kw_only=True)
+    odom_connection: OmniDrive | None = field(default=None, kw_only=True)
     """
     The odometry connection to use.
 
     If it is None and there is only one drive in the world, it will be used.
     """
 
-    _odom_joints: Tuple[Type[Connection], ...] = field(default=(OmniDrive,), init=False)
+    _odom_joints: tuple[type[Connection], ...] = field(default=(OmniDrive,), init=False)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.odom_connection = self._current_odom_connection(context)

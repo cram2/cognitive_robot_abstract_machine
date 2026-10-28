@@ -5,7 +5,7 @@ from enum import StrEnum
 from krrood.patterns.caching import memoize
 from uuid import UUID
 
-from typing_extensions import Dict, Any, Self, List, Optional
+from typing_extensions import Any, Self
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from semantic_digital_twin.world import World
@@ -31,7 +31,7 @@ class MetaData(SubclassJSONSerializer):
     """The id of the origin world. This is used to identify messages that were published by the same publisher."""
 
     @memoize
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "node_name": self.node_name,
@@ -40,7 +40,7 @@ class MetaData(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             node_name=data["node_name"],
             process_id=data["process_id"],
@@ -101,10 +101,10 @@ class WorldStateUpdate(Message):
     Class describing the updates to the free variables of a world state.
     """
 
-    ids: List[UUID]
+    ids: list[UUID]
     """The ids of the changed free variables."""
 
-    states: List[float]
+    states: list[float]
     """The states of the changed free variables."""
 
 
@@ -131,10 +131,10 @@ class WorldUpdate(Message):
     Either field may be ``None`` when only one type of change is being communicated.
     """
 
-    modification_block: Optional[ModificationBlock] = None
+    modification_block: ModificationBlock | None = None
     """The model modification to apply, if any."""
 
-    state_update: Optional[WorldStateUpdate] = None
+    state_update: WorldStateUpdate | None = None
     """The state values to apply, if any."""
 
 
@@ -181,16 +181,16 @@ class WorldModelSnapshot(SubclassJSONSerializer):
     Snapshot containing the complete modification history and the latest world state.
     """
 
-    modifications: List[WorldModelModificationBlock]
+    modifications: list[WorldModelModificationBlock]
     """The ordered list of world model modification blocks."""
 
-    ids: List[UUID]
+    ids: list[UUID]
     """The names of the free variables contained in the state snapshot."""
 
-    states: List[float]
+    states: list[float]
     """The values of the free variables contained in the state snapshot."""
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             SnapshotField.MODIFICATIONS: to_json(self.modifications, **kwargs),
@@ -201,7 +201,7 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         state = data.get(SnapshotField.STATE, {})
         return cls(
             modifications=[
@@ -214,7 +214,7 @@ class WorldModelSnapshot(SubclassJSONSerializer):
 
     @staticmethod
     def apply_to_json_snapshot_to_world(
-        world: World, json_data: Dict[str, Any], **kwargs
+        world: World, json_data: dict[str, Any], **kwargs
     ):
         """
         Deserialize modifications and state from JSON and apply them to the world.

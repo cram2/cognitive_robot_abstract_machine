@@ -9,12 +9,10 @@ This module provides NMS implementations for filtering overlapping bounding boxe
 :Created:     2023-02-02
 """
 
-from typing_extensions import Tuple, List
-
 # pylint: disable=invalid-name
 
 
-def _iou(box1: Tuple[int, int, int, int], box2: Tuple[int, int, int, int]) -> float:
+def _iou(box1: tuple[int, int, int, int], box2: tuple[int, int, int, int]) -> float:
     """Calculate the intersection over union (IoU) of two bounding boxes.
 
     :param box1: First bounding box coordinates (x1, y1, x2, y2) where:
@@ -50,10 +48,10 @@ def _iou(box1: Tuple[int, int, int, int], box2: Tuple[int, int, int, int]) -> fl
 
 
 def non_max_suppression_(
-    predictions: List[Tuple[Tuple[int, int, int, int], float, str]],
+    predictions: list[tuple[tuple[int, int, int, int], float, str]],
     confidence_treshold: float = 0.5,
     iou_threshold: float = 0.4,
-) -> List[Tuple[Tuple[int, int, int, int], float, str]]:
+) -> list[tuple[tuple[int, int, int, int], float, str]]:
     """Perform non-maxima suppression (NMS) on object detection results.
 
     :param predictions: List of tuples, where each tuple contains:
@@ -95,10 +93,10 @@ def non_max_suppression_(
 
 
 def class_based_nms(
-    predictions: List[Tuple[Tuple[int, int, int, int], float, str]],
+    predictions: list[tuple[tuple[int, int, int, int], float, str]],
     confidence_threshold: float = 0.5,
     iou_threshold: float = 0.4,
-) -> List[Tuple[Tuple[int, int, int, int], float, str]]:
+) -> list[tuple[tuple[int, int, int, int], float, str]]:
     """Perform class-based non-maximum suppression (NMS) on object detection results.
 
     :param predictions: List of tuples, where each tuple contains:

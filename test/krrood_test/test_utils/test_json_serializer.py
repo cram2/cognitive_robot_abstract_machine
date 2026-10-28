@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import Dict, Any, Self
+from typing_extensions import Any, Self
 
 import numpy as np
 from scipy.sparse import coo_array, csr_array
@@ -147,11 +147,11 @@ class ClassThatNeedsKWARGS(SubclassJSONSerializer):
     a: int
     b: float = 0
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {**super().to_json(), "a": (self.a)}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(a=(data["a"]), b=(kwargs["b"]))
 
 
@@ -160,17 +160,17 @@ class ClassThatNeedsKWARGSInList(SubclassJSONSerializer):
     a: int
     b: list[ClassThatNeedsKWARGS] = field(default_factory=list)
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {**super().to_json(), "a": (self.a), "b": to_json(self.b)}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(a=(data["a"]), b=from_json(data["b"], **kwargs))
 
 
 @dataclass
 class ClassWithDict(DataclassJSONSerializer):
-    a: Dict[str, int]
+    a: dict[str, int]
 
 
 @dataclass

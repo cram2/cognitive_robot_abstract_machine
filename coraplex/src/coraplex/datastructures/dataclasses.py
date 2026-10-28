@@ -3,13 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from typing_extensions import (
-    Optional,
-    TYPE_CHECKING,
-    List,
-    Type,
-    TypeVar,
-)
+from typing_extensions import TYPE_CHECKING, TypeVar
 
 from coraplex.plans.plan_entity import PlanEntity
 from krrood.entity_query_language.backends import (
@@ -67,7 +61,7 @@ class Context(PlanEntity):
     The semantic robot annotation which should execute the plan.
     """
 
-    ros_node: Optional[Node] = field(default=None)
+    ros_node: Node | None = field(default=None)
     """
     A ROS node that should be used for communication in this plan.
     """
@@ -87,7 +81,7 @@ class Context(PlanEntity):
     constructed (generated).
     """
 
-    alternative_motion_mappings: List[Type[AlternativeMotion]] = field(
+    alternative_motion_mappings: list[type[AlternativeMotion]] = field(
         default_factory=list
     )
     """
@@ -98,7 +92,7 @@ class Context(PlanEntity):
     use their default motion chart.
     """
 
-    plan_transformations: List[PlanTransformation] = field(default_factory=list)
+    plan_transformations: list[PlanTransformation] = field(default_factory=list)
     """
     The transformations that rewrite the plans of this context while they are expanded.
 
@@ -111,7 +105,7 @@ class Context(PlanEntity):
     Should debug information be printed or visualized.
     """
 
-    sampling_seed: Optional[int] = field(default=None, kw_only=True)
+    sampling_seed: int | None = field(default=None, kw_only=True)
     """
     Seed for the locations of this plan that have none of their own, so a run can be
     repeated; ``None`` samples afresh each run.
@@ -173,8 +167,8 @@ class Context(PlanEntity):
         cls,
         world: World,
         plan: Plan = None,
-        query_backend: Optional[QueryBackend] = None,
-        alternative_motion_mappings: Optional[List[Type[AlternativeMotion]]] = None,
+        query_backend: QueryBackend | None = None,
+        alternative_motion_mappings: list[type[AlternativeMotion]] | None = None,
     ):
         """
         Create a context from a world by getting the first robot in the world.

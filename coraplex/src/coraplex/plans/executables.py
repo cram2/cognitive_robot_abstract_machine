@@ -4,7 +4,7 @@ from contextlib import AbstractContextManager, ExitStack, nullcontext
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 
-from typing_extensions import Callable, List, Dict, ClassVar, Optional, TYPE_CHECKING
+from typing_extensions import Callable, ClassVar, TYPE_CHECKING
 
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.exceptions import (
@@ -160,7 +160,7 @@ class Executable:
     Base class for executable units.
     """
 
-    execution_list: List[Executable] = field(default_factory=list)
+    execution_list: list[Executable] = field(default_factory=list)
     """
     List of executables that comprises this executable.
     """
@@ -171,7 +171,7 @@ class Executable:
     """
 
     @property
-    def giskard_executables(self) -> List[GiskardExecutable]:
+    def giskard_executables(self) -> list[GiskardExecutable]:
         """
         :return: The giskard executables this unit is made of, in execution order.
         """
@@ -212,13 +212,13 @@ class GiskardExecutable(Executable):
     binds its updaters to the state arrays that adding a node would replace.
     """
 
-    motion_mappings: Dict[MotionNode, Task] = field(default_factory=dict, kw_only=True)
+    motion_mappings: dict[MotionNode, Task] = field(default_factory=dict, kw_only=True)
     """
     Mapping from the motion nodes of the plan to their giskard tasks, in execution
     order.
     """
 
-    pre_condition_node: Optional[ConditionNode] = field(default=None, kw_only=True)
+    pre_condition_node: ConditionNode | None = field(default=None, kw_only=True)
     """
     Optional pre-condition of the action this executable belongs to.
 
@@ -226,7 +226,7 @@ class GiskardExecutable(Executable):
     :meth:`_add_condition_monitors`.
     """
 
-    post_condition_node: Optional[ConditionNode] = field(default=None, kw_only=True)
+    post_condition_node: ConditionNode | None = field(default=None, kw_only=True)
     """
     Optional post-condition of the action this executable belongs to.
 
@@ -234,7 +234,7 @@ class GiskardExecutable(Executable):
     :meth:`_add_condition_monitors`.
     """
 
-    execution_type: ClassVar[Optional[ExecutionType]] = None
+    execution_type: ClassVar[ExecutionType | None] = None
     """
     The execution type used for all giskard executables, managed by
     :py:class:`pycram.motion_executor.ExecutionEnvironment`.
@@ -242,7 +242,7 @@ class GiskardExecutable(Executable):
 
     collision_avoidance: ClassVar[bool] = False
 
-    simulation: ClassVar[Optional[MujocoSim]] = None
+    simulation: ClassVar[MujocoSim | None] = None
     """
     The physically simulated world a plan is performed in, when the execution type is
     :attr:`~coraplex.datastructures.enums.ExecutionType.PHYSICALLY_SIMULATED`.
@@ -271,7 +271,7 @@ class GiskardExecutable(Executable):
         return timedelta(minutes=2)
 
     @property
-    def giskard_executables(self) -> List[GiskardExecutable]:
+    def giskard_executables(self) -> list[GiskardExecutable]:
         """
         :return: This executable, which is the only giskard executable it is made of.
         """
@@ -551,9 +551,9 @@ class MoveBranchExecutable(Executable):
         Move the branch, unless a physically simulated world is holding the body by
         contact already, in which case it is left where the physics puts it.
         """
-        if GiskardExecutable.execution_type == ExecutionType.PHYSICALLY_SIMULATED:
-            return
         with self.execution_scope():
+            if GiskardExecutable.execution_type == ExecutionType.PHYSICALLY_SIMULATED:
+                return
             self.context.world.move_branch(self.body, self.new_parent)
 
 

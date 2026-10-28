@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 
 from pymongo import MongoClient
-from typing_extensions import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
+from typing_extensions import Any, TYPE_CHECKING
 from robokudo import world
 
 from robokudo.cas import CAS
@@ -44,7 +44,7 @@ class Storage:
     ROS messages, etc.) into a BSON‑encodable dictionary format.
     """
 
-    BLACKLISTED_TYPES: Tuple[type, ...] = (type(lambda x: x),)
+    BLACKLISTED_TYPES: tuple[type, ...] = (type(lambda x: x),)
     VIEW_COLLECTION_NAME: str = "cas_views"
     cas_view_codecs = CASViewCodecRegistry()
 
@@ -96,11 +96,11 @@ class Storage:
             """
             MongoDB database instance.
             """
-            self.index: Optional[int] = None
+            self.index: int | None = None
             """
             Current position in data list.
             """
-            self.data: List[Dict[Any, Any]] = []
+            self.data: list[dict[Any, Any]] = []
             """
             List of loaded documents.
             """
@@ -125,7 +125,7 @@ class Storage:
             """
             return self.index is not None and self.index < len(self.data)
 
-        def get_next_frame(self) -> Optional[Dict[Any, Any]]:
+        def get_next_frame(self) -> dict[Any, Any] | None:
             """
             Get the next frame from the data list.
 
@@ -163,7 +163,7 @@ class Storage:
         self.client.drop_database(self.db_name)
 
     @staticmethod
-    def encode_view_document(view_name: str, view_value: Any) -> Dict[str, Any]:
+    def encode_view_document(view_name: str, view_value: Any) -> dict[str, Any]:
         """
         Encode one CAS view value into a serializable view document.
         """
@@ -179,13 +179,13 @@ class Storage:
         return document
 
     @staticmethod
-    def decode_view_document(view_document: Dict[str, Any]) -> tuple[str, Any]:
+    def decode_view_document(view_document: dict[str, Any]) -> tuple[str, Any]:
         """
         Decode one serialized view document into a CAS view value.
         """
         return Storage.cas_view_codecs.decode_view(view_document)
 
-    def store_views_in_mongo(self, cas_dict: Dict[str, Any]) -> None:
+    def store_views_in_mongo(self, cas_dict: dict[str, Any]) -> None:
         """
         Store CAS views in MongoDB.
 
@@ -209,8 +209,8 @@ class Storage:
 
     def load_views_from_mongo_in_cas(
         self,
-        cas_document: Dict[str, Any],
-        excluded_view_names: Optional[set[str]] = None,
+        cas_document: dict[str, Any],
+        excluded_view_names: set[str] | None = None,
     ) -> None:
         """
         Load views from MongoDB into a CAS document.
@@ -244,7 +244,7 @@ class Storage:
 
     @staticmethod
     def load_annotations_from_mongo_in_cas(
-        cas_document: Dict[str, Any], cas: CAS
+        cas_document: dict[str, Any], cas: CAS
     ) -> None:
         """
         Load annotations from MongoDB into a CAS.
@@ -264,7 +264,7 @@ class Storage:
             )
 
     @staticmethod
-    def generate_dict_from_real_cas(cas: CAS) -> Dict[str, Any]:
+    def generate_dict_from_real_cas(cas: CAS) -> dict[str, Any]:
         """
         Convert a CAS instance to a MongoDB-compatible dictionary.
 
@@ -288,7 +288,7 @@ class Storage:
 
         return result
 
-    def store_cas_dict(self, cas_dict: Dict[str, Any]) -> InsertOneResult:
+    def store_cas_dict(self, cas_dict: dict[str, Any]) -> InsertOneResult:
         """
         Store a CAS dictionary in MongoDB.
 

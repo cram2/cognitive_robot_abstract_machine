@@ -4,7 +4,6 @@ from jax.experimental.sparse import BCOO, BCSR
 from random_events.interval import SimpleInterval, Bound
 import jax
 from scipy.sparse import csr_array, csc_array
-from typing_extensions import Tuple
 
 
 def copy_bcoo(array: BCOO) -> BCOO:
@@ -76,7 +75,7 @@ def create_bcoo_indices_from_row_lengths(row_lengths: np.array) -> np.array:
 
 def create_bcsr_indices_from_row_lengths(
     row_lengths: jax.Array,
-) -> Tuple[jax.Array, jax.Array]:
+) -> tuple[jax.Array, jax.Array]:
     """
     Create the column indices and indent pointer of bcsr array with the given row lengths.
 

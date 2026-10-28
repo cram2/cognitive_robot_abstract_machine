@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 import pytest
 import rclpy
-from typing_extensions import Generator, Tuple
+from typing_extensions import Generator
 
 from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
@@ -126,7 +126,7 @@ def setup_multi_robot_simple_apartment(
 @pytest.fixture
 def multiple_robot_simple_apartment_context(
     setup_multi_robot_simple_apartment,
-) -> Generator[Tuple[World, AbstractRobot, Context]]:
+) -> Generator[tuple[World, AbstractRobot, Context]]:
     """
     The shared simple apartment world with one robot, the robot and a context for both,
     returned to its initial model and state after the test.

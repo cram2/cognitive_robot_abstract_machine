@@ -6,16 +6,7 @@ from dataclasses import dataclass, field
 from random_events.product_algebra import VariableMap
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import (
-    Any,
-    Dict,
-    Generic,
-    Iterable,
-    List,
-    Optional,
-    Self,
-    TypeVar,
-)
+from typing_extensions import Any, Generic, Iterable, Self, TypeVar
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     DenseEdgeValues,
@@ -49,7 +40,7 @@ class ConditionedCopies:
     The variables of the circuit the copies keep.
     """
 
-    renaming: Dict[Variable, Variable]
+    renaming: dict[Variable, Variable]
     """
     The new name of every kept variable.
     """
@@ -61,23 +52,23 @@ class ProductsOfCopies:
     Products whose ``i``-th one multiplies the ``i``-th copy of every factor.
     """
 
-    points: List[PartialPointType]
+    points: list[PartialPointType]
     """
     The point every product conditions its conditioned copies on, one per product.
     """
 
-    conditioned_copies: List[ConditionedCopies]
+    conditioned_copies: list[ConditionedCopies]
     """
     The conditioned copies every product multiplies.
     """
 
-    point_masses: Dict[Variable, List[Any]] = field(default_factory=dict)
+    point_masses: dict[Variable, list[Any]] = field(default_factory=dict)
     """
     Variables every product multiplies a point mass of, with the value of the point
     mass in every product.
     """
 
-    components: List[GroundableCircuit] = field(default_factory=list)
+    components: list[GroundableCircuit] = field(default_factory=list)
     """
     A circuit every product multiplies, one per product, or nothing.
     """
@@ -91,7 +82,7 @@ class GroundableCircuit(ProbabilisticCircuitRepresentation[NodeType], ABC):
 
     @property
     @abstractmethod
-    def variable_to_index_map(self) -> Dict[Variable, int]:
+    def variable_to_index_map(self) -> dict[Variable, int]:
         """
         :return: The index of every variable in the variables of the circuit.
         """
@@ -106,7 +97,7 @@ class GroundableCircuit(ProbabilisticCircuitRepresentation[NodeType], ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def marginal_in_place(self, variables: Iterable[Variable]) -> Optional[Self]:
+    def marginal_in_place(self, variables: Iterable[Variable]) -> Self | None:
         """
         Marginalize the circuit to the variables in place.
 
@@ -141,7 +132,7 @@ class GroundableCircuit(ProbabilisticCircuitRepresentation[NodeType], ABC):
     @abstractmethod
     def lowest_product_nodes_over(
         self, variables: SortedSet[Variable]
-    ) -> List[NodeType]:
+    ) -> list[NodeType]:
         """
         :param variables: The variables every returned node must model.
         :return: The product nodes that model all of the variables and have no such
@@ -159,8 +150,8 @@ class GroundableCircuit(ProbabilisticCircuitRepresentation[NodeType], ABC):
 
     @abstractmethod
     def remove_variables_in_place(
-        self, variables: SortedSet[Variable], nodes: List[NodeType]
-    ) -> List[NodeType]:
+        self, variables: SortedSet[Variable], nodes: list[NodeType]
+    ) -> list[NodeType]:
         """
         Marginalize variables out of the circuit in place, keeping its structure.
 
@@ -171,7 +162,7 @@ class GroundableCircuit(ProbabilisticCircuitRepresentation[NodeType], ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def root_mixture_components(self) -> List[Self]:
+    def root_mixture_components(self) -> list[Self]:
         """
         :return: The circuits that the root of the circuit mixes, or nothing if the root
             does not mix.
@@ -181,9 +172,9 @@ class GroundableCircuit(ProbabilisticCircuitRepresentation[NodeType], ABC):
     @abstractmethod
     def multiply_nodes_by_mixtures(
         self,
-        nodes: List[NodeType],
+        nodes: list[NodeType],
         products: ProductsOfCopies,
-        log_weights: Optional[DenseEdgeValues],
+        log_weights: DenseEdgeValues | None,
     ):
         """
         Make product nodes of the circuit multiply mixtures of products, in place.

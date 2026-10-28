@@ -9,7 +9,7 @@ This module provides utilities to:
 
 from __future__ import annotations
 
-from typing_extensions import Iterable, Optional, Tuple, Union
+from typing_extensions import Iterable
 
 import numpy as np
 import open3d as o3d
@@ -52,7 +52,7 @@ def _box_obb_from_shape(
 
 
 def region_obb(
-    region: Region, world: Optional[World] = None
+    region: Region, world: World | None = None
 ) -> o3d.geometry.OrientedBoundingBox:
     """
     Return an OBB for the region in world coordinates.
@@ -86,7 +86,7 @@ def region_obb(
 def region_obb_in_camera_coordinates(
     world: World,
     region: Region,
-    world_T_camera: Union[np.ndarray, HomogeneousTransformationMatrix],
+    world_T_camera: np.ndarray | HomogeneousTransformationMatrix,
 ) -> o3d.geometry.OrientedBoundingBox:
     """
     Transform region OBB to camera frame using world_to_camera matrix.
@@ -116,9 +116,9 @@ def region_pose_annotation(region: Region) -> robokudo.types.annotation.PoseAnno
 
 def region_marker_array(
     regions: Iterable[Region],
-    highlighted: Optional[Iterable[str]] = None,
-    highlight_color: Tuple[float, float, float] = (0.0, 1.0, 0.0),
-    default_color: Tuple[float, float, float] = (0.0, 0.0, 0.7),
+    highlighted: Iterable[str] | None = None,
+    highlight_color: tuple[float, float, float] = (0.0, 1.0, 0.0),
+    default_color: tuple[float, float, float] = (0.0, 0.0, 0.7),
 ):
     """
     Optional helper for visualization markers.

@@ -1,4 +1,5 @@
-"""Sensor data storage to filesystem.
+"""
+Sensor data storage to filesystem.
 
 This module provides an annotator for:
 
@@ -44,10 +45,13 @@ class FileWriter(BaseAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for file writer."""
+        """
+        Configuration descriptor for file writer.
+        """
 
         class Parameters:
-            """Parameters for configuring file storage.
+            """
+            Parameters for configuring file storage.
 
             .. note::
                filename_prefix should match FileReader configuration.
@@ -55,10 +59,14 @@ class FileWriter(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.target_dir: str = "/tmp/"
-                """Directory to store files in"""
+                """
+                Directory to store files in
+                """
 
                 self.filename_prefix: str = "rk_"
-                """Prefix for generated filenames, make sure that this matches the FileReader filename_prefix"""
+                """
+                Prefix for generated filenames, make sure that this matches the FileReader filename_prefix
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -68,7 +76,8 @@ class FileWriter(BaseAnnotator):
         name: str = "FileWriter",
         descriptor: FileWriter.Descriptor | None = None,
     ) -> None:
-        """Initialize the file writer.
+        """
+        Initialize the file writer.
 
         :param name: Name of this annotator instance
         :param descriptor: Configuration descriptor

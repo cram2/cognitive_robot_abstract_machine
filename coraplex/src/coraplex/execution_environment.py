@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.plans.executables import GiskardExecutable
@@ -109,7 +109,7 @@ class PhysicallySimulatedRobot(ExecutionEnvironment):
     already.
     """
 
-    previous_simulation: Optional[MujocoSim] = field(init=False, default=None)
+    previous_simulation: MujocoSim | None = field(init=False, default=None)
     """
     The simulation that was being performed in before this environment was entered, used
     for nested environments.

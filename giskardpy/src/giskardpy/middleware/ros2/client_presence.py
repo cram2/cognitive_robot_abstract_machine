@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 from threading import Lock, Thread
-from typing import Callable, Dict, Optional
+from typing_extensions import Callable
 
 import rclpy
 import std_msgs.msg
@@ -220,12 +220,12 @@ class HeartbeatPresence:
     deterministically instead of sleeping in real time.
     """
 
-    watched_client: Optional[MetaData] = field(init=False, default=None)
+    watched_client: MetaData | None = field(init=False, default=None)
     """
     The client this check reports on, or ``None`` while no goal is running.
     """
 
-    last_heartbeat: Dict[MetaData, float] = field(init=False, default_factory=dict)
+    last_heartbeat: dict[MetaData, float] = field(init=False, default_factory=dict)
     """
     When each client announced itself last.
     """
@@ -317,7 +317,7 @@ class ClientWatchdog:
     The check that reports on the client's continued presence.
     """
 
-    goal_client: Optional[MetaData] = field(init=False, default=None)
+    goal_client: MetaData | None = field(init=False, default=None)
     """
     The client of the running goal, or ``None`` while no goal is running.
     """

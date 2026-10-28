@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List
+from typing_extensions import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -143,7 +143,7 @@ class HistoryGanttChartPlotter:
         self._save_figure(file_name=file_name)
 
     def _build_subplots(
-        self, ordered_nodes: List[MotionStatechartNode]
+        self, ordered_nodes: list[MotionStatechartNode]
     ) -> tuple[plt.Axes, plt.Axes]:
         """
         Builds a subplot layout with a main axis and a fixed-width final-state axis for
@@ -156,7 +156,7 @@ class HistoryGanttChartPlotter:
         :return: A tuple containing the main axis and the fixed-width final-state axis.
         """
         # Build node label list early so we can size the right margin adaptively
-        node_names: List[str] = []
+        node_names: list[str] = []
         for idx, n in enumerate(ordered_nodes):
             prev_depth = 0 if idx == 0 else ordered_nodes[idx - 1].depth
             node_names.append(self._make_label(n, prev_depth))
@@ -222,7 +222,7 @@ class HistoryGanttChartPlotter:
         )
         return ax_main, ax_final
 
-    def _sort_nodes_by_parents(self) -> List[MotionStatechartNode]:
+    def _sort_nodes_by_parents(self) -> list[MotionStatechartNode]:
         """
         Sorts nodes of a motion statechart by their parent-child hierarchy.
 
@@ -239,7 +239,7 @@ class HistoryGanttChartPlotter:
                 for c in n.nodes:
                     yield from return_children_in_order(c)
 
-        ordered_: List[MotionStatechartNode] = []
+        ordered_: list[MotionStatechartNode] = []
         for root in self.motion_statechart.top_level_nodes:
             ordered_.extend(list(return_children_in_order(root)))
         # reverse list because plt plots bars bottom to top
@@ -364,8 +364,8 @@ class HistoryGanttChartPlotter:
         self,
         axis: plt.Axes,
         node_idx: int,
-        history: List[LifeCycleValues | ObservationStateValues],
-        control_cycle_indices: List[int],
+        history: list[LifeCycleValues | ObservationStateValues],
+        control_cycle_indices: list[int],
         top: bool,
     ):
         """
@@ -449,7 +449,7 @@ class HistoryGanttChartPlotter:
         self,
         main_axis: plt.Axes,
         final_state_axis: plt.Axes,
-        ordered_nodes: List[MotionStatechartNode],
+        ordered_nodes: list[MotionStatechartNode],
     ):
         """
         Configure and format axes for visualizing motion statechart nodes.
@@ -532,7 +532,7 @@ class HistoryGanttChartPlotter:
         else:
             return "│  " * (depth - 1) + "├─ " + node.unique_name
 
-    def _measure_labels_width_in(self, labels: List[str]) -> float:
+    def _measure_labels_width_in(self, labels: list[str]) -> float:
         """
         Measures the maximum width of a list of text labels when rendered in a temporary
         figure. This is useful to determine the required space for labels in a plot.

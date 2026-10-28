@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Optional
 
 from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -45,7 +44,7 @@ class ClauseComposer:
 
     def restriction(
         self, plan: QueryPlan, number: GrammaticalNumber = GrammaticalNumber.SINGULAR
-    ) -> Optional[RestrictionFragments]:
+    ) -> RestrictionFragments | None:
         """:return: The placed subject-restriction pieces (superlatives / whose / residual), or
         ``None`` when the query has no groupable subject restriction. The predicate agrees with
         *number* — a plural subject gives *"whose salaries are …"*.
@@ -63,7 +62,7 @@ class ClauseComposer:
             plan.subject_restriction.conditions, plan.subject, self.context, number
         )
 
-    def grouped_by(self, node: Query) -> Optional[VerbalizationFragment]:
+    def grouped_by(self, node: Query) -> VerbalizationFragment | None:
         """:return: The *"grouped by …"* clause, or ``None`` when the query has no GROUP BY.
 
         It routes to the grouped-by assembler for the grouping span; in this fronted report that span
@@ -77,7 +76,7 @@ class ClauseComposer:
         """
         return GroupedByAssembler(self.context).clause(node)
 
-    def having(self, node: Query) -> Optional[VerbalizationFragment]:
+    def having(self, node: Query) -> VerbalizationFragment | None:
         """:return: The trailing *"where …"* HAVING clause, or ``None`` when the query has no HAVING.
 
         It routes to the having assembler for the trailing *"where the sum is greater than 30000"*
@@ -86,7 +85,7 @@ class ClauseComposer:
         """
         return HavingAssembler(self.context).clause(node)
 
-    def ordered_by(self, node: Query) -> Optional[VerbalizationFragment]:
+    def ordered_by(self, node: Query) -> VerbalizationFragment | None:
         """:return: The *"ordered by …"* clause, or ``None`` when the query has no ORDER BY.
 
         It routes to the ordered-by assembler, which contributes only the trailing *"ordered by their

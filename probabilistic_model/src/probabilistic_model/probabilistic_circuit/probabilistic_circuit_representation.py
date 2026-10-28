@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from random_events.product_algebra import Event
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Generic, Iterable, List, Self, TypeVar
+from typing_extensions import Generic, Iterable, Self, TypeVar
 
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
@@ -66,7 +66,7 @@ class MixtureOverVariable(Generic[NodeType], SubClassSafeGeneric):
     The variable the supports are restricted to.
     """
 
-    component_supports: List[Event]
+    component_supports: list[Event]
     """
     What every component of the mixture models of the variable.
     """
@@ -90,8 +90,8 @@ class ProbabilisticCircuitRepresentation(
 
     @staticmethod
     def validate_mixture(
-        components: List[ProbabilisticCircuitRepresentation],
-        log_weights: List[float],
+        components: list[ProbabilisticCircuitRepresentation],
+        log_weights: list[float],
     ) -> None:
         """
         Check that circuits and weights make up a smooth mixture.
@@ -118,7 +118,7 @@ class ProbabilisticCircuitRepresentation(
 
     @staticmethod
     def validate_product(
-        factors: List[ProbabilisticCircuitRepresentation],
+        factors: list[ProbabilisticCircuitRepresentation],
     ) -> None:
         """
         Check that circuits make up a decomposable product.
@@ -140,7 +140,7 @@ class ProbabilisticCircuitRepresentation(
 
     @classmethod
     @abstractmethod
-    def mixture_of(cls, components: List[Self], log_weights: Iterable[float]) -> Self:
+    def mixture_of(cls, components: list[Self], log_weights: Iterable[float]) -> Self:
         """
         Mix copies of circuits over the same variables, normalized.
 
@@ -158,7 +158,7 @@ class ProbabilisticCircuitRepresentation(
 
     @classmethod
     @abstractmethod
-    def product_of(cls, factors: List[Self]) -> Self:
+    def product_of(cls, factors: list[Self]) -> Self:
         """
         Multiply copies of circuits over disjoint variables.
 
@@ -177,7 +177,7 @@ class ProbabilisticCircuitRepresentation(
     @abstractmethod
     def unnormalized_mixtures(
         self, tolerance: float = 1e-6
-    ) -> List[UnnormalizedMixture[NodeType]]:
+    ) -> list[UnnormalizedMixture[NodeType]]:
         """
         Find the mixtures whose component weights do not sum to one.
 
@@ -192,7 +192,7 @@ class ProbabilisticCircuitRepresentation(
     @abstractmethod
     def mixtures_over(
         self, variables: SortedSet[Variable]
-    ) -> List[MixtureOverVariable[NodeType]]:
+    ) -> list[MixtureOverVariable[NodeType]]:
         """
         Read what every component of every mixture models of some variables.
 

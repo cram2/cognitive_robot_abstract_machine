@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING, Union, Optional, Self
+from typing_extensions import TYPE_CHECKING, Self
 
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -66,11 +66,9 @@ class FixedConnection(Connection):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         *,
-        name: Optional[PrefixedName] = None,
-        parent_T_connection_expression: Optional[
-            HomogeneousTransformationMatrix
-        ] = None,
-        connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        name: PrefixedName | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
     ) -> Self:
         return cls(
             parent=parent,
@@ -161,14 +159,12 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         *,
-        name: Optional[PrefixedName] = None,
-        parent_T_connection_expression: Optional[
-            HomogeneousTransformationMatrix
-        ] = None,
-        connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        name: PrefixedName | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
         multiplier: float = 1.0,
         offset: float = 0.0,
-        dof_limits: Optional[DegreeOfFreedomLimits] = None,
+        dof_limits: DegreeOfFreedomLimits | None = None,
         axis: Vector3 | None = None,
     ) -> Self:
         """
@@ -415,14 +411,12 @@ class ScrewConnection(ActiveConnection1DOF):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         *,
-        name: Optional[PrefixedName] = None,
-        parent_T_connection_expression: Optional[
-            HomogeneousTransformationMatrix
-        ] = None,
-        connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        name: PrefixedName | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
         multiplier: float = 1.0,
         offset: float = 0.0,
-        dof_limits: Optional[DegreeOfFreedomLimits] = None,
+        dof_limits: DegreeOfFreedomLimits | None = None,
         axis: Vector3 | None = None,
         screw_pitch: float,
     ) -> Self:
@@ -555,11 +549,9 @@ class Connection6DoF(Connection):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         *,
-        name: Optional[PrefixedName] = None,
-        parent_T_connection_expression: Optional[
-            HomogeneousTransformationMatrix
-        ] = None,
-        connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        name: PrefixedName | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
     ) -> Self:
         """
         Creates an instance of the class with automatically generated degrees of freedom
@@ -756,7 +748,7 @@ class WheeledDrive(ActiveConnection, HasUpdateState, ABC):
 
     @origin.setter
     def origin(
-        self, transformation: Union[NpMatrix4x4, HomogeneousTransformationMatrix]
+        self, transformation: NpMatrix4x4 | HomogeneousTransformationMatrix
     ) -> None:
         """
         Overwrites the origin of the connection.
@@ -848,11 +840,9 @@ class OmniDrive(WheeledDrive):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         *,
-        name: Optional[PrefixedName] = None,
-        parent_T_connection_expression: Optional[
-            HomogeneousTransformationMatrix
-        ] = None,
-        connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        name: PrefixedName | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
         translation_velocity_limits: float = 0.6,
         rotation_velocity_limits: float = 0.5,
     ) -> Self:
@@ -1052,11 +1042,9 @@ class DifferentialDrive(WheeledDrive):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         *,
-        name: Optional[PrefixedName] = None,
-        parent_T_connection_expression: Optional[
-            HomogeneousTransformationMatrix
-        ] = None,
-        connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        name: PrefixedName | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
         translation_velocity_limits: float = 0.6,
         rotation_velocity_limits: float = 0.5,
     ) -> Self:

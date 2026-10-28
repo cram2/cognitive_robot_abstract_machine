@@ -6,7 +6,6 @@ from math import ceil
 
 import numpy as np
 import pytest
-from typing_extensions import List
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -84,7 +83,7 @@ def unreachable_arm_goal(world: World) -> CartesianPosition:
 def tick_until_end_recording(
     executor: Executor,
     motion_statechart: MotionStatechart,
-    nodes: List[MotionStatechartNode],
+    nodes: list[MotionStatechartNode],
     maximum_cycles: int = 2000,
 ) -> dict[MotionStatechartNode, list[float]]:
     """
@@ -113,18 +112,18 @@ class NodeWithDeclaredDependencies(MotionStatechartNode):
     and cycle detection can be exercised without a real task.
     """
 
-    dependencies: List[MotionStatechartNode] = field(default_factory=list, kw_only=True)
+    dependencies: list[MotionStatechartNode] = field(default_factory=list, kw_only=True)
     """
     The nodes this node claims to depend on.
     """
 
-    built_after: List[str] = field(default_factory=list, kw_only=True)
+    built_after: list[str] = field(default_factory=list, kw_only=True)
     """
     Shared list every instance appends its name to when it is built.
     """
 
     @property
-    def prerequisite_nodes(self) -> List[MotionStatechartNode]:
+    def prerequisite_nodes(self) -> list[MotionStatechartNode]:
         return self.dependencies
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -554,8 +553,8 @@ class ScriptedErrorRun:
         )
 
     def observations_while_the_error_is(
-        self, errors: List[float]
-    ) -> List[ObservationStateValues]:
+        self, errors: list[float]
+    ) -> list[ObservationStateValues]:
         """
         :param errors: The task's error on each control cycle.
         :return: What the monitor observes on each of those control cycles.
@@ -855,7 +854,7 @@ class TestNodeDependencies:
         """
         Build order follows declared dependencies, not the order nodes were added.
         """
-        built_after: List[str] = []
+        built_after: list[str] = []
         dependency = NodeWithDeclaredDependencies(
             name="dependency", built_after=built_after
         )

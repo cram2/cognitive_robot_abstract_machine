@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass, field
 from multiprocessing.synchronize import RLock
 from time import sleep
-from typing import Callable, Dict, Optional, Set, Tuple, List
+from typing_extensions import Callable
 from uuid import uuid4
 
 import numpy as np
@@ -98,7 +98,7 @@ from semantic_digital_twin.adapters.ros.messages import (
 from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 
 
-def create_dummy_world(w: Optional[World] = None) -> World:
+def create_dummy_world(w: World | None = None) -> World:
     def deterministic_uuid(seed: str) -> uuid.UUID:
         h = hashlib.sha1(seed.encode()).hexdigest()[:32]
         return uuid.UUID(h)
@@ -152,7 +152,7 @@ def create_dummy_world(w: Optional[World] = None) -> World:
 
 def wait_for_sync_kse_and_return_ids(
     w1: World, w2: World, timeout: float = 5.0, interval: float = 0.05
-) -> Tuple[Set[uuid.UUID], Set[uuid.UUID]]:
+) -> tuple[set[uuid.UUID], set[uuid.UUID]]:
     """
     Waits until the sets of kinematic structure entity IDs in both worlds are identical,
     or until the timeout is reached.
@@ -383,7 +383,7 @@ class PublisherWithAppearingSubscribers:
     appear.
     """
 
-    subscriber_counts: List[int]
+    subscriber_counts: list[int]
     """
     What each look at the topic reports, the last entry from then on.
     """
@@ -400,7 +400,7 @@ class PublisherWithAppearingSubscribers:
 
 
 def connect_with_appearing_subscribers(
-    synchronizer: WorldSynchronizer, subscriber_counts: List[int]
+    synchronizer: WorldSynchronizer, subscriber_counts: list[int]
 ) -> timedelta:
     """
     Let a synchronizer connect against subscribers that appear as given.
@@ -991,8 +991,8 @@ def test_attribute_updates(rclpy_node):
 @dataclass(eq=False)
 class TestAnnotation(SemanticAnnotation):
     value: str = "default"
-    entity: Optional[Body] = None
-    entities: List[Body] = field(default_factory=list, hash=False)
+    entity: Body | None = None
+    entities: list[Body] = field(default_factory=list, hash=False)
 
     @synchronized_attribute_modification
     def update_value(self, new_value: str):
@@ -2099,7 +2099,7 @@ def test_state_change_during_a_modification_is_published_after_its_model_change(
         node=rclpy_node, _world=world, topic_name=f"/publication_order_{uuid4().hex}"
     )
 
-    published_updates: List[WorldUpdate] = []
+    published_updates: list[WorldUpdate] = []
     original_publish = synchronizer.publish
 
     def slowly_publishing_model_updates(update: WorldUpdate):
@@ -2423,7 +2423,7 @@ class WorldUpdateSender:
         )
 
     def announce_state_change(
-        self, receiver: WorldSynchronizer, positions: Dict[uuid.UUID, float]
+        self, receiver: WorldSynchronizer, positions: dict[uuid.UUID, float]
     ) -> None:
         """
         Hand over the positions of the given degrees of freedom.
@@ -2484,7 +2484,7 @@ class DelayedApplyWorldSynchronizer(WorldSynchronizer):
 
 def create_connected_worlds(
     rclpy_node: Node, name: str
-) -> Tuple[World, World, WorldSynchronizer, WorldSynchronizer]:
+) -> tuple[World, World, WorldSynchronizer, WorldSynchronizer]:
     """
     Build a publishing world and a receiving world that share one prismatic connection.
 

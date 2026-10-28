@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+# %% Imports
+
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass

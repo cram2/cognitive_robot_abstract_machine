@@ -6,7 +6,6 @@ wiping).
 import math
 import os
 
-from typing_extensions import Optional
 
 import coraplex
 from semantic_digital_twin.adapters.mesh import STLParser
@@ -74,7 +73,7 @@ Yellowish color for the sponge.
 """
 
 
-def parse_object(stl_file_name: str, color: Optional[Color] = None) -> World:
+def parse_object(stl_file_name: str, color: Color | None = None) -> World:
     """
     :param stl_file_name: Name of the mesh file in the demo resources.
     :param color: Color to dye the mesh's visual shapes with. Keeps the mesh's own

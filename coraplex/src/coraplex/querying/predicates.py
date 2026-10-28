@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import List, Callable, Tuple
+from typing_extensions import Callable
 
 from krrood.entity_query_language.predicate import Predicate, RenderedFields
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -36,7 +36,7 @@ class GripperOccupancy:
     """
 
     def check_manipulator_occupancy(
-        self, condition: Callable[List[Body], bool]
+        self, condition: Callable[list[Body], bool]
     ) -> bool:
         """
         Checks the occupancy of the gripper against a condition.
@@ -178,7 +178,7 @@ class IsAmongTheClosestGraspsTo(Predicate):
     Where the robot stands while taking the grasp.
     """
 
-    grasps: List[GraspCandidate]
+    grasps: list[GraspCandidate]
     """
     The grasps on the same object that :attr:`grasp` is ranked among.
 
@@ -223,7 +223,7 @@ class IsAmongTheClosestGraspsTo(Predicate):
         grasp: GraspCandidate,
         world_T_object: NDArray[np.float64],
         world_P_standing: NDArray[np.float64],
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         Computes a tuple of the horizontal distance from the standing pose to `grasp`,
         and the angle between the direction `grasp` is approached along and the

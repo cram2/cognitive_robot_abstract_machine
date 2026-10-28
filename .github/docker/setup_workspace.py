@@ -2,7 +2,7 @@ import subprocess
 import os
 import shutil
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing_extensions import Optional
 
 
 class bcolors:
@@ -74,8 +74,8 @@ class Repository:
     url: str
     branch: str
     name: str
-    cleanup_dirs: List[str] = field(default_factory=list)
-    edits: List[FileEdit] = field(default_factory=list)
+    cleanup_dirs: list[str] = field(default_factory=list)
+    edits: list[FileEdit] = field(default_factory=list)
     """
     Changes applied to the checkout after cloning it.
     """
@@ -89,7 +89,7 @@ class SystemDependencyManager:
     def __init__(self):
         self.is_root = os.geteuid() == 0
 
-    def install_packages(self, packages: List[str]):
+    def install_packages(self, packages: list[str]):
         """
         Installs a list of packages via apt.
         """

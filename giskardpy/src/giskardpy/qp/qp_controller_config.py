@@ -5,9 +5,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
-from typing import Dict, Type
-
 from typing_extensions import TYPE_CHECKING
+
 
 from giskardpy.qp.exceptions import (
     BrakingTimeExceedsHorizonError,
@@ -82,7 +81,7 @@ class QPControllerConfig:
     .. warning:: Minimum value is :attr:`minimum_prediction_horizon`.
     """
 
-    dof_weights: Dict[PrefixedName, DerivativeMap[float]] = field(
+    dof_weights: dict[PrefixedName, DerivativeMap[float]] = field(
         default_factory=lambda: defaultdict(
             lambda: DerivativeMap(None, 0.01, None, None)
         )
@@ -118,7 +117,7 @@ class QPControllerConfig:
     If True, prints config.
     """
 
-    qp_solver_class: Type[QPSolver] = field(default=QPSolverPIQP)
+    qp_solver_class: type[QPSolver] = field(default=QPSolverPIQP)
     """
     Reference to the resolved QP solver class.
     """

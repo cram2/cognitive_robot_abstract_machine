@@ -9,17 +9,7 @@ from dataclasses import field, dataclass
 from functools import cached_property
 
 import numpy as np
-from typing_extensions import (
-    ClassVar,
-    Dict,
-    Any,
-    Self,
-    Optional,
-    TYPE_CHECKING,
-    List,
-    TypeVar,
-    Tuple,
-)
+from typing_extensions import ClassVar, Any, Self, TYPE_CHECKING, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
@@ -97,7 +87,7 @@ class TrinaryCondition(SubclassJSONSerializer):
     The logical trinary condition to be evaluated.
     """
 
-    owner: Optional[MotionStatechartNode] = field(default=None)
+    owner: MotionStatechartNode | None = field(default=None)
     """
     The node this transition belongs to.
     """
@@ -110,7 +100,7 @@ class TrinaryCondition(SubclassJSONSerializer):
 
     @classmethod
     def create_true(
-        cls, kind: TransitionKind, owner: Optional[MotionStatechartNode] = None
+        cls, kind: TransitionKind, owner: MotionStatechartNode | None = None
     ) -> Self:
         """
         Creates a condition that always evaluates to true.
@@ -123,7 +113,7 @@ class TrinaryCondition(SubclassJSONSerializer):
 
     @classmethod
     def create_false(
-        cls, kind: TransitionKind, owner: Optional[MotionStatechartNode] = None
+        cls, kind: TransitionKind, owner: MotionStatechartNode | None = None
     ) -> Self:
         """
         Creates a condition that always evaluates to false.
@@ -136,7 +126,7 @@ class TrinaryCondition(SubclassJSONSerializer):
 
     @classmethod
     def create_unknown(
-        cls, kind: TransitionKind, owner: Optional[MotionStatechartNode] = None
+        cls, kind: TransitionKind, owner: MotionStatechartNode | None = None
     ) -> Self:
         """
         Creates a condition that always evaluates to unknown.
@@ -233,7 +223,7 @@ class TrinaryCondition(SubclassJSONSerializer):
                 )
 
     @property
-    def variables(self) -> List[ConditionVariable]:
+    def variables(self) -> list[ConditionVariable]:
         """
         :return: The terms of this condition, each knowing how it is written and what it
             currently evaluates to.
@@ -245,7 +235,7 @@ class TrinaryCondition(SubclassJSONSerializer):
         ]
 
     @property
-    def node_dependencies(self) -> List[MotionStatechartNode]:
+    def node_dependencies(self) -> list[MotionStatechartNode]:
         """
         :return: The nodes this condition reads.
         """
@@ -272,7 +262,7 @@ class TrinaryCondition(SubclassJSONSerializer):
     def __repr__(self):
         return str(self)
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         json_data = super().to_json(**kwargs)
         json_data["kind"] = self.kind.name
         json_data["expression"] = str(self)
@@ -284,8 +274,8 @@ class TrinaryCondition(SubclassJSONSerializer):
         cls,
         kind: TransitionKind,
         trinary_logic_str: str,
-        state_variables: List[NodeStateVariable],
-        owner: Optional[MotionStatechartNode] = None,
+        state_variables: list[NodeStateVariable],
+        owner: MotionStatechartNode | None = None,
     ):
         """
         Creates a condition from the string representation produced by :meth:`__str__`.
@@ -305,7 +295,7 @@ class TrinaryCondition(SubclassJSONSerializer):
 
     @staticmethod
     def _parse_ast_expression(
-        node: ast.expr, state_variables: List[NodeStateVariable]
+        node: ast.expr, state_variables: list[NodeStateVariable]
     ) -> Scalar:
         """
         Translates a parsed trinary logic expression into a symbolic expression.
@@ -334,7 +324,7 @@ class TrinaryCondition(SubclassJSONSerializer):
                 raise TypeError(f"failed to parse {type(node).__name__}")
 
     @staticmethod
-    def _parse_ast_and(node, state_variables: List[NodeStateVariable]):
+    def _parse_ast_and(node, state_variables: list[NodeStateVariable]):
         """
         Translates a parsed conjunction into a symbolic expression.
 
@@ -350,7 +340,7 @@ class TrinaryCondition(SubclassJSONSerializer):
         )
 
     @staticmethod
-    def _parse_ast_or(node, state_variables: List[NodeStateVariable]):
+    def _parse_ast_or(node, state_variables: list[NodeStateVariable]):
         """
         Translates a parsed disjunction into a symbolic expression.
 
@@ -366,7 +356,7 @@ class TrinaryCondition(SubclassJSONSerializer):
         )
 
     @staticmethod
-    def _parse_ast_not(node, state_variables: List[NodeStateVariable]):
+    def _parse_ast_not(node, state_variables: list[NodeStateVariable]):
         """
         Translates a parsed negation into a symbolic expression.
 
@@ -381,7 +371,7 @@ class TrinaryCondition(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(
-        cls, data: Dict[str, Any], motion_statechart: MotionStatechart, **kwargs
+        cls, data: dict[str, Any], motion_statechart: MotionStatechart, **kwargs
     ) -> Self:
         return cls.create_from_trinary_logic_str(
             kind=TransitionKind[data["kind"]],
@@ -406,7 +396,7 @@ class NodeStateVariable(FloatVariable):
         super().__init__(name)
         self.motion_statechart_node = motion_statechart_node
 
-    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+    def _value_to_json(self, **kwargs) -> dict[str, Any]:
         """
         :raises NodeStateVariableNotSerializableError: Always, since JSON cannot refer to
             the node this variable belongs to.
@@ -602,19 +592,19 @@ class NodeArtifacts:
     """
     A collection of constraints that describe a motion task. 
     """
-    observation: Optional[Scalar] = field(default=None)
+    observation: Scalar | None = field(default=None)
     """
     A symbolic expression that describes the observation state of this node.
     Instead of setting this attribute directly, you may also implement the `on_tick` method of a node.
     The advantage of using observation is that you can reuse the expressions used in constraints.
     .. warning:: the result of `on_tick` takes precedence over the observation expression.
     """
-    error: Optional[Scalar] = field(default=None)
+    error: Scalar | None = field(default=None)
     """
     How far this node is from its goal. Set by :class:`ConvergingTask`, which derives
     :attr:`observation` from it, and used to watch whether the node is still converging.
     """
-    debug_expressions: List[DebugExpression] = field(default_factory=list)
+    debug_expressions: list[DebugExpression] = field(default_factory=list)
     """
     A list of symbolic expressions used for debugging only.
     While in debug mode, you can call .evaluate() on them to get their current value.
@@ -655,7 +645,7 @@ class LifeCycleTransitions:
     verdict is only left by a reset.
     """
 
-    def as_cases(self) -> List[Tuple[LifeCycleValues, sm.Scalar]]:
+    def as_cases(self) -> list[tuple[LifeCycleValues, sm.Scalar]]:
         """
         :return: (current state, next state) pairs covering every life cycle state.
         """
@@ -682,7 +672,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     """
     Back reference to the motion statechart that owns this node.
     """
-    index: Optional[int] = field(default=None, init=False)
+    index: int | None = field(default=None, init=False)
     """
     The index of this node in the motion statechart.
     """
@@ -696,7 +686,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     on load, and the serialized identifier only tells apart the nodes of one JSON document.
     """
 
-    parent_node_index: Optional[int] = field(
+    parent_node_index: int | None = field(
         default=None, init=False, metadata=JSONMetadata(serialize=True).as_dict()
     )
     """
@@ -720,9 +710,9 @@ class MotionStatechartNode(SubclassJSONSerializer):
     """The parameter is set after build() using its NodeArtifacts."""
     _observation_expression: Scalar = field(init=False, repr=False)
     """The parameter is set after build() using its NodeArtifacts."""
-    _error_signal: Optional[Scalar] = field(init=False, repr=False, default=None)
+    _error_signal: Scalar | None = field(init=False, repr=False, default=None)
     """The parameter is set after build() using its NodeArtifacts."""
-    _debug_expressions: List[DebugExpression] = field(default_factory=list, init=False)
+    _debug_expressions: list[DebugExpression] = field(default_factory=list, init=False)
     """The parameter is set after build() using its NodeArtifacts."""
 
     _start_condition: TrinaryCondition = field(init=False, default=None)
@@ -741,7 +731,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     """
     Decides when this transitions to NOT_STARTED.
     """
-    _life_cycle_predicate_variables: Dict[
+    _life_cycle_predicate_variables: dict[
         LifeCyclePredicate, LifeCyclePredicateVariable
     ] = field(init=False, default_factory=dict, repr=False)
     """
@@ -794,7 +784,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
         )
 
     @property
-    def parent_node(self) -> Optional[MotionStatechartNode]:
+    def parent_node(self) -> MotionStatechartNode | None:
         """
         :return: Reference to the parent node of this node.
         """
@@ -803,14 +793,14 @@ class MotionStatechartNode(SubclassJSONSerializer):
         return self._motion_statechart.get_node_by_index(self.parent_node_index)
 
     @property
-    def debug_expressions(self) -> List[DebugExpression]:
+    def debug_expressions(self) -> list[DebugExpression]:
         """
         :return: The debug expressions registered by this node during build.
         """
         return self._debug_expressions
 
     @property
-    def prerequisite_nodes(self) -> List[MotionStatechartNode]:
+    def prerequisite_nodes(self) -> list[MotionStatechartNode]:
         """
         Nodes that must be expanded and built before this one, because this node reads
         artifacts they only produce during expansion or build.
@@ -837,7 +827,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
         return depth
 
     @parent_node.setter
-    def parent_node(self, parent_node: Optional[MotionStatechartNode]) -> None:
+    def parent_node(self, parent_node: MotionStatechartNode | None) -> None:
         """
         :param parent_node: The node this node becomes a child of, or None to put it on the top layer.
         """
@@ -846,14 +836,14 @@ class MotionStatechartNode(SubclassJSONSerializer):
         else:
             self.parent_node_index = parent_node.index
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **DataclassJSONSerializer.to_json(self, **kwargs),
             NodeJSONKey.NODE_ID: self._node_id,
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
         Deserializes the node, or returns the instance already deserialized for the same
         node of the document, so that nodes referring to it share it.
@@ -941,7 +931,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
             else_result=sm.Scalar(LifeCycleValues.INTERRUPTED),
         )
 
-    def _create_end_case(self) -> Tuple[sm.Scalar, sm.Scalar]:
+    def _create_end_case(self) -> tuple[sm.Scalar, sm.Scalar]:
         """
         An ancestor ending ends this node on the same terms as its own end condition:
         what ends a node decides only *when* it ends, never what the ending is worth.
@@ -1155,7 +1145,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         """
         Triggered when the node is ticked.
         .. warning:: This method is called inside a control loop, make sure it is fast.
@@ -1352,7 +1342,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
         return self._life_cycle_predicate_variables[predicate]
 
     @property
-    def conditions(self) -> List[TrinaryCondition]:
+    def conditions(self) -> list[TrinaryCondition]:
         """
         :return: Every transition condition of this node.
         """
@@ -1524,9 +1514,9 @@ def velocity_convergence_expression(
     joint_convergence_threshold: float,
     minimum_threshold: float,
     maximum_threshold: float,
-    degrees_of_freedom: Optional[List[DegreeOfFreedom]] = None,
+    degrees_of_freedom: list[DegreeOfFreedom] | None = None,
     minimum_time: float = 1.0,
-    reference_cycle_variable: Optional[FloatVariable] = None,
+    reference_cycle_variable: FloatVariable | None = None,
 ) -> Scalar:
     """
     Builds a trinary expression that is true once every given degree of freedom's
@@ -1675,7 +1665,7 @@ class ConvergingTask(ABC, Task):
 
 @dataclass(eq=False, repr=False)
 class Goal(MotionStatechartNode):
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=False)
+    nodes: list[MotionStatechartNode] = field(default_factory=list, init=False)
     plot_specifications: NodePlotSpec = plot_specification_field(
         NodePlotSpec.create_goal_style
     )
@@ -1745,7 +1735,7 @@ class Goal(MotionStatechartNode):
             raise NodeAlreadyBelongsToDifferentNodeError(node=self, new_node=node)
 
     def _add_children_to_motion_statechart(
-        self, nodes: List[MotionStatechartNode]
+        self, nodes: list[MotionStatechartNode]
     ) -> None:
         """
         Adds multiple nodes to this goal and to the motion statechart this goal belongs
@@ -1926,7 +1916,7 @@ class EndMotion(TerminalNode):
         return end
 
     @classmethod
-    def when_all_true(cls, nodes: List[MotionStatechartNode]) -> Self:
+    def when_all_true(cls, nodes: list[MotionStatechartNode]) -> Self:
         """
         Factory method for creating an EndMotion node that activates once *all* of the
         given nodes reached their goals.
@@ -1941,7 +1931,7 @@ class EndMotion(TerminalNode):
         return end
 
     @classmethod
-    def when_any_true(cls, nodes: List[MotionStatechartNode]) -> Self:
+    def when_any_true(cls, nodes: list[MotionStatechartNode]) -> Self:
         """
         Factory method for creating an EndMotion node that activates once *any* of the
         given nodes reached its goal.
@@ -1980,7 +1970,7 @@ class CancelMotion(TerminalNode):
 
     @classmethod
     def when_true(
-        cls, node: MotionStatechartNode, exception: Optional[Exception] = None
+        cls, node: MotionStatechartNode, exception: Exception | None = None
     ) -> Self:
         """
         Factory method for creating a CancelMotion node that activates once the given
@@ -1999,7 +1989,7 @@ class CancelMotion(TerminalNode):
 
     @classmethod
     def when_failed(
-        cls, node: MotionStatechartNode, exception: Optional[Exception] = None
+        cls, node: MotionStatechartNode, exception: Exception | None = None
     ) -> Self:
         """
         Factory method for creating a CancelMotion node that activates once the given
@@ -2018,7 +2008,7 @@ class CancelMotion(TerminalNode):
 
     @classmethod
     def when_all_true(
-        cls, nodes: List[MotionStatechartNode], exception: Exception
+        cls, nodes: list[MotionStatechartNode], exception: Exception
     ) -> Self:
         """
         Factory method for creating a CancelMotion node that activates once *all* of the
@@ -2036,7 +2026,7 @@ class CancelMotion(TerminalNode):
 
     @classmethod
     def when_any_true(
-        cls, nodes: List[MotionStatechartNode], exception: Exception
+        cls, nodes: list[MotionStatechartNode], exception: Exception
     ) -> Self:
         """
         Factory method for creating a CancelMotion node that activates once *any* of the

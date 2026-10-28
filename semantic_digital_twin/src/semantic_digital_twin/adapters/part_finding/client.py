@@ -13,7 +13,6 @@ from datetime import timedelta
 from http import HTTPStatus
 
 import requests
-from typing_extensions import Optional
 
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.adapters.part_finding.exceptions import (
@@ -42,7 +41,7 @@ class RemotePartLocator(PartLocator):
     Locates parts by asking a part finding server.
     """
 
-    base_url: Optional[str] = field(
+    base_url: str | None = field(
         default_factory=lambda: os.environ.get(
             EnvironmentVariable.PART_FINDING_SERVER_URL
         )

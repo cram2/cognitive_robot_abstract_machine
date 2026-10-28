@@ -13,7 +13,6 @@ import time
 import tempfile
 from contextlib import contextmanager
 from dataclasses import is_dataclass, dataclass
-from typing import Type, List, Set, Tuple
 
 import plotly.graph_objects as go
 import tqdm
@@ -39,7 +38,7 @@ from krrood.utils import recursive_subclasses
 from coraplex.robot_plans.actions.base import ActionDescription
 
 
-def build_cram_class_sets() -> Tuple[Set[Type], List[Type], dict]:
+def build_cram_class_sets() -> tuple[set[type], list[type], dict]:
     """
     Collect all mappable classes, alternative mappings, and type mappings from the
     coraplex ORM interface.
@@ -183,8 +182,8 @@ def _silence_ormatic_logger():
 
 
 def ormatic_scalability_experiment(
-    filtered_classes: Set[Type],
-    alternative_mappings: List[Type],
+    filtered_classes: set[type],
+    alternative_mappings: list[type],
     type_mappings: dict,
 ) -> ORMaticScalabilityExperimentResult:
     """
@@ -206,8 +205,8 @@ def ormatic_scalability_experiment(
 
 
 def _ormatic_scalability_experiment(
-    filtered_classes: Set[Type],
-    alternative_mappings: List[Type],
+    filtered_classes: set[type],
+    alternative_mappings: list[type],
     type_mappings: dict,
 ) -> ORMaticScalabilityExperimentResult:
     """
@@ -261,12 +260,12 @@ def _ormatic_scalability_experiment(
 
 
 def run_scalability_experiment(
-    classes: List[Type],
-    alternative_mappings: List[Type],
+    classes: list[type],
+    alternative_mappings: list[type],
     type_mappings: dict,
     class_drop_probability: float = 0.3,
     iterations: int = 10,
-    required_classes: List[Type] | None = None,
+    required_classes: list[type] | None = None,
 ) -> ORMaticScalabilityAggregateResult:
     """
     Repeatedly sample a random subset of classes and run the ORMatic generation
@@ -342,7 +341,7 @@ def plot_scalability(table: ExperimentsTable) -> go.Figure:
         probabilities.
     :return: A Plotly figure ready for display or export.
     """
-    rows: List[ORMaticScalabilityAggregateResult] = table.experiments
+    rows: list[ORMaticScalabilityAggregateResult] = table.experiments
 
     x = [r.number_of_classes.mean for r in rows]
     y = [r.total_duration.mean for r in rows]

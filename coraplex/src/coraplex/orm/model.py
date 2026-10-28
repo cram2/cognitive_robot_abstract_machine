@@ -1,11 +1,9 @@
 from dataclasses import dataclass
-from typing import List
 
 from krrood.ormatic.data_access_objects.alternative_mappings import (
     AlternativeMapping,
     T,
 )
-from typing_extensions import Optional
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.plans.plan import (
@@ -32,10 +30,10 @@ class PlanEdge:
 @dataclass(eq=False)
 class PlanMapping(AlternativeMapping[Plan]):
     root: PlanNode
-    nodes: List[PlanNode]
-    edges: List[PlanEdge]
+    nodes: list[PlanNode]
+    edges: list[PlanEdge]
     context: Context
-    initial_world: Optional[World]
+    initial_world: World | None
 
     @classmethod
     def from_domain_object(cls, obj: Plan):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing_extensions import Any, Type
+from typing_extensions import Any
 
 from krrood.adapters.json_field import JSONField
 from krrood.exceptions import DataclassException
@@ -79,7 +79,7 @@ class ClassNotSerializableError(JSONSerializationError):
     Raised when the class specified cannot be JSON-serialized.
     """
 
-    clazz: Type
+    clazz: type
 
     def error_message(self) -> str:
         return f"Class '{self.clazz.__name__}' cannot be serialized"
@@ -94,7 +94,7 @@ class ClassNotDeserializableError(JSONSerializationError):
     Raised when the class specified cannot be JSON-deserialized.
     """
 
-    clazz: Type
+    clazz: type
 
     def error_message(self) -> str:
         return f"Class '{self.clazz.__name__}' cannot be deserialized"

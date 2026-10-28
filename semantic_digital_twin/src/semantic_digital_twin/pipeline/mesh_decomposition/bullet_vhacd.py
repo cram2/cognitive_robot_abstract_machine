@@ -2,7 +2,6 @@ import logging
 import os
 import tempfile
 from dataclasses import dataclass
-from typing import List
 
 import giskardpy_bullet_bindings as bullet
 import trimesh
@@ -93,7 +92,7 @@ class BulletVHACDMeshDecomposer(MeshDecomposer):
     Path to a file where V-HACD writes its log output.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> List[Mesh]:
+    def apply_to_mesh(self, mesh: Mesh) -> list[Mesh]:
         """
         Decompose the mesh and return the resulting convex parts as ``Mesh`` objects.
         """
@@ -132,7 +131,7 @@ class BulletVHACDMeshDecomposer(MeshDecomposer):
         return output_path
 
     @staticmethod
-    def _load_convex_parts(path: str, origin) -> List[Mesh]:
+    def _load_convex_parts(path: str, origin) -> list[Mesh]:
         loaded = trimesh.load(path, process=False)
         return [
             Mesh.from_trimesh(mesh=part, origin=origin)

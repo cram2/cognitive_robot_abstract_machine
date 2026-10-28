@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import Optional
 
 import numpy as np
 
@@ -17,8 +16,8 @@ from semantic_digital_twin.world_description.world_entity import Body
 class InsertCylinder(Goal):
     cylinder_name: Body = field(kw_only=True)
     hole_point: Point3 = field(kw_only=True)
-    cylinder_height: Optional[float] = None
-    up: Optional[Vector3] = None
+    cylinder_height: float | None = None
+    up: Vector3 | None = None
     pre_grasp_height: float = 0.1
     tilt: float = np.pi / 10
     get_straight_after: float = 0.02

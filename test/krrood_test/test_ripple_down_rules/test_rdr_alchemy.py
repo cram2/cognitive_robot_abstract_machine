@@ -5,7 +5,7 @@ from unittest import TestCase
 import sqlalchemy.orm
 from sqlalchemy import select
 from sqlalchemy.orm import MappedColumn as Column
-from typing_extensions import List, Sequence
+from typing_extensions import Sequence
 import pandas as pd
 
 from .datasets import (
@@ -37,7 +37,7 @@ class TestAlchemyRDR(TestCase):
     )
     cache_file: str = CACHE_FILE
     all_cases: Sequence[MappedAnimal]
-    targets: List[Species]
+    targets: list[Species]
 
     @classmethod
     def setUpClass(cls):
@@ -169,7 +169,7 @@ class TestAlchemyRDR(TestCase):
         grdr = GeneralRDR()
         grdr.add_rdr(fit_scrdr)
 
-        def get_habitat(x: MappedAnimal, t: Column) -> List[Column]:
+        def get_habitat(x: MappedAnimal, t: Column) -> list[Column]:
             habitats = set()
             if t == Species.mammal and x.aquatic == 0:
                 habitats = {HabitatTable(Habitat.land)}

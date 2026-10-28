@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import List
 
 from krrood.entity_query_language.operators.probabilistic_queries import (
     Distribution,
@@ -104,7 +103,7 @@ class DistributionRule(PhraseRule):
             parts=[Directive.DISTRIBUTION_OVER.as_fragment(), subject]
         )
 
-        items: List[VerbalizationFragment] = []
+        items: list[VerbalizationFragment] = []
         given = assembler._given_that_block(plan)
         if given is not None:
             items.append(given)

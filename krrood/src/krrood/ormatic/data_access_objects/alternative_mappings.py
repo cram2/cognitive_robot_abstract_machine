@@ -37,7 +37,7 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
 
     @classmethod
     def to_dao(
-        cls, source_object: T, state: Optional[ToDataAccessObjectState] = None
+        cls, source_object: T, state: ToDataAccessObjectState | None = None
     ) -> T:
         """
         Resolve a source object to a DAO.
@@ -76,7 +76,7 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
         """
 
     @classmethod
-    def required_pre_build_classes(cls) -> List[Type]:
+    def required_pre_build_classes(cls) -> list[type]:
         """
         A list of other classes that have to be built before this one in the `from_dao`
         algorithm.
@@ -110,7 +110,7 @@ class FunctionMapping(AlternativeMapping[FunctionType]):
     The name of the function.
     """
 
-    class_name: Optional[str] = None
+    class_name: str | None = None
     """
     The name of the class if the function is defined by a class.
     """

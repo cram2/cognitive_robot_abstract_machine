@@ -4,16 +4,7 @@ from abc import ABC
 from dataclasses import dataclass
 from inspect import isabstract
 
-from typing_extensions import (
-    TypeVar,
-    ClassVar,
-    TYPE_CHECKING,
-    List,
-    Optional,
-    Type,
-    Iterable,
-    Union,
-)
+from typing_extensions import TypeVar, ClassVar, TYPE_CHECKING, Iterable
 
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.ormatic.data_access_objects.base import HasGeneric
@@ -34,7 +25,7 @@ BaseMotionType = TypeVar("BaseMotionType", bound=BaseMotion)
 
 @dataclass
 class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
-    execution_type: ClassVar[Union[ExecutionType, Iterable[ExecutionType]]]
+    execution_type: ClassVar[ExecutionType | Iterable[ExecutionType]]
     """
     Execution type(s) for which this alternative motion applies.
 
@@ -47,10 +38,10 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
 
     @staticmethod
     def check_for_alternative(
-        alternatives: Iterable[Type[AlternativeMotion]],
+        alternatives: Iterable[type[AlternativeMotion]],
         robot_view: AbstractRobot,
-        motion: Type[BaseMotionType],
-    ) -> Optional[Type[BaseMotionType]]:
+        motion: type[BaseMotionType],
+    ) -> type[BaseMotionType] | None:
         """
         Checks if there is an alternative motion for the given robot view, motion and
         execution type among the provided alternatives.
@@ -76,7 +67,7 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
         return None
 
     @classmethod
-    def discover_all(cls) -> List[Type[AlternativeMotion]]:
+    def discover_all(cls) -> list[type[AlternativeMotion]]:
         """
         Discover every concrete :class:`AlternativeMotion` for every robot.
 

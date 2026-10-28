@@ -24,7 +24,7 @@ from timeit import default_timer
 
 from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Region
-from typing_extensions import TYPE_CHECKING, List
+from typing_extensions import TYPE_CHECKING
 
 import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
@@ -69,7 +69,7 @@ class LocationAnnotator(ThreadedAnnotator):
                 self.world_frame_name: str = "map"
                 """Name of the world coordinate frame"""
 
-                self.desired_regions: List[str] = ["kitchen_island"]
+                self.desired_regions: list[str] = ["kitchen_island"]
                 """List of region names to consider. Leave empty to include all regions."""
 
         # overwrite the parameters explicitly to enable auto-completion

@@ -35,7 +35,7 @@ class PerceptionTask(Task):
     What to look for and where.
     """
 
-    execution_type: Optional[ExecutionType] = field(kw_only=True)
+    execution_type: ExecutionType | None = field(kw_only=True)
     """
     Which source answers the query.
 
@@ -45,7 +45,7 @@ class PerceptionTask(Task):
     rejects.
     """
 
-    perception_source: Optional[PerceptionInterface] = field(init=False, default=None)
+    perception_source: PerceptionInterface | None = field(init=False, default=None)
     """
     The source answering the query, resolved during :meth:`build`.
     """
@@ -75,7 +75,7 @@ class PerceptionTask(Task):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         if self._detections_applied:
             return ObservationStateValues.TRUE
         detection = self.perception_source.detect(

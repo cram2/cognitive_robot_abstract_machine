@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from probabilistic_model.exceptions import ProbabilisticModelException
-from typing_extensions import Type
 
 
 @dataclass
@@ -12,7 +11,7 @@ class CannotConvertError(ProbabilisticModelException):
     Raised when no converter handles an object.
     """
 
-    data_type: Type = field(kw_only=True)
+    data_type: type = field(kw_only=True)
     """
     The type of the object that could not be converted.
     """
@@ -34,12 +33,12 @@ class NoConversionPathError(ProbabilisticModelException):
     requested representation.
     """
 
-    circuit_type: Type = field(kw_only=True)
+    circuit_type: type = field(kw_only=True)
     """
     The type of the circuit that was to be converted.
     """
 
-    representation: Type = field(kw_only=True)
+    representation: type = field(kw_only=True)
     """
     The requested representation.
     """

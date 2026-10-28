@@ -10,7 +10,6 @@ import jax.numpy as jnp
 import numpy as np
 from jax.experimental.sparse import BCOO
 from random_events.variable import Symbolic
-from typing_extensions import Tuple
 
 from probabilistic_model.adapters.jax_tensorized.exceptions import (
     StatesAreNotColumnIndicesError,
@@ -40,7 +39,7 @@ def to_numpy(array: jax.Array) -> np.ndarray:
 
 
 def sparse_matrix(
-    values: np.ndarray, rows: np.ndarray, columns: np.ndarray, shape: Tuple[int, int]
+    values: np.ndarray, rows: np.ndarray, columns: np.ndarray, shape: tuple[int, int]
 ) -> BCOO:
     """
     :param values: The value of every stored entry.

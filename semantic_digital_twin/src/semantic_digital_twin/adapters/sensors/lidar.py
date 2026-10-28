@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import List, Self, TYPE_CHECKING
+from typing_extensions import Self, TYPE_CHECKING
 
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.lidar_reading import LidarReading
@@ -135,7 +135,7 @@ class Lidar(Sensor, HasInputSource[LidarSource], ABC):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod

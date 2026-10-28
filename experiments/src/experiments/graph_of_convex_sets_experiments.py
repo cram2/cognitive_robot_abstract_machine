@@ -50,7 +50,7 @@ import random
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List
+from typing_extensions import Callable
 from urllib.parse import urlparse
 
 import tqdm
@@ -520,7 +520,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
             list of wall-clock durations in seconds, one per repetition.
         :rtype: tuple[Any, list[float]]
         """
-        elapsed_times: List[float] = []
+        elapsed_times: list[float] = []
         result = None
         for _ in range(repetitions):
             start = time.perf_counter()
@@ -529,7 +529,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         return result, elapsed_times
 
     @staticmethod
-    def _collect_obstacles(world: World) -> List[VolumetricBoundingBox]:
+    def _collect_obstacles(world: World) -> list[VolumetricBoundingBox]:
         """
         Return all obstacle bounding boxes from world expressed at the world root frame.
 
@@ -541,7 +541,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         return list(annotation.as_bounding_box_collection_at_origin(origin))
 
     @staticmethod
-    def _collect_obstacle_shapes(world: World) -> List[Shape]:
+    def _collect_obstacle_shapes(world: World) -> list[Shape]:
         """
         Return every collision shape of every obstacle body in world.
 
@@ -592,7 +592,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
 
     @staticmethod
     def _compute_minimal_search_space(
-        obstacle_bounding_boxes: List[VolumetricBoundingBox],
+        obstacle_bounding_boxes: list[VolumetricBoundingBox],
         world,
         xy_widen: float = 1.0,
     ) -> BoundingBoxCollection:

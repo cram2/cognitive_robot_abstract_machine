@@ -10,7 +10,6 @@ from __future__ import annotations
 from timeit import default_timer
 
 from py_trees.common import Status
-from typing_extensions import Type
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -37,7 +36,7 @@ class ROIAdjusterAnnotator(BaseAnnotator):
                 self.offset_pixel: int = 20
                 """Pixels to add/subtract from ROI sides (positive grows, negative shrinks)"""
 
-                self.analysis_scope: Type = ObjectHypothesis
+                self.analysis_scope: type = ObjectHypothesis
                 """Type of annotations to process."""
 
                 self.fill_value_mask: int = 0

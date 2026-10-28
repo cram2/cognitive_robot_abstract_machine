@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from typing_extensions import List, Set, Tuple, Type
 
 from segmind.datastructures.events import (
     DetectionEvent,
@@ -36,11 +35,11 @@ class GraspDetector(AbstractDetector):
     """
 
     @classmethod
-    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+    def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
         return (ContactDetector,)
 
     @staticmethod
-    def has_hold_of(end_effector: EndEffector, bodies_touching: Set[Body]) -> bool:
+    def has_hold_of(end_effector: EndEffector, bodies_touching: set[Body]) -> bool:
         """
         Whether ``end_effector`` holds a body that touches ``bodies_touching``.
 
@@ -64,7 +63,7 @@ class GraspDetector(AbstractDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
+        tracked_objects: list[Body],
     ) -> IndexedBodyPairs:
         """
         Which tool frames have hold of each body.
@@ -94,8 +93,8 @@ class GraspDetector(AbstractDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Detects bodies newly taken hold of and bodies that are no longer held.
 

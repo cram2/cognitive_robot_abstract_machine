@@ -5,7 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
-from typing import List, Self
+from typing_extensions import Self
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -86,7 +86,7 @@ class GarmiJoint(JointName):
     LIFT_UPPER = "lift_0_upper_joint"
 
     @classmethod
-    def left_arm(cls) -> List[GarmiJoint]:
+    def left_arm(cls) -> list[GarmiJoint]:
         """
         :return: The seven left FR3 arm joints, ordered from base to tip.
         """
@@ -101,7 +101,7 @@ class GarmiJoint(JointName):
         ]
 
     @classmethod
-    def right_arm(cls) -> List[GarmiJoint]:
+    def right_arm(cls) -> list[GarmiJoint]:
         """
         :return: The seven right FR3 arm joints, ordered from base to tip.
         """
@@ -116,21 +116,21 @@ class GarmiJoint(JointName):
         ]
 
     @classmethod
-    def left_fingers(cls) -> List[GarmiJoint]:
+    def left_fingers(cls) -> list[GarmiJoint]:
         """
         :return: The two finger joints of the left FR3 gripper.
         """
         return [cls.LEFT_FINGER_1, cls.LEFT_FINGER_2]
 
     @classmethod
-    def right_fingers(cls) -> List[GarmiJoint]:
+    def right_fingers(cls) -> list[GarmiJoint]:
         """
         :return: The two finger joints of the right FR3 gripper.
         """
         return [cls.RIGHT_FINGER_1, cls.RIGHT_FINGER_2]
 
     @classmethod
-    def wheels(cls) -> List[GarmiJoint]:
+    def wheels(cls) -> list[GarmiJoint]:
         """
         :return: The four mecanum wheel joints of the base.
         """
@@ -142,14 +142,14 @@ class GarmiJoint(JointName):
         ]
 
     @classmethod
-    def head(cls) -> List[GarmiJoint]:
+    def head(cls) -> list[GarmiJoint]:
         """
         :return: The head's pan and tilt joints.
         """
         return [cls.HEAD_PAN, cls.HEAD_TILT]
 
     @classmethod
-    def lift(cls) -> List[GarmiJoint]:
+    def lift(cls) -> list[GarmiJoint]:
         """
         :return: The two prismatic torso lift joints.
         """
@@ -162,12 +162,12 @@ class GarmiCamera(Camera):
     The head camera of the GARMI robot.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         No hardware interface for the camera itself.
         """
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         No joint states for the camera.
         """
@@ -199,14 +199,14 @@ class GarmiNeck(Neck[GarmiCamera]):
     The pan/tilt neck of the GARMI robot.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         Sets up hardware interfaces for the neck's pan and tilt joints.
         """
         for joint_name in GarmiJoint.head():
             self._world.get_connection_by_name(joint_name).has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         No default joint states for the neck.
         """
@@ -231,12 +231,12 @@ class GarmiLeftGripperLeftFinger(Finger):
     The left finger of the left gripper.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         No separate hardware interface for the finger.
         """
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         No separate joint states for the finger.
         """
@@ -265,12 +265,12 @@ class GarmiLeftGripperRightFinger(Finger):
     The right finger of the left gripper.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         No separate hardware interface for the finger.
         """
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         No separate joint states for the finger.
         """
@@ -299,12 +299,12 @@ class GarmiRightGripperLeftFinger(Finger):
     The left finger of the right gripper.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         No separate hardware interface for the finger.
         """
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         No separate joint states for the finger.
         """
@@ -333,12 +333,12 @@ class GarmiRightGripperRightFinger(Finger):
     The right finger of the right gripper.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         No separate hardware interface for the finger.
         """
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         No separate joint states for the finger.
         """
@@ -369,14 +369,14 @@ class GarmiLeftGripper(
     The left Franka parallel gripper.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         Sets up hardware interfaces for the gripper's finger joints.
         """
         for joint_name in GarmiJoint.left_fingers():
             self._world.get_connection_by_name(joint_name).has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         Sets up open and close states for the gripper.
         """
@@ -427,14 +427,14 @@ class GarmiRightGripper(
     The right Franka parallel gripper.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         Sets up hardware interfaces for the gripper's finger joints.
         """
         for joint_name in GarmiJoint.right_fingers():
             self._world.get_connection_by_name(joint_name).has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         Sets up open and close states for the gripper.
         """
@@ -482,14 +482,14 @@ class GarmiLeftArm(Arm[GarmiLeftGripper]):
     The left Franka FR3 arm.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         Sets up hardware interfaces for the arm joints.
         """
         for joint_name in GarmiJoint.left_arm():
             self._world.get_connection_by_name(joint_name).has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         Sets up the park configuration for the arm.
         """
@@ -536,14 +536,14 @@ class GarmiRightArm(Arm[GarmiRightGripper]):
     The right Franka FR3 arm.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         Sets up hardware interfaces for the arm joints.
         """
         for joint_name in GarmiJoint.right_arm():
             self._world.get_connection_by_name(joint_name).has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         Sets up the park configuration for the arm.
         """
@@ -592,14 +592,14 @@ class GarmiTorso(
     The lift torso of the GARMI robot.
     """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         Sets up hardware interfaces for the lift joints.
         """
         for joint_name in GarmiJoint.lift():
             self._world.get_connection_by_name(joint_name).has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         Sets up torso states (low, mid, high).
         """
@@ -648,14 +648,14 @@ class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
     def forward_axis(cls) -> Vector3:
         return Vector3.X()
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         """
         Sets up hardware interfaces for the wheel joints.
         """
         for joint_name in GarmiJoint.wheels():
             self._world.get_connection_by_name(joint_name).has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         """
         No default joint states for the mobile base.
         """

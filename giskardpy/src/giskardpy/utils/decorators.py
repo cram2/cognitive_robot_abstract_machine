@@ -3,8 +3,15 @@ from __future__ import division
 from copy import deepcopy
 from dataclasses import fields, dataclass
 from functools import wraps
-from typing import Any, TypeVar
-from typing import Callable, get_type_hints, get_origin, Union, get_args
+from typing_extensions import (
+    Any,
+    TypeVar,
+    Callable,
+    get_type_hints,
+    get_origin,
+    Union,
+    get_args,
+)
 
 # I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
 # fails on github actions

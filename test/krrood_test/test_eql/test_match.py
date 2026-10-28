@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 import pytest
-from typing_extensions import Tuple
 
 from krrood.entity_query_language.factories import (
     entity,
@@ -583,7 +582,7 @@ class SubscriptableRow:
     """
 
     name: str
-    cells: Tuple[int, ...]
+    cells: tuple[int, ...]
 
     def __getitem__(self, index: int) -> int:
         return self.cells[index]

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Optional, Type
 
 from coraplex.datastructures.enums import DetectionTechnique, DetectionState
 from coraplex.perception import PerceptionQuery
@@ -47,12 +46,12 @@ class DetectAction(ActionDescription):
     """
     The technique that should be used for detection
     """
-    state: Optional[DetectionState] = None
+    state: DetectionState | None = None
     """
     The state of the detection, e.g Start Stop for continues perception.
     """
 
-    object_sem_annotation: Type[SemanticAnnotation] = None
+    object_sem_annotation: type[SemanticAnnotation] = None
     """
     The type of the object that should be detected, only considered if technique is
     equal to Type.
@@ -61,7 +60,7 @@ class DetectAction(ActionDescription):
         ormatic cannot map ``Optional[Type]`` and would otherwise drop this column.
     """
 
-    region: Optional[Region] = None
+    region: Region | None = None
     """
     The region in which the object should be detected.
     """

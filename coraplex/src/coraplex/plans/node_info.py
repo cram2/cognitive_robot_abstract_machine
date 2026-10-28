@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Any, Dict, List
+from typing_extensions import Any
 
 # %% node details
 
@@ -18,12 +18,12 @@ class NodeInfoSection:
     The name the group is shown under.
     """
 
-    entries: Dict[str, Any] = field(default_factory=dict)
+    entries: dict[str, Any] = field(default_factory=dict)
     """
     The details of the group, keyed by the name each is shown under.
     """
 
-    def to_lines(self) -> List[str]:
+    def to_lines(self) -> list[str]:
         """
         :return: The heading followed by one line per detail.
         """
@@ -38,18 +38,18 @@ class NodeInfo:
     The details of a plan node, shown when it is clicked in the plan visualization.
     """
 
-    sections: List[NodeInfoSection] = field(default_factory=list)
+    sections: list[NodeInfoSection] = field(default_factory=list)
     """
     The groups of details, in the order they are shown.
     """
 
-    def to_dict(self) -> Dict[str, Dict[str, Any]]:
+    def to_dict(self) -> dict[str, dict[str, Any]]:
         """
         :return: The details of each section, keyed by the heading of that section.
         """
         return {section.heading: section.entries for section in self.sections}
 
-    def to_lines(self) -> List[str]:
+    def to_lines(self) -> list[str]:
         """
         :return: All sections rendered as the lines the visualization displays.
         """

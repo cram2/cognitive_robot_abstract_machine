@@ -26,7 +26,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     leaf,
 )
 from random_events.product_algebra import Event, SimpleEvent
-from typing_extensions import Any, List, Tuple
+from typing_extensions import Any
 
 
 @pytest.fixture
@@ -88,7 +88,7 @@ def regions(
     circuit_writing_one_range_two_ways: ProbabilisticCircuit,
     cause: Continuous,
     effect: Continuous,
-) -> Tuple[SupportRegion, ...]:
+) -> tuple[SupportRegion, ...]:
     """
     The regions the causal circuit splits that cause into.
     """
@@ -105,7 +105,7 @@ def regions(
 
 
 def test_a_range_written_two_ways_is_one_region(
-    regions: Tuple[SupportRegion, ...],
+    regions: tuple[SupportRegion, ...],
 ) -> None:
     """
     The circuit holds two ranges of the cause, so the regions are two: the range both
@@ -115,13 +115,13 @@ def test_a_range_written_two_ways_is_one_region(
 
 
 def test_the_regions_hold_the_whole_circuit_between_them(
-    regions: Tuple[SupportRegion, ...],
+    regions: tuple[SupportRegion, ...],
 ) -> None:
     assert sum(region.probability for region in regions) == pytest.approx(1.0)
 
 
 def test_each_region_holds_the_share_of_the_circuit_its_branches_carry(
-    regions: Tuple[SupportRegion, ...],
+    regions: tuple[SupportRegion, ...],
 ) -> None:
     """
     The range both branches hold carries three quarters of the circuit and the range
@@ -148,7 +148,7 @@ class SupportListedInReverse:
     """
 
     @property
-    def simple_sets(self) -> List[SimpleEvent]:
+    def simple_sets(self) -> list[SimpleEvent]:
         """
         :return: The simple sets of the support, last one first.
         """
@@ -186,7 +186,7 @@ def two_equally_weighted_regions(
     )
 
 
-def values_of(regions: List[SupportRegion], cause: Continuous) -> List[Any]:
+def values_of(regions: list[SupportRegion], cause: Continuous) -> list[Any]:
     """
     :param regions: The regions a cause was split into.
     :param cause: The cause the regions are of.

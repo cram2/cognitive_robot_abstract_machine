@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional, ClassVar
+from typing_extensions import ClassVar
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import (
@@ -48,7 +48,7 @@ class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     Shall we loop after iterating over a directory?
     """
 
-    target_ros_package: Optional[str] = None
+    target_ros_package: str | None = None
     """
     Files for the FileReaderInterface should be in a ROS package If you don't want that,
     leave target_ros_package to None and define target_dir either absolute or relative

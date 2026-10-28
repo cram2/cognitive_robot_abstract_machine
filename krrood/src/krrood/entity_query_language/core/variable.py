@@ -13,18 +13,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from typing_extensions import (
-    Type,
-    Any,
-    Dict,
-    Optional,
-    Iterable,
-    Union as TypingUnion,
-    Union,
-    Callable,
-    Iterator,
-    List,
-)
+from typing_extensions import Any, Iterable, Union as TypingUnion, Callable, Iterator
 
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
@@ -61,14 +50,14 @@ class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
     A superclass for variables that can have a domain source.
     """
 
-    _type_: Union[Type[T], Callable] = field(kw_only=True, default=None)
+    _type_: type[T] | Callable = field(kw_only=True, default=None)
     """
     The values type of the variable.
 
     (The value of `T`)
     """
 
-    _domain_source_: Optional[DomainSource] = field(default=None, kw_only=True)
+    _domain_source_: DomainSource | None = field(default=None, kw_only=True)
     """
     The source type of the domain (e.g., EXPLICIT, DEDUCED, ...etc.).
     """
@@ -162,7 +151,7 @@ class Literal(Variable[T]):
     The value of the literal.
     """
 
-    _domain_: List[T] = field(init=False, repr=False)
+    _domain_: list[T] = field(init=False, repr=False)
     """
     The domain of the literal.
 
@@ -170,7 +159,7 @@ class Literal(Variable[T]):
     iterable.
     """
 
-    _name__: Optional[str] = field(default=None, kw_only=True)
+    _name__: str | None = field(default=None, kw_only=True)
     """
     The name to use for the variable.
     """
@@ -203,19 +192,19 @@ class InstantiatedVariable(
     Predicates and symbolic functions.
     """
 
-    _type_: Union[Type[T], Callable] = field(kw_only=True)
+    _type_: type[T] | Callable = field(kw_only=True)
     """
     The result type of the variable.
 
     (The value of `T`)
     """
 
-    _kwargs_: Dict[str, Any] = field(default_factory=dict)
+    _kwargs_: dict[str, Any] = field(default_factory=dict)
     """
     The properties of the variable as keyword arguments.
     """
 
-    _child_variables_: Dict[str, SymbolicExpression] = field(
+    _child_variables_: dict[str, SymbolicExpression] = field(
         default_factory=dict, init=False, repr=False
     )
     """
@@ -292,7 +281,7 @@ class InstantiatedVariable(
     def _name_(self):
         return self._type_.__name__
 
-    def apply_mapping_on_external_root(self, *args, **kwargs: Dict[str, Any]) -> Any:
+    def apply_mapping_on_external_root(self, *args, **kwargs: dict[str, Any]) -> Any:
         """
         Build an instance of this variable's type from the given arguments.
 

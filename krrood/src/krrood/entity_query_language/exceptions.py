@@ -9,7 +9,7 @@ import uuid
 from abc import ABC
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Type, Any, List, Tuple, Optional
+from typing_extensions import TYPE_CHECKING, Any
 
 from krrood.exceptions import DataclassException
 
@@ -223,7 +223,7 @@ class UnsupportedExpressionTypeForDistinct(UsageError):
     :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    unsupported_expression_type: Type[SymbolicExpression]
+    unsupported_expression_type: type[SymbolicExpression]
 
     def error_message(self) -> str:
         return f"Distinct operation is not supported for expression type {self.unsupported_expression_type}"
@@ -300,7 +300,7 @@ class NotNumberLikeFieldError(UsageError):
     The attribute that was accessed.
     """
 
-    resolved_type: Optional[Type]
+    resolved_type: type | None
     """
     The attribute's resolved type, or None if it does not exist at all.
     """
@@ -475,7 +475,7 @@ class AggregationUsageError(UsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    query: Optional[Query] = field(default=None, kw_only=True)
+    query: Query | None = field(default=None, kw_only=True)
     """
     The query that contains the aggregation.
     """
@@ -520,12 +520,12 @@ class NonAggregatedSelectedVariablesError(AggregationUsageError):
     The builder class for the GroupedDataSource operation.
     """
 
-    non_aggregated_variables: List[Selectable]
+    non_aggregated_variables: list[Selectable]
     """
     The non-aggregated selected variables.
     """
 
-    aggregated_variables: List[Selectable]
+    aggregated_variables: list[Selectable]
     """
     The aggregated variables.
     """
@@ -549,7 +549,7 @@ class NonAggregatorInHavingConditionsError(AggregationUsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    non_aggregators: Tuple[Selectable, ...]
+    non_aggregators: tuple[Selectable, ...]
 
     def error_message(self) -> str:
         return f"The having condition of the query {self.query} contains non-aggregators {self.non_aggregators}."
@@ -566,7 +566,7 @@ class AggregatorInWhereConditionsError(AggregationUsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    aggregators: Tuple[Aggregator, ...]
+    aggregators: tuple[Aggregator, ...]
     """
     The aggregators in the where condition.
     """
@@ -590,8 +590,8 @@ class WrongSelectableType(UsageError):
     :doc:`/krrood/doc/eql/writing_queries`.
     """
 
-    wrong_variable_type: Type
-    expected_types: List[Type]
+    wrong_variable_type: type
+    expected_types: list[type]
 
     def error_message(self) -> str:
         return f"Select expects one of {self.expected_types}, instead {self.wrong_variable_type} was given."
@@ -622,7 +622,7 @@ class LiteralConditionError(UsageError):
     The query that contains the literal condition.
     """
 
-    literal_conditions: List[Any]
+    literal_conditions: list[Any]
     """
     The literal conditions that are given to the query.
     """
@@ -647,7 +647,7 @@ class CannotProcessResultOfGivenChildType(UsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    unsupported_child_type: Type
+    unsupported_child_type: type
     """
     The unsupported child type.
     """
@@ -703,7 +703,7 @@ class UnSupportedOperand(UnsupportedOperation):
     :doc:`/krrood/doc/eql/comparators`.
     """
 
-    operation: Type[SymbolicExpression]
+    operation: type[SymbolicExpression]
     """
     The operation used.
     """
@@ -729,7 +729,7 @@ class UnsupportedNegation(UnsupportedOperation):
     :doc:`/krrood/doc/eql/logical_operators`.
     """
 
-    operation_type: Type[SymbolicExpression]
+    operation_type: type[SymbolicExpression]
     """
     The type of the operation that is being negated.
     """
@@ -816,12 +816,12 @@ class InvalidChildType(UsageError):
     For further details, see :doc:`/krrood/doc/eql/writing_queries`.
     """
 
-    invalid_child_type: Type
+    invalid_child_type: type
     """
     The invalid child type.
     """
 
-    correct_child_types: List[Type]
+    correct_child_types: list[type]
     """
     The list of valid child types.
     """
@@ -873,7 +873,7 @@ class NoneWrappedFieldError(ClassDiagramError):
     For further details, see :doc:`/krrood/doc/eql/domain_mapping`.
     """
 
-    clazz: Type
+    clazz: type
     attr_name: str
 
     def error_message(self) -> str:
@@ -989,7 +989,7 @@ class BackendCannotEvaluateCause(DataclassException):
     The match that has a ``Cause`` attribute.
     """
 
-    backend_type: Type[QueryBackend]
+    backend_type: type[QueryBackend]
     """
     The type of the backend that cannot evaluate the intervention causally.
     """
@@ -1117,7 +1117,7 @@ class PositionalArgumentsInMatchPattern(DataclassException, TypeError):
     The match whose pattern was given positional arguments.
     """
 
-    arguments: Tuple[Any, ...]
+    arguments: tuple[Any, ...]
     """
     The positional arguments that were given.
     """
@@ -1369,7 +1369,7 @@ class WrongPropertyReturnStatementImplementation(ModelingError):
     The reason for the wrong property.
     """
 
-    clazz: Optional[Type] = None
+    clazz: type | None = None
     """
     The class that has the property.
     """
@@ -1396,7 +1396,7 @@ class NoReturnStatementInProperty(ModelingError):
     The property that is wrongly implemented.
     """
 
-    clazz: Optional[Type] = None
+    clazz: type | None = None
     """
     The class that has the property.
     """

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import List
 
 import trimesh
 
@@ -109,7 +108,7 @@ class VHACDMeshDecomposer(MeshDecomposer):
     Originally referenced as findBestPlane.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> List[Mesh]:
+    def apply_to_mesh(self, mesh: Mesh) -> list[Mesh]:
         decomposed = mesh.mesh.convex_decomposition(
             maxConvexHulls=self.max_convex_hulls,
             resolution=self.resolution,

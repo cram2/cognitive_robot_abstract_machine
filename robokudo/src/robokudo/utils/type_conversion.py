@@ -3,12 +3,10 @@ Type conversion utilities for Robokudo.
 
 This module provides functions for converting between different type representations:
 
-* ROS message types to Python dictionaries
 * Robokudo annotations to ROS geometry messages
 * Pose and position annotations to transform matrices
 
 The module supports bidirectional conversion between:
-* ROS CameraInfo messages
 * Geometry messages (Pose, PoseStamped)
 * Robokudo annotation types
 * Transform matrices
@@ -22,7 +20,7 @@ from geometry_msgs.msg import Pose, PoseStamped
 from rosidl_runtime_py import message_to_ordereddict
 from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import Header
-from typing_extensions import TYPE_CHECKING, Dict
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.utils.o3d_helper import get_obb_from_size_and_transform
@@ -40,7 +38,7 @@ if TYPE_CHECKING:
 _CV_BRIDGE_WORKAROUND = CVBridgeWorkaround()
 
 
-def ros_camera_info_to_dict(camera_info: CameraInfo) -> Dict:
+def ros_camera_info_to_dict(camera_info: CameraInfo) -> dict:
     """
     Convert ROS CameraInfo message to dictionary.
 
@@ -50,7 +48,7 @@ def ros_camera_info_to_dict(camera_info: CameraInfo) -> Dict:
     return message_to_ordereddict(camera_info)
 
 
-def ros_camera_info_from_dict(dict_camera_info: Dict) -> CameraInfo:
+def ros_camera_info_from_dict(dict_camera_info: dict) -> CameraInfo:
     """
     Convert dictionary to ROS CameraInfo message.
 

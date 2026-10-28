@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+# %% Imports
 import os
 from pathlib import Path
 import json

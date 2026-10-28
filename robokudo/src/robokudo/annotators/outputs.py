@@ -22,7 +22,7 @@ from __future__ import annotations
 
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING, Any, Dict, List
+from typing_extensions import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -43,7 +43,7 @@ class AnnotatorOutputStruct:
         self.image: npt.NDArray[np.uint8] = np.zeros((640, 480, 3), dtype="uint8")
         """Image output data"""
 
-        self.geometries: List[Dict[str, o3d.geometry.Geometry3D]] = []
+        self.geometries: list[dict[str, o3d.geometry.Geometry3D]] = []
         """Open3D Geometries data. Will be passed to o3d.visualization.O3DVisualizer.add_geometry."""
 
         self.render_next_time = True
@@ -57,7 +57,7 @@ class AnnotatorOutputStruct:
         self.image = img
         self.render_next_time = True
 
-    def set_geometries(self, geometries: List[Dict[str, Any]]) -> None:
+    def set_geometries(self, geometries: list[dict[str, Any]]) -> None:
         """Set the geometries in this AnnotatorOutputStruct and instruct the GUI to render it next time.
 
         :param geometries: This parameter holds the geometries to be drawn. It should behave like o3d.visualization.draw,
@@ -80,7 +80,7 @@ class AnnotatorOutputs:
     def __init__(self) -> None:
         """Initialize an empty outputs container."""
 
-        self.outputs: Dict[str, AnnotatorOutputStruct] = {}
+        self.outputs: dict[str, AnnotatorOutputStruct] = {}
         """Dictionary mapping annotator names to their outputs"""
 
         self.redraw = True
@@ -109,5 +109,5 @@ class AnnotatorOutputPerPipelineMap:
     def __init__(self) -> None:
         """Initialize an empty pipeline map."""
 
-        self.map: Dict[str, AnnotatorOutputs] = {}
+        self.map: dict[str, AnnotatorOutputs] = {}
         """Dictionary mapping pipeline names to their annotator outputs"""

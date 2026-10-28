@@ -8,17 +8,7 @@ from copy import copy
 from enum import Enum
 from types import GeneratorType
 
-from typing_extensions import (
-    Type,
-    Optional,
-    Any,
-    List,
-    Union,
-    Tuple,
-    Dict,
-    Set,
-    get_origin,
-)
+from typing_extensions import Any, get_origin
 
 from krrood.code_generation.source_extraction_utils import extract_function_source
 from krrood.ripple_down_rules.datastructures.case import create_case, Case
@@ -38,15 +28,13 @@ class VariableVisitor(ast.NodeVisitor):
     A visitor to extract all variables and comparisons from a python expression represented as an AST tree.
     """
 
-    compares: List[
-        Tuple[Union[ast.Name, ast.Call], ast.cmpop, Union[ast.Name, ast.Call]]
-    ]
-    variables: Set[str]
-    all: List[ast.BoolOp]
+    compares: list[tuple[ast.Name | ast.Call, ast.cmpop, ast.Name | ast.Call]]
+    variables: set[str]
+    all: list[ast.BoolOp]
 
     def __init__(self):
         self.variables = set()
-        self.attributes: Dict[ast.Name, ast.Attribute] = {}
+        self.attributes: dict[ast.Name, ast.Attribute] = {}
         self.types = set()
         self.callables = set()
         self.compares = list()
@@ -121,11 +109,11 @@ class CallableExpression:
 
     def __init__(
         self,
-        user_input: Optional[str] = None,
-        conclusion_type: Optional[Tuple[Type, ...]] = None,
-        expression_tree: Optional[AST] = None,
-        scope: Optional[Dict[str, Any]] = None,
-        conclusion: Optional[Any] = None,
+        user_input: str | None = None,
+        conclusion_type: tuple[type, ...] | None = None,
+        expression_tree: AST | None = None,
+        scope: dict[str, Any] | None = None,
+        conclusion: Any | None = None,
         mutually_exclusive: bool = True,
     ):
         """
@@ -143,7 +131,7 @@ class CallableExpression:
             raise ValueError("Either user_input or conclusion must be provided.")
         if user_input is None:
             user_input = build_user_input_from_conclusion(conclusion)
-        self.conclusion: Optional[Any] = conclusion
+        self.conclusion: Any | None = conclusion
         if "def " in user_input:
             self.user_defined_name = user_input.split("(")[0].replace("def ", "")
         else:
@@ -159,14 +147,14 @@ class CallableExpression:
             else:
                 conclusion_type = (conclusion_type,)
         self.conclusion_type = conclusion_type
-        self.expected_types: Set[Type] = (
+        self.expected_types: set[type] = (
             set(conclusion_type) if conclusion_type is not None else set()
         )
         if list in self.expected_types:
             self.expected_types.remove(list)
         if set in self.expected_types:
             self.expected_types.add(set)
-        self.scope: Optional[Dict[str, Any]] = scope if scope is not None else {}
+        self.scope: dict[str, Any] | None = scope if scope is not None else {}
         self.scope = get_used_scope(self.user_input, self.scope)
         self.expression_tree: AST = (
             expression_tree
@@ -219,7 +207,7 @@ class CallableExpression:
                 f"Error during evaluation: {e}, user_input: {self.user_input}"
             )
 
-    def combine_with(self, other: "CallableExpression") -> "CallableExpression":
+    def combine_with(self, other: CallableExpression) -> CallableExpression:
         """
         Combine this callable expression with another callable expression using the 'and' operator.
         """

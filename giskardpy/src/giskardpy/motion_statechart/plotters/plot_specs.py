@@ -2,13 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import (
-    Any,
-    Callable,
-    List,
-    TYPE_CHECKING,
-    Self,
-)
+from typing_extensions import Any, Callable, TYPE_CHECKING, Self
 
 from krrood.patterns.field_metadata import JSONMetadata
 from giskardpy.motion_statechart.plotters.styles import (
@@ -32,7 +26,7 @@ class NodePlotSpec:
 
     style: str = NodeDrawingStyle.MONITOR.style
     shape: str = NodeDrawingStyle.MONITOR.shape
-    extra_border_styles: List[str] = field(default_factory=list)
+    extra_border_styles: list[str] = field(default_factory=list)
 
     @classmethod
     def create_monitor_style(cls) -> Self:

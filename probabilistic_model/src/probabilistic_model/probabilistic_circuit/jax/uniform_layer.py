@@ -1,11 +1,10 @@
-from typing import Dict, Any
+from typing_extensions import Self, Any
 
 import jax
 from jax import numpy as jnp
 from jaxtyping import Array
 
 from probabilistic_model.exceptions import ShapeMismatchError
-from typing_extensions import Self
 
 from probabilistic_model.probabilistic_circuit.jax.input_layer import (
     DifferentiableContinuousLayerWithConstrainedSupport,
@@ -38,5 +37,5 @@ class DifferentiableUniformLayer(DifferentiableContinuousLayerWithConstrainedSup
         return jax.vmap(self.log_likelihood_of_nodes_single)(x)
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(data["variable"], jnp.array(data["interval"]))

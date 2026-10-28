@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import List
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import (
@@ -34,7 +33,7 @@ class ChainPlan:
     walked chain, its root, the display path-parts, and whether it reaches a boolean.
     """
 
-    chain: List[MappedVariable]
+    chain: list[MappedVariable]
     """
     The access path, root-adjacent first.
     """
@@ -44,7 +43,7 @@ class ChainPlan:
     The chain root (first non-``MappedVariable`` node).
     """
 
-    parts: List[PathStep]
+    parts: list[PathStep]
     """
     The display path-parts.
     """

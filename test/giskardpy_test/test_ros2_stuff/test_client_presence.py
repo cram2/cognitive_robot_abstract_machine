@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 from threading import Event
-from typing import Callable
+from typing_extensions import Callable
 
 import pytest
 import rclpy

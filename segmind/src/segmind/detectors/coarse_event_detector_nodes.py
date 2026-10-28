@@ -4,9 +4,8 @@ from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import List, Tuple, Type
-
 from typing_extensions import Hashable
+
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from segmind.datastructures.events import (
     GraspEvent,
@@ -48,7 +47,7 @@ class AbstractInteractionDetector(EventCombiningDetector):
     The threshold for the time difference between two events to be considered an interaction.
     """
 
-    def runs_beside(self, detector_type: Type[AbstractDetector]) -> bool:
+    def runs_beside(self, detector_type: type[AbstractDetector]) -> bool:
         """
         Whether a detector of ``detector_type`` runs in the same statechart as this one.
 
@@ -75,7 +74,7 @@ class AbstractInteractionDetector(EventCombiningDetector):
 
     @property
     @abstractmethod
-    def primary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def primary_event_type(self) -> type[EventWithTrackedObjects]:
         """
         The kind of event the interaction is concluded from, which happens to the
         tracked object.
@@ -83,7 +82,7 @@ class AbstractInteractionDetector(EventCombiningDetector):
 
     @property
     @abstractmethod
-    def secondary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def secondary_event_type(self) -> type[EventWithTrackedObjects]:
         """
         The kind of event that has to happen close in time to the primary one for the
         interaction to be concluded.
@@ -101,8 +100,8 @@ class AbstractInteractionDetector(EventCombiningDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Concludes the interactions that the events logged so far amount to.
 
@@ -116,7 +115,7 @@ class AbstractInteractionDetector(EventCombiningDetector):
 
     def _find_interaction_events(
         self, segmind_context: SegmindContext
-    ) -> List[DetectionEvent]:
+    ) -> list[DetectionEvent]:
         """
         Scans logged events for correlated pairs of primary and secondary events and
         emits a detection event for each new, unseen pairing.
@@ -184,7 +183,7 @@ class PlacingDetector(AbstractInteractionDetector):
     """
 
     @classmethod
-    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+    def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
         return (SupportDetector, TranslationDetector)
 
     def interaction_key(
@@ -196,7 +195,7 @@ class PlacingDetector(AbstractInteractionDetector):
         return PlacingEvent, secondary.tracked_object, secondary.with_object
 
     @property
-    def primary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def primary_event_type(self) -> type[EventWithTrackedObjects]:
         """
         The agent letting go of the object where an agent is watched for, otherwise the
         object coming to a stop.
@@ -208,7 +207,7 @@ class PlacingDetector(AbstractInteractionDetector):
         )
 
     @property
-    def secondary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def secondary_event_type(self) -> type[EventWithTrackedObjects]:
         return SupportEvent
 
     def make_event(
@@ -237,7 +236,7 @@ class PickUpDetector(AbstractInteractionDetector):
     """
 
     @classmethod
-    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+    def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
         return (SupportDetector, TranslationDetector)
 
     def interaction_key(
@@ -249,7 +248,7 @@ class PickUpDetector(AbstractInteractionDetector):
         return PickUpEvent, primary
 
     @property
-    def primary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def primary_event_type(self) -> type[EventWithTrackedObjects]:
         """
         The agent taking hold of the object where an agent is watched for, otherwise the
         object moving.
@@ -257,7 +256,7 @@ class PickUpDetector(AbstractInteractionDetector):
         return GraspEvent if self.runs_beside(GraspDetector) else TranslationEvent
 
     @property
-    def secondary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def secondary_event_type(self) -> type[EventWithTrackedObjects]:
         return LossOfSupportEvent
 
     def make_event(

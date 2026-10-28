@@ -6,9 +6,8 @@ from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Any, List, Type, TYPE_CHECKING, Iterable
+from typing_extensions import Union, Iterator, Any, TYPE_CHECKING, Iterable
 
-from typing_extensions import Union, Iterator
 
 from coraplex.datastructures.enums import NodeDetail
 from coraplex.exceptions import NodeNotInPlanTree
@@ -59,12 +58,12 @@ class PlanNode(PlanEntity):
     Where this node is in its execution.
     """
 
-    start_time: Optional[datetime] = field(default_factory=datetime.now)
+    start_time: datetime | None = field(default_factory=datetime.now)
     """
     The starting time of the function, optional.
     """
 
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     """
     The ending time of the function, optional.
     """
@@ -85,7 +84,7 @@ class PlanNode(PlanEntity):
     The original runtime exception, excluded from persistent execution records.
     """
 
-    result: Optional[Any] = None
+    result: Any | None = None
     """
     Result from the execution of this node.
     """
@@ -97,12 +96,12 @@ class PlanNode(PlanEntity):
     Whether a call is already executing this node.
     """
 
-    index: Optional[int] = field(default=None, init=False, repr=False)
+    index: int | None = field(default=None, init=False, repr=False)
     """
     The index of this node in `self.plan.plan_graph`.
     """
 
-    layer_index: Optional[int] = field(default=None, init=False, repr=False)
+    layer_index: int | None = field(default=None, init=False, repr=False)
     """
     The position of this node in its children.
 
@@ -118,7 +117,7 @@ class PlanNode(PlanEntity):
         return self.plan.context
 
     @property
-    def parent(self) -> Optional[PlanNode]:
+    def parent(self) -> PlanNode | None:
         """
         The parent node of this node, None if this is the root node.
 
@@ -131,7 +130,7 @@ class PlanNode(PlanEntity):
         )
 
     @property
-    def children(self) -> List[PlanNode]:
+    def children(self) -> list[PlanNode]:
         """
         All children nodes of this node.
 
@@ -141,7 +140,7 @@ class PlanNode(PlanEntity):
         return list(sort_by_layer_index(children))
 
     @property
-    def descendants(self) -> List[PlanNode]:
+    def descendants(self) -> list[PlanNode]:
         """
         :return: A list of all descendants in breadth-first order.
         """
@@ -156,7 +155,7 @@ class PlanNode(PlanEntity):
         return result
 
     @property
-    def path(self) -> List[PlanNode]:
+    def path(self) -> list[PlanNode]:
         """
         :return: The ancestors of this node, ordered from the immediate parent
             up to and including the root node. Empty for the root node.
@@ -186,7 +185,7 @@ class PlanNode(PlanEntity):
         return self.children == []
 
     @property
-    def siblings(self) -> List[PlanNode]:
+    def siblings(self) -> list[PlanNode]:
         """
         :return: All siblings of this node.
         """
@@ -199,7 +198,7 @@ class PlanNode(PlanEntity):
         )
 
     @property
-    def left_siblings(self) -> List[PlanNode]:
+    def left_siblings(self) -> list[PlanNode]:
         return [
             sibling
             for sibling in self.siblings
@@ -207,7 +206,7 @@ class PlanNode(PlanEntity):
         ]
 
     @property
-    def right_siblings(self) -> List[PlanNode]:
+    def right_siblings(self) -> list[PlanNode]:
         return [
             sibling
             for sibling in self.siblings
@@ -215,7 +214,7 @@ class PlanNode(PlanEntity):
         ]
 
     @property
-    def left_neighbour(self) -> Optional[PlanNode]:
+    def left_neighbour(self) -> PlanNode | None:
         """
         :return: The closest sibling to the left, or None if this is the leftmost.
         """
@@ -223,7 +222,7 @@ class PlanNode(PlanEntity):
         return left_siblings[-1] if left_siblings else None
 
     @property
-    def right_neighbour(self) -> Optional[PlanNode]:
+    def right_neighbour(self) -> PlanNode | None:
         """
         :return: The closest sibling to the right, or None if this is the rightmost.
         """
@@ -231,7 +230,7 @@ class PlanNode(PlanEntity):
         return right_siblings[0] if right_siblings else None
 
     @property
-    def previous_nodes(self) -> List[PlanNode]:
+    def previous_nodes(self) -> list[PlanNode]:
         """
         Gets the previous nodes to the given node.
 
@@ -252,8 +251,8 @@ class PlanNode(PlanEntity):
         raise NodeNotInPlanTree(self)
 
     def get_previous_node_by_designator_type(
-        self, *type_: Type[Designator]
-    ) -> Optional[DesignatorNode]:
+        self, *type_: type[Designator]
+    ) -> DesignatorNode | None:
         """
         :param type_: The types of the designator to search for.
         :return: The previous node with a designator of the specified type, or None if not found.
@@ -564,12 +563,12 @@ class ActionNode(DesignatorNode, BuildsMotionStateChart):
     A node representing a fully specified action.
     """
 
-    execution_data: Optional[ExecutionData] = None
+    execution_data: ExecutionData | None = None
     """
     Additional data that is collected before and after the execution of the action.
     """
 
-    _last_world_modification_block_pre_perform_index: Optional[int] = None
+    _last_world_modification_block_pre_perform_index: int | None = None
     """
     Index of the last model modification block before the execution of this node.
 
@@ -610,7 +609,7 @@ class ActionNode(DesignatorNode, BuildsMotionStateChart):
         )
 
     @property
-    def parent_action_node(self) -> Optional[ActionNode]:
+    def parent_action_node(self) -> ActionNode | None:
         """
         Returns the next action node in the plan above this node, None if this is the
         outermost action.
@@ -629,7 +628,7 @@ class ActionNode(DesignatorNode, BuildsMotionStateChart):
         self.notify_children()
 
     @property
-    def body_children(self) -> List[PlanNode]:
+    def body_children(self) -> list[PlanNode]:
         """
         :return: The children forming the action body, without its pre- and
             post-condition.
@@ -720,7 +719,7 @@ class MotionNode(DesignatorNode, BuildsMotionStateChart):
         # return self.motion.perform()
 
     @property
-    def parent_action_node(self) -> Optional[ActionNode]:
+    def parent_action_node(self) -> ActionNode | None:
         """
         Returns the next resolved action node in the plan above this motion node.
         """

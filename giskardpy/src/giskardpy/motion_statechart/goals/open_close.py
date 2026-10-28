@@ -1,7 +1,6 @@
 from __future__ import division
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -37,7 +36,7 @@ class Open(Goal):
     Name of the handle that was grasped.
     """
 
-    goal_joint_state: Optional[float] = field(default=None, kw_only=True)
+    goal_joint_state: float | None = field(default=None, kw_only=True)
     """
     Goal state for the mechanism.
 

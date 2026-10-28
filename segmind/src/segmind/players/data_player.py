@@ -7,7 +7,7 @@ import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import Callable, Optional, Dict, Generator, List
+from typing_extensions import Callable, Generator
 
 from segmind.datastructures.enums import PlayerStatus
 from segmind.episode_player import EpisodePlayer
@@ -32,7 +32,7 @@ class FrameData:
     The time of the frame.
     """
 
-    objects_data: Dict[str, float]
+    objects_data: dict[str, float]
     """
     The objects data which contains the poses of the objects.
     """
@@ -52,7 +52,7 @@ class DataPlayer(EpisodePlayer, ABC):
     Abstract class for players that play the episode from a data source.
     """
 
-    frame_callbacks: List[Callable[[float], None]] = field(
+    frame_callbacks: list[Callable[[float], None]] = field(
         default_factory=list, hash=False, compare=False
     )
     """
@@ -138,7 +138,7 @@ class DataPlayer(EpisodePlayer, ABC):
                 obj.parent_connection.origin = objects_poses[obj].homogeneous_matrix
 
     @abstractmethod
-    def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
+    def get_objects_poses(self, frame_data: FrameData) -> dict[Body, Pose]:
         """
         Get the poses of the objects.
 
@@ -159,12 +159,12 @@ class FilePlayer(DataPlayer, ABC):
     The path to the file.
     """
 
-    models_dir: Optional[str] = None
+    models_dir: str | None = None
     """
     The directory containing the models.
     """
 
-    position_shift: Optional[Vector3] = None
+    position_shift: Vector3 | None = None
     """
     Position shift that needs to be applied to the objects.
     """

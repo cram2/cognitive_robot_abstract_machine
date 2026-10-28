@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict, Set, Any
+from typing_extensions import Any
 import numpy as np
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -36,7 +36,7 @@ class ContactDetector(AbstractDetector):
     reported: the robot's touches are read as grasps and nothing else.
     """
 
-    def bodies_left_out(self, world: World) -> Set[Body]:
+    def bodies_left_out(self, world: World) -> set[Body]:
         """
         Every body of every robot apart from its end effectors, unless
         :attr:`exclude_robot` says otherwise.
@@ -47,8 +47,8 @@ class ContactDetector(AbstractDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Detects newly formed and newly lost contacts and updates the stored contact
         state.
@@ -106,7 +106,7 @@ class MotionDetector(AbstractDetector):
     Threshold for the rotation error between two poses to be considered rotation.
     """
 
-    _pose_history: Dict[Body, List[Pose]] = field(
+    _pose_history: dict[Body, list[Pose]] = field(
         default_factory=dict, init=False, repr=False
     )
     """
@@ -121,8 +121,8 @@ class MotionDetector(AbstractDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Updates the pose history for each tracked object and checks for motion events.
 
@@ -150,8 +150,8 @@ class MotionDetector(AbstractDetector):
 
     @abstractmethod
     def _check_and_trigger_event(
-        self, context: SegmindContext, tracked_object: Body, poses: List[Pose]
-    ) -> Optional[DetectionEvent]:
+        self, context: SegmindContext, tracked_object: Body, poses: list[Pose]
+    ) -> DetectionEvent | None:
         """
         Subclass-specific logic to trigger a Motion or StopMotion event.
 
@@ -166,7 +166,7 @@ class MotionDetector(AbstractDetector):
         """
         pass
 
-    def _is_moving(self, poses: List[Pose]) -> bool:
+    def _is_moving(self, poses: list[Pose]) -> bool:
         """
         Determines whether an object is moving by evaluating the distance between the
         first and the last recorded position of the window.
@@ -179,7 +179,7 @@ class MotionDetector(AbstractDetector):
             > self.distance_threshold
         )
 
-    def _is_rotating(self, poses: List[Pose]) -> bool:
+    def _is_rotating(self, poses: list[Pose]) -> bool:
         """
         Determines whether an object is rotating by evaluating the rotation error
         between the first and the last recorded pose of the window.
@@ -205,8 +205,8 @@ class TranslationDetector(MotionDetector):
     """
 
     def _check_and_trigger_event(
-        self, context: SegmindContext, tracked_object: Body, poses: List[Pose]
-    ) -> Optional[DetectionEvent]:
+        self, context: SegmindContext, tracked_object: Body, poses: list[Pose]
+    ) -> DetectionEvent | None:
         """
         Reports the object starting to move or, when it was moving, coming to a stop.
 
@@ -252,8 +252,8 @@ class RotationDetector(MotionDetector):
     """
 
     def _check_and_trigger_event(
-        self, context: SegmindContext, tracked_object: Body, poses: List[Pose]
-    ) -> Optional[DetectionEvent]:
+        self, context: SegmindContext, tracked_object: Body, poses: list[Pose]
+    ) -> DetectionEvent | None:
         """
         Reports the object starting to rotate or, when it was rotating, coming to a
         stop.

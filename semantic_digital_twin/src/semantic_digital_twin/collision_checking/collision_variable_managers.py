@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Callable
+from typing_extensions import Callable
 
 import numpy as np
 

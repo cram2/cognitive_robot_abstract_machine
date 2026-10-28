@@ -13,7 +13,7 @@ import logging
 from abc import ABC, abstractmethod
 
 from geometry_msgs.msg import Vector3, PoseStamped
-from typing_extensions import TYPE_CHECKING, Type, Optional, TypeVar, Generic
+from typing_extensions import TYPE_CHECKING, TypeVar, Generic
 
 from robokudo_msgs.msg import ShapeSize
 from robokudo.utils.annotator_helper import transform_pose_from_camera_to_world
@@ -49,7 +49,7 @@ class Annotation2AnnotationConverter(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def can_convert(self, annotation: Annotation, target_annotation_type: Type) -> bool:
+    def can_convert(self, annotation: Annotation, target_annotation_type: type) -> bool:
         """
         Checks whether the converter can convert the given annotation to the given
         target annotation type.
@@ -63,7 +63,7 @@ class Annotation2AnnotationConverter(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def convert(self, annotation: T, cas: Optional[CAS] = None) -> Annotation:
+    def convert(self, annotation: T, cas: CAS | None = None) -> Annotation:
         """
         Converts the given annotation to the given target annotation type.
 
@@ -126,14 +126,14 @@ class PoseAnnotationToStampedPoseAnnotationConverter(
     `StampedPoseAnnotation`.
     """
 
-    def can_convert(self, annotation: Annotation, target_annotation_type: Type) -> bool:
+    def can_convert(self, annotation: Annotation, target_annotation_type: type) -> bool:
         return (
             isinstance(annotation, PoseAnnotation)
             and target_annotation_type == StampedPoseAnnotation
         )
 
     def convert(
-        self, annotation: PoseAnnotation, cas: Optional[CAS] = None
+        self, annotation: PoseAnnotation, cas: CAS | None = None
     ) -> StampedPoseAnnotation:
         spa = StampedPoseAnnotation()
         spa.source = annotation.source
@@ -151,14 +151,14 @@ class PositionAnnotationToStampedPoseAnnotationConverter(
     `StampedPoseAnnotation`.
     """
 
-    def can_convert(self, annotation: Annotation, target_annotation_type: Type) -> bool:
+    def can_convert(self, annotation: Annotation, target_annotation_type: type) -> bool:
         return (
             isinstance(annotation, PositionAnnotation)
             and target_annotation_type == StampedPoseAnnotation
         )
 
     def convert(
-        self, annotation: PositionAnnotation, cas: Optional[CAS] = None
+        self, annotation: PositionAnnotation, cas: CAS | None = None
     ) -> StampedPoseAnnotation:
         spa = StampedPoseAnnotation()
         spa.source = annotation.source

@@ -24,7 +24,7 @@ Run with (the ``experiments`` package must be importable)::
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List
+from typing_extensions import Any
 
 import coraplex as _coraplex_pkg
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
@@ -378,7 +378,7 @@ def _q_world_state_at_end(plan: Plan) -> BehaviourQuery:
     )
 
 
-def build_queries(plan: Plan) -> List[BehaviourQuery]:
+def build_queries(plan: Plan) -> list[BehaviourQuery]:
     """
     Construct all behaviour queries for a completed plan execution.
 
@@ -433,7 +433,7 @@ def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
     :param session: An open SQLAlchemy session connected to the persisted plan database.
     :return: A table with one :class:`BehaviourQueryResult` row per query.
     """
-    rows: List[BehaviourQueryResult] = []
+    rows: list[BehaviourQueryResult] = []
     for query in build_queries(plan):
         # EQL evaluation
         t0 = time.perf_counter()

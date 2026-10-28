@@ -4,9 +4,8 @@ import logging
 import os
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass, field
-from typing import List
+from typing_extensions import ClassVar
 
-from typing_extensions import ClassVar, Dict, List, Optional, Tuple, Type
 
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
@@ -77,7 +76,7 @@ class GazeboParser(WorldModelParser):
         movable.
     """
 
-    connection_type_map: ClassVar[Dict[str, Type[Connection]]] = {
+    connection_type_map: ClassVar[dict[str, type[Connection]]] = {
         "revolute": RevoluteConnection,
         "continuous": RevoluteConnection,
         "prismatic": PrismaticConnection,
@@ -92,12 +91,12 @@ class GazeboParser(WorldModelParser):
     The reserved link name that refers to the simulation world rather than a model link.
     """
 
-    truthy_values: ClassVar[Tuple[str, ...]] = ("1", "true")
+    truthy_values: ClassVar[tuple[str, ...]] = ("1", "true")
     """
     The texts that SDF accepts for a boolean element that is set.
     """
 
-    interpreted_elements: ClassVar[Tuple[str, ...]] = (
+    interpreted_elements: ClassVar[tuple[str, ...]] = (
         "model",
         "include",
         "link",
@@ -114,7 +113,7 @@ class GazeboParser(WorldModelParser):
     The SDF document.
     """
 
-    prefix: Optional[str] = None
+    prefix: str | None = None
     """
     The prefix for every name used in this world.
     """
@@ -139,8 +138,8 @@ class GazeboParser(WorldModelParser):
     def from_file(
         cls,
         file_path: str,
-        prefix: Optional[str] = None,
-        path_resolver: Optional[PathResolver] = None,
+        prefix: str | None = None,
+        path_resolver: PathResolver | None = None,
     ) -> GazeboParser:
         """
         Creates a parser for a description file.
@@ -282,8 +281,8 @@ class GazeboParser(WorldModelParser):
         self,
         world: World,
         include_element: ElementTree.Element,
-        instance_name: Optional[str],
-        wrapper_pose: Optional[HomogeneousTransformationMatrix] = None,
+        instance_name: str | None,
+        wrapper_pose: HomogeneousTransformationMatrix | None = None,
     ) -> None:
         """
         Resolves an ``include`` to its model file and attaches an instance of it.
@@ -403,7 +402,7 @@ class GazeboParser(WorldModelParser):
         return os.path.join(model_directory, max(candidates)[2])
 
     @staticmethod
-    def version_of(version: str) -> Tuple[int, ...]:
+    def version_of(version: str) -> tuple[int, ...]:
         """
         :param version: A dotted version such as ``1.6``.
         :return: The version as a tuple that orders like the version does.
@@ -473,7 +472,7 @@ class GazeboParser(WorldModelParser):
 
     @staticmethod
     def root_body_of(
-        bodies: Dict[str, Body], child_link_names: set, instance_name: str
+        bodies: dict[str, Body], child_link_names: set, instance_name: str
     ) -> Body:
         """
         Determines the root link of a model, which is the first link no joint moves.
@@ -564,8 +563,8 @@ class GazeboParser(WorldModelParser):
         return body
 
     def parse_inertial(
-        self, element: Optional[ElementTree.Element], body: Body
-    ) -> Optional[Inertial]:
+        self, element: ElementTree.Element | None, body: Body
+    ) -> Inertial | None:
         """
         Parses an ``inertial`` element.
 
@@ -602,7 +601,7 @@ class GazeboParser(WorldModelParser):
     # %% shapes
 
     def parse_shapes(
-        self, elements: List[ElementTree.Element], body: Body
+        self, elements: list[ElementTree.Element], body: Body
     ) -> ShapeCollection:
         """
         Parses the ``visual`` or ``collision`` elements of a link.
@@ -674,7 +673,7 @@ class GazeboParser(WorldModelParser):
             supported_types=["box", "cylinder", "mesh", "sphere"],
         )
 
-    def parse_color(self, element: Optional[ElementTree.Element]) -> Color:
+    def parse_color(self, element: ElementTree.Element | None) -> Color:
         """
         Parses the diffuse color of a ``material`` element.
 
@@ -695,8 +694,8 @@ class GazeboParser(WorldModelParser):
     def parse_joint(
         self,
         element: ElementTree.Element,
-        bodies: Dict[str, Body],
-        model_T_link: Dict[str, HomogeneousTransformationMatrix],
+        bodies: dict[str, Body],
+        model_T_link: dict[str, HomogeneousTransformationMatrix],
         prefix: str,
     ) -> JointDescription:
         """
@@ -855,7 +854,7 @@ class GazeboParser(WorldModelParser):
             maximum_speed=velocity,
         )
 
-    def parse_dynamics(self, element: Optional[ElementTree.Element]) -> JointDynamics:
+    def parse_dynamics(self, element: ElementTree.Element | None) -> JointDynamics:
         """
         Parses a ``dynamics`` element.
 
@@ -876,8 +875,8 @@ class GazeboParser(WorldModelParser):
 
     def parse_pose(
         self,
-        element: Optional[ElementTree.Element],
-        reference_frame: Optional[Body] = None,
+        element: ElementTree.Element | None,
+        reference_frame: Body | None = None,
     ) -> HomogeneousTransformationMatrix:
         """
         Parses a ``pose`` element.
@@ -910,7 +909,7 @@ class GazeboParser(WorldModelParser):
         )
 
     @staticmethod
-    def parse_vector(text: Optional[str]) -> List[float]:
+    def parse_vector(text: str | None) -> list[float]:
         """
         :param text: Whitespace separated numbers.
         :return: The numbers the text holds.
@@ -918,7 +917,7 @@ class GazeboParser(WorldModelParser):
         return [float(value) for value in (text or "").split()]
 
     @classmethod
-    def parse_boolean(cls, element: Optional[ElementTree.Element]) -> bool:
+    def parse_boolean(cls, element: ElementTree.Element | None) -> bool:
         """
         :param element: The element holding the flag.
         :return: Whether the element is present and set.
@@ -929,7 +928,7 @@ class GazeboParser(WorldModelParser):
 
     @staticmethod
     def parse_float(
-        element: Optional[ElementTree.Element], name: str, default: float
+        element: ElementTree.Element | None, name: str, default: float
     ) -> float:
         """
         :param element: The element holding the value as a child.
@@ -943,9 +942,7 @@ class GazeboParser(WorldModelParser):
         return float(text) if text is not None else default
 
     @staticmethod
-    def parse_optional_float(
-        element: ElementTree.Element, name: str
-    ) -> Optional[float]:
+    def parse_optional_float(element: ElementTree.Element, name: str) -> float | None:
         """
         :param element: The element holding the value as a child.
         :param name: The name of the child element.
@@ -961,7 +958,7 @@ class MissingRootElement(ParsingError):
     Raised when a description file contains none of the expected root elements.
     """
 
-    expected_elements: List[str] = field(kw_only=True, default_factory=list)
+    expected_elements: list[str] = field(kw_only=True, default_factory=list)
     """
     The element names that were searched for.
     """
@@ -1007,7 +1004,7 @@ class UnsupportedJointType(ParsingError):
     The joint type that is not supported.
     """
 
-    supported_types: List[str] = field(kw_only=True, default_factory=list)
+    supported_types: list[str] = field(kw_only=True, default_factory=list)
     """
     The joint types that can be mapped to connections.
     """
@@ -1032,7 +1029,7 @@ class UnsupportedGeometryType(ParsingError):
     The geometry type that is not supported.
     """
 
-    supported_types: List[str] = field(kw_only=True, default_factory=list)
+    supported_types: list[str] = field(kw_only=True, default_factory=list)
     """
     The geometry types that can be mapped to shapes.
     """

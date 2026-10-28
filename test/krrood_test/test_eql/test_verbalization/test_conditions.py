@@ -9,7 +9,6 @@ exercised end-to-end through the verbalizer.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
 
 from krrood.entity_query_language.verbalization.boolean_predicate import (
     AdjectivalPredicate,
@@ -51,7 +50,7 @@ class _Task:
 @dataclass
 class _Robot:
     battery: int
-    tasks: List[_Task]
+    tasks: list[_Task]
 
 
 def test_single_hop_attr_recognizes_subject_attribute():

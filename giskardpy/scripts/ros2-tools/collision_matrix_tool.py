@@ -9,7 +9,7 @@ import sys
 import traceback
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
-from typing import Tuple, List, Optional, Dict
+from typing_extensions import Callable
 
 import rclpy
 from PyQt5.QtCore import Qt, QTimer
@@ -33,7 +33,6 @@ from PyQt5.QtWidgets import (
     QFrame,
     QScrollArea,
 )
-from typing_extensions import Callable
 
 from giskardpy.middleware.ros2 import rospy
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -88,7 +87,7 @@ class SelfCollisionMatrixInterface:
     """
     World instance for managing bodies.
     """
-    _reasons: Dict[Tuple[Body, Body], DisableCollisionReason] = field(
+    _reasons: dict[tuple[Body, Body], DisableCollisionReason] = field(
         init=False, default_factory=dict
     )
     """
@@ -134,11 +133,11 @@ class SelfCollisionMatrixInterface:
                     shape.color = Color(1.0, 1.0, 1.0, 0.5)
 
     @property
-    def bodies(self) -> List[Body]:
+    def bodies(self) -> list[Body]:
         return list(sorted(self.world.bodies_with_collision, key=lambda x: x.name.name))
 
     @property
-    def enabled_bodies(self) -> List[Body]:
+    def enabled_bodies(self) -> list[Body]:
         return [
             body
             for body in self.bodies
@@ -153,7 +152,7 @@ class SelfCollisionMatrixInterface:
 
     def get_reason_for_pair(
         self, body_a: Body, body_b: Body
-    ) -> Optional[DisableCollisionReason]:
+    ) -> DisableCollisionReason | None:
         body_a, body_b = self.sort_bodies(body_a, body_b)
         return self._reasons.get((body_a, body_b), None)
 
@@ -311,7 +310,7 @@ class CollisionMatrixTable(QTableWidget):
         return self.bodies.index(body)
 
     def update_reason(
-        self, body_a: Body, body_b: Body, new_reason: Optional[DisableCollisionReason]
+        self, body_a: Body, body_b: Body, new_reason: DisableCollisionReason | None
     ):
         if new_reason is None:
             self.self_collision_matrix_interface.remove_pair(body_a, body_b)
@@ -397,7 +396,7 @@ class CollisionMatrixTable(QTableWidget):
             self.setColumnWidth(0, max(widths))
 
 
-def get_readable_color(red: float, green: float, blue: float) -> Tuple[int, int, int]:
+def get_readable_color(red: float, green: float, blue: float) -> tuple[int, int, int]:
     luminance = ((0.299 * red) + (0.587 * green) + (0.114 * blue)) / 255
     if luminance > 0.5:
         return 0, 0, 0
@@ -406,7 +405,7 @@ def get_readable_color(red: float, green: float, blue: float) -> Tuple[int, int,
 
 
 class ProgressBarWithText(QProgressBar):
-    def set_progress(self, value: int, text: Optional[str] = None):
+    def set_progress(self, value: int, text: str | None = None):
         value = int(min(max(value, 0), 100))
         self.setValue(value)
         if text is not None:
@@ -549,7 +548,7 @@ class ComputeSelfCollisionMatrixParameterDialog(QDialog):
         self.parameters[parameter_name] = edit
         return outer_box
 
-    def get_parameter_map(self) -> Dict[str, float]:
+    def get_parameter_map(self) -> dict[str, float]:
         params = {
             param_name: float(edit.text())
             for param_name, edit in self.parameters.items()

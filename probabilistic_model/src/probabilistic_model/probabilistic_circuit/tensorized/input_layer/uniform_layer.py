@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import List, Self
+from typing_extensions import Self
 
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
@@ -79,7 +79,7 @@ class UniformLayer(ContinuousLayerWithConstrainedSupport):
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: List[UniformDistribution]
+        cls, variable_index: int, distributions: list[UniformDistribution]
     ) -> Self:
         interval = np.array(
             [

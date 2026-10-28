@@ -4,7 +4,7 @@ import weakref
 from dataclasses import dataclass, field
 from weakref import ReferenceType
 
-from typing_extensions import TYPE_CHECKING, Any, Dict, Iterator, List
+from typing_extensions import TYPE_CHECKING, Any, Iterator
 
 if TYPE_CHECKING:
     from krrood.patterns.role import Role
@@ -24,7 +24,7 @@ class RoleRegistry:
     taker alive and never conflates two distinct takers that happen to compare equal.
     """
 
-    _roles_by_taker_identity: Dict[int, List[ReferenceType[Role]]] = field(
+    _roles_by_taker_identity: dict[int, list[ReferenceType[Role]]] = field(
         default_factory=dict
     )
     """

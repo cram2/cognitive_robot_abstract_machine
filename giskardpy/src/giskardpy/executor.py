@@ -5,7 +5,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 import numpy as np
 

@@ -4,7 +4,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 
 from rclpy.subscription import Subscription
-from typing_extensions import Generic, Type, TypeVar
+from typing_extensions import Generic, TypeVar
 
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
@@ -46,7 +46,7 @@ class LatestMessageSubscriber(Generic[MessageType], SubClassSafeGeneric, HasROS2
         self.node.get_logger().info(f"Subscribed to {self.topic_name}")
 
     @classmethod
-    def message_type(cls) -> Type[MessageType]:
+    def message_type(cls) -> type[MessageType]:
         """
         The type of the messages published on :attr:`topic_name`.
 

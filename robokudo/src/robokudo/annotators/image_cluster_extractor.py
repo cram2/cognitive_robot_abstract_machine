@@ -24,7 +24,7 @@ import cv2
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Dict, Optional, Tuple
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -91,16 +91,16 @@ class ImageClusterExtractor(BaseAnnotator):
                 """
                 Initialize default parameter values.
                 """
-                self.hsv_min: Tuple[int, int, int] = (150, 130, 85)
-                self.hsv_max: Tuple[int, int, int] = (200, 255, 255)
+                self.hsv_min: tuple[int, int, int] = (150, 130, 85)
+                self.hsv_max: tuple[int, int, int] = (200, 255, 255)
                 self.erosion_iterations: int = 2
 
                 # This parameter controls the filtering of the initial list of contours.
                 # It is used to avoid very small contours when calculating 3d points etc.
                 self.contour_min_size: int = 1000
 
-                self.color_name_to_hsv_range: Dict[
-                    str, Dict[str, Tuple[int, int, int]]
+                self.color_name_to_hsv_range: dict[
+                    str, dict[str, tuple[int, int, int]]
                 ] = dict()
                 self.color_name_to_hsv_range["blue"] = {
                     "hsv_min": (150, 130, 85),
@@ -144,8 +144,8 @@ class ImageClusterExtractor(BaseAnnotator):
     ) -> None:
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.color: Optional[npt.NDArray] = None
-        self.depth: Optional[npt.NDArray] = None
+        self.color: npt.NDArray | None = None
+        self.depth: npt.NDArray | None = None
         self.query = None
         self.camera_intrinsics = None
 
@@ -210,8 +210,8 @@ class ImageClusterExtractor(BaseAnnotator):
 
     def _threshold_hsv(
         self,
-        hsv_min: Tuple[int, int, int],
-        hsv_max: Tuple[int, int, int],
+        hsv_min: tuple[int, int, int],
+        hsv_max: tuple[int, int, int],
     ) -> npt.NDArray:
         """
         Threshold ``self.hsv`` to the given bounds, wrapping the hue channel around the
@@ -223,7 +223,8 @@ class ImageClusterExtractor(BaseAnnotator):
         pixels that wrapped to just above 0).
 
         :param hsv_min: Lower HSV bound.
-        :param hsv_max: Upper HSV bound. A hue lower than ``hsv_min``'s signals wraparound.
+        :param hsv_max: Upper HSV bound. A hue lower than ``hsv_min``'s signals
+            wraparound.
         :return: Binary mask of pixels within the (possibly wrapped) bounds.
         """
         if hsv_min[0] <= hsv_max[0]:

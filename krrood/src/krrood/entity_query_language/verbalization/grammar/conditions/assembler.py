@@ -23,7 +23,6 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     RangeFold,
     build_between,
 )
-from typing_extensions import List
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Aggregations,
@@ -88,8 +87,8 @@ class ConditionAssembler(Assembler[Comparator, None]):
         return transform.render(comparator, self.context, negated)
 
     def as_statements(
-        self, conditions: List[SymbolicExpression]
-    ) -> List[VerbalizationFragment]:
+        self, conditions: list[SymbolicExpression]
+    ) -> list[VerbalizationFragment]:
         """
         Say a list of conditions as standalone statements — the entry a caller uses when the
         conditions stand on their own (an ``AND``'s operands, a ``where`` block), as opposed to

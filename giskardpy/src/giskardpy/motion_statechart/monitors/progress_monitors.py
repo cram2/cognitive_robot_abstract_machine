@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 import numpy as np
-from typing_extensions import List, Optional
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import (
@@ -100,7 +99,7 @@ class NotApproachingGoal(MotionStatechartNode):
     """
 
     @property
-    def prerequisite_nodes(self) -> List[MotionStatechartNode]:
+    def prerequisite_nodes(self) -> list[MotionStatechartNode]:
         return [self.monitored_task]
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -219,7 +218,7 @@ class AnyMonitoredTaskShortOfItsGoal(MotionStatechartNode):
     of the motion and make the first wait after the last goal was reached a stall.
     """
 
-    monitored_tasks: List[ConvergingTask] = field(kw_only=True)
+    monitored_tasks: list[ConvergingTask] = field(kw_only=True)
     """
     The tasks whose life cycle states and goals are watched.
     """
@@ -279,14 +278,14 @@ class StillProgressing(Goal):
     task's own threshold per second.
     """
 
-    _monitored_tasks: List[ConvergingTask] = field(
+    _monitored_tasks: list[ConvergingTask] = field(
         default_factory=list, init=False, repr=False
     )
     """
     The converging tasks found under :attr:`monitored_node`.
     """
 
-    _not_approaching_monitors: List[NotApproachingGoal] = field(
+    _not_approaching_monitors: list[NotApproachingGoal] = field(
         default_factory=list, init=False, repr=False
     )
     """
@@ -299,18 +298,18 @@ class StillProgressing(Goal):
     """
 
     @property
-    def prerequisite_nodes(self) -> List[MotionStatechartNode]:
+    def prerequisite_nodes(self) -> list[MotionStatechartNode]:
         return [self.monitored_node]
 
     @property
-    def monitored_tasks(self) -> List[ConvergingTask]:
+    def monitored_tasks(self) -> list[ConvergingTask]:
         """
         :return: The converging tasks watched by this node, in the order they were found.
         """
         return self._monitored_tasks
 
     @property
-    def stalled_tasks(self) -> List[ConvergingTask]:
+    def stalled_tasks(self) -> list[ConvergingTask]:
         """
         :return: The monitored tasks that are running but not currently approaching their
             goal, leaving out those that already hold it.
@@ -394,7 +393,7 @@ class StillProgressing(Goal):
 
     def _find_converging_tasks(
         self, node: MotionStatechartNode
-    ) -> List[ConvergingTask]:
+    ) -> list[ConvergingTask]:
         """
         Collect every converging task at or below ``node``.
 
@@ -429,5 +428,5 @@ class _CancelBecauseNoProgress(CancelMotion):
     which tasks are stalled.
     """
 
-    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
+    def on_tick(self, context: MotionStatechartContext) -> float | None:
         raise NoProgressError(progress_monitor=self.progress_monitor)

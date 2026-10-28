@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 import trimesh
 from numpy.typing import NDArray
-from typing_extensions import List, Optional
 
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -101,7 +100,7 @@ def test_a_part_that_is_the_whole_shape_is_not_split_off():
 # %% splitting a part off an annotation in a world
 
 
-def annotated_mug(world: Optional[World] = None) -> Mug:
+def annotated_mug(world: World | None = None) -> Mug:
     """
     :param world: The empty world to put the mug in; a new one if not given.
     :return: A mug, alone in its world, whose handle is still part of its body's shape.
@@ -314,7 +313,7 @@ class ConvexHullDecomposer(MeshDecomposer):
     Decomposes a mesh into its convex hull: a stand-in for a real decomposer.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> List[Shape]:
+    def apply_to_mesh(self, mesh: Mesh) -> list[Shape]:
         return [Mesh.from_trimesh(mesh=mesh.mesh.convex_hull, origin=mesh.origin)]
 
     def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:

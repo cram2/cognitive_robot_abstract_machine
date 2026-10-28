@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pytest
 from rustworkx.rustworkx import NoEdgeBetweenNodes
-from typing_extensions import Iterable, Tuple, Generator
+from typing_extensions import Iterable, Generator
 
 from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
@@ -259,7 +259,7 @@ def setup_multi_robot_apartment(
 @pytest.fixture
 def multiple_robot_apartment_context(
     setup_multi_robot_apartment,
-) -> Generator[Tuple[World, AbstractRobot, Context]]:
+) -> Generator[tuple[World, AbstractRobot, Context]]:
     """
     The shared apartment world with one robot, the robot and a context for both,
     returned to its initial model, state and full body control setting after the test.

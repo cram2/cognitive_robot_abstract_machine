@@ -6,9 +6,8 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field, fields
-from typing import Any, Generic, Type, cast
+from typing_extensions import TypeVar, Any, Generic, cast
 
-from typing_extensions import TypeVar
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -76,7 +75,7 @@ class ConnectionSpecification(
     """
 
     @property
-    def connection_type(self) -> Type[TConnection]:
+    def connection_type(self) -> type[TConnection]:
         """
         The connection type this specification materializes, from its bound generic
         parameter.

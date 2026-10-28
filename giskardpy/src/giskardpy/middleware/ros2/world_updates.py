@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from time import sleep
-from typing import Any, Dict, Optional
+from typing_extensions import Any
 
 from krrood.adapters.json_serializer import from_json
 from semantic_digital_twin.adapters.ros.messages import StreamPosition
@@ -107,7 +107,7 @@ class ClientWorldUpdates:
     Seconds between two looks at what the world caught up with.
     """
 
-    def required_position(self) -> Optional[StreamPosition]:
+    def required_position(self) -> StreamPosition | None:
         """
         The position a goal built on this world requires, or ``None`` if this world
         never published a change.
@@ -116,7 +116,7 @@ class ClientWorldUpdates:
             return None
         return self.world_synchronizer.latest_published_position
 
-    def wait_for_the_changes_of_a_goal(self, result: Dict[str, Any]) -> None:
+    def wait_for_the_changes_of_a_goal(self, result: dict[str, Any]) -> None:
         """
         Wait until the changes Giskard made while executing a goal reached this world.
 

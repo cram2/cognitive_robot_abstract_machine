@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing_extensions import Any
 import pandas as pd
 
 from krrood.utils import get_default_value
@@ -11,7 +11,6 @@ from pandas.core.dtypes.common import (
     is_string_dtype,
 )
 from random_events.set import Set
-from typing_extensions import List, Any
 
 
 @dataclass
@@ -27,37 +26,37 @@ class AnnotatedVariable:
     The variable that is annotated.
     """
 
-    mean: Optional[float] = field(default=0)
+    mean: float | None = field(default=0)
     """
     Mean of the random variable.
     """
 
-    standard_deviation: Optional[float] = field(default=1)
+    standard_deviation: float | None = field(default=1)
     """
     Standard Deviation of the random variable.
     """
 
-    minimal_distance: Optional[float] = field(default=1.0)
+    minimal_distance: float | None = field(default=1.0)
     """
     The minimal distance between two values of the variable.
     """
 
-    min_likelihood_improvement: Optional[float] = field(default=0.1)
+    min_likelihood_improvement: float | None = field(default=0.1)
     """
     The minimum likelihood improvement passed to the Nyga Distributions.
     """
 
-    min_samples_per_quantile: Optional[int] = field(default=10)
+    min_samples_per_quantile: int | None = field(default=10)
     """
     The minimum number of samples per quantile passed to the Nyga Distributions.
     """
 
-    min_impurity_improvement: Optional[float] = field(default=0)
+    min_impurity_improvement: float | None = field(default=0)
     """
     The minimum impurity improvement for JPT learning.
     """
 
-    max_standard_deviation: Optional[float] = field(default=None)
+    max_standard_deviation: float | None = field(default=None)
     """
     The precision a JPT has to reach for this variable: a node is only split while
     the standard deviation of some numeric target in it is above that target's
@@ -74,7 +73,7 @@ def infer_variables_from_dataframe(
     min_likelihood_improvement: float = 0.1,
     min_samples_per_quantile: int = 10,
     min_impurity_improvement: float = 0,
-) -> List[AnnotatedVariable]:
+) -> list[AnnotatedVariable]:
     """
     Infer the variables from a dataframe.
 

@@ -1,7 +1,6 @@
 from copy import deepcopy
 from unittest.mock import MagicMock, patch
 import pytest
-from typing_extensions import List, Set, Tuple
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
@@ -362,7 +361,7 @@ def test_double_tf_publisher(rclpy_node, pr2_world_state_reset):
 # %% tf frame naming
 
 
-def world_with_bodies(*names: str) -> Tuple[World, List[Body]]:
+def world_with_bodies(*names: str) -> tuple[World, list[Body]]:
     """
     Build a world whose root carries one body per given name.
     """
@@ -453,7 +452,7 @@ def test_removing_a_body_leaves_the_frame_name_of_the_other_one_alone():
     assert frame_names.assign(second) == published
 
 
-def published_child_frames(tf_publisher: TFPublisher) -> Set[str]:
+def published_child_frames(tf_publisher: TFPublisher) -> set[str]:
     """
     The tf frames the publisher broadcasts a transform for.
     """
@@ -464,7 +463,7 @@ def published_child_frames(tf_publisher: TFPublisher) -> Set[str]:
 
 
 def publisher_ignoring_existing_frames(
-    world: World, node: Node, existing_frames: List[str]
+    world: World, node: Node, existing_frames: list[str]
 ) -> TFPublisher:
     """
     Build a publisher for a world whose tf tree already carries the given frames.

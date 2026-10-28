@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Self, List
+from typing_extensions import Self
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
@@ -84,10 +84,10 @@ class Armar7Joint(JointName):
 @dataclass(eq=False)
 class Armar7LeftThumb(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -107,10 +107,10 @@ class Armar7LeftThumb(Finger):
 @dataclass(eq=False)
 class Armar7LeftRingFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -130,10 +130,10 @@ class Armar7LeftRingFinger(Finger):
 @dataclass(eq=False)
 class Armar7LeftPinkyFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -153,10 +153,10 @@ class Armar7LeftPinkyFinger(Finger):
 @dataclass(eq=False)
 class Armar7LeftMiddleFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -176,10 +176,10 @@ class Armar7LeftMiddleFinger(Finger):
 @dataclass(eq=False)
 class Armar7LeftIndexFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -199,10 +199,10 @@ class Armar7LeftIndexFinger(Finger):
 @dataclass(eq=False)
 class Armar7RightThumb(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -222,10 +222,10 @@ class Armar7RightThumb(Finger):
 @dataclass(eq=False)
 class Armar7RightRingFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -245,10 +245,10 @@ class Armar7RightRingFinger(Finger):
 @dataclass(eq=False)
 class Armar7RightPinkyFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -268,10 +268,10 @@ class Armar7RightPinkyFinger(Finger):
 @dataclass(eq=False)
 class Armar7RightMiddleFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -291,10 +291,10 @@ class Armar7RightMiddleFinger(Finger):
 @dataclass(eq=False)
 class Armar7RightIndexFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -323,10 +323,10 @@ class Armar7LeftGripper(
     ],
 ):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
@@ -377,10 +377,10 @@ class Armar7RightGripper(
     ],
 ):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
@@ -422,10 +422,10 @@ class Armar7RightGripper(
 @dataclass(eq=False)
 class Armar7LeftArm(Arm[Armar7LeftGripper]):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         vals = [0.0, 0.0, 0.25, 0.5, 1.0, 1.0, 0.0, 0.0]
         arm_park = JointState.from_mapping(
             name=PrefixedName("left_arm_park", prefix=self.name.name),
@@ -451,10 +451,10 @@ class Armar7LeftArm(Arm[Armar7LeftGripper]):
 @dataclass(eq=False)
 class Armar7RightArm(Arm[Armar7RightGripper]):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         vals = [0.0, 0.0, 0.25, -0.5, 1.0, -1.0, 0.0, 0.0]
         arm_park = JointState.from_mapping(
             name=PrefixedName("right_arm_park", prefix=self.name.name),
@@ -498,20 +498,20 @@ class AzureKinectRGB(Camera):
             default_camera=True,
         )
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
 
 @dataclass(eq=False)
 class Armar7Neck(Neck[AzureKinectRGB]):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -533,10 +533,10 @@ class Armar7Torso(
     Torso, HasLeftRightArm[Armar7LeftArm, Armar7RightArm], HasNeck[Armar7Neck]
 ):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         torso_joints = self.active_connections
         torso_low = JointState.from_mapping(
             name=PrefixedName("torso_low", prefix=self.name.name),
@@ -576,10 +576,10 @@ class Armar7MobileBase(MobileBase[OmniDrive], HasTorso[Armar7Torso]):
     def forward_axis(cls) -> Vector3:
         return Vector3.Y()
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod

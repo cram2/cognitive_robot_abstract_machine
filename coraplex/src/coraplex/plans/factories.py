@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing_extensions import assert_never, TYPE_CHECKING, TypeVar, Callable
 
-from typing_extensions import List, assert_never, Optional, TYPE_CHECKING, TypeVar
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.plans.plan import Plan
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
 
 def execute_single(
     action_like: ActionLike,
-    context: Optional[Context] = None,
+    context: Context | None = None,
 ) -> PlanNode:
     """
     Executes the given action like on its own.
@@ -42,8 +41,8 @@ def execute_single(
 
 
 def sequential(
-    children: List[ActionLike],
-    context: Optional[Context] = None,
+    children: list[ActionLike],
+    context: Context | None = None,
 ) -> SequentialNode:
     """
     Executes the given actions or motions in order, one after the other.
@@ -59,8 +58,8 @@ def sequential(
 
 
 def parallel(
-    children: List[ActionLike],
-    context: Optional[Context] = None,
+    children: list[ActionLike],
+    context: Context | None = None,
 ) -> ParallelNode:
     """
     Executes the given actions in parallel as far as possible, this uses the Giskard
@@ -78,8 +77,8 @@ def parallel(
 
 
 def try_in_order(
-    children: List[ActionLike],
-    context: Optional[Context] = None,
+    children: list[ActionLike],
+    context: Context | None = None,
 ) -> TryInOrderNode:
     """
     Executes the given actions or motions one after another, if one fails the next one
@@ -95,8 +94,8 @@ def try_in_order(
 
 
 def try_all(
-    children: List[ActionLike],
-    context: Optional[Context] = None,
+    children: list[ActionLike],
+    context: Context | None = None,
 ) -> TryAllNode:
     """
     Tries all given actions or motions, similar to try_in_order but executes them in
@@ -114,9 +113,9 @@ def try_all(
 
 
 def pause_while(
-    children: List[ActionLike],
+    children: list[ActionLike],
     monitor: MotionStatechartNode,
-    context: Optional[Context] = None,
+    context: Context | None = None,
 ) -> PauseMonitor:
     """
     Hold `children` for as long as `monitor` observes True.
@@ -134,9 +133,9 @@ def pause_while(
 
 
 def pause_until(
-    children: List[ActionLike],
+    children: list[ActionLike],
     monitor: MotionStatechartNode,
-    context: Optional[Context] = None,
+    context: Context | None = None,
 ) -> PauseUntilMonitor:
     """
     Hold `children` until `monitor` observes True.
@@ -154,9 +153,9 @@ def pause_until(
 
 
 def cancel_when(
-    children: List[ActionLike],
+    children: list[ActionLike],
     monitor: MotionStatechartNode,
-    context: Optional[Context] = None,
+    context: Context | None = None,
 ) -> CancelMonitor:
     """
     Stop `children` once `monitor` observes True and cancel the rest of the plan.
@@ -174,9 +173,9 @@ def cancel_when(
 
 
 def repeat(
-    children: List[ActionLike],
+    children: list[ActionLike],
     maximum_repetitions: int,
-    context: Optional[Context] = None,
+    context: Context | None = None,
     **repeat_arguments,
 ) -> RepeatNode:
     """
@@ -195,7 +194,7 @@ def repeat(
     return _make_plan_from_type_and_children(root, children, context)
 
 
-def code(function: Callable, context: Optional[Context] = None) -> CodeNode:
+def code(function: Callable, context: Context | None = None) -> CodeNode:
     from coraplex.language import CodeNode
 
     root = CodeNode(code=function)
@@ -206,7 +205,7 @@ T = TypeVar("T")
 
 
 def _make_plan_from_type_and_children(
-    root: T, children: List[ActionLike], context: Optional[Context]
+    root: T, children: list[ActionLike], context: Context | None
 ) -> T:
     plan = Plan(context=context)
     plan.add_node(root)

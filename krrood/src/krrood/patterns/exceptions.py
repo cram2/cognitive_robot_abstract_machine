@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 
-from typing_extensions import Any, Callable, List, Type
+from typing_extensions import Any, Callable
 
 from krrood.exceptions import DataclassException
 
@@ -18,12 +18,12 @@ class DelegatedFactoryMethodError(DataclassException):
     is refused to keep that mistake loud instead of quiet.
     """
 
-    role_type: Type
+    role_type: type
     """
     The role type the factory method was accessed through.
     """
 
-    taker_type: Type
+    taker_type: type
     """
     The role-taker type that declares the factory method.
     """
@@ -58,7 +58,7 @@ class RoleAttributeNotDeclaredError(DataclassException):
     write cannot silently shadow a role-taker attribute.
     """
 
-    role_type: Type
+    role_type: type
     """
     The role class the assignment was attempted on.
     """
@@ -158,7 +158,7 @@ class AmbiguousRuleError(DataclassException):
     What the rules were asked about when the collision occurred.
     """
 
-    candidates: List[Type]
+    candidates: list[type]
     """
     The equally specific rule classes that collided.
     """
@@ -180,7 +180,7 @@ class InterfaceInstantiationError(DataclassException, TypeError):
     Raised when an interface itself is instantiated instead of a class implementing it.
     """
 
-    interface: Type
+    interface: type
     """
     The interface that was instantiated.
     """

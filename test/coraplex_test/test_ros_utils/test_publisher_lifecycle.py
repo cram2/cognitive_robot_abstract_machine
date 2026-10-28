@@ -16,7 +16,7 @@ retention such as an ``atexit`` registration.
 
 import gc
 import weakref
-from typing import Callable
+from typing_extensions import Callable
 
 from unittest.mock import MagicMock, patch
 

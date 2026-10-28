@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum, Enum, StrEnum
-from typing import Union, FrozenSet
+from typing_extensions import Union
 
 from krrood.symbolic_math.symbolic_math import Scalar, if_eq_cases
 from semantic_digital_twin.world_description.geometry import Color
@@ -96,14 +96,14 @@ class LifeCycleValues(IntEnum):
         return member
 
     @classmethod
-    def terminal_states(cls) -> FrozenSet[LifeCycleValues]:
+    def terminal_states(cls) -> frozenset[LifeCycleValues]:
         """
         :return: The states a node can only leave by being reset.
         """
         return frozenset({cls.SUCCEEDED, cls.FAILED, cls.INTERRUPTED})
 
     @classmethod
-    def judged_states(cls) -> FrozenSet[LifeCycleValues]:
+    def judged_states(cls) -> frozenset[LifeCycleValues]:
         """
         :return: The states a node reaches by being judged on its own terms, as opposed
             to :attr:`INTERRUPTED`.
@@ -185,12 +185,12 @@ class LifeCyclePredicateDefinition:
     The truth table of a test on a node's life cycle state.
     """
 
-    true_states: FrozenSet[LifeCycleValues]
+    true_states: frozenset[LifeCycleValues]
     """
     The states in which the predicate is true.
     """
 
-    unknown_states: FrozenSet[LifeCycleValues] = frozenset()
+    unknown_states: frozenset[LifeCycleValues] = frozenset()
     """
     The states in which the predicate has no answer yet.
 
@@ -304,7 +304,7 @@ class TransitionKind(Enum):
     """
 
     @property
-    def source_states(self) -> FrozenSet[LifeCycleValues]:
+    def source_states(self) -> frozenset[LifeCycleValues]:
         """
         :return: The lifecycle states from which this transition kind can trigger.
         """

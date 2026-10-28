@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from krrood.class_diagrams.progress_report import is_progress_wanted, report_progress
-from typing_extensions import List
 
 GENERATION_LOG_NAME = "generation_log.txt"
 """
@@ -53,7 +52,7 @@ class GenerationRecord:
     Name of the package the generator belongs to.
     """
 
-    generated_packages: List[str]
+    generated_packages: list[str]
     """
     Names of the packages whose interface already held content, in alphabetical order.
     """
@@ -96,7 +95,7 @@ class GenerationRecord:
         )
 
 
-def read_generation_log(repository_root: Path) -> List[GenerationRecord]:
+def read_generation_log(repository_root: Path) -> list[GenerationRecord]:
     """
     Read every record the generators of a checkout appended, in the order they ran.
 
@@ -112,7 +111,7 @@ def read_generation_log(repository_root: Path) -> List[GenerationRecord]:
     ]
 
 
-def generated_packages(repository_root: Path) -> List[str]:
+def generated_packages(repository_root: Path) -> list[str]:
     """
     Names of the packages of a checkout whose interface already holds content.
 

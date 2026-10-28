@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing_extensions import List
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     map_structural_children,
@@ -52,8 +51,8 @@ class OrthographyProcessor(RealizationPass):
         return node
 
     def _apply_glue(
-        self, parts: List[VerbalizationFragment]
-    ) -> List[VerbalizationFragment]:
+        self, parts: list[VerbalizationFragment]
+    ) -> list[VerbalizationFragment]:
         """Each merge is a zero-separator subgroup, so the surrounding separator is dropped.
 
         :param parts: The phrase's parts.
@@ -65,9 +64,9 @@ class OrthographyProcessor(RealizationPass):
         >>> len(glued)
         2
         """
-        out: List[VerbalizationFragment] = []
+        out: list[VerbalizationFragment] = []
         # A RIGHT token (e.g. "(") held until its following part arrives, to attach to it.
-        pending_right: List[VerbalizationFragment] = []
+        pending_right: list[VerbalizationFragment] = []
         for part in parts:
             spacing = part.spacing if isinstance(part, WordFragment) else Spacing.NONE
             if pending_right:  # attach the held "(" to this part
@@ -85,7 +84,7 @@ class OrthographyProcessor(RealizationPass):
         return out
 
     @staticmethod
-    def _merge(items: List[VerbalizationFragment]) -> VerbalizationFragment:
+    def _merge(items: list[VerbalizationFragment]) -> VerbalizationFragment:
         """:return: A zero-separator group of *items* (the single item itself when there is only one).
 
         >>> only = WordFragment(text="x")

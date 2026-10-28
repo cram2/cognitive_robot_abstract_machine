@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
 
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
@@ -12,7 +11,7 @@ class PoseTrajectory:
     Immutable wrapper for a sequence of waypoint poses.
     """
 
-    poses: List[Pose]
+    poses: list[Pose]
     """
     Ordered waypoint poses.
     """

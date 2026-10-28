@@ -6,14 +6,7 @@ from copy import copy
 from dataclasses import dataclass
 from functools import cached_property
 
-from typing_extensions import (
-    Any,
-    TypeVar,
-    Dict,
-    Union,
-    Iterable,
-    Optional,
-)
+from typing_extensions import Any, TypeVar, Union, Iterable
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.exceptions import ContextIsUnavailable
@@ -43,7 +36,7 @@ class ActionDescription(Designator):
     """
 
     @property
-    def world(self) -> Optional[World]:
+    def world(self) -> World | None:
         if self.plan is None:
             raise ContextIsUnavailable(self)
         return self.plan.world
@@ -122,21 +115,21 @@ class ActionDescription(Designator):
 
     @staticmethod
     def pre_condition(
-        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+        variables: dict[str, Variable], context: Context, kwargs: dict[str, Any]
     ) -> SymbolicExpression:
         return True
 
     @staticmethod
     def post_condition(
-        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+        variables: dict[str, Variable], context: Context, kwargs: dict[str, Any]
     ) -> SymbolicExpression:
         return True
 
     @cached_property
-    def bound_variables(self) -> Dict[T, Variable[T] | T]:
+    def bound_variables(self) -> dict[T, Variable[T] | T]:
         return self._create_variables()
 
-    def _create_variables(self) -> Dict[str, Variable[T] | T]:
+    def _create_variables(self) -> dict[str, Variable[T] | T]:
         """
         Creates krrood variables for all parameter of this action.
 

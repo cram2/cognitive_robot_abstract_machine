@@ -2,7 +2,7 @@ import json
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing_extensions import ClassVar
 
 from krrood.adapters.json_serializer import from_json
 from krrood.entity_query_language.backends import ProbabilisticBackend
@@ -150,7 +150,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
 
     action_type = MoveToReach
 
-    model_path: Optional[Path] = None
+    model_path: Path | None = None
     """
     Path to a model file that should be used for the action.
 

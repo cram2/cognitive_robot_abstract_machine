@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import List
 
 from coraplex.datastructures.enums import (
     DetectionTechnique,
@@ -588,7 +587,7 @@ def test_detect_action_parses_to_a_single_motion_chart(pr2_apartment_context):
 # %% perceiving before the grasp
 
 
-def detect_actions_of(plan: PlanNode) -> List[DetectAction]:
+def detect_actions_of(plan: PlanNode) -> list[DetectAction]:
     """
     :param plan: The expanded plan to search.
     :return: The detections the plan performs, in no particular order.

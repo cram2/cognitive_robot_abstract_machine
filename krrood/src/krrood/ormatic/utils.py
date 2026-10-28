@@ -10,7 +10,7 @@ import types
 from contextlib import suppress
 from enum import Enum
 from functools import lru_cache
-from typing import Type, Dict, Any
+from typing_extensions import TypeVar, Iterable, Any, Callable, Generic, get_type_hints
 
 import sqlalchemy
 from sqlalchemy import (
@@ -20,18 +20,6 @@ from sqlalchemy import (
     create_engine as create_sqlalchemy_engine,
     URL,
     Column,
-)
-from typing_extensions import (
-    TypeVar,
-    Type,
-    List,
-    Iterable,
-    Union,
-    Any,
-    Callable,
-    Generic,
-    Optional,
-    get_type_hints,
 )
 
 from krrood.adapters.json_serializer import to_json, from_json
@@ -44,7 +32,7 @@ class classproperty(Generic[T]):
     A decorator that allows a class method to be accessed as a property.
     """
 
-    def __init__(self, fget: Callable[[Type[Any]], T]) -> None:
+    def __init__(self, fget: Callable[[type[Any]], T]) -> None:
         """
         Stores the accessor function invoked when the property is read on the owning
         class.
@@ -55,14 +43,14 @@ class classproperty(Generic[T]):
         value.
         """
 
-    def __get__(self, instance: Any, owner: Optional[Type[Any]] = None) -> T:
+    def __get__(self, instance: Any, owner: type[Any] | None = None) -> T:
         """
         Returns the property value by invoking the accessor with the owning class.
         """
         return self.fget(owner)
 
 
-def classes_of_module(module: types.ModuleType) -> List[Type]:
+def classes_of_module(module: types.ModuleType) -> list[type]:
     """
     Get all classes of a given module.
 
@@ -76,7 +64,7 @@ def classes_of_module(module: types.ModuleType) -> List[Type]:
     return result
 
 
-def classes_of_package(package: types.ModuleType, recursive=True) -> List[Type]:
+def classes_of_package(package: types.ModuleType, recursive=True) -> list[type]:
     """
     Get all classes that are defined in a given python package.
 
@@ -191,7 +179,7 @@ def drop_database(engine: Engine) -> None:
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 
 
-def is_direct_subclass(cls: Type, *bases: Type) -> bool:
+def is_direct_subclass(cls: type, *bases: type) -> bool:
     """
     :param cls: The class to check.
     :param bases: The base classes to check against.
@@ -201,7 +189,7 @@ def is_direct_subclass(cls: Type, *bases: Type) -> bool:
     return cls in bases or (set(cls.__bases__) & set(bases))
 
 
-def create_engine(url: Union[str, URL], **kwargs: Any) -> Engine:
+def create_engine(url: str | URL, **kwargs: Any) -> Engine:
     """
     Check https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine for more information.
 
@@ -231,7 +219,7 @@ def is_data_column(column: Column) -> bool:
 
 
 @lru_cache(maxsize=None)
-def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
+def _get_type_hints_cached(clazz: type) -> dict[str, Any]:
     """
     Get type hints for a class.
     """

@@ -3,9 +3,8 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
-from typing import Optional, Callable
+from typing_extensions import Self, Callable
 
-from typing_extensions import Self
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -61,7 +60,7 @@ class CountSeconds(MotionStatechartNode):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         difference = self._now() - self._start_time
         if difference >= self.seconds - 1e-5:
             return ObservationStateValues.TRUE
@@ -90,7 +89,7 @@ class TickCounter(MotionStatechartNode, ABC):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         self._counter += 1
         if self._reached_target(context):
             return ObservationStateValues.TRUE
@@ -163,15 +162,15 @@ class ThreadedPredicateMonitor(MotionStatechartNode):
         remote giskard instance.
     """
 
-    predicate: Optional[Callable[[], bool]] = field(kw_only=True)
+    predicate: Callable[[], bool] | None = field(kw_only=True)
     """
     The predicate to evaluate, passed as a constructor argument.
     """
 
-    _thread: Optional[threading.Thread] = field(default=None, init=False, repr=False)
-    _result: Optional[bool] = field(default=None, init=False, repr=False)
+    _thread: threading.Thread | None = field(default=None, init=False, repr=False)
+    _result: bool | None = field(default=None, init=False, repr=False)
     _done: bool = field(default=False, init=False, repr=False)
-    _error: Optional[BaseException] = field(default=None, init=False, repr=False)
+    _error: BaseException | None = field(default=None, init=False, repr=False)
 
     def _worker(self, predicate: Callable[[], bool]) -> None:
         """
@@ -180,8 +179,8 @@ class ThreadedPredicateMonitor(MotionStatechartNode):
 
         :param predicate: The predicate to evaluate
         """
-        result: Optional[bool] = None
-        error: Optional[BaseException] = None
+        result: bool | None = None
+        error: BaseException | None = None
         try:
             result = bool(predicate())
         except BaseException as e:  # noqa: BLE001 - reported via observation/logging
@@ -214,7 +213,7 @@ class ThreadedPredicateMonitor(MotionStatechartNode):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         """
         On tick of the Motion State Chart check if the thread is finished and set the
         ObservationStateValues accordingly to ObservationStateValues.UNKNOWN if the
@@ -275,7 +274,7 @@ class Pulse(MotionStatechartNode):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         if self._counter < self.length:
             self._triggered = True
             self._counter += 1
@@ -308,7 +307,7 @@ class CountNodeResets(MotionStatechartNode):
     Resets of :attr:`node` seen so far.
     """
 
-    _previous_life_cycle: Optional[LifeCycleValues] = field(
+    _previous_life_cycle: LifeCycleValues | None = field(
         default=None, init=False, repr=False
     )
     """
@@ -317,7 +316,7 @@ class CountNodeResets(MotionStatechartNode):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         current_life_cycle = self.node.life_cycle_state
         if (
             self._previous_life_cycle is not None

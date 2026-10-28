@@ -13,7 +13,6 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
-from typing_extensions import Type
 
 from krrood.patterns.path_enumeration import PathEnumeration
 
@@ -85,7 +84,7 @@ class MilkTransportDemonstration(RobotDemonstration):
     The HSR carries the milk from the counter in front of it to the table behind it.
     """
 
-    used_robot: Type[AbstractRobot] = HSRB
+    used_robot: type[AbstractRobot] = HSRB
 
     ros_node_name: str = "hsr_milk_transport_demo"
 

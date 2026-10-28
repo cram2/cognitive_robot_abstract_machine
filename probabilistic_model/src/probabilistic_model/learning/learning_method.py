@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import pandas as pd
-from typing_extensions import Iterable, Optional, Sequence
+from typing_extensions import Iterable, Sequence
 
 from probabilistic_model.learning.jpt.variables import (
     AnnotatedVariable,
@@ -41,7 +41,7 @@ class LearningMethod(ABC):
     def fit(
         self,
         data: pd.DataFrame,
-        variables: Optional[Iterable[AnnotatedVariable]] = None,
+        variables: Iterable[AnnotatedVariable] | None = None,
     ) -> GroundableCircuit:
         """
         Fit a circuit on the rows of a dataframe.
@@ -82,7 +82,7 @@ class StratifiedLearning(LearningMethod):
     def fit(
         self,
         data: pd.DataFrame,
-        variables: Optional[Iterable[AnnotatedVariable]] = None,
+        variables: Iterable[AnnotatedVariable] | None = None,
     ) -> ProbabilisticCircuit:
         if variables is None:
             variables = infer_variables_from_dataframe(data)
@@ -115,7 +115,7 @@ class LayeredLearning(LearningMethod):
     def fit(
         self,
         data: pd.DataFrame,
-        variables: Optional[Iterable[AnnotatedVariable]] = None,
+        variables: Iterable[AnnotatedVariable] | None = None,
     ) -> LayeredProbabilisticCircuit:
         return RustworkxCircuitToLayeredCircuitConverter.convert(
             self.method.fit(data, variables)

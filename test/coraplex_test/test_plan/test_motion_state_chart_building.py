@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.language import LanguageNode
@@ -47,7 +46,7 @@ class ChartBuilderWithoutPlan(BuildsMotionStateChart):
     Whether this builder claims to contribute motions.
     """
 
-    added_goal: Optional[Goal] = field(default=None, init=False)
+    added_goal: Goal | None = field(default=None, init=False)
     """
     The goal this builder added to a chart, None until it was added to one.
     """

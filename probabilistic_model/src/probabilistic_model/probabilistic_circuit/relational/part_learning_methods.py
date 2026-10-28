@@ -8,7 +8,7 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field
 
-from typing_extensions import Any, Dict, Optional, Self
+from typing_extensions import Any, Self
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -32,13 +32,13 @@ class PartLearningMethods(SubclassJSONSerializer):
     attribute accesses hash by identity and compare symbolically.
     """
 
-    default: Optional[LearningMethod] = field(default_factory=JointProbabilityTree)
+    default: LearningMethod | None = field(default_factory=JointProbabilityTree)
     """
     What a part without a learning method is fitted with, copied for every such part,
     or ``None`` to require a learning method for every part.
     """
 
-    methods_by_path: Dict[str, LearningMethod] = field(init=False, default_factory=dict)
+    methods_by_path: dict[str, LearningMethod] = field(init=False, default_factory=dict)
     """
     The learning method of every part, keyed by its path.
     """
@@ -46,8 +46,8 @@ class PartLearningMethods(SubclassJSONSerializer):
     @classmethod
     def from_methods_and_default(
         cls,
-        methods: Dict[Attribute, LearningMethod],
-        default: Optional[LearningMethod],
+        methods: dict[Attribute, LearningMethod],
+        default: LearningMethod | None,
     ) -> Self:
         """
         :param methods: The learning methods of the parts.
@@ -115,7 +115,7 @@ class PartLearningMethods(SubclassJSONSerializer):
         }
         return result
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(),
             "default": to_json(self.default, **kwargs),
@@ -126,7 +126,7 @@ class PartLearningMethods(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         result = cls(from_json(data["default"], **kwargs))
         result.methods_by_path = {
             path: from_json(method, **kwargs)

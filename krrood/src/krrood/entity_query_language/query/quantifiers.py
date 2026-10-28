@@ -10,7 +10,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.exceptions import (
@@ -208,7 +207,7 @@ class ResultQuantifier(ABC):
     """
 
     @classmethod
-    def _default_constraint_(cls) -> Optional[ResultQuantificationConstraint]:
+    def _default_constraint_(cls) -> ResultQuantificationConstraint | None:
         """
         :return: The result-count constraint this quantifier kind enforces by default, applied by the
             query's quantification pipeline stage when no explicit constraint is given.

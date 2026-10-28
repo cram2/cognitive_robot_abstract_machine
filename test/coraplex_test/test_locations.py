@@ -4,7 +4,7 @@ from itertools import islice
 
 import numpy as np
 import pytest
-from typing_extensions import Iterator, List, Optional, Tuple
+from typing_extensions import Iterator
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.locations.base import Location
@@ -38,7 +38,7 @@ class RecordsHowItWasSampled(Location):
     The single candidate to yield.
     """
 
-    sampled_with: List[Tuple[int, Optional[int]]] = field(default_factory=list)
+    sampled_with: list[tuple[int, int | None]] = field(default_factory=list)
     """
     One entry per call: the number of samples and the seed it sampled with.
     """

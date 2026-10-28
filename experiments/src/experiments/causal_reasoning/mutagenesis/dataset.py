@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
-from typing_extensions import List
 
 from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisAtom,
@@ -91,7 +90,7 @@ def is_mutagenesis_dataset_reachable(
 
 def fetch_mutagenesis_molecules(
     connection: MutagenesisDatabaseConnection = MutagenesisDatabaseConnection(),
-) -> List[MutagenesisMolecule]:
+) -> list[MutagenesisMolecule]:
     """
     Download the Mutagenesis dataset and convert it into domain objects.
 
@@ -156,7 +155,7 @@ def synthetic_mutagenesis_molecules(
     molecule_count: int = 20,
     atom_count: int = 2,
     bond_count: int = 3,
-) -> List[MutagenesisMolecule]:
+) -> list[MutagenesisMolecule]:
     """
     Generate a small, network-free dataset with the same shape as
     :func:`fetch_mutagenesis_molecules`, for tests that must run without live network

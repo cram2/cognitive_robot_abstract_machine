@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing_extensions import Self, Any
 
-from typing_extensions import Self
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
@@ -24,7 +23,7 @@ class MotionGoal(SubclassJSONSerializer):
     ``required_position``.
     """
 
-    motion_statechart_json_data: Dict[str, Any]
+    motion_statechart_json_data: dict[str, Any]
     """
     The motion statechart to execute, as json.
     """
@@ -39,7 +38,7 @@ class MotionGoal(SubclassJSONSerializer):
     it.
     """
 
-    required_position: Optional[StreamPosition] = field(default=None, kw_only=True)
+    required_position: StreamPosition | None = field(default=None, kw_only=True)
     """
     The position in the client's stream that the world has to contain before the motion
     statechart may be parsed.
@@ -53,7 +52,7 @@ class MotionGoal(SubclassJSONSerializer):
         cls,
         motion_statechart: MotionStatechart,
         client: MetaData,
-        required_position: Optional[StreamPosition] = None,
+        required_position: StreamPosition | None = None,
     ) -> MotionGoal:
         """
         Build the goal that asks for the given motion statechart.
@@ -64,7 +63,7 @@ class MotionGoal(SubclassJSONSerializer):
             required_position=required_position,
         )
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "motion_statechart": self.motion_statechart_json_data,
@@ -77,7 +76,7 @@ class MotionGoal(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
         Rebuild a goal from what a client sent.
         """

@@ -4,7 +4,7 @@ import signal
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from types import FrameType
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from signal import _HANDLER as SignalHandler

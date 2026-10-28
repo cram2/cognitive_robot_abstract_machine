@@ -17,7 +17,7 @@ from __future__ import annotations
 import builtins
 import inspect
 
-from typing_extensions import Any, Dict, Optional, Tuple
+from typing_extensions import Any
 
 import krrood.entity_query_language
 from krrood.entity_query_language import factories as eql
@@ -36,7 +36,7 @@ Attribute name under which a captured scope snapshot is stashed on an object.
 
 
 def _is_internal_frame(
-    frame_info: inspect.FrameInfo, skip_packages: Tuple[str, ...]
+    frame_info: inspect.FrameInfo, skip_packages: tuple[str, ...]
 ) -> bool:
     """
     :return: True if this frame belongs to EQL internals, an installed package, or
@@ -61,8 +61,8 @@ def _is_internal_frame(
 
 
 def capture_caller_scope(
-    skip_packages: Tuple[str, ...] = (), max_depth: int = 60
-) -> Dict[str, Any]:
+    skip_packages: tuple[str, ...] = (), max_depth: int = 60
+) -> dict[str, Any]:
     """
     Snapshot the merged ``{**f_globals, **f_locals}`` of the innermost user frame.
 
@@ -91,7 +91,7 @@ def capture_caller_scope(
         del frames
 
 
-def eql_factory_namespace() -> Dict[str, Any]:
+def eql_factory_namespace() -> dict[str, Any]:
     """
     :return: A namespace mapping of EQL factory callables for use in an interactive
         shell or evaluation scope.
@@ -126,7 +126,7 @@ def eql_factory_namespace() -> Dict[str, Any]:
     return namespace
 
 
-def attach_definition_scope(obj: T, scope: Optional[Dict[str, Any]] = None) -> T:
+def attach_definition_scope(obj: T, scope: dict[str, Any] | None = None) -> T:
     """
     Capture (or store a provided) caller scope onto ``obj`` for later retrieval.
 
@@ -146,8 +146,8 @@ def attach_definition_scope(obj: T, scope: Optional[Dict[str, Any]] = None) -> T
 
 
 def get_definition_scope(
-    obj: Optional[Any] = None, *, include_factories: bool = True
-) -> Dict[str, Any]:
+    obj: Any | None = None, *, include_factories: bool = True
+) -> dict[str, Any]:
     """
     Return the definition scope to use for an interactive expert session.
 
@@ -163,7 +163,7 @@ def get_definition_scope(
     :param include_factories: Whether to overlay the EQL factory namespace.
     :return: A merged namespace dict.
     """
-    scope: Dict[str, Any] = {}
+    scope: dict[str, Any] = {}
     # Read from ``__dict__`` rather than ``getattr``: an EQL variable's ``__getattr__``
     # synthesises a symbolic attribute for *any* missing name, so ``getattr(.., None)``
     # would never return ``None`` (it returns a bogus expression) for a variable that

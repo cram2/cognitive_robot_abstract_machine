@@ -8,7 +8,7 @@ import supervision as sv
 from py_trees.common import Status
 from supervision.config import CLASS_NAME_DATA_FIELD
 from trackers import ByteTrackTracker
-from typing_extensions import TYPE_CHECKING, List
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -29,24 +29,32 @@ class ByteTrackAnnotator(BaseAnnotator):
     * ObjectHypothesis ROI + Mask + Classification annotation
     """
 
-    def __init__(self, name: str = "ByteTrackAnnotator"):
+    def __init__(self, name: str = "ByteTrackAnnotator") -> None:
         super().__init__(name)
 
         self.tracker: ByteTrackTracker = ByteTrackTracker()
-        """Main ByteTrack instance for object instance tracking."""
+        """
+        Main ByteTrack instance for object instance tracking.
+        """
 
         self.last_ts: float = 0.0
-        """Timestamp of the last data received, used for tracker reset detection."""
+        """
+        Timestamp of the last data received, used for tracker reset detection.
+        """
 
         self.label_annotator = sv.RichLabelAnnotator(color_lookup=sv.ColorLookup.TRACK)
-        """A special label annotator, that cannot simply be used like the annotators in `self.vis_annotators`."""
+        """
+        A special label annotator, that cannot simply be used like the annotators in `self.vis_annotators`.
+        """
 
         self.vis_annotators = [
             sv.BoxAnnotator(color_lookup=sv.ColorLookup.TRACK),
             sv.MaskAnnotator(color_lookup=sv.ColorLookup.INDEX),
             sv.TraceAnnotator(color_lookup=sv.ColorLookup.TRACK),
         ]
-        """A list of simple supervision annotators to use for visualization. They will be applied in order."""
+        """
+        A list of simple supervision annotators to use for visualization. They will be applied in order.
+        """
 
     def update(self) -> Status:
         cas = self.get_cas()
@@ -58,7 +66,7 @@ class ByteTrackAnnotator(BaseAnnotator):
             self.tracker.reset()
         self.last_ts = data_ts
 
-        ohs: List[ObjectHypothesis] = cas.filter_annotations_by_type(ObjectHypothesis)
+        ohs: list[ObjectHypothesis] = cas.filter_annotations_by_type(ObjectHypothesis)
         if len(ohs) == 0:
             self.rk_logger.debug(f"{len(ohs)} object hypothesis found, nothing to do.")
             return Status.SUCCESS
@@ -94,7 +102,7 @@ class ByteTrackAnnotator(BaseAnnotator):
                 f"Using {len(restored_masks)} masks for object tracking."
             )
 
-        classifications: List[Classification] = []
+        classifications: list[Classification] = []
         for oh in ohs:
             classification = cas.filter_by_type(Classification, oh.annotations)
             if len(classification) == 0:
@@ -122,7 +130,8 @@ class ByteTrackAnnotator(BaseAnnotator):
         return Status.SUCCESS
 
     def visualize(self, tracked_detections: sv.Detections) -> None:
-        """Visualize the tracked detections and set the resulting image in the annotator output struct.
+        """
+        Visualize the tracked detections and set the resulting image in the annotator output struct.
 
         :param tracked_detections: The tracked detections to visualize.
         """

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, Field
-from typing import TYPE_CHECKING, Dict
+from typing_extensions import Any, TYPE_CHECKING
 
-from typing_extensions import Optional, List, Any
 
 from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
@@ -27,7 +26,7 @@ class Designator:
     Designators are objects that can be executed and are managed by a plan node.
     """
 
-    plan_node: Optional[PlanNode] = field(
+    plan_node: PlanNode | None = field(
         kw_only=True, default=None, repr=False, init=False
     )
     """
@@ -57,7 +56,7 @@ class Designator:
         return self.plan.context
 
     @classproperty
-    def fields(cls) -> List[Field]:
+    def fields(cls) -> list[Field]:
         """
         The parameters of this designator: the fields a caller constructs it with.
 
@@ -68,5 +67,5 @@ class Designator:
         ]
 
     @property
-    def designator_parameter(self) -> Dict[str, Any]:
+    def designator_parameter(self) -> dict[str, Any]:
         return {f.name: getattr(self, f.name) for f in self.fields}

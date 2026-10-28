@@ -14,7 +14,7 @@ from functools import partial
 from importlib.metadata import entry_points
 from types import TracebackType
 
-from typing_extensions import TYPE_CHECKING, ClassVar, Optional, Self
+from typing_extensions import TYPE_CHECKING, ClassVar, Self
 
 from coraplex.datastructures.enums import VisualizationBackend, VisualizationOption
 from coraplex.exceptions import (
@@ -292,12 +292,12 @@ class RvizVisualization(WorldVisualization):
     Empty publishes the frames under their own names.
     """
 
-    marker_topic: Optional[str] = field(default=None, kw_only=True)
+    marker_topic: str | None = field(default=None, kw_only=True)
     """
     The topic the markers are published on, or ``None`` for the marker publisher's own.
     """
 
-    marker_alpha: Optional[float] = field(default=None, kw_only=True)
+    marker_alpha: float | None = field(default=None, kw_only=True)
     """
     The opacity the markers are drawn with, in [0.0, 1.0], or ``None`` for the marker
     publisher's own.
@@ -339,7 +339,7 @@ class RvizVisualization(WorldVisualization):
         if self.collision_visualization:
             self.publisher.with_collision_visualization()
 
-    def _prefixed_tf_publisher(self, cleanup: ExitStack) -> Optional[TFPublisher]:
+    def _prefixed_tf_publisher(self, cleanup: ExitStack) -> TFPublisher | None:
         """
         :return: A tf publisher of the world under :attr:`frame_prefix`, stopped with
             this renderer, or ``None`` to let the marker publisher find or start the

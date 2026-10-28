@@ -4,7 +4,6 @@ import logging
 import os
 from dataclasses import field, dataclass
 from pathlib import Path
-from typing import Optional, List
 from giskardpy.executor import Executor
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -44,12 +43,12 @@ class EpisodeSegmenterExecutor(Executor):
     The detector statechart that drives the episode execution.
     """
 
-    ignored_objects: Optional[List[str]] = field(default_factory=list)
+    ignored_objects: list[str] | None = field(default_factory=list)
     """
     A list of objects that should be ignored during the episode.
     """
 
-    fixed_objects: Optional[List[str]] = field(default_factory=list)
+    fixed_objects: list[str] | None = field(default_factory=list)
     """
     A list of objects that should be fixed during the episode.
     """
@@ -88,7 +87,7 @@ class EpisodeSegmenterExecutor(Executor):
             if "hole" in o.name.name:
                 segmind_context.holes.append(o)
 
-    def spawn_scene(self, models_dir, file_resolver: Optional[FileUriResolver] = None):
+    def spawn_scene(self, models_dir, file_resolver: FileUriResolver | None = None):
         """
         Spawns the scene from the given directory.
 
@@ -101,7 +100,7 @@ class EpisodeSegmenterExecutor(Executor):
         for file in directory.glob("*.stl"):
             self._load_stl(file)
 
-    def _load_urdf(self, file: Path, file_resolver: Optional[FileUriResolver] = None):
+    def _load_urdf(self, file: Path, file_resolver: FileUriResolver | None = None):
         """
         Loads an URDF file into the simulation world.
 

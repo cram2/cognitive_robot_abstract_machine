@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing_extensions import Any
 
 from giskardpy.middleware.ros2.exceptions import (
     ExecutionAbortedException,
@@ -26,7 +28,7 @@ class ResultMessageMimic:
     """
 
     @classmethod
-    def with_payload(cls, payload: dict) -> "ResultMessageMimic":
+    def with_payload(cls, payload: dict) -> ResultMessageMimic:
         """
         Build a result message around the given payload.
         """

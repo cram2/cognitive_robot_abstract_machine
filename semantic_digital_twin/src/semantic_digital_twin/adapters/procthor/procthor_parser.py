@@ -4,13 +4,12 @@ import math
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Dict, Tuple, Union, Set, Optional, List, Any, Self
+from typing_extensions import assert_never, Any, Self
 
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
-from typing_extensions import assert_never
 
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
@@ -206,9 +205,9 @@ class ProcthorDoor:
         self,
         semantic_handle_position: SemanticPositionDescription,
         world: World,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        world_T_door: Optional[HomogeneousTransformationMatrix] = None,
+        name: str | None = None,
+        scale: Scale | None = None,
+        world_T_door: HomogeneousTransformationMatrix | None = None,
     ) -> Door:
         """
         Parses the parameters according to the single door assumptions, and returns a single door factory.
@@ -245,7 +244,7 @@ class ProcthorDoor:
         door.mount_on_movable_joint(RevoluteConnectionSpecification(axis=Vector3.Z()))
         return door
 
-    def add_to_world(self, world: World) -> Union[Door, DoubleDoor]:
+    def add_to_world(self, world: World) -> Door | DoubleDoor:
         """
         Returns a Factory for the door, either a DoorFactory or a DoubleDoorFactory,
         depending on its name. If the door's name contains "double", it is treated as a double door.
@@ -276,12 +275,12 @@ class ProcthorWall:
     the wall polygon.
     """
 
-    wall_dicts: List[dict] = field(default_factory=list)
+    wall_dicts: list[dict] = field(default_factory=list)
     """
     List of dictionaries, where each dictionary represents one wall polygon in procthor
     """
 
-    door_dicts: List[dict] = field(default_factory=list)
+    door_dicts: list[dict] = field(default_factory=list)
     """
     List of dictionaries, where each dictionary represents one door hole in the wall polygon
     """
@@ -296,17 +295,17 @@ class ProcthorWall:
     Name of the wall, constructed from the corners of the wall polygon and the room numbers associated with the wall.
     """
 
-    x_coords: List[float] = field(init=False)
+    x_coords: list[float] = field(init=False)
     """
     List of unique X-coordinates of the wall polygon, extracted in order from the wall dictionary. 
     """
 
-    y_coords: List[float] = field(init=False)
+    y_coords: list[float] = field(init=False)
     """
     List of unique Y-coordinates of the wall polygon, extracted in order from the wall dictionary.
     """
 
-    z_coords: List[float] = field(init=False)
+    z_coords: list[float] = field(init=False)
     """
     List of unique Z-coordinates of the wall polygon, extracted in order from the wall dictionary.
     """
@@ -442,7 +441,7 @@ class ProcthorRoom:
     Name of the room, constructed from the room type and room ID.
     """
 
-    centered_polytope: List[Point3] = field(init=False)
+    centered_polytope: list[Point3] = field(init=False)
     """
     Polytope representing the room's floor polygon, centered around its local 0, 0, 0 coordinate
     """
@@ -548,7 +547,7 @@ class ProcthorObject:
             unity_to_semantic_digital_twin_transform(world_T_obj)
         )
 
-    def get_world(self) -> Optional[World]:
+    def get_world(self) -> World | None:
         """
         Returns a World instance with this object at its root, importing it from the database using its assetId.
         If the object has children, they are imported recursively and connected to the parent object.
@@ -627,18 +626,18 @@ class ProcTHORParser:
     """
     The name of the world that is extracted from the house."""
 
-    house: Dict[str, Any]
+    house: dict[str, Any]
     """
     The house as JSON.
     """
 
-    session: Optional[Session] = field(default=None)
+    session: Session | None = field(default=None)
     """
     SQLAlchemy session to interact with the database to import objects.
     """
 
     @classmethod
-    def from_file(cls, file_path: str, session: Optional[Session] = None) -> Self:
+    def from_file(cls, file_path: str, session: Session | None = None) -> Self:
         return cls(
             name=Path(file_path).stem, house=json.load(open(file_path)), session=session
         )
@@ -669,7 +668,7 @@ class ProcTHORParser:
         return world
 
     @staticmethod
-    def import_rooms(world: World, rooms: List[Dict]):
+    def import_rooms(world: World, rooms: list[dict]):
         """
         Imports rooms from the Procthor JSON file into ProcthorRoom instances.
 
@@ -680,7 +679,7 @@ class ProcTHORParser:
             procthor_room = ProcthorRoom(room_dict=room)
             procthor_room.add_to_world(world)
 
-    def import_objects(self, world: World, objects: List[Dict]):
+    def import_objects(self, world: World, objects: list[dict]):
         """
         Imports objects from the Procthor JSON file into ProcthorObject instances.
 
@@ -700,7 +699,7 @@ class ProcTHORParser:
             world.merge_world(obj_world, obj_connection)
 
     def import_walls_and_doors(
-        self, world: World, walls: List[Dict], doors: List[Dict]
+        self, world: World, walls: list[dict], doors: list[dict]
     ):
         """
         Imports walls from the Procthor JSON file into ProcthorWall instances.
@@ -716,8 +715,8 @@ class ProcTHORParser:
 
     @staticmethod
     def _build_procthor_wall_from_polygon(
-        walls: List[Dict],
-    ) -> List[ProcthorWall]:
+        walls: list[dict],
+    ) -> list[ProcthorWall]:
         """
         Groups walls by their polygon and creates ProcthorWall instances for each group.
 
@@ -748,8 +747,8 @@ class ProcTHORParser:
 
     @staticmethod
     def _build_procthor_wall_from_door(
-        walls: List[Dict], doors: List[Dict]
-    ) -> Tuple[List[ProcthorWall], Set[str]]:
+        walls: list[dict], doors: list[dict]
+    ) -> tuple[list[ProcthorWall], set[str]]:
         """
         Builds ProcthorWall instances from the provided walls and doors, associating each door with its corresponding walls.
 
@@ -782,8 +781,8 @@ class ProcTHORParser:
         return procthor_walls, used_wall_ids
 
     def _build_procthor_walls(
-        self, walls: List[Dict], doors: List[Dict]
-    ) -> List[ProcthorWall]:
+        self, walls: list[dict], doors: list[dict]
+    ) -> list[ProcthorWall]:
         """
         Builds ProcthorWall instances from the provided walls and doors.
 
@@ -804,7 +803,7 @@ class ProcTHORParser:
         return procthor_walls
 
 
-def get_world_by_asset_id(session: Session, asset_id: str) -> Optional[World]:
+def get_world_by_asset_id(session: Session, asset_id: str) -> World | None:
     """
     Queries the database for a WorldMapping with the given asset_id provided by the procthor file.
     """

@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import cv2
-from typing_extensions import TYPE_CHECKING, Optional, Dict, Any, Union, ClassVar
+from typing_extensions import TYPE_CHECKING, Any, ClassVar
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.types.cv import ColorToDepthRatio
@@ -34,7 +34,7 @@ class OpenCVCameraConfig(BaseCameraConfig):
 
     interface_type: str = "OpenCV"
 
-    device: Union[int, str] = 0
+    device: int | str = 0
     """
     Input source identifier (camera index, file path, or URL).
 
@@ -63,16 +63,17 @@ class OpenCVCameraConfig(BaseCameraConfig):
     """
 
     loop_mode: int = -1
-    """Loop after iterating over all frames of the video file
+    """
+    Loop after iterating over all frames of the video file
     > 0: number of repetitions before to stop
     = 0: never loop
     < 0: infinite loop
-    
+
     ... note::
         Only works with a file as source
     """
 
-    depth: Optional[npt.NDArray] = None
+    depth: npt.NDArray | None = None
     """
     Static depth image, which is used as depth image for all rgb images.
     """
@@ -82,7 +83,7 @@ class OpenCVCameraConfig(BaseCameraConfig):
     Flag to update global depth parameters.
     """
 
-    camera_info: Dict[str, Any] = None
+    camera_info: dict[str, Any] = None
     """
     Camera config as dict.
     """

@@ -2,7 +2,6 @@ from __future__ import division
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import (
@@ -34,7 +33,7 @@ class MonitoredGoal(Goal, ABC):
     The node whose observation controls the monitored node.
     """
 
-    monitored_node: Optional[MotionStatechartNode] = field(default=None, kw_only=True)
+    monitored_node: MotionStatechartNode | None = field(default=None, kw_only=True)
     """
     The node placed under the monitor's control.
     """

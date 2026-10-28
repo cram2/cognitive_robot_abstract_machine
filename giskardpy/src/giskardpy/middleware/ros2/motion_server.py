@@ -5,7 +5,7 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from threading import Event, Thread
-from typing import Any, Dict, List
+from typing_extensions import Any
 
 import rclpy
 from json_msgs.action import JsonAction
@@ -106,7 +106,7 @@ class MotionServer:
     Seconds a goal waits for the change of the world it was built on.
     """
 
-    post_goal_plotters: List[PostGoalPlotter] = field(default_factory=list)
+    post_goal_plotters: list[PostGoalPlotter] = field(default_factory=list)
     """
     Debug plots that are written once a goal is finished.
     """
@@ -322,7 +322,7 @@ class MotionServer:
         result.result = json.dumps(states)
         return result
 
-    def serialize_error(self, error: Exception) -> Dict[str, Any]:
+    def serialize_error(self, error: Exception) -> dict[str, Any]:
         """
         Serialize the error a goal failed with, so that the client can rebuild it.
 
@@ -356,7 +356,7 @@ class MotionServer:
             return None
         return self.world_synchronizer.latest_published_position
 
-    def create_states(self) -> Dict[str, Any]:
+    def create_states(self) -> dict[str, Any]:
         """
         Collect the final life cycle and observation state of the motion statechart.
 

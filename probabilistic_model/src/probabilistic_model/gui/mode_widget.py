@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, InitVar
-from typing import List, Optional, Union
+from typing_extensions import Union
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -30,19 +30,19 @@ class ModeWidget(QWidget):
     The model controller.
     """
 
-    parent: InitVar[Optional[QWidget]] = None
+    parent: InitVar[QWidget | None] = None
     """
     The parent widget.
     """
 
-    evidence_widgets: List[VariableConstraintWidget] = field(
+    evidence_widgets: list[VariableConstraintWidget] = field(
         default_factory=list, init=False, repr=False, compare=False
     )
     """
     The list of variable constraint widgets for the evidence.
     """
 
-    modes: List[SimpleEvent] = field(
+    modes: list[SimpleEvent] = field(
         default_factory=list, init=False, repr=False, compare=False
     )
     """
@@ -104,7 +104,7 @@ class ModeWidget(QWidget):
     The layout for the mode rows.
     """
 
-    def __post_init__(self, parent: Optional[QWidget]):
+    def __post_init__(self, parent: QWidget | None):
         super().__init__(parent)
         self.init_ui()
 

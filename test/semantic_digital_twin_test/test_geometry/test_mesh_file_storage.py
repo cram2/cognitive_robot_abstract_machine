@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 import trimesh
-from typing_extensions import Set
 
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.mesh_file_storage import (
@@ -24,7 +23,7 @@ class DeclaredProcessLiveness(ProcessLiveness):
     machine it wants instead of hunting for a process id that is really dead.
     """
 
-    live_process_ids: Set[int] = field(default_factory=set)
+    live_process_ids: set[int] = field(default_factory=set)
     """
     The process ids to report as running.
     """

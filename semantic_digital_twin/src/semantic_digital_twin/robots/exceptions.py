@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING
 
 from semantic_digital_twin.exceptions import UsageError
 
@@ -228,7 +228,7 @@ class UnexpectedInputSourceError(RobotPartValidationError):
     The source the part was handed.
     """
 
-    expected_source_family: Type[InputSource]
+    expected_source_family: type[InputSource]
     """
     The kind of source the part can be read from.
     """

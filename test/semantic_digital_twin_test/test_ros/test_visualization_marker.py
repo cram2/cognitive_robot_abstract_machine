@@ -5,7 +5,6 @@ from time import sleep
 import pytest
 from rclpy.duration import Duration
 from rclpy.time import Time
-from typing_extensions import List, Set, Tuple
 from visualization_msgs.msg import MarkerArray, Marker
 
 from .test_tf_publisher import publisher_ignoring_existing_frames
@@ -248,7 +247,7 @@ def test_trimesh(rclpy_node):
 # %% marker frames
 
 
-def world_with_visible_bodies(*names: str) -> Tuple[World, List[Body]]:
+def world_with_visible_bodies(*names: str) -> tuple[World, list[Body]]:
     """
     Build a world whose root carries one body with a visual shape per given name.
     """
@@ -268,7 +267,7 @@ def world_with_visible_bodies(*names: str) -> Tuple[World, List[Body]]:
     return world, bodies
 
 
-def published_child_frames(tf_publisher: TFPublisher) -> Set[str]:
+def published_child_frames(tf_publisher: TFPublisher) -> set[str]:
     """
     The tf frames the publisher broadcasts a transform for.
     """
@@ -278,7 +277,7 @@ def published_child_frames(tf_publisher: TFPublisher) -> Set[str]:
     }
 
 
-def marker_frames(viz: VizMarkerPublisher) -> Set[str]:
+def marker_frames(viz: VizMarkerPublisher) -> set[str]:
     """
     The tf frames the markers are positioned in.
     """

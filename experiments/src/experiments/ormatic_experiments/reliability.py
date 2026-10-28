@@ -11,7 +11,6 @@ import pathlib
 import time
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List
 
 import plotly.graph_objects as go
 import tqdm
@@ -264,7 +263,7 @@ def reliability_experiment(
 def run_reliability_experiment(
     plan_size: int,
     iterations: int = 10,
-) -> tuple[ORMaticReliabilityAggregateResult, List[ORMaticReliabilityExperimentResult]]:
+) -> tuple[ORMaticReliabilityAggregateResult, list[ORMaticReliabilityExperimentResult]]:
     """
     Run *iterations* reliability experiment cycles for plans of *plan_size* actions and
     aggregate the results.
@@ -311,7 +310,7 @@ def run_reliability_experiment(
 
 
 def plot_reliability(
-    raw_results: List[ORMaticReliabilityExperimentResult],
+    raw_results: list[ORMaticReliabilityExperimentResult],
 ) -> go.Figure:
     """
     Produce a grouped violin plot of plan size vs duration for each timing phase.
@@ -352,7 +351,7 @@ def plot_reliability(
 
 def main():
     aggregate_results = []
-    all_raw: List[ORMaticReliabilityExperimentResult] = []
+    all_raw: list[ORMaticReliabilityExperimentResult] = []
     for plan_size in tqdm.tqdm(
         [
             1,

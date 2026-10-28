@@ -13,7 +13,6 @@ from types import NoneType
 
 import numpy as np
 import sqlalchemy
-from typing_extensions import Type
 
 from krrood.adapters.json_serializer import JSONData, SubclassJSONSerializer
 from krrood.ormatic.custom_types import (
@@ -52,12 +51,12 @@ class TypeMapping:
     A Python type and the SQLAlchemy column type that stores its values.
     """
 
-    python_type: Type
+    python_type: type
     """
     The type of the values.
     """
 
-    column_type: Type[sqlalchemy.types.TypeEngine]
+    column_type: type[sqlalchemy.types.TypeEngine]
     """
     The column type that stores the values.
     """

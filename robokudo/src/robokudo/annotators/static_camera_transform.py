@@ -1,6 +1,8 @@
-"""Annotator for writing a configured static camera transform into the CAS.
+"""
+Annotator for writing a configured static camera transform into the CAS.
 Use this in scenarios where you do not have a world to camera transform published
-or when you develop the perception system in isolation."""
+or when you develop the perception system in isolation.
+"""
 
 from __future__ import annotations
 
@@ -28,7 +30,9 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
                 self.world_T_camera: HomogeneousTransformationMatrix = (
                     HomogeneousTransformationMatrix()
                 )
-                """Camera pose relative to the configured world frame."""
+                """
+                Image-frame pose relative to the configured world frame.
+                """
 
         parameters = Parameters()
 

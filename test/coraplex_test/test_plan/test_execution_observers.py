@@ -12,7 +12,10 @@ from coraplex.datastructures.dataclasses import Context
 from giskardpy.motion_statechart.graph_node import EndMotion, Goal, Task
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 
-from coraplex.execution_environment import kinematically_simulated_robot
+from coraplex.execution_environment import (
+    PhysicallySimulatedRobot,
+    kinematically_simulated_robot,
+)
 from coraplex.plans.attachment_nodes import ReAttachNode
 from coraplex.plans.executables import MotionPlanHistory
 from coraplex.plans.factories import code, parallel, sequential
@@ -287,24 +290,38 @@ def test_native_motion_reports_boundaries_and_ticks(pr2_apartment_context) -> No
     assert recorder.statecharts[-1].is_end_motion()
 
 
-def test_native_attachment_reports_its_own_completion(pr2_apartment_context) -> None:
-    """A model change receives a lifecycle even when compiled below the plan root."""
+@pytest.mark.parametrize(
+    "environment, world_model_moves_the_body",
+    [
+        pytest.param(kinematically_simulated_robot, True, id="kinematic"),
+        pytest.param(PhysicallySimulatedRobot(simulation=None), False, id="physics"),
+    ],
+)
+def test_native_attachment_reports_its_own_completion(
+    pr2_apartment_context, environment, world_model_moves_the_body
+) -> None:
+    """
+    A model change receives a lifecycle even when compiled below the plan root, also
+    where a physically simulated world holds the body by contact and the world model
+    is left alone.
+    """
     world, robot, context = pr2_apartment_context
-    attachment = ReAttachNode(
-        body=world.get_body_by_name("milk.stl"), new_parent=robot.root
-    )
+    milk = world.get_body_by_name("milk.stl")
+    parent_before = milk.parent_connection.parent
+    attachment = ReAttachNode(body=milk, new_parent=robot.root)
     plan = sequential([attachment], context=context).plan
     recorder = ExecutionRecorder(plan=plan)
     plan.node_callbacks.append(recorder)
 
-    with kinematically_simulated_robot:
+    with environment:
         plan.perform()
 
     assert [event for event in recorder.events if event.node is attachment] == [
         NodeEvent(ExecutionEvent.START, attachment, LifeCycleValues.RUNNING),
         NodeEvent(ExecutionEvent.END, attachment, LifeCycleValues.SUCCEEDED),
     ]
-    assert attachment.body.parent_connection.parent is robot.root
+    expected_parent = robot.root if world_model_moves_the_body else parent_before
+    assert milk.parent_connection.parent is expected_parent
 
 
 def test_failed_plan_reports_failure_before_end(monkeypatch) -> None:
@@ -829,7 +846,9 @@ def test_parallel_plan_reports_failed_native_verdict(
 
 
 # %% node-owned execution scopes
-def test_direct_attachment_reports_one_pair_of_boundaries(pr2_apartment_context) -> None:
+def test_direct_attachment_reports_one_pair_of_boundaries(
+    pr2_apartment_context,
+) -> None:
     world, robot, context = pr2_apartment_context
     attachment = ReAttachNode(
         body=world.get_body_by_name("milk.stl"), new_parent=robot.root

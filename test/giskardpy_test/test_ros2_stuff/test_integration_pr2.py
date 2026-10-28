@@ -4,7 +4,6 @@ import asyncio
 from copy import deepcopy
 from dataclasses import dataclass, field
 from time import sleep
-from typing import Set
 
 import numpy as np
 import pytest
@@ -186,10 +185,10 @@ class PR2Tester(GiskardTester):
             if "right" in str(end_effector.name).lower()
         )
 
-    def get_l_gripper_links(self) -> Set[Body]:
+    def get_l_gripper_links(self) -> set[Body]:
         return set(b for b in self.l_gripper_annotation.bodies if b.has_collision())
 
-    def get_r_gripper_links(self) -> Set[Body]:
+    def get_r_gripper_links(self) -> set[Body]:
         return set(b for b in self.r_gripper_annotation.bodies if b.has_collision())
 
     def get_r_forearm_links(self):

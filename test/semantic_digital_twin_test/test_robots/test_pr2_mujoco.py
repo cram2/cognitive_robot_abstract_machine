@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import timedelta
 
-from typing_extensions import List
 
 import mujoco
 import numpy as np
@@ -107,7 +106,7 @@ def test_every_commanded_joint_the_fingers_and_the_drive_are_driven_by_one_servo
         arm.end_effector.thumb.root.parent_connection.raw_dof for arm in pr2.all_arms
     }
 
-    def driven_by(servo_type: type) -> List[str]:
+    def driven_by(servo_type: type) -> list[str]:
         return sorted(
             str(degree_of_freedom.name)
             for actuator in world.actuators

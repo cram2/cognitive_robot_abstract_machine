@@ -21,7 +21,6 @@ import rclpy
 from rclpy.action import ActionServer
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
-from typing_extensions import List, Tuple
 
 from coraplex.datastructures.enums import (
     ExecutionType,
@@ -490,7 +489,7 @@ class ReportedObject:
     Label to report it under; empty for a pipeline that localizes without recognizing.
     """
 
-    position: Tuple[float, float, float]
+    position: tuple[float, float, float]
     """
     Where to report it.
     """
@@ -508,7 +507,7 @@ class RecordedQueryServer:
     """
 
     def __init__(
-        self, node_name: str, action_name: str, reports: List[ReportedObject]
+        self, node_name: str, action_name: str, reports: list[ReportedObject]
     ) -> None:
         from robokudo_msgs.action import Query
 
@@ -576,7 +575,7 @@ def query_server_reporting(rclpy_node):
     pytest.importorskip("robokudo_msgs")
     started = []
 
-    def start(reports: List[ReportedObject]) -> RecordedQueryServer:
+    def start(reports: list[ReportedObject]) -> RecordedQueryServer:
         server = RecordedQueryServer(
             node_name="robokudo_stand_in",
             action_name="robokudo/query",

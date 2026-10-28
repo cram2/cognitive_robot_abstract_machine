@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 import fcl
 import numpy as np
 from trimesh.collision import CollisionManager, mesh_to_BVH
-from typing_extensions import Optional, Dict
 
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionDetector,
@@ -23,17 +22,17 @@ class FCLCollisionDetector(CollisionDetector):
     The collision manager from trimesh to handle collision detection.
     """
 
-    _last_synced_state: Optional[int] = field(default=None, init=False)
+    _last_synced_state: int | None = field(default=None, init=False)
     """
     Last synced state version of the world.
     """
 
-    _last_synced_model: Optional[int] = field(default=None, init=False)
+    _last_synced_model: int | None = field(default=None, init=False)
     """
     Last synced model version of the world.
     """
 
-    _collision_objects: Dict[Body, fcl.CollisionObject] = field(
+    _collision_objects: dict[Body, fcl.CollisionObject] = field(
         default_factory=dict, init=False
     )
     """

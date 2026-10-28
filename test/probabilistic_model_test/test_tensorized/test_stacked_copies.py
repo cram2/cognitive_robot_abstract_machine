@@ -6,7 +6,7 @@ from random_events.interval import Bound, closed
 from random_events.product_algebra import SimpleEvent
 from random_events.variable import Continuous, Integer
 from sortedcontainers import SortedSet
-from typing_extensions import Callable, List, Tuple
+from typing_extensions import Callable
 
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
@@ -97,7 +97,7 @@ def variables() -> Variables:
 
 def mixture_of(
     variables: Variables,
-    components: List[Tuple[float, Tuple[float, float], dict[int, float]]],
+    components: list[tuple[float, tuple[float, float], dict[int, float]]],
 ) -> LayeredProbabilisticCircuit:
     """
     :param variables: The variables of the tests.

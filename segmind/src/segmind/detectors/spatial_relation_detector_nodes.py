@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Set, Tuple, Type
+from typing_extensions import Optional
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from segmind.datastructures.events import (
@@ -42,8 +42,8 @@ class SupportDetector(AbstractDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        objects_to_check: List[Body],
-    ) -> List[DetectionEvent]:
+        objects_to_check: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Detects newly established and newly lost support relationships.
 
@@ -108,12 +108,12 @@ class ContainmentDetector(AbstractDetector):
     """
 
     @classmethod
-    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+    def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
         return (SupportDetector,)
 
     def bodies_come_to_rest(
-        self, segmind_context: SegmindContext, tracked_objects: List[Body]
-    ) -> List[Body]:
+        self, segmind_context: SegmindContext, tracked_objects: list[Body]
+    ) -> list[Body]:
         """
         The tracked objects resting on something they did not rest on when their
         supports were last remembered (see :meth:`remember_supports`).
@@ -129,7 +129,7 @@ class ContainmentDetector(AbstractDetector):
         ]
 
     def remember_supports(
-        self, segmind_context: SegmindContext, tracked_objects: List[Body]
+        self, segmind_context: SegmindContext, tracked_objects: list[Body]
     ) -> None:
         """
         Remember what each tracked object rests on now, for :meth:`bodies_come_to_rest`
@@ -144,8 +144,8 @@ class ContainmentDetector(AbstractDetector):
             )
 
     def containers_still_holding(
-        self, tracked_object: Body, containers: Set[Body]
-    ) -> Set[Body]:
+        self, tracked_object: Body, containers: set[Body]
+    ) -> set[Body]:
         """
         :param tracked_object: The body found inside ``containers``.
         :param containers: What ``tracked_object`` was found inside.
@@ -159,8 +159,8 @@ class ContainmentDetector(AbstractDetector):
         }
 
     def get_containment_pairs(
-        self, context: MotionStatechartContext, tracked_objects: List[Body]
-    ) -> Dict[Body, Set[Body]]:
+        self, context: MotionStatechartContext, tracked_objects: list[Body]
+    ) -> dict[Body, set[Body]]:
         """
         Computes containment relationships.
 
@@ -170,7 +170,7 @@ class ContainmentDetector(AbstractDetector):
         :param tracked_objects: Bodies that should be checked.
         :return: Mapping of body → containing bodies.
         """
-        containment_pairs: Dict[Body, Set[Body]] = {}
+        containment_pairs: dict[Body, set[Body]] = {}
         if not tracked_objects:
             return containment_pairs
         left_out = self.bodies_left_out(context.world)
@@ -197,8 +197,8 @@ class ContainmentDetector(AbstractDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        objects_to_check: List[Body],
-    ) -> List[DetectionEvent]:
+        objects_to_check: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Detects newly established and newly lost containments and updates the stored
         containment state.
@@ -252,7 +252,7 @@ class InsertionDetector(EventCombiningDetector):
     """
 
     @classmethod
-    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+    def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
         return (ContactDetector, ContainmentDetector)
 
     shift_threshold: timedelta = timedelta(seconds=15.0)
@@ -264,8 +264,8 @@ class InsertionDetector(EventCombiningDetector):
         self,
         context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Updates context and processes tracked objects to generate a list of events.
 

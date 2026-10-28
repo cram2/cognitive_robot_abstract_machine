@@ -1,6 +1,5 @@
 from dataclasses import field, dataclass
 from itertools import combinations
-from typing import Optional
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -279,7 +278,7 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
             )
         return NodeArtifacts()
 
-    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
+    def on_tick(self, context: MotionStatechartContext) -> float | None:
         violated_tasks = [
             task
             for task in self.tasks
@@ -668,7 +667,7 @@ class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
             )
         return NodeArtifacts()
 
-    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
+    def on_tick(self, context: MotionStatechartContext) -> float | None:
         violated_tasks = [
             task
             for task in self.tasks

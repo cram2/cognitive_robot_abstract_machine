@@ -1,7 +1,9 @@
-from dataclasses import dataclass
-from typing import Optional
+from __future__ import annotations
 
-from typing_extensions import List
+# %% Imports
+from dataclasses import dataclass
+from typing_extensions import List, Optional
+
 
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.tasks.joint_tasks import (
@@ -17,43 +19,44 @@ from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
+# %% Joint motions
 @dataclass
 class MoveJointsMotion(BaseMotion, HasMaxJointVelocity):
     """
     Moves any joint on the robot.
     """
 
-    names: List[str]
+    names: list[str]
     """
     List of joint names that should be moved 
     """
-    positions: List[float]
+    positions: list[float]
     """
     Target positions of joints, should correspond to the list of names.
     """
 
-    align: Optional[bool] = False
+    align: bool | None = False
     """
     If True, aligns the end-effector with a specified axis (optional).
     """
 
-    tip_link: Optional[str] = None
+    tip_link: str | None = None
     """
     Name of the tip link to align with, e.g the object (optional).
     """
 
-    tip_normal: Optional[Vector3] = None
+    tip_normal: Vector3 | None = None
     """
     Normalized vector representing the current orientation axis of the end-effector
     (optional).
     """
 
-    root_link: Optional[str] = None
+    root_link: str | None = None
     """
     Base link of the robot; typically set to the torso (optional).
     """
 
-    root_normal: Optional[Vector3] = None
+    root_normal: Vector3 | None = None
     """
     Normalized vector representing the desired orientation axis to align with
     (optional).
@@ -96,7 +99,7 @@ class LookingMotion(BaseMotion):
     Camera annotation that should look at the target.
     """
 
-    def perform(self):
+    def perform(self) -> None:
         return
 
     @property

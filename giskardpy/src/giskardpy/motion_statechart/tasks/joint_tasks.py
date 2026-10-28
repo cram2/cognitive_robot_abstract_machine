@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import field, dataclass
-from typing_extensions import List
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -113,7 +112,7 @@ class JointVelocityLimit(Task):
     for each given joint, not by tuning a reference/normalization velocity.
     """
 
-    connections: List[ActiveConnection1DOF] = field(kw_only=True)
+    connections: list[ActiveConnection1DOF] = field(kw_only=True)
     """
     The joints whose velocity is constrained.
     """

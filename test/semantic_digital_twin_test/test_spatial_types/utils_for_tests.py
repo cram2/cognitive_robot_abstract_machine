@@ -1,4 +1,4 @@
-from typing import Union, Iterable
+from typing_extensions import Union, Iterable
 
 import numpy as np
 from numpy import pi

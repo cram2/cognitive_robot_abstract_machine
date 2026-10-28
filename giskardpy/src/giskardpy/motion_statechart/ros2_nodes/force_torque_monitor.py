@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 from geometry_msgs.msg import WrenchStamped
@@ -53,7 +52,7 @@ class ForceImpactMonitor(ForceTorqueNode):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         super().on_tick(context)
         if not self.has_msg():
             return ObservationStateValues.UNKNOWN

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
 
 from giskardpy.executor import Executor
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
@@ -67,7 +66,7 @@ class ControlLoop:
     instead.
     """
 
-    command_publishers: List[CommandPublisher] = field(default_factory=list)
+    command_publishers: list[CommandPublisher] = field(default_factory=list)
     """
     Sends the computed velocities to the robot at the end of every cycle.
     """
