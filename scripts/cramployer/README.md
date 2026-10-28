@@ -58,8 +58,10 @@ Source directories on the host are mounted into the container:
 | ROS packages (`ROS_SOURCE`) | `~/cramployer-workspace/ros_ws/src` | `/workspace/ros_ws/src` |
 
 Setup populates the ROS source directory when it is empty and leaves existing
-contents untouched. Both host locations can be changed in `.env`; they can share
-a parent directory. The container locations stay the same.
+contents untouched. Later setup runs warn if host source files differ from the
+rebuilt image, including added or removed packages and changed files. Git metadata
+and Python caches are ignored. Both host locations can be changed in `.env`;
+they can share a parent directory. The container locations stay the same.
 
 For the commands below, enter the launcher directory:
 
@@ -149,7 +151,8 @@ Blank lines and `#` comments are supported. Run `./cramployer setup` after chang
 
 ### Python dependencies
 
-All workspace packages and the root development dependencies are installed.
+CI and cramployer use the same `scripts/install_dependencies.sh` in the selected
+checkout. All workspace packages and the root development dependencies are installed.
 Optional dependencies are configured in `.env`:
 
 ```dotenv
@@ -238,8 +241,10 @@ cd scripts/cramployer
 ```
 
 Docker reuses matching build layers and its download cache. Host ROS sources are
-not overwritten or automatically pulled; review and update them if upstream ROS
-repositories or revisions change. Incremental ROS builds retain artifacts from
+not overwritten or automatically pulled. If setup warns that sources differ from
+the image, review your local changes and update the sources manually, or select a
+fresh `ROS_SOURCE` and `VOLUME_PREFIX` in `.env` and rerun setup. This keeps the old
+sources and build data available. Incremental ROS builds retain artifacts from
 deleted packages.
 
 Volumes survive shell exit. Remove them only if you intend to discard their build

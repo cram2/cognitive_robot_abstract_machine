@@ -1,6 +1,0 @@
-# %% Named installation action without shell commands
-jobs:
-  test:
-    steps:
-      - name: Install dependencies
-        uses: example/install@v1

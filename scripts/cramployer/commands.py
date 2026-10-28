@@ -127,11 +127,6 @@ class EnvironmentSetup(DeploymentCommand):
     ROS image build context relative to the editable checkout.
     """
 
-    workflow_path: Path = Path(".github/workflows/ci_reusable.yml")
-    """
-    Installation workflow required before building images.
-    """
-
     def execute(self, arguments: tuple[str, ...]) -> int:
         self.prepare_checkout()
         self.build_base_image()
@@ -176,7 +171,7 @@ class EnvironmentSetup(DeploymentCommand):
             configuration.source_checkout
             / self.base_image_directory
             / FileName.DOCKERFILE,
-            configuration.source_checkout / self.workflow_path,
+            configuration.source_checkout / FileName.DEPENDENCY_INSTALLER,
         ):
             required_path.resolve(strict=True)
         configuration.run(
@@ -191,13 +186,22 @@ class EnvironmentSetup(DeploymentCommand):
 
     def prepare_sources(self) -> None:
         """
-        Seed empty host ROS sources from the base image.
+        Seed empty ROS sources and warn when preserved sources differ from the image.
         """
         self.configuration.robot_workspace_sources.mkdir(parents=True, exist_ok=True)
-        if any(self.configuration.robot_workspace_sources.iterdir()):
-            return
         with SourceContainer(self.configuration) as container:
-            container.copy_sources()
+            if not any(self.configuration.robot_workspace_sources.iterdir()):
+                container.copy_sources()
+                return
+            if not container.matches_sources():
+                print(
+                    f"Warning: ROS sources at {self.configuration.robot_workspace_sources} "
+                    f"differ from {DeploymentName.BASE_IMAGE}:{DeploymentName.SOURCE_ARCHIVE}. "
+                    "Local sources are preserved and will overlay the image. "
+                    "Review local changes, or select a fresh ROS_SOURCE and VOLUME_PREFIX "
+                    "in .env and rerun setup to use the updated image sources.",
+                    file=sys.stderr,
+                )
 
     def build_development_image(self) -> None:
         """

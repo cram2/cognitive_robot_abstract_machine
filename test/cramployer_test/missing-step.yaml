@@ -1,6 +1,0 @@
-# %% Changed CI structure
-jobs:
-  test:
-    steps:
-      - name: Renamed installation
-        run: exit 1

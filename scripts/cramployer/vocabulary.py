@@ -1,4 +1,4 @@
-"""Names shared by installation configuration and workflow parsing."""
+"""Names shared by dependency installation and deployment configuration."""
 
 from __future__ import annotations
 
@@ -6,22 +6,10 @@ from __future__ import annotations
 from enum import StrEnum
 
 
-# %% Workflow and package metadata
+# %% Package and service metadata
 class PayloadKey(StrEnum):
-    """Keys in GitHub Actions, Compose, and project metadata."""
+    """Keys in Compose and project metadata."""
 
-    JOBS = "jobs"
-    """Workflow jobs."""
-    TEST = "test"
-    """Job providing installation steps."""
-    STEPS = "steps"
-    """Ordered job steps."""
-    NAME = "name"
-    """Step title."""
-    RUN = "run"
-    """Step shell commands."""
-    STEP_ENVIRONMENT = "env"
-    """Step environment variables."""
     TOOL = "tool"
     """Tool-specific project configuration."""
     UV = "uv"
@@ -42,19 +30,8 @@ class PayloadKey(StrEnum):
     """Resolved service environment."""
 
 
-class StepTitle(StrEnum):
-    """Installation steps supplied by the repository workflow."""
-
-    WORKSPACE = "Install dependencies"
-    """Required workspace installation."""
-    ROBOKUDO = "Install robokudo optional requirements"
-    """Optional RoboKudo installation."""
-    DRAKE = "Install drake"
-    """Optional Drake installation."""
-
-
 class OptionalPackage(StrEnum):
-    """Packages with additional installation steps in CI."""
+    """Packages with optional dependency installation."""
 
     ROBOKUDO = "robokudo"
     """Visual perception package."""
@@ -68,7 +45,7 @@ class DependencySource(StrEnum):
     DEFAULT = "default"
     """Use the normal package index."""
     PROCESSOR_ONLY = "cpu"
-    """Retain CI's CPU-only package index."""
+    """Select the CPU-only PyTorch package index."""
 
 
 # %% Installation files and shell vocabulary
@@ -83,21 +60,8 @@ class FileName(StrEnum):
     """Image build instructions."""
     PROJECT = "pyproject.toml"
     """Package and workspace metadata."""
-    CHECKOUT = "cognitive_robot_abstract_machine"
-    """Checkout directory expected by CI steps."""
-    SHELL_PREAMBLE = "installation.sh"
-    """Shell environment for image installation."""
-    EXTRA_TEMPLATE = "workspace-extra.sh"
-    """Command template for an optional workspace feature."""
-
-
-class ShellSyntax(StrEnum):
-    """Foreign syntax that cannot be evaluated during image installation."""
-
-    GITHUB_EXPRESSION = "${{"
-    """Expression requiring a GitHub Actions runner."""
-    PROCESSOR_INDEX = "--extra-index-url https://download.pytorch.org/whl/cpu"
-    """CI's explicit PyTorch CPU index selection."""
+    DEPENDENCY_INSTALLER = "scripts/install_dependencies.sh"
+    """Shared dependency installation entry point relative to a checkout."""
 
 
 class Program(StrEnum):

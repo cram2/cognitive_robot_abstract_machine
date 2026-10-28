@@ -12,11 +12,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
 
 # %% Standalone installation failures
 @dataclass
@@ -44,57 +39,19 @@ class InstallationError(ValueError, ABC):
 @dataclass
 class UnsupportedPackages(InstallationError):
     """
-    Optional package selections without corresponding CI installation steps.
+    Optional package selections unsupported by the shared installer.
     """
 
     packages: tuple[str, ...]
     """Unsupported package selections."""
 
     def error_message(self) -> str:
-        return f"Unsupported CI packages: {', '.join(self.packages)}."
+        return f"Unsupported optional packages: {', '.join(self.packages)}."
 
     def suggest_correction(self) -> str:
-        return "Select packages listed in cramployer's CI dependency documentation."
-
-
-@dataclass
-class MissingWorkflowStep(InstallationError):
-    """
-    A required installation step is absent or ambiguous.
-    """
-
-    title: str
-    """Expected installation step title."""
-    occurrences: int
-    """
-    Number of matching workflow steps.
-    """
-
-    def error_message(self) -> str:
-        return f"Expected one CI step titled {self.title!r}; found {self.occurrences}."
-
-    def suggest_correction(self) -> str:
-        return "Review the installation step titles in the reusable CI workflow."
-
-
-@dataclass
-class InvalidWorkflowStep(InstallationError):
-    """
-    An installation step contains commands or environment values requiring review.
-    """
-
-    title: str
-    """Installation step requiring review."""
-    setting: str
-    """
-    Command or environment setting that cannot be executed.
-    """
-
-    def error_message(self) -> str:
-        return f"CI step {self.title!r} has an unsupported setting: {self.setting}."
-
-    def suggest_correction(self) -> str:
-        return "Use literal shell commands and string environment values without GitHub expressions."
+        return (
+            "Select optional packages listed in cramployer's dependency documentation."
+        )
 
 
 @dataclass
@@ -145,22 +102,6 @@ class InvalidDependencySource(InstallationError):
 
     def suggest_correction(self) -> str:
         return "Set TORCH_MODE to default or cpu."
-
-
-@dataclass
-class CheckoutConflict(InstallationError):
-    """
-    CI's checkout path belongs to another directory or file.
-    """
-
-    checkout: Path
-    """Existing path conflicting with the installation checkout."""
-
-    def error_message(self) -> str:
-        return f"The CI checkout path points elsewhere: {self.checkout}."
-
-    def suggest_correction(self) -> str:
-        return "Use an installation directory without a conflicting CI checkout path."
 
 
 # %% Host resource failures

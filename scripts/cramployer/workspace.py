@@ -8,8 +8,6 @@ from __future__ import annotations
 import shlex
 import tomllib
 from dataclasses import dataclass
-from pathlib import Path
-from string import Template
 
 from typing_extensions import TYPE_CHECKING
 
@@ -17,6 +15,7 @@ from scripts.cramployer.exceptions import UnknownWorkspaceExtra, UnknownWorkspac
 from scripts.cramployer.vocabulary import CommandArgument, FileName, PayloadKey, Program
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from typing_extensions import Any, Self
 
 
@@ -96,7 +95,7 @@ class WorkspaceFeature:
         """
         Build the command that installs the extra while preserving installed packages.
         """
-        command = shlex.join(
+        return shlex.join(
             [
                 Program.UV,
                 CommandArgument.SYNC,
@@ -108,9 +107,3 @@ class WorkspaceFeature:
                 self.extra,
             ]
         )
-        template = Template(
-            (Path(__file__).parent / FileName.EXTRA_TEMPLATE).read_text()
-        )
-        return template.substitute(
-            checkout=shlex.quote(FileName.CHECKOUT), command=command
-        ).rstrip()

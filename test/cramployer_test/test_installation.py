@@ -1,20 +1,19 @@
 """
-Check CI command reuse without installing packages or contacting services.
+Check shared installation commands without installing packages or contacting services.
 """
 
 from __future__ import annotations
 
 # %% Imports
+import shlex
 import subprocess
 
 from typing_extensions import TYPE_CHECKING
 
 import pytest
-import yaml
 
 from scripts.cramployer.installation import Installation
 from scripts.cramployer.exceptions import (
-    MissingWorkflowStep,
     UnsupportedPackages,
     UnknownWorkspaceExtra,
 )
@@ -22,11 +21,9 @@ from scripts.cramployer.vocabulary import (
     CommandArgument,
     OptionalPackage,
     Program,
-    ShellSyntax,
-    StepTitle,
     DependencySource,
+    FileName,
 )
-from scripts.cramployer.workflow import Workflow
 
 from .dataset.paths import FixturePath
 from scripts.cramployer.launcher_vocabulary import ExitStatus
@@ -36,54 +33,32 @@ if TYPE_CHECKING:
 
 
 # %% Installation commands
-def test_processor_installation_preserves_current_workflow_commands(
-    repository: Path,
+@pytest.mark.parametrize("mode", list(DependencySource))
+def test_installation_calls_shared_script(
+    repository: Path, mode: DependencySource
 ) -> None:
     """
-    Keep both installation blocks unchanged in CPU mode.
+    Pass dependency selections to the checkout's shared installer.
     """
-    workflow = Workflow.from_json(
-        yaml.safe_load((repository / FixturePath.WORKFLOW).read_text())
-    )
-    selected = [
-        step.shell_commands
-        for step in workflow.steps
-        if step.title in (StepTitle.WORKSPACE, StepTitle.ROBOKUDO)
+    assert shlex.split(Installation(repository, mode).build_commands()) == [
+        Program.BASH,
+        str(repository / FileName.DEPENDENCY_INSTALLER),
+        mode,
+        OptionalPackage.ROBOKUDO,
     ]
-    assert Installation(
-        repository, DependencySource.PROCESSOR_ONLY
-    ).build_commands() == "\n".join("(\n" + command + "\n)" for command in selected)
 
 
-def test_default_installation_removes_processor_index(repository: Path) -> None:
+def test_missing_shared_installer_fails_before_installation(tmp_path: Path) -> None:
     """
-    Allow the package index to supply GPU-capable PyTorch wheels.
+    Reject a checkout without the shared dependency installer.
     """
-    processor_commands = Installation(
-        repository, DependencySource.PROCESSOR_ONLY
-    ).build_commands()
-    assert ShellSyntax.PROCESSOR_INDEX in processor_commands
-    assert Installation(
-        repository, DependencySource.DEFAULT
-    ).build_commands() == processor_commands.replace(ShellSyntax.PROCESSOR_INDEX, "")
-
-
-def test_missing_workflow_step_fails_before_installation(tmp_path: Path) -> None:
-    """
-    Require review when the workflow no longer exposes the selected steps.
-    """
-    workflow_directory = (tmp_path / FixturePath.WORKFLOW).parent
-    workflow_directory.mkdir(parents=True)
-    (workflow_directory / FixturePath.WORKFLOW.name).write_text(
-        FixturePath.MISSING_STEP.read_text()
-    )
-    with pytest.raises(MissingWorkflowStep):
+    with pytest.raises(FileNotFoundError):
         Installation(tmp_path, DependencySource.PROCESSOR_ONLY).build_commands()
 
 
 def test_installation_blocks_have_valid_shell_syntax(repository: Path) -> None:
     """
-    Check generated subshell boundaries against the actual workflow.
+    Check the generated installation commands for valid shell syntax.
     """
     result = subprocess.run(
         [Program.BASH, CommandArgument.SYNTAX_CHECK],
@@ -94,66 +69,38 @@ def test_installation_blocks_have_valid_shell_syntax(repository: Path) -> None:
     assert result.returncode == ExitStatus.SUCCESS
 
 
-def test_workflow_steps_start_from_the_checkout_parent(checkout: Path) -> None:
+def test_installation_runs_in_the_selected_checkout(checkout: Path) -> None:
     """
-    Resolve each CI checkout command independently of the previous step.
+    Run shared dependency installation without a checkout alias.
     """
     Installation(checkout, DependencySource.PROCESSOR_ONLY).install()
-    workflow = Workflow.from_json(yaml.safe_load(FixturePath.INSTALLATION.read_text()))
-    outputs = {
-        FixturePath.FIRST_OUTPUT: StepTitle.WORKSPACE,
-        FixturePath.SECOND_OUTPUT: StepTitle.ROBOKUDO,
-    }
-    for output_path, step_title in outputs.items():
-        step = next(step for step in workflow.steps if step.title == step_title)
-        assert (checkout / output_path).read_text() == next(
-            iter(step.environment.values())
-        )
+    assert (checkout / FixturePath.FIRST_OUTPUT).read_text().splitlines() == [
+        str(checkout),
+        DependencySource.PROCESSOR_ONLY,
+        OptionalPackage.ROBOKUDO,
+    ]
 
 
 # %% Optional package features
-def test_common_installation_can_skip_package_specific_steps(repository: Path) -> None:
+@pytest.mark.parametrize(
+    "packages", [(), (OptionalPackage.SEMANTIC_DIGITAL_TWIN,), tuple(OptionalPackage)]
+)
+def test_installation_passes_optional_packages(
+    repository: Path, packages: tuple[str, ...]
+) -> None:
     """
-    Prepare all workspace members without selecting optional CI packages.
+    Pass selected optional packages to the shared script in order.
     """
-    workflow = Workflow.from_json(
-        yaml.safe_load((repository / FixturePath.WORKFLOW).read_text())
-    )
-    common = next(
-        step.shell_commands
-        for step in workflow.steps
-        if step.title == StepTitle.WORKSPACE
-    )
-    assert (
+    assert shlex.split(
         Installation(
-            repository, DependencySource.PROCESSOR_ONLY, additional_packages=()
+            repository, DependencySource.DEFAULT, additional_packages=packages
         ).build_commands()
-        == "(\n" + common + "\n)"
-    )
-
-
-def test_semantic_digital_twin_selects_its_installation(repository: Path) -> None:
-    """
-    Reuse Drake's installation commands from the current CI workflow.
-    """
-    workflow = Workflow.from_json(
-        yaml.safe_load((repository / FixturePath.WORKFLOW).read_text())
-    )
-    expected = [
-        step.shell_commands
-        for step in workflow.steps
-        if step.title in (StepTitle.WORKSPACE, StepTitle.DRAKE)
-    ]
-    assert Installation(
-        repository,
-        DependencySource.PROCESSOR_ONLY,
-        additional_packages=(OptionalPackage.SEMANTIC_DIGITAL_TWIN,),
-    ).build_commands() == "\n".join("(\n" + command + "\n)" for command in expected)
+    )[-1] == ",".join(packages)
 
 
 def test_unknown_additional_package_is_rejected(repository: Path) -> None:
     """
-    Reject a package selection without a supported optional CI step.
+    Reject unsupported optional dependency selections.
     """
     with pytest.raises(UnsupportedPackages):
         Installation(
@@ -172,7 +119,7 @@ def test_workspace_extra_selects_the_package_extra(repository: Path) -> None:
         DependencySource.PROCESSOR_ONLY,
         workspace_extras=("semantic_digital_twin:iris",),
     ).build_commands()
-    assert commands.splitlines()[-2] == (
+    assert commands.splitlines()[-1] == (
         " ".join(
             [
                 Program.UV,

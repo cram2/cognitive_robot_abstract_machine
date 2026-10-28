@@ -27,7 +27,7 @@ class EnvironmentVariable(StrEnum):
     DEPENDENCY_SOURCE = "TORCH_MODE"
     """PyTorch dependency index selection."""
     ADDITIONAL_PACKAGES = "CI_PACKAGES"
-    """Optional package-specific CI installations."""
+    """Packages whose optional dependencies are installed."""
     WORKSPACE_EXTRAS = "WORKSPACE_EXTRAS"
     """Optional workspace dependency groups."""
     PROJECT_NAME = "COMPOSE_PROJECT_NAME"
@@ -197,7 +197,7 @@ class BuildArgument(StrEnum):
     DEPENDENCY_SOURCE = "TORCH_MODE"
     """PyTorch dependency source."""
     ADDITIONAL_PACKAGES = "CI_PACKAGES"
-    """Optional package-specific dependencies."""
+    """Packages whose optional dependencies are installed."""
     WORKSPACE_EXTRAS = "WORKSPACE_EXTRAS"
     """Optional workspace dependency groups."""
 

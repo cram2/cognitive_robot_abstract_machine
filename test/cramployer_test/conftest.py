@@ -16,13 +16,14 @@ import pytest
 from .dataset.deployment import DevelopmentEnvironment
 from .dataset.docker import EnvironmentVariable
 from .dataset.paths import FixturePath
+from scripts.cramployer.vocabulary import FileName
 
 
 # %% Checkout fixtures
 @pytest.fixture
 def repository() -> Path:
     """
-    Provide the repository whose workflow supplies installation commands.
+    Provide the repository containing the shared installation script.
     """
     return FixturePath.REPOSITORY
 
@@ -69,13 +70,16 @@ def deployment(
     checkout_directory = tmp_path / FixturePath.CHECKOUT
     (checkout_directory / FixturePath.GIT).mkdir(parents=True)
     (checkout_directory / FixturePath.DOCKER_DIRECTORY).mkdir(parents=True)
-    workflow = checkout_directory / FixturePath.WORKFLOW
-    workflow.parent.mkdir(parents=True)
+    installer = checkout_directory / FileName.DEPENDENCY_INSTALLER
+    installer.parent.mkdir(parents=True)
     (checkout_directory / FixturePath.DOCKER_DIRECTORY / FixturePath.DOCKERFILE).touch()
-    workflow.touch()
+    installer.touch()
     robot_workspace_sources = tmp_path / FixturePath.ROBOT_WORKSPACE_SOURCES
     robot_workspace_sources.mkdir(parents=True)
     (robot_workspace_sources / FixturePath.EXISTING_PACKAGE).touch()
+    monkeypatch.setenv(
+        EnvironmentVariable.SOURCE_DIRECTORY, str(robot_workspace_sources)
+    )
     return DevelopmentEnvironment(directory, docker_executable)
 
 
@@ -83,7 +87,7 @@ def deployment(
 @pytest.fixture
 def checkout_name() -> str:
     """
-    Use a checkout directory distinct from CI's expected directory.
+    Use a checkout directory independent of CI naming conventions.
     """
     return str(FixturePath.CHECKOUT)
 
@@ -91,10 +95,10 @@ def checkout_name() -> str:
 @pytest.fixture
 def checkout(tmp_path: Path, checkout_name: str) -> Path:
     """
-    Provide local installation commands in an isolated checkout.
+    Provide a local installation script in an isolated checkout.
     """
     checkout_directory = tmp_path / checkout_name
-    workflow = checkout_directory / FixturePath.WORKFLOW
-    workflow.parent.mkdir(parents=True)
-    workflow.write_text(FixturePath.INSTALLATION.read_text())
+    installer = checkout_directory / FileName.DEPENDENCY_INSTALLER
+    installer.parent.mkdir(parents=True)
+    shutil.copyfile(FixturePath.INSTALLATION, installer)
     return checkout_directory

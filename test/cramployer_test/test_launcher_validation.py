@@ -20,6 +20,7 @@ from scripts.cramployer.launcher_vocabulary import (
     EnvironmentVariable,
 )
 from scripts.cramployer.vocabulary import CommandArgument
+from scripts.cramployer.vocabulary import FileName
 
 from .dataset.paths import FixturePath
 
@@ -30,14 +31,14 @@ if TYPE_CHECKING:
 
 
 # %% Required build inputs
-def test_setup_requires_the_installation_workflow(
+def test_setup_requires_the_shared_installer(
     deployment: DevelopmentEnvironment, tmp_path: Path
 ) -> None:
     """
     Reject incomplete checkouts before building the base image.
     """
     source_checkout = tmp_path / FixturePath.CHECKOUT
-    (source_checkout / FixturePath.WORKFLOW).unlink()
+    (source_checkout / FileName.DEPENDENCY_INSTALLER).unlink()
     settings = DeploymentSettings(
         deployment.deployment_directory,
         source_checkout,

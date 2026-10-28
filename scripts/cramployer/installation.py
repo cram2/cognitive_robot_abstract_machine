@@ -1,10 +1,10 @@
-"""Install a checkout using its CI dependency commands and selected extras."""
+"""Install a checkout through the shared dependency script and selected extras."""
 
 from __future__ import annotations
 
 # %% Imports
 import argparse
-import os
+import shlex
 import subprocess
 import sys
 import tomllib
@@ -12,11 +12,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-import yaml
 from typing_extensions import TYPE_CHECKING
 
 from scripts.cramployer.exceptions import (
-    CheckoutConflict,
+    InvalidDependencySource,
     UnsupportedPackages,
 )
 from scripts.cramployer.vocabulary import (
@@ -24,17 +23,12 @@ from scripts.cramployer.vocabulary import (
     FileName,
     OptionalPackage,
     Program,
-    StepTitle,
     DependencySource,
 )
-from scripts.cramployer.dependency_index import DependencyIndex
-from scripts.cramployer.workflow import Workflow
 from scripts.cramployer.workspace import Workspace, WorkspaceFeature
 
 if TYPE_CHECKING:
     from typing_extensions import Self, Sequence
-
-    from scripts.cramployer.workflow import WorkflowStep
 
 
 # %% Command-line configuration
@@ -46,7 +40,7 @@ class ArgumentName(StrEnum):
     DEPENDENCY_SOURCE = "dependency_source"
     """PyTorch dependency source."""
     ADDITIONAL_PACKAGES = "additional_packages"
-    """Additional package-specific CI installations."""
+    """Packages whose optional dependencies are installed."""
     WORKSPACE_EXTRAS = "workspace_extras"
     """Optional workspace dependency groups."""
 
@@ -58,21 +52,19 @@ class ArgumentCardinality(StrEnum):
     """Accept zero or one positional value."""
 
 
-# %% CI installation
+# %% Dependency installation
 @dataclass
 class Installation:
-    """Install workspace dependencies selected from checkout configuration."""
+    """Install shared workspace dependencies and selected optional features."""
 
     repository: Path
-    """Checkout whose workflow supplies installation commands."""
+    """Checkout containing the shared dependency installation script."""
     dependency_source: str
     """Requested source for PyTorch dependencies."""
     additional_packages: tuple[str, ...] = (OptionalPackage.ROBOKUDO,)
-    """Packages whose additional CI installation steps are enabled."""
+    """Packages whose optional dependencies are installed."""
     workspace_extras: tuple[str, ...] = ()
     """Optional dependency selections in package:extra form."""
-    workflow_path: Path = Path(".github/workflows/ci_reusable.yml")
-    """Workflow path relative to the checkout."""
 
     @classmethod
     def from_arguments(class_type, arguments: Sequence[str]) -> Self:
@@ -104,32 +96,26 @@ class Installation:
             ),
         )
 
-    def select_steps(self) -> list[WorkflowStep]:
-        """Resolve required and selected optional CI installation steps."""
-        optional_steps: dict[str, StepTitle] = {
-            OptionalPackage.ROBOKUDO: StepTitle.ROBOKUDO,
-            OptionalPackage.SEMANTIC_DIGITAL_TWIN: StepTitle.DRAKE,
-        }
-        unknown_packages = set(self.additional_packages) - optional_steps.keys()
+    def build_commands(self) -> str:
+        """Build validated dependency installation commands for the checkout."""
+        if self.dependency_source not in tuple(DependencySource):
+            raise InvalidDependencySource(self.dependency_source)
+        unknown_packages = set(self.additional_packages) - set(OptionalPackage)
         if unknown_packages:
             raise UnsupportedPackages(tuple(sorted(unknown_packages)))
-        titles = [
-            StepTitle.WORKSPACE,
-            *(
-                optional_steps[package]
-                for package in dict.fromkeys(self.additional_packages)
-            ),
-        ]
-        workflow = Workflow.from_json(
-            yaml.safe_load((self.repository / self.workflow_path).read_text())
+        installer = (self.repository / FileName.DEPENDENCY_INSTALLER).resolve(
+            strict=True
         )
-        return workflow.select_steps(titles)
-
-    def build_commands(self, steps: list[WorkflowStep] | None = None) -> str:
-        """Build validated installation commands for the selected dependencies."""
-        dependency_index = DependencyIndex.from_mode(self.dependency_source)
-        selected = self.select_steps() if steps is None else steps
-        commands = [step.build_commands() for step in selected]
+        commands = [
+            shlex.join(
+                [
+                    Program.BASH,
+                    str(installer),
+                    self.dependency_source,
+                    ",".join(dict.fromkeys(self.additional_packages)),
+                ]
+            )
+        ]
         if self.workspace_extras:
             workspace = Workspace.from_json(
                 tomllib.loads((self.repository / FileName.PROJECT).read_text())
@@ -139,29 +125,10 @@ class Installation:
                 for selection in self.workspace_extras
             ]
             commands.extend(extra.build_commands() for extra in extras)
-        shell_commands = "\n".join(commands)
-        return dependency_index.configure_commands(shell_commands)
-
-    def prepare_checkout(self) -> Path:
-        """Make CI's checkout directory resolve to this repository without replacing paths."""
-        repository = self.repository.resolve()
-        checkout = repository.parent / FileName.CHECKOUT
-        if checkout.resolve() == repository:
-            return repository.parent
-        if checkout.exists() or checkout.is_symlink():
-            raise CheckoutConflict(checkout)
-        checkout.symlink_to(repository, target_is_directory=True)
-        return repository.parent
+        return "\n".join(commands)
 
     def install(self) -> None:
-        """Install the selected dependencies in the active image environment."""
-        steps = self.select_steps()
-        commands = self.build_commands(steps)
-        environment = os.environ.copy()
-        for step in steps:
-            environment.update(step.environment)
-        working_directory = self.prepare_checkout()
-        preamble = (Path(__file__).parent / FileName.SHELL_PREAMBLE).read_text()
+        """Install selected dependencies in the active environment."""
         subprocess.run(
             [
                 Program.BASH,
@@ -169,10 +136,9 @@ class Installation:
                 CommandArgument.OPTION,
                 CommandArgument.PIPELINE_FAILURE,
                 CommandArgument.COMMAND,
-                preamble + "\n" + commands,
+                self.build_commands(),
             ],
-            cwd=working_directory,
-            env=environment,
+            cwd=self.repository,
             check=True,
         )
 

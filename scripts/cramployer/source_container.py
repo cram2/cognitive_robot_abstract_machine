@@ -8,9 +8,12 @@ from __future__ import annotations
 import subprocess
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
 from scripts.cramployer.exceptions import SourceCopyFailed
+from scripts.cramployer.source_tree import SourceTree
 from scripts.cramployer.launcher_vocabulary import (
     ArchiveArgument,
     DeploymentName,
@@ -67,9 +70,9 @@ class SourceContainer(AbstractContextManager[object]):
             capture_output=True,
         )
 
-    def copy_sources(self) -> None:
+    def copy_sources(self, destination: Path | None = None) -> None:
         """
-        Stream the image's source archive into the host ROS source directory.
+        Copy image sources into the destination or configured host source directory.
         """
         configuration = self.configuration
         with subprocess.Popen(
@@ -91,7 +94,11 @@ class SourceContainer(AbstractContextManager[object]):
                     ArchiveArgument.FILE,
                     ArchiveArgument.STANDARD_INPUT,
                     ArchiveArgument.DIRECTORY,
-                    str(configuration.robot_workspace_sources),
+                    str(
+                        destination
+                        if destination is not None
+                        else configuration.robot_workspace_sources
+                    ),
                 ],
                 stdin=archive.stdout,
                 cwd=configuration.deployment_directory,
@@ -101,3 +108,15 @@ class SourceContainer(AbstractContextManager[object]):
             exit_status = archive.wait()
         if exit_status:
             raise SourceCopyFailed(self.container_name, exit_status)
+
+    def matches_sources(self) -> bool:
+        """
+        Check whether host sources have the same content as the image sources.
+        """
+        with TemporaryDirectory() as directory:
+            image_sources = Path(directory)
+            self.copy_sources(image_sources)
+            return (
+                SourceTree(image_sources).read_files()
+                == SourceTree(self.configuration.robot_workspace_sources).read_files()
+            )

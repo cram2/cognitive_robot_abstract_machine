@@ -60,7 +60,7 @@ def test_argument_selections_preserve_package_order(tmp_path: Path) -> None:
 # %% Standalone entry point
 def test_installer_entry_point_runs_fixture_commands(checkout: Path) -> None:
     """
-    Execute local workflow commands through the module entry point.
+    Execute the shared installation script through the module entry point.
     """
     subprocess.run(
         [
@@ -73,4 +73,8 @@ def test_installer_entry_point_runs_fixture_commands(checkout: Path) -> None:
         cwd=FixturePath.REPOSITORY,
         check=True,
     )
-    assert (checkout.parent / FileName.CHECKOUT).resolve() == checkout
+    assert (checkout / FixturePath.FIRST_OUTPUT).read_text().splitlines() == [
+        str(checkout),
+        DependencySource.PROCESSOR_ONLY,
+        OptionalPackage.ROBOKUDO,
+    ]

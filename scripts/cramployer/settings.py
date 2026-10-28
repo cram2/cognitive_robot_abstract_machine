@@ -63,7 +63,7 @@ class DeploymentSettings:
 
     additional_packages: str = OptionalPackage.ROBOKUDO
     """
-    Comma-separated optional package-specific CI installations.
+    Comma-separated packages whose optional dependencies are installed.
     """
 
     workspace_extras: str = ""

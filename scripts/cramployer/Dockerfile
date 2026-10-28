@@ -7,7 +7,7 @@ SHELL ["/bin/bash", "-e", "-o", "pipefail", "-c"]
 ARG TORCH_MODE=default
 ARG CI_PACKAGES=robokudo
 ARG WORKSPACE_EXTRAS=
-COPY installation.py dependency_index.py exceptions.py vocabulary.py workflow.py workspace.py installation.sh workspace-extra.sh /deployment/scripts/cramployer/
+COPY installation.py exceptions.py vocabulary.py workspace.py /deployment/scripts/cramployer/
 RUN --mount=type=bind,from=repository,target=/workspace/cram,rw \
     --mount=type=cache,target=/opt/ros/.uv_cache \
     source /opt/ros/overlay_ws/install/setup.bash && \

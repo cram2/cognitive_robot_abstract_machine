@@ -66,19 +66,9 @@ class FixturePath(PathEnumeration):
     Optional container settings.
     """
 
-    WORKFLOW = Path(".github/workflows/ci_reusable.yml")
+    INSTALLATION = Path(__file__).parent / "installation.sh"
     """
-    Installation workflow within a checkout.
-    """
-
-    INSTALLATION = Path(__file__).parent / "../installation.yaml"
-    """
-    Local commands replacing CI installation steps.
-    """
-
-    MISSING_STEP = Path(__file__).parent / "../missing-step.yaml"
-    """
-    Workflow missing required installation steps.
+    Local script replacing dependency installation.
     """
 
     READ_SOURCE = Path(__file__).parent / "read-source.sh"
@@ -89,6 +79,16 @@ class FixturePath(PathEnumeration):
     SOURCE_PROBE = Path(__file__).parent / "docker-source.py"
     """
     Docker mimic reporting its source checkout.
+    """
+
+    IMAGE_SOURCES = Path("image-sources")
+    """
+    ROS source tree supplied by the base-image mimic.
+    """
+
+    INSTALL_RECORDER = Path(__file__).parent / "install_command.py"
+    """
+    Executable recording package installation requests.
     """
 
     RECORDER = Path(__file__).parent / "docker.py"
@@ -103,12 +103,7 @@ class FixturePath(PathEnumeration):
 
     FIRST_OUTPUT = Path("first-output")
     """
-    Output produced by the first local installation step.
-    """
-
-    SECOND_OUTPUT = Path("second-output")
-    """
-    Output produced by the second local installation step.
+    Output produced by the local installation probe.
     """
 
     CHECKOUT = Path("cram")
