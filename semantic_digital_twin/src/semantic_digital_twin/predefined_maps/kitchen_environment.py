@@ -83,6 +83,14 @@ class KitchenMeasurements:
 
     wall_interior_y: float = -2.480
     """Observed interior plane behind the kitchen run in metres."""
+    refrigerator_wall_interior_x: float = 0.0315
+    """Observed interior plane beside the refrigerator in metres."""
+    refrigerator_return_interior_y: float = -1.4812
+    """Observed kitchen-facing plane of the short wall return in metres."""
+    refrigerator_wall_thickness: float = 0.05
+    """Nominal thickness of the refrigerator-side wall and return in metres."""
+    refrigerator_return_left_x: float = -0.29
+    """Nominal return endpoint toward the adjacent wall along root X in metres."""
     refrigerator_depth: float = 0.581
     """Refrigerator corpus depth under the flush-back constraint in metres."""
     counter_cabinet_depth: float = 0.586
@@ -188,20 +196,45 @@ class KitchenEnvironment:
         )
 
         with world.modify_world():
+            refrigerator_wall_start_y = self.measurements.wall_interior_y - 0.025
+            refrigerator_wall_length = (
+                self.measurements.refrigerator_return_interior_y
+                - refrigerator_wall_start_y
+            )
             south_wall1 = Wall.create_with_new_body_in_world(
                 world=world,
                 name="south_wall1",
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=-2.01),
-                scale=Scale(x=0.05, y=1.00, z=3.00),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=self.measurements.refrigerator_wall_interior_x
+                    - self.measurements.refrigerator_wall_thickness / 2,
+                    y=refrigerator_wall_start_y + refrigerator_wall_length / 2,
+                ),
+                scale=Scale(
+                    x=self.measurements.refrigerator_wall_thickness,
+                    y=refrigerator_wall_length,
+                    z=3.00,
+                ),
             )
 
             south_wall2 = Wall.create_with_new_body_in_world(
                 world=world,
                 name="south_wall2",
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-0.145, y=-1.45, yaw=np.pi / 2
+                    x=(
+                        self.measurements.refrigerator_return_left_x
+                        + self.measurements.refrigerator_wall_interior_x
+                    )
+                    / 2,
+                    y=self.measurements.refrigerator_return_interior_y
+                    + self.measurements.refrigerator_wall_thickness / 2,
+                    yaw=np.pi / 2,
                 ),
-                scale=Scale(x=0.05, y=0.29, z=3.00),
+                scale=Scale(
+                    x=self.measurements.refrigerator_wall_thickness,
+                    y=self.measurements.refrigerator_wall_interior_x
+                    - self.measurements.refrigerator_return_left_x,
+                    z=3.00,
+                ),
             )
 
             south_wall3 = Wall.create_with_new_body_in_world(

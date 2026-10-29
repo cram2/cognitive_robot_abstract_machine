@@ -11,6 +11,8 @@ import pytest
 from semantic_digital_twin.predefined_maps.kitchen_environment import KitchenEnvironment
 from semantic_digital_twin.world import World
 
+from .test_kitchen_environment import visual_world_bounds
+
 
 # %% Measured geometry
 @pytest.fixture
@@ -77,3 +79,43 @@ def test_run_backs_remain_flush_with_wall_interior(
         )
         bounds.append(mesh.bounds)
     assert bounds[0][0, 1] == pytest.approx(bounds[1][1, 1], abs=1e-6)
+
+
+# %% Refrigerator-side wall junctions
+@pytest.mark.parametrize(
+    ("body_name", "axis", "side", "coordinate"),
+    [("south_wall1", 0, 1, 0.0315), ("south_wall2", 1, 0, -1.4812)],
+)
+def test_refrigerator_walls_match_observed_planes(
+    measured_kitchen: World,
+    body_name: str,
+    axis: int,
+    side: int,
+    coordinate: float,
+) -> None:
+    """
+    The two exposed wall faces occupy their measured scan planes.
+    """
+    bounds = visual_world_bounds(measured_kitchen, body_name)
+    assert bounds[side, axis] == pytest.approx(coordinate, abs=1e-6)
+
+
+def test_refrigerator_wall_meets_short_return(measured_kitchen: World) -> None:
+    """
+    The side wall reaches the return face without an open junction.
+    """
+    wall = visual_world_bounds(measured_kitchen, "south_wall1")
+    short_return = visual_world_bounds(measured_kitchen, "south_wall2")
+    assert wall[1, 1] == pytest.approx(short_return[0, 1], abs=1e-6)
+    assert wall[1, 0] == pytest.approx(short_return[1, 0], abs=1e-6)
+
+
+def test_refrigerator_wall_overlaps_east_wall(measured_kitchen: World) -> None:
+    """
+    The side wall remains connected to the wall behind the kitchen run.
+    """
+    wall = visual_world_bounds(measured_kitchen, "south_wall1")
+    east = visual_world_bounds(measured_kitchen, "east_wall")
+    assert wall[0, 1] < east[1, 1]
+    assert east[0, 1] < wall[0, 1]
+    assert wall[0, 0] < east[0, 0] < wall[1, 0]
