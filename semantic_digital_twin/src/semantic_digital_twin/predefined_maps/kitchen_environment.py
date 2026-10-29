@@ -2,13 +2,16 @@ from __future__ import annotations
 
 # %% Imports
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
-from enum import Enum
+import trimesh
+from enum import Enum, StrEnum
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Room, Floor
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Aperture,
     Table,
     Sofa,
     TrashCan,
@@ -40,6 +43,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Point3,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from semantic_digital_twin.utils import create_cache_dir
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -47,7 +51,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale, Color
+from semantic_digital_twin.world_description.geometry import Box, Scale, Color, Mesh
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -74,6 +78,222 @@ class MaximumSpeed(float, Enum):
     Taken from the prismatic joint limits of the apartment description in
     ``iai_apartment``.
     """
+
+
+# %% Wall parts
+class WindowWallPart(StrEnum):
+    """Named bodies and window bays in the predefined kitchen wall."""
+
+    WALL = "north_wall"
+    """Main enclosing wall with window apertures."""
+    CHANNEL = "north_wall_cable_channel"
+    """Surface-mounted service channel near the floor."""
+    LOWER_STRIP = "north_wall_lower_strip"
+    """Exposed surface beneath the channel."""
+    FIRST_WINDOW = "north_window_0"
+    """Window bay beside the kitchen run."""
+    SECOND_WINDOW = "north_window_1"
+    """Middle window bay along the wall."""
+    THIRD_WINDOW = "north_window_2"
+    """Window bay toward the curved room corner."""
+
+
+class WindowWallResource(StrEnum):
+    """Cache categories for generated wall geometry."""
+
+    GEOMETRY = "kitchen_window_wall"
+    """Persistent generated meshes for the measured wall strips."""
+
+
+# %% Surface measurements
+@dataclass
+class WallProfile:
+    """A face coordinate varying linearly along the wall in root coordinates."""
+
+    coordinate_at_reference: float
+    """Face coordinate at the reference position in metres."""
+    along_wall_slope: float = 0.0
+    """Coordinate change per metre along root Y."""
+    reference_y: float = -1.0
+    """Along-wall reference position in metres."""
+
+    def coordinate_at(self, along_wall_y: float) -> float:
+        """Return the face coordinate at an along-wall position."""
+        return self.coordinate_at_reference + self.along_wall_slope * (
+            along_wall_y - self.reference_y
+        )
+
+
+@dataclass
+class WallStrip:
+    """A solid wall-mounted strip bounded by fitted front, top and bottom faces."""
+
+    front: WallProfile
+    """Root X coordinate of the exposed face."""
+    top: WallProfile
+    """Root Z coordinate of the top face."""
+    bottom: WallProfile
+    """Root Z coordinate of the bottom face."""
+
+    def create_in_world(
+        self,
+        world: World,
+        name: WindowWallPart,
+        wall: KitchenWindowWall,
+    ) -> WallPanel:
+        """Add a closed collision and visual solid backed by the wall plane."""
+        panel = WallPanel.create_with_new_body_in_world(name=name, world=world)
+        vertices = [
+            (depth_x, along_wall_y, height_z)
+            for along_wall_y in (wall.start_y, wall.end_y)
+            for depth_x in (
+                self.front.coordinate_at(along_wall_y),
+                wall.interior_x,
+            )
+            for height_z in (
+                self.bottom.coordinate_at(along_wall_y),
+                self.top.coordinate_at(along_wall_y),
+            )
+        ]
+        mesh = Mesh.from_trimesh(
+            trimesh.points.PointCloud(vertices).convex_hull,
+            origin=HomogeneousTransformationMatrix(reference_frame=panel.root),
+            directory=wall.geometry_directory,
+        )
+        geometry = ShapeCollection([mesh], reference_frame=panel.root)
+        panel.root.visual = geometry
+        panel.root.collision = geometry
+        return panel
+
+
+# %% Window recesses
+@dataclass
+class WindowRecess:
+    """An observed window bay with a sill and a closed recessed panel."""
+
+    name: WindowWallPart
+    """Stable name of the window bay."""
+    start_y: float
+    """First opening edge along root Y in metres."""
+    end_y: float
+    """Last opening edge along root Y in metres."""
+    sill_top: float
+    """Sill top above the registered floor in metres."""
+    opening_top: float = 2.960
+    """Upper recess boundary above the floor in metres."""
+
+    def add_to_wall(self, world: World, wall: Wall, model: KitchenWindowWall) -> None:
+        """Cut the window recess and add its sill and closed collision panel."""
+        depth = model.panel_front_x + model.backing_thickness - model.interior_x
+        opening_height = self.opening_top - self.sill_top
+        center_y = (self.start_y + self.end_y) / 2
+        width = self.end_y - self.start_y
+        aperture = Aperture.create_with_new_region_in_world(
+            name=f"{self.name}_opening",
+            world=world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=model.interior_x + depth / 2,
+                y=center_y,
+                z=(self.sill_top + self.opening_top) / 2,
+            ),
+            scale=Scale(depth * 2, width, opening_height),
+        )
+        wall.add(aperture)
+        window_panel = WallPanel.create_with_new_body_in_world(
+            name=f"{self.name}_panel",
+            world=world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=model.panel_front_x + model.panel_thickness / 2,
+                y=center_y,
+                z=(self.sill_top + self.opening_top) / 2,
+            ),
+            scale=Scale(model.panel_thickness, width, opening_height),
+        )
+        for shape in window_panel.root.visual.shapes:
+            shape.color = Color(0.55, 0.75, 0.9, 0.3)
+        sill_depth = model.panel_front_x + model.panel_thickness - model.sill_front_x
+        WallPanel.create_with_new_body_in_world(
+            name=f"{self.name}_sill",
+            world=world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=model.sill_front_x + sill_depth / 2,
+                y=center_y,
+                z=self.sill_top - model.sill_thickness / 2,
+            ),
+            scale=Scale(sill_depth, width, model.sill_thickness),
+        )
+
+
+# %% Window wall construction
+@dataclass
+class KitchenWindowWall:
+    """The lab's window wall with recessed bays and projecting lower features."""
+
+    interior_x: float = 4.986
+    """Observed main room-facing wall plane in metres."""
+    start_y: float = -2.510
+    """Existing wall endpoint beside the kitchen run in metres."""
+    end_y: float = 5.580
+    """Wall endpoint overlapping the existing curved corner in metres."""
+    height: float = 3.0
+    """Retained nominal wall height in metres."""
+    panel_front_x: float = 5.129
+    """Observed window-assembly depth used for closed collision panels in metres."""
+    backing_thickness: float = 0.05
+    """Nominal wall material behind the window-assembly plane in metres."""
+    panel_thickness: float = 0.01
+    """Nominal closed window-panel thickness in metres."""
+    sill_front_x: float = 4.945
+    """Observed roomward sill edge in metres."""
+    sill_thickness: float = 0.02
+    """Approximate sill slab thickness in metres."""
+    windows: tuple[WindowRecess, ...] = field(
+        default_factory=lambda: (
+            WindowRecess(WindowWallPart.FIRST_WINDOW, -2.370, -0.205, 0.619),
+            WindowRecess(WindowWallPart.SECOND_WINDOW, 0.374, 2.542, 0.615),
+            WindowRecess(WindowWallPart.THIRD_WINDOW, 3.124, 5.300, 0.611),
+        )
+    )
+    """Observed window-bay boundaries and sill levels."""
+    cable_channel: WallStrip = field(
+        default_factory=lambda: WallStrip(
+            front=WallProfile(4.92004270, -0.004738043),
+            top=WallProfile(0.24908890, -0.002023020),
+            bottom=WallProfile(0.08430169, -0.002697850),
+        )
+    )
+    """Fitted channel faces extended along the wall."""
+    lower_strip_front: WallProfile = field(
+        default_factory=lambda: WallProfile(4.94318739, -0.004332790)
+    )
+    """Observed face of the exposed strip below the channel."""
+    geometry_directory: Path = field(
+        default_factory=lambda: create_cache_dir(WindowWallResource.GEOMETRY)
+    )
+    """Persistent directory for generated collision and visual meshes."""
+
+    def create_in_world(self, world: World) -> Wall:
+        """Add the windowed wall and its fixed surface-mounted features."""
+        depth = self.panel_front_x + self.backing_thickness - self.interior_x
+        wall = Wall.create_with_new_body_in_world(
+            name=WindowWallPart.WALL,
+            world=world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=self.interior_x + depth / 2,
+                y=(self.start_y + self.end_y) / 2,
+            ),
+            scale=Scale(depth, self.end_y - self.start_y, self.height),
+        )
+        for window in self.windows:
+            window.add_to_wall(world, wall, self)
+        self.cable_channel.create_in_world(world, WindowWallPart.CHANNEL, self)
+        lower_strip = WallStrip(
+            front=self.lower_strip_front,
+            top=self.cable_channel.bottom,
+            bottom=WallProfile(0.0),
+        )
+        lower_strip.create_in_world(world, WindowWallPart.LOWER_STRIP, self)
+        return wall
 
 
 # %% Measured kitchen geometry
@@ -105,6 +325,8 @@ class KitchenMeasurements:
     """Measured island corpus centre along root Y in metres."""
     island_yaw: float = np.pi / 2 + np.radians(0.3315143615)
     """Measured island orientation about the root vertical axis in radians."""
+    window_wall: KitchenWindowWall = field(default_factory=KitchenWindowWall)
+    """Observed oven-side wall recesses and surface-mounted features."""
 
 
 # %% Environment construction
@@ -286,9 +508,11 @@ class KitchenEnvironment:
                 world=world,
                 name="east_wall",
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=2.462, y=self.measurements.wall_interior_y - 0.025, yaw=np.pi / 2
+                    x=self.measurements.window_wall.interior_x / 2,
+                    y=self.measurements.wall_interior_y - 0.025,
+                    yaw=np.pi / 2,
                 ),
-                scale=Scale(0.05, 4.924, 3.00),
+                scale=Scale(0.05, self.measurements.window_wall.interior_x, 3.00),
             )
 
             middle_wall = Wall.create_with_new_body_in_world(
@@ -309,14 +533,7 @@ class KitchenEnvironment:
                 scale=Scale(0.05, 4.449, 3.00),
             )
 
-            north_wall = Wall.create_with_new_body_in_world(
-                world=world,
-                name="north_wall",
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=4.949, y=1.51
-                ),
-                scale=Scale(0.05, 8.04, 3.00),
-            )
+            self.measurements.window_wall.create_in_world(world)
 
             world.add_connection(root_C_north_west_wall)
             return world
