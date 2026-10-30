@@ -3,9 +3,9 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import StrEnum
 from time import sleep
-from typing import Optional
-from typing_extensions import Dict, Set
 from uuid import UUID
+
+import numpy as np
 
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
@@ -25,9 +25,11 @@ from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
+from semantic_digital_twin.datastructures.unique_entity_names import UniqueEntityNames
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
+    Connection,
     KinematicStructureEntity,
 )
 
@@ -46,19 +48,13 @@ class TfTopic(StrEnum):
 
 
 @dataclass
-class TfFrameNames:
+class TfFrameNames(UniqueEntityNames):
     """
-    Names the tf frame every kinematic structure entity is published under.
+    Names the tf frame every kinematic structure entity is published under, unique
+    across the whole tf tree.
 
-    Frame names must be unique across the whole tf tree, while entity names need not be
-    unique even within one world. Only entities that actually share a name are told
-    apart, by appending their identifier; every other frame keeps the entity's name. An
-    entity another publisher already broadcasts therefore keeps that publisher's frame
-    name, which is where our tree joins theirs.
-
-    The name an entity is first published under is kept for as long as this publisher
-    lives, so a frame never moves to another entity and an entity arriving later never
-    renames the ones already on the tree.
+    An entity another publisher already broadcasts keeps that publisher's frame name,
+    which is where our tree joins theirs.
     """
 
     prefix: str = field(default="", kw_only=True)
@@ -70,39 +66,8 @@ class TfFrameNames:
     body ``copy/milk``, while ``"copy"`` would name it ``copymilk``.
     """
 
-    _frame_name_per_entity: Dict[UUID, str] = field(init=False, default_factory=dict)
-    """
-    The frame name each entity has been published under so far.
-    """
-
-    _assigned_frame_names: Set[str] = field(init=False, default_factory=set)
-    """
-    Every frame name handed out so far, kept even after the entity holding it is gone so
-    that no later entity can take over a name someone may still be following.
-    """
-
-    def assign(self, entity: KinematicStructureEntity) -> str:
-        """
-        :param entity: The entity about to be published.
-        :return: the tf frame name of an entity, giving it one if it has none yet.
-        """
-        if entity.id in self._frame_name_per_entity:
-            return self._frame_name_per_entity[entity.id]
-
-        frame_name = self._unused_frame_name_for(entity)
-        self._frame_name_per_entity[entity.id] = frame_name
-        self._assigned_frame_names.add(frame_name)
-        return frame_name
-
-    def _unused_frame_name_for(self, entity: KinematicStructureEntity) -> str:
-        """
-        :param entity: The entity about to be published.
-        :return: the frame name a not yet published entity should get.
-        """
-        frame_name = f"{self.prefix}{entity.name}"
-        if frame_name not in self._assigned_frame_names:
-            return frame_name
-        return f"{frame_name}_{entity.id.hex}"
+    def preferred_name(self, entity: KinematicStructureEntity) -> str:
+        return f"{self.prefix}{entity.name}"
 
 
 @dataclass(eq=False)
@@ -124,16 +89,32 @@ class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
         init=False, default_factory=OrderedDict
     )
     """
-    Maps kinematic structure entity ids which are directly connected to the
-    corresponding position and quaternion expressions.
+    Maps the ids of the parent and child of every published connection whose origin
+    depends on the world state to its position and quaternion expression.
+    """
 
-    If either parent or child is in the ignored_kinematic_structure_entities set, the
-    connection is not included in this dictionary.
+    fixed_connections_to_expression: dict[tuple[UUID, UUID], Matrix] = field(
+        init=False, default_factory=OrderedDict
+    )
+    """
+    Maps the ids of the parent and child of every published connection whose origin
+    does not depend on the world state to its position and quaternion expression.
     """
 
     tf_message: TFMessage = field(init=False)
     """
-    Cache for the tf message that is published.
+    Cache for the tf message that is published on every state change.
+    """
+
+    static_tf_message: TFMessage = field(init=False)
+    """
+    The transforms of :attr:`fixed_connections_to_expression`, published once per model
+    change.
+    """
+
+    static_tf_pub: Publisher = field(init=False)
+    """
+    Publisher of :attr:`static_tf_message`, latched for late subscribers.
     """
 
     compiled_tf: CompiledFunction = field(init=False)
@@ -146,22 +127,43 @@ class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
     The tf frame name of every entity published so far.
     """
 
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.static_tf_pub = self.node.create_publisher(
+            TFMessage,
+            TfTopic.STATIC,
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL),
+        )
+
     def on_model_change(self, **kwargs):
         self.update_connections_to_expression()
         self.compile_tf_expression()
         self.init_tf_message()
+        self.static_tf_pub.publish(self.static_tf_message)
+
+    def stop(self) -> None:
+        self.node.destroy_publisher(self.static_tf_pub)
+        super().stop()
 
     def update_connections_to_expression(self):
+        """
+        Sorts every connection that is not ignored into
+        :attr:`connections_to_expression` or :attr:`fixed_connections_to_expression`.
+        """
         self.connections_to_expression.clear()
+        self.fixed_connections_to_expression.clear()
         for connection in self._world.connections:
             if (
                 connection.parent in self.ignored_kinematic_structure_entities
                 and connection.child in self.ignored_kinematic_structure_entities
             ):
                 continue
-            self.connections_to_expression[
-                (connection.parent.id, connection.child.id)
-            ] = connection.origin_as_position_quaternion()
+            expression = connection.origin_as_position_quaternion()
+            if expression.is_constant():
+                published = self.fixed_connections_to_expression
+            else:
+                published = self.connections_to_expression
+            published[(connection.parent.id, connection.child.id)] = expression
 
     def compile_tf_expression(self):
         tf = Matrix.vstack([pose for pose in self.connections_to_expression.values()])
@@ -175,39 +177,61 @@ class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
         self.compiled_tf.bind_args_to_memory_view(0, self._world.state.positions)
 
     def init_tf_message(self):
-        self.tf_message = TFMessage()
-        self.tf_message.transforms = [
-            TransformStamped() for _ in range(len(self.connections_to_expression))
-        ]
-        for i, (parent_link_id, child_link_id) in enumerate(
-            self.connections_to_expression
-        ):
-            parent_link = self._world.get_kinematic_structure_entity_by_id(
-                parent_link_id
-            )
-            child_link = self._world.get_kinematic_structure_entity_by_id(child_link_id)
+        """
+        Builds :attr:`tf_message` with the frames of every connection whose origin
+        depends on the world state, and :attr:`static_tf_message` complete with the
+        transforms of every other one.
 
-            self.tf_message.transforms[i].header.frame_id = self.frame_names.assign(
-                parent_link
-            )
-            self.tf_message.transforms[i].child_frame_id = self.frame_names.assign(
-                child_link
-            )
+        Frame names are assigned in the order of the world's connections, whichever
+        message a connection goes to.
+        """
+        self.tf_message = TFMessage()
+        self.static_tf_message = TFMessage()
+        current_time = self.node.get_clock().now().to_msg()
+        for connection in self._world.connections:
+            ids = (connection.parent.id, connection.child.id)
+            if ids in self.connections_to_expression:
+                self.tf_message.transforms.append(self._transform_between(connection))
+            elif ids in self.fixed_connections_to_expression:
+                transform = self._transform_between(connection)
+                transform.header.stamp = current_time
+                self._write_pose(
+                    transform, self.fixed_connections_to_expression[ids].to_np().ravel()
+                )
+                self.static_tf_message.transforms.append(transform)
+
+    def _transform_between(self, connection: Connection) -> TransformStamped:
+        """
+        :param connection: A published connection.
+        :return: A transform from the frame of its parent to the frame of its child.
+        """
+        transform = TransformStamped()
+        transform.header.frame_id = self.frame_names.assign(connection.parent)
+        transform.child_frame_id = self.frame_names.assign(connection.child)
+        return transform
+
+    @staticmethod
+    def _write_pose(transform: TransformStamped, pose: np.ndarray) -> None:
+        """
+        :param transform: The transform to write into.
+        :param pose: The position followed by the quaternion of the transform.
+        """
+        transform.transform.translation.x = pose[0]
+        transform.transform.translation.y = pose[1]
+        transform.transform.translation.z = pose[2]
+        transform.transform.rotation.x = pose[3]
+        transform.transform.rotation.y = pose[4]
+        transform.transform.rotation.z = pose[5]
+        transform.transform.rotation.w = pose[6]
 
     def update_tf_message(self):
         if self.compiled_tf.is_result_empty():
             return
         tf_data = self.compiled_tf.evaluate()
         current_time = self.node.get_clock().now().to_msg()
-        for i, (p_T_c, pose) in enumerate(zip(self.tf_message.transforms, tf_data)):
+        for p_T_c, pose in zip(self.tf_message.transforms, tf_data):
             p_T_c.header.stamp = current_time
-            p_T_c.transform.translation.x = pose[0]
-            p_T_c.transform.translation.y = pose[1]
-            p_T_c.transform.translation.z = pose[2]
-            p_T_c.transform.rotation.x = pose[3]
-            p_T_c.transform.rotation.y = pose[4]
-            p_T_c.transform.rotation.z = pose[5]
-            p_T_c.transform.rotation.w = pose[6]
+            self._write_pose(p_T_c, pose)
 
 
 @dataclass(eq=False)
@@ -253,7 +277,7 @@ class TFPublisher(StateChangeCallback, HasROS2Node):
     The tf frame name of every entity this publisher publishes.
     """
 
-    root_link_pub: Optional[Publisher] = field(init=False, default=None)
+    root_link_pub: Publisher | None = field(init=False, default=None)
     """
     Publisher of the static transform joining a prefixed tree to the unprefixed one,
     kept for as long as this publisher lives so the transform stays latched.
@@ -339,6 +363,7 @@ class TFPublisher(StateChangeCallback, HasROS2Node):
         tf_wrapper = TFWrapper(node=node)
         sleep(wait_for_existing_tf)
         all_frames = set(tf_wrapper.get_tf_frames())
+        tf_wrapper.stop()
         ignored_bodies = set(
             kse
             for kse in world.kinematic_structure_entities

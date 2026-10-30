@@ -5,11 +5,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from os.path import dirname
 
-from typing_extensions import (
-    Dict,
-    Any,
-    Optional,
-)
+from typing_extensions import Any
 
 from krrood.ripple_down_rules.rdr import GeneralRDR
 
@@ -35,7 +31,7 @@ class CaseReasoner:
     The case instance on which the reasoning is performed.
     """
 
-    result: Optional[ReasoningResult] = field(init=False, default=None)
+    result: ReasoningResult | None = field(init=False, default=None)
     """
     The latest result of the :py:meth:`reason` call.
     """
@@ -58,7 +54,7 @@ class CaseReasoner:
             model_name=f"{self.case.__class__.__name__.lower()}_rdr",
         )
 
-    def reason(self) -> Dict[str, Any]:
+    def reason(self) -> dict[str, Any]:
         """
         Perform rule-based reasoning on the current semantic annotation and infer all
         possible concepts.

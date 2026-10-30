@@ -1,44 +1,55 @@
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass
 from pathlib import Path
+
 import pooch
+from filelock import FileLock
 
-# ---- Configuration ----
-DATA_PACKAGE_NAME: str = "robokudo_test_data"
-DATA_VERSION: str = "b991b2f15cd734672f449349a9e566fb67aad81e"
-KNOWN_HASH: str = (
-    "sha256:b9150798870b7e7d067387dc295e661a55e2360c8c9cd944b6815d0ec59047e5"
-)
 
-URL: str = (
-    "https://gitlab.informatik.uni-bremen.de/robokudo/robokudo_test_data/-/jobs/artifacts/"
-    f"{DATA_VERSION}/raw/robokudo_test_data-{DATA_VERSION}.zip?job=package_zip"
-)
+# %% Test dataset
+@dataclass(frozen=True)
+class TestDataset:
+    """
+    Identify the downloadable RoboKudo test dataset.
+    """
 
-FILENAME: str = f"{DATA_PACKAGE_NAME}.zip"
+    package_name: str = "robokudo_test_data"
+    """
+    Dataset archive and cache name.
+    """
+
+    revision: str = "859e8ef72d820de229bef3ef3e80f61e8be9643e"
+    """
+    Repository revision packaged in the archive.
+    """
+
+    checksum: str | None = (
+        "sha256:370ea67e870ae5b25a7de46eab046167ae825836d223b5d2527d5a3194d872d5"
+    )
+    """
+    Expected archive checksum.
+    """
 
 
 def test_data_path() -> Path:
     """
-    Retrieve Robokudo test data, downloading and unpacking if needed.
-
-    :return: Path to the root extracted dataset directory in the local cache.
-
-    .. warning::
-       This function performs network I/O on first use.
+    Retrieve the extracted dataset directory, downloading it when absent.
     """
-    downloader = pooch.HTTPDownloader()
-
-    # Download + verify + unzip
-    extracted_files = pooch.retrieve(
-        url=f"{URL}",
-        known_hash=KNOWN_HASH,
-        path=pooch.os_cache(DATA_PACKAGE_NAME),  # ~/.cache/DATA_PACKAGE_NAME
-        fname=FILENAME,
-        downloader=downloader,
-        processor=pooch.Unzip(),
-    )
-
-    # Pooch returns list of extracted file paths
-    # We usually want the root extracted directory:
-    extracted_dir = Path(extracted_files[0]).parents[0]
-
-    return extracted_dir
+    dataset = TestDataset()
+    cache_directory = Path(pooch.os_cache(dataset.package_name))
+    cache_directory.mkdir(parents=True, exist_ok=True)
+    with FileLock(cache_directory / f"{dataset.package_name}.zip.lock"):
+        extracted_files = pooch.retrieve(
+            url=(
+                "https://gitlab.informatik.uni-bremen.de/robokudo/robokudo_test_data/-/jobs/artifacts/"
+                f"{dataset.revision}/raw/{dataset.package_name}-{dataset.revision}.zip?job=package_zip"
+            ),
+            known_hash=dataset.checksum,
+            path=cache_directory,
+            fname=f"{dataset.package_name}.zip",
+            downloader=pooch.HTTPDownloader(),
+            processor=pooch.Unzip(),
+        )
+    return Path(extracted_files[0]).parent

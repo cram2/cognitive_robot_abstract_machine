@@ -41,10 +41,9 @@ print(new_semantic_annotations)
 print(kitchen_world.semantic_annotations)
 ```
 
-Inferring also wires up what belongs together: a drawer is given the handle mounted on it, a cabinet is given the
-drawers and doors that open out of it, and every drawer and door is given the
-{py:class}`semantic_digital_twin.semantic_annotations.semantic_annotations.Slider` or
-{py:class}`semantic_digital_twin.semantic_annotations.semantic_annotations.Hinge` that already moves it.
+Inferring also wires up what belongs together: a drawer is given the handle mounted on it, and a cabinet is given the
+drawers and doors that open out of it. The kinematic structure is left as it is, so every drawer and door keeps hanging
+on the prismatic or revolute connection that already moves it, which its `movable_joint` property returns.
 
 {py:meth}`~semantic_digital_twin.reasoning.world_reasoner.WorldReasoner.reason` returns every world attribute the
 reasoner has rules for, keyed by attribute name, and only re-runs when the world model has changed since the last call.

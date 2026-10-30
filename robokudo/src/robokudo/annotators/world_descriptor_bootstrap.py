@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from timeit import default_timer
-from typing import Any
+from typing_extensions import Any
 from uuid import UUID
 
 from py_trees.common import Status

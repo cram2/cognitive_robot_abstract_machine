@@ -10,7 +10,10 @@ from sqlalchemy import select
 
 from krrood.ormatic.data_access_objects.conversion_order import HoldingOrder
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
-from krrood.ormatic.data_access_objects.helper import to_dao, get_dao_class
+from krrood.ormatic.data_access_objects.helper import (
+    to_dao,
+    get_data_access_object_class,
+)
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.exceptions import ConversionOrderCycle, QueryCannotBePersisted
 from krrood.ormatic.ormatic import ORMatic
@@ -315,12 +318,12 @@ def test_dao_lookup_recovers_after_late_dao_definition():
     A failed DAO lookup must not be cached forever; defining the DAO class afterwards
     must make the lookup succeed.
     """
-    assert get_dao_class(_LateDomainClass) is None
+    assert get_data_access_object_class(_LateDomainClass) is None
 
     class _LateDomainClassDAO(DataAccessObject[_LateDomainClass]):
         pass
 
-    assert get_dao_class(_LateDomainClass) is _LateDomainClassDAO
+    assert get_data_access_object_class(_LateDomainClass) is _LateDomainClassDAO
 
 
 def test_bare_generic_resolves_to_unique_concrete_subclass():
@@ -343,7 +346,10 @@ def test_bare_generic_resolves_to_unique_concrete_subclass():
     ):
         pass
 
-    assert get_dao_class(_SingleParameterGeneric) is _SingleParameterGenericFloatDAO
+    assert (
+        get_data_access_object_class(_SingleParameterGeneric)
+        is _SingleParameterGenericFloatDAO
+    )
 
 
 def test_bare_generic_with_multiple_parametrizations_stays_on_base():
@@ -368,7 +374,10 @@ def test_bare_generic_with_multiple_parametrizations_stays_on_base():
     ):
         pass
 
-    assert get_dao_class(_MultiParameterGeneric) is _MultiParameterGenericDAO
+    assert (
+        get_data_access_object_class(_MultiParameterGeneric)
+        is _MultiParameterGenericDAO
+    )
 
 
 class _SpawnWorkerDomainClass:
@@ -418,7 +427,7 @@ def test_dao_lookup_matches_domain_class_reexecuted_as_spawn_worker_entry_point(
     A ``spawn`` worker that builds an instance of the entry-point-reloaded class object
     must still resolve the DAO registered against the normally imported one.
 
-    Before the fix, :func:`get_dao_class` compared domain classes by identity, so this
+    Before the fix, :func:`get_data_access_object_class` compared domain classes by identity, so this
     returned ``None`` -- and :func:`~krrood.ormatic.data_access_objects.helper.to_dao`
     raised ``NoDAOFoundError`` -- for every object a spawned worker built, even though a
     DAO was registered for the class.
@@ -427,7 +436,7 @@ def test_dao_lookup_matches_domain_class_reexecuted_as_spawn_worker_entry_point(
         _SpawnWorkerDomainClass, "__mp_main__", monkeypatch
     )
 
-    assert get_dao_class(reexecuted_class) is _SpawnWorkerDomainClassDAO
+    assert get_data_access_object_class(reexecuted_class) is _SpawnWorkerDomainClassDAO
 
 
 def test_dao_lookup_does_not_conflate_unrelated_same_named_classes():
@@ -435,14 +444,15 @@ def test_dao_lookup_does_not_conflate_unrelated_same_named_classes():
     Two classes that merely share a name and qualified name in genuinely different,
     normally imported modules must not be conflated as the same domain class.
 
-    The entry-point fallback in :func:`get_dao_class` only applies when one of the two
-    classes was actually loaded as ``__main__``/``__mp_main__``; neither class here was,
-    so a coincidentally matching name must not resolve to the other's DAO.
+    The entry-point fallback in :func:`get_data_access_object_class` only applies when
+    one of the two classes was actually loaded as ``__main__``/``__mp_main__``; neither
+    class here was, so a coincidentally matching name must not resolve to the other's
+    DAO.
     """
     unrelated_class = types.new_class("_SpawnWorkerDomainClass")
     unrelated_class.__qualname__ = _SpawnWorkerDomainClass.__qualname__
 
-    assert get_dao_class(unrelated_class) is None
+    assert get_data_access_object_class(unrelated_class) is None
 
 
 # %% queries cannot be stored

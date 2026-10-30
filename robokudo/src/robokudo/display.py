@@ -34,7 +34,7 @@ from py_trees.common import BlackBoxLevel, VisibilityLevel, Status
 from py_trees.composites import Selector, Sequence, Parallel
 from py_trees.decorators import Decorator
 from pydot import Node, Edge
-from typing_extensions import TYPE_CHECKING, Dict, Optional, Tuple
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.pipeline import Pipeline
 from robokudo.annotators.core import BaseAnnotator
@@ -53,7 +53,7 @@ def generate_pydot_graph(
     root: Behaviour,
     visibility_level: VisibilityLevel,
     collapse_decorators: bool = False,
-) -> Tuple[Dot, Dict]:
+) -> tuple[Dot, dict]:
     """
     Generate a pydot graph representation of a behavior tree.
 
@@ -80,7 +80,7 @@ def generate_pydot_graph(
     def get_node_attributes_legacy(
         node: Behaviour,
         visibility_level: VisibilityLevel,
-    ) -> Tuple[str, str, str]:
+    ) -> tuple[str, str, str]:
         """
         Get visual attributes for a node in legacy mode.
 
@@ -120,7 +120,7 @@ def generate_pydot_graph(
     def get_node_attributes(
         node: Behaviour,
         visibility_level: VisibilityLevel,
-    ) -> Tuple[str, str, str]:
+    ) -> tuple[str, str, str]:
         """
         Get visual attributes for a node.
 
@@ -199,7 +199,7 @@ def generate_pydot_graph(
         root_dot_name: str,
         visibility_level: VisibilityLevel,
         collapse_decorators: bool,
-        timing_info_dict: Optional[Dict],
+        timing_info_dict: dict | None,
     ) -> None:
         """
         Add edges to the dot graph recursively.
@@ -288,9 +288,9 @@ def render_dot_tree(
     root: Behaviour,
     visibility_level: VisibilityLevel = VisibilityLevel.DETAIL,
     collapse_decorators: bool = False,
-    name: Optional[str] = None,
-    threadpool_executor: Optional[ThreadPoolExecutor] = None,
-    path_prefix: Optional[str] = None,
+    name: str | None = None,
+    threadpool_executor: ThreadPoolExecutor | None = None,
+    path_prefix: str | None = None,
 ) -> None:
     """
     Render the dot tree to .dot, .svg, .png files in the current
@@ -349,7 +349,7 @@ def render_dot_tree(
 
 
 def write_timing_info_to_csv(
-    filename_wo_extension: str, timing_info_dict: Dict[str, float]
+    filename_wo_extension: str, timing_info_dict: dict[str, float]
 ) -> None:
     """
     Write timing information for annotators to a CSV file.

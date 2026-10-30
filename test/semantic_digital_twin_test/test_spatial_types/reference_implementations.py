@@ -1,5 +1,4 @@
 import numpy as np
-from typing_extensions import Tuple, Union, List
 
 from semantic_digital_twin.datastructures.types import AnyMatrix4x4, NpMatrix4x4
 
@@ -26,7 +25,7 @@ def quaternion_conjugate(quaternion: np.ndarray) -> np.ndarray:
 
 
 def quaternion_from_axis_angle(
-    axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float
+    axis: list[float] | tuple[float, float, float] | np.ndarray, angle: float
 ) -> np.ndarray:
     half_angle = angle / 2
     return np.array(
@@ -43,7 +42,7 @@ def quaternion_from_axis_angle(
 _EPS = np.finfo(float).eps * 4.0
 
 
-def rpy_from_matrix(rotation_matrix: NpMatrix4x4) -> Tuple[float, float, float]:
+def rpy_from_matrix(rotation_matrix: NpMatrix4x4) -> tuple[float, float, float]:
     """
     :param rotation_matrix: 4x4 Matrix
     :type rotation_matrix: Matrix
@@ -71,7 +70,7 @@ def rpy_from_matrix(rotation_matrix: NpMatrix4x4) -> Tuple[float, float, float]:
 
 def rpy_from_quaternion(
     qx: float, qy: float, qz: float, qw: float
-) -> Tuple[float, float, float]:
+) -> tuple[float, float, float]:
     return rpy_from_matrix(rotation_matrix_from_quaternion(qx, qy, qz, qw))
 
 
@@ -133,7 +132,7 @@ def rotation_matrix_from_quaternion(
 
 
 def rotation_matrix_from_axis_angle(
-    axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float
+    axis: list[float] | tuple[float, float, float] | np.ndarray, angle: float
 ) -> NpMatrix4x4:
     return rotation_matrix_from_quaternion(*quaternion_from_axis_angle(axis, angle))
 
@@ -172,7 +171,7 @@ def quaternion_from_rotation_matrix(matrix: AnyMatrix4x4) -> np.ndarray:
 
 def axis_angle_from_quaternion(
     x: float, y: float, z: float, w: float
-) -> Tuple[np.ndarray, float]:
+) -> tuple[np.ndarray, float]:
     l = np.linalg.norm(np.array([x, y, z, w]))
     x, y, z, w = x / l, y / l, z / l, w / l
     w2 = np.sqrt(1 - w**2)
@@ -191,7 +190,7 @@ def axis_angle_from_quaternion(
     return np.array([x, y, z]), angle
 
 
-def axis_angle_from_rotation_matrix(m: NpMatrix4x4) -> Tuple[np.ndarray, float]:
+def axis_angle_from_rotation_matrix(m: NpMatrix4x4) -> tuple[np.ndarray, float]:
     return axis_angle_from_quaternion(*quaternion_from_rotation_matrix(m))
 
 

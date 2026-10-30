@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp import qp_controller_config

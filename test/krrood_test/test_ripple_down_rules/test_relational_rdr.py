@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from unittest import TestCase
 
-from typing_extensions import List, Any
+from typing_extensions import Any
 
 from .datasets import Robot, Part, PhysicalObject
 from krrood.ripple_down_rules.datastructures.case import CaseAttribute
@@ -30,7 +30,7 @@ class RelationalRDRTestCase(TestCase):
     part_d: Part
     part_e: Part
     part_f: Part
-    target: List[PhysicalObject]
+    target: list[PhysicalObject]
 
     @classmethod
     def setUpClass(cls):

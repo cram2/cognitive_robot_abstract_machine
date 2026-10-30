@@ -39,20 +39,7 @@ from uuid import UUID, uuid4
 import casadi as ca
 import numpy as np
 from scipy import sparse as sp
-from typing_extensions import (
-    ClassVar,
-    Iterable,
-    Tuple,
-    Sequence,
-    Self,
-    Callable,
-    List,
-    Optional,
-    Dict,
-    TypeVar,
-    Type,
-    Any,
-)
+from typing_extensions import ClassVar, Iterable, Sequence, Self, Callable, TypeVar, Any
 
 from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
@@ -105,9 +92,9 @@ class CasadiLock:
 
     def __exit__(
         self,
-        exception_type: Optional[Type[BaseException]],
-        exception: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        exception_type: type[BaseException] | None,
+        exception: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         """
         Lets the next thread into CasADi.
@@ -121,7 +108,7 @@ class VariableGroup:
     A homogeneous, ordered group of variables that forms one input block.
     """
 
-    variables: Tuple[FloatVariable, ...]
+    variables: tuple[FloatVariable, ...]
 
     def __len__(self) -> int:
         return len(self.variables)
@@ -133,16 +120,16 @@ class VariableParameters:
     A collection of variable groups that define the input blocks of a compiled function.
     """
 
-    groups: Tuple[VariableGroup, ...]
+    groups: tuple[VariableGroup, ...]
 
     def __len__(self) -> int:
         return len(self.groups)
 
-    def flatten(self) -> Tuple[FloatVariable, ...]:
+    def flatten(self) -> tuple[FloatVariable, ...]:
         return tuple(v for g in self.groups for v in g.variables)
 
     @classmethod
-    def from_lists(cls, *args: List[FloatVariable]) -> VariableParameters:
+    def from_lists(cls, *args: list[FloatVariable]) -> VariableParameters:
         """
         Creates a new instance of VariableParameters from multiple lists.
 
@@ -152,7 +139,7 @@ class VariableParameters:
         """
         return cls(groups=tuple(VariableGroup(tuple(g)) for g in args))
 
-    def to_casadi_parameters(self) -> List[ca.SX]:
+    def to_casadi_parameters(self) -> list[ca.SX]:
         casadi_parameters = []
         if len(self) > 0:
             # create an array for each VariableGroup
@@ -175,7 +162,7 @@ class _Layout(ABC):
         return len(self.compiled.expression) == 0
 
     @abstractmethod
-    def compile(self, casadi_parameters: List[ca.SX]) -> None: ...
+    def compile(self, casadi_parameters: list[ca.SX]) -> None: ...
 
     @abstractmethod
     def setup_output(self) -> None: ...
@@ -187,7 +174,7 @@ class _DenseLayout(_Layout):
     Strategy for dense compiled function setup.
     """
 
-    def compile(self, casadi_parameters: List[ca.SX]) -> None:
+    def compile(self, casadi_parameters: list[ca.SX]) -> None:
         self.compiled.expression.casadi_sx = ca.densify(
             self.compiled.expression.casadi_sx
         )
@@ -214,7 +201,7 @@ class _SparseLayout(_Layout):
     Strategy for sparse compiled function setup.
     """
 
-    def compile(self, casadi_parameters: List[ca.SX]) -> None:
+    def compile(self, casadi_parameters: list[ca.SX]) -> None:
         self.compiled.expression.casadi_sx = ca.sparsify(
             self.compiled.expression.casadi_sx
         )
@@ -258,7 +245,7 @@ class CompiledFunction:
     The symbolic expression to compile.
     """
 
-    variable_parameters: Optional[VariableParameters] = None
+    variable_parameters: VariableParameters | None = None
     """
     The input parameters for the compiled symbolic expression.
     """
@@ -268,15 +255,15 @@ class CompiledFunction:
     Whether to return a sparse matrix or a dense numpy matrix.
     """
 
-    _layout: _Layout = field(init=False)
+    _layout: _Layout = field(init=False, repr=False)
     """
     The layout strategy to use for the compiled function.
     """
 
-    _compiled_casadi_function: ca.Function = field(init=False)
+    _compiled_casadi_function: ca.Function = field(init=False, repr=False)
 
-    _function_buffer: ca.FunctionBuffer = field(init=False)
-    _function_evaluator: partial = field(init=False)
+    _function_buffer: ca.FunctionBuffer = field(init=False, repr=False)
+    _function_evaluator: partial = field(init=False, repr=False)
     """
     Helpers to avoid new memory allocation during function evaluation.
     """
@@ -471,7 +458,7 @@ class CompiledFunctionWithViews:
     np.concatenate([expr1_result, expr2_result])[start:end]]
     """
 
-    expressions: List[SymbolicMathType]
+    expressions: list[SymbolicMathType]
     """
     The list of expressions to be compiled.
     """
@@ -481,7 +468,7 @@ class CompiledFunctionWithViews:
     The input parameters for the compiled symbolic expression.
     """
 
-    additional_views: Optional[List[slice]] = field(default_factory=list)
+    additional_views: list[slice] | None = field(default_factory=list)
     """
     If additional views are required that don't correspond to the expressions directly.
     """
@@ -491,7 +478,7 @@ class CompiledFunctionWithViews:
     Reference to the compiled function.
     """
 
-    split_out_view: List[np.ndarray] = field(init=False)
+    split_out_view: list[np.ndarray] = field(init=False)
     """
     Views to the out buffer of the compiled function.
     """
@@ -511,7 +498,7 @@ class CompiledFunctionWithViews:
         for expression_slice in self.additional_views:
             self.split_out_view.append(self.compiled_function._out[expression_slice])
 
-    def __call__(self, *args: np.ndarray) -> List[np.ndarray]:
+    def __call__(self, *args: np.ndarray) -> list[np.ndarray]:
         """
         :param args: A numpy array for each List[FloatVariable] in self.variable_parameters.
         :return: A np array for each expression, followed by arrays corresponding to the additional views.
@@ -532,7 +519,7 @@ class SymbolicMathType(ABC):
     Reference to the casadi data structure of type casadi.SX.
     """
 
-    pinned_free_variables: List[FloatVariable] = field(
+    pinned_free_variables: list[FloatVariable] = field(
         kw_only=True,
         repr=False,
         default_factory=list,
@@ -553,8 +540,10 @@ class SymbolicMathType(ABC):
 
     @classmethod
     def from_casadi_sx(cls, casadi_sx: ca.SX) -> Self:
-        result = cls()
+        result = cls.__new__(cls)
+        # result = cls() is equivalent but slightly slower. if anything is sus with symbolic math, try if this fixes it
         result.casadi_sx = casadi_sx
+        result.pinned_free_variables = []
         return result
 
     @property
@@ -580,7 +569,7 @@ class SymbolicMathType(ABC):
     def __hash__(self) -> int:
         return hash(self.casadi_sx)
 
-    def pretty_str(self) -> List[List[str]]:
+    def pretty_str(self) -> list[list[str]]:
         """
         Turns a symbolic type into a more or less readable string.
         """
@@ -608,7 +597,7 @@ class SymbolicMathType(ABC):
         return f"{self.__class__.__name__}({repr(self.casadi_sx)[3:-1]})"
 
     def __getitem__(
-        self, item: np.ndarray | int | slice | Tuple[int | slice, int | slice]
+        self, item: np.ndarray | int | slice | tuple[int | slice, int | slice]
     ) -> Scalar | Vector:
         """
         Gives this class the getitem behavior of numpy.
@@ -624,7 +613,7 @@ class SymbolicMathType(ABC):
 
     def __setitem__(
         self,
-        key: int | slice | Tuple[int | slice, int | slice],
+        key: int | slice | tuple[int | slice, int | slice],
         value: ScalarData | VectorData | MatrixData,
     ):
         """
@@ -633,7 +622,7 @@ class SymbolicMathType(ABC):
         self.casadi_sx[key] = value.casadi_sx if hasattr(value, "casadi_sx") else value
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self) -> tuple[int, int]:
         return self.casadi_sx.shape
 
     def flatten(self) -> Vector:
@@ -650,8 +639,11 @@ class SymbolicMathType(ABC):
     def __len__(self) -> int:
         return self.shape[0]
 
-    def free_variables(self) -> List[FloatVariable]:
-        return [FloatVariable._registry[s] for s in ca.symvar(self.casadi_sx)]
+    def free_variables(self) -> list[FloatVariable]:
+        return [
+            FloatVariable._registry[symbol.element_hash()]
+            for symbol in ca.symvar(self.casadi_sx)
+        ]
 
     def is_constant(self) -> bool:
         return self.casadi_sx.is_constant()
@@ -689,7 +681,7 @@ class SymbolicMathType(ABC):
     def safe_division(
         self,
         other: GenericSymbolicType,
-        if_nan: Optional[ScalarData] = None,
+        if_nan: ScalarData | None = None,
     ) -> GenericSymbolicType:
         """
         A version of division where no sub-expression is ever NaN.
@@ -708,7 +700,7 @@ class SymbolicMathType(ABC):
 
     def compile(
         self,
-        parameters: Optional[VariableParameters] = None,
+        parameters: VariableParameters | None = None,
         sparse: bool = False,
     ) -> CompiledFunction:
         """
@@ -742,8 +734,8 @@ class SymbolicMathType(ABC):
 
     def substitute(
         self,
-        old_variables: List[FloatVariable],
-        new_variables: List[ScalarData] | Vector,
+        old_variables: list[FloatVariable],
+        new_variables: list[ScalarData] | Vector,
     ) -> Self:
         """
         Replace variables in an expression with new variables or expressions.
@@ -782,10 +774,10 @@ class SymbolicMathType(ABC):
         return self.from_casadi_sx(copy.copy(self.casadi_sx))
 
     def __neg__(self) -> Self:
-        return self.from_casadi_sx(self.casadi_sx.__neg__())
+        return self.from_casadi_sx(ca.SX.unary(ca.OP_NEG, self.casadi_sx))
 
     def __abs__(self) -> Self:
-        return self.from_casadi_sx(ca.fabs(self.casadi_sx))
+        return self.from_casadi_sx(ca.SX.unary(ca.OP_FABS, self.casadi_sx))
 
     def jacobian(self, variables: Iterable[FloatVariable]) -> Matrix:
         """
@@ -970,12 +962,12 @@ class SerializableSymbolicMathType(SymbolicMathType, SubclassJSONSerializer):
     :class:`ExpressionGraph` computing it.
     """
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         result = super().to_json(**kwargs)
         result.update(self._value_to_json(**kwargs))
         return result
 
-    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+    def _value_to_json(self, **kwargs) -> dict[str, Any]:
         """
         :param kwargs: Keyword arguments to hand on to nested ``to_json`` calls.
         :return: The JSON entries describing the value itself.
@@ -989,7 +981,7 @@ class SerializableSymbolicMathType(SymbolicMathType, SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         if SymbolicMathJSONKey.EXPRESSION in data:
             return ExpressionGraph.from_json(
                 data[SymbolicMathJSONKey.EXPRESSION], **kwargs
@@ -1003,7 +995,7 @@ class ExpressionGraph(SubclassJSONSerializer):
     The computation of a symbolic math value from the variables it depends on.
     """
 
-    free_variables: List[FloatVariable]
+    free_variables: list[FloatVariable]
     """
     The variables the value depends on, in the order :attr:`casadi_function` takes them.
     """
@@ -1023,12 +1015,12 @@ class ExpressionGraph(SubclassJSONSerializer):
         casadi_function = ca.Function(
             cls.__name__,
             [ca.vertcat(*[variable.casadi_sx for variable in free_variables])],
-            [expression.casadi_sx],
+            [ca.densify(expression.casadi_sx)],
         )
         return cls(free_variables=free_variables, casadi_function=casadi_function)
 
     def to_expression(
-        self, expression_type: Type[GenericSymbolicType]
+        self, expression_type: type[GenericSymbolicType]
     ) -> GenericSymbolicType:
         """
         :param expression_type: The type of the value this graph computes.
@@ -1041,7 +1033,7 @@ class ExpressionGraph(SubclassJSONSerializer):
         result.pinned_free_variables = list(self.free_variables)
         return result
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         result = super().to_json(**kwargs)
         result[SymbolicMathJSONKey.FREE_VARIABLES] = [
             variable.to_json(**kwargs) for variable in self.free_variables
@@ -1050,7 +1042,7 @@ class ExpressionGraph(SubclassJSONSerializer):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         # registers the tracker in kwargs, so every variable below shares it
         FloatVariableTracker.from_kwargs(kwargs)
         return cls(
@@ -1101,7 +1093,7 @@ class Scalar(SerializableSymbolicMathType):
         """
         Determine whether the scalar is constantly true.
         """
-        return self.is_constant() and bool(self == True)
+        return self.casadi_sx.is_one()
 
     def is_constant_unknown(self) -> bool:
         """
@@ -1113,13 +1105,15 @@ class Scalar(SerializableSymbolicMathType):
         """
         Determine whether the scalar is constantly false.
         """
-        return self.is_constant() and bool(self == False)
+        return self.casadi_sx.is_zero()
 
     def is_true(self) -> Scalar:
         """
         :return: An expression that is True wherever this one is the trinary True.
         """
-        return Scalar(ca.eq(self.casadi_sx, True))
+        return Scalar.from_casadi_sx(
+            ca.SX.binary(ca.OP_EQ, self.casadi_sx, ca.SX(True))
+        )
 
     def is_not_true(self) -> Scalar:
         """
@@ -1131,7 +1125,9 @@ class Scalar(SerializableSymbolicMathType):
         """
         :return: An expression that is True wherever this one is the trinary False.
         """
-        return Scalar(ca.eq(self.casadi_sx, False))
+        return Scalar.from_casadi_sx(
+            ca.SX.binary(ca.OP_EQ, self.casadi_sx, ca.SX(False))
+        )
 
     def is_not_false(self) -> Scalar:
         """
@@ -1143,7 +1139,7 @@ class Scalar(SerializableSymbolicMathType):
         """
         :return: An expression that is True wherever this one is the trinary Unknown.
         """
-        return Scalar(ca.eq(self.casadi_sx, 0.5))
+        return Scalar.from_casadi_sx(ca.SX.binary(ca.OP_EQ, self.casadi_sx, ca.SX(0.5)))
 
     def __bool__(self) -> bool:
         """
@@ -1171,24 +1167,24 @@ class Scalar(SerializableSymbolicMathType):
         raise HasFreeVariablesError(self.free_variables())
 
     def __neg__(self) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__neg__())
+        return Scalar.from_casadi_sx(ca.SX.unary(ca.OP_NEG, self.casadi_sx))
 
     def __invert__(self) -> Scalar:
-        return Scalar.from_casadi_sx(ca.logic_not(self.casadi_sx))
+        return Scalar.from_casadi_sx(ca.SX.unary(ca.OP_NOT, self.casadi_sx))
 
     def __and__(self, other: Scalar | FloatVariable) -> Scalar:
         if is_constant_false(self):
             return self
         if is_constant_false(other):
             return other
-        return Scalar.from_casadi_sx(ca.logic_and(to_sx(self), to_sx(other)))
+        return Scalar.from_casadi_sx(ca.SX.binary(ca.OP_AND, to_sx(self), to_sx(other)))
 
     def __or__(self, other: Scalar | FloatVariable) -> Scalar:
         if is_constant_true(self):
             return self
         if is_constant_true(other):
             return other
-        return Scalar.from_casadi_sx(ca.logic_or(to_sx(self), to_sx(other)))
+        return Scalar.from_casadi_sx(ca.SX.binary(ca.OP_OR, to_sx(self), to_sx(other)))
 
     # %% Comparison operations
     def _compare(self, other: ScalarData, op_f: Callable) -> Scalar:
@@ -1211,7 +1207,7 @@ class Scalar(SerializableSymbolicMathType):
         :param other: Value to compare with.
         :return: A scalar representing the equality comparison.
         """
-        return self._compare(other, operator.eq)
+        return self._compare(other, partial(ca.SX.binary, ca.OP_EQ))
 
     def __ne__(self, other: ScalarData) -> Scalar:
         """
@@ -1220,7 +1216,7 @@ class Scalar(SerializableSymbolicMathType):
         :param other: Value to compare with.
         :return: A scalar representing the inequality comparison.
         """
-        return self._compare(other, operator.ne)
+        return self._compare(other, partial(ca.SX.binary, ca.OP_NE))
 
     def __le__(self, other: ScalarData) -> Scalar:
         """
@@ -1229,7 +1225,7 @@ class Scalar(SerializableSymbolicMathType):
         :param other: Value to compare with.
         :return: A scalar representing the comparison result.
         """
-        return self._compare(other, operator.le)
+        return self._compare(other, partial(ca.SX.binary, ca.OP_LE))
 
     def __lt__(self, other: ScalarData) -> Scalar:
         """
@@ -1238,7 +1234,7 @@ class Scalar(SerializableSymbolicMathType):
         :param other: Value to compare with.
         :return: A scalar representing the comparison result.
         """
-        return self._compare(other, operator.lt)
+        return self._compare(other, partial(ca.SX.binary, ca.OP_LT))
 
     def __ge__(self, other: ScalarData) -> Scalar:
         """
@@ -1247,7 +1243,9 @@ class Scalar(SerializableSymbolicMathType):
         :param other: Value to compare with.
         :return: A scalar representing the comparison result.
         """
-        return self._compare(other, operator.ge)
+        return self._compare(
+            other, lambda left, right: ca.SX.binary(ca.OP_LE, right, left)
+        )
 
     def __gt__(self, other: ScalarData) -> Scalar:
         """
@@ -1256,7 +1254,9 @@ class Scalar(SerializableSymbolicMathType):
         :param other: Value to compare with.
         :return: A scalar representing the comparison result.
         """
-        return self._compare(other, operator.gt)
+        return self._compare(
+            other, lambda left, right: ca.SX.binary(ca.OP_LT, right, left)
+        )
 
     # %% Arithmatic operations
     def __float__(self):
@@ -1295,34 +1295,34 @@ class Scalar(SerializableSymbolicMathType):
         return Scalar.from_casadi_sx(op(a, b))
 
     def __add__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.add)
+        return self._binary(other, partial(ca.SX.binary, ca.OP_ADD))
 
     def __radd__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.add)
+        return self._rbinary(other, partial(ca.SX.binary, ca.OP_ADD))
 
     def __sub__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.sub)
+        return self._binary(other, partial(ca.SX.binary, ca.OP_SUB))
 
     def __rsub__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.sub)
+        return self._rbinary(other, partial(ca.SX.binary, ca.OP_SUB))
 
     def __mul__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.mul)
+        return self._binary(other, partial(ca.SX.binary, ca.OP_MUL))
 
     def __rmul__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.mul)
+        return self._rbinary(other, partial(ca.SX.binary, ca.OP_MUL))
 
     def __truediv__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.truediv)
+        return self._binary(other, partial(ca.SX.binary, ca.OP_DIV))
 
     def __rtruediv__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.truediv)
+        return self._rbinary(other, partial(ca.SX.binary, ca.OP_DIV))
 
     def __pow__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.pow)
+        return self._binary(other, partial(ca.SX.binary, ca.OP_POW))
 
     def __rpow__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.pow)
+        return self._rbinary(other, partial(ca.SX.binary, ca.OP_POW))
 
     def __floordiv__(self, other: ScalarData) -> Scalar:
         return self._binary(other, lambda a, b: ca.floor(to_sx(a) / to_sx(b)))
@@ -1331,10 +1331,10 @@ class Scalar(SerializableSymbolicMathType):
         return self._rbinary(other, lambda a, b: ca.floor(to_sx(a) / to_sx(b)))
 
     def __mod__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, ca.fmod)
+        return self._binary(other, partial(ca.SX.binary, ca.OP_FMOD))
 
     def __rmod__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, ca.fmod)
+        return self._rbinary(other, partial(ca.SX.binary, ca.OP_FMOD))
 
 
 @dataclass(eq=False, init=False, repr=False)
@@ -1353,12 +1353,11 @@ class FloatVariable(Scalar):
     several variables may share.
     """
 
-    _registry: ClassVar[weakref.WeakValueDictionary[ca.SX, FloatVariable]] = (
+    _registry: ClassVar[weakref.WeakValueDictionary[int, FloatVariable]] = (
         weakref.WeakValueDictionary()
     )
     """
-    Keeps track of which FloatVariable instances are associated with which which
-    casadi.SX instances.
+    The living FloatVariable instances, by the hash of their casadi symbol.
 
     Needed to recreate the FloatVariables from a casadi expression.
     .. warning:: Does not ensure that two FloatVariable instances are identical.
@@ -1378,7 +1377,7 @@ class FloatVariable(Scalar):
     Subclasses should set it to return the current float value for this variable.
     """
 
-    def __init__(self, name: str, id: Optional[UUID] = None):
+    def __init__(self, name: str, id: UUID | None = None):
         """
         :param name: The name of the variable.
         :param id: The id of the variable, a new one if None.
@@ -1386,18 +1385,19 @@ class FloatVariable(Scalar):
         self.name = name
         self.id = uuid4() if id is None else id
         casadi_sx = ca.SX.sym(self.name)
-        self._registry[casadi_sx] = self
+        self._registry[casadi_sx.element_hash()] = self
         self._registry_by_id[self.id] = self
-        super().__init__(casadi_sx)
+        self.casadi_sx = casadi_sx
+        self.pinned_free_variables = [self]
 
-    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+    def _value_to_json(self, **kwargs) -> dict[str, Any]:
         return {
             SymbolicMathJSONKey.ID: to_json(self.id),
             SymbolicMathJSONKey.NAME: self.name,
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
         :return: The variable with the serialized id, if one was already deserialized
             from this document or is alive in this process, else a new one.
@@ -1470,7 +1470,7 @@ class Vector(SerializableSymbolicMathType):
 
     def __init__(
         self,
-        data: Optional[VectorData] = None,
+        data: VectorData | None = None,
     ):
         if data is None:
             data = []
@@ -1507,19 +1507,19 @@ class Vector(SerializableSymbolicMathType):
             yield self[i]
 
     def __add__(self, other: ScalarData | VectorData) -> Self:
-        return Vector.from_casadi_sx(to_sx(self) + to_sx(other))
+        return Vector.from_casadi_sx(ca.SX.binary(ca.OP_ADD, to_sx(self), to_sx(other)))
 
     def __sub__(self, other: ScalarData | VectorData) -> Self:
-        return Vector.from_casadi_sx(to_sx(self) - to_sx(other))
+        return Vector.from_casadi_sx(ca.SX.binary(ca.OP_SUB, to_sx(self), to_sx(other)))
 
     def __mul__(self, other: ScalarData | VectorData) -> Self:
-        return Vector.from_casadi_sx(to_sx(self) * to_sx(other))
+        return Vector.from_casadi_sx(ca.SX.binary(ca.OP_MUL, to_sx(self), to_sx(other)))
 
     def __truediv__(self, other: ScalarData | VectorData) -> Self:
-        return Vector.from_casadi_sx(to_sx(self) / to_sx(other))
+        return Vector.from_casadi_sx(ca.SX.binary(ca.OP_DIV, to_sx(self), to_sx(other)))
 
     def __pow__(self, other: ScalarData | VectorData) -> Self:
-        return Vector.from_casadi_sx(to_sx(self) ** to_sx(other))
+        return Vector.from_casadi_sx(ca.SX.binary(ca.OP_POW, to_sx(self), to_sx(other)))
 
     def __floordiv__(self, other: ScalarData | VectorData) -> Self:
         return Vector.from_casadi_sx(ca.floor(to_sx(self) / to_sx(other)))
@@ -1544,19 +1544,19 @@ class Vector(SerializableSymbolicMathType):
     def __eq__(self, other: Vector) -> Vector | bool:
         if self.is_constant() and other.is_constant():
             return self.to_np() == other.to_np()
-        return Vector.from_casadi_sx(to_sx(self).__eq__(to_sx(other)))
+        return Vector.from_casadi_sx(ca.SX.binary(ca.OP_EQ, to_sx(self), to_sx(other)))
 
     def __le__(self, other: Vector) -> Self:
-        return self.from_casadi_sx(to_sx(self).__le__(to_sx(other)))
+        return self.from_casadi_sx(ca.SX.binary(ca.OP_LE, to_sx(self), to_sx(other)))
 
     def __lt__(self, other: Vector) -> Self:
-        return self.from_casadi_sx(to_sx(self).__lt__(to_sx(other)))
+        return self.from_casadi_sx(ca.SX.binary(ca.OP_LT, to_sx(self), to_sx(other)))
 
     def __ge__(self, other: Vector) -> Self:
-        return self.from_casadi_sx(to_sx(self).__ge__(to_sx(other)))
+        return self.from_casadi_sx(ca.SX.binary(ca.OP_LE, to_sx(other), to_sx(self)))
 
     def __gt__(self, other: Vector) -> Self:
-        return self.from_casadi_sx(to_sx(self).__gt__(to_sx(other)))
+        return self.from_casadi_sx(ca.SX.binary(ca.OP_LT, to_sx(other), to_sx(self)))
 
     def euclidean_distance(self, other: Self) -> Scalar:
         difference = self - other
@@ -1602,7 +1602,7 @@ class Matrix(SerializableSymbolicMathType):
 
     def __init__(
         self,
-        data: Optional[VectorData | MatrixData] = None,
+        data: VectorData | MatrixData | None = None,
     ):
         if data is None:
             data = []
@@ -1610,7 +1610,7 @@ class Matrix(SerializableSymbolicMathType):
         super().__post_init__()
 
     @classmethod
-    def create_filled_with_variables(cls, shape: Tuple[int, int], name: str) -> Self:
+    def create_filled_with_variables(cls, shape: tuple[int, int], name: str) -> Self:
         data = []
         for row in range(shape[0]):
             row_data = []
@@ -1636,27 +1636,27 @@ class Matrix(SerializableSymbolicMathType):
 
     def __add__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
-        return Matrix.from_casadi_sx(self.casadi_sx + other_sx)
+        return Matrix.from_casadi_sx(ca.SX.binary(ca.OP_ADD, self.casadi_sx, other_sx))
 
     def __radd__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
-        return Matrix.from_casadi_sx(self.casadi_sx + other_sx)
+        return Matrix.from_casadi_sx(ca.SX.binary(ca.OP_ADD, self.casadi_sx, other_sx))
 
     def __sub__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
-        return Matrix.from_casadi_sx(self.casadi_sx - other_sx)
+        return Matrix.from_casadi_sx(ca.SX.binary(ca.OP_SUB, self.casadi_sx, other_sx))
 
     def __rsub__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
-        return Matrix.from_casadi_sx(self.casadi_sx - other_sx)
+        return Matrix.from_casadi_sx(ca.SX.binary(ca.OP_SUB, self.casadi_sx, other_sx))
 
     def __mul__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
-        return Matrix.from_casadi_sx(self.casadi_sx * other_sx)
+        return Matrix.from_casadi_sx(ca.SX.binary(ca.OP_MUL, self.casadi_sx, other_sx))
 
     def __rmul__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
-        return Matrix.from_casadi_sx(self.casadi_sx * other_sx)
+        return Matrix.from_casadi_sx(ca.SX.binary(ca.OP_MUL, self.casadi_sx, other_sx))
 
     def __truediv__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
@@ -1675,7 +1675,7 @@ class Matrix(SerializableSymbolicMathType):
 
     def __pow__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
-        return Matrix.from_casadi_sx(self.casadi_sx**other_sx)
+        return Matrix.from_casadi_sx(ca.SX.binary(ca.OP_POW, self.casadi_sx, other_sx))
 
     def __floordiv__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
@@ -1711,19 +1711,29 @@ class Matrix(SerializableSymbolicMathType):
     def __eq__(self, other: Matrix) -> Self | bool:
         if self.is_constant() and other.is_constant():
             return self.to_np() == other.to_np()
-        return Matrix.from_casadi_sx(self.casadi_sx.__eq__(other.casadi_sx))
+        return Matrix.from_casadi_sx(
+            ca.SX.binary(ca.OP_EQ, self.casadi_sx, other.casadi_sx)
+        )
 
     def __le__(self, other: ScalarData | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__le__(to_sx(other)))
+        return Scalar.from_casadi_sx(
+            ca.SX.binary(ca.OP_LE, self.casadi_sx, to_sx(other))
+        )
 
     def __lt__(self, other: ScalarData | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__lt__(to_sx(other)))
+        return Scalar.from_casadi_sx(
+            ca.SX.binary(ca.OP_LT, self.casadi_sx, to_sx(other))
+        )
 
     def __ge__(self, other: ScalarData | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__ge__(to_sx(other)))
+        return Scalar.from_casadi_sx(
+            ca.SX.binary(ca.OP_LE, to_sx(other), self.casadi_sx)
+        )
 
     def __gt__(self, other: ScalarData | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__gt__(to_sx(other)))
+        return Scalar.from_casadi_sx(
+            ca.SX.binary(ca.OP_LT, to_sx(other), self.casadi_sx)
+        )
 
     def _broadcast_like_self(self, other: SymbolicMathType) -> ca.SX:
         """
@@ -1833,7 +1843,7 @@ class Matrix(SerializableSymbolicMathType):
             column_counter += matrix.shape[1]
         return combined_matrix
 
-    def remove(self, rows: List[int], columns: List[int]):
+    def remove(self, rows: list[int], columns: list[int]):
         """
         Removes the specified rows and columns from the matrix.
 
@@ -1887,9 +1897,9 @@ class Matrix(SerializableSymbolicMathType):
         """
         :return: the Transpose of the matrix.
         """
-        return Matrix(self.casadi_sx.T)
+        return Matrix.from_casadi_sx(self.casadi_sx.T)
 
-    def reshape(self, new_shape: Tuple[int, int]) -> Self:
+    def reshape(self, new_shape: tuple[int, int]) -> Self:
         """
         See numpy.reshape.
         """
@@ -1928,7 +1938,7 @@ class Matrix(SerializableSymbolicMathType):
         return Matrix(ca.kron(m1, m2))
 
 
-def _create_return_type(input_type: SymbolicMathType) -> Type[SymbolicMathType]:
+def _create_return_type(input_type: SymbolicMathType) -> type[SymbolicMathType]:
     """
     Determines the return type based on the given input type.
 
@@ -2027,24 +2037,21 @@ def array_like_to_casadi_sx(data: VectorData | SparseData) -> ca.SX:
 
 
 def _unary_function_wrapper(
-    casadi_fn: Callable[[ca.SX], ca.SX],
+    operation: int, name: str
 ) -> Callable[[GenericSymbolicType], GenericSymbolicType]:
     """
-    Wraps a unary CasADi function to allow it to operate on symbolic types while
-    maintaining compatibility with the associated symbolic structure. This function
-    converts the input to a CasADi symbolic expression, applies the provided CasADi
-    function, and reconverts the result back to the symbolic type of the input.
+    Wraps a unary casadi operation into a function on symbolic types that returns the
+    type it was given.
 
-    :param casadi_fn: A CasADi function that transforms a symbolic expression (ca.SX)
-        into another symbolic expression of the same type.
-    :return: A callable function that applies the CasADi function to an input of type
-        GenericSymbolicType and returns an output of the same type.
+    :param operation: The casadi operation code, one of the ``ca.OP_*`` constants.
+    :param name: The name of the returned function.
+    :return: The function applying the operation element-wise.
     """
 
     def f(x: GenericSymbolicType) -> GenericSymbolicType:
-        return _create_return_type(x).from_casadi_sx(casadi_fn(to_sx(x)))
+        return _create_return_type(x).from_casadi_sx(ca.SX.unary(operation, to_sx(x)))
 
-    f.__name__ = casadi_fn.__name__
+    f.__name__ = name
     f.__doc__ = (
         f"Applies {f.__name__} to the expression. Look at numpy for documentation."
     )
@@ -2052,24 +2059,23 @@ def _unary_function_wrapper(
 
 
 def _binary_function_wrapper(
-    casadi_fn: Callable[[ca.SX, ca.SX], ca.SX],
+    operation: int, name: str
 ) -> Callable[[GenericSymbolicType, GenericSymbolicType], GenericSymbolicType]:
     """
-    Wraps a CasADi callable into a function that operates with a given symbolic type.
-    The returned function applies the CasADi operation to two symbolic arguments, while
-    handling their conversion to and from CasADi types as needed.
+    Wraps a binary casadi operation into a function on symbolic types that returns the
+    type of its first argument.
 
-    :param casadi_fn: The CasADi function to be wrapped. It should accept two CasADi SX
-        symbolic expressions and return a CasADi SX symbolic expression.
-    :return: A callable function that accepts two symbolic arguments of a generic
-        symbolic type and returns a result of the same type after applying the wrapped
-        CasADi operation.
+    :param operation: The casadi operation code, one of the ``ca.OP_*`` constants.
+    :param name: The name of the returned function.
+    :return: The function applying the operation element-wise.
     """
 
     def f(x: GenericSymbolicType, y: GenericSymbolicType) -> GenericSymbolicType:
-        return _create_return_type(x).from_casadi_sx(casadi_fn(to_sx(x), to_sx(y)))
+        return _create_return_type(x).from_casadi_sx(
+            ca.SX.binary(operation, to_sx(x), to_sx(y))
+        )
 
-    f.__name__ = casadi_fn.__name__
+    f.__name__ = name
     f.__doc__ = (
         f"Applies {f.__name__} to the expression. Look at numpy for documentation."
     )
@@ -2077,8 +2083,8 @@ def _binary_function_wrapper(
 
 
 def create_float_variables(
-    names: List[str] | int,
-) -> List[FloatVariable]:
+    names: list[str] | int,
+) -> list[FloatVariable]:
     """
     Generates a list of symbolic objects based on the input names or an integer value.
 
@@ -2147,11 +2153,11 @@ def concatenate(*vectors: Vector) -> Vector:
 
 
 # %% basic math
-abs = _unary_function_wrapper(ca.fabs)
+abs = _unary_function_wrapper(ca.OP_FABS, "fabs")
 
 
 def max(
-    arg1: GenericSymbolicType, arg2: Optional[GenericSymbolicType] = None
+    arg1: GenericSymbolicType, arg2: GenericSymbolicType | None = None
 ) -> GenericSymbolicType:
     """
     Returns the maximum element-wise value.
@@ -2165,11 +2171,13 @@ def max(
     """
     if arg2 is None:
         return Scalar.from_casadi_sx(ca.mmax(to_sx(arg1)))
-    return _create_return_type(arg1).from_casadi_sx(ca.fmax(to_sx(arg1), to_sx(arg2)))
+    return _create_return_type(arg1).from_casadi_sx(
+        ca.SX.binary(ca.OP_FMAX, to_sx(arg1), to_sx(arg2))
+    )
 
 
 def min(
-    arg1: GenericSymbolicType, arg2: Optional[GenericSymbolicType] = None
+    arg1: GenericSymbolicType, arg2: GenericSymbolicType | None = None
 ) -> GenericSymbolicType:
     """
     Returns the minimum element-wise value.
@@ -2183,7 +2191,9 @@ def min(
     """
     if arg2 is None:
         return Scalar.from_casadi_sx(ca.mmin(to_sx(arg1)))
-    return _create_return_type(arg1).from_casadi_sx(ca.fmin(to_sx(arg1), to_sx(arg2)))
+    return _create_return_type(arg1).from_casadi_sx(
+        ca.SX.binary(ca.OP_FMIN, to_sx(arg1), to_sx(arg2))
+    )
 
 
 def limit(
@@ -2223,14 +2233,14 @@ def sum(*expressions: ScalarData) -> Scalar:
     return Scalar(ca.sum(to_sx(expressions)))
 
 
-floor = _unary_function_wrapper(ca.floor)
-ceil = _unary_function_wrapper(ca.ceil)
-sign = _unary_function_wrapper(ca.sign)
-exp = _unary_function_wrapper(ca.exp)
-log = _unary_function_wrapper(ca.log)
-sqrt = _unary_function_wrapper(ca.sqrt)
+floor = _unary_function_wrapper(ca.OP_FLOOR, "floor")
+ceil = _unary_function_wrapper(ca.OP_CEIL, "ceil")
+sign = _unary_function_wrapper(ca.OP_SIGN, "sign")
+exp = _unary_function_wrapper(ca.OP_EXP, "exp")
+log = _unary_function_wrapper(ca.OP_LOG, "log")
+sqrt = _unary_function_wrapper(ca.OP_SQRT, "sqrt")
 
-fmod = _binary_function_wrapper(ca.fmod)
+fmod = _binary_function_wrapper(ca.OP_FMOD, "fmod")
 
 
 # %% trigonometry
@@ -2269,13 +2279,13 @@ def safe_acos(angle: GenericSymbolicType) -> GenericSymbolicType:
     return acos(angle)
 
 
-cos = _unary_function_wrapper(ca.cos)
-sin = _unary_function_wrapper(ca.sin)
-tan = _unary_function_wrapper(ca.tan)
-cosh = _unary_function_wrapper(ca.cosh)
-sinh = _unary_function_wrapper(ca.sinh)
-acos = _unary_function_wrapper(ca.acos)
-atan2 = _binary_function_wrapper(ca.atan2)
+cos = _unary_function_wrapper(ca.OP_COS, "cos")
+sin = _unary_function_wrapper(ca.OP_SIN, "sin")
+tan = _unary_function_wrapper(ca.OP_TAN, "tan")
+cosh = _unary_function_wrapper(ca.OP_COSH, "cosh")
+sinh = _unary_function_wrapper(ca.OP_SINH, "sinh")
+acos = _unary_function_wrapper(ca.OP_ACOS, "acos")
+atan2 = _binary_function_wrapper(ca.OP_ATAN2, "atan2")
 
 
 # %% other
@@ -2351,7 +2361,7 @@ def is_constant_true(expression: Scalar) -> bool:
     :param expression: The scalar expression to test.
     :return: True if the expression is exactly the constant 1, otherwise False.
     """
-    return bool(expression == 1)
+    return to_sx(expression).is_one()
 
 
 def is_constant_false(expression: Scalar) -> bool:
@@ -2361,29 +2371,48 @@ def is_constant_false(expression: Scalar) -> bool:
     :param expression: The scalar expression to test.
     :return: True if the expression is exactly the constant 0, otherwise False.
     """
-    return bool(expression == 0)
+    return to_sx(expression).is_zero()
 
 
-def logic_and(left: ScalarData, right: ScalarData) -> Scalar:
+def logic_and(*args: ScalarData) -> Scalar:
     """
     Logical conjunction on symbolic scalars.
 
-    :param left: The left operand.
-    :param right: The right operand.
-    :return: The symbolic result of left AND right.
+    :param args: The operands.
+    :return: The symbolic result of all operands combined by AND.
+    :raises NotEnoughArgumentsError: If no operand is given.
     """
-    return left & right
+    return _combine_logic(operator.and_, args)
 
 
-def logic_or(left: ScalarData, right: ScalarData) -> Scalar:
+def logic_or(*args: ScalarData) -> Scalar:
     """
     Logical disjunction on symbolic scalars.
 
-    :param left: The left operand.
-    :param right: The right operand.
-    :return: The symbolic result of left OR right.
+    :param args: The operands.
+    :return: The symbolic result of all operands combined by OR.
+    :raises NotEnoughArgumentsError: If no operand is given.
     """
-    return left | right
+    return _combine_logic(operator.or_, args)
+
+
+def _combine_logic(
+    logic_operator: Callable[[Scalar, ScalarData], Scalar], args: Sequence[ScalarData]
+) -> Scalar:
+    """
+    :param logic_operator: The two-argument operator to fold the operands with.
+    :param args: The operands.
+    :return: The operands folded from the left by `logic_operator`.
+    :raises NotEnoughArgumentsError: If no operand is given.
+    """
+    if len(args) < 1:
+        raise NotEnoughArgumentsError(
+            minimum_number_of_arguments=1, actual_number_of_arguments=len(args)
+        )
+    result = args[0] if isinstance(args[0], Scalar) else Scalar(args[0])
+    for argument in args[1:]:
+        result = logic_operator(result, argument)
+    return result
 
 
 def logic_not(expression: ScalarData) -> Scalar:
@@ -2394,6 +2423,52 @@ def logic_not(expression: ScalarData) -> Scalar:
     :return: The symbolic result of NOT expression.
     """
     return ~expression
+
+
+def boolean_expression_to_str(expression: ScalarData) -> str:
+    """
+    Renders a boolean expression, with every variable quoted by its name. Unlike
+    :meth:`Scalar.__str__`, it accepts only boolean expressions.
+
+    :param expression: The expression to render.
+    :return: The rendered expression, using ``and``, ``or``, ``not``, ``True`` and
+        ``False``.
+    :raises CannotConvertToStringError: If `expression` contains anything but those
+        operators, variables and the constants true and false.
+    """
+    casadi_expression = to_sx(expression)
+    if casadi_expression.is_symbolic():
+        return f'"{casadi_expression}"'
+    if casadi_expression.is_constant():
+        return _boolean_constant_to_str(expression, float(casadi_expression))
+    match casadi_expression.op():
+        case ca.OP_AND:
+            left = boolean_expression_to_str(casadi_expression.dep(0))
+            right = boolean_expression_to_str(casadi_expression.dep(1))
+            return f"({left} and {right})"
+        case ca.OP_OR:
+            left = boolean_expression_to_str(casadi_expression.dep(0))
+            right = boolean_expression_to_str(casadi_expression.dep(1))
+            return f"({left} or {right})"
+        case ca.OP_NOT:
+            return f"not {boolean_expression_to_str(casadi_expression.dep(0))}"
+        case _:
+            raise CannotConvertToStringError(expression=expression)
+
+
+def _boolean_constant_to_str(expression: ScalarData, value: float) -> str:
+    """
+    :param expression: The constant expression being rendered, reported if it is
+        neither true nor false.
+    :param value: The value of that constant.
+    :return: ``True`` or ``False``.
+    :raises CannotConvertToStringError: If `value` is neither true nor false.
+    """
+    if value == float(Scalar.const_true()):
+        return "True"
+    if value == float(Scalar.const_false()):
+        return "False"
+    raise CannotConvertToStringError(expression=expression)
 
 
 def logic_any(args: VectorData | MatrixData) -> Scalar:
@@ -2417,6 +2492,8 @@ def logic_all(args: GenericVectorOrMatrixType) -> Scalar:
 
 
 # %% trinary logic
+
+
 def trinary_logic_not(expression: FloatVariable | Scalar) -> Scalar:
     """
     |   Not ------------------ True    |  False Unknown | Unknown False   |  True.
@@ -2482,52 +2559,6 @@ def trinary_logic_or(*args: FloatVariable | Scalar) -> Scalar:
         return trinary_logic_or(args[0], trinary_logic_or(*args[1:]))
 
 
-def trinary_logic_to_str(expression: Scalar) -> str:
-    """
-    Converts a trinary logic expression into its string representation.
-
-    This function processes an expression with trinary logic values (True, False,
-    Unknown) and translates it into a comprehensible string format. It takes into
-    account the logical operations involved and recursively evaluates the components if
-    necessary. The function handles variables representing trinary logic values, as well
-    as logical constructs such as "and", "or", and "not". If the expression cannot be
-    evaluated, an exception is raised.
-
-    :param expression: The trinary logic expression to be converted into a string
-        representation.
-    :return: A string representation of the trinary logic expression, displaying the
-        appropriate logical variables and structure.
-    :raises SpatialTypesError: If the provided expression cannot be converted into a
-        string representation.
-    """
-    cas_expr = to_sx(expression)
-
-    # Constant case
-    if cas_expr.n_dep() == 0:
-        if not cas_expr.is_constant():
-            return f'"{expression}"'
-        if float(expression) == 1.0:
-            return "True"
-        if float(expression) == 0.0:
-            return "False"
-        if float(expression) == 0.5:
-            return "Unknown"
-
-    match cas_expr.op():
-        case ca.OP_SUB:  # trinary "not" is 1-x
-            return f"not {trinary_logic_to_str(cas_expr.dep(1))}"
-        case ca.OP_FMIN:  # trinary "and" is min(left, right)
-            left = trinary_logic_to_str(cas_expr.dep(0))
-            right = trinary_logic_to_str(cas_expr.dep(1))
-            return f"({left} and {right})"
-        case ca.OP_FMAX:  # trinary "or" is max(left, right)
-            left = trinary_logic_to_str(cas_expr.dep(0))
-            right = trinary_logic_to_str(cas_expr.dep(1))
-            return f"({left} or {right})"
-        case _:
-            raise CannotConvertToStringError(expression=expression)
-
-
 # %% ifs
 
 
@@ -2543,12 +2574,25 @@ def if_else(
     else:
         return else_result
     """
-    condition = to_sx(condition)
-    if_result_sx = to_sx(if_result)
-    else_result_sx = to_sx(else_result)
-    return_type = _create_return_type(if_result)
-    return return_type.from_casadi_sx(
-        ca.if_else(condition, if_result_sx, else_result_sx)
+    return _create_return_type(if_result).from_casadi_sx(
+        _if_else_sx(to_sx(condition), to_sx(if_result), to_sx(else_result))
+    )
+
+
+def _if_else_sx(condition: ca.SX, if_result: ca.SX, else_result: ca.SX) -> ca.SX:
+    """
+    :param condition: The condition selecting between the results.
+    :param if_result: The result while `condition` is not 0.
+    :param else_result: The result while `condition` is 0.
+    :return: The same expression as ``ca.if_else``, without the cost of resolving its
+        overloads.
+    """
+    return ca.SX.binary(
+        ca.OP_ADD,
+        ca.SX.binary(ca.OP_IF_ELSE_ZERO, condition, if_result),
+        ca.SX.binary(
+            ca.OP_IF_ELSE_ZERO, ca.SX.unary(ca.OP_NOT, condition), else_result
+        ),
     )
 
 
@@ -2567,7 +2611,7 @@ def if_greater(
     """
     a = to_sx(a)
     b = to_sx(b)
-    return if_else(ca.gt(a, b), if_result, else_result)
+    return if_else(ca.SX.binary(ca.OP_LT, b, a), if_result, else_result)
 
 
 def if_less(
@@ -2585,7 +2629,7 @@ def if_less(
     """
     a = to_sx(a)
     b = to_sx(b)
-    return if_else(ca.lt(a, b), if_result, else_result)
+    return if_else(ca.SX.binary(ca.OP_LT, a, b), if_result, else_result)
 
 
 def if_greater_zero(
@@ -2601,7 +2645,7 @@ def if_greater_zero(
         return else_result
     """
     condition = to_sx(condition)
-    return if_else(ca.gt(condition, 0), if_result, else_result)
+    return if_else(ca.SX.binary(ca.OP_LT, ca.SX(0), condition), if_result, else_result)
 
 
 def if_greater_eq_zero(
@@ -2634,7 +2678,7 @@ def if_greater_eq(
     """
     a = to_sx(a)
     b = to_sx(b)
-    return if_else(ca.ge(a, b), if_result, else_result)
+    return if_else(ca.SX.binary(ca.OP_LE, b, a), if_result, else_result)
 
 
 def if_less_eq(
@@ -2683,38 +2727,35 @@ def if_eq(
     """
     a = to_sx(a)
     b = to_sx(b)
-    return if_else(ca.eq(a, b), if_result, else_result)
+    return if_else(ca.SX.binary(ca.OP_EQ, a, b), if_result, else_result)
 
 
 def if_eq_cases(
     a: ScalarData,
-    b_result_cases: Iterable[Tuple[ScalarData, GenericSymbolicType]],
+    b_result_cases: Iterable[tuple[ScalarData, GenericSymbolicType]],
     else_result: GenericSymbolicType,
 ) -> GenericSymbolicType:
     """
-    If a == b_result_cases[0][0]:
+    Selects the result of the case whose value equals `a`.
 
-    return b_result_cases[0][1]
-    elif a == b_result_cases[1][0]:
-        return b_result_cases[1][1]
-    ...
-    else:
-        return else_result
+    .. note:: If several cases equal `a`, the last of them is selected.
+
+    :param a: The value compared against every case.
+    :param b_result_cases: The (value, result) pairs.
+    :param else_result: The result while no case equals `a`.
+    :return: The expression selecting between the results.
     """
     a_sx = to_sx(a)
-    result_sx_list = []
-    ind = to_sx(-1)
-    for i, (b, b_result) in enumerate(b_result_cases):
-        b_sx = to_sx(b)
-        ind = ca.if_else(ca.eq(a_sx, b_sx), i, ind)
-        result_sx_list.append(to_sx(b_result))
-
-    result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
+    result_sx = to_sx(else_result)
+    for b, b_result in b_result_cases:
+        result_sx = _if_else_sx(
+            ca.SX.binary(ca.OP_EQ, a_sx, to_sx(b)), to_sx(b_result), result_sx
+        )
     return _create_return_type(else_result).from_casadi_sx(result_sx)
 
 
 def if_cases(
-    cases: Sequence[Tuple[ScalarData, GenericSymbolicType]],
+    cases: Sequence[tuple[ScalarData, GenericSymbolicType]],
     else_result: GenericSymbolicType,
 ) -> GenericSymbolicType:
     """
@@ -2726,21 +2767,38 @@ def if_cases(
     ...
     else:
         return else_result
-    """
-    result_sx_list = []
-    ind = to_sx(len(cases))
-    for i in reversed(range(len(cases))):
-        case = to_sx(cases[i][0])
-        ind = ca.if_else(case, i, ind)
-        result_sx_list.insert(0, to_sx(cases[i][1]))
 
-    result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
+    .. warning:: Any guard that is not 0 selects its case, the trinary Unknown included.
+        Use :func:`trinary_if_cases` for guards in trinary logic.
+    """
+    result_sx = to_sx(else_result)
+    for guard, result in reversed(cases):
+        result_sx = _if_else_sx(to_sx(guard), to_sx(result), result_sx)
     return _create_return_type(else_result).from_casadi_sx(result_sx)
+
+
+def trinary_if_cases(
+    cases: Sequence[tuple[ScalarData, GenericSymbolicType]],
+    else_result: GenericSymbolicType,
+) -> GenericSymbolicType:
+    """
+    Like :func:`if_cases`, for guards in trinary logic: a case is selected only while its
+    guard is True, never while it is Unknown.
+
+    :param cases: The (guard, result) pairs; the first guard that is True selects its
+        result.
+    :param else_result: The result while no guard is True.
+    :return: The expression selecting between the results.
+    """
+    return if_cases(
+        cases=[(Scalar(guard).is_true(), result) for guard, result in cases],
+        else_result=else_result,
+    )
 
 
 def if_less_eq_cases(
     a: ScalarData,
-    b_result_cases: Sequence[Tuple[ScalarData, GenericSymbolicType]],
+    b_result_cases: Sequence[tuple[ScalarData, GenericSymbolicType]],
     else_result: GenericSymbolicType,
 ) -> GenericSymbolicType:
     """
@@ -2755,14 +2813,11 @@ def if_less_eq_cases(
         return else_result
     """
     a_sx = to_sx(a)
-    result_sx_list = []
-    ind = to_sx(len(b_result_cases))
-    for i in reversed(range(len(b_result_cases))):
-        b_sx = to_sx(b_result_cases[i][0])
-        ind = ca.if_else(ca.le(a_sx, b_sx), i, ind)
-        result_sx_list.insert(0, to_sx(b_result_cases[i][1]))
-
-    result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
+    result_sx = to_sx(else_result)
+    for b, b_result in reversed(b_result_cases):
+        result_sx = _if_else_sx(
+            ca.SX.binary(ca.OP_LE, a_sx, to_sx(b)), to_sx(b_result), result_sx
+        )
     return _create_return_type(else_result).from_casadi_sx(result_sx)
 
 

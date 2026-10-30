@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
-from typing_extensions import List, Optional, Set, Tuple
+from typing_extensions import List, Optional
 
 from cognitive_robot_abstract_machine import orm_interfaces
 from cognitive_robot_abstract_machine.exceptions import (
@@ -30,7 +30,7 @@ from .dataset import failing_generate_orm, generate_orm, mapped_module
 
 # %% a checkout of packages that generate an interface
 
-PACKAGE_NAMES: Tuple[str, ...] = ("upstream", "downstream")
+PACKAGE_NAMES: tuple[str, ...] = ("upstream", "downstream")
 """
 Packages of the checkout under test, in dependency order.
 """
@@ -88,7 +88,7 @@ def workspace(checkout: Path) -> WorkspaceOrmInterfaces:
     )
 
 
-def tracked_interfaces(repository_root: Path) -> Set[str]:
+def tracked_interfaces(repository_root: Path) -> set[str]:
     """
     Read which ORM interfaces of a checkout git tracks.
 

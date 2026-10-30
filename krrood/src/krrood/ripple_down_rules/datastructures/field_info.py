@@ -11,7 +11,7 @@ from datetime import datetime
 from krrood.patterns.caching import memoize
 from types import NoneType
 
-from typing_extensions import Type, get_origin, Optional, get_type_hints, Tuple
+from typing_extensions import Type, get_origin, get_type_hints
 
 from krrood.ripple_down_rules.utils import make_tuple
 
@@ -33,7 +33,7 @@ class FieldInfo:
     A class that wraps a field of dataclass and provides some utility functions.
     """
 
-    clazz: Type
+    clazz: type
     """
     The class that the field is in.
     """
@@ -43,7 +43,7 @@ class FieldInfo:
     The name of the field.
     """
 
-    type: Tuple[Type, ...]
+    type: tuple[type, ...]
     """
     The type of the field or inner type of the container if it is a container.
     """
@@ -53,7 +53,7 @@ class FieldInfo:
     True if the field is optional, False otherwise.
     """
 
-    container: Optional[Type]
+    container: type | None
     """
     The type of the container if it is one (list, set, tuple, etc.).
 
@@ -70,7 +70,7 @@ class FieldInfo:
     The field instance.
     """
 
-    def __init__(self, clazz: Type, f: Field):
+    def __init__(self, clazz: type, f: Field):
         self.field = f
         self.name = f.name
         self.clazz = clazz
@@ -123,7 +123,7 @@ class FieldInfo:
         return len(self.type) == 1 and self.type[0] == datetime
 
 
-def is_container(clazz: Type) -> bool:
+def is_container(clazz: type) -> bool:
     """
     Check if a class is an iterable.
 
@@ -133,7 +133,7 @@ def is_container(clazz: Type) -> bool:
     return get_origin(clazz) in [list, set, tuple]
 
 
-def manually_search_for_class_name(target_class_name: str) -> Type:
+def manually_search_for_class_name(target_class_name: str) -> type:
     """
     Searches for a class with the specified name in the current module's `globals()`
     dictionary and all loaded modules present in `sys.modules`. This function attempts

@@ -18,9 +18,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
-from typing_extensions import Optional
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     NounPhrase,
@@ -67,7 +66,7 @@ class BooleanPredicate(ABC):
         would be wrong."""
 
     @abstractmethod
-    def predicate_object(self, attribute: Attribute) -> Optional[VerbalizationFragment]:
+    def predicate_object(self, attribute: Attribute) -> VerbalizationFragment | None:
         """:param attribute: The boolean attribute node, supplying the owner class and name for the
         default surface when the predicate names none.
 
@@ -83,7 +82,7 @@ class AdjectivalPredicate(BooleanPredicate):
     The attribute reads as a predicative adjective — *"is operational"*.
     """
 
-    adjective: Optional[str] = None
+    adjective: str | None = None
     """
     The adjective word; ``None`` uses the attribute's own (display) name.
     """
@@ -109,7 +108,7 @@ class PossessivePredicate(BooleanPredicate):
     backbone"*.
     """
 
-    noun: Optional[str] = None
+    noun: str | None = None
     """
     The possessed noun; ``None`` uses the attribute's own (display) name.
     """
@@ -150,7 +149,7 @@ class VerbalPredicate(BooleanPredicate):
     pass.
     """
 
-    object_noun: Optional[str] = None
+    object_noun: str | None = None
     """
     An optional object noun (*"produces **milk**"*); ``None`` for an intransitive verb —
     one that takes no object, so the predicate is the verb alone (*"breathes"*).
@@ -167,7 +166,7 @@ class VerbalPredicate(BooleanPredicate):
     def bare_head(self) -> VerbalizationFragment:
         return WordFragment(text=self.verb)
 
-    def predicate_object(self, attribute: Attribute) -> Optional[VerbalizationFragment]:
+    def predicate_object(self, attribute: Attribute) -> VerbalizationFragment | None:
         if self.object_noun is None:
             return None
         return Noun(

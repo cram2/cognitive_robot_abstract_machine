@@ -46,7 +46,7 @@ box_world = World()
 
 with box_world.modify_world():
     box = Body(name=PrefixedName("box"), collision=ShapeCollection([Box(scale=Scale(0.5, 0.5, 0.5),
-                                                        color=Color(1., 1., 1., 1.),
+                                                        color=Color.from_rgba(red=1., green=1., blue=1., opacity=1.),
                                                         origin=HomogeneousTransformationMatrix.from_xyz_rpy(0,0,0,0,0,0),)],
                                                         ))
     box_world.add_kinematic_structure_entity(box)

@@ -20,6 +20,34 @@ class SetupException(GiskardException):
 
 
 @dataclass
+class UnpairedKinematicChainParametersError(SetupException):
+    """
+    Raised when the ``root_links`` and ``tip_links`` parameters differ in length, so
+    their entries cannot be paired into kinematic chains.
+    """
+
+    root_links: list[str]
+    """
+    The root link names that were declared.
+    """
+
+    tip_links: list[str]
+    """
+    The tip link names that were declared.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "root_links and tip_links must have the same length; "
+            f"got {len(self.root_links)} root links {self.root_links} and "
+            f"{len(self.tip_links)} tip links {self.tip_links}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Declare one tip link for every root link, in the same order."
+
+
+@dataclass
 class PlanningException(GiskardException):
     """
     Base class for errors that occur while planning a motion.
@@ -112,34 +140,6 @@ class NoControlledJointsError(SetupException):
 
 
 @dataclass
-class NonPositiveRealTimeFactorError(SetupException):
-    """
-    Raised when a simulation is configured to run at a non positive speed.
-    """
-
-    real_time_factor: float
-    """
-    The rejected factor.
-    """
-
-    def error_message(self) -> str:
-        return f"A real time factor of {self.real_time_factor} would never advance the simulation."
-
-    def suggest_correction(self) -> str:
-        return "Use a positive factor, or NoPacing to run as fast as possible."
-
-
-@dataclass
-class JointRegistrationRequiresStandaloneModeError(SetupException):
-    """
-    Raised when joints are registered outside of StandAlone mode.
-    """
-
-    def error_message(self) -> str:
-        return "Joints only need to be registered in StandAlone mode."
-
-    def suggest_correction(self) -> str:
-        return "Remove the manual registration. For real robots, the joints are retrieved from the connected controllers."
 
 
 @dataclass
@@ -152,7 +152,7 @@ class MaxTrajectoryLengthException(PlanningException):
         return "Trajectory exceeded the maximum allowed length."
 
     def suggest_correction(self) -> str:
-        return "Look at the final state of the MotionStatechart to see which nodes are still running. Use the debugger or the MotionStatechart.draw() method to visualize the MotionStatechart."
+        return "Look at the final state of the Statechart to see which nodes are still running. Use the debugger or the Statechart.draw() method to visualize the Statechart."
 
 
 @dataclass

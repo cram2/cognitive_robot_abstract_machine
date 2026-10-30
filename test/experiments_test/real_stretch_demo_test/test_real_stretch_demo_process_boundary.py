@@ -11,8 +11,9 @@ stop being feasible.
 """
 
 import numpy as np
+import pytest
 
-from coraplex.datastructures.enums import ExecutionType
+from coraplex.plans.executors import RealRobotPlanExecutor
 from experiments.real_stretch_apartment_demo.demo import (
     CEREAL_NAME,
     CEREAL_SHELF_LAYER_NAME,
@@ -53,7 +54,7 @@ def test_demonstration_runs_against_a_controller_in_another_process(
     gripper.
     """
     StretchApartmentDemonstration(
-        execution_type=ExecutionType.REAL, used_robot=Stretch
+        executor_type=RealRobotPlanExecutor, used_robot=Stretch
     ).run()
 
     controller_world = stretch_controller_process.session.fetch_world(

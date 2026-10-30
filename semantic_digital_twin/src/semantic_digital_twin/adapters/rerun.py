@@ -6,7 +6,6 @@ from enum import StrEnum
 
 import numpy as np
 import rerun
-from typing_extensions import Optional
 
 from krrood.symbolic_math.symbolic_math import (
     CompiledFunction,
@@ -170,7 +169,7 @@ class RerunAdapter(StateChangeCallback):
     Where the recording sends its data.
     """
 
-    target: Optional[str] = field(default=None, kw_only=True)
+    target: str | None = field(default=None, kw_only=True)
     """
     GRPC URL for ``CONNECT`` or file path for ``SAVE``.
     """

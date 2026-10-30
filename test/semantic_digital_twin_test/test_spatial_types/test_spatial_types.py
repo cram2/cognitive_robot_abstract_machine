@@ -15,6 +15,7 @@ from semantic_digital_twin.exceptions import (
     SpatialTypesError,
 )
 from semantic_digital_twin.spatial_types import (
+    AxisAngle,
     RotationMatrix,
     Quaternion,
     Vector3,
@@ -51,6 +52,17 @@ quaternions = [np.array([1.0, 0, 0, 0]), np.array([0.0, 1, 0, 0])]
 
 
 class TestRotationMatrix:
+    def test_expression_with_structural_zeros_is_written_the_same_after_a_round_trip(
+        self,
+    ) -> None:
+        angle = sm.FloatVariable("angle")
+        rotation = RotationMatrix.from_vectors(
+            x=Vector3(sm.cos(angle), sm.sin(angle), 0), z=Vector3.Z()
+        )
+        rotation_json = rotation.to_json()
+
+        assert RotationMatrix.from_json(rotation_json).to_json() == rotation_json
+
     @pytest.mark.parametrize("q1", quaternions)
     @pytest.mark.parametrize("q2", quaternions)
     def test_rotation_distance(self, q1, q2):
@@ -80,8 +92,8 @@ class TestRotationMatrix:
         q = Quaternion(reference_frame=reference_frame)
 
         assert m1.reference_frame == reference_frame
-        assert m1.to_quaternion().reference_frame == reference_frame
-        assert m1.to_axis_angle()[0].reference_frame == reference_frame
+        assert m1.quaternion.reference_frame == reference_frame
+        assert m1.axis_angle.axis.reference_frame == reference_frame
         assert (
             RotationMatrix.from_rpy(reference_frame=reference_frame).reference_frame
             == reference_frame
@@ -127,7 +139,7 @@ class TestRotationMatrix:
         v = np.array([1, 1, 1])
         v = v / np.linalg.norm(v)
         R_ref = rotation_matrix_from_axis_angle(v, 1)
-        R = RotationMatrix().from_axis_angle(Vector3.unit_vector(1, 1, 1), 1)
+        R = RotationMatrix().from_axis_angle(AxisAngle(Vector3.unit_vector(1, 1, 1), 1))
         assert np.allclose(R.x_vector(), R_ref[:, 0])
         assert np.allclose(R.y_vector(), R_ref[:, 1])
         assert np.allclose(R.z_vector(), R_ref[:, 2])
@@ -206,7 +218,9 @@ class TestRotationMatrix:
     @pytest.mark.parametrize("angle", numbers)
     def test_rotation3_axis_angle(self, axis, angle):
         assert np.allclose(
-            RotationMatrix.from_axis_angle(axis, angle),
+            RotationMatrix.from_axis_angle(
+                AxisAngle(Vector3.from_iterable(axis), angle)
+            ),
             rotation_matrix_from_axis_angle(np.array(axis), angle),
         )
 
@@ -214,8 +228,8 @@ class TestRotationMatrix:
     def test_axis_angle_from_matrix(self, q):
         m = rotation_matrix_from_quaternion(*q)
 
-        actual_axis = RotationMatrix(data=m).to_axis_angle()[0]
-        actual_angle = RotationMatrix(data=m).to_axis_angle()[1]
+        actual_axis = RotationMatrix(data=m).axis_angle.axis
+        actual_angle = RotationMatrix(data=m).axis_angle.angle
 
         expected_axis, expected_angle = axis_angle_from_rotation_matrix(m)
         compare_axis_angle(actual_angle, actual_axis[:3], expected_angle, expected_axis)
@@ -226,8 +240,8 @@ class TestRotationMatrix:
     @pytest.mark.parametrize("expected_angle", numbers)
     def test_axis_angle_from_matrix2(self, expected_axis, expected_angle):
         m = rotation_matrix_from_axis_angle(expected_axis, expected_angle)
-        actual_axis = RotationMatrix(data=m).to_axis_angle()[0]
-        actual_angle = RotationMatrix(data=m).to_axis_angle()[1]
+        actual_axis = RotationMatrix(data=m).axis_angle.axis
+        actual_angle = RotationMatrix(data=m).axis_angle.angle
         compare_axis_angle(actual_angle, actual_axis[:3], expected_angle, expected_axis)
         assert actual_axis[-1] == 0
 
@@ -235,9 +249,9 @@ class TestRotationMatrix:
     def test_rpy_from_matrix(self, q):
         expected = rotation_matrix_from_quaternion(*q)
 
-        roll = float(RotationMatrix(data=expected).to_rpy()[0].to_np()[0])
-        pitch = float(RotationMatrix(data=expected).to_rpy()[1].to_np()[0])
-        yaw = float(RotationMatrix(data=expected).to_rpy()[2].to_np()[0])
+        roll = float(RotationMatrix(data=expected).rpy[0].to_np()[0])
+        pitch = float(RotationMatrix(data=expected).rpy[1].to_np()[0])
+        yaw = float(RotationMatrix(data=expected).rpy[2].to_np()[0])
         actual = rotation_matrix_from_rpy(roll, pitch, yaw)
 
         assert np.allclose(actual, expected)
@@ -245,9 +259,9 @@ class TestRotationMatrix:
     @pytest.mark.parametrize("q", quaternions)
     def test_rpy_from_matrix2(self, q):
         matrix = rotation_matrix_from_quaternion(*q)
-        roll = RotationMatrix(data=matrix).to_rpy()[0]
-        pitch = RotationMatrix(data=matrix).to_rpy()[1]
-        yaw = RotationMatrix(data=matrix).to_rpy()[2]
+        roll = RotationMatrix(data=matrix).rpy[0]
+        pitch = RotationMatrix(data=matrix).rpy[1]
+        yaw = RotationMatrix(data=matrix).rpy[2]
         r1 = RotationMatrix.from_rpy(roll, pitch, yaw)
         assert np.allclose(r1, matrix, atol=1.0e-4)
 
@@ -311,7 +325,7 @@ class TestRotationMatrix:
         assert np.allclose(should_be_identity, np.eye(4), atol=1e-10)
 
         # Test that determinant is 1 (proper rotation, not reflection)
-        det = r.to_generic_matrix().det()
+        det = r.generic_matrix.det()
         assert np.allclose(det, 1.0, atol=1e-10)
 
     def test_transpose(self):
@@ -363,7 +377,7 @@ class TestRotationMatrix:
 
         # Note: Order matters in rotation composition, so this might not be exactly equal
         # but both should be valid rotation matrices
-        assert np.allclose(combined.to_generic_matrix().det(), 1.0)
+        assert np.allclose(combined.generic_matrix.det(), 1.0)
         assert np.allclose(combined @ combined.T, np.eye(4), atol=1e-10)
 
     def test_vector_rotation(self):
@@ -371,7 +385,7 @@ class TestRotationMatrix:
         Test rotation of vectors and unit vectors.
         """
         # 90-degree rotation around Z-axis
-        r_z90 = RotationMatrix.from_axis_angle(Vector3.Z(), np.pi / 2)
+        r_z90 = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), np.pi / 2))
 
         # Rotate unit vector along X-axis
         x_axis = Vector3.X()
@@ -412,19 +426,19 @@ class TestRotationMatrix:
         r = RotationMatrix.from_rpy(0.1, 0.2, 0.3)
 
         # Test conversion to axis-angle
-        axis, angle = r.to_axis_angle()
+        axis, angle = r.axis_angle.axis, r.axis_angle.angle
         assert isinstance(axis, Vector3)
         assert axis[3] == 0  # Should be a vector, not point
         assert hasattr(angle, "to_np")  # Should be Expression or similar
 
         # Test conversion to RPY
-        roll, pitch, yaw = r.to_rpy()
+        roll, pitch, yaw = r.rpy
         assert np.allclose(roll, 0.1, atol=1e-10)
         assert np.allclose(pitch, 0.2, atol=1e-10)
         assert np.allclose(yaw, 0.3, atol=1e-10)
 
         # Test conversion to quaternion
-        q = r.to_quaternion()
+        q = r.quaternion
         assert isinstance(q, Quaternion)
 
         # Round-trip krrood_test: R -> Q -> R should preserve rotation
@@ -436,7 +450,7 @@ class TestRotationMatrix:
     @pytest.mark.parametrize("yaw", [np.pi / 2, 0, -np.pi / 23])
     def test_rpy_roundtrip(self, roll, pitch, yaw):
         r = RotationMatrix.from_rpy(roll, pitch, yaw)
-        r_roll, r_pitch, r_yaw = r.to_rpy()
+        r_roll, r_pitch, r_yaw = r.rpy
 
         assert np.allclose(r_roll, roll, atol=1e-10)
         assert np.allclose(r_pitch, pitch, atol=1e-10)
@@ -447,7 +461,7 @@ class TestRotationMatrix:
     def test_axis_angle_properties(self, axis, angle):
 
         axis_unit = Vector3.from_iterable(axis)
-        r = RotationMatrix.from_axis_angle(axis_unit, angle)
+        r = RotationMatrix.from_axis_angle(AxisAngle(axis_unit, angle))
 
         # Test that axis is preserved (rotation around axis shouldn't change axis)
         rotated_axis = r @ axis_unit
@@ -462,7 +476,7 @@ class TestRotationMatrix:
         small_angle = 1e-8
 
         # Small rotation around Z-axis
-        r = RotationMatrix.from_axis_angle(Vector3.Z(), small_angle)
+        r = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), small_angle))
         rotation_part = r[:3, :3]
 
         # Should be close to identity for very small angles
@@ -478,7 +492,7 @@ class TestRotationMatrix:
         angle_sym = sm.FloatVariable(name="theta")
 
         # Create symbolic rotation
-        r_sym = RotationMatrix.from_axis_angle(Vector3.Z(), angle_sym)
+        r_sym = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), angle_sym))
 
         # Should be able to compose with other rotations
         r_numeric = RotationMatrix.from_rpy(0.1, 0, 0)
@@ -496,11 +510,13 @@ class TestRotationMatrix:
         Test compilation and execution of rotation matrices.
         """
         # Test symbolic rotation compilation
-        compiled_rotation = RotationMatrix.from_axis_angle(Vector3.Z(), np.pi / 4)
+        compiled_rotation = RotationMatrix.from_axis_angle(
+            AxisAngle(Vector3.Z(), np.pi / 4)
+        )
 
         # Should be a valid 4x4 rotation matrix
         assert compiled_rotation.shape == (4, 4)
-        assert np.allclose(compiled_rotation.to_generic_matrix().det(), 1.0)
+        assert np.allclose(compiled_rotation.generic_matrix.det(), 1.0)
         assert np.allclose(
             compiled_rotation @ compiled_rotation.T, np.eye(4), atol=1e-10
         )
@@ -510,16 +526,16 @@ class TestRotationMatrix:
         Test edge cases and boundary conditions.
         """
         # Zero rotation
-        r_zero = RotationMatrix.from_axis_angle(Vector3.X(), 0)
+        r_zero = RotationMatrix.from_axis_angle(AxisAngle(Vector3.X(), 0))
         identity = RotationMatrix()
         assert np.allclose(r_zero, identity, atol=1e-12)
 
         # Full rotation (2π)
-        r_full = RotationMatrix.from_axis_angle(Vector3.Y(), 2 * np.pi)
+        r_full = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Y(), 2 * np.pi))
         assert np.allclose(r_full, identity, atol=1e-10)
 
         # π rotation (180 degrees)
-        r_pi = RotationMatrix.from_axis_angle(Vector3.Z(), np.pi)
+        r_pi = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), np.pi))
         rotation_part = r_pi[:3, :3]
         # Should flip X and Y axes
         expected_rotation = np.array([[-1, 0, 0], [0, -1, 0], [0, 0, 1]])
@@ -531,7 +547,7 @@ class TestRotationMatrix:
         """
         # Create rotation via different methods
         r_rpy = RotationMatrix.from_rpy(0.1, 0.2, 0.3)
-        q = r_rpy.to_quaternion()
+        q = r_rpy.quaternion
         r_from_q = RotationMatrix.from_quaternion(q)
 
         # Should be identical
@@ -540,7 +556,9 @@ class TestRotationMatrix:
     def test_determinant_preservation(self):
         """Test that all operations preserve determinant = 1"""
         r1 = RotationMatrix.from_rpy(0.5, -0.3, 1.2)
-        r2 = RotationMatrix.from_axis_angle(Vector3.unit_vector(1, 1, 1), 0.8)
+        r2 = RotationMatrix.from_axis_angle(
+            AxisAngle(Vector3.unit_vector(1, 1, 1), 0.8)
+        )
 
         operations_to_test = [
             r1,
@@ -570,6 +588,34 @@ class TestRotationMatrix:
 
 
 class TestPoint3:
+    def test_the_midpoint_lies_halfway_between_both_points(self):
+        near = Point3(x=0, y=2, z=4)
+        far = Point3(x=2, y=6, z=-4)
+
+        np.testing.assert_allclose(
+            near.midpoint(far).to_np(), Point3(x=1, y=4, z=0).to_np()
+        )
+
+    def test_the_midpoint_is_the_same_whichever_point_it_is_asked_of(self):
+        near = Point3(x=0, y=2, z=4)
+        far = Point3(x=2, y=6, z=-4)
+
+        np.testing.assert_allclose(
+            near.midpoint(far).to_np(), far.midpoint(near).to_np()
+        )
+
+    def test_a_point_meets_itself_where_it_already_is(self):
+        point = Point3(x=1, y=-2, z=3)
+
+        np.testing.assert_allclose(point.midpoint(point).to_np(), point.to_np())
+
+    def test_the_midpoint_stays_in_the_frame_the_points_were_given_in(self):
+        reference_frame = Body(name=PrefixedName("muh"))
+        near = Point3(x=0, y=0, z=0, reference_frame=reference_frame)
+        far = Point3(x=2, y=0, z=0, reference_frame=reference_frame)
+
+        assert near.midpoint(far).reference_frame is reference_frame
+
     def test_distance_point_to_line_segment1(self):
         p = Point3(x=0, y=0, z=0)
         start = Point3(x=0, y=0, z=-1)
@@ -1375,10 +1421,10 @@ class TestTransformationMatrix:
         assert (t2 @ t1).child_frame == child_frame
         assert t1.inverse().reference_frame == child_frame
         assert t1.inverse().child_frame == reference_frame
-        assert t1.to_position().reference_frame == reference_frame
-        assert t1.to_quaternion().reference_frame == reference_frame
-        assert t1.to_translation_matrix().reference_frame == reference_frame
-        assert t1.to_rotation_matrix().reference_frame == reference_frame
+        assert t1.position.reference_frame == reference_frame
+        assert t1.quaternion.reference_frame == reference_frame
+        assert t1.translation_matrix.reference_frame == reference_frame
+        assert t1.rotation_matrix.reference_frame == reference_frame
 
         assert (t1 @ p).reference_frame == reference_frame
         assert (t1 @ v).reference_frame == reference_frame
@@ -1401,7 +1447,7 @@ class TestTransformationMatrix:
             sm.Scalar(1),
             np.eye(4),
             Point2(x=1, y=1),
-            Pose2D(x=1, y=1, yaw=1),
+            Pose2D.from_xy_yaw(x=1, y=1, yaw=1),
         ]
 
         for other in works:
@@ -1436,7 +1482,7 @@ class TestTransformationMatrix:
         assert isinstance(composed, Quaternion)
         np.testing.assert_allclose(
             composed.to_np(),
-            transformation.to_quaternion().multiply(quaternion).to_np(),
+            transformation.quaternion.multiply(quaternion).to_np(),
             atol=1e-12,
         )
 
@@ -1477,14 +1523,14 @@ class TestTransformationMatrix:
         pose with those dropped.
         """
         transformation = self._transformation()
-        pose_2d = Pose2D(x=1, y=2, yaw=0.4)
+        pose_2d = Pose2D.from_xy_yaw(x=1, y=2, yaw=0.4)
 
         transformed = pose_2d.transform(transformation)
 
         assert isinstance(transformed, Pose2D)
         np.testing.assert_allclose(
             transformed.to_np(),
-            Pose2D.from_pose(transformation @ pose_2d.to_pose()).to_np(),
+            Pose2D.from_pose(transformation @ pose_2d.pose).to_np(),
             atol=1e-12,
         )
 
@@ -1522,7 +1568,10 @@ class TestTransformationMatrix:
         r2[1, 3] = y
         r2[2, 3] = z
         r = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            Point3(x, y, z), RotationMatrix.from_axis_angle(axis, angle)
+            Point3(x, y, z),
+            RotationMatrix.from_axis_angle(
+                AxisAngle(Vector3.from_iterable(axis), angle)
+            ),
         )
         assert np.allclose(r, r2)
 
@@ -1557,7 +1606,7 @@ class TestTransformationMatrix:
         r1 = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             Point3(x, y, z),
             RotationMatrix.from_quaternion(Quaternion(qx, qy, qz, qw)),
-        ).to_position()
+        ).position
         r2 = [x, y, z, 1]
         for i, e in enumerate(r2):
             assert np.allclose(r1[i], e)
@@ -1567,7 +1616,7 @@ class TestTransformationMatrix:
         r1 = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=Point3(x, y, z),
             rotation_matrix=RotationMatrix.from_quaternion(Quaternion(qx, qy, qz, qw)),
-        ).to_translation_matrix()
+        ).translation_matrix
         r2 = np.identity(4)
         r2[0, 3] = x
         r2[1, 3] = y
@@ -1578,7 +1627,7 @@ class TestTransformationMatrix:
         x, y, z, qx, qy, qz, qw = 1, 2, 3, 1, 0, 0, 0
         r1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
             x, y, z, qx, qy, qz, qw
-        ).to_rotation_matrix()
+        ).rotation_matrix
         r2 = rotation_matrix_from_quaternion(qx, qy, qz, qw)
         assert np.allclose(r1, r2)
 
@@ -1587,7 +1636,7 @@ class TestTransformationMatrix:
         Test to make sure the function doesn't alter the original.
         """
         f = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3)
-        r = f.to_rotation_matrix()
+        r = f.rotation_matrix
         assert f[0, 3] == 1
         assert f[1, 3] == 2
         assert f[2, 3] == 3
@@ -1815,7 +1864,7 @@ class TestTransformationMatrix:
         t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
 
         # Extract position
-        position = t.to_position()
+        position = t.position
         assert isinstance(position, Point3)
         assert position.x.to_np() == 1
         assert position.y.to_np() == 2
@@ -1823,7 +1872,7 @@ class TestTransformationMatrix:
         assert position[3] == 1
 
         # Extract rotation
-        rotation = t.to_rotation_matrix()
+        rotation = t.rotation_matrix
         assert isinstance(rotation, RotationMatrix)
         # Should have zero translation
         assert rotation[0, 3] == 0
@@ -1831,7 +1880,7 @@ class TestTransformationMatrix:
         assert rotation[2, 3] == 0
 
         # Extract translation (pure translation matrix)
-        translation = t.to_translation_matrix()
+        translation = t.translation_matrix
         assert isinstance(translation, HomogeneousTransformationMatrix)
         # Should have identity rotation
         rotation_part = translation[:3, :3]
@@ -1842,7 +1891,7 @@ class TestTransformationMatrix:
         assert translation.z.to_np() == 3
 
         # Extract quaternion
-        quaternion = t.to_quaternion()
+        quaternion = t.quaternion
         assert isinstance(quaternion, Quaternion)
 
     def test_frame_properties(self):
@@ -2052,7 +2101,7 @@ class TestTransformationMatrix:
             quat_z=q[2],
         )
 
-        q_extracted = t.to_quaternion()
+        q_extracted = t.quaternion
 
         t_roundtrip = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=1,
@@ -2115,7 +2164,9 @@ class TestQuaternion:
     @pytest.mark.parametrize("axis", unit_vectors3)
     @pytest.mark.parametrize("angle", numbers)
     def test_quaternion_from_axis_angle1(self, axis, angle):
-        actual = Quaternion.from_axis_angle(Vector3.from_iterable(axis), angle)
+        actual = Quaternion.from_axis_angle(
+            AxisAngle(Vector3.from_iterable(axis), angle)
+        )
         expected = quaternion_from_axis_angle(axis, angle)
         assert np.allclose(actual, expected)
 
@@ -2146,16 +2197,16 @@ class TestQuaternion:
     @pytest.mark.parametrize("q", quaternions)
     def test_axis_angle_from_quaternion(self, q):
         axis2, angle2 = axis_angle_from_quaternion(*q)
-        axis = Quaternion.from_iterable(q).to_axis_angle()[0]
-        angle = Quaternion.from_iterable(q).to_axis_angle()[1]
+        axis = Quaternion.from_iterable(q).axis_angle.axis
+        angle = Quaternion.from_iterable(q).axis_angle.angle
         compare_axis_angle(angle, axis[:3], angle2, axis2)
         assert axis[-1] == 0
 
     def test_axis_angle_from_quaternion2(self):
         q = (0, 0, 0, 1.0000001)
         axis2, angle2 = axis_angle_from_quaternion(*q)
-        axis = Quaternion.from_iterable(q).to_axis_angle()[0]
-        angle = Quaternion.from_iterable(q).to_axis_angle()[1]
+        axis = Quaternion.from_iterable(q).axis_angle.axis
+        angle = Quaternion.from_iterable(q).axis_angle.angle
         compare_axis_angle(angle, axis[:3], angle2, axis2)
         assert axis[-1] == 0
 

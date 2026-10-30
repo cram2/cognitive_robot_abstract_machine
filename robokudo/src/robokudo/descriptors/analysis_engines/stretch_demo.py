@@ -11,8 +11,9 @@ grasping it.
     :class:`~robokudo.types.annotation.Classification`, so every reported object designator
     has an empty ``type`` and the caller decides what it asked for. Adding a classifying
     annotator (for example
-    :class:`~robokudo.annotators.clip_annotator.ClipAnnotator` or
-    :class:`~robokudo.annotators.simple_yolo_annotator.SimpleYoloAnnotator`) before
+    :class:`~robokudo.annotators.clip_annotator.CLIPAnnotator` or
+    :class:`~robokudo.annotators.yolo_annotator.YoloAnnotator` with
+    ``classify_existing_hypotheses`` enabled) before
     :class:`~robokudo.annotators.query.GenerateQueryResult` fills that field in without any
     other change.
 """
@@ -20,7 +21,11 @@ grasping it.
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
-from robokudo.annotators.image_cluster_extractor import ImageClusterExtractor
+from robokudo.annotators.image_cluster_extractor import (
+    ColorName,
+    ColorRangeBound,
+    ImageClusterExtractor,
+)
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
@@ -123,11 +128,15 @@ class AnalysisEngine(AnalysisEngineInterface):
         # already-correctly-shaped region. Hardcoded to red for now, matching the one
         # object this pipeline currently targets.
         cluster_descriptor = ImageClusterExtractor.Descriptor()
-        cluster_descriptor.parameters.hsv_min = (
-            cluster_descriptor.parameters.color_name_to_hsv_range["red"]["hsv_min"]
+        cluster_descriptor.parameters.minimum_hue_saturation_value = (
+            cluster_descriptor.parameters.color_ranges[ColorName.RED][
+                ColorRangeBound.LOWER
+            ]
         )
-        cluster_descriptor.parameters.hsv_max = (
-            cluster_descriptor.parameters.color_name_to_hsv_range["red"]["hsv_max"]
+        cluster_descriptor.parameters.maximum_hue_saturation_value = (
+            cluster_descriptor.parameters.color_ranges[ColorName.RED][
+                ColorRangeBound.UPPER
+            ]
         )
         # The depth hole leaves few valid 3D points under the color mask. Lowered to
         # ClusterPoseBBAnnotator's own floor (it needs more than 10 points to compute a

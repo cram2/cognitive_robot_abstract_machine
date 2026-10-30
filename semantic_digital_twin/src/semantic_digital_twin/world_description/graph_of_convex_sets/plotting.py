@@ -37,7 +37,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
-from typing_extensions import Iterable, List, Optional, Sequence, Self
+from typing_extensions import Iterable, Sequence, Self
 
 from semantic_digital_twin.spatial_types import Point, Point3
 from semantic_digital_twin.world_description.geometry import (
@@ -274,7 +274,7 @@ class NavigationPath:
     instead of recomputing it from a bare list.
     """
 
-    waypoints: List[Point]
+    waypoints: list[Point]
     """
     The points to navigate to, starting at the query's start and ending at its goal.
     """
@@ -431,7 +431,7 @@ class NavigationScene:
     The path to draw, from its start to its goal.
     """
 
-    obstacles: Optional[BoundingBoxCollection] = None
+    obstacles: BoundingBoxCollection | None = None
     """
     The environment's true collision geometry, unbloated.
 
@@ -472,14 +472,14 @@ class NavigationScene:
         return Footprint.of(self.search_space.bounding_box())
 
     @property
-    def convex_sets(self) -> List[AxisAlignedBox]:
+    def convex_sets(self) -> list[AxisAlignedBox]:
         """
         :return: The convex sets partitioning free space.
         """
         return list(self.graph_of_convex_sets.graph.nodes())
 
     @property
-    def adjacencies(self) -> List[ConvexSetAdjacency]:
+    def adjacencies(self) -> list[ConvexSetAdjacency]:
         """
         :return: One adjacency per edge of the graph.
         """
@@ -1124,7 +1124,7 @@ class GraphOfConvexSetsFigure:
             )
         return figure
 
-    def save(self, output_directory: Path) -> List[Path]:
+    def save(self, output_directory: Path) -> list[Path]:
         """
         Render the figure and write it as both a vector and a raster file.
 
@@ -1147,7 +1147,7 @@ class GraphOfConvexSetsFigure:
 
     def _draw_panels(
         self, all_axes: Iterable[Axes], palette: FigurePalette
-    ) -> List[LegendEntry]:
+    ) -> list[LegendEntry]:
         """
         Draw every panel and collect one legend entry per distinct label.
 
@@ -1155,7 +1155,7 @@ class GraphOfConvexSetsFigure:
         :param palette: The colors to draw with.
         :return: The legend entries of the whole figure.
         """
-        entries: List[LegendEntry] = []
+        entries: list[LegendEntry] = []
         seen_labels = set()
         for panel, axes, label in zip(self.panels, all_axes, self._panel_labels()):
             for entry in panel.draw(axes, self.scene, palette, label):
@@ -1165,7 +1165,7 @@ class GraphOfConvexSetsFigure:
                 entries.append(entry)
         return entries
 
-    def _panel_labels(self) -> List[str]:
+    def _panel_labels(self) -> list[str]:
         """
         :return: The enumerating labels the panel titles are prefixed with.
         """

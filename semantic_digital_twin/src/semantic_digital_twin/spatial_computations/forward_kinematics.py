@@ -1,7 +1,7 @@
 from __future__ import absolute_import, annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 from uuid import UUID
 
 import numpy as np
@@ -51,19 +51,19 @@ class ForwardKinematicsManager(ModelChangeCallback):
     efficiency.
     """
 
-    body_id_to_forward_kinematics_idx: Dict[UUID, int] = field(init=False, repr=False)
+    body_id_to_forward_kinematics_idx: dict[UUID, int] = field(init=False, repr=False)
     """
     Given a body id, returns the index of the first row in
     `forward_kinematics_for_all_bodies` that corresponds to that body.
     """
 
-    root_T_kse_expression_cache: Dict[UUID, HomogeneousTransformationMatrix] = field(
+    root_T_kse_expression_cache: dict[UUID, HomogeneousTransformationMatrix] = field(
         init=False, repr=False
     )
 
-    body_id_to_all_fk_index: Dict[UUID, int] = field(init=False, repr=False)
+    body_id_to_all_fk_index: dict[UUID, int] = field(init=False, repr=False)
 
-    compiled_revision: Optional[ModelRevision] = field(
+    compiled_revision: ModelRevision | None = field(
         init=False, default=None, repr=False
     )
     """

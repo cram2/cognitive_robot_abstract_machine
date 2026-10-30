@@ -49,7 +49,8 @@ def test_classes_communicating_over_a_node_are_ros2_nodes(node_user):
 @pytest.mark.parametrize("node_user", node_users)
 def test_node_field_is_declared_only_on_ros2_node(node_user):
     assert (
-            node_user.__dataclass_fields__["node"] is HasROS2Node.__dataclass_fields__["node"]
+        node_user.__dataclass_fields__["node"]
+        is HasROS2Node.__dataclass_fields__["node"]
     )
 
 

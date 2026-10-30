@@ -1,17 +1,16 @@
 import importlib.util
 import os
+import select
 import signal
 import subprocess
 import sys
 import time
+from contextlib import ExitStack, contextmanager
 from importlib.resources import files
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-# Mock PyQt5 and ROS 2 before importing the tool
-sys.modules["giskardpy.middleware.ros2"] = MagicMock()
-sys.modules["giskardpy.middleware.ros2.rospy"] = MagicMock()
+from typing_extensions import Any, Iterator
 
 # Mock PyQt5
 QtWidgets = MagicMock()
@@ -50,11 +49,37 @@ QtWidgets.QLabel = MockQWidget
 QtWidgets.QFrame = MockQWidget
 QtWidgets.QScrollArea = MockQWidget
 
-sys.modules["PyQt5"] = MagicMock()
-sys.modules["PyQt5.QtCore"] = MagicMock()
-sys.modules["PyQt5.QtCore"].Qt = MagicMock()
-sys.modules["PyQt5.QtGui"] = MagicMock()
-sys.modules["PyQt5.QtWidgets"] = QtWidgets
+
+@contextmanager
+def substituted_modules(substitutes: dict[str, Any]) -> Iterator[None]:
+    """
+    Makes imports of the given module names resolve to their substitutes inside the
+    block, and to what they resolved to before once it is left.
+
+    A submodule of a package that is imported already is also substituted as the
+    attribute of that package, which ``from package import submodule`` reads first.
+
+    :param substitutes: The substitute of each module name.
+    """
+    replaced_modules = {
+        name: sys.modules[name] for name in substitutes if name in sys.modules
+    }
+    with ExitStack() as package_attributes:
+        for name, substitute in substitutes.items():
+            package_name, _, attribute = name.rpartition(".")
+            if package_name in sys.modules and package_name not in substitutes:
+                package_attributes.enter_context(
+                    patch.object(
+                        sys.modules[package_name], attribute, substitute, create=True
+                    )
+                )
+        sys.modules.update(substitutes)
+        try:
+            yield
+        finally:
+            for name in substitutes:
+                del sys.modules[name]
+            sys.modules.update(replaced_modules)
 
 
 # Import the tool
@@ -69,8 +94,47 @@ def import_tool(path):
 tool_path = os.path.abspath(
     files("giskardpy").joinpath("../../scripts/ros2-tools/collision_matrix_tool.py")
 )
-tool = import_tool(tool_path)
+# Mock PyQt5 and ROS 2 only while importing the tool
+with substituted_modules(
+    {
+        "giskardpy.middleware.ros2": MagicMock(),
+        "semantic_digital_twin.adapters.ros.rospy": MagicMock(),
+        "PyQt5": MagicMock(),
+        "PyQt5.QtCore": MagicMock(),
+        "PyQt5.QtGui": MagicMock(),
+        "PyQt5.QtWidgets": QtWidgets,
+    }
+):
+    tool = import_tool(tool_path)
 from collision_matrix_tool import SelfCollisionMatrixInterface, DisableCollisionReason
+
+STARTUP_TIMEOUT_SECONDS = 120
+"""
+How long the launched tool may take to report that it is ready before the test gives up
+on it.
+"""
+
+
+def wait_until_ready(process: subprocess.Popen) -> None:
+    """
+    Read the launched tool's output until it reports that it is ready, and fail the test
+    if it exits or does not report it within :data:`STARTUP_TIMEOUT_SECONDS`.
+    """
+    deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
+    output = []
+    while time.monotonic() < deadline:
+        readable, _, _ = select.select(
+            [process.stdout], [], [], deadline - time.monotonic()
+        )
+        if not readable:
+            break
+        line = process.stdout.readline().decode()
+        if not line:
+            pytest.fail(f"Script exited before it was ready:\n{''.join(output)}")
+        if tool.StatusMessage.READY in line:
+            return
+        output.append(line)
+    pytest.fail(f"Script was not ready in time:\n{''.join(output)}")
 
 
 @pytest.fixture
@@ -147,7 +211,9 @@ def test_script_launch_and_kill():
     process = subprocess.Popen(
         ["python3", script_path],
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        # One stream, read while waiting for readiness, so neither pipe can fill up and block
+        # the tool.
+        stderr=subprocess.STDOUT,
         # start_new_session rather than preexec_fn=os.setsid: preexec_fn is documented
         # as unsafe in the presence of threads, and the xdist workers this runs under
         # are threaded.
@@ -160,13 +226,7 @@ def test_script_launch_and_kill():
     )
 
     try:
-        # Give it enough time to initialize (e.g., 3-5 seconds)
-        time.sleep(5)
-
-        # Check if it crashed immediately
-        if process.poll() is not None:
-            _, stderr = process.communicate()
-            pytest.fail(f"Script crashed on startup. Error: {stderr.decode()}")
+        wait_until_ready(process)
 
         # Send SIGINT (Ctrl+C)
         os.killpg(os.getpgid(process.pid), signal.SIGINT)

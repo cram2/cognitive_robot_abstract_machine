@@ -9,9 +9,10 @@ import numpy as np
 import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+from cramph.statechart import Statechart
+from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.qp.dof_limits import (
     BoundDirection,
@@ -284,14 +285,15 @@ def _peak_acceleration_moving_to(
     )
     connection.position = 0.0
     world.state[degree_of_freedom.id].velocity = initial_velocity
-    statechart = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world),
+        extensions=[MotionControl(qp_controller_config=config)],
+    )
+    statechart = Statechart(context=executor.context)
     statechart.add_node(
         JointPositionList(goal_state=JointState.from_mapping({connection: goal}))
     )
-    executor = Executor(
-        MotionStatechartContext(world=world, qp_controller_config=config)
-    )
-    executor.compile(motion_statechart=statechart)
+    executor.compile(statechart=statechart)
     accelerations = []
     for _ in range(6 * TARGET_FREQUENCY):
         executor.tick()

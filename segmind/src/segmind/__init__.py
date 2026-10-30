@@ -1,1 +1,1 @@
-__version__ = "1.0.32"
+from segmind._version import __version__

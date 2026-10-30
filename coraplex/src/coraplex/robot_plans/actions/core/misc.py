@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from typing_extensions import Optional, Type
 
-from coraplex.datastructures.enums import DetectionTechnique, DetectionState
-from coraplex.perception import PerceptionQuery
-from coraplex.plans.factories import sequential, execute_single
-from coraplex.plans.plan_node import PlanNode
-from coraplex.robot_plans.actions.base import ActionDescription
+from krrood.ormatic.utils import classproperty
+from coraplex.datastructures.enums import (
+    DetectionState,
+    DetectionTechnique,
+    PerceptionSource,
+)
+from coraplex.perception import PerceptionQuery, PerceptionTask
+from cramph.node import StatechartNode
+from coraplex.robot_plans.actions.base import SequentialAction
+from coraplex.robot_plans.actions.core.exceptions import DetectionTargetMissing
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveManipulatorAction
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses, HasTcpGoalThresholds
-from coraplex.robot_plans.motions.misc import DetectingMotion
+from coraplex.robot_plans.mixins import HasApproachesGraspPoses, MovesToolCenterPoint
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
@@ -25,34 +28,31 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
-from semantic_digital_twin.world_description.world_entity import (
-    Region,
-    SemanticAnnotation,
-)
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
 
 
-@dataclass
-class DetectAction(ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class DetectAction(SequentialAction):
     """
-    Detects an object that fits the object description and returns an object
-    designator_description describing the object.
+    Detects an object and writes the pose it is seen at into the world.
 
-    If no object is found, an PerceptionObjectNotFound error is raised.
+    The action fails if no such object is seen.
     """
 
     technique: DetectionTechnique
     """
-    The technique that should be used for detection
+    The technique that should be used for detection.
     """
-    state: Optional[DetectionState] = None
+
+    state: DetectionState | None = None
     """
     The state of the detection, e.g Start Stop for continues perception.
     """
 
-    object_sem_annotation: Type[SemanticAnnotation] = None
+    object_sem_annotation: type[SemanticAnnotation] = None
     """
     The type of the object that should be detected, only considered if technique is
     equal to Type.
@@ -61,9 +61,10 @@ class DetectAction(ActionDescription):
         ormatic cannot map ``Optional[Type]`` and would otherwise drop this column.
     """
 
-    region: Optional[Region] = None
+    detection_box: VolumetricBoundingBox | None = None
     """
-    The region in which the object should be detected.
+    The box in which the object should be detected, None for the box around the robot's
+    base that :attr:`default_detection_distance` spans.
     """
 
     trust_detected_orientation: bool = True
@@ -83,54 +84,70 @@ class DetectAction(ActionDescription):
     :class:`~coraplex.exceptions.UnidentifiedDetections` instead of being chosen between.
     """
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        return execute_single(
-            DetectingMotion(
+    perception_source: PerceptionSource = field(
+        default=PerceptionSource.WORLD_MODEL, init=False
+    )
+    """
+    What answers the detection.
+    """
+
+    @classproperty
+    def default_detection_distance(cls) -> float:
+        """
+        :return: How far from the robot's base, horizontally in every direction and
+            upwards, an object is detected when no :attr:`detection_box` is given.
+        """
+        return 3.0
+
+    def create_steps(self) -> list[StatechartNode]:
+        return [
+            PerceptionTask(
                 query=self._build_query(),
+                answered_by=self.perception_source,
                 accept_first_if_multiple=self.accept_first_if_multiple,
             )
-        )
+        ]
 
     def _build_query(self) -> PerceptionQuery:
         """
         Build the perception query from this action's parameters.
 
         :return: The perception query that the detection motion answers.
+        :raises DetectionTargetMissing: If neither an object type nor a box is given.
         """
-        if not self.object_sem_annotation and not self.region:
-            raise AttributeError(
-                "Either a Semantic Annotation or a Region must be provided."
-            )
-        region_bb = (
-            self.region.area.as_bounding_box_collection_in_frame(
-                self.robot.root
-            ).bounding_box
-            if self.region
-            else VolumetricBoundingBox(
-                origin=HomogeneousTransformationMatrix(reference_frame=self.robot.root),
-                min_x=-1,
-                min_y=-1,
-                min_z=0,
-                max_x=3,
-                max_y=3,
-                max_z=3,
-            )
-        )
-        object_sem_annotation = (
-            self.object_sem_annotation or SemanticEnvironmentAnnotation
-        )
+        if not self.object_sem_annotation and self.detection_box is None:
+            raise DetectionTargetMissing(self)
         return PerceptionQuery(
-            object_sem_annotation,
-            region_bb,
+            self.object_sem_annotation or SemanticEnvironmentAnnotation,
+            (
+                self._box_around_robot()
+                if self.detection_box is None
+                else self.detection_box
+            ),
             self.robot,
             self.world,
             trust_detected_orientation=self.trust_detected_orientation,
         )
 
+    def _box_around_robot(self) -> VolumetricBoundingBox:
+        """
+        :return: The box reaching :attr:`default_detection_distance` from the robot's
+            base horizontally in every direction and upwards from it.
+        """
+        distance = self.default_detection_distance
+        return VolumetricBoundingBox(
+            origin=HomogeneousTransformationMatrix(reference_frame=self.robot.root),
+            min_x=-distance,
+            min_y=-distance,
+            min_z=0,
+            max_x=distance,
+            max_y=distance,
+            max_z=distance,
+        )
 
-@dataclass
-class MoveToReach(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThresholds):
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class MoveToReach(MovesToolCenterPoint, SequentialAction, HasApproachesGraspPoses):
     """
     Let the robot move to a position facing the target and reach with a end_effector.
     """
@@ -157,20 +174,19 @@ class MoveToReach(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThreshol
     The end effector that should reach it.
     """
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        return sequential(
-            [
-                NavigateAction(self.standing_pose),
-                MoveManipulatorAction(
-                    self.end_effector.tool_frame_goal(self.reference_T_grasp),
-                    self.end_effector,
-                    allow_gripper_collision=False,
-                    position_threshold=self.position_threshold,
-                    orientation_threshold=self.orientation_threshold,
+    def create_steps(self) -> list[StatechartNode]:
+        return [
+            NavigateAction(target_location=self.standing_pose),
+            MoveManipulatorAction(
+                target_pose=self.end_effector.tool_frame_goal_for_grasp(
+                    self.reference_T_grasp
                 ),
-            ]
-        )
+                end_effector=self.end_effector,
+                allow_gripper_collision=False,
+                position_threshold=self.position_threshold,
+                orientation_threshold=self.orientation_threshold,
+            ),
+        ]
 
     @property
     def standing_pose(self) -> Pose:
@@ -179,7 +195,7 @@ class MoveToReach(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThreshol
 
         :return: The calculated standing pose on the floor.
         """
-        reference_T_target = self.reference_T_grasp.to_homogeneous_matrix()
+        reference_T_target = self.reference_T_grasp.homogeneous_matrix
         target_V_robot = -Vector3(
             x=self.target_pose_offset_robot.x, y=self.target_pose_offset_robot.y
         )
@@ -198,9 +214,7 @@ class MoveToReach(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThreshol
             reference_frame=self.reference_T_grasp.reference_frame,
         )
         reference_T_robot = reference_T_target @ target_T_robot
-        world_T_robot = self.world.transform(
-            reference_T_robot.to_pose(), self.world.root
-        )
+        world_T_robot = self.world.transform(reference_T_robot.pose, self.world.root)
         return Pose.from_xyz_rpy(
             x=world_T_robot.x,
             y=world_T_robot.y,

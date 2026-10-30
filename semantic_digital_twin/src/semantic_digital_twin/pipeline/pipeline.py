@@ -4,7 +4,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Callable, TYPE_CHECKING
+from typing_extensions import Callable, TYPE_CHECKING
 
 import numpy as np
 
@@ -49,7 +49,7 @@ class Pipeline:
     output World of one Step is passed as the input World to the next Step.
     """
 
-    steps: List[Step]
+    steps: list[Step]
     """
     The list of Steps to be applied in the Pipeline.
     """

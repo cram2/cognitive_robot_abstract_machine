@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import partial
 from threading import Thread
-from typing import Optional, List, Any, Callable, Union, ClassVar
+from typing_extensions import Any, Callable, ClassVar
 
 
 class SimulatorState(Enum):
@@ -178,7 +178,7 @@ class BaseSimulator:
 
     _step_size: float = field(default=1e-3, repr=False)
 
-    _callbacks: List[SimulatorCallback] = field(default_factory=list, repr=False)
+    _callbacks: list[SimulatorCallback] = field(default_factory=list, repr=False)
 
     config: dict = field(default_factory=dict)
     """
@@ -201,22 +201,22 @@ class BaseSimulator:
     Logger for the simulator.
     """
 
-    simulation_thread: Optional[Thread] = field(init=False, default=None)
+    simulation_thread: Thread | None = field(init=False, default=None)
     """
     Simulation thread, run step() method in this thread.
     """
 
-    render_thread: Optional[Thread] = field(init=False, default=None)
+    render_thread: Thread | None = field(init=False, default=None)
     """
     Render thread, run render() method in this thread.
     """
 
-    class_level_callbacks: ClassVar[List[SimulatorCallback]] = []
+    class_level_callbacks: ClassVar[list[SimulatorCallback]] = []
     """
     Class level callback functions.
     """
 
-    instance_level_callbacks: List[SimulatorCallback] = field(
+    instance_level_callbacks: list[SimulatorCallback] = field(
         init=False, default_factory=list
     )
     """
@@ -245,7 +245,7 @@ class BaseSimulator:
     Current state of the simulator.
     """
 
-    _stop_reason: Optional[SimulatorStopReason] = field(
+    _stop_reason: SimulatorStopReason | None = field(
         init=False, default=None, repr=False
     )
     """
@@ -430,7 +430,7 @@ class BaseSimulator:
 
     def should_stop(
         self, constraints: SimulatorConstraints = None
-    ) -> Optional[SimulatorStopReason]:
+    ) -> SimulatorStopReason | None:
         """
         Check if the simulator should stop based on the constraints.
 
@@ -524,7 +524,7 @@ class BaseSimulator:
         """
         self._current_simulation_time = 0.0
 
-    def should_stop_callback(self) -> Optional[SimulatorStopReason]:
+    def should_stop_callback(self) -> SimulatorStopReason | None:
         """
         This function is called when the simulator should stop.
 
@@ -586,8 +586,8 @@ class BaseSimulator:
     @classmethod
     def add_callback(
         cls,
-        callback: Union[Callable, SimulatorCallback],
-        callbacks: List[SimulatorCallback],
+        callback: Callable | SimulatorCallback,
+        callbacks: list[SimulatorCallback],
     ):
         if not isinstance(callback, SimulatorCallback):
             if isinstance(callback, Callable):
@@ -602,11 +602,11 @@ class BaseSimulator:
         callbacks.append(callback)
         cls.log_info(f"Function {callback.__name__} is registered")
 
-    def add_instance_callback(self, callback: Union[Callable, SimulatorCallback]):
+    def add_instance_callback(self, callback: Callable | SimulatorCallback):
         self.add_callback(callback, self.instance_level_callbacks)
 
     @classmethod
-    def add_class_callback(cls, callback: Union[Callable, SimulatorCallback]):
+    def add_class_callback(cls, callback: Callable | SimulatorCallback):
         cls.add_callback(callback, cls.class_level_callbacks)
 
     @classmethod

@@ -6,16 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import partial, wraps
 
-from typing_extensions import (
-    Any,
-    Callable,
-    ClassVar,
-    Dict,
-    FrozenSet,
-    Optional,
-    Tuple,
-    TypeVar,
-)
+from typing_extensions import Any, Callable, ClassVar, TypeVar
 
 from krrood.patterns.exceptions import UnmemoizableOwnerError
 
@@ -50,7 +41,7 @@ def weak_key_cache(
     :param function: A one-argument function keyed on a weak-referenceable value.
     :return: The memoized function, with a ``cache_clear`` attribute.
     """
-    cache: "weakref.WeakKeyDictionary[_Key, _Value]" = weakref.WeakKeyDictionary()
+    cache: weakref.WeakKeyDictionary[_Key, _Value] = weakref.WeakKeyDictionary()
 
     @wraps(function)
     def wrapper(key: _Key) -> _Value:
@@ -81,12 +72,12 @@ class MemoizationKey:
     The undecorated function whose result is cached.
     """
 
-    arguments: Tuple[Any, ...]
+    arguments: tuple[Any, ...]
     """
     The positional arguments the call was made with, excluding the owner.
     """
 
-    keyword_arguments: FrozenSet[Tuple[str, Any]]
+    keyword_arguments: frozenset[tuple[str, Any]]
     """
     The keyword arguments the call was made with, as name-value pairs.
     """
@@ -166,7 +157,7 @@ class MemoizationCache:
     on the same owner cannot end up with a cache each.
     """
 
-    entries: Dict[MemoizationKey, MemoizedValue] = field(default_factory=dict)
+    entries: dict[MemoizationKey, MemoizedValue] = field(default_factory=dict)
     """
     The result of every memoized call made on the owner so far.
     """
@@ -200,7 +191,7 @@ class MemoizationCache:
             return cache
 
     @classmethod
-    def existing_for(cls, owner: Any) -> Optional[MemoizationCache]:
+    def existing_for(cls, owner: Any) -> MemoizationCache | None:
         """
         Looks up an owner's own cache, ignoring the cache of its class or of any class
         it inherits from.
@@ -248,14 +239,14 @@ class MemoizationCache:
         """
         return len(self.entries)
 
-    def __deepcopy__(self, memo: Dict[int, Any]) -> MemoizationCache:
+    def __deepcopy__(self, memo: dict[int, Any]) -> MemoizationCache:
         """
         Returns an empty cache, so a copy of an owner starts out with nothing cached
         instead of inheriting results computed for the original.
         """
         return MemoizationCache()
 
-    def __reduce__(self) -> Tuple[Callable[[], MemoizationCache], Tuple[()]]:
+    def __reduce__(self) -> tuple[Callable[[], MemoizationCache], tuple[()]]:
         """
         Pickles as an empty cache, since a lock cannot be pickled and cached results do
         not survive the owner they were computed for.

@@ -5,7 +5,7 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import List, Self, Sequence
+from typing_extensions import Self, Sequence
 
 from probabilistic_model.distributions.multivariate_gaussian import Covariance
 from probabilistic_model.exceptions import ShapeMismatchError
@@ -148,7 +148,7 @@ class CovarianceArray:
         return type(self)(self.lower_triangles[indices])
 
     @classmethod
-    def concatenate(cls, arrays: List[Self]) -> Self:
+    def concatenate(cls, arrays: list[Self]) -> Self:
         """
         :param arrays: Covariances of the same dimension.
         :return: All of their matrices, in order.

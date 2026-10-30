@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from queue import Queue, Empty
 from time import sleep
-from typing import Any
+from typing_extensions import Any
 
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.action.server import ServerGoalHandle
@@ -13,7 +13,7 @@ from giskardpy.data_types.exceptions import (
     MissingActionResultError,
     MissingGoalOutcomeError,
 )
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import rospy
 
 
 class GoalOutcome(Enum):

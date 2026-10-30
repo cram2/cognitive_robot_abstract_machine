@@ -20,10 +20,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+from cramph.statechart import Statechart
+from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointState
 from semantic_digital_twin.robots.pr2 import PR2Joint
@@ -211,11 +212,13 @@ def run_pose_goal(
     at most `maximum_cycles`.
     """
     goal = CartesianPose(root_link=root, tip_link=tip, goal_pose=offset.goal_pose(tip))
-    motion_statechart = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[MotionControl()]
+    )
+    motion_statechart = Statechart(context=executor.context)
     motion_statechart.add_node(goal)
     motion_statechart.add_node(EndMotion.when_true(goal))
-    executor = Executor(MotionStatechartContext(world=world))
-    executor.compile(motion_statechart=motion_statechart)
+    executor.compile(statechart=motion_statechart)
 
     root_T_goal = world.compute_forward_kinematics_np(root, tip) @ (
         offset.goal_pose(tip).to_np()
@@ -225,11 +228,11 @@ def run_pose_goal(
     for _ in range(maximum_cycles):
         executor.tick()
         trace.record(
-            executor.time.total_seconds(),
+            executor.time,
             world.compute_forward_kinematics_np(root, tip),
             root_T_goal,
         )
-        if executor.motion_statechart.is_end_motion():
+        if executor.statechart.is_ended():
             return BalanceRun(offset=offset, goal=goal, trace=trace, reached=True)
     return BalanceRun(offset=offset, goal=goal, trace=trace, reached=False)
 

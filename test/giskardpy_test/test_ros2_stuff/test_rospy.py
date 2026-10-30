@@ -8,7 +8,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import rospy
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 

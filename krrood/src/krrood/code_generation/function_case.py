@@ -5,7 +5,7 @@ import inspect
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from typing_extensions import Callable, Dict, Optional, ClassVar, Type, Any, List, Self
+from typing_extensions import Callable, ClassVar, Any, Self
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.code_generation import templates
@@ -69,7 +69,7 @@ class FunctionMetaData:
     Metadata about a function.
     """
 
-    parameter_data: List[FunctionParameter] = field(default_factory=list)
+    parameter_data: list[FunctionParameter] = field(default_factory=list)
     """
     The data of the parameters of the function.
     """
@@ -85,7 +85,7 @@ class FunctionMetaData:
         :return: A FunctionMetaData instance containing the given function's metadata.
         """
         try:
-            type_hints: Dict[str, object] = get_type_hints_of_object(function)
+            type_hints: dict[str, object] = get_type_hints_of_object(function)
         except NameError:
             type_hints = {}
 
@@ -116,7 +116,7 @@ class FunctionCaseGenerator:
     Generates a dataclass FunctionCase subclass source for a given function.
     """
 
-    base_class: Type[FunctionCase] = FunctionCase
+    base_class: type[FunctionCase] = FunctionCase
     """
     The base class to inherit from.  Must be a subclass of ``FunctionCase``.
     """
@@ -135,7 +135,7 @@ class FunctionCaseGenerator:
         templates_path = importlib.resources.files(templates)
         self.code_generator = CodeGenerator(template_directory=str(templates_path))
 
-    def generate(self, function: Callable, class_name: Optional[str] = None) -> str:
+    def generate(self, function: Callable, class_name: str | None = None) -> str:
         """
         Generate Python source for a ``@dataclass`` subclass of ``FunctionCase``.
 

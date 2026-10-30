@@ -12,7 +12,7 @@ from action_msgs.srv import CancelGoal
 from sensor_msgs.msg import Joy
 import numpy as np
 
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.ros2_interface import wait_for_message
 
 

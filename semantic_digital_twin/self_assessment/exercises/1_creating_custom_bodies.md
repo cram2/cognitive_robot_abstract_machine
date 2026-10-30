@@ -63,7 +63,7 @@ body: Body = ...
 collision_box = Box(
     origin=HomogeneousTransformationMatrix(),
     scale=Scale(0.2, 0.2, 0.2),
-    color=Color(1.0, 0.0, 0.0, 1.0),
+    color=Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0),
 )
 visual_sphere = Sphere(
     origin=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.3),

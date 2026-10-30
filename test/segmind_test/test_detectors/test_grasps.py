@@ -6,7 +6,8 @@ carries it.
 
 from __future__ import annotations
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 from typing_extensions import List, Tuple, Type
 
 from segmind.datastructures.events import (
@@ -30,8 +31,8 @@ from segmind.detectors.spatial_relation_detector_nodes import (
 from segmind.detectors.agent_event_detector_nodes import (
     GraspDetector,
 )
-from segmind.episode_segmenter import EpisodeSegmenterExecutor
-from segmind.statecharts.segmind_statechart import SegmindStatechart
+from segmind.episode_segmenter import EpisodeSegmentation
+from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -86,7 +87,7 @@ def _bottom_of(body: Body) -> float:
 
 
 def _box_at(
-    world: World, position: Tuple[float, float, float], size: float = BOX_SIZE
+    world: World, position: tuple[float, float, float], size: float = BOX_SIZE
 ) -> Body:
     """
     Add a box free to move to ``world``, standing at ``position``.
@@ -105,7 +106,7 @@ def _box_at(
     return box
 
 
-def _move_to(box: Body, position: Tuple[float, float, float]) -> None:
+def _move_to(box: Body, position: tuple[float, float, float]) -> None:
     """
     Stand ``box`` at ``position``, in the world's own frame.
     """
@@ -121,23 +122,25 @@ def _box_in_the_hand_of(world: World, gripper: EndEffector) -> Body:
     That is where a held object sits: between the fingers, clear of the wrist and the
     rest of the arm.
     """
-    return _box_at(world, gripper.tool_frame.global_pose.to_position().to_np()[:3])
+    return _box_at(world, gripper.tool_frame.global_pose.position.to_np()[:3])
 
 
 def _executor_for(
-    world: World, detectors: List[AbstractDetector]
-) -> EpisodeSegmenterExecutor:
-    executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
-    executor.compile(SegmindStatechart().build_statechart(detectors))
+    world: World, detectors: list[AbstractDetector]
+) -> StatechartExecutor:
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
+    )
+    executor.compile(DetectorStatechartBuilder(detectors).build(executor.context))
     return executor
 
 
 def _events_of(
-    executor: EpisodeSegmenterExecutor,
-    event_type: Type[DetectionEvent],
+    executor: StatechartExecutor,
+    event_type: type[DetectionEvent],
     body: Body,
     with_object: bool = False,
-) -> List[DetectionEvent]:
+) -> list[DetectionEvent]:
     """
     :param with_object: Whether to answer with what each event happened with, rather
         than the events themselves.
@@ -183,8 +186,8 @@ def test_a_body_only_one_side_of_a_hand_touches_is_not_grasped(pr2_world_copy):
     all.
     """
     gripper = _left_gripper(pr2_world_copy)
-    thumb_x, thumb_y, thumb_z = gripper.thumb.tip.global_pose.to_position().to_np()[:3]
-    _, finger_y, _ = gripper.finger.tip.global_pose.to_position().to_np()[:3]
+    thumb_x, thumb_y, thumb_z = gripper.thumb.tip.global_pose.position.to_np()[:3]
+    _, finger_y, _ = gripper.finger.tip.global_pose.position.to_np()[:3]
     past_the_thumb = thumb_y + BESIDE_THE_THUMB * (1 if thumb_y > finger_y else -1)
     box = _box_at(pr2_world_copy, (thumb_x, past_the_thumb, thumb_z))
 
@@ -299,7 +302,7 @@ def _surface_under(world: World, box: Body, aside: float = 0.0) -> Body:
             [Box(scale=Scale(TABLE_SIZE, TABLE_SIZE, TABLE_SIZE))]
         ),
     )
-    x, y, _ = box.global_pose.to_position().to_np()[:3]
+    x, y, _ = box.global_pose.position.to_np()[:3]
     x += aside
     bottom = _bottom_of(box)
     with world.modify_world():
@@ -319,7 +322,7 @@ def _raise_by(box: Body, height: float) -> None:
     """
     Move ``box`` straight up by ``height``.
     """
-    x, y, z = box.global_pose.to_position().to_np()[:3]
+    x, y, z = box.global_pose.position.to_np()[:3]
     box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x, y, z + height, reference_frame=box.parent_connection.parent
     )
@@ -348,7 +351,7 @@ def test_an_object_is_picked_up_when_an_agent_lifts_it_off_what_it_rested_on(
     executor.tick()
     assert _events_of(executor, PickUpEvent, box) == []
 
-    _move_to(box, gripper.tool_frame.global_pose.to_position().to_np()[:3])
+    _move_to(box, gripper.tool_frame.global_pose.position.to_np()[:3])
     executor.tick()
 
     assert len(_events_of(executor, PickUpEvent, box)) == 1
@@ -377,7 +380,7 @@ def test_an_object_is_placed_where_the_agent_let_go_of_it(pr2_world_copy):
     executor.tick()
     assert _events_of(executor, PlacingEvent, box) == []
 
-    x, y, z = box.global_pose.to_position().to_np()[:3]
+    x, y, z = box.global_pose.position.to_np()[:3]
     box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x + MOVED_ASIDE, y, z, reference_frame=pr2_world_copy.root
     )
@@ -429,7 +432,7 @@ def test_taking_hold_again_mid_carry_is_not_a_second_pick_up(pr2_world_copy):
             PickUpDetector(),
         ],
     )
-    held = gripper.tool_frame.global_pose.to_position().to_np()[:3]
+    held = gripper.tool_frame.global_pose.position.to_np()[:3]
 
     executor.tick()
     _move_to(box, held)

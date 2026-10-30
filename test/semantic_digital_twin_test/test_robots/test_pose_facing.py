@@ -3,7 +3,6 @@ import pkgutil
 
 import numpy as np
 import pytest
-from typing_extensions import List, Tuple, Type
 
 import semantic_digital_twin.robots as robots_package
 from krrood.entity_query_language.factories import (
@@ -16,7 +15,7 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.utils import get_generic_type_parameters, recursive_subclasses
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
-from semantic_digital_twin.api import RobotSpecification
+from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, MobileBase
@@ -27,7 +26,7 @@ from semantic_digital_twin.world import World
 # %% the forward axes the declared robots use
 
 
-def axis_components(axis: Vector3) -> Tuple[float, float, float]:
+def axis_components(axis: Vector3) -> tuple[float, float, float]:
     """
     The three components of ``axis``.
 
@@ -39,7 +38,7 @@ def axis_components(axis: Vector3) -> Tuple[float, float, float]:
     return float(x), float(y), float(z)
 
 
-def mobile_base_type(robot_type: Type[AbstractRobot]) -> Type[MobileBase]:
+def mobile_base_type(robot_type: type[AbstractRobot]) -> type[MobileBase]:
     """
     The mobile base ``robot_type`` stands on.
     """
@@ -48,8 +47,8 @@ def mobile_base_type(robot_type: Type[AbstractRobot]) -> Type[MobileBase]:
 
 @symbolic_function
 def forward_axis_components(
-    robot_type: Type[AbstractRobot],
-) -> Tuple[float, float, float]:
+    robot_type: type[AbstractRobot],
+) -> tuple[float, float, float]:
     """
     The direction the robot's base calls its front.
     """
@@ -57,7 +56,7 @@ def forward_axis_components(
 
 
 @symbolic_function
-def points_along(robot_type: Type[AbstractRobot], axis: Vector3) -> bool:
+def points_along(robot_type: type[AbstractRobot], axis: Vector3) -> bool:
     """
     Whether the robot's base calls ``axis`` its front.
     """
@@ -67,7 +66,7 @@ def points_along(robot_type: Type[AbstractRobot], axis: Vector3) -> bool:
 
 
 @symbolic_function
-def description_is_available(robot_type: Type[AbstractRobot]) -> bool:
+def description_is_available(robot_type: type[AbstractRobot]) -> bool:
     """
     Whether this machine carries the description needed to spawn the robot.
 
@@ -81,7 +80,7 @@ def description_is_available(robot_type: Type[AbstractRobot]) -> bool:
     return True
 
 
-def robot_types_with_a_mobile_base() -> List[Type[AbstractRobot]]:
+def robot_types_with_a_mobile_base() -> list[type[AbstractRobot]]:
     """
     Every robot this repository declares that stands on a mobile base.
 
@@ -132,7 +131,7 @@ The spawnable robots whose base already calls the x-axis its front.
 """
 
 
-def spawn(robot_type: Type[AbstractRobot]) -> MobileBase:
+def spawn(robot_type: type[AbstractRobot]) -> MobileBase:
     """
     The mobile base of ``robot_type``, alone in a world of its own.
     """
@@ -141,7 +140,7 @@ def spawn(robot_type: Type[AbstractRobot]) -> MobileBase:
     return robot.mobile_base
 
 
-def robot_name(robot_type: Type[AbstractRobot]) -> str:
+def robot_name(robot_type: type[AbstractRobot]) -> str:
     """
     Name a parametrized case after the robot it runs against.
     """
@@ -149,7 +148,7 @@ def robot_name(robot_type: Type[AbstractRobot]) -> str:
 
 
 @pytest.fixture()
-def x_forward_robot() -> Type[AbstractRobot]:
+def x_forward_robot() -> type[AbstractRobot]:
     """
     A robot whose front is the x-axis, which needs no correction to face a heading.
     """
@@ -184,7 +183,7 @@ def test_a_robot_is_selected_for_every_forward_axis_that_can_be_spawned():
 )
 @pytest.mark.parametrize("heading_yaw", [0.0, np.pi / 2, -np.pi / 2, np.pi, 0.3])
 def test_forward_axis_points_along_the_heading(
-    robot_type: Type[AbstractRobot], heading_yaw: float
+    robot_type: type[AbstractRobot], heading_yaw: float
 ):
     mobile_base = spawn(robot_type)
     heading = Pose.from_xyz_rpy(
@@ -193,7 +192,7 @@ def test_forward_axis_points_along_the_heading(
 
     base_pose = mobile_base.pose_facing(heading)
 
-    world_V_forward = base_pose.to_rotation_matrix() @ mobile_base.forward_axis
+    world_V_forward = base_pose.rotation_matrix @ mobile_base.forward_axis
     np.testing.assert_allclose(
         world_V_forward.to_np()[:3].flatten(),
         [np.cos(heading_yaw), np.sin(heading_yaw), 0.0],
@@ -204,7 +203,7 @@ def test_forward_axis_points_along_the_heading(
 @pytest.mark.parametrize(
     "robot_type", ROBOTS_WITH_DISTINCT_FORWARD_AXES, ids=robot_name
 )
-def test_the_position_is_the_headings_own(robot_type: Type[AbstractRobot]):
+def test_the_position_is_the_headings_own(robot_type: type[AbstractRobot]):
     mobile_base = spawn(robot_type)
     heading = Pose.from_xyz_rpy(
         1.3, 2.0, 0.0, yaw=0.3, reference_frame=mobile_base.root._world.root
@@ -213,7 +212,7 @@ def test_the_position_is_the_headings_own(robot_type: Type[AbstractRobot]):
     base_pose = mobile_base.pose_facing(heading)
 
     np.testing.assert_allclose(
-        base_pose.to_position().to_np(), heading.to_position().to_np(), atol=1e-9
+        base_pose.position.to_np(), heading.position.to_np(), atol=1e-9
     )
     assert base_pose.reference_frame is heading.reference_frame
 
@@ -226,7 +225,7 @@ def test_the_position_is_the_headings_own(robot_type: Type[AbstractRobot]):
 )
 @pytest.mark.parametrize("heading_yaw", [0.0, np.pi / 2, -np.pi / 2, np.pi, 0.3])
 def test_the_heading_of_a_base_pose_is_the_heading_it_was_placed_at(
-    robot_type: Type[AbstractRobot], heading_yaw: float
+    robot_type: type[AbstractRobot], heading_yaw: float
 ):
     """
     The heading recovered from a base pose is the one it was placed at, by undoing
@@ -240,10 +239,10 @@ def test_the_heading_of_a_base_pose_is_the_heading_it_was_placed_at(
     base_pose = mobile_base.pose_facing(heading)
 
     read_back = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-        base_pose.to_position(),
-        base_pose.to_rotation_matrix() @ mobile_base.base_R_front,
+        base_pose.position,
+        base_pose.rotation_matrix @ mobile_base.base_R_front,
         reference_frame=base_pose.reference_frame,
-    ).to_pose()
+    ).pose
 
     np.testing.assert_allclose(read_back.to_np(), heading.to_np(), atol=1e-9)
 
@@ -252,7 +251,7 @@ def test_the_heading_of_a_base_pose_is_the_heading_it_was_placed_at(
 
 
 def test_an_x_forward_base_takes_the_heading_unchanged(
-    x_forward_robot: Type[AbstractRobot],
+    x_forward_robot: type[AbstractRobot],
 ):
     mobile_base = spawn(x_forward_robot)
     heading = Pose.from_xyz_rpy(

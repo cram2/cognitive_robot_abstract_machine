@@ -4,24 +4,28 @@ import random
 from dataclasses import dataclass, field
 
 import numpy as np
-from typing_extensions import Optional, Tuple
 
 import krrood.symbolic_math.symbolic_math as symbolic_math
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import (
-    DefaultWeights,
-    ObservationStateValues,
-)
+from giskardpy.motion_statechart.context import MotionControlContext
+from krrood.ormatic.utils import classproperty
+from cramph.context import ContextExtension
+from giskardpy.motion_statechart.weights import DefaultWeights
+from cramph.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     DebugExpression,
-    NodeArtifacts,
+    MotionNodeArtifacts,
 )
-from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
+from semantic_digital_twin.spatial_types import (
+    AxisAngle,
+    Point3,
+    Vector3,
+    RotationMatrix,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class WiggleInsert(ConvergingTask):
     """
     Presses the tip link down towards a hole while wiggling it with random translational
@@ -31,82 +35,80 @@ class WiggleInsert(ConvergingTask):
     in :meth:`on_tick`.
     """
 
-    root_link: Body = field(kw_only=True)
+    root_link: Body
     """
     Root link of the kinematic chain.
     """
 
-    tip_link: Body = field(kw_only=True)
+    tip_link: Body
     """
     Tip link that is pressed into the hole.
     """
 
-    hole_point: Point3 = field(kw_only=True)
+    hole_point: Point3
     """
     Center point of the hole.
     """
 
-    noise_translation: float = field(kw_only=True, default=0.5)
+    noise_translation: float = 0.5
     """
     Strength of the translational wiggle.
 
     Default is an untuned preset, not a calibrated value.
     """
 
-    noise_angle: float = field(kw_only=True, default=10)
+    noise_angle: float = 10
     """
     Strength of the angular wiggle.
 
     Default is an untuned preset, not a calibrated value.
     """
 
-    down_velocity: float = field(kw_only=True, default=0.2)
+    down_velocity: float = 0.2
     """
     Reference velocity for pressing down in m/s.
 
     Default is an untuned preset, not a calibrated value.
     """
 
-    hole_normal: Optional[Vector3] = field(default=None, kw_only=True)
+    hole_normal: Vector3 | None = None
     """
     Vector perpendicular to the hole.
 
     Defaults to the root z-axis.
     """
 
-    threshold: float = field(default=0.01, kw_only=True)
+    threshold: float = 0.01
     """
     Distance to the hole point below which the task is achieved.
     """
 
-    random_walk: bool = field(default=True, kw_only=True)
+    random_walk: bool = True
     """
     If ``True`` a random walk is used, otherwise an uncorrelated random sample.
     """
 
-    vector_momentum_factor: float = field(default=0.9, kw_only=True)
+    vector_momentum_factor: float = 0.9
     """
     Influence of the previous translational momentum during a random walk.
     """
 
-    angular_momentum_factor: float = field(default=0.9, kw_only=True)
+    angular_momentum_factor: float = 0.9
     """
     Influence of the previous angular momentum during a random walk.
     """
 
-    center_pull_strength_angle: float = field(default=0.1, kw_only=True)
+    center_pull_strength_angle: float = 0.1
     """
     Pull back towards the starting angle during a random walk.
     """
 
-    center_pull_strength_vector: float = field(default=0.25, kw_only=True)
+    center_pull_strength_vector: float = 0.25
     """
     Pull back towards the hole point during a random walk.
     """
 
-    weight: float = field(
-        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
-    )
+    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
     Priority weight relative to other tasks.
     """
@@ -160,18 +162,45 @@ class WiggleInsert(ConvergingTask):
     Auxiliary variable holding the current angular noise.
     """
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+    @classproperty
+    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
+        return super().required_context_extensions + (MotionControlContext,)
+
+    def set_up(self) -> None:
+        """
+        Register the noise variables and start the wiggle at rest.
+        """
+        super().set_up()
+        control_time_step = self.context.require_extension(
+            MotionControlContext
+        ).qp_controller_config.control_time_step
+        self._control_frequency = 1 / control_time_step.total_seconds()
+
+        self._current_angle = 0.0
+        self._angular_momentum = 0.0
+        self._current_vector = np.zeros(3)
+        self._vector_momentum = np.zeros(3)
+
+        self._random_translation = Vector3.create_with_variables(
+            f"{self.name}_rand_translation"
+        )
+        self._random_translation.reference_frame = self.root_link
+        self.context.float_variable_data.register_expression(self._random_translation)
+
+        self._random_angle = symbolic_math.FloatVariable(f"{self.name}_rand_angle")
+        self.context.float_variable_data.register_expression(self._random_angle)
+
+    def build_artifacts(self) -> MotionNodeArtifacts:
         """
         Build motion constraints that press the tip into the hole while wiggling.
 
-        :param context: Provides access to world model and kinematic expressions.
         :return: The artifacts of this task, whose error is the distance between the tip
             and the hole.
         """
-        artifacts = NodeArtifacts()
+        artifacts = MotionNodeArtifacts()
         # The previous default was a zero vector, which has no well-defined perpendicular plane;
         # the root z-axis is used instead so the default is usable.
-        hole_normal = context.world.transform(
+        hole_normal = self.context.world.transform(
             target_frame=self.root_link,
             spatial_object=(
                 self.hole_normal
@@ -180,29 +209,16 @@ class WiggleInsert(ConvergingTask):
             ),
         )
 
-        control_time_step = context.qp_controller_config.control_time_step
-        self._control_frequency = 1 / control_time_step.total_seconds()
-
-        self._current_angle = 0.0
-        self._angular_momentum = 0.0
-        self._current_vector = np.zeros(3)
-        self._vector_momentum = np.zeros(3)
         self._perpendicular_basis_first, self._perpendicular_basis_second = (
             self._calculate_perpendicular_basis(hole_normal.to_np()[:3])
         )
 
-        root_P_current = context.world.compose_forward_kinematics_expression(
+        root_P_current = self.context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()
-        root_P_hole = context.world.transform(
+        ).position
+        root_P_hole = self.context.world.transform(
             target_frame=self.root_link, spatial_object=self.hole_point
         )
-
-        self._random_translation = Vector3.create_with_variables(
-            f"{self.name}_rand_translation"
-        )
-        self._random_translation.reference_frame = self.root_link
-        context.float_variable_data.register_expression(self._random_translation)
 
         root_P_hole_wiggled = root_P_hole + self._random_translation
         artifacts.geometry.add_point_goal_constraints(
@@ -213,18 +229,15 @@ class WiggleInsert(ConvergingTask):
             name=f"{self.name}_point_goal",
         )
 
-        self._random_angle = symbolic_math.FloatVariable(f"{self.name}_rand_angle")
-        context.float_variable_data.register_expression(self._random_angle)
-
-        tip_V_hole_normal = context.world.transform(
+        tip_V_hole_normal = self.context.world.transform(
             target_frame=self.tip_link, spatial_object=hole_normal
         )
         tip_R_hole_normal = RotationMatrix.from_axis_angle(
-            angle=self._random_angle, axis=tip_V_hole_normal
+            AxisAngle(angle=self._random_angle, axis=tip_V_hole_normal)
         )
-        root_R_current = context.world.compose_forward_kinematics_expression(
+        root_R_current = self.context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_rotation_matrix()
+        ).rotation_matrix
         root_R_goal = root_R_current.dot(tip_R_hole_normal)
 
         artifacts.geometry.add_rotation_goal_constraints(
@@ -244,17 +257,17 @@ class WiggleInsert(ConvergingTask):
         artifacts.error = root_P_current.euclidean_distance(root_P_hole)
         return artifacts
 
-    def on_tick(
-        self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    def on_tick(self) -> ObservationStateValues | None:
         if self.random_walk:
             translation = self._random_walk_translation()
             angle = self._random_walk_angle()
         else:
             translation = self._random_sample_translation()
             angle = self._random_sample_angle()
-        context.float_variable_data.set_value(self._random_translation, translation)
-        context.float_variable_data.set_value(self._random_angle, angle)
+        self.context.float_variable_data.set_value(
+            self._random_translation, translation
+        )
+        self.context.float_variable_data.set_value(self._random_angle, angle)
         return None
 
     def _random_sample_angle(self) -> float:
@@ -335,7 +348,7 @@ class WiggleInsert(ConvergingTask):
     @staticmethod
     def _calculate_perpendicular_basis(
         normal: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Return two orthonormal vectors spanning the plane perpendicular to ``normal``.
 

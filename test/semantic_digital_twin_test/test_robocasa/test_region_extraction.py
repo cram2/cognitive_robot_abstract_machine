@@ -68,10 +68,10 @@ def test_placement_sampler_regions_are_annotated_and_attached_at_their_resolved_
         assert len(region.area.shapes) == 1
         assert isinstance(region.area.shapes[0], Box)
 
-        world_position = region.global_pose.to_position().to_np()[:3]
+        world_position = region.global_pose.position.to_np()[:3]
         assert np.allclose(
             world_position,
-            region_data.world_T_sampler.to_position().to_np()[:3],
+            region_data.world_T_sampler.position.to_np()[:3],
             atol=1e-6,
         )
 
@@ -104,6 +104,5 @@ def test_gripper_exclusion_zone_is_annotated_and_attached_at_the_bodys_resolved_
     assert isinstance(sphere, Sphere)
     assert sphere.radius == 0.25
 
-    world_position = region.global_pose.to_position().to_np()[:3]
+    world_position = region.global_pose.position.to_np()[:3]
     assert np.allclose(world_position, zone_data.center.to_np()[:3], atol=1e-6)
-

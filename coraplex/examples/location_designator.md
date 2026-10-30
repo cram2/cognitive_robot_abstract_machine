@@ -29,18 +29,39 @@ above zero wherever the robot meets the criterion. Both also merge in an occupan
 position where the robot can stand without colliding with its surroundings. The costmaps are built from the world as it
 is when the candidates are sampled.
 
-We start with a world holding the PR2 in the apartment. The candidates are sampled at random, so the context is given a
-seed, which makes this example run the same way every time.
+We start with a world holding the PR2 in the apartment. The candidates are sampled at random, with the seed of the
+plan's context, so this example runs the same way every time.
 
 ```python
 from coraplex.testing import setup_world
-from coraplex.datastructures.dataclasses import Context
 from semantic_digital_twin.robots.pr2 import PR2
-
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
-context = Context(world, pr2_view, sampling_seed=0)
+from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from cramph.statechart import Statechart
+
+extensions = [RobotAccess(pr2_view), StatementGrounding()]
+context = KinematicallySimulatedPlanExecutor(
+    StatechartContext.with_extensions(world, extensions)
+).context
+
+
+def run(plan):
+    """
+    Run `plan` simulated in `world`, with the robot and settings in `extensions`.
+    """
+    executor = KinematicallySimulatedPlanExecutor(
+        StatechartContext.with_extensions(world, extensions)
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(plan)
+    executor.compile(statechart)
+    executor.execute()
+    return executor
+
 
 origin_pose = pr2_view.root.global_pose
 ```
@@ -54,14 +75,12 @@ We use the milk as the target. The torso of the PR2 is raised first, since other
 the countertop.
 
 ```python
-from coraplex.execution_environment import simulated_robot
-from coraplex.plans.factories import execute_single, sequential
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+from cramph.composites import Sequence
 from semantic_digital_twin.datastructures.definitions import TorsoState
 
-with simulated_robot:
-    sequential([ParkArmsAction(pr2_view.all_arms),
-                MoveTorsoAction(TorsoState.HIGH)], context=context).perform()
+run(Sequence(nodes=[ParkArmsAction(arms=pr2_view.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH)]))
 
 ```
 
@@ -76,12 +95,9 @@ location = ReachabilityLocation(
     context=context,
 )
 
-plan = execute_single(NavigateAction(location.ground()), context=context)
+run(NavigateAction(target_location=location.ground()))
 
-with simulated_robot:
-    plan.perform()
-
-pr2_view.root.parent_connection.origin = origin_pose.to_homogeneous_matrix()
+pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
 ```
 
 {meth}`~coraplex.locations.base.Location.ground` returns the first candidate. It is a pose near the countertop where
@@ -132,19 +148,16 @@ location = VisibilityLocation(
     Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
 )
 
-plan = execute_single(NavigateAction(location.ground()), context=context)
+run(NavigateAction(target_location=location.ground()))
 
-with simulated_robot:
-    plan.perform()
-
-pr2_view.root.parent_connection.origin = origin_pose.to_homogeneous_matrix()
+pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
 ```
 
 ## Iterating the Candidates
 
 A location is a generator of candidates, which is useful when the first candidate does not work for some reason. A
-location samples at most `number_of_samples` candidates. It draws them with its own `seed`, or with the context's
-`sampling_seed` if it has none; a seed of `None` draws different candidates each time.
+location samples at most `number_of_samples` candidates. It draws them with the plan's seed, the `sampling_seed` of the
+`StatementGrounding` in its context, which is 0 unless set; a seed of `None` draws different candidates each time.
 
 ```python
 from semantic_digital_twin.spatial_types.spatial_types import Point3
@@ -166,6 +179,7 @@ action open, and the plan tries the candidates in turn when it gets to that acti
 of them.
 
 ```python
+from cramph.composites import StatementNode
 from krrood.entity_query_language.factories import a, variable
 
 navigate = a(NavigateAction)(
@@ -179,10 +193,9 @@ navigate = a(NavigateAction)(
     )
 )
 
-with simulated_robot:
-    sequential([navigate], context=context).perform()
+run(StatementNode(statement=navigate))
 
-pr2_view.root.parent_connection.origin = origin_pose.to_homogeneous_matrix()
+pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
 ```
 
 ## Tuning the Costmaps

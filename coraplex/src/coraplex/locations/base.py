@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import Iterator, Iterable, Optional
+from typing_extensions import Iterator, Iterable
 
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
@@ -20,16 +20,10 @@ class Location(Iterable[Pose], ABC):
     How many candidates to sample at most.
     """
 
-    seed: Optional[int] = field(default=None, kw_only=True)
-    """
-    Seed of the sampling, so a run can be repeated; ``None`` samples afresh each time.
-    """
-
     @abstractmethod
     def candidates(self) -> Iterator[Pose]:
         """
-        Sample pose candidates from this location, :attr:`number_of_samples` of them
-        from :attr:`seed`.
+        Sample pose candidates from this location, :attr:`number_of_samples` of them.
 
         :return: The pose candidates, in the order they should be tried.
         """

@@ -4,13 +4,14 @@ from itertools import islice
 
 import numpy as np
 import pytest
-from typing_extensions import Iterator, List, Optional, Tuple
+from typing_extensions import Iterator
 
-from coraplex.datastructures.dataclasses import Context
 from coraplex.locations.base import Location
 from coraplex.locations.costmaps import RingCostmap
 from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
-from semantic_digital_twin.api import RobotSpecification, WorldSpecification
+from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
@@ -22,6 +23,8 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+from ..plan_running import context_of, robot_extensions, with_grounding
+from ..sampling import SAMPLING_SEED
 
 # %% test doubles
 
@@ -29,7 +32,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class RecordsHowItWasSampled(Location):
     """
-    Yields one candidate and records the terms it sampled with.
+    Yields one candidate and records how many samples it was asked for.
     """
 
     pose: Pose
@@ -37,13 +40,13 @@ class RecordsHowItWasSampled(Location):
     The single candidate to yield.
     """
 
-    sampled_with: List[Tuple[int, Optional[int]]] = field(default_factory=list)
+    sampled_with: list[int] = field(default_factory=list)
     """
-    One entry per call: the number of samples and the seed it sampled with.
+    One entry per call: the number of samples it was asked for.
     """
 
     def candidates(self) -> Iterator[Pose]:
-        self.sampled_with.append((self.number_of_samples, self.seed))
+        self.sampled_with.append(self.number_of_samples)
         return iter([self.pose])
 
 
@@ -81,7 +84,7 @@ def _single_robot_world_setup() -> World:
 def single_robot_world(_single_robot_world_setup):
     world = deepcopy(_single_robot_world_setup)
     robot = world.get_semantic_annotations_by_type(PR2)[0]
-    return world, robot, Context(world, robot)
+    return world, robot, robot_extensions(robot)
 
 
 def _candidate(world: World) -> Pose:
@@ -92,14 +95,12 @@ def _candidate(world: World) -> Pose:
 
 
 def test_a_location_samples_on_the_terms_it_was_given(single_robot_world):
-    world, robot, context = single_robot_world
-    location = RecordsHowItWasSampled(
-        pose=_candidate(world), number_of_samples=17, seed=3
-    )
+    world, robot, extensions = single_robot_world
+    location = RecordsHowItWasSampled(pose=_candidate(world), number_of_samples=17)
 
     list(islice(iter(location), 1))
 
-    assert location.sampled_with == [(17, 3)]
+    assert location.sampled_with == [17]
 
 
 def test_a_location_samples_nothing_before_it_is_consumed(single_robot_world):
@@ -107,18 +108,18 @@ def test_a_location_samples_nothing_before_it_is_consumed(single_robot_world):
     A location handed to a plan as a domain is only sampled from once the plan asks for
     a pose, so it reflects the world at that moment.
     """
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     location = RecordsHowItWasSampled(pose=_candidate(world))
 
     candidates = iter(location)
     assert location.sampled_with == []
 
     next(candidates)
-    assert location.sampled_with == [(location.number_of_samples, location.seed)]
+    assert location.sampled_with == [location.number_of_samples]
 
 
 def test_a_location_grounds_to_its_first_candidate(single_robot_world):
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     location = RecordsHowItWasSampled(pose=_candidate(world))
 
     assert location.ground() is location.pose
@@ -159,19 +160,18 @@ def test_a_ring_from_the_arm_reach_distance_stands_off_by_the_reach_fraction(
     """
     The standing distance follows the reach fraction, so tuning it moves the robot.
     """
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     target = Pose.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     # approximate_length returns a symbolic scalar, and so does the distance derived
     # from it, which compares as unequal to a float under pytest.approx no matter the
     # tolerance.
-    arm = context.robot.right_arm
+    arm = robot.right_arm
     expected_distance = float(arm.approximate_length()) * REACH_FRACTION
-    location = ReachabilityLocation(target, arm, context=context)
+    location = ReachabilityLocation(target, arm, context=context_of(extensions))
 
     ring = RingCostmap.from_arm_reach_distance(
-        context,
         arm,
         target,
         reach_fraction=REACH_FRACTION,
@@ -194,9 +194,7 @@ def _horizontal_distance(pose: Pose, target: Pose) -> float:
     :return: How far `pose` stands from `target` along the floor.
     """
     return float(
-        np.linalg.norm(
-            pose.to_position().to_np()[:2] - target.to_position().to_np()[:2]
-        )
+        np.linalg.norm(pose.position.to_np()[:2] - target.position.to_np()[:2])
     )
 
 
@@ -207,16 +205,18 @@ def test_a_reachability_location_stands_around_the_reach_fraction_of_the_arm(
     The ring the candidates are sampled from is centred on the stand-off distance, so
     the poses offered stand that far off on the whole.
     """
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     target = Pose.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
-    arm = context.robot.right_arm
+    arm = robot.right_arm
     location = ReachabilityLocation(
-        target, arm, context=context, seed=0, reach_fraction=REACH_FRACTION
+        target,
+        arm,
+        context=context_of(extensions),
+        reach_fraction=REACH_FRACTION,
     )
     ring = RingCostmap.from_arm_reach_distance(
-        context,
         arm,
         target,
         reach_fraction=REACH_FRACTION,
@@ -242,14 +242,14 @@ def test_a_reachability_location_offers_no_standing_pose_farther_than_the_arm_is
     A target farther from where the robot stands than its arm is long cannot be reached
     from there, so such a standing pose is not worth trying.
     """
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     target = Pose.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
-    arm = context.robot.right_arm
-    location = ReachabilityLocation(target, arm, context=context, seed=0)
+    arm = robot.right_arm
+    location = ReachabilityLocation(target, arm, context=context_of(extensions))
     sampled = islice(
-        location.costmap().sample(location.number_of_samples, location.seed),
+        location.costmap().sample(location.number_of_samples, location.sampling_seed),
         POSES_CHECKED,
     )
     assert any(
@@ -271,23 +271,25 @@ def test_a_reachability_location_offers_the_poses_in_reach_in_the_order_sampled(
     Leaving out what is out of reach does not change which of the remaining poses come
     first, so a plan that found a standing pose before still finds the same one.
     """
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     target = Pose.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
-    arm = context.robot.right_arm
-    location = ReachabilityLocation(target, arm, context=context, seed=0)
+    arm = robot.right_arm
+    location = ReachabilityLocation(target, arm, context=context_of(extensions))
     in_reach = [
-        pose.to_position().to_np()[:2]
+        pose.position.to_np()[:2]
         for pose in islice(
-            location.costmap().sample(location.number_of_samples, location.seed),
+            location.costmap().sample(
+                location.number_of_samples, location.sampling_seed
+            ),
             POSES_CHECKED,
         )
         if _horizontal_distance(pose, target) <= float(arm.approximate_length())
     ]
 
     offered = [
-        pose.to_position().to_np()[:2]
+        pose.position.to_np()[:2]
         for pose in islice(location.candidates(), len(in_reach))
     ]
 
@@ -321,48 +323,19 @@ def _box_in(world: World) -> Milk:
 
 
 def test_a_reachability_location_is_sampled_around_its_target(single_robot_world):
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     target = Pose.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
 
-    location = ReachabilityLocation(target, context.robot.right_arm, context=context)
+    location = ReachabilityLocation(
+        target, robot.right_arm, context=context_of(extensions)
+    )
 
     np.testing.assert_allclose(
-        location.costmap().origin.to_position().to_np()[:2],
-        target.to_position().to_np()[:2],
+        location.costmap().origin.position.to_np()[:2],
+        target.position.to_np()[:2],
     )
-
-
-def test_a_reachability_location_takes_its_seed_from_the_context(single_robot_world):
-    """
-    A demonstration is only worth running as a regression test if it runs the same way
-    twice, so a plan can fix the samples made anywhere inside it.
-    """
-    world, robot, context = single_robot_world
-    context.sampling_seed = 5
-
-    location = ReachabilityLocation(
-        _box_in(world).root.global_pose,
-        context.robot.right_arm,
-        context=context,
-    )
-
-    assert location.seed == context.sampling_seed
-
-
-def test_a_location_keeps_a_seed_of_its_own_over_the_contexts(single_robot_world):
-    world, robot, context = single_robot_world
-    context.sampling_seed = 5
-
-    location = ReachabilityLocation(
-        _box_in(world).root.global_pose,
-        context.robot.right_arm,
-        context=context,
-        seed=7,
-    )
-
-    assert location.seed == 7
 
 
 def test_a_reachability_location_samples_afresh_without_one(single_robot_world):
@@ -370,15 +343,15 @@ def test_a_reachability_location_samples_afresh_without_one(single_robot_world):
     Left unseeded a plan explores the region differently each run, which is what makes
     sampling from the map worth more than ranking it.
     """
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
 
     location = ReachabilityLocation(
         _box_in(world).root.global_pose,
-        context.robot.right_arm,
-        context=context,
+        robot.right_arm,
+        context=context_of(with_grounding(extensions, sampling_seed=None)),
     )
 
-    assert location.seed is None
+    assert location.sampling_seed is None
 
 
 # %% a location reflects the world when it is sampled from
@@ -391,11 +364,11 @@ def test_a_costmap_location_builds_its_costmap_only_when_sampled_from(
     Handing a location to a plan must not build its costmap, so the map describes the
     world as the plan finds it when it gets there.
     """
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     location = ReachabilityLocation(
         _box_in(world).root.global_pose,
-        context.robot.right_arm,
-        context=context,
+        robot.right_arm,
+        context=context_of(extensions),
     )
     built = []
     build_costmap = ReachabilityLocation.costmap
@@ -417,12 +390,12 @@ def test_a_target_given_in_a_body_frame_follows_the_body(single_robot_world):
     A target named relative to a body is where that body is when the location is sampled
     from, not where it was when the location was made.
     """
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     box = _box_in(world).root
     location = ReachabilityLocation(
         Pose(reference_frame=box),
-        context.robot.right_arm,
-        context=context,
+        robot.right_arm,
+        context=context_of(extensions),
     )
     with world.modify_world():
         box.parent_connection.parent_T_connection_expression = (
@@ -430,37 +403,79 @@ def test_a_target_given_in_a_body_frame_follows_the_body(single_robot_world):
         )
 
     np.testing.assert_allclose(
-        location.costmap().origin.to_position().to_np()[:2],
-        box.global_pose.to_position().to_np()[:2],
+        location.costmap().origin.position.to_np()[:2],
+        box.global_pose.position.to_np()[:2],
     )
 
 
 # %% seeing a target
 
 
-def test_a_visibility_location_takes_its_seed_from_the_context(single_robot_world):
-    world, robot, context = single_robot_world
-    context.sampling_seed = 5
-
-    location = VisibilityLocation(
-        Pose.from_xyz_rpy(*REACHABILITY_TARGET_POSITION, reference_frame=world.root),
-        context=context,
-    )
-
-    assert location.seed == context.sampling_seed
-
-
 def test_a_visibility_location_offers_poses_facing_its_target(single_robot_world):
     """
     A pose to see a target from is only any use looking at it.
     """
-    world, robot, context = single_robot_world
+    world, robot, extensions = single_robot_world
     target = Pose.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
-    location = VisibilityLocation(target, context=context, seed=0)
+    location = VisibilityLocation(target, context=context_of(extensions))
 
     for pose in islice(location.candidates(), POSES_CHECKED):
-        heading = pose.to_rotation_matrix().to_np()[:2, 0]
-        offset = target.to_position().to_np()[:2] - pose.to_position().to_np()[:2]
+        heading = pose.rotation_matrix.to_np()[:2, 0]
+        offset = target.position.to_np()[:2] - pose.position.to_np()[:2]
         np.testing.assert_allclose(heading, offset / np.linalg.norm(offset), atol=1e-6)
+
+
+# %% the seed a costmap location samples with
+
+
+def test_a_costmap_location_samples_with_the_seed_of_its_plan(single_robot_world):
+    """
+    A location sampled for a plan draws its candidates with the plan's seed, so a run
+    repeats.
+    """
+    world, robot, extensions = single_robot_world
+    sampling_seed = SAMPLING_SEED + 1
+    target = Pose.from_xyz_rpy(
+        *REACHABILITY_TARGET_POSITION, reference_frame=world.root
+    )
+    location = VisibilityLocation(
+        target,
+        context=context_of(with_grounding(extensions, sampling_seed=sampling_seed)),
+        number_of_samples=5,
+    )
+
+    sampled = [pose.position.to_np() for pose in location.candidates()]
+
+    expected = [
+        pose.position.to_np()
+        for pose in location.costmap().sample(location.number_of_samples, sampling_seed)
+    ]
+    np.testing.assert_array_equal(sampled, expected)
+
+
+def test_a_plan_without_a_seed_of_its_own_samples_the_same_candidates_every_run(
+    single_robot_world,
+):
+    """
+    A plan that sets no seed still repeats, so a run that found a standing pose once
+    finds it again.
+    """
+    world, robot, extensions = single_robot_world
+    target = Pose.from_xyz_rpy(
+        *REACHABILITY_TARGET_POSITION, reference_frame=world.root
+    )
+    context = context_of([RobotAccess(robot), StatementGrounding()])
+
+    runs = [
+        [
+            pose.position.to_np()
+            for pose in VisibilityLocation(
+                target, context=context, number_of_samples=5
+            ).candidates()
+        ]
+        for _ in range(2)
+    ]
+
+    np.testing.assert_array_equal(runs[0], runs[1])

@@ -1,6 +1,6 @@
 import os
 from PySide6.QtGui import QColor
-from typing import Optional
+from typing_extensions import Optional
 
 
 def get_theme_color(name: str, default: str) -> str:

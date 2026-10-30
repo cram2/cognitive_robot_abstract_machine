@@ -34,9 +34,8 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass
-from typing import List
-
 from typing_extensions import Mapping
+
 
 from krrood.entity_query_language.factories import Symbol
 from krrood.entity_query_language.predicate import Predicate
@@ -115,7 +114,7 @@ class Worker:
     name: str
     """The worker's name."""
 
-    tasks: List[Task]
+    tasks: list[Task]
     """
     The worker's tasks (indexable, e.g. ``tasks[0]``).
     """

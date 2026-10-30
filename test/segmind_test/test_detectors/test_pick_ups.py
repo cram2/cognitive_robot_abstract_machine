@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from typing_extensions import List
 
 from segmind.datastructures.events import (
     DetectionEvent,
@@ -25,7 +24,9 @@ from segmind.detectors.coarse_event_detector_nodes import (
     PickUpDetector,
 )
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
-from segmind.statecharts.segmind_statechart import SegmindStatechart
+from cramph.context import StatechartContext
+from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 LIFTS_APART = timedelta(minutes=5)
@@ -35,7 +36,7 @@ is allowed to span.
 """
 
 
-def _logged(events: List[DetectionEvent]) -> SegmindContext:
+def _logged(events: list[DetectionEvent]) -> SegmindContext:
     """
     :return: A context whose logger holds ``events``.
     """
@@ -55,12 +56,10 @@ def _translation_of(body: Body, at: datetime) -> TranslationEvent:
     )
 
 
-def _pick_ups_concluded_from(segmind_context: SegmindContext) -> List[DetectionEvent]:
+def _pick_ups_concluded_from(segmind_context: SegmindContext) -> list[DetectionEvent]:
     return [
         event
-        for event in PickUpDetector().update_context_and_events(
-            None, segmind_context, []
-        )
+        for event in PickUpDetector().update_context_and_events(segmind_context, [])
         if isinstance(event, PickUpEvent)
     ]
 
@@ -130,16 +129,18 @@ def test_one_loss_of_support_is_the_pick_up_of_one_translation(milk_in_the_apart
 
 def _pick_ups_concluded_beside_a_grasp_detector(
     segmind_context: SegmindContext,
-) -> List[DetectionEvent]:
+) -> list[DetectionEvent]:
     """
     What a pick-up detector makes of ``segmind_context`` while a grasp detector runs in
     the same statechart.
     """
     pick_up = PickUpDetector()
-    SegmindStatechart().build_statechart([GraspDetector(), pick_up])
+    DetectorStatechartBuilder([GraspDetector(), pick_up]).build(
+        StatechartContext(world=World())
+    )
     return [
         event
-        for event in pick_up.update_context_and_events(None, segmind_context, [])
+        for event in pick_up.update_context_and_events(segmind_context, [])
         if isinstance(event, PickUpEvent)
     ]
 
@@ -189,8 +190,8 @@ def test_a_grasp_and_a_lift_are_a_pick_up_where_grasps_are_watched_for(
 @dataclass
 class DetectorOfAPlacingFollowingALossOfSupport(AbstractInteractionDetector):
     """
-    Concludes a placing from a loss of support detected close to a support, stating only which events
-    it is concluded from and what it concludes.
+    Concludes a placing from a loss of support detected close to a support, stating only
+    which events it is concluded from and what it concludes.
     """
 
     @property
@@ -223,7 +224,7 @@ def test_an_interaction_is_concluded_from_the_events_a_detector_states(
     )
 
     [concluded] = DetectorOfAPlacingFollowingALossOfSupport().update_context_and_events(
-        None, segmind_context, []
+        segmind_context, []
     )
 
     assert isinstance(concluded, PlacingEvent)

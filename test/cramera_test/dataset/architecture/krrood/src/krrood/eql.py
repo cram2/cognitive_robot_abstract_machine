@@ -1,4 +1,0 @@
-class Entity:
-    """
-    An entity.
-    """

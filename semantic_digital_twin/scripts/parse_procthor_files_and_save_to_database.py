@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import re
 import time
-from typing import List
 
 import tqdm
 from sqlalchemy.orm import Session
@@ -35,7 +34,7 @@ from semantic_digital_twin.pipeline.pipeline import (
 )
 
 
-def remove_root_and_move_children_into_new_worlds(world: World) -> List[World]:
+def remove_root_and_move_children_into_new_worlds(world: World) -> list[World]:
     """
     Remove the root of the given world and move its children into new worlds.
 
@@ -67,8 +66,8 @@ def remove_root_and_move_children_into_new_worlds(world: World) -> List[World]:
 
 
 def replace_dresser_meshes_with_factories(
-    worlds: List[World], dresser_pattern: re.Pattern[str]
-) -> List[World]:
+    worlds: list[World], dresser_pattern: re.Pattern[str]
+) -> list[World]:
     """
     Replace dresser meshes in the given worlds with dresser factories.
 
@@ -93,7 +92,7 @@ def replace_dresser_meshes_with_factories(
     return worlds
 
 
-def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> List[WorldMappingDAO]:
+def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> list[WorldMappingDAO]:
     """
     Parse a Procthor FBX file path and return a list of WorldMappingDAO objects.
     """

@@ -120,7 +120,7 @@ class KRROODPositionsSubclassWithAnotherKRROODPosition(KRROODPositions):
 
 
 # check that one to many relationships work where the many side is of the same type
-@dataclass
+@dataclass(eq=False)
 class DoubleKRROODPositionAggregator(Symbol):
     positions1: List[KRROODPosition]
     positions2: List[KRROODPosition]
@@ -327,7 +327,7 @@ class BackreferenceMapping(AlternativeMapping[Backreference]):
         return Backreference({v: v for v in self.values}, self.reference)
 
 
-@dataclass
+@dataclass(eq=False)
 class AlternativeMappingAggregator(Symbol):
     entities1: List[Entity]
     entities2: List[Entity]
@@ -902,13 +902,16 @@ class SceneRoom:
 
 
 @dataclass
-class TestExParts:
+class SceneWithExchangeableParts:
     objects: List[SceneObject]
     rooms: List[SceneRoom]
 
 
-@dataclass
-class SceneObjectAggregationBase(AggregationStatistic[T]):
+TSceneObjectHolder = TypingTypeVar("TSceneObjectHolder", bound=object)
+
+
+@dataclass(eq=False)
+class SceneObjectAggregationBase(AggregationStatistic[TSceneObjectHolder]):
     """
     Abstract base providing shared aggregation statistics over a
     ``objects: List[SceneObject]`` field.
@@ -916,12 +919,12 @@ class SceneObjectAggregationBase(AggregationStatistic[T]):
     Concrete subclasses bind ``T`` to the owner type and are auto-registered.
     """
 
-    @aggregation_statistic("objects")
+    @aggregation_statistic(variable(SceneRoom).objects)
     def chair_count(self) -> int:
         """
         Count of CHAIR-type objects.
         """
-        type_var = variable(SceneObject, self.instance.objects).type
+        type_var = variable(SceneObject, self.objects).type
         [cou] = (
             entity(count_range(type_var))
             .where(type_var == SceneObjectType.CHAIR)
@@ -929,12 +932,12 @@ class SceneObjectAggregationBase(AggregationStatistic[T]):
         )
         return cou
 
-    @aggregation_statistic("objects")
+    @aggregation_statistic(variable(SceneRoom).objects)
     def table_count(self) -> int:
         """
         Count of TABLE-type objects.
         """
-        type_var = variable(SceneObject, self.instance.objects).type
+        type_var = variable(SceneObject, self.objects).type
         [cou] = (
             entity(count_range(type_var))
             .where(type_var == SceneObjectType.TABLE)
@@ -942,35 +945,92 @@ class SceneObjectAggregationBase(AggregationStatistic[T]):
         )
         return cou
 
-    @aggregation_statistic("objects")
+    @aggregation_statistic(variable(SceneRoom).objects)
     def total_count(self) -> int:
         """
         Total number of objects.
         """
-        [cou] = count(variable(SceneObject, self.instance.objects)).tolist()
+        [cou] = count(variable(SceneObject, self.objects)).tolist()
         return cou
 
 
-@dataclass
+@dataclass(eq=False)
 class SceneRoomAggregations(SceneObjectAggregationBase[SceneRoom]):
     """
     Aggregation statistics for :class:`SceneRoom` over its ``objects`` field.
     """
 
 
-@dataclass
-class TestExPartsAggregations(SceneObjectAggregationBase[TestExParts]):
+@dataclass(eq=False)
+class SceneWithExchangeablePartsAggregations(
+    SceneObjectAggregationBase[SceneWithExchangeableParts]
+):
     """
-    Aggregation statistics for :class:`TestExParts` over its ``objects`` and
+    Aggregation statistics for :class:`SceneWithExchangeableParts` over its ``objects`` and
     ``rooms`` fields.
     """
 
-    @aggregation_statistic("rooms")
+    @aggregation_statistic(variable(SceneWithExchangeableParts).rooms)
     def room_count(self) -> int:
         """
         Total number of rooms.
         """
-        [cou] = count(variable(SceneRoom, self.instance.rooms)).tolist()
+        [cou] = count(variable(SceneRoom, self.rooms)).tolist()
+        return cou
+
+
+@dataclass
+class SceneFloor:
+    """
+    A level of a building, holding rooms; a mimic of an entity that is itself an
+    exchangeable part and holds exchangeable parts.
+    """
+
+    rooms: List[SceneRoom]
+    """
+    The rooms on this floor.
+    """
+
+
+@dataclass
+class SceneBuilding:
+    """
+    A building, holding floors; the root of a three-level chain of exchangeable parts.
+    """
+
+    floors: List[SceneFloor]
+    """
+    The floors of this building.
+    """
+
+
+@dataclass(eq=False)
+class SceneFloorAggregations(AggregationStatistic[SceneFloor]):
+    """
+    Aggregation statistics for :class:`SceneFloor` over its ``rooms`` field.
+    """
+
+    @aggregation_statistic(variable(SceneFloor).rooms)
+    def room_count(self) -> int:
+        """
+        Total number of rooms on the floor.
+        """
+        [cou] = count(variable(SceneRoom, self.rooms)).tolist()
+        return cou
+
+
+@dataclass(eq=False)
+class SceneBuildingAggregations(AggregationStatistic[SceneBuilding]):
+    """
+    Aggregation statistics for :class:`SceneBuilding` over its ``floors`` field.
+    """
+
+    @aggregation_statistic(variable(SceneBuilding).floors)
+    def floor_count(self) -> int:
+        """
+        Total number of floors in the building.
+        """
+        [cou] = count(variable(SceneFloor, self.floors)).tolist()
         return cou
 
 
@@ -1013,27 +1073,27 @@ class PickingRobot:
     """
 
 
-@dataclass
+@dataclass(eq=False)
 class PickingRobotAggregations(AggregationStatistic[PickingRobot]):
     """
     Aggregation statistics for :class:`PickingRobot` over its ``attempts`` field.
     """
 
-    @aggregation_statistic("attempts")
+    @aggregation_statistic(variable(PickingRobot).attempts)
     def success_count(self) -> int:
         """
         Count of successful grasp attempts.
         """
-        grasped_var = variable(GraspAttempt, self.instance.attempts).grasped
+        grasped_var = variable(GraspAttempt, self.attempts).grasped
         [result] = entity(count_range(grasped_var)).where(grasped_var == True).tolist()
         return result
 
-    @aggregation_statistic("attempts")
+    @aggregation_statistic(variable(PickingRobot).attempts)
     def total_count(self) -> int:
         """
         Total number of grasp attempts.
         """
-        [result] = count(variable(GraspAttempt, self.instance.attempts)).tolist()
+        [result] = count(variable(GraspAttempt, self.attempts)).tolist()
         return result
 
 
@@ -1069,19 +1129,19 @@ class StationedPickingRobot:
     """
 
 
-@dataclass
+@dataclass(eq=False)
 class StationedPickingRobotAggregations(AggregationStatistic[StationedPickingRobot]):
     """
     Aggregation statistics for :class:`StationedPickingRobot` over its ``attempts``
     field.
     """
 
-    @aggregation_statistic("attempts")
+    @aggregation_statistic(variable(StationedPickingRobot).attempts)
     def success_count(self) -> int:
         """
         Count of successful grasp attempts.
         """
-        grasped_var = variable(GraspAttempt, self.instance.attempts).grasped
+        grasped_var = variable(GraspAttempt, self.attempts).grasped
         [result] = entity(count_range(grasped_var)).where(grasped_var == True).tolist()
         return result
 
@@ -1101,7 +1161,7 @@ class MissingBaseClass:
     objects: List[ExampleInt] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(eq=False)
 class ActionWithMissingAggregationsMixin:
     """
     Action with a field whose domain type has exchangeable parts but no

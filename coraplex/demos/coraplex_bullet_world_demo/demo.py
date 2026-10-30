@@ -18,27 +18,30 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from typing_extensions import Optional, Tuple, Type
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import ExecutionType
+from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
+from coraplex.plans.plan_transformation import PlanRewriting
 from coraplex.demonstrations import RobotDemonstration
-from coraplex.plans.factories import sequential
-from coraplex.plans.plan_node import PlanNode
+from coraplex.plans.executors import PlanExecutor, KinematicallySimulatedPlanExecutor
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from coraplex.robot_plans.plan_transformations import OpenDrawerBeforeMoveAndPickUp
+from cramph.composites import Sequence
+from cramph.context import ContextExtension, StatechartContext
+from cramph.statechart import Statechart
 from krrood.entity_query_language.factories import (
     an,
     entity,
     variable,
 )
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    RobotSpecification,
-    SemanticAnnotationWithRootSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
 from segmind.detectors.coarse_event_detector_nodes import (
     PickUpDetector,
@@ -89,6 +92,11 @@ class ApartmentBody(StrEnum):
     The apartment's own bodies the demonstration acts on.
     """
 
+    ROOT = "apartment_root"
+    """
+    The apartment's root, which marks whether the scene was already populated.
+    """
+
     SPOON_DRAWER = "cabinet10_drawer_top"
 
 
@@ -98,7 +106,7 @@ class PlaceSettingObject:
     One object of the place setting: what it is, where it starts, and where it is laid.
     """
 
-    semantic_annotation_type: Type[HasRootKinematicStructureEntity]
+    semantic_annotation_type: type[HasRootKinematicStructureEntity]
     """
     What the object is.
 
@@ -126,7 +134,7 @@ class PlaceSettingObject:
     (z=0.723).
     """
 
-    starts_on: Optional[ApartmentBody] = None
+    starts_on: ApartmentBody | None = None
     """
     The apartment body the object starts on.
 
@@ -225,7 +233,7 @@ class BulletWorldDemonstration(RobotDemonstration):
             SceneFile.MILK,
             HomogeneousTransformationMatrix.from_xyz_rpy(2.37, 2, 1.0345),
             along_table=4.8,
-            height=0.82,
+            height=0.81,
         )
     )
     """
@@ -251,7 +259,7 @@ class BulletWorldDemonstration(RobotDemonstration):
             SceneFile.SPOON,
             HomogeneousTransformationMatrix.from_xyz_rpy(-0.05, -0.05, -0.01),
             along_table=5.2,
-            height=0.74,
+            height=0.73,
             across_table=3.25,
             starts_on=ApartmentBody.SPOON_DRAWER,
         )
@@ -261,30 +269,29 @@ class BulletWorldDemonstration(RobotDemonstration):
     """
 
     @property
-    def place_setting(self) -> Tuple[PlaceSettingObject, ...]:
+    def place_setting(self) -> tuple[PlaceSettingObject, ...]:
         """
         :return: The objects carried onto the table, in the order they are carried. They
             are laid 20 cm apart, so placing one keeps the gripper clear of the last.
         """
         return self.milk, self.bowl, self.spoon
 
-    def build_simulated_world(self) -> World:
+    def scene_specification(self) -> WorldSpecification:
         """
-        The apartment with the PR2 in it, placed at :attr:`robot_start` through its
-        odom.
+        :return: The apartment.
         """
-        return WorldSpecification.from_urdf(
-            SceneFile.APARTMENT.path,
-            robots=[
-                RobotSpecification(
-                    semantic_annotation_type=self.used_robot,
-                    world_T_odom=self.robot_start,
-                )
-            ],
-        ).to_domain_object()
+        return WorldSpecification.from_urdf(SceneFile.APARTMENT.path)
+
+    def robot_specification(self) -> RobotSpecification:
+        """
+        :return: The PR2, placed at :attr:`robot_start` through its odom.
+        """
+        return RobotSpecification(
+            semantic_annotation_type=self.used_robot, world_T_odom=self.robot_start
+        )
 
     def is_scene_populated(self, world: World) -> bool:
-        return world.is_kinematic_structure_entity_in_world_by_name(Bowl.__name__)
+        return world.is_kinematic_structure_entity_in_world_by_name(ApartmentBody.ROOT)
 
     def populate_scene(self, world: World) -> None:
         """
@@ -297,16 +304,12 @@ class BulletWorldDemonstration(RobotDemonstration):
         with world.modify_world():
             WorldReasoner(world).reason()
 
-    def build_context(self, world: World) -> Context:
-        return Context(
-            world=world,
-            robot=world.get_semantic_annotations_by_type(self.used_robot)[0],
-            ros_node=self.ros_node,
-            sampling_seed=0,
-            alternative_motion_mappings=self.alternative_motion_mappings,
-            plan_transformations=[OpenDrawerBeforeMoveAndPickUp()],
-            _debug=self.debug,
-        )
+    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+        return [
+            RobotAccess(world.get_semantic_annotations_by_type(self.used_robot)[0]),
+            StatementGrounding(),
+            PlanRewriting(transformations=[OpenDrawerBeforeMoveAndPickUp()]),
+        ]
 
     def segment_events(self, world: World) -> AbstractContextManager:
         """
@@ -326,41 +329,45 @@ class BulletWorldDemonstration(RobotDemonstration):
             ),
         )
 
-    def build_plan(self, context: Context) -> PlanNode:
+    def build_statechart(self, context: StatechartContext) -> Statechart:
         """
         Carry each object to its place on the table.
         """
         world = context.world
-        left_arm = context.robot.left_arm
-        return sequential(
-            [
-                ParkArmsAction(context.robot.all_arms),
-                MoveTorsoAction(TorsoState.HIGH),
-                TransportAction.from_graspable_by_closest_grasps(
-                    self.milk.annotation_in(world),
-                    self.milk.target_location(world),
-                    left_arm,
-                    context,
-                ),
-                TransportAction.from_graspable_by_closest_grasps(
-                    self.bowl.annotation_in(world),
-                    self.bowl.target_location(world),
-                    left_arm,
-                    context,
-                ),
-                TransportAction.from_graspable_by_closest_grasps(
-                    self.spoon.annotation_in(world),
-                    self.spoon.target_location(world),
-                    left_arm,
-                    context,
-                ),
-            ],
-            context=context,
-        ).plan
+        robot = context.require_extension(RobotAccess).robot
+        left_arm = robot.left_arm
+        statechart = Statechart(context=context)
+        statechart.add_node(
+            Sequence(
+                nodes=[
+                    ParkArmsAction(arms=robot.all_arms),
+                    MoveTorsoAction(torso_state=TorsoState.HIGH),
+                    TransportAction.from_graspable_by_closest_grasps(
+                        self.milk.annotation_in(world),
+                        self.milk.target_location(world),
+                        left_arm,
+                        context,
+                    ),
+                    TransportAction.from_graspable_by_closest_grasps(
+                        self.bowl.annotation_in(world),
+                        self.bowl.target_location(world),
+                        left_arm,
+                        context,
+                    ),
+                    TransportAction.from_graspable_by_closest_grasps(
+                        self.spoon.annotation_in(world),
+                        self.spoon.target_location(world),
+                        left_arm,
+                        context,
+                    ),
+                ]
+            )
+        )
+        return statechart
 
 
 def main(
-    execution_type: ExecutionType = ExecutionType.SIMULATED,
+    executor_type: type[PlanExecutor] = KinematicallySimulatedPlanExecutor,
     collision_avoidance: bool = True,
     event_segmentation: bool = True,
     debug: bool = False,
@@ -368,15 +375,16 @@ def main(
     """
     Run the demonstration.
 
-    :param execution_type: Whether to drive the real robot or simulate it.
-    :param collision_avoidance: Whether every motion state chart avoids collisions.
+    :param executor_type: The executor running the plan, which decides whether it drives
+        the real robot or simulates it.
+    :param collision_avoidance: Whether the statechart avoids collisions.
     :param event_segmentation: Whether SegMind segments the run into events.
     :param debug: Whether to run in debug mode, publishing every copy of the world a
         candidate is tried in.
     """
     BulletWorldDemonstration(
         used_robot=PR2,
-        execution_type=execution_type,
+        executor_type=executor_type,
         collision_avoidance=collision_avoidance,
         event_segmentation=event_segmentation,
         debug=debug,

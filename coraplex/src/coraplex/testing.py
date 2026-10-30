@@ -9,7 +9,7 @@ import time
 import unittest
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List
+from typing_extensions import Callable
 
 import numpy as np
 import pytest
@@ -31,8 +31,12 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
-from coraplex.datastructures.enums import VisualizationBackend
-from coraplex.visualization import WorldVisualization
+from cramph.visualization import RvizVisualization
+from cramph.executor import ExecutorExtension
+from typing_extensions import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rclpy.node import Node
 
 logger = logging.getLogger(__name__)
 
@@ -49,19 +53,19 @@ except ImportError:
     )
 
 
-def start_visualization(world: World) -> WorldVisualization:
+def selected_visualizations(ros_node: Node | None) -> list[ExecutorExtension]:
     """
-    Start the selected renderer, defaulting to native RViz when available.
+    :param ros_node: The ROS node RViz publishes through.
+    :return: An RViz visualization when ROS is available and `ros_node` is given, as
+        executor extensions; empty when headless.
 
-    :param world: The world to visualize.
-    :return: The renderer owner, accepting optional plan observers.
+    .. note::
+        Add the same visualizations to every executor of one demo. Each call returns a
+        new one.
     """
-    default_backend = (
-        VisualizationBackend.RVIZ
-        if VizMarkerPublisher is not None
-        else VisualizationBackend.NONE
-    )
-    return WorldVisualization.from_environment(world, default_backend).start()
+    if VizMarkerPublisher is None or ros_node is None:
+        return []
+    return [RvizVisualization(ros_node=ros_node)]
 
 
 def attach_tool(world: World, arm: Arm, tool_world: World, mount: dict) -> Body:
@@ -133,10 +137,10 @@ def setup_world() -> World:
             1.5, 2.5, 0, reference_frame=apartment_root
         )
 
-    apartment_world.get_body_by_name("milk.stl").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 2, 1.0345, reference_frame=apartment_world.root
-        )
+    apartment_world.get_body_by_name(
+        "milk.stl"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2.37, 2, 1.0345, reference_frame=apartment_world.root
     )
     apartment_world.get_body_by_name(
         "breakfast_cereal.stl"
@@ -206,7 +210,7 @@ def _make_sine_scan_poses(
     x0 = anchor.x
     y0 = anchor.y
     z0 = anchor.z
-    q = anchor.to_quaternion()
+    q = anchor.quaternion
 
     y_min = y0 - 0.5 * y_span
     y_max = y0 + 0.5 * y_span
@@ -270,7 +274,7 @@ class StandaloneProcess:
     node to look from.
     """
 
-    arguments: List[str] = field(default_factory=list)
+    arguments: list[str] = field(default_factory=list)
     """
     Command-line arguments passed to the script.
     """

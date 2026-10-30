@@ -65,7 +65,7 @@ with table_world.modify_world():
     table_world.remove_connection(root_C_left_leg)
     table_world.add_connection(moved_root_C_left_leg)
 
-cube = Box(scale=Scale(0.2, 0.2, 0.2), color=Color(R=1, G=0, B=0, A=1))
+cube = Box(scale=Scale(0.2, 0.2, 0.2), color=Color.from_rgba(red=1, green=0, blue=0, opacity=1))
 box_body = Body(
     name=PrefixedName(name="cube", prefix="transformation_exercise"),
     collision=ShapeCollection([cube]),

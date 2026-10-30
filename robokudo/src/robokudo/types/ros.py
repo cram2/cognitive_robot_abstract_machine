@@ -13,7 +13,6 @@ The module includes:
 
 from dataclasses import dataclass, field
 
-from typing_extensions import List
 
 from robokudo.types.core import Type
 
@@ -106,22 +105,22 @@ class CameraInfo(Type):
     Name of distortion model
     """
 
-    D: List[float] = field(default_factory=list)  # list of floats
+    D: list[float] = field(default_factory=list)  # list of floats
     """
     Distortion parameters
     """
 
-    K: List[float] = field(default_factory=list)  # 9-dim list of floats
+    K: list[float] = field(default_factory=list)  # 9-dim list of floats
     """
     Intrinsic camera matrix (3x3)
     """
 
-    R: List[float] = field(default_factory=list)  # 9-dim list of floats
+    R: list[float] = field(default_factory=list)  # 9-dim list of floats
     """
     Rotation matrix (3x3)
     """
 
-    P: List[float] = field(default_factory=list)  # 12-dim list of floats
+    P: list[float] = field(default_factory=list)  # 12-dim list of floats
     """
     Projection matrix (3x4)
     """

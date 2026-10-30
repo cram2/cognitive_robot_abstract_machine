@@ -46,49 +46,70 @@ it takes the milk by and with which arm. A step that is still an EQL query, as t
 
 ```python
 from coraplex.robot_plans import *
-from coraplex.execution_environment import simulated_robot
 from coraplex.robot_plans.actions.composite.transporting import (
     MoveAndPickUpAction,
     MoveAndPlaceAction,
     TransportAction,
 )
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
-from coraplex.plans.factories import *
 from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2, TorsoState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from coraplex.datastructures.dataclasses import Context
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from cramph.composites import Sequence
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
-context = Context(world, pr2_view)
+from coraplex.plans.context_extensions import RobotAccess
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from cramph.statechart import Statechart
+
+extensions = [RobotAccess(pr2_view)]
+
+
+def run(plan):
+    """
+    Run `plan` simulated in `world`, with the robot and settings in `extensions`.
+    """
+    executor = KinematicallySimulatedPlanExecutor(
+        StatechartContext.with_extensions(world, extensions)
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(plan)
+    executor.compile(statechart)
+    executor.execute()
+    return executor
+
 
 milk = world.get_semantic_annotations_by_type(Milk)[0]
 description = TransportAction(
     pick_up=MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose.from_xyz_rpy(1.63, 1.98, 0.0, reference_frame=world.root),
+        standing_position=Pose.from_xyz_rpy(
+            1.63, 1.98, 0.0, reference_frame=world.root
+        ),
         grasp=milk.grasp_candidates()[0],
         arm=pr2_view.left_arm,
     ),
     place=MoveAndPlaceAction.from_standing_position(
-        standing_position=Pose.from_xyz_rpy(1.64, 3.24, 0.0, reference_frame=world.root),
+        standing_position=Pose.from_xyz_rpy(
+            1.64, 3.24, 0.0, reference_frame=world.root
+        ),
         target_location=Pose.from_xyz_quaternion(
             2.4, 3, 1.05, 0.0, 0.0, 0.0, 1.0, reference_frame=world.root
         ),
         object_designator=milk,
     ),
 )
-plan = sequential([MoveTorsoAction(TorsoState.HIGH),
-                   description], context=context).plan
-with simulated_robot:
-    plan.perform()
+plan = Sequence(nodes=[MoveTorsoAction(torso_state=TorsoState.HIGH), description])
+run(plan)
 ```
 
 The data obtained throughout the plan execution, including robot states, poses, action descriptions and more will be
 logged into the database once we insert the plan.
 
 ```python
-from krrood.ormatic.data_access_objects.helper import to_dao, get_dao_class
+from krrood.ormatic.data_access_objects.helper import to_dao, get_data_access_object_class
 
 session.add(to_dao(plan))
 session.commit()
@@ -100,7 +121,7 @@ Now we can query the database to see what we have logged. Let's say we want to s
 from sqlalchemy import select
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 
-navigations = session.scalars(select(get_dao_class(NavigateAction))).all()
+navigations = session.scalars(select(get_data_access_object_class(NavigateAction))).all()
 print(*navigations, sep="\n")
 ```
 
@@ -110,9 +131,9 @@ it places it.
 Due to the inheritance mapped in the ORM package, we can also get all executed actions with just one query.
 
 ```python
-from coraplex.robot_plans.actions.base import ActionDescription
+from coraplex.robot_plans.actions.base import Action
 
-actions = session.scalars(select(get_dao_class(ActionDescription))).all()
+actions = session.scalars(select(get_data_access_object_class(Action))).all()
 print(*actions, sep="\n")
 ```
 

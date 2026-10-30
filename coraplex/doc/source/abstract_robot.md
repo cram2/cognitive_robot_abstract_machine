@@ -1,8 +1,8 @@
 # Abstract Robot Overview
 
 To define and manage semantic information about robots CoraPlex uses the `AbstractRobot` class of the semantic
-digital twin. Specific instances of the `AbstractRobot` class are part of the Context that is passed to the Plan on
-creation.
+digital twin. The robot performing a plan is given to the executor running it, in the plan's `RobotAccess` context
+extension.
 
 The `AbstractRobot` class defines a semantic, high-level model of a robot as it appears in a world description. Rather
 than focusing on actuation details or low-level control, it organizes the robot's physical and functional structure into

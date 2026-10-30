@@ -1,15 +1,13 @@
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 from geometry_msgs.msg import WrenchStamped
 
 from giskardpy.motion_statechart.ros2_nodes.topic_monitor import TopicSubscriberNode
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValues
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class ForceTorqueNode(TopicSubscriberNode[WrenchStamped]):
     """
     Superclass for all nodes that subscribe to a ROS topic that contains force and
@@ -43,18 +41,16 @@ class ForceTorqueNode(TopicSubscriberNode[WrenchStamped]):
         return float(np.linalg.norm(self.torque_as_np()))
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class ForceImpactMonitor(ForceTorqueNode):
     """
     This node checks if the force magnitude is above a threshold.
     """
 
-    threshold: float = field(kw_only=True)
+    threshold: float
 
-    def on_tick(
-        self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
-        super().on_tick(context)
+    def on_tick(self) -> ObservationStateValues | None:
+        super().on_tick()
         if not self.has_msg():
             return ObservationStateValues.UNKNOWN
         if self.force_magnitude() > self.threshold:

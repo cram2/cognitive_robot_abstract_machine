@@ -16,7 +16,7 @@ import numpy as np
 from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from typing_extensions import Any, Dict
+from typing_extensions import Any
 from rclpy.publisher import Publisher
 
 from robokudo.annotators.core import BaseAnnotator
@@ -136,7 +136,7 @@ class AllAnnotatorROSVisualizer(Visualizer, Node):
         Visualizer.__init__(self, *args, **kwargs)
         Node.__init__(self, "all_annotator_ros_visualizer")
 
-        self.ros_image_publishers: Dict[str, Publisher] = {}
+        self.ros_image_publishers: dict[str, Publisher] = {}
         """
         Mapping of annotator names to ROS publishers.
         """

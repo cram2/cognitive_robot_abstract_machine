@@ -1,9 +1,9 @@
+import copy
 import enum
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import assert_never
+from typing_extensions import Self, Any, Optional, Iterable, Type, Union, assert_never
 
-from typing_extensions import Self, Any, Optional, Iterable, Type, Union
 
 import random_events_lib as rl
 from random_events.interval import reals, Interval, closed, singleton, SimpleInterval
@@ -42,6 +42,15 @@ class Variable(CPPWrapper):
 
     def __hash__(self) -> int:
         return self.name.__hash__()
+
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        """
+        Variables are immutable, so a deep copy shares them.
+
+        :param memo: The objects already copied during this deep copy, by their id.
+        :return: This variable.
+        """
+        return self
 
     def __eq__(self, other):
         return self.cpp_object == other.cpp_object
@@ -131,7 +140,7 @@ class Symbolic(Variable):
     domain: Set = field(kw_only=True)
 
     def __post_init__(self):
-        self.domain = self.domain.__deepcopy__()
+        self.domain = copy.deepcopy(self.domain)
         self.cpp_object = rl.Symbolic(self.name, self.domain.cpp_object)
 
     @property
@@ -212,7 +221,7 @@ class Integer(Variable):
         return Continuous.make_value(self, value)
 
 
-def variable_from_name_and_type(name: str, type_: Type) -> Variable:
+def variable_from_name_and_type(name: str, type_: type) -> Variable:
     """
     Create a variable from a name and type.
 
@@ -235,8 +244,8 @@ def variable_from_name_and_type(name: str, type_: Type) -> Variable:
 
 
 def most_appropriate_variable_type(
-    union: Iterable[Type],
-) -> Optional[Type[Union[*compatible_types]]]:
+    union: Iterable[type],
+) -> type[Union[*compatible_types,]] | None:
     """
     Get the most appropriate type for a random events variable from a union of types.
     The most appropriate type is the one, where the mathematical interpretation as set

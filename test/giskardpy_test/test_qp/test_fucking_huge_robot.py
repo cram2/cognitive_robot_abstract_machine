@@ -1,13 +1,11 @@
 from copy import deepcopy
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.goals.templates import Sequence
+from cramph.composites import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
 )
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
 )
@@ -16,7 +14,6 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -29,6 +26,9 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import (
     Body,
 )
+from giskardpy.motion_control import MotionControl
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 
 
 def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
@@ -50,9 +50,8 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             )
         ]
     )
-    dof_limits = DegreeOfFreedomLimits(
-        lower=DerivativeMap(None, -vel_limit, None, None),
-        upper=DerivativeMap(None, vel_limit, None, None),
+    dof_limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+        maximum_speed=vel_limit
     )
     world = World()
     with world.modify_world():
@@ -165,13 +164,24 @@ def execute(link_length: float, vel_limit: float):
     fucking_huge_robot = robot_factory(
         fucking_huge_link_length=link_length, vel_limit=vel_limit
     )
-    msc = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=fucking_huge_robot),
+        extensions=[
+            MotionControl(
+                qp_controller_config=QPControllerConfig(
+                    target_frequency=100,
+                    prediction_horizon=50,
+                )
+            )
+        ],
+    )
+    statechart = Statechart(context=executor.context)
     goal = 1
     eef = fucking_huge_robot.get_kinematic_structure_entity_by_name("eef")
 
-    msc.add_node(
+    statechart.add_node(
         node1 := Sequence(
-            [
+            nodes=[
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_str_dict(
                         {
@@ -194,20 +204,11 @@ def execute(link_length: float, vel_limit: float):
             ]
         )
     )
-    msc.add_node(EndMotion.when_true(node1))
+    statechart.add_node(EndMotion.when_true(node1))
 
-    kin_sim = Executor(
-        MotionStatechartContext(
-            world=fucking_huge_robot,
-            qp_controller_config=QPControllerConfig(
-                target_frequency=100,
-                prediction_horizon=50,
-            ),
-        ),
-    )
-    kin_sim.compile(motion_statechart=msc)
+    executor.compile(statechart=statechart)
 
-    kin_sim.tick_until_end(10_000)
+    executor.tick_until_end(10_000)
 
 
 def test_cart_goal01():

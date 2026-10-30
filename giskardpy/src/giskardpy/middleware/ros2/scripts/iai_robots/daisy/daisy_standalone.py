@@ -1,36 +1,56 @@
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
+import argparse
+
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
-    WorldWithDaisyConfig,
-    DaisyStandAloneRobotInterfaceConfig,
+    DAiSyInteractiveMarkerChain,
+    WorldWithDAiSyConfig,
 )
-from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.utils.utils import load_xacro
-from rclpy import Parameter
-
+from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
+    InteractiveMarkerNode,
+)
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 
 
-def main():
-    rospy.init_node("giskard")
-    default_robot_desc = load_xacro(
-        "package://iai_daisy_description/robots/daisy.urdf.xacro"
-    )
-    rospy.get_node().declare_parameters(
-        namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
-    )
-    robot_description = rospy.get_node().get_parameter_or("robot_description").value
-    if robot_description is None:
-        robot_description = default_robot_desc
-    giskard = Giskard(
-        world_config=WorldWithDaisyConfig(urdf=robot_description),
-        robot_interface_config=DaisyStandAloneRobotInterfaceConfig(),
-        server_config=GiskardServerConfig(
-            execution_mode=ExecutionMode.STANDALONE, debug_mode=True
-        ),
+def create_giskard() -> Giskard:
+    """
+    Build a Giskard that simulates DAiSy, described by the file its robot class
+    declares.
+    """
+    return Giskard.standalone(
+        world_config=WorldWithDAiSyConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=33),
     )
-    giskard.live()
+
+
+def create_giskard_with_interactive_markers() -> Giskard:
+    """
+    Build the Giskard :func:`create_giskard` builds and start the interactive marker
+    server that moves DAiSy's grippers through it from RViz.
+    """
+    giskard = create_giskard()
+    InteractiveMarkerNode.start_in_background_thread(
+        chains=[chain.value for chain in DAiSyInteractiveMarkerChain]
+    )
+    return giskard
+
+
+def main() -> None:
+    """
+    Run the Giskard :func:`create_giskard` builds as a ros node until ROS shuts down,
+    with the interactive markers if ``--interactive-marker`` is given.
+    """
+    parser = argparse.ArgumentParser(description="DAiSy Giskard standalone controller.")
+    parser.add_argument(
+        "--interactive-marker",
+        action="store_true",
+        help="Also start the interactive marker server for Cartesian control via RViz.",
+    )
+    # parse_known_args ignores ROS 2 arguments (--ros-args ...) that argparse does not know about.
+    args, _ = parser.parse_known_args()
+    if args.interactive_marker:
+        Giskard.launch(create_giskard_with_interactive_markers)
+    else:
+        Giskard.launch(create_giskard)
 
 
 if __name__ == "__main__":

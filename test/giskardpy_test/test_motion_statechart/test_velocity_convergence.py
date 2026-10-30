@@ -3,8 +3,8 @@ Tests for the velocity-convergence expression shared by ``EndMotion`` and the lo
 minimum monitor.
 """
 
+from cramph.context import StatechartContext
 import pytest
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import velocity_convergence_expression
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -14,7 +14,8 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
 )
-from typing_extensions import List, Optional
+from typing_extensions import Optional
+from ..motion_control_context import create_context_with_motion_control
 
 #: thresholds the expression is built with; the values themselves do not matter here
 CONVERGENCE_THRESHOLDS = {
@@ -25,7 +26,7 @@ CONVERGENCE_THRESHOLDS = {
 
 
 def add_degree_of_freedom(
-    world: World, name: str, velocity_limit: Optional[float]
+    world: World, name: str, velocity_limit: float | None
 ) -> DegreeOfFreedom:
     """
     Register a degree of freedom in a world, with or without an upper velocity limit.
@@ -55,17 +56,18 @@ def world() -> World:
 
 
 @pytest.fixture()
-def context(world) -> MotionStatechartContext:
+def context(world) -> StatechartContext:
     """
-    A context carrying the cycle counter the :class:`Executor` would otherwise install.
+    A context carrying the cycle counter the
+    :class:`~cramph.executor.StatechartExecutor` would otherwise install.
     """
-    built = MotionStatechartContext(world=world)
-    built.control_cycle_variable = FloatVariable("control_cycles")
+    built = create_context_with_motion_control(world)
+    built.tick_variable = FloatVariable("control_cycles")
     return built
 
 
 def convergence_of(
-    context: MotionStatechartContext, degrees_of_freedom: List[DegreeOfFreedom]
+    context: StatechartContext, degrees_of_freedom: list[DegreeOfFreedom]
 ) -> str:
     """
     The convergence expression over the given degrees of freedom, as comparable text.

@@ -4,11 +4,12 @@ from dataclasses import dataclass, field
 
 from typing_extensions import ClassVar
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import EndMotion, NodeArtifacts, Task
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+from cramph.statechart import Statechart
+from giskardpy.motion_control import MotionControl
+from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.graph_node import EndMotion, MotionNodeArtifacts, Task
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection
@@ -40,8 +41,8 @@ class FarAwayFloor(Task):
     from it would visibly slow the joint down.
     """
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        artifacts = NodeArtifacts()
+    def build_artifacts(self) -> MotionNodeArtifacts:
+        artifacts = MotionNodeArtifacts()
         position = self.degree_of_freedom.variables.position
         artifacts.constraints.add_inequality_constraint(
             reference_velocity=self.REFERENCE_VELOCITY,
@@ -69,7 +70,10 @@ def control_cycles_to_reach_joint_goal(world: World, with_floor: bool) -> int:
     :return: The number of control cycles until the joint goal is reached.
     """
     connection = next(c for c in world.connections if isinstance(c, ActiveConnection))
-    motion_statechart = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[MotionControl()]
+    )
+    motion_statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
         goal_state=JointState.from_mapping({connection: 0.9})
     )
@@ -78,10 +82,9 @@ def control_cycles_to_reach_joint_goal(world: World, with_floor: bool) -> int:
         motion_statechart.add_node(FarAwayFloor(degree_of_freedom=connection.dof))
     motion_statechart.add_node(EndMotion.when_true(joint_goal))
 
-    executor = Executor(MotionStatechartContext(world=world))
-    executor.compile(motion_statechart=motion_statechart)
+    executor.compile(statechart=motion_statechart)
     executor.tick_until_end()
-    return executor.control_cycles
+    return executor.tick_count
 
 
 # %% inequality caps

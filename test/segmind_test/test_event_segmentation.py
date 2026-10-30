@@ -12,9 +12,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 import pytest
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.executor import StatechartExecutor
 from krrood.exceptions import DataclassException
-from typing_extensions import List
 
 from segmind.datastructures.events import (
     DetectionEvent,
@@ -55,6 +54,16 @@ How far a test moves the milk while it is watched.
 CHANGES_WHILE_WATCHED = 20
 """
 How many changes a test makes to the world while it is watched.
+"""
+
+TICK_PERIOD = 0.1
+"""
+The tick period, in seconds, a test watches the world at.
+"""
+
+WATCHED_FOR = 0.5
+"""
+Seconds a test counts the ticks the watching thread makes.
 """
 
 
@@ -172,7 +181,7 @@ class DetectorCountingItsTicks(AbstractDetector):
     How often this detector was ticked.
     """
 
-    tick_threads: List[int] = field(default_factory=list, init=False)
+    tick_threads: list[int] = field(default_factory=list, init=False)
     """
     The identifier of the thread each tick ran on, in order.
     """
@@ -184,10 +193,9 @@ class DetectorCountingItsTicks(AbstractDetector):
 
     def update_context_and_events(
         self,
-        context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         self.ticks += 1
         self.tick_threads.append(threading.get_ident())
         self.ticked.set()
@@ -207,10 +215,9 @@ class DetectorTakingItsTime(AbstractDetector):
 
     def update_context_and_events(
         self,
-        context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         time.sleep(self.seconds_per_tick)
         return []
 
@@ -306,6 +313,79 @@ def test_changing_the_world_is_not_held_up_by_watching_it(milk_in_the_apartment)
     assert seconds_taken < CHANGES_WHILE_WATCHED * (
         detector.seconds_per_tick + TICK_TIMEOUT / CHANGES_WHILE_WATCHED
     )
+
+
+def test_changing_the_world_is_not_held_up_by_ticks_longer_than_the_tick_period(
+    milk_in_the_apartment,
+):
+    """
+    A tick that overruns its period still leaves the world to whatever changes it before
+    the next tick begins.
+    """
+    world, milk, _ = milk_in_the_apartment
+    rest_x, rest_y, rest_z = RESTING_ON_THE_TABLE
+    detector = DetectorTakingItsTime()
+
+    with Segmind(
+        world=world, detectors=[detector], tick_period=detector.seconds_per_tick / 2
+    ):
+        started = time.monotonic()
+        for step in range(CHANGES_WHILE_WATCHED):
+            milk.parent_connection.origin = (
+                HomogeneousTransformationMatrix.from_xyz_rpy(
+                    rest_x + 0.01 * step,
+                    rest_y,
+                    rest_z,
+                    reference_frame=milk.parent_connection.parent,
+                )
+            )
+        seconds_taken = time.monotonic() - started
+
+    assert seconds_taken < CHANGES_WHILE_WATCHED * (
+        detector.seconds_per_tick + TICK_TIMEOUT / CHANGES_WHILE_WATCHED
+    )
+
+
+def test_detectors_are_ticked_once_a_tick_period(milk_in_the_apartment):
+    """
+    However quick a tick is, the next one begins only a tick period after it, so the
+    share of the run that watching takes shrinks as ticks get cheaper instead of the
+    ticks getting more frequent.
+    """
+    world, _, _ = milk_in_the_apartment
+    detector = DetectorCountingItsTicks()
+
+    with Segmind(world=world, detectors=[detector], tick_period=TICK_PERIOD):
+        detector.ticked.wait(TICK_TIMEOUT)
+        ticks_before = detector.ticks
+        time.sleep(WATCHED_FOR)
+        ticks_while_watched = detector.ticks - ticks_before
+
+    assert ticks_while_watched <= WATCHED_FOR / TICK_PERIOD + 1
+
+
+def test_a_tick_as_long_as_its_period_is_followed_by_a_pause_as_long_as_it_took(
+    milk_in_the_apartment,
+):
+    """
+    A slow tick leaves the world to whatever changes it for as long as it held it, so
+    watching never holds the world for more than half the run.
+    """
+    world, _, _ = milk_in_the_apartment
+    slow_detector = DetectorTakingItsTime(seconds_per_tick=TICK_PERIOD)
+    counting_detector = DetectorCountingItsTicks()
+
+    with Segmind(
+        world=world,
+        detectors=[slow_detector, counting_detector],
+        tick_period=TICK_PERIOD,
+    ):
+        counting_detector.ticked.wait(TICK_TIMEOUT)
+        ticks_before = counting_detector.ticks
+        time.sleep(WATCHED_FOR)
+        ticks_while_watched = counting_detector.ticks - ticks_before
+
+    assert ticks_while_watched <= WATCHED_FOR / (2 * slow_detector.seconds_per_tick) + 1
 
 
 def test_a_body_that_stopped_as_watching_ends_is_seen_at_rest(milk_in_the_apartment):

@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import List, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from semantic_digital_twin.exceptions import InputAlreadyAddedError
 from semantic_digital_twin.world import World
@@ -65,7 +65,7 @@ class WorldStateInputs:
     The world whose state is written and whose observers are notified.
     """
 
-    synchronizers: List[InputSynchronizer] = field(default_factory=list)
+    synchronizers: list[InputSynchronizer] = field(default_factory=list)
     """
     The inputs, applied in the order they were added.
     """
@@ -76,7 +76,7 @@ class WorldStateInputs:
     moves the world state away from what it last read.
     """
 
-    added_inputs: List[InputSynchronizer] = field(default_factory=list, init=False)
+    added_inputs: list[InputSynchronizer] = field(default_factory=list, init=False)
     """
     The inputs added to this loop, as they were handed to it rather than as they are
     applied.

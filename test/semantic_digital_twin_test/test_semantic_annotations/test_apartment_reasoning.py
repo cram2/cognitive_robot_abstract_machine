@@ -10,7 +10,6 @@ missing annotation.
 from enum import StrEnum
 
 import pytest
-from typing_extensions import List, Set, Type
 
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
@@ -25,18 +24,20 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Fridge,
     Handle,
-    Hinge,
     Oven,
     ShelfLayer,
     SideTable,
     Sink,
-    Slider,
     Sofa,
     Table,
     Wall,
     Wardrobe,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
+    PrismaticConnection,
+    RevoluteConnection,
+)
 
 # %% the bodies each annotation is expected on
 
@@ -250,7 +251,7 @@ class ApartmentWardrobe(StrEnum):
 
 # %% pairing each annotation type with what it is expected on
 
-EXPECTED_BODIES: List[tuple] = [
+EXPECTED_BODIES: list[tuple] = [
     (Handle, ApartmentHandle),
     (Drawer, ApartmentDrawer),
     (Door, ApartmentDoor),
@@ -274,14 +275,14 @@ Each annotation type together with the bodies the reasoner must infer it on.
 """
 
 
-def expected_body_names(expected: Type[StrEnum]) -> Set[str]:
+def expected_body_names(expected: type[StrEnum]) -> set[str]:
     """
     The body names one of the expectations above holds.
     """
     return {member.value for member in expected}
 
 
-def inferred_body_names(world: World, annotation_type: Type[HasRootBody]) -> Set[str]:
+def inferred_body_names(world: World, annotation_type: type[HasRootBody]) -> set[str]:
     """
     The names of the bodies the world's annotations of ``annotation_type`` sit on.
 
@@ -324,8 +325,8 @@ def reasoned_apartment(apartment_world_copy) -> World:
     ids=[annotation_type.__name__ for annotation_type, _ in EXPECTED_BODIES],
 )
 def test_every_expected_body_exists(
-    annotation_type: Type[HasRootBody],
-    expected: Type[StrEnum],
+    annotation_type: type[HasRootBody],
+    expected: type[StrEnum],
     apartment_world_copy: World,
 ):
     """
@@ -341,8 +342,8 @@ def test_every_expected_body_exists(
     ids=[annotation_type.__name__ for annotation_type, _ in EXPECTED_BODIES],
 )
 def test_annotations_sit_on_the_expected_bodies(
-    annotation_type: Type[HasRootBody],
-    expected: Type[StrEnum],
+    annotation_type: type[HasRootBody],
+    expected: type[StrEnum],
     reasoned_apartment: World,
 ):
     """
@@ -459,14 +460,14 @@ def test_no_body_carries_the_same_kind_of_annotation_twice(
         assert len(inferred) == len(set(inferred)), annotation_type.__name__
 
 
-def test_an_annotation_the_world_already_held_is_wired_to_its_mechanical_joint(
+def test_an_annotation_the_world_already_held_keeps_hanging_on_its_own_joint(
     reasoned_apartment: World,
 ):
     """
     The world is given one drawer by hand before reasoning runs.
 
-    Reasoning must wire the joint onto that very drawer, since that is the one
-    everything else refers to.
+    Reasoning recognises that drawer again without storing a second one, and the drawer
+    still hangs on the prismatic joint the URDF gave it.
     """
     drawers = [
         drawer
@@ -475,24 +476,24 @@ def test_an_annotation_the_world_already_held_is_wired_to_its_mechanical_joint(
     ]
 
     [drawer] = drawers
-    assert isinstance(drawer.mechanical_joint, Slider)
+    assert isinstance(drawer.movable_joint, PrismaticConnection)
 
 
-def test_every_openable_part_is_carried_by_a_mechanical_joint(
+def test_every_openable_part_hangs_on_the_joint_that_moves_it(
     reasoned_apartment: World,
 ):
     """
-    Every drawer and door the world ends up holding is given the joint that already
-    moves it, so the world stays valid after the reasoner rewires it.
+    Every drawer and door the world ends up holding hangs on the active connection that
+    moves it, and the world stays valid after reasoning.
     """
     drawers = reasoned_apartment.get_semantic_annotations_by_type(Drawer)
     doors = reasoned_apartment.get_semantic_annotations_by_type(Door)
     assert drawers and doors
 
     for drawer in drawers:
-        assert isinstance(drawer.mechanical_joint, Slider)
+        assert isinstance(drawer.movable_joint, PrismaticConnection)
     for door in doors:
-        assert isinstance(door.mechanical_joint, Hinge)
+        assert isinstance(door.movable_joint, RevoluteConnection)
 
     assert reasoned_apartment.validate()
 

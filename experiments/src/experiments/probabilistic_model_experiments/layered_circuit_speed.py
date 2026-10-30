@@ -16,7 +16,7 @@ import pandas as pd
 from random_events.interval import SimpleInterval
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
-from typing_extensions import Any, Callable, List, Self
+from typing_extensions import Any, Callable, Self
 
 from experiments.experiment_definitions import (
     ExperimentResult,
@@ -116,7 +116,7 @@ class StaircaseTruncation:
     """
 
     @classmethod
-    def variants(cls) -> List[Self]:
+    def variants(cls) -> list[Self]:
         """
         :return: The truncations the benchmark measures, from the fewest simple sets to
             the most.
@@ -336,7 +336,7 @@ def measure_query_durations(
     stage: BenchmarkStage,
     rustworkx_circuit: RustworkxProbabilisticCircuit,
     layered: LayeredProbabilisticCircuit,
-) -> List[QueryDurationResult]:
+) -> list[QueryDurationResult]:
     """
     Measure ``log_likelihood``, ``sample`` and ``probability_of_simple_event`` on both
     circuits.
@@ -430,7 +430,7 @@ class TruncationScaling:
     truncated to the most of them.
     """
 
-    results: List[TruncationScalingResult]
+    results: list[TruncationScalingResult]
     """
     One result per number of simple sets.
     """
@@ -456,7 +456,7 @@ class TruncationScaling:
 def measure_truncation_scaling(
     rustworkx_circuit: RustworkxProbabilisticCircuit,
     layered: LayeredProbabilisticCircuit,
-    truncations: List[StaircaseTruncation],
+    truncations: list[StaircaseTruncation],
 ) -> TruncationScaling:
     """
     Measure truncating both circuits to staircases of disjoint boxes.
@@ -488,12 +488,12 @@ def measure_truncation_scaling(
             lambda: rustworkx_circuit.truncated(event.__deepcopy__())
         )
         layered_call = TimedCall.of(lambda: layered.truncated(event.__deepcopy__()))
-        rustworkx_truncated, rustworkx_probability = rustworkx_call.result
-        layered_truncated, layered_probability = layered_call.result
+        rustworkx_truncated = rustworkx_call.result.distribution
+        layered_truncated = layered_call.result.distribution
         raise_if_answers_disagree(
             f"truncation to {truncation.number_of_simple_sets} simple sets",
-            rustworkx_probability,
-            layered_probability,
+            rustworkx_call.result.probability,
+            layered_call.result.probability,
         )
 
         if truncation is largest:
@@ -546,7 +546,7 @@ class ConditioningResult(ExperimentResult):
 
 def measure_conditioning(
     rustworkx_circuit: JointProbabilityTree, layered: LayeredProbabilisticCircuit
-) -> List[ConditioningResult]:
+) -> list[ConditioningResult]:
     """
     Measure conditioning on points that fix a growing number of variables.
 
@@ -578,11 +578,10 @@ def measure_conditioning(
         layered_call = TimedCall.of(
             lambda: layered.__deepcopy__().log_conditional_in_place(point), repeats=5
         )
-        _, layered_log_probability = layered_call.result
         raise_if_answers_disagree(
             f"conditioning on {number_of_conditioned} variables",
             expected_log_probability,
-            layered_log_probability,
+            layered_call.result.log_likelihood,
         )
 
         results.append(

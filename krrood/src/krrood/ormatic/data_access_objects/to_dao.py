@@ -3,8 +3,7 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Optional, Type, TYPE_CHECKING
-from typing_extensions import get_origin
+from typing_extensions import get_origin, Any, TYPE_CHECKING
 
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.data_access_objects.base import (
@@ -23,8 +22,8 @@ if TYPE_CHECKING:
 
 @lru_cache(maxsize=None)
 def _get_alternative_mapping_class(
-    dao_clazz: Type[DataAccessObject],
-) -> Optional[Type[AlternativeMapping]]:
+    dao_clazz: type[DataAccessObject],
+) -> type[AlternativeMapping] | None:
     """
     :param dao_clazz: The DAO class to check.
     :return: The AlternativeMapping class of the DAO's original class, or None.
@@ -45,7 +44,7 @@ class ToDataAccessObjectWorkItem(DataAccessObjectWorkItem):
     """
 
     source_object: Any
-    alternative_base: Optional[Type[DataAccessObject]] = None
+    alternative_base: type[DataAccessObject] | None = None
 
 
 @dataclass
@@ -63,7 +62,7 @@ class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem])
         self,
         source_object: Any,
         dao_instance: DataAccessObject,
-        alternative_base: Optional[Type[DataAccessObject]] = None,
+        alternative_base: type[DataAccessObject] | None = None,
     ):
         """
         Add a new work item to the processing queue.
@@ -81,7 +80,7 @@ class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem])
         )
 
     def apply_alternative_mapping_if_needed(
-        self, dao_clazz: Type[DataAccessObject], source_object: Any
+        self, dao_clazz: type[DataAccessObject], source_object: Any
     ) -> Any:
         """
         Apply an alternative mapping if the DAO class requires it.

@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 import pytest
 from random_events.interval import SimpleInterval
-from typing_extensions import List, Tuple
 
 from typing_extensions import get_args
 
@@ -68,14 +67,14 @@ def test_a_box_must_implement_contains():
     @dataclass(eq=False)
     class BoxWithoutContains(AxisAlignedBox[Point2]):
         @classmethod
-        def axes(cls) -> Tuple[SpatialVariables, ...]:
+        def axes(cls) -> tuple[SpatialVariables, ...]:
             return SpatialVariables.x, SpatialVariables.y
 
         @property
-        def _ordered_intervals(self) -> Tuple[SimpleInterval, ...]:
+        def _ordered_intervals(self) -> tuple[SimpleInterval, ...]:
             return ()
 
-        def get_points(self) -> List[Point2]:
+        def get_points(self) -> list[Point2]:
             return []
 
         @classmethod

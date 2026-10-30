@@ -5,7 +5,7 @@ Tests for the synchronizers that write ROS topics and tf frames into the world s
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import Any, Optional
+from typing_extensions import Any, Optional
 
 import pytest
 from geometry_msgs.msg import PoseStamped
@@ -95,8 +95,8 @@ def odometry_message(pose: HomogeneousTransformationMatrix) -> Odometry:
     """
     An odometry message that reports the given pose.
     """
-    quaternion = pose.to_rotation_matrix().to_quaternion().to_np()
-    position = pose.to_position().to_np()
+    quaternion = pose.rotation_matrix.quaternion.to_np()
+    position = pose.position.to_np()
     message = Odometry()
     message.pose.pose.position.x = float(position[0])
     message.pose.pose.position.y = float(position[1])

@@ -13,7 +13,10 @@ from sqlalchemy import select
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.ormatic.custom_types import NumpyType, ZoneInfoType
 from krrood.ormatic.default_type_mappings import DefaultTypeMapping
-from krrood.ormatic.data_access_objects.helper import get_dao_class, to_dao
+from krrood.ormatic.data_access_objects.helper import (
+    get_data_access_object_class,
+    to_dao,
+)
 from krrood.ormatic.exceptions import ZoneInfoWithoutKey
 from krrood.ormatic.helper import OrmaticInterfaceInformation
 from krrood.ormatic.ormatic import ORMatic
@@ -34,7 +37,11 @@ def store_and_load(original, session):
     session.add(to_dao(original))
     session.commit()
     session.expire_all()
-    return session.scalars(select(get_dao_class(type(original)))).one().from_dao()
+    return (
+        session.scalars(select(get_data_access_object_class(type(original))))
+        .one()
+        .from_dao()
+    )
 
 
 # %% round trips

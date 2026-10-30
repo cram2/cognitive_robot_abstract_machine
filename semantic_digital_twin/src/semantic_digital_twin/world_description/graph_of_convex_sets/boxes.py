@@ -14,15 +14,7 @@ from random_events.plotting import EventPlotter
 from random_events.product_algebra import Event
 from random_events.product_algebra import SimpleEvent
 from rtree import index
-from typing_extensions import (
-    Generic,
-    List,
-    Optional,
-    Dict,
-    Sequence,
-    Self,
-    Type,
-)
+from typing_extensions import Generic, Sequence, Self
 
 from krrood.entity_query_language.core.mapped_variable import (
     CanBehaveLikeAVariable,
@@ -45,7 +37,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
     PlanarBoundingBox,
-    Bounds,
+    CoordinateBounds,
 )
 from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
     GraphOfConvexSets,
@@ -108,7 +100,7 @@ class GraphOfBoundingBoxes(
     The connectivity graph of the convex sets.
     """
 
-    box_to_index_map: Dict[BoxT, int] = field(default_factory=dict)
+    box_to_index_map: dict[BoxT, int] = field(default_factory=dict)
     """
     A mapping from bounding boxes to their indices in the graph.
     """
@@ -118,7 +110,7 @@ class GraphOfBoundingBoxes(
         raise NotImplementedError
 
     @classmethod
-    def box_type(cls) -> Type[BoxT]:
+    def box_type(cls) -> type[BoxT]:
         """
         :return: The concrete box type this subclass decomposes free space into --
             :class:`VolumetricBoundingBox` for :class:`VolumetricGraphOfBoundingBoxes`,
@@ -222,7 +214,7 @@ class GraphOfBoundingBoxes(
         rustworkx.visualization.mpl_draw(self.graph)
         plt.show()
 
-    def plot_free_space(self) -> List[go.BaseTraceType]:
+    def plot_free_space(self) -> list[go.BaseTraceType]:
         """
         Plot the free space of the environment in blue.
 
@@ -235,7 +227,7 @@ class GraphOfBoundingBoxes(
 
         go.Figure(self.plot_free_space()).show()
 
-    def plot_occupied_space(self) -> List[go.BaseTraceType]:
+    def plot_occupied_space(self) -> list[go.BaseTraceType]:
         """
         Plot the occupied space of the environment in red.
 
@@ -252,7 +244,7 @@ class GraphOfBoundingBoxes(
 
         go.Figure(self.plot_occupied_space()).show()
 
-    def _node_of_point(self, point: PointT) -> Optional[BoxT]:
+    def _node_of_point(self, point: PointT) -> BoxT | None:
         """
         Find the node that contains a point, without checking the search space.
 
@@ -281,7 +273,7 @@ class GraphOfBoundingBoxes(
             raise PointOccupiedError(point)
         return node
 
-    def path_from_to(self, start: PointT, goal: PointT) -> Optional[List[PointT]]:
+    def path_from_to(self, start: PointT, goal: PointT) -> list[PointT] | None:
         """
         Calculate a connected path from a start point to a goal point.
 
@@ -341,7 +333,7 @@ class GraphOfBoundingBoxes(
 
         return self._shortcut_waypoints(waypoints)
 
-    def _shortcut_waypoints(self, waypoints: List[PointT]) -> List[PointT]:
+    def _shortcut_waypoints(self, waypoints: list[PointT]) -> list[PointT]:
         """
         Drop waypoints that a straight line can bypass without leaving free space.
 
@@ -372,7 +364,7 @@ class GraphOfBoundingBoxes(
         return result
 
     def _segment_is_collision_free(
-        self, start: PointT, end: PointT, node_bounds: List[Bounds[np.ndarray]]
+        self, start: PointT, end: PointT, node_bounds: list[CoordinateBounds]
     ) -> bool:
         """
         Check whether a straight-line segment stays entirely within free space.
@@ -498,7 +490,7 @@ class GraphOfBoundingBoxes(
         )
 
     @staticmethod
-    def _selected_variable_of(root) -> Optional[CanBehaveLikeAVariable]:
+    def _selected_variable_of(root) -> CanBehaveLikeAVariable | None:
         """
         :param root: The chain root of an eql variable.
         :return: The single variable ``root`` selects, or None if ``root`` is not a
@@ -585,7 +577,7 @@ class VolumetricGraphOfBoundingBoxes(
         cls,
         search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         semantic_obstacle_annotation: SemanticEnvironmentAnnotation,
-        semantic_wall_annotation: Optional[Wall] = None,
+        semantic_wall_annotation: Wall | None = None,
         tolerance=0.001,
         bloat_obstacles: float = 0.0,
         bloat_walls: float = 0.0,
@@ -754,7 +746,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
         cls,
         search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         semantic_obstacle_annotation: SemanticEnvironmentAnnotation,
-        semantic_wall_annotation: Optional[Wall] = None,
+        semantic_wall_annotation: Wall | None = None,
         tolerance=0.001,
         bloat_obstacles: float = 0.0,
         bloat_walls: float = 0.0,
@@ -822,9 +814,9 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
         cls,
         world: World,
         tolerance=0.001,
-        search_space: Optional[
-            BoundingBoxCollection[VolumetricBoundingBox, Point3]
-        ] = None,
+        search_space: (
+            BoundingBoxCollection[VolumetricBoundingBox, Point3] | None
+        ) = None,
         bloat_obstacles: float = 0.0,
     ) -> Self:
         """

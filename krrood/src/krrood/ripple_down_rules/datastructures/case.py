@@ -8,17 +8,7 @@ from enum import Enum
 from pandas import DataFrame
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase as SQLTable, registry
-from typing_extensions import (
-    Any,
-    Optional,
-    Dict,
-    Type,
-    Set,
-    Hashable,
-    Union,
-    List,
-    TYPE_CHECKING,
-)
+from typing_extensions import Any, Set, Hashable, Union, TYPE_CHECKING
 
 from krrood.ripple_down_rules.utils import (
     make_set,
@@ -45,10 +35,10 @@ class Case(UserDict):
 
     def __init__(
         self,
-        _obj_type: Type,
-        _id: Optional[Hashable] = None,
-        _name: Optional[str] = None,
-        original_object: Optional[Any] = None,
+        _obj_type: type,
+        _id: Hashable | None = None,
+        _name: str | None = None,
+        original_object: Any | None = None,
         **kwargs,
     ):
         """
@@ -61,13 +51,13 @@ class Case(UserDict):
         """
         super().__init__(kwargs)
         self._original_object = original_object
-        self._obj_type: Type = _obj_type
+        self._obj_type: type = _obj_type
         self._id: Hashable = _id if _id is not None else id(self)
         self._name: str = _name if _name is not None else self._obj_type.__name__
 
     @classmethod
     def from_obj(
-        cls, obj: Any, obj_name: Optional[str] = None, max_recursion_idx: int = 3
+        cls, obj: Any, obj_name: str | None = None, max_recursion_idx: int = 3
     ) -> Case:
         """
         Create a case from an object.
@@ -108,7 +98,7 @@ class Case(UserDict):
     def __hash__(self):
         return self._id
 
-    def __deepcopy__(self, memo: Dict[Hashable, Any]) -> Case:
+    def __deepcopy__(self, memo: dict[Hashable, Any]) -> Case:
         """
         Create a deep copy of the case.
 
@@ -177,11 +167,11 @@ class CaseAttribute(list):
     """
 
     @classmethod
-    def from_obj(cls, values: List[Any]) -> CaseAttribute:
+    def from_obj(cls, values: list[Any]) -> CaseAttribute:
         return cls(make_list(values))
 
     @property
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """
         Get the case attribute as a dictionary.
 
@@ -212,9 +202,7 @@ class CaseAttribute(list):
         return str([v for v in self]) if len(self) > 1 else str(next(iter(self)))
 
 
-def create_cases_from_dataframe(
-    df: DataFrame, name: Optional[str] = None
-) -> List[Case]:
+def create_cases_from_dataframe(df: DataFrame, name: str | None = None) -> list[Case]:
     """
     Create cases from a pandas DataFrame.
 
@@ -234,7 +222,7 @@ def create_case(
     obj: Any,
     recursion_idx: int = 0,
     max_recursion_idx: int = 0,
-    obj_name: Optional[str] = None,
+    obj_name: str | None = None,
     parent_is_iterable: bool = False,
 ) -> Case:
     """
@@ -304,11 +292,11 @@ def create_or_update_case_from_attribute(
     attr_value: Any,
     name: str,
     obj: Any,
-    obj_name: Optional[str] = None,
+    obj_name: str | None = None,
     recursion_idx: int = 0,
     max_recursion_idx: int = 1,
     parent_is_iterable: bool = False,
-    case: Optional[Case] = None,
+    case: Case | None = None,
 ) -> Case:
     """
     Create or update a case from an attribute of the object that the case represents.
@@ -346,7 +334,7 @@ def create_case_attribute_from_iterable_attribute(
     attr_value: Any,
     name: str,
     obj: Any,
-    obj_name: Optional[str] = None,
+    obj_name: str | None = None,
     recursion_idx: int = 0,
     max_recursion_idx: int = 1,
 ) -> CaseAttribute:
@@ -395,9 +383,9 @@ def create_case_attribute_from_iterable_attribute(
 
 def show_current_and_corner_cases(
     case: Any,
-    targets: Optional[Dict[str, Any]] = None,
-    current_conclusions: Optional[Dict[str, Any]] = None,
-    last_evaluated_rule: Optional[Rule] = None,
+    targets: dict[str, Any] | None = None,
+    current_conclusions: dict[str, Any] | None = None,
+    last_evaluated_rule: Rule | None = None,
 ) -> str:
     """
     Get the the data to show of the new case and if last evaluated rule exists also show that of the corner case.

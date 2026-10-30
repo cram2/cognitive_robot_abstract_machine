@@ -52,6 +52,10 @@ jobs:
             doc_path: doc
             artifact_name: giskardpy-doc
             use_container: false
+          - lib: cramph
+            doc_path: doc
+            artifact_name: cramph-doc
+            use_container: false
     uses: ./.github/workflows/build_doc_reusable.yml
     with:
       lib: ${{ matrix.lib }}
@@ -126,6 +130,12 @@ jobs:
         with:
           name: giskardpy-doc
           path: aggregate/giskardpy
+
+      - name: Download cramph-doc
+        uses: actions/download-artifact@v4
+        with:
+          name: cramph-doc
+          path: aggregate/cramph
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

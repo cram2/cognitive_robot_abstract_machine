@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+# %% Imports
 from abc import ABC
 from dataclasses import dataclass
-from typing import Optional, Any
 
 import numpy as np
 import trimesh.boolean
 from trimesh.collision import CollisionManager
-from typing_extensions import List, TYPE_CHECKING, Iterable, Type
+from typing_extensions import TYPE_CHECKING, Iterable, Any
 
 from krrood.entity_query_language.predicate import (
     Predicate,
@@ -89,7 +89,7 @@ class InContactWith(Triple[TBody, TBody]):
         distance = self.compute_distance()
         return distance is not None and distance < self.maximum_distance
 
-    def compute_distance(self) -> Optional[float]:
+    def compute_distance(self) -> float | None:
         """
         :return: How far apart the two bodies' collision geometry is, or ``None`` when
             the collision detector reports no result for the pair at all.
@@ -193,8 +193,8 @@ def compute_euclidean_planar_distance(
     :return: The Euclidean distance between the two bodies in the 2D plane after
         ignoring the specified dimension.
     """
-    body1_position = body1.global_pose.to_position()
-    body2_position = body2.global_pose.to_position()
+    body1_position = body1.global_pose.position
+    body2_position = body2.global_pose.position
 
     if np.allclose(ignore_dimension, Vector3.X()):
         body1_position.x = 0.0
@@ -232,20 +232,24 @@ class SupportedBy(Triple[TBody, TBody]):
 
     maximum_intersection_height: float = 0.1
     """
-    How deep, in metres, the two may sink into each other. Sunk deeper, they are a
-    clipping the simulation did not resolve, and the reading is refused.
+    How deep, in metres, the two may sink into each other.
+
+    Sunk deeper, they are a clipping the simulation did not resolve, and the reading is
+    refused.
     """
 
     contact_tolerance: float = 0.005
     """
-    How far apart, in metres, the two may be and still count as touching, and so how
-    far above the supporting body the supported body may stand and still rest on it.
+    How far apart, in metres, the two may be and still count as touching, and so how far
+    above the supporting body the supported body may stand and still rest on it.
 
-    A body is set down by a motion that stops where it can rather than exactly on the
-    surface, so a support read from overlapping volume alone would hold for almost no
-    placement at all. Measured on a robot stacking boxes, a placement missed the surface
-    it was aimed at by 1.9 mm; the default leaves room for that while staying far below
-    the centimetres by which a body that is genuinely in the air clears a surface.
+    A body is set down by a motion that stops where it can rather than
+    exactly on the surface, so a support read from overlapping volume
+    alone would hold for almost no placement at all. Measured on a robot
+    stacking boxes, a placement missed the surface it was aimed at by
+    1.9 mm; the default leaves room for that while staying far below the
+    centimetres by which a body that is genuinely in the air clears a
+    surface.
     """
 
     maximum_slope: float = np.radians(30.0)
@@ -515,8 +519,8 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
             reference_frame=self.point_of_view.reference_frame,
         )
 
-        s_body = front_norm.dot(self.point.to_vector3())
-        s_other = front_norm.dot(self.other.to_vector3())
+        s_body = front_norm.dot(self.point.vector3)
+        s_other = front_norm.dot(self.other.vector3)
         return (s_body - s_other).compile()()
 
 
@@ -624,41 +628,33 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
 
     def compute_containment_ratio(self) -> float:
         """
-        Compute the containment ratio of self.body inside self.other.
+        :return: The fraction of the vertices of :attr:`body` that lie within the
+            world-aligned bounding box of :attr:`other`, or 0 when either has no mesh or
+            that box encloses no volume.
         """
-        if self.other.combined_mesh is None:
-            return 0.0
-
-        # Get meshes in their local (body) frames
-        mesh_a_local = self.body.combined_mesh
-        mesh_b_local = self.other.combined_mesh
-
-        # Check if either mesh is empty
+        body_mesh = self.body.combined_mesh
+        other_mesh = self.other.combined_mesh
         if (
-            mesh_a_local is None
-            or mesh_a_local.is_empty
-            or mesh_b_local is None
-            or mesh_b_local.is_empty
+            body_mesh is None
+            or body_mesh.is_empty
+            or other_mesh is None
+            or other_mesh.is_empty
         ):
             return 0.0
 
-        # Transform meshes from body frame to world frame
-        mesh_a = mesh_a_local.copy()
-        mesh_a.apply_transform(self.body.global_transform.to_np())
-
-        mesh_b = mesh_b_local.copy()
-        mesh_b.apply_transform(self.other.global_transform.to_np())
-
-        # Use bounding box of mesh_b to check if mesh_a is inside mesh_b
-        mesh_b_bbox = mesh_b.bounding_box
-
-        if not mesh_b_bbox.is_watertight:
+        other_vertices = trimesh.transform_points(
+            other_mesh.vertices, self.other.global_transform.to_np()
+        )
+        lower = other_vertices.min(axis=0)
+        upper = other_vertices.max(axis=0)
+        if np.any(upper <= lower):
             return 0.0
 
-        inside = mesh_b_bbox.contains(mesh_a.vertices)
-        if len(inside) == 0:
-            return 0.0
-        return sum(inside) / len(inside)
+        body_vertices = trimesh.transform_points(
+            body_mesh.vertices, self.body.global_transform.to_np()
+        )
+        inside = np.all((body_vertices >= lower) & (body_vertices <= upper), axis=1)
+        return float(inside.mean())
 
     @classmethod
     def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
@@ -686,7 +682,7 @@ class ContainsType(Predicate):
     Iterable to check for objects of the given type.
     """
 
-    obj_type: Type
+    obj_type: type
     """
     Object type to check for.
     """
@@ -729,7 +725,7 @@ class PlaceIsOccupied(Predicate):
     The world whose collidable bodies are tested against it.
     """
 
-    allowed_bodies: Optional[List[Body]] = None
+    allowed_bodies: list[Body] | None = None
     """
     Bodies that may stand there without the place counting as occupied.
     """

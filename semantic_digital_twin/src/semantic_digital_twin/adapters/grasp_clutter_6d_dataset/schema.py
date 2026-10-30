@@ -3,12 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing_extensions import Self
 
 import numpy as np
 import numpy.typing as npt
 import trimesh
-from typing_extensions import Self
 
 from semantic_digital_twin.adapters.grasp_clutter_6d_dataset.exceptions import (
     GraspClutter6DImageNotFoundError,
@@ -72,7 +71,7 @@ class GraspClutter6DCameraInfo:
     depth_scale: float
     """Multiply this frame's raw depth image values by this factor to get millimeters."""
 
-    camera_T_world: Optional[HomogeneousTransformationMatrix] = None
+    camera_T_world: HomogeneousTransformationMatrix | None = None
     """
     This frame's world-to-camera transform (`cam_R_w2c`/`cam_t_w2c` bundled together):
     rotates/translates a point given in the dataset's world frame into this camera's
@@ -83,7 +82,7 @@ class GraspClutter6DCameraInfo:
     """
 
     @classmethod
-    def from_json(cls, data: Dict) -> Self:
+    def from_json(cls, data: dict) -> Self:
         rotation = data.get("cam_R_w2c")
         translation = data.get("cam_t_w2c")
         camera_T_world = None
@@ -129,7 +128,7 @@ class GraspClutter6DObjectPose:
     """
 
     @classmethod
-    def from_json(cls, data: Dict) -> Self:
+    def from_json(cls, data: dict) -> Self:
         return cls(
             object_id=int(data["obj_id"]),
             camera_T_object=HomogeneousTransformationMatrix.from_point_rotation_matrix(
@@ -159,7 +158,7 @@ class GraspClutter6DFrame:
     camera: GraspClutter6DCameraInfo
     """This frame's camera parameters."""
 
-    object_poses: List[GraspClutter6DObjectPose] = field(default_factory=list)
+    object_poses: list[GraspClutter6DObjectPose] = field(default_factory=list)
     """The ground-truth pose of every object visible in this frame."""
 
 
@@ -182,7 +181,7 @@ class GraspClutter6DScene:
     directory: Path
     """The scene's own extracted folder, directly containing `scene_camera.json`/`scene_gt.json`."""
 
-    frames: List[GraspClutter6DFrame] = field(default_factory=list)
+    frames: list[GraspClutter6DFrame] = field(default_factory=list)
     """Every frame of this scene. Each frame carries its own `image_id` - see :meth:`frame`."""
 
     def frame(self, image_id: str) -> GraspClutter6DFrame:
@@ -239,7 +238,7 @@ class GraspClutter6DScene:
         *,
         with_world_frame: bool = False,
         mesh_unit_scale: float = float(_millimeters_to_meters(1.0)),
-        object_names: Optional[Dict[int, str]] = None,
+        object_names: dict[int, str] | None = None,
     ) -> World:
         """
         Build a :class:`~semantic_digital_twin.world.World` for one frame of this scene.
@@ -352,7 +351,7 @@ class GraspClutter6DScene:
         image_id: str,
         models_directory: Path,
         mesh_unit_scale: float,
-        object_names: Optional[Dict[int, str]],
+        object_names: dict[int, str] | None,
     ) -> Body:
         """
         Create one object's body, mesh, connection to `root_body`, and semantic

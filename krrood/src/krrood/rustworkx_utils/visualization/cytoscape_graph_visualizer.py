@@ -5,7 +5,7 @@ import threading
 import webbrowser
 from dataclasses import dataclass
 
-from typing_extensions import Any, ClassVar, Dict, List, TYPE_CHECKING, Tuple
+from typing_extensions import Any, ClassVar, Dict, TYPE_CHECKING
 
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
@@ -35,7 +35,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         browser from a content delivery network, so viewing the page needs internet access.
     """
 
-    required_modules: ClassVar[Tuple[str, ...]] = ("flask",)
+    required_modules: ClassVar[tuple[str, ...]] = ("flask",)
     """The libraries needed to serve the application."""
 
     layout_options: ClassVar[GraphLayoutOptions] = GraphLayoutOptions(
@@ -60,7 +60,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
             :attr:`~krrood.rustworkx_utils.graph_visualizer_base.GraphVisualizerBase.border_color_getter`
             supplies one.
         """
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "id": str(node_index),
             "label": self.node_label(node_index),
             "color": self.node_color(node_index),
@@ -70,7 +70,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
             data["borderColor"] = border_color
         return {"data": data}
 
-    def graph_elements(self) -> List[CytoscapeElement]:
+    def graph_elements(self) -> list[CytoscapeElement]:
         """
         :return: The Cytoscape.js node and edge elements for the current graph.
         """
@@ -87,7 +87,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         ]
         return elements
 
-    def extra_node_styles(self) -> List[Dict[str, Any]]:
+    def extra_node_styles(self) -> list[dict[str, Any]]:
         """
         :return: Additional Cytoscape.js style selectors spread in after the built-in node styles,
             letting subclasses layer extra styling (for example an image fill) onto specific nodes

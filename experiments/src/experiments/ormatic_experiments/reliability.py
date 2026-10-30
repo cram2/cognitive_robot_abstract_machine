@@ -11,7 +11,6 @@ import pathlib
 import time
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List
 
 import plotly.graph_objects as go
 import tqdm
@@ -19,10 +18,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
-from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
-from coraplex.orm.ormatic_interface import Base, PlanMappingDAO  # type: ignore
-from coraplex.plans.factories import sequential
+from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
+from cramph.context import ContextExtension, StatechartContext
+from cramph.statechart import Statechart
+from coraplex.orm.ormatic_interface import Base  # type: ignore
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from experiments.experiment_definitions import (
     ExperimentResult,
@@ -46,6 +46,8 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
 )
 from semantic_digital_twin.world_description.world_entity import Body
+from cramph.composites import Sequence, StatementNode
+from cramph.orm.ormatic_interface import SequenceDAO  # type: ignore
 
 _REPO_ROOT = pathlib.Path(__file__).parents[4]
 _APARTMENT_URDF = _REPO_ROOT / "coraplex" / "resources" / "worlds" / "apartment.urdf"
@@ -71,22 +73,21 @@ def _build_hsrb_world() -> World:
 
 def build_cram_world():
     """
-    Build an HSRB+apartment world and return ``(world, hsrb, context)``.
+    Build an HSRB+apartment world and return ``(world, hsrb, extensions)``, the
+    extensions being what its plans read from their context.
     """
     hsrb_world = _build_hsrb_world()
     apartment = URDFParser.from_file(str(_APARTMENT_URDF)).parse()
     hsrb_world.merge_world(apartment)
-    hsrb_world.get_body_by_name("base_footprint").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
-    )
+    hsrb_world.get_body_by_name(
+        "base_footprint"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
     hsrb = hsrb_world.get_semantic_annotations_by_type(HSRB)[0]
-    ctx = Context(
-        hsrb_world,
-        hsrb,
-        evaluate_conditions=False,
-        query_backend=ProbabilisticBackend(),
-    )
-    return hsrb_world, hsrb, ctx
+    extensions = [
+        RobotAccess(hsrb),
+        StatementGrounding(query_backend=ProbabilisticBackend()),
+    ]
+    return hsrb_world, hsrb, extensions
 
 
 def _random_navigate_action(world: World):
@@ -108,12 +109,16 @@ def _random_navigate_action(world: World):
     return action
 
 
-def create_plan(world: World, ctx: Context, n_actions: int):
+def create_plan(world: World, n_actions: int) -> Sequence:
     """
     Create a sequential plan with *n_actions* random :class:`NavigateAction` instances.
     """
-    actions = [_random_navigate_action(world) for _ in range(n_actions)]
-    return sequential(actions, context=ctx).plan
+    return Sequence(
+        nodes=[
+            StatementNode(statement=_random_navigate_action(world))
+            for _ in range(n_actions)
+        ]
+    )
 
 
 @dataclass
@@ -134,7 +139,7 @@ class ORMaticReliabilityExperimentResult(ExperimentResult):
 
     plan_execution_duration: float
     """
-    Seconds to execute the plan under simulated_robot.
+    Seconds to execute the plan with a simulated executor.
     """
 
     to_data_access_object_duration: float
@@ -149,7 +154,7 @@ class ORMaticReliabilityExperimentResult(ExperimentResult):
 
     reading_from_database_duration: float
     """
-    Seconds for session.scalars(select(PlanMappingDAO)).one().
+    Seconds for reading the stored plan back with session.scalars(...).one().
     """
 
     reconstruction_duration: float
@@ -176,7 +181,7 @@ class ORMaticReliabilityAggregateResult(ExperimentResult):
 
     plan_execution_duration: MeanAndStandardDeviation
     """
-    Mean and standard deviation of plan execution time under simulated_robot (seconds).
+    Mean and standard deviation of plan execution time in simulation (seconds).
     """
 
     to_data_access_object_duration: MeanAndStandardDeviation
@@ -191,8 +196,7 @@ class ORMaticReliabilityAggregateResult(ExperimentResult):
 
     reading_from_database_duration: MeanAndStandardDeviation
     """
-    Mean and standard deviation of session.scalars(select(PlanMappingDAO)).one() time
-    (seconds).
+    Mean and standard deviation of the time reading the stored plan back (seconds).
     """
 
     reconstruction_duration: MeanAndStandardDeviation
@@ -204,7 +208,7 @@ class ORMaticReliabilityAggregateResult(ExperimentResult):
 def reliability_experiment(
     plan_size: int,
     world: World,
-    context: Context,
+    extensions: list[ContextExtension],
     world_building_duration: float,
 ) -> ORMaticReliabilityExperimentResult:
     """
@@ -213,15 +217,20 @@ def reliability_experiment(
 
     :param plan_size: Number of actions to include in the random plan.
     :param world: The pre-built world to create the plan in.
-    :param context: The execution context.
+    :param extensions: What the plan reads from its context.
     :param world_building_duration: Pre-measured world building time (s).
     :return: Timing breakdown for this single run.
     """
-    plan = create_plan(world, context, plan_size)
+    plan = create_plan(world, plan_size)
 
     t0 = time.perf_counter()
-    with simulated_robot:
-        plan.perform()
+    executor = KinematicallySimulatedPlanExecutor(
+        StatechartContext.with_extensions(world, extensions)
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(plan)
+    executor.compile(statechart)
+    executor.execute()
     plan_execution_duration = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -239,7 +248,9 @@ def reliability_experiment(
 
     with selectin_loading(session):
         t0 = time.perf_counter()
-        fetched = session.scalars(select(PlanMappingDAO)).one()
+        fetched = session.scalars(
+            select(SequenceDAO).where(SequenceDAO.database_id == dao.database_id)
+        ).one()
         reading_from_database_duration = time.perf_counter() - t0
 
         t0 = time.perf_counter()
@@ -264,7 +275,7 @@ def reliability_experiment(
 def run_reliability_experiment(
     plan_size: int,
     iterations: int = 10,
-) -> tuple[ORMaticReliabilityAggregateResult, List[ORMaticReliabilityExperimentResult]]:
+) -> tuple[ORMaticReliabilityAggregateResult, list[ORMaticReliabilityExperimentResult]]:
     """
     Run *iterations* reliability experiment cycles for plans of *plan_size* actions and
     aggregate the results.
@@ -280,10 +291,12 @@ def run_reliability_experiment(
     raw = []
     for _ in range(iterations):
         t0 = time.perf_counter()
-        world, _, ctx = build_cram_world()
+        world, _, extensions = build_cram_world()
         world_building_duration = time.perf_counter() - t0
 
-        result = reliability_experiment(plan_size, world, ctx, world_building_duration)
+        result = reliability_experiment(
+            plan_size, world, extensions, world_building_duration
+        )
         raw.append(result)
 
     aggregate = ORMaticReliabilityAggregateResult(
@@ -311,7 +324,7 @@ def run_reliability_experiment(
 
 
 def plot_reliability(
-    raw_results: List[ORMaticReliabilityExperimentResult],
+    raw_results: list[ORMaticReliabilityExperimentResult],
 ) -> go.Figure:
     """
     Produce a grouped violin plot of plan size vs duration for each timing phase.
@@ -352,7 +365,7 @@ def plot_reliability(
 
 def main():
     aggregate_results = []
-    all_raw: List[ORMaticReliabilityExperimentResult] = []
+    all_raw: list[ORMaticReliabilityExperimentResult] = []
     for plan_size in tqdm.tqdm(
         [
             1,

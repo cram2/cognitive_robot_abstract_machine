@@ -15,7 +15,7 @@ from __future__ import annotations
 import datetime
 import uuid
 
-from typing_extensions import Iterable, List, Optional, Set, Tuple
+from typing_extensions import Iterable
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import (
@@ -28,7 +28,7 @@ from krrood.entity_query_language.core.variable import Literal, Variable
 
 def walk_chain(
     expression: SymbolicExpression,
-) -> Tuple[List[MappedVariable], SymbolicExpression]:
+) -> tuple[list[MappedVariable], SymbolicExpression]:
     """
     Walk a ``MappedVariable`` chain outward-first.
 
@@ -59,7 +59,7 @@ def chain_root(expression: SymbolicExpression) -> SymbolicExpression:
     )
 
 
-def root_variable_ids(expressions: Iterable[SymbolicExpression]) -> Set[uuid.UUID]:
+def root_variable_ids(expressions: Iterable[SymbolicExpression]) -> set[uuid.UUID]:
     """
     :param expressions: Any expressions.
     :return: The ids of the distinct ``Variable`` chain-roots among *expressions* (e.g. for
@@ -73,7 +73,7 @@ def root_variable_ids(expressions: Iterable[SymbolicExpression]) -> Set[uuid.UUI
     }
 
 
-def boolean_terminal_attribute(chain: List[MappedVariable]) -> Optional[Attribute]:
+def boolean_terminal_attribute(chain: list[MappedVariable]) -> Attribute | None:
     """
     :param chain: A walked chain (root-adjacent first).
     :return: The attribute the walked *chain* reaches a ``bool`` through, or ``None`` when
@@ -98,7 +98,7 @@ def boolean_terminal_attribute(chain: List[MappedVariable]) -> Optional[Attribut
     return None
 
 
-def chain_ends_in_boolean_terminal(chain: List[MappedVariable]) -> bool:
+def chain_ends_in_boolean_terminal(chain: list[MappedVariable]) -> bool:
     """
     :param chain: A walked chain (root-adjacent first).
     :return: ``True`` when the walked *chain* reaches a ``bool`` (the predicative

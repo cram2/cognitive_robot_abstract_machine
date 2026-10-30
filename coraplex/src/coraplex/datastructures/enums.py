@@ -5,11 +5,6 @@ Module holding all enums of CoraPlex.
 from __future__ import annotations
 
 from enum import Enum, auto, StrEnum
-from typing_extensions import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from coraplex.plans.plan import Plan
-    from coraplex.plans.plan_node import PlanNode
 
 
 class ReachFraction(float, Enum):
@@ -17,7 +12,7 @@ class ReachFraction(float, Enum):
     How far the robot stands off what it reaches for, as a fraction of the arm's length.
     """
 
-    GRASPING = 0.5
+    GRASPING = 0.6
     """
     Reaching something that stays where it is.
     """
@@ -31,96 +26,20 @@ class ReachFraction(float, Enum):
     """
 
 
-class VisualizationLayout(Enum):
-    BFS = "bfs"
+class PerceptionSource(Enum):
     """
-    Breath first search layout, used for tree structures.
-    """
-
-    SPRING = "spring"
-    """
-    Spring layout, root is in the center and nodes are ordered in circles around it.
+    The kinds of source a perception query can be answered by.
     """
 
-
-class AdjacentBodyMethod(Enum):
-    ClosestPoints = auto()
+    WORLD_MODEL = auto()
     """
-    The ClosestPoints method is used to find the closest points in other bodies to the
-    body.
+    The world model, read the way a perfect sensor would see it, for a simulated robot.
     """
 
-    RayCasting = auto()
+    ROBOKUDO = auto()
     """
-    The RayCasting method is used to find the points in other bodies that are
-    intersected by rays cast from the body bounding box to 6 directions (up, down, left,
-    right, front, back).
+    A RoboKudo pipeline, for the real robot.
     """
-
-
-class ContainerManipulationType(Enum):
-    """
-    Enum for the different types of container manipulation.
-    """
-
-    Opening = auto()
-    """
-    The Opening type is used to open a container.
-    """
-
-    Closing = auto()
-    """
-    The Closing type is used to close a container.
-    """
-
-
-class FindBodyInRegionMethod(Enum):
-    """
-    Enum for the different methods to find a body in a region.
-    """
-
-    FingerToCentroid = auto()
-    """
-    The FingerToCentroid method is used to find the body in a region by casting a ray
-    from each finger to the centroid of the region.
-    """
-
-    Centroid = auto()
-    """
-    The Centroid method is used to find the body in a region by calculating the centroid
-    of the region and casting two rays from opposite sides of the region to the
-    centroid.
-    """
-
-    MultiRay = auto()
-    """
-    The MultiRay method is used to find the body in a region by casting multiple rays
-    covering the region.
-    """
-
-
-class ExecutionType(Enum):
-    """
-    Enum for Execution Process Module types.
-    """
-
-    REAL = auto()
-    SIMULATED = auto()
-    SEMI_REAL = auto()
-    NO_EXECUTION = auto()
-
-
-class VisualizationBackend(StrEnum):
-    """The renderer selected for a simulated world."""
-
-    NONE = "none"
-    """Run without a renderer."""
-    RVIZ = "rviz"
-    """Publish native ROS visualization markers."""
-    RERUN = "rerun"
-    """Use the native Rerun adapter."""
-    CRAMERA = "cramera"
-    """Use an installed browser visualization provider."""
 
 
 class ActionTrialVisualization(StrEnum):
@@ -137,32 +56,6 @@ class ActionTrialVisualization(StrEnum):
     MARKER_TOPIC = "/semworld/action_trial/viz_marker"
     """
     The topic the markers of the copy are published on.
-    """
-
-
-class VisualizationOption(StrEnum):
-    """
-    Configuration names for optional visualization providers.
-    """
-
-    BACKEND = "CORAPLEX_VISUALIZATION"
-    """
-    Environment setting selecting the renderer.
-    """
-
-    RERUN_MODE = "CORAPLEX_RERUN_MODE"
-    """
-    Environment setting selecting Rerun's output mode.
-    """
-
-    RERUN_TARGET = "CORAPLEX_RERUN_TARGET"
-    """
-    Environment setting selecting Rerun's file or server.
-    """
-
-    PROVIDER_GROUP = "coraplex.visualizations"
-    """
-    Installed entry points implementing PlanVisualization.
     """
 
 
@@ -190,61 +83,6 @@ class JointType(Enum):
     FLOATING = 7
 
 
-class AxisIdentifier(Enum):
-    """
-    Enum for translating the axis name to a vector along that axis.
-    """
-
-    X = (1, 0, 0)
-    Y = (0, 1, 0)
-    Z = (0, 0, 1)
-    Undefined = (0, 0, 0)
-
-    @classmethod
-    def from_tuple(cls, axis_tuple):
-        return next((axis for axis in cls if axis.value == axis_tuple), None)
-
-
-class GripperType(Enum):
-    """
-    Enum for the different types of grippers.
-    """
-
-    PARALLEL = auto()
-    SUCTION = auto()
-    FINGER = auto()
-    HYDRAULIC = auto()
-    PNEUMATIC = auto()
-    CUSTOM = auto()
-
-
-class ImageEnum(Enum):
-    """
-    Enum for image switch view on hsrb display.
-    """
-
-    HI = 0
-    TALK = 1
-    DISH = 2
-    DONE = 3
-    DROP = 4
-    HANDOVER = 5
-    ORDER = 6
-    PICKING = 7
-    PLACING = 8
-    REPEAT = 9
-    SEARCH = 10
-    WAVING = 11
-    FOLLOWING = 12
-    DRIVINGBACK = 13
-    PUSHBUTTONS = 14
-    FOLLOWSTOP = 15
-    JREPEAT = 16
-    SOFA = 17
-    INSPECT = 18
-    CHAIR = 37
-
-
 class DetectionTechnique(int, Enum):
     """
     Enum for techniques for detection tasks.
@@ -268,71 +106,20 @@ class DetectionState(int, Enum):
     PAUSE = 2
 
 
-class MovementType(Enum):
-    """
-    Enum for the different movement types of the robot.
-    """
-
-    STRAIGHT_TRANSLATION = auto()
-    STRAIGHT_CARTESIAN = auto()
-    TRANSLATION = auto()
-    CARTESIAN = auto()
-
-
-class WaypointsMovementType(Enum):
-    """
-    Enum for the different movement types of the robot.
-    """
-
-    ENFORCE_ORIENTATION_STRICT = auto()
-    ENFORCE_ORIENTATION_FINAL_POINT = auto()
-
-
-class FilterConfig(Enum):
-    """
-    Declare existing filter methods.
-
-    Currently supported: Butterworth
-    """
-
-    butterworth = 1
-
-
 class InsertionPosition(Enum):
     """
-    Where an insertion rewrite places its nodes relative to the anchor node.
+    When the nodes a sequential insertion inserts run relative to the anchor node.
     """
 
     BEFORE = auto()
     """
-    As the left neighbour of the anchor node.
+    Right before the anchor node.
     """
 
     AFTER = auto()
     """
-    As the right neighbour of the anchor node.
+    Right after the anchor node.
     """
-
-    LAST_CHILD = auto()
-    """
-    As the last child of the anchor node.
-    """
-
-    def insert(self, plan: Plan, reference_node: PlanNode, node: PlanNode) -> None:
-        """
-        Inserts a node at this position relative to a node of a plan.
-
-        :param plan: The plan both nodes belong to
-        :param reference_node: The node the given node is placed relative to
-        :param node: The node to insert
-        """
-        match self:
-            case InsertionPosition.BEFORE:
-                plan.insert_before(reference_node, node)
-            case InsertionPosition.AFTER:
-                plan.insert_after(reference_node, node)
-            case InsertionPosition.LAST_CHILD:
-                plan.insert_as_last_child(reference_node, node)
 
 
 class CuttingTechnique(Enum):
@@ -444,50 +231,4 @@ class MixingPattern(Enum):
     STIR = auto()
     """
     Mix along circular stirring laps.
-    """
-
-
-class NodeDetail(StrEnum):
-    """
-    The names a plan node is described by in the plan visualization.
-    """
-
-    EXECUTION = "Execution"
-    """
-    The section holding how far a node got and what came out of it.
-    """
-
-    STATUS = "status"
-    """
-    Where the node is in its execution.
-    """
-
-    START_TIME = "start"
-    """
-    When the node started.
-    """
-
-    END_TIME = "end"
-    """
-    When the node finished.
-    """
-
-    RESULT = "result"
-    """
-    What the node returned.
-    """
-
-    REASON = "reason"
-    """
-    The failure that ended the node.
-    """
-
-    DESIGNATOR_PARAMETER = "Designator Parameter"
-    """
-    The section holding the designator a node manages.
-    """
-
-    DESIGNATOR_TYPE = "Designator Type"
-    """
-    The class of that designator.
     """

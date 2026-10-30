@@ -6,7 +6,7 @@ from enum import Enum
 
 import daqp
 import numpy as np
-from typing_extensions import Dict, TYPE_CHECKING, List, Tuple
+from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import (
@@ -17,6 +17,7 @@ from krrood.symbolic_math.symbolic_math import (
     VariableParameters,
 )
 from semantic_digital_twin.spatial_types import (
+    AxisAngle,
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Vector3,
@@ -166,7 +167,7 @@ class InverseKinematicsSolver:
         max_iterations: int = 200,
         translation_velocity: float = 0.2,
         rotation_velocity: float = 0.2,
-    ) -> Dict[DegreeOfFreedom, float]:
+    ) -> dict[DegreeOfFreedom, float]:
         """
         Solve inverse kinematics problem.
 
@@ -238,7 +239,7 @@ class InverseKinematicsSolver:
 
     def _solve_qp_step(
         self, qp_problem: QPProblem, solver_state: SolverState
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Evaluate the QP matrices at the current state and solve the QP.
 
@@ -338,7 +339,7 @@ class QPProblem:
 
     def _extract_dofs(
         self,
-    ) -> Tuple[
+    ) -> tuple[
         list[DegreeOfFreedom],
         list[DegreeOfFreedom],
         list[FloatVariable],
@@ -358,10 +359,10 @@ class QPProblem:
             active_dofs_set.update(connection.active_dofs)
             passive_dofs_set.update(connection.passive_dofs)
 
-        active_dofs: List[DegreeOfFreedom] = list(
+        active_dofs: list[DegreeOfFreedom] = list(
             sorted(active_dofs_set, key=lambda d: str(d.id))
         )
-        passive_dofs: List[DegreeOfFreedom] = list(
+        passive_dofs: list[DegreeOfFreedom] = list(
             sorted(passive_dofs_set, key=lambda d: str(d.id))
         )
 
@@ -489,8 +490,8 @@ class ConstraintBuilder:
     """
 
     def build_box_constraints(
-        self, active_dofs: List[DegreeOfFreedom]
-    ) -> Tuple[Vector, Vector]:
+        self, active_dofs: list[DegreeOfFreedom]
+    ) -> tuple[Vector, Vector]:
         """
         Build position and velocity limit constraints for DOFs.
         """
@@ -520,8 +521,8 @@ class ConstraintBuilder:
         return Vector(lower_constraints), Vector(upper_constraints)
 
     def build_goal_constraints(
-        self, active_variables: List[FloatVariable]
-    ) -> Tuple[Matrix, Matrix]:
+        self, active_variables: list[FloatVariable]
+    ) -> tuple[Matrix, Matrix]:
         """
         Build position and rotation goal constraints.
         """
@@ -544,16 +545,16 @@ class ConstraintBuilder:
 
     def _compute_position_error(
         self, root_T_tip: HomogeneousTransformationMatrix
-    ) -> Tuple[Vector, Vector]:
+    ) -> tuple[Vector, Vector]:
         """
         Compute position error with velocity limits.
 
         :param root_T_tip: Forward kinematics expression.
         :return: Expression describing the position, and the error vector.
         """
-        root_P_tip = root_T_tip.to_position()
+        root_P_tip = root_T_tip.position
         root_T_tip_goal = HomogeneousTransformationMatrix(self.target)
-        root_P_tip_goal = root_T_tip_goal.to_position()
+        root_P_tip_goal = root_T_tip_goal.position
 
         translation_cap = self.max_translation_velocity * self.dt
         position_error = root_P_tip_goal[:3] - root_P_tip[:3]
@@ -567,7 +568,7 @@ class ConstraintBuilder:
 
     def _compute_rotation_error(
         self, root_T_tip: HomogeneousTransformationMatrix
-    ) -> Tuple[Vector, Vector]:
+    ) -> tuple[Vector, Vector]:
         """
         Compute rotation error with velocity limits.
 
@@ -576,10 +577,10 @@ class ConstraintBuilder:
         """
         rotation_cap = self.max_rotation_velocity * self.dt
 
-        hack = RotationMatrix.from_axis_angle(Vector3.Z(), -0.0001)
-        root_R_tip = root_T_tip.to_rotation_matrix().dot(hack)
-        q_actual = HomogeneousTransformationMatrix(self.target).to_quaternion()
-        q_goal = root_R_tip.to_quaternion()
+        hack = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), -0.0001))
+        root_R_tip = root_T_tip.rotation_matrix.dot(hack)
+        q_actual = HomogeneousTransformationMatrix(self.target).quaternion
+        q_goal = root_R_tip.quaternion
         q_goal = sm.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
         q_error = q_actual.diff(q_goal)
 

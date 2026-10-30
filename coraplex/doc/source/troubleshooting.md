@@ -28,16 +28,23 @@ The best solution is to double check the input arguments of the DesignatorDescri
 
 ## Error when performing Actions or Motions
 
-If you get an error when trying to perform an action or motion designator that complains about a missing execution
-environment, then you did not specify how the designator should be executed. You can specify how the designator should
-be performed by wrapping the call in the `simulated_robot` or `real_robot` environment. This is also explained in
-the [Action Designator Example](https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/action_designator.html#Navigate-Action).
+If you get an error when trying to perform an action that complains about a missing context extension, such as
+`RobotAccess`, then the context of the executor running the plan does not hold it. Add it to the context the executor
+is given, and build the statechart in the executor's context. This is also explained in the
+[Action Designator Example](https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/action_designator.html#Navigate-Action).
 
 ```python
-from coraplex.execution_environment import simulated_robot
-from coraplex.plans.factories import execute_single
+from coraplex.plans.context_extensions import RobotAccess
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from cramph.statechart import Statechart
 
-with simulated_robot:
-   execute_single(NavigateAction(target_location=pose), context=context).perform()
+executor = KinematicallySimulatedPlanExecutor(
+    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+)
+statechart = Statechart(context=executor.context)
+statechart.add_node(NavigateAction(target_location=pose))
+executor.compile(statechart)
+executor.execute()
 ```

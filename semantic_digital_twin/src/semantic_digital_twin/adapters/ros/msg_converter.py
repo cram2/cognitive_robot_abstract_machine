@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Type
-
 from typing_extensions import Generic, TypeVar, Any, get_args
+
 
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.adapters.ros.exceptions import (
@@ -32,7 +31,7 @@ class MessageConverter(ABC, Generic[InputType, OutputType]):
 
     @classmethod
     @property
-    def input_type(cls) -> Type[InputType]:
+    def input_type(cls) -> type[InputType]:
         """
         The type this converter reads.
         """
@@ -40,7 +39,7 @@ class MessageConverter(ABC, Generic[InputType, OutputType]):
 
     @classmethod
     @property
-    def output_type(cls) -> Type[OutputType]:
+    def output_type(cls) -> type[OutputType]:
         """
         The type this converter writes.
         """
@@ -48,7 +47,7 @@ class MessageConverter(ABC, Generic[InputType, OutputType]):
 
     @classmethod
     @abstractmethod
-    def conversion_error(cls) -> Type[ROS2ConversionError]:
+    def conversion_error(cls) -> type[ROS2ConversionError]:
         """
         :return: The error raised when no converter of this direction fits.
         """
@@ -66,7 +65,7 @@ class MessageConverter(ABC, Generic[InputType, OutputType]):
         return cls.input_type == type(data)
 
     @classmethod
-    def get_to_converter(cls, input_obj: Any) -> Type[MessageConverter]:
+    def get_to_converter(cls, input_obj: Any) -> type[MessageConverter]:
         """
         :param input_obj: The object to find a converter for.
         :return: The subclass of this direction that converts the given object.
@@ -85,7 +84,7 @@ class Ros2ToSemDTConverter(MessageConverter[InputType, OutputType], ABC):
     """
 
     @classmethod
-    def conversion_error(cls) -> Type[ROS2ConversionError]:
+    def conversion_error(cls) -> type[ROS2ConversionError]:
         return CannotConvertRos2ToSemDTError
 
     @classmethod
@@ -108,7 +107,7 @@ class SemDTToRos2Converter(MessageConverter[InputType, OutputType], ABC):
     """
 
     @classmethod
-    def conversion_error(cls) -> Type[ROS2ConversionError]:
+    def conversion_error(cls) -> type[ROS2ConversionError]:
         return CannotConvertSemDTToRos2Error
 
     @classmethod

@@ -10,7 +10,6 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -52,7 +51,7 @@ class StateChangeCounter(StateChangeCallback):
     Number of state changes announced since this callback was registered.
     """
 
-    publish_changes_of_last_call: Optional[bool] = field(default=None, init=False)
+    publish_changes_of_last_call: bool | None = field(default=None, init=False)
     """
     The ``publish_changes`` the most recent announcement carried.
     """
@@ -66,7 +65,7 @@ class StateChangeCounter(StateChangeCallback):
 
 
 @pytest.fixture
-def world_setup() -> Tuple[
+def world_setup() -> tuple[
     World,
     Body,
     Body,
@@ -84,16 +83,9 @@ def world_setup() -> Tuple[
 
     with world.modify_world():
         [world.add_kinematic_structure_entity(b) for b in [root, l1, l2, bf, r1, r2]]
-        lower_limits = DerivativeMap()
-        lower_limits.velocity = -1
-        upper_limits = DerivativeMap()
-        upper_limits.velocity = 1
         dof = DegreeOfFreedom(
             name=PrefixedName("dof"),
-            limits=DegreeOfFreedomLimits(
-                lower=lower_limits,
-                upper=upper_limits,
-            ),
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1),
         )
         world.add_degree_of_freedom(dof)
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import time
-from typing import List, Optional
 
 import pytest
 
@@ -18,7 +17,7 @@ from physics_simulators.base_simulator import (
 class TestBaseSimulator:
     file_path: str = ""
     world_path: str = ""
-    robots_path: Optional[str] = None
+    robots_path: str | None = None
     headless: bool = False
     step_size: float = 1e-3
     Simulator = BaseSimulator
@@ -27,8 +26,8 @@ class TestBaseSimulator:
     @pytest.fixture
     def simulator_factory(self):
         def _make_simulator(
-            callbacks: Optional[List[SimulatorCallback]] = None,
-            step_size: Optional[float] = None,
+            callbacks: list[SimulatorCallback] | None = None,
+            step_size: float | None = None,
         ) -> BaseSimulator:
             callbacks = callbacks or []
             simulator = self.Simulator(
@@ -77,7 +76,7 @@ class TestBaseSimulator:
     def _run_with_constraints(
         self,
         simulator: BaseSimulator,
-        constraints: Optional[SimulatorConstraints] = None,
+        constraints: SimulatorConstraints | None = None,
     ) -> BaseSimulator:
         simulator.start(constraints=constraints)
 

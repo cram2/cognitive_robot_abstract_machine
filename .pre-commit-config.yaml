@@ -1,17 +1,18 @@
+# The hooks of .pre-commit-hooks.yaml, run from krrood's development tools in this
+# repository's development environment (`uv sync --extra dev` installs them), so a change
+# to them applies here before it is released.
 repos:
   - repo: local
     hooks:
-      - id: format-python
-        name: Format Python (black, then docformatter where it doesn't conflict with black)
-        description: >
-          Runs black, then docformatter on top of it, keeping docformatter's
-          docstring changes only when a subsequent black pass leaves them
-          unchanged. See scripts/format_docstrings.py for why: docformatter
-          can miscount blank lines after an attribute docstring that
-          precedes a decorated top-level class/function, which would
-          otherwise oscillate forever against black.
-        entry: python scripts/format_docstrings.py
-        language: python
-        additional_dependencies: ["black==25.11.0", "docformatter==1.7.8", "typing_extensions", "tqdm"]
-        files: \.py$
-        exclude: (?x)^(.*/ormatic_interface\.py)$
+      - id: krrood-format
+        name: Format Python (ruff, then docformatter where it doesn't conflict with ruff)
+        entry: krrood format
+        language: system
+        types: [python]
+        exclude: (?x)^(.*/ormatic_interface\.py|test/krrood_test/test_development_tools/dataset/.*)$
+      - id: krrood-agents-md
+        name: Update the rules in AGENTS.md
+        entry: krrood agents-md
+        language: system
+        pass_filenames: false
+        always_run: true

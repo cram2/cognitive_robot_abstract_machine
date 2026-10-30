@@ -4,10 +4,7 @@ from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import List, Tuple, Type
-
 from typing_extensions import Hashable
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from segmind.datastructures.events import (
     GraspEvent,
     LossOfGraspEvent,
@@ -34,21 +31,22 @@ from segmind.detectors.spatial_relation_detector_nodes import SupportDetector
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AbstractInteractionDetector(EventCombiningDetector):
     """
     Abstract base class for interaction-based detectors.
 
-    Provides shared functionality for monitoring interactions of
-    bodies and generating events when detected.
+    Provides shared functionality for monitoring interactions of bodies and generating
+    events when detected.
     """
 
     shift_threshold: timedelta = timedelta(seconds=15)
     """
-    The threshold for the time difference between two events to be considered an interaction.
+    The threshold for the time difference between two events to be considered an
+    interaction.
     """
 
-    def runs_beside(self, detector_type: Type[AbstractDetector]) -> bool:
+    def runs_beside(self, detector_type: type[AbstractDetector]) -> bool:
         """
         Whether a detector of ``detector_type`` runs in the same statechart as this one.
 
@@ -59,9 +57,8 @@ class AbstractInteractionDetector(EventCombiningDetector):
         :param detector_type: The kind of detector looked for.
         :return: True when one of that kind runs beside this detector.
         """
-        statechart = self._motion_statechart
-        return statechart is not None and any(
-            isinstance(node, detector_type) for node in statechart.nodes
+        return self.belongs_to_statechart() and any(
+            isinstance(node, detector_type) for node in self.statechart.nodes
         )
 
     @abstractmethod
@@ -75,7 +72,7 @@ class AbstractInteractionDetector(EventCombiningDetector):
 
     @property
     @abstractmethod
-    def primary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def primary_event_type(self) -> type[EventWithTrackedObjects]:
         """
         The kind of event the interaction is concluded from, which happens to the
         tracked object.
@@ -83,7 +80,7 @@ class AbstractInteractionDetector(EventCombiningDetector):
 
     @property
     @abstractmethod
-    def secondary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def secondary_event_type(self) -> type[EventWithTrackedObjects]:
         """
         The kind of event that has to happen close in time to the primary one for the
         interaction to be concluded.
@@ -99,14 +96,12 @@ class AbstractInteractionDetector(EventCombiningDetector):
 
     def update_context_and_events(
         self,
-        context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Concludes the interactions that the events logged so far amount to.
 
-        :param context: The current motion statechart context.
         :param segmind_context: The shared SegmindContext containing the information
             required to track events.
         :param tracked_objects: The bodies checked this tick.
@@ -116,7 +111,7 @@ class AbstractInteractionDetector(EventCombiningDetector):
 
     def _find_interaction_events(
         self, segmind_context: SegmindContext
-    ) -> List[DetectionEvent]:
+    ) -> list[DetectionEvent]:
         """
         Scans logged events for correlated pairs of primary and secondary events and
         emits a detection event for each new, unseen pairing.
@@ -124,9 +119,9 @@ class AbstractInteractionDetector(EventCombiningDetector):
         For each secondary event, this method searches for a primary event on the same
         tracked object whose timestamp is within :attr:`shift_threshold`. A secondary
         event is evidence of one interaction only, so a later primary cannot conclude a
-        second interaction from the same one. If such a pair
-        is found and has not been recorded in ``segmind_context.placing_pairs`` before,
-        the pair is registered and a detection event is produced via :meth:`make_event`.
+        second interaction from the same one. If such a pair is found and has not been
+        recorded in :attr:`~segmind.detectors.base.SegmindContext.placing_pairs` before, the pair is registered and
+        a detection event is produced via :meth:`make_event`.
 
         :param segmind_context: The shared context holding the event logger and
             previously seen interaction pairs.
@@ -168,7 +163,7 @@ class AbstractInteractionDetector(EventCombiningDetector):
         return events
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlacingDetector(AbstractInteractionDetector):
     """
     Reports an object being put down.
@@ -177,14 +172,14 @@ class PlacingDetector(AbstractInteractionDetector):
     one go; otherwise it is the object coming to rest on a surface, which is all a run
     with no agent in it has to go on.
 
-    This class is typically used to analyze specific event types, such as stop
-    motion and support events, and identify correlations that form the basis
-    of new placing events. By ensuring that placing events are uniquely paired,
-    the class helps maintain consistency and prevent duplication of events.
+    This class is typically used to analyze specific event types, such as stop motion
+    and support events, and identify correlations that form the basis of new placing
+    events. By ensuring that placing events are uniquely paired, the class helps
+    maintain consistency and prevent duplication of events.
     """
 
     @classmethod
-    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+    def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
         return (SupportDetector, TranslationDetector)
 
     def interaction_key(
@@ -196,7 +191,7 @@ class PlacingDetector(AbstractInteractionDetector):
         return PlacingEvent, secondary.tracked_object, secondary.with_object
 
     @property
-    def primary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def primary_event_type(self) -> type[EventWithTrackedObjects]:
         """
         The agent letting go of the object where an agent is watched for, otherwise the
         object coming to a stop.
@@ -208,7 +203,7 @@ class PlacingDetector(AbstractInteractionDetector):
         )
 
     @property
-    def secondary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def secondary_event_type(self) -> type[EventWithTrackedObjects]:
         return SupportEvent
 
     def make_event(
@@ -219,7 +214,7 @@ class PlacingDetector(AbstractInteractionDetector):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PickUpDetector(AbstractInteractionDetector):
     """
     Reports an object being picked up.
@@ -229,15 +224,15 @@ class PickUpDetector(AbstractInteractionDetector):
     losing its support, which is all a run with no agent in it has to go on.
 
     The PickUpDetector class determines if a "pickup" event has occurred by analyzing
-    contextual events such as TranslationEvent and LossOfSupportEvent. It ensures
-    that such events are detected and processed by checking their timestamps and
-    associating them with corresponding objects. The resulting detected events are
-    then returned. This class interfaces with a logger to gather the needed event
-    data and uses a context to manage event pairs and thresholds.
+    contextual events such as TranslationEvent and LossOfSupportEvent. It ensures that
+    such events are detected and processed by checking their timestamps and associating
+    them with corresponding objects. The resulting detected events are then returned.
+    This class interfaces with a logger to gather the needed event data and uses a
+    context to manage event pairs and thresholds.
     """
 
     @classmethod
-    def get_required_detector_types(cls) -> Tuple[Type[AbstractDetector], ...]:
+    def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
         return (SupportDetector, TranslationDetector)
 
     def interaction_key(
@@ -249,7 +244,7 @@ class PickUpDetector(AbstractInteractionDetector):
         return PickUpEvent, primary
 
     @property
-    def primary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def primary_event_type(self) -> type[EventWithTrackedObjects]:
         """
         The agent taking hold of the object where an agent is watched for, otherwise the
         object moving.
@@ -257,7 +252,7 @@ class PickUpDetector(AbstractInteractionDetector):
         return GraspEvent if self.runs_beside(GraspDetector) else TranslationEvent
 
     @property
-    def secondary_event_type(self) -> Type[EventWithTrackedObjects]:
+    def secondary_event_type(self) -> type[EventWithTrackedObjects]:
         return LossOfSupportEvent
 
     def make_event(

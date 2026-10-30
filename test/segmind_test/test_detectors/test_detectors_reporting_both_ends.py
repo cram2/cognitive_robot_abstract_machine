@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 from segmind.datastructures.events import (
     ContactEvent,
     ContainmentEvent,
@@ -30,8 +31,8 @@ from segmind.detectors.spatial_relation_detector_nodes import (
     ContainmentDetector,
     SupportDetector,
 )
-from segmind.episode_segmenter import EpisodeSegmenterExecutor
-from segmind.statecharts.segmind_statechart import SegmindStatechart
+from segmind.episode_segmenter import EpisodeSegmentation
+from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -40,17 +41,20 @@ from ..conftest import RESTING_ON_THE_TABLE, WHERE_THE_MILK_STOOD
 
 MOVING_TICKS = 5
 """
-How many ticks a test keeps a body moving, which is more than a motion detector's window.
+How many ticks a test keeps a body moving, which is more than a motion detector's
+window.
 """
 
 
-def _ticking(world: World, detector: AbstractDetector):
+def _ticking(world: World, *detectors: AbstractDetector):
     """
-    :return: An executor ticking only ``detector``, and the context it logs to.
+    :return: An executor ticking only ``detectors``, and the context they log to.
     """
-    executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
+    )
     segmind_context = executor.context.require_extension(SegmindContext)
-    executor.compile(SegmindStatechart().build_statechart([detector]))
+    executor.compile(DetectorStatechartBuilder(list(detectors)).build(executor.context))
     executor.tick()
     return executor, segmind_context
 
@@ -113,22 +117,28 @@ def test_the_support_detector_reports_gaining_and_losing_a_support(
 
 
 def test_the_containment_detector_reports_gaining_and_losing_a_containment(
-    milk_in_the_apartment,
+    box_and_trays,
 ):
-    world, milk, box = milk_in_the_apartment
-    executor, segmind_context = _ticking(world, ContainmentDetector())
+    """
+    Containment is looked for once an object comes to rest, so the supports it is read
+    from are ticked along with it.
+    """
+    world = box_and_trays.world
+    box = box_and_trays.box
+    executor, segmind_context = _ticking(
+        world, SupportDetector(), ContainmentDetector()
+    )
 
-    _place(milk, box.global_pose.x, box.global_pose.y, box.global_pose.z)
+    box.parent_connection.origin = box_and_trays.set_down_in_the_tray
     executor.tick()
     assert len(_events_of(segmind_context, ContainmentEvent)) == 1
     assert _events_of(segmind_context, LossOfContainmentEvent) == []
 
-    _place(milk, 0, 0, 1)
+    box.parent_connection.origin = box_and_trays.lifted_out_of_the_tray
     executor.tick()
 
     [lost] = _events_of(segmind_context, LossOfContainmentEvent)
-    assert lost.tracked_object is milk
-    _put_back(milk)
+    assert lost.tracked_object is box
 
 
 def test_the_translation_detector_reports_starting_and_stopping(

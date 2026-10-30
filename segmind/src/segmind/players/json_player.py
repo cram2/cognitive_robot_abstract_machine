@@ -5,7 +5,6 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Set
 
 import numpy as np
 import trimesh
@@ -26,6 +25,7 @@ class JSONPlayer(FilePlayer):
     """
     Plays the episode from a JSON file.
     """
+
     scene_id: int = 1
     """
     ID of the scene to play.
@@ -36,34 +36,40 @@ class JSONPlayer(FilePlayer):
     Sets the scale of the meshes.
     """
 
-    obj_id_to_name: Optional[Dict[int, str]] = None
+    obj_id_to_name: dict[int, str] | None = None
     """
     Mapping from object ID to object name. It also selects what is replayed: objects whose ID
     is not in this mapping are ignored, since the file may contain objects that have no body
     in the world.
     """
 
-    data_object_names: Set[str] = field(default=None, init=False)
+    data_object_names: set[str] = field(default=None, init=False)
     """
     The names of the objects in the file.
     """
 
-    object_meshes: Dict[Body, Geometry] = field(default_factory=dict, init=False)
+    object_meshes: dict[Body, Geometry] = field(default_factory=dict, init=False)
     """
     Meshes of the objects in the file.
     """
 
-    correction_quaternions: Dict[Body, np.ndarray] = field(default_factory=dict, init=False)
+    correction_quaternions: dict[Body, np.ndarray] = field(
+        default_factory=dict, init=False
+    )
     """
     Correction quaternions for the objects in the file.
     """
 
-    base_origin_of_objects: Dict[Body, np.ndarray] = field(default_factory=dict, init=False)
+    base_origin_of_objects: dict[Body, np.ndarray] = field(
+        default_factory=dict, init=False
+    )
     """
     Sets the origin of the objects to the base of the robot.
     """
 
-    average_rotation_correction_matrix: Optional[np.ndarray] = field(default=None, init=False)
+    average_rotation_correction_matrix: np.ndarray | None = field(
+        default=None, init=False
+    )
     """
     Correction matrix for the average rotation of the objects.
     """
@@ -72,19 +78,23 @@ class JSONPlayer(FilePlayer):
         """
         Generates the frame data from the json file.
         """
-        with open(self.file_path, 'r') as f:
+        with open(self.file_path, "r") as f:
             self.data_frames = json.load(f)[str(self.scene_id)]
-        self.data_frames = {int(frame_id): objects_data for frame_id, objects_data in self.data_frames.items()}
+        self.data_frames = {
+            int(frame_id): objects_data
+            for frame_id, objects_data in self.data_frames.items()
+        }
         self.data_frames = dict(sorted(self.data_frames.items(), key=lambda x: x[0]))
         for i, (frame_id, objects_data) in enumerate(self.data_frames.items()):
-            yield FrameData(i * self.time_between_frames.total_seconds(), objects_data, frame_idx=i)
-
+            yield FrameData(
+                i * self.time_between_frames.total_seconds(), objects_data, frame_idx=i
+            )
 
     def _pause(self): ...
 
     def _resume(self): ...
 
-    def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
+    def get_objects_poses(self, frame_data: FrameData) -> dict[Body, Pose]:
         """
         Extracts the poses of the objects from the frame data.
 
@@ -94,18 +104,20 @@ class JSONPlayer(FilePlayer):
 
         objects_data = frame_data.objects_data
         obj_id_to_name = self.obj_id_to_name or {}
-        objects_poses: Dict[Body, Pose] = {}
+        objects_poses: dict[Body, Pose] = {}
         for obj_name, obj_data in objects_data.items():
             body_name = obj_id_to_name.get(int(obj_name))
             if body_name is None:
-                logger.debug(f"Skipping object {obj_name}, it has no entry in obj_id_to_name.")
+                logger.debug(
+                    f"Skipping object {obj_name}, it has no entry in obj_id_to_name."
+                )
                 continue
             for det in obj_data:
                 R = det["R"]
                 t = det["t"]
                 r = np.array(R).reshape(3, 3)
                 R_mat = RotationMatrix(data=r)
-                orientation = R_mat.to_quaternion().to_np()  # [x, y, z, w]
+                orientation = R_mat.quaternion.to_np()  # [x, y, z, w]
                 obj_pose = Pose.from_xyz_quaternion(
                     pos_x=t[0],
                     pos_y=t[1],
@@ -121,9 +133,8 @@ class JSONPlayer(FilePlayer):
 
         return objects_poses
 
-    def get_joint_states(self, frame_data: FrameData) -> Dict[str, float]:
+    def get_joint_states(self, frame_data: FrameData) -> dict[str, float]:
         pass
-
 
     def transform_to_stl(self, path: str):
         """
@@ -134,9 +145,6 @@ class JSONPlayer(FilePlayer):
         for filename in os.listdir(path):
             if filename.lower().endswith(".ply"):
                 ply_path = os.path.join(path, filename)
-                stl_path = os.path.join(
-                    path,
-                    os.path.splitext(filename)[0] + ".stl"
-                )
+                stl_path = os.path.join(path, os.path.splitext(filename)[0] + ".stl")
                 mesh = trimesh.load(ply_path)
                 mesh.export(stl_path)

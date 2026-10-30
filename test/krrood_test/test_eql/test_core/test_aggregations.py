@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from types import NoneType
 
 import pytest
-from typing_extensions import Type, Any
+from typing_extensions import Any
 
 import krrood.entity_query_language.factories as eql
 from krrood import logger
@@ -723,11 +723,11 @@ def test_nearest_object_type():
     class Level2Object(Object1): ...
 
     @symbolic_function
-    def symbolic_distance(type1: Type, type2: Type) -> int | None:
+    def symbolic_distance(type1: type, type2: type) -> int | None:
         return inheritance_path_length(type1, type2)
 
     @symbolic_function
-    def eql_mro(object_: Any) -> tuple[Type]:
+    def eql_mro(object_: Any) -> tuple[type]:
         return object_.__class__.__mro__
 
     objects = [BaseObject(), Object1(), Object2()]

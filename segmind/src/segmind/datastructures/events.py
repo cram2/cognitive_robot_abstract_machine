@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cached_property
 
-from typing_extensions import Optional, List
 
 from segmind.datastructures.object_tracker import (
     ObjectEventTracker,
@@ -52,11 +51,11 @@ class EventWithTrackedObjects(DetectionEvent, ABC):
     tracked_object: Body
     """The primary object involved in this event."""
 
-    with_object: Optional[Body] = None
+    with_object: Body | None = None
     """The secondary object involved in this event, if any."""
 
     @property
-    def tracked_objects(self) -> List[Body]:
+    def tracked_objects(self) -> list[Body]:
         """
         :return: the primary object, plus the secondary object when present.
         """
@@ -74,7 +73,7 @@ class EventWithTrackedObjects(DetectionEvent, ABC):
         return ObjectTrackerFactory.get_tracker(self.tracked_object)
 
     @cached_property
-    def with_object_tracker(self) -> Optional[ObjectEventTracker]:
+    def with_object_tracker(self) -> ObjectEventTracker | None:
         """
         :return: the event tracker for :attr:`with_object`, or ``None`` if absent.
         """
@@ -203,14 +202,14 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     Pose of the object, in the world frame.
     """
 
-    with_object_bounding_box: Optional[VolumetricBoundingBox] = field(
+    with_object_bounding_box: VolumetricBoundingBox | None = field(
         init=False, default=None
     )
     """
     Bounding box of the second object in contact.
     """
 
-    world_T_with_object: Optional[Pose] = field(init=False, default=None)
+    world_T_with_object: Pose | None = field(init=False, default=None)
     """
     Pose of the second object in contact, in the world frame.
     """
@@ -218,14 +217,14 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     def __post_init__(self):
         self.bounding_box = VolumetricBoundingBox.from_mesh(
             self.tracked_object.collision.combined_mesh,
-            origin=self.tracked_object.global_pose.to_homogeneous_matrix(),
+            origin=self.tracked_object.global_pose.homogeneous_matrix,
         )
         self.world_T_tracked_object = self.tracked_object.global_pose
 
         if self.with_object is not None:
             self.with_object_bounding_box = VolumetricBoundingBox.from_mesh(
                 self.with_object.collision.combined_mesh,
-                origin=self.with_object.global_pose.to_homogeneous_matrix(),
+                origin=self.with_object.global_pose.homogeneous_matrix,
             )
             self.world_T_with_object = self.with_object.global_pose
 
@@ -289,7 +288,7 @@ class InsertionEvent(EventWithTrackedObjects):
     Represents an event where an object is inserted into another object.
     """
 
-    inserted_into_objects: List[Body] = field(default_factory=list)
+    inserted_into_objects: list[Body] = field(default_factory=list)
     """
     List of objects into which the object was inserted.
     """

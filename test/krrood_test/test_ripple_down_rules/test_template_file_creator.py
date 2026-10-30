@@ -65,8 +65,8 @@ def test_rdr_decorator_func_name():
             pass
 
         def select_objects_that_are_parts_of_robot(
-            self, objects: List[PhysicalObject], robot: Robot
-        ) -> List[PhysicalObject]:
+            self, objects: list[PhysicalObject], robot: Robot
+        ) -> list[PhysicalObject]:
             pass
 
     example = Example()

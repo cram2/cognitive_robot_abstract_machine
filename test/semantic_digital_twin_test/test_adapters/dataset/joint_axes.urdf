@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<robot name="joint_axes">
+  <link name="base_link"/>
+  <link name="free_link"/>
+  <link name="knob_link"/>
+  <joint name="base_to_free" type="floating">
+    <parent link="base_link"/>
+    <child link="free_link"/>
+    <origin xyz="0.2 -0.1 0.9" rpy="0 0 0"/>
+  </joint>
+  <joint name="base_to_knob" type="revolute">
+    <parent link="base_link"/>
+    <child link="knob_link"/>
+    <axis xyz="0 3 4"/>
+    <limit lower="-3.14" upper="3.14" effort="1" velocity="1"/>
+  </joint>
+</robot>

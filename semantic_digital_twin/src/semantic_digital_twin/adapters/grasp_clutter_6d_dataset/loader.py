@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from types import ModuleType
-from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ except ImportError:
         "huggingface_hub not installed. `GraspClutter6DDatasetLoader` downloads will not "
         "work. Install it with `pip install huggingface_hub`."
     )
-    huggingface_hub: Optional[ModuleType] = None
+    huggingface_hub: ModuleType | None = None
 
 try:
     import py7zr
@@ -36,7 +35,7 @@ except ImportError:
         "py7zr not installed. `GraspClutter6DDatasetLoader` archive extraction will not "
         "work. Install it with `pip install py7zr`."
     )
-    py7zr: Optional[ModuleType] = None
+    py7zr: ModuleType | None = None
 
 
 class GraspClutter6DModelVariant(StrEnum):
@@ -105,7 +104,7 @@ class GraspClutter6DDatasetLoader:
     )
     """The directory archives are downloaded to and extracted in."""
 
-    token: Optional[str] = field(default_factory=lambda: os.environ.get("HF_TOKEN"))
+    token: str | None = field(default_factory=lambda: os.environ.get("HF_TOKEN"))
     """
     The Hugging Face access token used to download the dataset.
 
@@ -116,7 +115,7 @@ class GraspClutter6DDatasetLoader:
     repository_id: str = "GraspClutter6D/GraspClutter6D"
     """The Hugging Face dataset repository ID."""
 
-    _scenes_archive_parts: Tuple[str, ...] = field(
+    _scenes_archive_parts: tuple[str, ...] = field(
         default=(
             "scenes.7z.001",
             "scenes.7z.002",
@@ -245,7 +244,7 @@ class GraspClutter6DDatasetLoader:
         self,
         object_set: GraspClutter6DObjectSet = GraspClutter6DObjectSet.GRASP,
         split: GraspClutter6DSplit = GraspClutter6DSplit.TRAIN,
-    ) -> Tuple[str, ...]:
+    ) -> tuple[str, ...]:
         """
         List the scene ids of one split, without downloading any scene data.
 
@@ -259,7 +258,7 @@ class GraspClutter6DDatasetLoader:
         )
         return tuple(json.loads(file_path.read_text()))
 
-    def object_ids_for_scene(self, scene_id: str) -> Tuple[int, ...]:
+    def object_ids_for_scene(self, scene_id: str) -> tuple[int, ...]:
         """
         :param scene_id: A scene id, e.g. ``"000005"``.
         :return: The object ids present anywhere in that scene, from

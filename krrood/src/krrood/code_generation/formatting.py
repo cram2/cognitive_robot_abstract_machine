@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from typing import List
 
 from krrood.exceptions import SubprocessExecutionError
 
@@ -12,7 +11,7 @@ from krrood.exceptions import SubprocessExecutionError
 # Formatting
 
 
-def run_subprocess_on_file(command: List[str]) -> None:
+def run_subprocess_on_file(command: list[str]) -> None:
     """Run a subprocess command and handle errors.
 
     :param command: The command to run as a list of arguments.

@@ -11,7 +11,7 @@ resemble) so causal-specific code has its own, easily reviewable surface, mirror
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import TYPE_CHECKING, Any, Iterable, List, Optional, Type, Self
+from typing_extensions import TYPE_CHECKING, Any, Iterable, Self
 
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import (
@@ -29,8 +29,8 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import Attribute
-    from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-        ProbabilisticCircuit,
+    from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
+        ProbabilisticCircuitRepresentation,
     )
 
 
@@ -47,7 +47,7 @@ class CausalRoleMarker(Literal):
 
     _value_: Any = field(default=Ellipsis, init=False)
 
-    def _as_assigned_variable_(self, attribute_type: Optional[Type]) -> Self:
+    def _as_assigned_variable_(self, attribute_type: type | None) -> Self:
         """
         :param attribute_type: The type of the attribute this marks.
         :return: This marker if it already has a type, otherwise a fresh copy of it
@@ -120,7 +120,7 @@ class CausesEffect(LogicalOperator, UnaryExpression):
     optimize for.
     """
 
-    cause_attributes: List[Attribute] = field(default_factory=list, kw_only=True)
+    cause_attributes: list[Attribute] = field(default_factory=list, kw_only=True)
     """
     The ``cause``-marked attribute(s) this effect condition explains, so its
     verbalization can name them (*"the arm causes its outcome to be SUCCESS"*) instead
@@ -154,7 +154,7 @@ class CauseEffectVariables:
     The cause candidates and effect variable a ``cause`` search resolves to.
     """
 
-    cause_variables: List[random_events.variable.Variable]
+    cause_variables: list[random_events.variable.Variable]
     """
     The variable(s) a ``cause`` intervention is searched over.
 
@@ -170,7 +170,7 @@ class CauseEffectVariables:
     The variable a ``causes_effect(...)`` condition declares as the effect.
     """
 
-    confounder_variables: List[random_events.variable.Variable]
+    confounder_variables: list[random_events.variable.Variable]
     """
     Variables assigned a ``confounder`` marker: Pearl's backdoor-criterion adjustment
     set, summed back out of each cause candidate's interventional probability so it is
@@ -203,9 +203,11 @@ class ScoredIntervention:
     that region happens to cover: the higher one is the better explanation.
     """
 
-    narrowed_circuit: ProbabilisticCircuit
+    narrowed_circuit: ProbabilisticCircuitRepresentation
     """
     The interventional joint, truncated to the effect condition and this candidate's
     best region -- what the query samples from if this candidate turns out to be the
     primary cause.
+
+    Of the circuit type the causal circuit was read from.
     """

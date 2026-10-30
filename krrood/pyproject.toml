@@ -79,6 +79,16 @@ visualization = [
     "plotly",
     "flask",
 ]
+# The formatter's output depends on the versions of ruff and docformatter, so they are
+# pinned for every repository that formats with a given krrood release to format alike.
+development-tools = [
+    "ruff==0.17.2",
+    "docformatter==1.7.8",
+    "tqdm",
+]
+
+[project.scripts]
+krrood = "krrood.development_tools.command_line:CommandLine.main"
 
 [project.urls]
 Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"
@@ -101,6 +111,7 @@ krrood = [
   "rustworkx_utils/visualization/templates/*.jinja",
   "code_generation/templates/*.jinja",
   "entity_query_language/testing/templates/*.jinja",
+  "development_tools/agents/templates/*.jinja",
 ]
 
 [tool.pytest.ini_options]

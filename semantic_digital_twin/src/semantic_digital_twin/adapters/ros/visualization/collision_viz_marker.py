@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 import numpy as np
 from geometry_msgs.msg import Point as RosPoint

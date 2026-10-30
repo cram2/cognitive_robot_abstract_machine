@@ -24,19 +24,17 @@ Run with (the ``experiments`` package must be importable)::
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List
+from typing_extensions import Any
 
 import coraplex as _coraplex_pkg
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
 import krrood.entity_query_language.factories as eql
-from giskardpy.motion_statechart.data_types import LifeCycleValues
-from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
-from coraplex.orm.ormatic_interface import Base, PlanMappingDAO  # type: ignore
-from coraplex.plans.factories import sequential, try_in_order, code
+from cramph.data_types import LifeCycleValues
+from coraplex.orm.ormatic_interface import Base  # type: ignore
 from coraplex.plans.failures import PlanFailure
-from coraplex.plans.plan import Plan
-from coraplex.plans.plan_node import ActionNode, PlanNode
+from coraplex.robot_plans.actions.base import Action
+from cramph.composites import Sequence, StatementNode, TryInOrder
+from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from coraplex.testing import setup_world
@@ -58,6 +56,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
 )
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
@@ -70,6 +69,11 @@ from experiments.experiment_definitions import (
     ExperimentsTable,
     TypstRenderer,
 )
+from cramph.threaded_nodes import FunctionCall
+from coraplex.plans.context_extensions import RobotAccess
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from cramph.statechart import Statechart
 
 _CORAPLEX_RESOURCES = Path(_coraplex_pkg.__file__).parent.parent.parent / "resources"
 _DATABASE_PATH = Path(__file__).parent / "querying.db"
@@ -145,17 +149,13 @@ class BehaviourQueryResult(ExperimentResult):
     """
 
 
-def build_plan() -> Plan:
+def build_executor() -> KinematicallySimulatedPlanExecutor:
     """
-    Set up the bullet-world scene, execute the plan in simulation, and return the
-    completed :class:`~coraplex.plans.plan.Plan`.
+    Set up the bullet-world scene the plan runs in.
 
-    The scene and action sequence mirror
-    ``coraplex/demos/coraplex_bullet_world_demo/demo.py`` exactly: the PR2 parks
-    its arms, raises its torso, then transports milk, bowl, and spoon to the
-    dining table.
+    The scene mirrors ``coraplex/demos/coraplex_bullet_world_demo/demo.py`` exactly.
 
-    :return: The fully executed plan, ready for EQL queries.
+    :return: The executor running plans of the PR2 in the scene.
     """
     world = setup_world()
 
@@ -192,7 +192,9 @@ def build_plan() -> Plan:
         ros_node = None
 
     pr2 = PR2.from_world(world)
-    context = Context(world=world, robot=pr2, _debug=False, ros_node=ros_node)
+    executor = KinematicallySimulatedPlanExecutor(
+        StatechartContext.with_extensions(world, [RobotAccess(pr2)]), ros_node=ros_node
+    )
 
     with world.modify_world():
         world_reasoner = WorldReasoner(world)
@@ -207,58 +209,82 @@ def build_plan() -> Plan:
             )
         )
 
-    context.evaluate_conditions = False
+    return executor
+
+
+def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
+    """
+    Execute the plan in simulation and return it, completed.
+
+    The action sequence mirrors ``coraplex/demos/coraplex_bullet_world_demo/demo.py``
+    exactly: the PR2 parks its arms, raises its torso, then transports milk, bowl, and
+    spoon to the dining table.
+
+    :param executor: The executor running the plan.
+    :return: The fully executed plan, ready for EQL queries.
+    """
+    world = executor.context.world
+    pr2 = executor.context.require_extension(RobotAccess).robot
 
     def _failing_step():
         raise PlanFailure()
 
-    root = sequential(
-        [
-            ParkArmsAction(pr2.all_arms),
-            MoveTorsoAction(TorsoState.HIGH),
-            try_in_order(
-                [
-                    code(_failing_step),
+    root = Sequence(
+        nodes=[
+            ParkArmsAction(arms=pr2.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+            TryInOrder(
+                nodes=[
+                    FunctionCall(function=_failing_step, failure_types=(PlanFailure,)),
                     TransportAction.from_graspable_by_closest_grasps(
                         world.get_semantic_annotations_by_type(Milk)[0],
                         Pose.from_xyz_rpy(
                             4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root
                         ),
                         pr2.left_arm,
-                        context,
+                        executor.context,
                     ),
-                ],
-                context=context,
+                ]
             ),
             TransportAction.from_graspable_by_closest_grasps(
-                bowl_annotation,
+                world.get_semantic_annotations_by_type(Bowl)[0],
                 Pose.from_xyz_rpy(5.0, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
                 pr2.left_arm,
-                context,
+                executor.context,
             ),
             TransportAction.from_graspable_by_closest_grasps(
-                spoon_annotation,
+                world.get_semantic_annotations_by_type(Spoon)[0],
                 Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
                 pr2.left_arm,
-                context,
+                executor.context,
             ),
-        ],
-        context=context,
+        ]
     )
 
-    plan = root.plan
-    with simulated_robot:
-        plan.perform()
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(root)
+    executor.compile(statechart)
+    executor.execute()
 
-    return plan
+    return root
 
 
-def _q_what_did_you_do(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+def _nodes_of(plan: StatechartNode) -> list[StatechartNode]:
+    """
+    :return: Every node the performed plan ran, its root first.
+    """
+    return [plan, *plan.descendants]
+
+
+def _q_what_did_you_do(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(Action, domain=_nodes_of(plan))
     return BehaviourQuery(
         question="What did you just do?",
         query=eql.an(
-            eql.entity(n).where(n.status == LifeCycleValues.SUCCEEDED)
+            eql.entity(n).where(n.life_cycle_state == LifeCycleValues.SUCCEEDED)
         ).ordered_by(
             n.start_time,
             descending=False,
@@ -266,31 +292,38 @@ def _q_what_did_you_do(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_walk_through_in_order(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_walk_through_in_order(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(StatechartNode, domain=_nodes_of(plan))
     return BehaviourQuery(
         question="Walk me through what you did in order.",
         query=eql.an(
-            eql.entity(n).where(n.status == LifeCycleValues.SUCCEEDED)
+            eql.entity(n).where(n.life_cycle_state == LifeCycleValues.SUCCEEDED)
         ).ordered_by(n.start_time),
     )
 
 
-def _q_total_duration(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+def _q_total_duration(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(Action, domain=_nodes_of(plan))
     return BehaviourQuery(
         question="How long did the whole task take?",
         query=eql.set_of(
             min_start := eql.min(n.start_time),
             max_end := eql.max(n.end_time),
-        ).where(
-            n.start_time != None, n.end_time != None
-        ),  # noqa: E711
+        ).where(n.start_time != None, n.end_time != None),  # noqa: E711
     )
 
 
-def _q_duration_per_step(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_duration_per_step(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(StatechartNode, domain=_nodes_of(plan))
     return BehaviourQuery(
         question="How long did each step take?",
         query=eql.an(eql.entity(n).where(n.end_time != None)).ordered_by(  # noqa: E711
@@ -299,48 +332,65 @@ def _q_duration_per_step(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_did_anything_go_wrong(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_did_anything_go_wrong(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(StatechartNode, domain=_nodes_of(plan))
     return BehaviourQuery(
         question="Did anything go wrong?",
-        query=eql.an(eql.entity(n).where(n.status == LifeCycleValues.FAILED)),
+        query=eql.an(eql.entity(n).where(n.life_cycle_state == LifeCycleValues.FAILED)),
     )
 
 
-def _q_why_did_you_fail(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_why_did_you_fail(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(StatementNode, domain=_nodes_of(plan))
     return BehaviourQuery(
         question="Why did you fail at that step?",
-        query=eql.an(eql.entity(n.reason).where(n.status == LifeCycleValues.FAILED)),
+        query=eql.an(eql.entity(n.failure_reasons)),
     )
 
 
-def _q_how_many_retries(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_how_many_retries(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(StatechartNode, domain=_nodes_of(plan))
     return BehaviourQuery(
         question="How many times did you retry before giving up?",
         query=(
-            eql.set_of(c := eql.count_all()).where(n.status == LifeCycleValues.FAILED)
-        ),
-    )
-
-
-def _q_which_fallback(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
-    s = eql.variable(PlanNode, domain=n.left_siblings)
-    return BehaviourQuery(
-        question="Which fallback did you end up using?",
-        query=eql.an(
-            eql.entity(n).where(
-                n.status == LifeCycleValues.SUCCEEDED,
-                eql.exists(s, s.status == LifeCycleValues.FAILED),
+            eql.set_of(c := eql.count_all()).where(
+                n.life_cycle_state == LifeCycleValues.FAILED
             )
         ),
     )
 
 
-def _q_longest_step(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+def _q_which_fallback(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(StatechartNode, domain=_nodes_of(plan))
+    s = eql.variable(StatechartNode, domain=n.left_siblings)
+    return BehaviourQuery(
+        question="Which fallback did you end up using?",
+        query=eql.an(
+            eql.entity(n).where(
+                n.life_cycle_state == LifeCycleValues.SUCCEEDED,
+                eql.exists(s, s.life_cycle_state == LifeCycleValues.FAILED),
+            )
+        ),
+    )
+
+
+def _q_longest_step(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(Action, domain=_nodes_of(plan))
 
     return BehaviourQuery(
         question="Which step took the longest?",
@@ -350,39 +400,49 @@ def _q_longest_step(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_status_breakdown(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_status_breakdown(plan: StatechartNode) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(StatechartNode, domain=_nodes_of(plan))
     return BehaviourQuery(
         question="Were all subtasks successful, or did some fail?",
         query=(
-            eql.set_of(status := n.status, c := eql.count(n))
+            eql.set_of(status := n.life_cycle_state, c := eql.count(n))
             .grouped_by(status)
             .ordered_by(c, descending=True)
         ),
     )
 
 
-def _q_world_state_at_start(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(Plan, domain=[plan])
+def _q_world_modifications(world: World) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    m = eql.variable(WorldModelModificationBlock, domain=world.modification_history)
     return BehaviourQuery(
-        question="What was the state of the world when you started the task?",
-        query=eql.an(eql.entity(n.initial_world.state)),
+        question="What world modifications were made?",
+        query=eql.an(eql.entity(m)),
     )
 
 
-def _q_world_state_at_end(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(Plan, domain=[plan])
+def _q_world_state_at_end(world: World) -> BehaviourQuery:
+    """
+    :return: The query answering the question it carries.
+    """
+    n = eql.variable(World, domain=[world])
     return BehaviourQuery(
         question="What was the state of the world when you finished?",
-        query=eql.an(eql.entity(n.context.world.state)),
+        query=eql.an(eql.entity(n.state)),
     )
 
 
-def build_queries(plan: Plan) -> List[BehaviourQuery]:
+def build_queries(plan: StatechartNode, world: World) -> list[BehaviourQuery]:
     """
     Construct all behaviour queries for a completed plan execution.
 
     :param plan: The plan whose execution history the queries will inspect.
+    :param world: The world the plan was executed in.
     :return: All behaviour queries, in presentation order.
     """
     return [
@@ -396,9 +456,8 @@ def build_queries(plan: Plan) -> List[BehaviourQuery]:
         _q_which_fallback(plan),
         _q_longest_step(plan),
         _q_status_breakdown(plan),
-        _q_world_modifications(plan),
-        _q_world_state_at_start(plan),
-        _q_world_state_at_end(plan),
+        _q_world_modifications(world),
+        _q_world_state_at_end(world),
     ]
 
 
@@ -421,7 +480,9 @@ def _count_results(raw: Any) -> int:
     return 1
 
 
-def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
+def run_experiment(
+    plan: StatechartNode, world: World, session: Session
+) -> ExperimentsTable:
     """
     Evaluate all behaviour queries both via in-memory EQL and via SQL, collecting
     timings and result counts for each approach in a single row per query.
@@ -430,11 +491,12 @@ def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
     query does not abort the experiment.
 
     :param plan: The fully executed plan to query.
+    :param world: The world the plan was executed in.
     :param session: An open SQLAlchemy session connected to the persisted plan database.
     :return: A table with one :class:`BehaviourQueryResult` row per query.
     """
-    rows: List[BehaviourQueryResult] = []
-    for query in build_queries(plan):
+    rows: list[BehaviourQueryResult] = []
+    for query in build_queries(plan, world):
         # EQL evaluation
         t0 = time.perf_counter()
         try:
@@ -487,7 +549,7 @@ def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
 # ---------------------------------------------------------------------------
 
 
-def persist_plan(plan: Plan) -> tuple[Session, Engine]:
+def persist_plan(plan: StatechartNode) -> tuple[Session, Engine]:
     """
     Serialise *plan* to a SQLite database at :data:`_DATABASE_PATH` via ORMatic.
 
@@ -521,10 +583,11 @@ def main() -> None:
     Run the bullet-world plan, persist it to a database, evaluate all behaviour queries
     both via EQL and via SQL, and print the combined result table.
     """
-    plan = build_plan()
+    executor = build_executor()
+    plan = build_plan(executor)
     session, engine = persist_plan(plan)
     try:
-        table = run_experiment(plan, session)
+        table = run_experiment(plan, executor.context.world, session)
     finally:
         session.close()
         engine.dispose()

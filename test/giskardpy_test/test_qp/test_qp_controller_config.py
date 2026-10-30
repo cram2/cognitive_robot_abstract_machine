@@ -3,11 +3,15 @@ from datetime import timedelta
 import numpy as np
 import pytest
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+from cramph.statechart import Statechart
+from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from giskardpy.qp.exceptions import BrakingTimeExceedsHorizonError
+from giskardpy.qp.exceptions import (
+    BrakingTimeExceedsHorizonError,
+    PredictionHorizonTooShortForDerivativeError,
+)
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
@@ -119,6 +123,26 @@ def test_explicit_prediction_horizon_too_short_for_the_braking_raises():
     assert error.value.minimum_prediction_horizon == minimum_prediction_horizon
 
 
+@pytest.mark.parametrize("max_derivative", [Derivatives.jerk, Derivatives.acceleration])
+def test_explicit_prediction_horizon_too_short_for_the_highest_derivative_raises(
+    max_derivative,
+):
+    minimum_prediction_horizon = QPControllerConfig(
+        target_frequency=20, max_derivative=max_derivative
+    ).minimum_prediction_horizon
+
+    with pytest.raises(PredictionHorizonTooShortForDerivativeError) as error:
+        QPControllerConfig(
+            target_frequency=20,
+            max_derivative=max_derivative,
+            prediction_horizon=minimum_prediction_horizon - 1,
+        )
+
+    assert error.value.prediction_horizon == minimum_prediction_horizon - 1
+    assert error.value.minimum_prediction_horizon == minimum_prediction_horizon
+    assert error.value.max_derivative == max_derivative
+
+
 # %% behaviour independent of the control frequency
 
 
@@ -135,19 +159,20 @@ def _peak_acceleration_of_a_joint_goal(
     """
     connection = world.controlled_connections[0]
     connection.position = 0.0
-    statechart = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world),
+        extensions=[MotionControl(qp_controller_config=config)],
+    )
+    statechart = Statechart(context=executor.context)
     statechart.add_node(
         JointPositionList(goal_state=JointState.from_mapping({connection: 1.5}))
     )
-    executor = Executor(
-        MotionStatechartContext(world=world, qp_controller_config=config)
-    )
-    executor.compile(motion_statechart=statechart)
+    executor.compile(statechart=statechart)
     accelerations = []
     for _ in range(int(3 * config.target_frequency)):
         executor.tick()
         accelerations.append(world.state[connection.dof.id].acceleration)
-    executor.set_velocity_acceleration_jerk_to_zero()
+    MotionControl.set_velocity_acceleration_jerk_to_zero(world)
     return float(np.max(np.abs(accelerations)))
 
 

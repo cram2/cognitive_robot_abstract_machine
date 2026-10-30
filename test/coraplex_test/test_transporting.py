@@ -2,26 +2,26 @@
 How a transport moves to an object, fetches it and puts it down.
 """
 
+from __future__ import annotations
+
 import itertools
 
 import numpy as np
 import pytest
-from typing_extensions import Callable, List, Type
+from typing_extensions import Callable, List
 
 from krrood.entity_query_language.factories import a, variable
 from krrood.entity_query_language.query.match import Match
-from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
 from coraplex.locations.locations import ReachabilityLocation
-from coraplex.plans.factories import sequential
-from coraplex.plans.plan_node import ActionNode
-from coraplex.plans.underspecified import UnderspecifiedNode
-from coraplex.robot_plans.actions.base import ActionDescription
+from cramph.composites import Sequence, StatementNode
+from cramph.node import StatechartNode
+from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.actions.core.navigation import (
     FaceAtAction,
     LookAtAction,
     NavigateAction,
 )
+from coraplex.robot_plans.actions.composite.carrying import CarryAction
 from coraplex.robot_plans.actions.composite.facing import FaceAndLookAtAction
 from coraplex.robot_plans.actions.composite.transporting import (
     MoveAndOpenAction,
@@ -30,8 +30,9 @@ from coraplex.robot_plans.actions.composite.transporting import (
     PickAndPlaceAction,
     TransportAction,
 )
+from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
-from coraplex.querying.predicates import IsAmongTheClosestGraspsTo
+from coraplex.querying.grasp_closeness import GraspCloseness, GraspsByCloseness
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -39,10 +40,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from semantic_digital_twin.grasping.grasp_candidates import (
-    GraspCandidate,
-    HasGraspCandidates,
-)
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import (
     Point3,
@@ -52,25 +51,40 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
+from .conftest import expand
+from ..plan_running import context_of, robot_of, run_plan
+from cramph.context import ContextExtension
+from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
+
 # %% where the robot stands is tried together with what it does there
 
 
-def _underspecified_steps(transport: TransportAction) -> List[Type[ActionDescription]]:
+def _steps_of(action: Action) -> list[StatechartNode]:
+    """
+    :return: The steps the expanded `action` runs, in order.
+    """
+    return action.nodes
+
+
+def _underspecified_steps(transport: TransportAction) -> list[type[Action]]:
     """
     :return: The action types of the steps the transport leaves to be grounded, in
         order.
     """
     return [
-        child.designator_type
-        for child in transport._action_plan.children
-        if isinstance(child, UnderspecifiedNode)
+        child.statement._type_
+        for child in _steps_of(transport)
+        if isinstance(child, StatementNode)
     ]
 
 
-def _pick_up_the_milk(world: World, context: Context) -> MoveAndPickUpAction:
+def _pick_up_the_milk(
+    world: World, extensions: list[ContextExtension]
+) -> MoveAndPickUpAction:
     """
     :return: A pick-up of the milk, standing wherever its trial finds one that works.
     """
+    robot = robot_of(extensions)
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     milk_pose = milk.root.global_pose
     return a(MoveAndPickUpAction)(
@@ -79,8 +93,8 @@ def _pick_up_the_milk(world: World, context: Context) -> MoveAndPickUpAction:
                 Pose,
                 domain=ReachabilityLocation(
                     Pose(reference_frame=milk.root),
-                    context.robot.right_arm,
-                    context=context,
+                    robot.right_arm,
+                    context=context_of(extensions),
                 ),
             )
         ),
@@ -88,28 +102,29 @@ def _pick_up_the_milk(world: World, context: Context) -> MoveAndPickUpAction:
             face_at=a(FaceAtAction)(target=milk_pose),
             look_at=a(LookAtAction)(target=milk_pose),
         ),
-        pick_up=a(PickUpAction)(
-            grasp=milk.grasp_candidates()[0], arm=context.robot.right_arm
-        ),
+        pick_up=a(PickUpAction)(grasp=milk.grasp_candidates()[0], arm=robot.right_arm),
     )
 
 
 def _place_at(
-    target: Pose, placed: HasGraspCandidates, context: Context
+    target: Pose, placed: HasGraspCandidates, extensions: list[ContextExtension]
 ) -> MoveAndPlaceAction:
     """
     :return: A place of `placed` at `target`, standing wherever its trial finds one
         that works.
     """
+    robot = robot_of(extensions)
     return a(MoveAndPlaceAction)(
-        navigate=a(NavigateAction)(
-            target_location=variable(
-                Pose,
-                domain=ReachabilityLocation(
-                    target,
-                    context.robot.right_arm,
-                    context=context,
-                ),
+        carry=a(CarryAction)(
+            navigate=a(NavigateAction)(
+                target_location=variable(
+                    Pose,
+                    domain=ReachabilityLocation(
+                        target,
+                        robot.right_arm,
+                        context=context_of(extensions),
+                    ),
+                )
             )
         ),
         face_and_look_at=a(FaceAndLookAtAction)(
@@ -120,32 +135,35 @@ def _place_at(
     )
 
 
-def _standing_positions(step: Match) -> ReachabilityLocation:
+def _standing_positions(navigate: Match) -> ReachabilityLocation:
     """
-    :return: The location the standing pose of `step` is sampled from.
+    :param navigate: The statement of a drive to where the robot stands.
+    :return: The location the standing pose of `navigate` is sampled from.
     """
-    return step._kwargs_["navigate"]._kwargs_["target_location"]._domain_.domain
+    return navigate._kwargs_["target_location"]._domain_.domain
 
 
-def _transport_of_the_milk(world: World, context: Context) -> TransportAction:
+def _transport_of_the_milk(
+    world: World, extensions: list[ContextExtension]
+) -> TransportAction:
     return TransportAction(
-        pick_up=_pick_up_the_milk(world, context),
+        pick_up=_pick_up_the_milk(world, extensions),
         place=_place_at(
             Pose(reference_frame=world.root),
             world.get_semantic_annotations_by_type(Milk)[0],
-            context,
+            extensions,
         ),
     )
 
 
-def test_a_transport_grounds_the_steps_it_is_given(pr2_apartment_context):
+def test_a_transport_grounds_the_steps_it_is_given(pr2_apartment_context) -> None:
     """
     The caller decides what is left open in each step, so the transport grounds the
     steps it was given rather than steps of its own.
     """
-    world, robot, context = pr2_apartment_context
-    transport = _transport_of_the_milk(world, context)
-    sequential([transport], context)
+    world, robot, extensions = pr2_apartment_context
+    transport = _transport_of_the_milk(world, extensions)
+    expand(Sequence(nodes=[transport]), extensions)
 
     assert _underspecified_steps(transport) == [
         MoveAndPickUpAction,
@@ -153,36 +171,35 @@ def test_a_transport_grounds_the_steps_it_is_given(pr2_apartment_context):
     ]
 
 
-def test_a_transport_leaves_the_torso_where_it_is(pr2_apartment_context):
-    world, robot, context = pr2_apartment_context
-    transport = _transport_of_the_milk(world, context)
-    sequential([transport], context)
+def test_a_transport_leaves_the_torso_where_it_is(pr2_apartment_context) -> None:
+    world, robot, extensions = pr2_apartment_context
+    transport = _transport_of_the_milk(world, extensions)
+    expand(Sequence(nodes=[transport]), extensions)
 
     assert not [
-        child
-        for child in transport._action_plan.children
-        if isinstance(child, ActionNode)
-        and isinstance(child.designator, MoveTorsoAction)
+        child for child in _steps_of(transport) if isinstance(child, MoveTorsoAction)
     ]
 
 
 def test_a_transport_of_a_graspable_stands_around_the_object_then_the_target(
     pr2_apartment_context,
-):
+) -> None:
     """
     Built from the object alone, a transport stands close to the object for the pick-up,
     and close to the target for the place.
     """
-    world, robot, context = pr2_apartment_context
+    world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root)
 
     transport = TransportAction.from_graspable_by_closest_grasps(
-        milk, target, context.robot.right_arm, context
+        milk, target, robot.right_arm, context_of(extensions)
     )
 
-    pick_up_location = _standing_positions(transport.pick_up)
-    place_location = _standing_positions(transport.place)
+    pick_up_location = _standing_positions(transport.pick_up._kwargs_["navigate"])
+    place_location = _standing_positions(
+        transport.place._kwargs_["carry"]._kwargs_["navigate"]
+    )
     assert pick_up_location.target_pose.reference_frame is milk.root
     assert place_location.target_pose is target
 
@@ -207,62 +224,62 @@ def pick_and_place_of_the_milk(world: World, arm: Arm) -> PickAndPlaceAction:
     )
 
 
-def test_a_pick_and_place_grounds_the_steps_it_is_given(pr2_apartment_context):
-    world, robot, context = pr2_apartment_context
+def test_a_pick_and_place_grounds_the_steps_it_is_given(pr2_apartment_context) -> None:
+    world, robot, extensions = pr2_apartment_context
     pick_and_place = pick_and_place_of_the_milk(world, robot.right_arm)
-    sequential([pick_and_place], context)
+    expand(Sequence(nodes=[pick_and_place]), extensions)
 
     assert [
-        child.designator_type
-        for child in pick_and_place._action_plan.children
-        if isinstance(child, UnderspecifiedNode)
+        child.statement._type_
+        for child in _steps_of(pick_and_place)
+        if isinstance(child, StatementNode)
     ] == [PickUpAction, PlaceAction]
 
 
 # %% moving to an object and picking it up
 
 
-def test_move_and_pick_up_takes_the_grasp_it_was_given(pr2_apartment_context):
+def test_move_and_pick_up_takes_the_grasp_it_was_given(pr2_apartment_context) -> None:
     """
     The caller chooses the grasp, so the pick-up at the end of the walk takes that one
     rather than whichever grasp the object happens to list first.
     """
-    world, robot, context = pr2_apartment_context
+    world, robot, extensions = pr2_apartment_context
     grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[-1]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
         standing_position=Pose(reference_frame=world.root),
         grasp=grasp,
-        arm=context.robot.left_arm,
+        arm=robot.left_arm,
     )
-    sequential([move_and_pick_up], context)
+    expand(Sequence(nodes=[move_and_pick_up]), extensions)
 
     pick_ups = [
         child
-        for child in move_and_pick_up._action_plan.children
-        if isinstance(child, ActionNode) and isinstance(child.designator, PickUpAction)
+        for child in _steps_of(move_and_pick_up)
+        if isinstance(child, PickUpAction)
     ]
 
-    assert [pick_up.designator.grasp for pick_up in pick_ups] == [grasp]
+    assert [pick_up.grasp for pick_up in pick_ups] == [grasp]
 
 
 def test_move_and_pick_up_approaches_with_the_clearances_it_was_given(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     approach_clearance, retreat_distance = 0.07, 0.13
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
         standing_position=Pose(reference_frame=world.root),
         grasp=world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
-        arm=context.robot.left_arm,
+        arm=robot.left_arm,
         approach_clearance=approach_clearance,
         retreat_distance=retreat_distance,
     )
-    sequential([move_and_pick_up], context)
+    expand(Sequence(nodes=[move_and_pick_up]), extensions)
 
     [pick_up] = [
-        child.designator
-        for child in move_and_pick_up._action_plan.children
-        if isinstance(child, ActionNode) and isinstance(child.designator, PickUpAction)
+        child
+        for child in _steps_of(move_and_pick_up)
+        if isinstance(child, PickUpAction)
     ]
 
     assert (pick_up.approach_clearance, pick_up.retreat_distance) == (
@@ -275,8 +292,7 @@ def test_move_and_pick_up_approaches_with_the_clearances_it_was_given(
 
 STANDING_DISTANCE = 1.0
 """
-How far from the milk, against the world's x-axis, the robot stands, so that the milk
-lies straight ahead along that axis.
+How far back from a grasp, along the direction it is approached along, the robot stands.
 """
 
 CLOSER_BY = 0.05
@@ -294,17 +310,6 @@ NON_DEFAULT_NUMBER_OF_GRASPS = 2
 A number of closest grasps other than the default, so that the number is seen to be
 passed on.
 """
-
-
-def _standing_behind_the_milk(world: World) -> Pose:
-    """
-    :return: A standing pose from which the milk lies straight ahead along the world's
-        x-axis.
-    """
-    milk_pose = world.get_semantic_annotations_by_type(Milk)[0].root.global_pose
-    return Pose.from_xyz_rpy(
-        milk_pose.x - STANDING_DISTANCE, milk_pose.y, 0.0, reference_frame=world.root
-    )
 
 
 def _standing_in_front_of(grasp: GraspCandidate, world: World) -> Pose:
@@ -330,7 +335,7 @@ def _raised(grasp: GraspCandidate, height: float) -> GraspCandidate:
         grasp.graspable,
         Pose(
             position=Point3.from_iterable(root_P_grasp),
-            orientation=grasp.grasp_pose.to_quaternion(),
+            orientation=grasp.grasp_pose.quaternion,
             reference_frame=grasp.graspable.root,
         ),
     )
@@ -349,8 +354,8 @@ def _turned_around(grasp: GraspCandidate, nearer_by: float = 0.0) -> GraspCandid
         Pose(
             position=Point3.from_iterable(root_P_grasp),
             orientation=(
-                grasp_pose.to_rotation_matrix() @ RotationMatrix.from_rpy(yaw=np.pi)
-            ).to_quaternion(),
+                grasp_pose.rotation_matrix @ RotationMatrix.from_rpy(yaw=np.pi)
+            ).quaternion,
             reference_frame=grasp.graspable.root,
         ),
     )
@@ -365,7 +370,7 @@ def _grasp_signature(grasp: GraspCandidate) -> tuple:
 
 
 def _assert_each_standing_pose_keeps_the_closest_grasps(
-    pick_ups: List[MoveAndPickUpAction],
+    pick_ups: list[MoveAndPickUpAction],
     graspable: HasGraspCandidates,
     number_of_grasps: int,
 ) -> None:
@@ -379,14 +384,12 @@ def _assert_each_standing_pose_keeps_the_closest_grasps(
         pick_ups_by_standing_pose.setdefault(
             tuple(np.round(standing_position.to_np(), 6).ravel()), []
         ).append(pick_up)
-    grasps = graspable.grasp_candidates()
     for pick_ups_from_one_pose in pick_ups_by_standing_pose.values():
         standing_position = pick_ups_from_one_pose[0].navigate.target_location
         closest = {
             _grasp_signature(grasp)
-            for grasp in grasps
-            if IsAmongTheClosestGraspsTo(
-                grasp, standing_position, grasps, number_of_grasps
+            for grasp in GraspsByCloseness(
+                graspable, standing_position, number_of_grasps
             )()
         }
         kept = [
@@ -397,144 +400,182 @@ def _assert_each_standing_pose_keeps_the_closest_grasps(
         assert set(kept) == closest
 
 
+def _assert_each_standing_pose_tries_its_grasps_closest_first(
+    steps: list[MoveAndPickUpAction | MoveAndOpenAction],
+    grasp_of: Callable[[MoveAndPickUpAction | MoveAndOpenAction], GraspCandidate],
+    graspable: HasGraspCandidates,
+) -> None:
+    """
+    Assert that the grasps `steps` take from each of their standing poses come in the
+    order of their :class:`GraspCloseness` to that pose.
+
+    :param grasp_of: The grasp a step takes.
+    """
+    world = graspable.root._world
+    world_T_object = graspable.root.global_transform.to_np()
+    for _, steps_from_one_pose in itertools.groupby(
+        steps, key=lambda step: id(step.navigate.target_location)
+    ):
+        steps_from_one_pose = list(steps_from_one_pose)
+        standing_position = steps_from_one_pose[0].navigate.target_location
+        world_P_standing = world.transform(standing_position, world.root).to_np()[:, 3]
+        closeness = [
+            GraspCloseness.from_grasp(grasp_of(step), world_T_object, world_P_standing)
+            for step in steps_from_one_pose
+        ]
+        assert closeness == sorted(closeness)
+
+
+def _closeness(grasp: GraspCandidate, standing_position: Pose) -> GraspCloseness:
+    """
+    :return: How close `grasp` is to `standing_position`.
+    """
+    world = grasp.graspable.root._world
+    return GraspCloseness.from_grasp(
+        grasp,
+        grasp.graspable.root.global_transform.to_np(),
+        world.transform(standing_position, world.root).to_np()[:, 3],
+    )
+
+
+@pytest.mark.parametrize("grasp_index", [0, 1])
+def test_grasps_ranked_from_the_robot_are_ranked_from_where_it_stands_when_ranked(
+    pr2_apartment_context, grasp_index
+):
+    """
+    A standing position relative to the robot is read when the grasps are ranked, so the
+    ranking follows the robot once it moved.
+    """
+    world, robot, extensions = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    ranking = GraspsByCloseness(milk, Pose(reference_frame=robot.root))
+    grasp = milk.grasp_candidates()[grasp_index]
+
+    robot.root.parent_connection.origin = _standing_in_front_of(
+        grasp, world
+    ).homogeneous_matrix
+
+    closest, *_ = ranking()
+    assert _grasp_signature(closest) == _grasp_signature(grasp)
+
+
+def test_grasps_ranked_without_a_number_are_all_kept(pr2_apartment_context):
+    world, robot, extensions = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+
+    ranked = GraspsByCloseness(milk, Pose(reference_frame=robot.root), None)()
+
+    assert sorted(map(_grasp_signature, ranked)) == sorted(
+        map(_grasp_signature, milk.grasp_candidates())
+    )
+
+
 def test_a_grasp_approached_straight_from_the_standing_position_is_the_closest(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     grasps = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()
+    standing_position = _standing_in_front_of(grasps[0], world)
 
-    assert IsAmongTheClosestGraspsTo(
-        grasps[0], _standing_in_front_of(grasps[0], world), grasps, number_of_grasps=1
-    )()
+    assert _closeness(grasps[0], standing_position) == min(
+        _closeness(grasp, standing_position) for grasp in grasps
+    )
 
 
-def test_a_grasp_approached_from_the_far_side_is_not_among_the_closest(
+def test_a_grasp_approached_from_the_far_side_is_farther_than_one_approached_head_on(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
-    grasps = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()
+) -> None:
+    world, robot, extensions = pr2_apartment_context
+    grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0]
+    standing_position = _standing_in_front_of(grasp, world)
 
-    assert not IsAmongTheClosestGraspsTo(
-        _turned_around(grasps[0]), _standing_in_front_of(grasps[0], world), grasps
-    )()
+    assert _closeness(_turned_around(grasp), standing_position) > _closeness(
+        grasp, standing_position
+    )
 
 
-def test_a_nearer_grasp_is_the_closest_however_it_is_approached(pr2_apartment_context):
+def test_a_nearer_grasp_is_the_closest_however_it_is_approached(
+    pr2_apartment_context,
+) -> None:
     """
     Distance is ranked before the direction a grasp is approached along, which only
     decides between grasps at the same distance.
     """
-    world, robot, context = pr2_apartment_context
+    world, robot, extensions = pr2_apartment_context
     grasps = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()
+    standing_position = _standing_in_front_of(grasps[0], world)
 
-    assert IsAmongTheClosestGraspsTo(
-        _turned_around(grasps[0], nearer_by=CLOSER_BY),
-        _standing_in_front_of(grasps[0], world),
-        grasps,
-        number_of_grasps=1,
-    )()
+    assert _closeness(
+        _turned_around(grasps[0], nearer_by=CLOSER_BY), standing_position
+    ) < min(_closeness(grasp, standing_position) for grasp in grasps)
 
 
-def test_grasps_tied_for_the_closest_are_still_only_as_many_as_asked_for(
+def test_a_grasp_at_the_standing_position_itself_is_as_close_as_can_be(
     pr2_apartment_context,
-):
+) -> None:
     """
-    Grasps can be exactly as close as one another, for example mirror images of each
-    other seen from a standing pose on the object's axis, and no more of them count as
-    the closest than were asked for.
+    A grasp right where the robot stands has no direction it is approached from.
     """
-    world, robot, context = pr2_apartment_context
+    world, robot, extensions = pr2_apartment_context
     grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0]
-    tied = [grasp, _raised(grasp, 0.0)]
-    standing_position = _standing_in_front_of(grasp, world)
 
-    closest = [
-        candidate
-        for candidate in tied
-        if IsAmongTheClosestGraspsTo(
-            candidate, standing_position, tied, number_of_grasps=1
-        )()
-    ]
-
-    assert closest == [grasp]
+    assert _closeness(
+        grasp, world.transform(grasp.grasp_pose, world.root)
+    ) == GraspCloseness(horizontal_distance=0.0, approach_angle=0.0)
 
 
-def test_grasps_at_the_standing_position_itself_still_rank(pr2_apartment_context):
-    """
-    A grasp right where the robot stands has no direction it is approached from, and
-    grasps tied there still count no more of themselves as the closest than were asked
-    for.
-    """
-    world, robot, context = pr2_apartment_context
-    grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0]
-    tied = [grasp, _raised(grasp, 0.0)]
-    standing_position = world.transform(grasp.grasp_pose, world.root)
-
-    closest = [
-        candidate
-        for candidate in tied
-        if IsAmongTheClosestGraspsTo(
-            candidate, standing_position, tied, number_of_grasps=1
-        )()
-    ]
-
-    assert closest == [grasp]
-
-
-def test_a_grasp_higher_up_is_as_close_as_one_below_it(pr2_apartment_context):
+def test_a_grasp_higher_up_is_as_close_as_one_below_it(pr2_apartment_context) -> None:
     """
     Only the horizontal distance counts, so between a grasp and one at the same spot
     higher up, the direction they are approached along decides.
     """
-    world, robot, context = pr2_apartment_context
-    grasps = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()
-    raised_head_on = _raised(grasps[0], RAISED_BY)
+    world, robot, extensions = pr2_apartment_context
+    grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0]
+    standing_position = _standing_in_front_of(grasp, world)
 
-    assert IsAmongTheClosestGraspsTo(
-        raised_head_on,
-        _standing_in_front_of(grasps[0], world),
-        [_turned_around(grasps[0]), raised_head_on],
-        number_of_grasps=1,
-    )()
+    assert _closeness(_raised(grasp, RAISED_BY), standing_position) < _closeness(
+        _turned_around(grasp), standing_position
+    )
 
 
 def test_a_pick_up_of_a_graspable_tries_each_standing_pose_with_its_closest_grasps(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
-        milk, context.robot.right_arm, context
+        milk, robot.right_arm, context_of(extensions)
     )
 
     pick_ups = list(
         itertools.islice(
-            context.query_backend.evaluate(step),
-            2 * IsAmongTheClosestGraspsTo.number_of_grasps,
+            EntityQueryLanguageGenerativeBackend().evaluate(step),
+            2 * GraspsByCloseness.number_of_grasps,
         )
     )
 
     assert len({id(pick_up.navigate.target_location) for pick_up in pick_ups}) == 2
     _assert_each_standing_pose_keeps_the_closest_grasps(
-        pick_ups, milk, IsAmongTheClosestGraspsTo.number_of_grasps
+        pick_ups, milk, GraspsByCloseness.number_of_grasps
     )
 
 
 def test_a_pick_up_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
         milk,
-        context.robot.right_arm,
-        context,
+        robot.right_arm,
+        context_of(extensions),
         number_of_grasps=NON_DEFAULT_NUMBER_OF_GRASPS,
     )
 
     pick_ups = list(
         itertools.islice(
-            context.query_backend.evaluate(step), 2 * NON_DEFAULT_NUMBER_OF_GRASPS
+            EntityQueryLanguageGenerativeBackend().evaluate(step),
+            2 * NON_DEFAULT_NUMBER_OF_GRASPS,
         )
     )
 
@@ -544,86 +585,70 @@ def test_a_pick_up_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
     )
 
 
-def test_a_transport_of_a_graspable_picks_it_up_by_the_closest_grasps(
+def test_a_pick_up_of_a_graspable_tries_the_grasps_from_each_standing_pose_closest_first(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    transport = TransportAction.from_graspable_by_closest_grasps(
-        milk,
-        Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
-        context.robot.right_arm,
-        context,
+    step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
+        milk, robot.right_arm, context_of(extensions)
     )
 
     pick_ups = list(
         itertools.islice(
-            context.query_backend.evaluate(transport.pick_up),
-            IsAmongTheClosestGraspsTo.number_of_grasps,
+            EntityQueryLanguageGenerativeBackend().evaluate(step),
+            2 * GraspsByCloseness.number_of_grasps,
+        )
+    )
+
+    _assert_each_standing_pose_tries_its_grasps_closest_first(
+        pick_ups, lambda pick_up: pick_up.pick_up.grasp, milk
+    )
+
+
+def test_a_transport_of_a_graspable_picks_it_up_by_the_closest_grasps(
+    pr2_apartment_context,
+) -> None:
+    world, robot, extensions = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    transport = TransportAction.from_graspable_by_closest_grasps(
+        milk,
+        Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
+        robot.right_arm,
+        context_of(extensions),
+    )
+
+    pick_ups = list(
+        itertools.islice(
+            EntityQueryLanguageGenerativeBackend().evaluate(transport.pick_up),
+            GraspsByCloseness.number_of_grasps,
         )
     )
 
     _assert_each_standing_pose_keeps_the_closest_grasps(
-        pick_ups, milk, IsAmongTheClosestGraspsTo.number_of_grasps
+        pick_ups, milk, GraspsByCloseness.number_of_grasps
     )
 
 
 def test_a_transport_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     transport = TransportAction.from_graspable_by_closest_grasps(
         milk,
         Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
-        context.robot.right_arm,
-        context,
+        robot.right_arm,
+        context_of(extensions),
         number_of_grasps=NON_DEFAULT_NUMBER_OF_GRASPS,
     )
 
     pick_ups = list(
         itertools.islice(
-            context.query_backend.evaluate(transport.pick_up),
+            EntityQueryLanguageGenerativeBackend().evaluate(transport.pick_up),
             NON_DEFAULT_NUMBER_OF_GRASPS,
         )
     )
-
-    _assert_each_standing_pose_keeps_the_closest_grasps(
-        pick_ups, milk, NON_DEFAULT_NUMBER_OF_GRASPS
-    )
-
-
-def test_the_closest_grasps_can_be_required_of_a_pick_up_from_a_fixed_standing_pose(
-    pr2_apartment_context,
-):
-    """
-    The condition applies to a pick-up whatever its caller left open, so a fixed
-    standing pose is tried with only the grasps closest to it.
-    """
-    world, robot, context = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
-    grasps = milk.grasp_candidates()
-    object_pose = Pose(reference_frame=milk.root)
-    step = a(MoveAndPickUpAction)(
-        navigate=NavigateAction(_standing_behind_the_milk(world)),
-        face_and_look_at=FaceAndLookAtAction(
-            FaceAtAction(object_pose), LookAtAction(object_pose)
-        ),
-        pick_up=a(PickUpAction)(
-            grasp=variable(GraspCandidate, domain=grasps),
-            arm=context.robot.right_arm,
-        ),
-    )
-    step.where(
-        IsAmongTheClosestGraspsTo(
-            step.pick_up.grasp,
-            step.navigate.target_location,
-            grasps,
-            number_of_grasps=NON_DEFAULT_NUMBER_OF_GRASPS,
-        )
-    )
-
-    pick_ups = list(context.query_backend.evaluate(step))
 
     _assert_each_standing_pose_keeps_the_closest_grasps(
         pick_ups, milk, NON_DEFAULT_NUMBER_OF_GRASPS
@@ -652,27 +677,27 @@ def _move_the_milk(world: World) -> Milk:
     return milk
 
 
-def _assert_every_target_is_at(targets: List[Pose], body: Body, world: World) -> None:
+def _assert_every_target_is_at(targets: list[Pose], body: Body, world: World) -> None:
     """
     Assert that every target resolves to where `body` is now.
     """
     for target in targets:
         np.testing.assert_allclose(
-            world.transform(target, world.root).to_position().to_np(),
-            body.global_pose.to_position().to_np(),
+            world.transform(target, world.root).position.to_np(),
+            body.global_pose.position.to_np(),
         )
 
 
 def test_a_transport_of_a_graspable_faces_it_where_it_is_when_it_picks_it_up(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     transport = TransportAction.from_graspable_by_closest_grasps(
         milk,
         Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
-        context.robot.right_arm,
-        context,
+        robot.right_arm,
+        context_of(extensions),
     )
 
     _move_the_milk(world)
@@ -687,13 +712,13 @@ def test_a_transport_of_a_graspable_faces_it_where_it_is_when_it_picks_it_up(
 
 def test_a_move_and_pick_up_faces_the_object_where_it_is_when_it_picks_it_up(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
         standing_position=Pose(reference_frame=world.root),
         grasp=milk.grasp_candidates()[0],
-        arm=context.robot.left_arm,
+        arm=robot.left_arm,
     )
 
     _move_the_milk(world)
@@ -722,11 +747,11 @@ How far :data:`DRAWER` is pulled out after an opening of it has been built.
 
 def test_a_move_and_open_faces_the_handle_where_it_is_when_it_opens_the_container(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
     move_and_open = MoveAndOpenAction.from_standing_position(
-        Pose(reference_frame=world.root), handle, context.robot.left_arm
+        Pose(reference_frame=world.root), handle.grasp_candidates()[0], robot.left_arm
     )
 
     world.get_connection_by_name(f"{DRAWER}_joint").position = OPENED_DRAWER_POSITION
@@ -755,8 +780,8 @@ def _hold_the_milk(world: World, arm: Arm) -> Milk:
 
 def test_a_move_and_place_from_a_standing_position_places_the_given_object(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     standing_position = Pose(reference_frame=world.root)
     target = Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root)
@@ -765,7 +790,7 @@ def test_a_move_and_place_from_a_standing_position_places_the_given_object(
         standing_position, target, milk
     )
 
-    assert move_and_place.navigate.target_location is standing_position
+    assert move_and_place.carry.navigate.target_location is standing_position
     assert move_and_place.face_and_look_at.face_at.target is target
     assert move_and_place.face_and_look_at.look_at.target is target
     assert move_and_place.place.object_designator is milk
@@ -774,18 +799,95 @@ def test_a_move_and_place_from_a_standing_position_places_the_given_object(
 
 def test_a_move_and_open_from_a_standing_position_opens_the_given_handle(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
+    [grasp, *_] = handle.grasp_candidates()
     standing_position = Pose(reference_frame=world.root)
 
     move_and_open = MoveAndOpenAction.from_standing_position(
-        standing_position, handle, context.robot.left_arm
+        standing_position, grasp, robot.left_arm
     )
 
     assert move_and_open.navigate.target_location is standing_position
-    assert move_and_open.open_container.handle is handle
-    assert move_and_open.open_container.arm is context.robot.left_arm
+    assert move_and_open.open_container.grasp is grasp
+    assert move_and_open.open_container.arm is robot.left_arm
+
+
+# %% opening a container by any grasp its handle offers
+
+
+def test_an_opening_of_a_handle_is_grounded_by_every_grasp_the_handle_offers(
+    pr2_apartment_context,
+) -> None:
+    world, robot, extensions = pr2_apartment_context
+    handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
+
+    openings = list(
+        EntityQueryLanguageGenerativeBackend().evaluate(
+            OpenAction.from_handle(handle, robot.left_arm)
+        )
+    )
+
+    assert sorted(_grasp_signature(opening.grasp) for opening in openings) == sorted(
+        _grasp_signature(grasp) for grasp in handle.grasp_candidates()
+    )
+    assert all(opening.arm is robot.left_arm for opening in openings)
+
+
+@pytest.mark.parametrize("facing_grasp_index", [0, 1], ids=["first", "second"])
+def test_an_opening_of_a_handle_first_tries_the_grasp_facing_the_robot(
+    pr2_apartment_context, facing_grasp_index
+) -> None:
+    """
+    Which side of a handle faces out of the furniture differs between models, so of the
+    grasps approached horizontally, the one approached straight from where the robot
+    stands is tried first, wherever the robot moved before the opening is grounded.
+    """
+    world, robot, extensions = pr2_apartment_context
+    handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
+    opening = OpenAction.from_handle(handle, robot.left_arm)
+    horizontally_approached = [
+        grasp
+        for grasp in handle.grasp_candidates()
+        if world.transform(grasp.grasp_pose, world.root).to_np()[2, 0]
+        == pytest.approx(0, abs=1e-9)
+    ]
+    facing_grasp = horizontally_approached[facing_grasp_index]
+    standing = _standing_in_front_of(facing_grasp, world)
+    robot.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        standing.x, standing.y, 0.0, reference_frame=world.root
+    )
+
+    first_opening = next(iter(EntityQueryLanguageGenerativeBackend().evaluate(opening)))
+
+    assert _grasp_signature(first_opening.grasp) == _grasp_signature(facing_grasp)
+
+
+def test_a_move_and_open_tries_the_grasps_from_each_standing_pose_closest_first(
+    pr2_apartment_context,
+) -> None:
+    """
+    Which side of a handle faces out of the furniture differs between models, so each
+    standing pose tries the grasp facing it first.
+    """
+    world, robot, extensions = pr2_apartment_context
+    handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
+    step = MoveAndOpenAction.from_handle_by_closest_grasps(
+        handle, robot.left_arm, context_of(extensions)
+    )
+
+    openings = list(
+        itertools.islice(
+            EntityQueryLanguageGenerativeBackend().evaluate(step),
+            2 * GraspsByCloseness.number_of_grasps,
+        )
+    )
+
+    assert len({id(opening.navigate.target_location) for opening in openings}) == 2
+    _assert_each_standing_pose_tries_its_grasps_closest_first(
+        openings, lambda opening: opening.open_container.grasp, handle
+    )
 
 
 # %% a move-and-act step acts from where it moved to
@@ -796,15 +898,14 @@ Where the move-and-act steps are sent, away from where the robot starts.
 """
 
 
-def _navigation_targets(action: ActionDescription) -> List[Pose]:
+def _navigation_targets(action: Action) -> list[Pose]:
     """
-    :return: Every standing pose `action` navigates to, including the ones of the
-        actions it is built from.
+    :return: Every standing pose the expanded `action` navigates to, including the ones
+        of the actions it is built from.
     """
-    action.plan_node.notify()
     return [
-        node.designator.target_location
-        for node in action.plan_node.plan.get_nodes_by_designator_type(NavigateAction)
+        node.target_location
+        for node in action.statechart.get_nodes_by_type(NavigateAction)
     ]
 
 
@@ -812,8 +913,11 @@ def _standing_pose(world: World) -> Pose:
     return Pose.from_xyz_rpy(*STANDING_POSITION, 0.0, reference_frame=world.root)
 
 
-def _placing_the_held_milk(world: World, context: Context) -> MoveAndPlaceAction:
-    milk = _hold_the_milk(world, context.robot.left_arm)
+def _placing_the_held_milk(
+    world: World, extensions: list[ContextExtension]
+) -> MoveAndPlaceAction:
+    robot = robot_of(extensions)
+    milk = _hold_the_milk(world, robot.left_arm)
     return MoveAndPlaceAction.from_standing_position(
         standing_position=_standing_pose(world),
         target_location=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
@@ -822,10 +926,10 @@ def _placing_the_held_milk(world: World, context: Context) -> MoveAndPlaceAction
 
 
 MOVE_AND_ACT_STEPS = {
-    "pick up": lambda world, context: MoveAndPickUpAction.from_standing_position(
+    "pick up": lambda world, extensions: MoveAndPickUpAction.from_standing_position(
         standing_position=_standing_pose(world),
         grasp=world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
-        arm=context.robot.left_arm,
+        arm=robot_of(extensions).left_arm,
     ),
     "place": _placing_the_held_milk,
 }
@@ -833,20 +937,20 @@ MOVE_AND_ACT_STEPS = {
 
 @pytest.mark.parametrize("build", MOVE_AND_ACT_STEPS.values(), ids=MOVE_AND_ACT_STEPS)
 def test_a_move_and_act_step_only_ever_stands_where_it_was_sent(
-    pr2_apartment_context, build: Callable[[World, Context], ActionDescription]
-):
+    pr2_apartment_context, build: Callable[[World, list[ContextExtension]], Action]
+) -> None:
     """
     Its plan is built before the robot moves, so turning to face the target has to be
     worked out from where the robot is sent rather than from where it stands at first,
     or the robot is sent back there before it acts.
     """
-    world, robot, context = pr2_apartment_context
-    step = build(world, context)
-    sequential([step], context)
+    world, robot, extensions = pr2_apartment_context
+    step = build(world, extensions)
+    expand(Sequence(nodes=[step]), extensions)
 
     for target in _navigation_targets(step):
         np.testing.assert_allclose(
-            target.to_position().to_np()[:2].ravel(), STANDING_POSITION
+            target.position.to_np()[:2].ravel(), STANDING_POSITION
         )
 
 
@@ -863,63 +967,62 @@ def _assert_base_faces(robot: AbstractRobot, target: Point3):
     )
 
 
-def test_facing_after_navigating_turns_where_the_robot_was_sent(pr2_apartment_context):
-    world, robot, context = pr2_apartment_context
+def test_facing_after_navigating_turns_where_the_robot_was_sent(
+    pr2_apartment_context,
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     target = Pose.from_xyz_rpy(4.0, 2.5, 0.9, reference_frame=world.root)
-    plan = sequential(
-        [NavigateAction(_standing_pose(world)), FaceAtAction(target)], context
+    plan = Sequence(
+        nodes=[
+            NavigateAction(target_location=_standing_pose(world)),
+            FaceAtAction(target=target),
+        ]
     )
 
-    with simulated_robot:
-        plan.perform()
-
+    run_plan(plan, extensions)
     np.testing.assert_allclose(
-        robot.root.global_pose.to_position().to_np()[:2],
+        robot.root.global_pose.position.to_np()[:2],
         STANDING_POSITION,
         atol=0.03,
     )
-    _assert_base_faces(robot, target.to_position())
+    _assert_base_faces(robot, target.position)
 
 
 def test_facing_a_target_given_relative_to_a_body_turns_towards_that_body(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0].root
-    plan = sequential(
-        [
-            NavigateAction(_standing_pose(world)),
-            FaceAtAction(Pose(reference_frame=milk)),
-        ],
-        context,
+    plan = Sequence(
+        nodes=[
+            NavigateAction(target_location=_standing_pose(world)),
+            FaceAtAction(target=Pose(reference_frame=milk)),
+        ]
     )
 
-    with simulated_robot:
-        plan.perform()
-
-    _assert_base_faces(robot, milk.global_pose.to_position())
+    run_plan(plan, extensions)
+    _assert_base_faces(robot, milk.global_pose.position)
 
 
 def test_facing_and_looking_at_a_target_turns_the_base_and_the_camera_towards_it(
     pr2_apartment_context,
-):
-    world, robot, context = pr2_apartment_context
+) -> None:
+    world, robot, extensions = pr2_apartment_context
     target = Pose.from_xyz_rpy(4.0, 2.5, 0.9, reference_frame=world.root)
-    plan = sequential(
-        [
-            NavigateAction(_standing_pose(world)),
-            FaceAndLookAtAction(FaceAtAction(target), LookAtAction(target)),
-        ],
-        context,
+    plan = Sequence(
+        nodes=[
+            NavigateAction(target_location=_standing_pose(world)),
+            FaceAndLookAtAction(
+                face_at=FaceAtAction(target=target), look_at=LookAtAction(target=target)
+            ),
+        ]
     )
 
-    with simulated_robot:
-        plan.perform()
-
-    _assert_base_faces(robot, target.to_position())
+    run_plan(plan, extensions)
+    _assert_base_faces(robot, target.position)
     camera = robot.get_default_camera()
-    camera_P_target = world.transform(target.to_position(), camera.root).to_np()[:3]
-    camera_V_forward = camera.forward_facing_axis.to_np()[:3]
+    camera_P_target = world.transform(target.position, camera.root).to_np()[:3]
+    camera_V_forward = camera.viewing_direction.to_np()[:3]
     np.testing.assert_allclose(
         camera_P_target / np.linalg.norm(camera_P_target),
         camera_V_forward / np.linalg.norm(camera_V_forward),

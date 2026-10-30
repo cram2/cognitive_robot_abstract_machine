@@ -6,7 +6,6 @@ import geometry_msgs.msg as geometry_msgs
 import std_msgs.msg as std_msgs
 import visualization_msgs.msg as visualization_msgs
 from std_msgs.msg import ColorRGBA
-from trimesh.visual import TextureVisuals
 from visualization_msgs.msg import Marker
 
 from semantic_digital_twin.adapters.ros.msg_converter import (
@@ -45,8 +44,8 @@ class HomogeneousTransformationMatrixToRos2Converter(
             result.header.frame_id = str(data.reference_frame.name)
         if data.child_frame is not None:
             result.child_frame_id = str(data.child_frame.name)
-        position = data.to_position().to_np()
-        orientation = data.to_rotation_matrix().to_quaternion().to_np()
+        position = data.position.to_np()
+        orientation = data.rotation_matrix.quaternion.to_np()
         result.transform.translation = geometry_msgs.Vector3(
             x=position[0], y=position[1], z=position[2]
         )
@@ -67,8 +66,8 @@ class PoseToRos2StampedConverter(SemDTToRos2Converter[Pose, geometry_msgs.PoseSt
         result = geometry_msgs.PoseStamped()
         if data.reference_frame is not None:
             result.header.frame_id = str(data.reference_frame.name)
-        position = data.to_position().to_np()
-        orientation = data.to_rotation_matrix().to_quaternion().to_np()
+        position = data.position.to_np()
+        orientation = data.rotation_matrix.quaternion.to_np()
         result.pose.position = geometry_msgs.Point(
             x=position[0], y=position[1], z=position[2]
         )
@@ -87,8 +86,8 @@ class PoseToRos2Converter(SemDTToRos2Converter[Pose, geometry_msgs.Pose]):
     @classmethod
     def convert(cls, data: Pose) -> geometry_msgs.Pose:
         result = geometry_msgs.Pose()
-        position = data.to_position().to_np()
-        orientation = data.to_rotation_matrix().to_quaternion().to_np()
+        position = data.position.to_np()
+        orientation = data.rotation_matrix.quaternion.to_np()
         result.position = geometry_msgs.Point(
             x=position[0], y=position[1], z=position[2]
         )
@@ -167,7 +166,7 @@ class ShapeToRos2Converter(SemDTToRos2Converter[InputType, Marker]):
         reference_frame = data.origin.reference_frame
         marker.header.frame_id = str(reference_frame.name)
         marker.color = ColorToRos2Converter.convert(data.color)
-        marker.pose = PoseToRos2Converter.convert(data.origin.to_pose())
+        marker.pose = PoseToRos2Converter.convert(data.origin.pose)
         return marker
 
 
@@ -214,14 +213,29 @@ class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
 class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
 
     @classmethod
+    def mesh_resource_of(cls, mesh: Mesh) -> str:
+        """
+        :return: A ``package://`` URI when the mesh file lies in a package's share
+            directory, so the receiving machine resolves it in its own install;
+            otherwise a ``file://`` URI.
+        """
+        if mesh.filename.startswith("package://"):
+            return mesh.filename
+        parts = mesh.local_file.parts
+        if "share" not in parts[:-2]:
+            return "file://" + str(mesh.local_file)
+        share_index = len(parts) - 1 - parts[::-1].index("share")
+        return "package://" + "/".join(parts[share_index + 1 :])
+
+    @classmethod
     def convert(cls, data: Mesh) -> Marker:
         marker = super().convert(data)
         marker.type = visualization_msgs.Marker.MESH_RESOURCE
-        marker.mesh_resource = "file://" + str(data.local_file)
+        marker.mesh_resource = cls.mesh_resource_of(data)
         marker.scale.x = data.scale.x
         marker.scale.y = data.scale.y
         marker.scale.z = data.scale.z
-        if data.mesh.visual.kind == TextureVisuals().kind:
+        if data.is_textured:
             marker.mesh_use_embedded_materials = True
             marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
         else:

@@ -10,7 +10,7 @@ only a formatted string), consistent with the rest of krrood.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from krrood.exceptions import DataclassException
 
@@ -35,7 +35,7 @@ class PredicateFragmentRequiredError(DataclassException):
     a degraded *"a HasHighSalary, where …"* rendering.
     """
 
-    node: "InstantiatedVariable"
+    node: InstantiatedVariable
     """The instantiated predicate whose type supplies no verbalization fragment."""
 
     def error_message(self) -> str:
@@ -89,7 +89,7 @@ class UnverbalizableExpressionError(DataclassException):
     rather than silently degrading the node to its class name.
     """
 
-    node: "SymbolicExpression"
+    node: SymbolicExpression
     """The EQL expression no grammar rule matched."""
 
     def error_message(self) -> str:
@@ -111,7 +111,7 @@ class UnloweredFragmentError(DataclassException):
     skipped, leaving an un-lowered ``NounPhrase`` or ``PossessiveChain`` in the tree.
     """
 
-    fragment: "VerbalizationFragment"
+    fragment: VerbalizationFragment
     """The un-lowered fragment that reached the renderer."""
 
     def error_message(self) -> str:
@@ -133,7 +133,7 @@ class UndeclaredFormPositionError(DataclassException):
     ``place``.
     """
 
-    form: "type[ConditionForm]"
+    form: type[ConditionForm]
     """The condition-form subclass missing its ``position``."""
 
     def error_message(self) -> str:
@@ -155,7 +155,7 @@ class UnknownAggregatorError(DataclassException):
     n.vocabulary.english.Aggregations`.
     """
 
-    aggregator_type: "type[Aggregator]"
+    aggregator_type: type[Aggregator]
     """The aggregator type that maps to no aggregation phrase."""
 
     def error_message(self) -> str:

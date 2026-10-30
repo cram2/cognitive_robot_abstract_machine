@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
-from typing import ClassVar, Optional, Type, List, Dict
+from typing_extensions import ClassVar
 from uuid import UUID
 
 import numpy as np
@@ -92,6 +92,8 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     Every published message carries its position in this synchronizer's stream, and
     every applied message is remembered per publisher, so that two processes can tell
     each other what to catch up with without comparing world models they cannot compare.
+    A message that does not follow the one received from its publisher before reveals
+    that messages in between were lost, which is logged.
     """
 
     node: RosNode = field(kw_only=True)
@@ -99,7 +101,7 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     The rclpy node used to create the publishers and subscribers.
     """
 
-    topic_name: Optional[str] = None
+    topic_name: str | None = None
     """
     The topic name of the publisher and subscriber.
     """
@@ -119,17 +121,23 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     How long to wait between two looks at the subscribers of the topic while connecting.
     """
 
-    publisher: Optional[Publisher] = field(init=False, default=None)
+    message_queue_depth: int = 1000
+    """
+    How many messages the publisher and the subscriber keep for a receiver that has not
+    taken them yet; once more are waiting, the oldest are lost.
+    """
+
+    publisher: Publisher | None = field(init=False, default=None)
     """
     The publisher used to publish the world state.
     """
 
-    subscriber: Optional[Subscription] = field(default=None, init=False)
+    subscriber: Subscription | None = field(default=None, init=False)
     """
     The subscriber to the world state.
     """
 
-    message_type: ClassVar[Optional[Type[Message]]] = None
+    message_type: ClassVar[type[Message] | None] = None
     """
     The type of the message that is sent and received.
     """
@@ -139,11 +147,18 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     Position of the message this synchronizer published last.
     """
 
-    _applied_sequence_numbers: Dict[MetaData, int] = field(
+    _applied_sequence_numbers: dict[MetaData, int] = field(
         default_factory=dict, init=False, repr=False
     )
     """
     The highest position applied so far, per publisher.
+    """
+
+    _received_sequence_numbers: dict[MetaData, int] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The position of the message received last, per publisher.
     """
 
     _sequence_number_lock: threading.Lock = field(
@@ -161,10 +176,12 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
             std_msgs.msg.String,
             topic=self.topic_name,
             callback=self.subscription_callback,
-            qos_profile=10,
+            qos_profile=self.message_queue_depth,
         )
         self.publisher = self.node.create_publisher(
-            std_msgs.msg.String, topic=self.topic_name, qos_profile=10
+            std_msgs.msg.String,
+            topic=self.topic_name,
+            qos_profile=self.message_queue_depth,
         )
         self.wait_until_connected()
 
@@ -238,7 +255,34 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
             if deserialized_message.meta_data == self.meta_data:
                 return
 
+            self._notice_lost_messages(deserialized_message)
             self._subscription_callback(deserialized_message)
+
+    def _notice_lost_messages(
+        self, message: Message, warning_throttle_period: float = 1.0
+    ) -> None:
+        """
+        Warn that messages of the publisher of `message` were lost if `message` does not
+        follow the one received from it before.
+
+        Only what changed is published, so the world may differ from the publisher's in
+        what the lost messages carried.
+
+        :param message: A message just received from another synchronizer.
+        :param warning_throttle_period: The fewest seconds between two warnings.
+        """
+        publisher = message.meta_data
+        with self._sequence_number_lock:
+            last_received = self._received_sequence_numbers.get(publisher)
+            self._received_sequence_numbers[publisher] = message.sequence_number
+        if last_received is None or message.sequence_number == last_received + 1:
+            return
+        self.node.get_logger().warning(
+            f"Updates #{last_received + 1} to #{message.sequence_number - 1} of "
+            f"'{publisher.node_name}' were lost, so this world may differ from the one "
+            f"of the publisher.",
+            throttle_duration_sec=warning_throttle_period,
+        )
 
     @property
     def published_sequence_number(self) -> int:
@@ -324,7 +368,7 @@ class ModelReloadSynchronizer(Synchronizer):
     Note that this may take a couple of seconds.
     """
 
-    message_type: ClassVar[Type[Message]] = LoadModel
+    message_type: ClassVar[type[Message]] = LoadModel
 
     session: Session = None
     """
@@ -343,7 +387,7 @@ class ModelReloadSynchronizer(Synchronizer):
     running motion.
     """
 
-    pending_reload: Optional[LoadModel] = field(default=None, init=False, repr=False)
+    pending_reload: LoadModel | None = field(default=None, init=False, repr=False)
     """
     The reload that was received but not applied yet.
 
@@ -418,7 +462,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     messages arrive before the model update that introduced the referenced DOF UUIDs.
     """
 
-    message_type: ClassVar[Optional[Type[Message]]] = WorldUpdate
+    message_type: ClassVar[type[Message] | None] = WorldUpdate
 
     topic_name: str = "/semantic_digital_twin/world_sync"
 
@@ -432,7 +476,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     example a controller that must not have the world changed under a running motion.
     """
 
-    missed_messages: List[WorldUpdate] = field(
+    missed_messages: list[WorldUpdate] = field(
         default_factory=list, init=False, repr=False
     )
     """
@@ -477,7 +521,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         Synchronizer.__post_init__(self)
         ModelChangeCallback.__post_init__(self)
 
-    def on_model_change(self, publish_changes: Optional[bool] = None, **kwargs):
+    def on_model_change(self, publish_changes: bool | None = None, **kwargs):
         """
         Send the modification block the world just recorded to the other synchronizers.
 
@@ -504,7 +548,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
 
     def on_state_change(
         self,
-        publish_changes: Optional[bool] = None,
+        publish_changes: bool | None = None,
         force_republish: bool = False,
         **kwargs,
     ):
@@ -561,7 +605,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         else:
             self.publish(update)
 
-    def compute_state_changes(self) -> Dict[UUID, float]:
+    def compute_state_changes(self) -> dict[UUID, float]:
         """
         Return only DOF positions that changed since the last snapshot.
         """

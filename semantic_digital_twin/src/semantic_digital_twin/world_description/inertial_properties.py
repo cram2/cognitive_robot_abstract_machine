@@ -1,10 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Tuple, Optional, Dict, Any
+from typing_extensions import Self, TypeVar, Any
 
 import numpy as np
 from numpy._typing import NDArray
-from typing_extensions import Self, TypeVar
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from semantic_digital_twin.spatial_types import Point3, RotationMatrix
@@ -12,7 +11,7 @@ from semantic_digital_twin.spatial_types import Point3, RotationMatrix
 
 @dataclass
 class NPMatrix3x3(SubclassJSONSerializer):
-    data: Optional[NDArray] = None
+    data: NDArray | None = None
 
     def __post_init__(self):
         if self.data is not None:
@@ -21,11 +20,11 @@ class NPMatrix3x3(SubclassJSONSerializer):
     def __matmul__(self, other: GenericMatrix3x3Type) -> GenericMatrix3x3Type:
         return NPMatrix3x3(data=self.data @ other.data)
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {**super().to_json(**kwargs), "data": self.data.tolist()}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(data=np.array(data["data"]))
 
 
@@ -34,7 +33,7 @@ GenericMatrix3x3Type = TypeVar("GenericMatrix3x3Type", bound=NPMatrix3x3)
 
 @dataclass
 class NPVector3(SubclassJSONSerializer):
-    data: Optional[NDArray] = None
+    data: NDArray | None = None
 
     def __post_init__(self):
         if self.data is not None:
@@ -47,7 +46,7 @@ class NPVector3(SubclassJSONSerializer):
         """
         return cls(data=np.array([x, y, z]))
 
-    def to_values(self) -> Tuple[float, float, float]:
+    def to_values(self) -> tuple[float, float, float]:
         """
         Return the tuple (x,y,z)
         """
@@ -59,11 +58,11 @@ class NPVector3(SubclassJSONSerializer):
         """
         return NPMatrix3x3(data=np.diag(self.data))
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {**super().to_json(**kwargs), "data": self.data.tolist()}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
+    def _from_json(cls, data: dict[str, Any]) -> Self:
         return cls(data=np.array(data["data"]))
 
 
@@ -170,7 +169,7 @@ class InertiaTensor(NPMatrix3x3):
         )
         return InertiaTensor(data=data)
 
-    def to_values(self) -> Tuple[float, float, float, float, float, float]:
+    def to_values(self) -> tuple[float, float, float, float, float, float]:
         """
         Return the individual components of the inertia tensor.
 
@@ -198,8 +197,8 @@ class InertiaTensor(NPMatrix3x3):
         return InertiaTensor(data=data.data)
 
     def to_principal_moments_and_axes(
-        self, sorted_array: Optional[NDArray] = None
-    ) -> Tuple[PrincipalMoments, PrincipalAxes]:
+        self, sorted_array: NDArray | None = None
+    ) -> tuple[PrincipalMoments, PrincipalAxes]:
         """
         Decompose inertia tensor into principal moments and axes.
 
@@ -247,3 +246,15 @@ class Inertial:
     The inertia tensor of the body about its center of mass, expressed in the body's
     local coordinate frame.
     """
+
+    @classmethod
+    def negligible(cls) -> Self:
+        """
+        :return: The inertial of a body whose material belongs to another body it is
+            fixed to: too light for a simulator to notice, yet stated, so that no
+            simulator weighs the body by its shapes instead.
+        """
+        return cls(
+            mass=1e-6,
+            inertia=InertiaTensor.from_values(1e-12, 1e-12, 1e-12, 0.0, 0.0, 0.0),
+        )

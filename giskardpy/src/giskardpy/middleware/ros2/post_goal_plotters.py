@@ -5,8 +5,9 @@ import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from giskardpy.executor import Executor
-from giskardpy.middleware.ros2 import rospy
+from cramph.executor import StatechartExecutor
+from semantic_digital_twin.adapters.ros import rospy
+from giskardpy.motion_control import WorldStateTrajectoryRecording
 from giskardpy.utils.utils import create_path
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,
@@ -19,7 +20,7 @@ class PostGoalPlotter(ABC):
     Writes a debug plot of the finished motion to a file.
     """
 
-    executor: Executor
+    executor: StatechartExecutor
     """
     The executor holding the data that is plotted.
     """
@@ -65,7 +66,9 @@ class GoalTrajectoryPlotter(PostGoalPlotter):
     """
 
     def start_recording(self) -> None:
-        self.executor.trajectory_plotter = self.trajectory_plotter
+        self.executor.extensions.append(
+            WorldStateTrajectoryRecording(plotter=self.trajectory_plotter)
+        )
 
     def plot(self, goal_id: int) -> None:
         if len(self.trajectory_plotter.world_state_trajectory.times) <= 1:
@@ -87,10 +90,10 @@ class GoalGanttChartPlotter(PostGoalPlotter):
     """
 
     def plot(self, goal_id: int) -> None:
-        if not self.executor.motion_statechart.history:
+        if not self.executor.statechart.state_history:
             return
         file_name = self.create_file_name("gantt_charts", goal_id)
-        self.executor.motion_statechart.plot_gantt_chart(
+        self.executor.statechart.plot_gantt_chart(
             file_name,
             context=self.executor.context,
             second_length_in_cm=self.second_length_in_cm,
@@ -106,5 +109,5 @@ class MotionStatechartPlotter(PostGoalPlotter):
 
     def plot(self, goal_id: int) -> None:
         file_name = self.create_file_name("motion_statecharts", goal_id)
-        self.executor.motion_statechart.draw(file_name)
+        self.executor.statechart.draw(file_name)
         rospy.get_node().get_logger().info(f"saved {file_name}")

@@ -5,7 +5,7 @@ import webbrowser
 from dataclasses import dataclass, field
 
 import rustworkx as rx
-from typing_extensions import Any, ClassVar, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing_extensions import Any, ClassVar, Tuple, TYPE_CHECKING
 
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
@@ -32,13 +32,13 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
         Install them with ``pip install krrood[visualization]``.
     """
 
-    required_modules: ClassVar[Tuple[str, ...]] = ("dash", "plotly")
+    required_modules: ClassVar[tuple[str, ...]] = ("dash", "plotly")
     """The libraries needed to render with Dash and Plotly."""
 
-    _selected_details: List[str] = field(default_factory=list, init=False, repr=False)
+    _selected_details: list[str] = field(default_factory=list, init=False, repr=False)
     """The details of the most recently clicked node, empty when nothing is selected."""
 
-    def compute_positions(self) -> Dict[int, NodePosition]:
+    def compute_positions(self) -> dict[int, NodePosition]:
         """
         :return: A position for every node, keyed by its rustworkx node index.
         """
@@ -75,14 +75,14 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
         if self.open_browser:
             webbrowser.open(f"http://127.0.0.1:{self.port}")
 
-    def _spring_positions(self) -> Dict[int, NodePosition]:
+    def _spring_positions(self) -> dict[int, NodePosition]:
         """Force-directed positions for every node."""
         if self.graph.num_nodes() == 0:
             return {}
         layout = rx.spring_layout(self.graph)
         return {index: tuple(layout[index]) for index in self.graph.node_indices()}
 
-    def _layered_positions(self) -> Dict[int, NodePosition]:
+    def _layered_positions(self) -> dict[int, NodePosition]:
         """Top-to-bottom positions grouped by distance from the source nodes."""
         source_indices = [
             index
@@ -92,7 +92,7 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
         if not source_indices:
             return self._spring_positions()
 
-        positions: Dict[int, NodePosition] = {}
+        positions: dict[int, NodePosition] = {}
         for depth, layer in enumerate(
             rx.layers(self.graph, source_indices, index_output=True)
         ):
@@ -100,7 +100,7 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
                 positions[index] = (float(position_in_layer), float(-depth))
         return positions
 
-    def _node_trace(self, positions: Dict[int, NodePosition]) -> go.Scatter:
+    def _node_trace(self, positions: dict[int, NodePosition]) -> go.Scatter:
         """The scatter trace holding one clickable marker per node."""
         import plotly.graph_objects as go
 
@@ -119,12 +119,12 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
             marker=dict(size=18, color=[self.node_color(index) for index in indices]),
         )
 
-    def _edge_trace(self, positions: Dict[int, NodePosition]) -> go.Scatter:
+    def _edge_trace(self, positions: dict[int, NodePosition]) -> go.Scatter:
         """The line trace connecting adjacent nodes."""
         import plotly.graph_objects as go
 
-        x_coordinates: List[Optional[float]] = []
-        y_coordinates: List[Optional[float]] = []
+        x_coordinates: list[float | None] = []
+        y_coordinates: list[float | None] = []
         for source, target in self.graph.edge_list():
             if source not in positions or target not in positions:
                 continue
@@ -202,7 +202,7 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
 
         return application
 
-    def _render_details(self) -> List[Any]:
+    def _render_details(self) -> list[Any]:
         """The children of the details panel for the current selection.
         :return: The children of the details panel for the current selection.
         """

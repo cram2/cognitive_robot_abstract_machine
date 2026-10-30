@@ -5,12 +5,13 @@ Exceptions raised while executing a trajectory on a robot.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
     SetupException,
 )
+from semantic_digital_twin.adapters.ros.messages import MetaData
+from semantic_digital_twin.world_description.connections import WheeledDrive
 
 
 @dataclass
@@ -24,7 +25,7 @@ class UnknownMinimumVelocityJointError(SetupException):
     The joint the override was written for.
     """
 
-    commanded_joint_names: List[str]
+    commanded_joint_names: list[str]
     """
     The joints the publisher actually commands.
     """
@@ -37,6 +38,100 @@ class UnknownMinimumVelocityJointError(SetupException):
 
     def suggest_correction(self) -> str:
         return f"Use one of {sorted(self.commanded_joint_names)}."
+
+
+@dataclass
+class ServiceUnavailableError(SetupException):
+    """
+    Raised when a service Giskard needs for its setup does not become available.
+    """
+
+    service_name: str
+    """
+    The service that was waited for.
+    """
+
+    def error_message(self) -> str:
+        return f'The service "{self.service_name}" is not available.'
+
+    def suggest_correction(self) -> str:
+        return "Make sure the node offering the service is running."
+
+
+@dataclass
+class ControllersNotLoadedError(SetupException):
+    """
+    Raised when controllers Giskard was told to use are not loaded by their controller
+    manager.
+    """
+
+    controller_manager_name: str
+    """
+    The controller manager that was asked.
+    """
+
+    missing_controllers: list[str]
+    """
+    The requested controllers the manager does not report.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'The controller manager "{self.controller_manager_name}" has not loaded '
+            f"the controllers {self.missing_controllers}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Load the controllers or remove them from the whitelist."
+
+
+@dataclass
+class ControllersNotActiveError(SetupException):
+    """
+    Raised when controllers Giskard was told to use are loaded by their controller
+    manager but do not run.
+    """
+
+    controller_manager_name: str
+    """
+    The controller manager that was asked.
+    """
+
+    inactive_controllers: list[str]
+    """
+    The requested controllers the manager reports in another state than active.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The controllers {self.inactive_controllers} of the controller manager "
+            f'"{self.controller_manager_name}" are not active.'
+        )
+
+    def suggest_correction(self) -> str:
+        return "Activate the controllers or remove them from the whitelist."
+
+
+@dataclass
+class NoUniqueDriveError(SetupException):
+    """
+    Raised when Giskard is told to command the drive of a world without being told which
+    drive, and the world does not hold exactly one.
+    """
+
+    drives: list[WheeledDrive]
+    """
+    The drives the world holds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Expected exactly one drive to command, but the world holds "
+            f"{[str(drive.name) for drive in self.drives]}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Name the drive to command."
 
 
 @dataclass
@@ -82,6 +177,50 @@ class ExecutionCanceledException(ExecutionException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class ClientDisconnectedError(ExecutionException):
+    """
+    Raised when the client that sent the running goal disconnected.
+
+    Nobody is waiting for the motion any more, so it is stopped instead of being run to
+    its end.
+    """
+
+    print_stack_trace: bool = field(default=False, kw_only=True)
+
+    client: MetaData
+    """
+    The client that sent the goal and is now gone.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The client '{self.client.node_name}' (process {self.client.process_id}) "
+            f"that sent this goal is gone."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Restart the client and send the goal again."
+
+
+@dataclass
+class NoWatchedClientError(GiskardException):
+    """
+    Raised when a presence check is asked about a client while it watches none.
+    """
+
+    check_type: type
+    """
+    The check that was asked.
+    """
+
+    def error_message(self) -> str:
+        return f"'{self.check_type.__name__}' is not watching a client."
+
+    def suggest_correction(self) -> str:
+        return "Only ask a check about a client that it started watching."
 
 
 @dataclass
@@ -331,3 +470,98 @@ class FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(FollowJointTrajectoryError):
     """
     Raised when the action server reports a goal tolerance violation.
     """
+
+
+@dataclass
+class StatechartOutOfStepError(ExecutionException):
+    """
+    Raised when a client sends a child for a statechart that holds other nodes than the
+    client's copy of it.
+    """
+
+    node_count: int
+    """
+    How many nodes the running statechart holds.
+    """
+
+    first_sent_node_index: int
+    """
+    The index the client gave the first node it sent.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The client sent nodes from index {self.first_sent_node_index} on, but the "
+            f"running statechart holds {self.node_count}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Send children only for the goal the client's statechart was sent as."
+
+
+@dataclass
+class StatechartNotEndedByResultError(ExecutionException):
+    """
+    Raised when the result of a goal that succeeded leaves the client's statechart in a
+    state that has not ended.
+    """
+
+    def error_message(self) -> str:
+        return "The result of the finished goal does not end the client's statechart."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that the statechart Giskard ran holds the same nodes as the "
+            "client's copy of it."
+        )
+
+
+@dataclass
+class StateUpdateAheadOfStatechartError(ExecutionException):
+    """
+    Raised when Giskard reports the states of more nodes than the client's copy of the
+    statechart holds.
+    """
+
+    node_count: int
+    """
+    How many nodes the client's copy holds.
+    """
+
+    reported_node_count: int
+    """
+    How many nodes Giskard reported a state for.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Giskard reported the states of {self.reported_node_count} nodes, but the "
+            f"client's statechart holds {self.node_count}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Apply the states only to the statechart that was sent as the running goal."
+        )
+
+
+@dataclass
+class MotionServerThreadStillRunningError(GiskardException):
+    """
+    Raised when a motion server's background thread does not stop in time.
+    """
+
+    timeout: float
+    """
+    Seconds :meth:`~giskardpy.middleware.ros2.motion_server.MotionServer.stop` waited
+    before giving up on the thread.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The motion server's background thread did not stop within "
+            f"{self.timeout} seconds."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Check whether a goal is stuck or the idle loop is blocked."

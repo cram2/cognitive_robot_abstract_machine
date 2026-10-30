@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.bound_cap import BoundCap, ScalarBoundCap

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from functools import cached_property
 
-from typing_extensions import Hashable, Optional
-from typing import Any, Iterable, Self, Dict, Optional, Tuple
+from typing_extensions import Hashable, Optional, Any, Iterable, Self, Tuple
 from dataclasses import field, dataclass
 
 from krrood.adapters.json_serializer import to_json, from_json
@@ -11,8 +10,8 @@ from random_events.sigma_algebra import AbstractSimpleSet, AbstractCompositeSet
 import random_events_lib as rl
 
 # Type Definitions
-HashMap: Dict[int, Hashable]
-AllElements: Tuple[Hashable]
+HashMap: dict[int, Hashable]
+AllElements: tuple[Hashable]
 
 
 @dataclass(eq=False)
@@ -109,7 +108,7 @@ class SetElement(AbstractSimpleSet):
     def __repr__(self):
         return self.non_empty_to_string()
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {
             **super().to_json(),
             "value": to_json(self.element),
@@ -117,13 +116,13 @@ class SetElement(AbstractSimpleSet):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls.from_data(from_json(data["value"]), from_json(data["content"]))
 
     def as_composite_set(self) -> AbstractCompositeSet:
         return Set.from_simple_sets(self)
 
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         return SetElement.from_data(self.element, self.all_elements)
 
 
@@ -147,7 +146,7 @@ class Set(AbstractCompositeSet):
 
     cpp_object: rl.Set = field(default_factory=lambda: rl.Set(set(), set()))
     simple_set_example: SetElement = field(init=False)
-    all_elements: Tuple[Hashable] = field(init=False)
+    all_elements: tuple[Hashable] = field(init=False)
 
     @classmethod
     def from_simple_sets(cls, *simple_sets: SetElement) -> Self:
@@ -186,3 +185,9 @@ class Set(AbstractCompositeSet):
         :return: A map that maps the hashes of each element in all_elements to the element.
         """
         return {hash(elem): elem for elem in self.all_elements}
+
+    def is_singleton(self) -> bool:
+        """
+        :return: Whether the set contains exactly one element.
+        """
+        return len(self.simple_sets) == 1

@@ -9,7 +9,7 @@ import os.path
 from dataclasses import dataclass, field
 from functools import wraps
 
-from typing_extensions import Callable, Optional, Type, Tuple, Dict, Any, List
+from typing_extensions import Callable, Any
 
 from krrood.ripple_down_rules.experts import Expert, Human
 from krrood.ripple_down_rules.rdr import GeneralRDR
@@ -32,7 +32,7 @@ class RDRDecorator:
     """
     The directory to save the RDR models in.
     """
-    output_type: Tuple[Type, ...]
+    output_type: tuple[type, ...]
     """
     The type(s) of the output produced by the RDR model (The type(s) of the queried attribute).
     """
@@ -44,7 +44,7 @@ class RDRDecorator:
     """
     Whether to run in fitting mode and prompt the expert or just classify using existing rules.
     """
-    expert: Optional[Expert] = field(default=None)
+    expert: Expert | None = field(default=None)
     """
     The expert instance, this is used by the rdr to prompt for answers.
     """
@@ -52,7 +52,7 @@ class RDRDecorator:
     """
     When in fitting mode, whether to ask for answers for existing rules as well or not.
     """
-    package_name: Optional[str] = field(default=None)
+    package_name: str | None = field(default=None)
     """
     The name of the user python package where the RDR model will be saved, this is useful for generating relative
     imports in the generated rdr model files.
@@ -62,17 +62,17 @@ class RDRDecorator:
     Whether to use the generated classifier files of the rdr model instead of the RDR instance itself, this is useful
     when you want to debug inside the rules.
     """
-    ask_now: Callable[Dict[str, Any], bool] = field(default=lambda _: False)
+    ask_now: Callable[dict[str, Any], bool] = field(default=lambda _: False)
     """
     A user provided callable function that outputs a boolean indicating when to ask the expert for an answer. The input
     to the `ask_now` function is a dictionary with the original function arguments, while arguments like `self` and
     `cls` are passed as a special key `self_` or `cls_` respectively.
     """
-    ask_now_target: Optional[Any] = field(default=None)
+    ask_now_target: Any | None = field(default=None)
     """
     A target for the case that triggers the ask now function.
     """
-    fitting_decorator: Optional[Callable] = field(default=lambda f: f)
+    fitting_decorator: Callable | None = field(default=lambda f: f)
     """
     A user provided decorator that wraps the `py:meth:ripple_down_rules.rdr.RippleDownRules.fit_case` method which is 
     used when in fitting mode, this is useful when you want special logic pre and post the fitting operation, you can
@@ -88,7 +88,7 @@ class RDRDecorator:
     """
     Whether to regenerate the rdr model from scratch or not, this is useful when rdr package has been updated.
     """
-    model_name: Optional[str] = field(default=None)
+    model_name: str | None = field(default=None)
     """
     The name of the rdr model, this gets auto generated from the function signature and the class/file it is contained
     in.
@@ -97,12 +97,12 @@ class RDRDecorator:
     """
     The ripple down rules instance of the decorator class.
     """
-    parsed_output_type: List[Type] = field(init=False, default_factory=list)
+    parsed_output_type: list[type] = field(init=False, default_factory=list)
     """
     The output of a post processing done on the output types, for example converting typing module types 
     (i.e. type hints) to python types.
     """
-    origin_type: Optional[Type] = field(init=False, default=None)
+    origin_type: type | None = field(init=False, default=None)
     """
     The origin of the type hint of the attribute, useful in the case of not mutually exclusive attributes to map the 
     result to the specified container type (e.g. a list instead of a set which is the default container type for rdr
@@ -119,7 +119,7 @@ class RDRDecorator:
     This is a flag that indicates that a not None output for the rdr has been inferred, this is used to update the 
     generated dot file if it is set to `True`.
     """
-    generated_classifier: Optional[Callable] = field(init=False, default=None)
+    generated_classifier: Callable | None = field(init=False, default=None)
     """
     The generated classifier file of the rdr model, this is used when `use_generated_classifier` is set to `True`.
     """
@@ -127,7 +127,7 @@ class RDRDecorator:
     def decorator(self, func: Callable) -> Callable:
 
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Optional[Any]:
+        def wrapper(*args, **kwargs) -> Any | None:
 
             kwargs = fill_in_missing_kwargs(func, **kwargs)
 
@@ -217,7 +217,7 @@ class RDRDecorator:
         if self.regenerate_model:
             self.rdr.save(self.models_dir, self.model_name)
 
-    def parse_output_type(self, func: Callable, output_type: Any, *args) -> List[Type]:
+    def parse_output_type(self, func: Callable, output_type: Any, *args) -> list[type]:
         parsed_output_type = []
         for ot in make_set(output_type):
             ot = get_arg_type_of_function_output(

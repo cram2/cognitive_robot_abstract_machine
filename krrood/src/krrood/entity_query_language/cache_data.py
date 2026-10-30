@@ -9,7 +9,7 @@ This module provides caching datastructures and utilities.
 """
 from dataclasses import dataclass, field
 from itertools import islice
-from typing_extensions import Dict, Generic, Iterable, Iterator, List, Optional
+from typing_extensions import Generic, Iterable, Iterator
 
 
 @dataclass
@@ -27,7 +27,7 @@ class SeenSet:
     constraints: list = field(default_factory=list, init=False, repr=False)
     exact: set = field(default_factory=set, init=False, repr=False)
 
-    def add(self, assignment: Dict) -> None:
+    def add(self, assignment: dict) -> None:
         """
         Add a constraint (partial assignment) to the coverage index.
         """
@@ -49,7 +49,7 @@ class SeenSet:
 
         self.constraints.append(assignment)
 
-    def check(self, assignment: Dict) -> bool:
+    def check(self, assignment: dict) -> bool:
         """
         Return True if any stored constraint is a subset of the given assignment.
 
@@ -77,7 +77,7 @@ class SeenSet:
                 return True
         return False
 
-    def exact_contains(self, assignment: Dict) -> bool:
+    def exact_contains(self, assignment: dict) -> bool:
         """
         Return True if the assignment contains all cache keys and the exact key tuple
         exists in the cache.
@@ -131,7 +131,7 @@ class ReEnterableLazyIterable(Generic[T]):
     materializing values as they are iterated over.
     """
 
-    iterable: Optional[Iterator[T]] = field(default=None)
+    iterable: Iterator[T] | None = field(default=None)
     """
     The live source iterator currently feeding new values, or ``None`` when it has been
     released.
@@ -140,12 +140,12 @@ class ReEnterableLazyIterable(Generic[T]):
     still to come.
     """
 
-    materialized_values: List[T] = field(default_factory=list)
+    materialized_values: list[T] = field(default_factory=list)
     """
     The materialized values of the iterable.
     """
 
-    _source: Optional[Iterable[T]] = field(default=None, init=False, repr=False)
+    _source: Iterable[T] | None = field(default=None, init=False, repr=False)
     """
     The original iterable, kept so a released source iterator can be recreated for a
     later iteration.

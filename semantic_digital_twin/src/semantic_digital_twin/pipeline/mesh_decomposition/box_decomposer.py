@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
 
 import numpy as np
 import trimesh
@@ -600,7 +599,7 @@ class BoxDecomposer(MeshDecomposer):
     Overlap threshold at which two boards are merged into one.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> List[Box]:
+    def apply_to_mesh(self, mesh: Mesh) -> list[Box]:
         """
         Decompose a mesh into boxes.
 

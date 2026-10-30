@@ -4,23 +4,36 @@ Codec registry and serializers for CAS view persistence.
 
 from __future__ import annotations
 
+from robokudo.io.exceptions import CASViewCodecMissing, UnknownViewSerializer
+
 import array
 import base64
 import importlib
 import io
 from dataclasses import dataclass, field
+from enum import StrEnum
+from uuid import UUID
+
+from krrood.adapters.json_serializer import DataclassJSONSerializer
+from krrood.ormatic.utils import classproperty
 
 import numpy as np
-from typing_extensions import Any, Dict, Iterable, List, Optional
+from typing_extensions import Any, Iterable
 from robokudo import world
+from robokudo.exceptions import InvalidCameraObservation
 from robokudo.io.cas_annotation_codecs import krrood_to_json, krrood_from_json
+from robokudo.types.camera import CameraObservation
 from robokudo.io.open3d_codec_utils import (
-    o3d,
     is_open3d_point_cloud,
     encode_open3d_point_cloud_to_base64_pcd,
     decode_open3d_point_cloud_from_base64_pcd,
 )
 from robokudo.types.tf import StampedTransform
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
+from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 
@@ -39,11 +52,11 @@ def _recursive_convert(value: Any) -> Any:
     return value
 
 
-def _ros_message_to_dict(msg: Any) -> Dict[str, Any]:
+def _ros_message_to_dict(msg: Any) -> dict[str, Any]:
     """
     Convert a ROS message object into plain dictionary data.
     """
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     for field_name, _ in msg.get_fields_and_field_types().items():
         value = getattr(msg, field_name)
         if hasattr(value, "get_fields_and_field_types"):
@@ -55,7 +68,7 @@ def _ros_message_to_dict(msg: Any) -> Dict[str, Any]:
     return result
 
 
-def _dict_to_ros_message(message_type: type[Any], data_dict: Dict[str, Any]) -> Any:
+def _dict_to_ros_message(message_type: type[Any], data_dict: dict[str, Any]) -> Any:
     """
     Populate a ROS message instance from plain dictionary data.
     """
@@ -111,20 +124,6 @@ def _load_type(type_name: str) -> type[Any]:
     return getattr(module, class_name)
 
 
-def _is_open3d_pinhole_camera_intrinsic(value: Any) -> bool:
-    """
-    Check whether a value is an Open3D pinhole camera intrinsic object.
-    """
-    value_type = value.__class__
-    return (
-        value_type.__name__ == "PinholeCameraIntrinsic"
-        and value_type.__module__.startswith("open3d.")
-        and hasattr(value, "intrinsic_matrix")
-        and hasattr(value, "width")
-        and hasattr(value, "height")
-    )
-
-
 @dataclass
 class ViewPayload:
     """
@@ -134,9 +133,9 @@ class ViewPayload:
     serializer_id: str
     payload: Any
     type_name: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_document(self, view_name: str) -> Dict[str, Any]:
+    def to_document(self, view_name: str) -> dict[str, Any]:
         """
         Build a storage document for one encoded view.
         """
@@ -149,7 +148,7 @@ class ViewPayload:
         }
 
     @staticmethod
-    def from_document(document: Dict[str, Any]) -> "ViewPayload":
+    def from_document(document: dict[str, Any]) -> ViewPayload:
         """
         Create a payload object from a storage document.
         """
@@ -374,69 +373,6 @@ class Open3DPointCloudCodec(ViewCodec):
         return decode_open3d_point_cloud_from_base64_pcd(payload.payload)
 
 
-class Open3DPinholeCameraIntrinsicCodec(ViewCodec):
-    """
-    Codec for Open3D pinhole camera intrinsic values.
-    """
-
-    serializer_id: str = "open3d_pinhole_camera_intrinsic_v1"
-
-    def can_encode(self, value: Any) -> bool:
-        """
-        Check whether the value is an Open3D pinhole camera intrinsic.
-        """
-        return _is_open3d_pinhole_camera_intrinsic(value)
-
-    def encode(self, value: Any) -> ViewPayload:
-        """
-        Encode an Open3D pinhole intrinsic into JSON-compatible payload data.
-        """
-        intrinsic_matrix = np.asarray(value.intrinsic_matrix, dtype=float)
-        if intrinsic_matrix.shape != (3, 3):
-            raise ValueError(
-                "Open3D pinhole camera intrinsic matrix must have shape (3, 3)."
-            )
-        return ViewPayload(
-            serializer_id=self.serializer_id,
-            payload={
-                "width": int(value.width),
-                "height": int(value.height),
-                "intrinsic_matrix": intrinsic_matrix.tolist(),
-            },
-            type_name=_full_type_name(value),
-        )
-
-    def decode(self, payload: ViewPayload) -> Any:
-        """
-        Decode payload data to an Open3D pinhole intrinsic object.
-        """
-        payload_data: Dict[str, Any] = payload.payload
-        width = int(payload_data["width"])
-        height = int(payload_data["height"])
-        intrinsic_matrix = np.asarray(payload_data["intrinsic_matrix"], dtype=float)
-        if intrinsic_matrix.shape != (3, 3):
-            raise ValueError(
-                "Serialized Open3D camera intrinsic matrix must have shape (3, 3)."
-            )
-
-        fx = float(intrinsic_matrix[0, 0])
-        fy = float(intrinsic_matrix[1, 1])
-        cx = float(intrinsic_matrix[0, 2])
-        cy = float(intrinsic_matrix[1, 2])
-
-        try:
-            camera_intrinsic_type = _load_type(payload.type_name)
-        except Exception:  # pragma: no cover - fallback for cpu/cuda module differences
-            camera_intrinsic_type = o3d.camera.PinholeCameraIntrinsic
-
-        try:
-            return camera_intrinsic_type(width, height, fx, fy, cx, cy)
-        except Exception:
-            camera_intrinsic = camera_intrinsic_type()
-            camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
-            return camera_intrinsic
-
-
 class StampedTransformCodec(ViewCodec):
     """
     Codec for RoboKudo ``StampedTransform`` values.
@@ -528,6 +464,103 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
         return HomogeneousTransformationMatrix.from_json(payload.payload, **kwargs)
 
 
+# %% Recorded camera observations
+@dataclass
+class RecordedCameraObservation:
+    """
+    Image calibration and optical pose linked to a recorded camera.
+    """
+
+    camera_id: str
+    """
+    Identifier of the semantic camera in the recorded world.
+    """
+
+    effective_camera_model: PinholeCameraModel
+    """
+    Projection model matching the recorded image.
+    """
+
+    world_T_camera: HomogeneousTransformationMatrix | None
+    """
+    Sampled optical-frame pose in world coordinates.
+    """
+
+    timestamp_nanoseconds: int
+    """
+    Frame acquisition time in nanoseconds since the Unix epoch.
+    """
+
+
+@dataclass
+class CameraObservationCodec(ViewCodec):
+    """
+    Persist optical image observations linked to recorded cameras.
+    """
+
+    @classproperty
+    def serializer_id(cls: type[CameraObservationCodec]) -> str:
+        """
+        Identifier of the recorded camera observation format.
+
+        :return: Serialization identifier used by the codec registry.
+        """
+        return "robokudo_camera_observation_v3"
+
+    def can_encode(self, value: Any) -> bool:
+        return isinstance(value, CameraObservation)
+
+    def encode(self, value: CameraObservation) -> ViewPayload:
+        """
+        Record the optical pose and image calibration linked to the semantic camera.
+
+        :param value: Camera observation to persist.
+        :return: Serialized observation linked to its semantic camera.
+        """
+        recorded = RecordedCameraObservation(
+            camera_id=str(value.camera.id),
+            effective_camera_model=value.effective_camera_model,
+            world_T_camera=value.world_T_camera,
+            timestamp_nanoseconds=value.timestamp_nanoseconds,
+        )
+        return ViewPayload(
+            serializer_id=self.serializer_id,
+            payload=DataclassJSONSerializer.to_json(recorded),
+            type_name=_full_type_name(value),
+        )
+
+    def decode(self, payload: ViewPayload) -> CameraObservation:
+        return self.decode_with_tracker(payload, world.get_world_entity_tracker())
+
+    def decode_with_tracker(
+        self, payload: ViewPayload, tracker: WorldEntityWithIDKwargsTracker
+    ) -> CameraObservation:
+        """
+        Restore the observation against a recorded world's entity tracker.
+
+        :param payload: Serialized optical image observation.
+        :param tracker: Entity tracker resolving the recorded camera and pose frames.
+        :return: Observation referencing the tracked semantic camera.
+        :raises InvalidCameraObservation: If the recorded camera or model is invalid.
+        """
+        recorded = DataclassJSONSerializer.from_json(
+            payload.payload, RecordedCameraObservation, **tracker.create_kwargs()
+        )
+        camera = tracker.get(UUID(recorded.camera_id))
+        if not isinstance(camera, Camera):
+            raise InvalidCameraObservation(reason="recorded entity is not a camera")
+        if not isinstance(recorded.effective_camera_model, PinholeCameraModel):
+            raise InvalidCameraObservation(
+                reason="the payload does not contain a pinhole camera model"
+            )
+        return CameraObservation(
+            camera=camera,
+            effective_camera_model=recorded.effective_camera_model,
+            world_T_camera=recorded.world_T_camera,
+            timestamp_nanoseconds=recorded.timestamp_nanoseconds,
+        )
+
+
 class KrroodCodec(ViewCodec):
     """
     Codec that delegates serialization to KRROOD.
@@ -568,7 +601,7 @@ class CASViewCodecRegistry:
     Registry that routes CAS views to matching codecs.
     """
 
-    codecs: List[ViewCodec] = field(default_factory=list)
+    codecs: list[ViewCodec] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """
@@ -582,8 +615,8 @@ class CASViewCodecRegistry:
                 BytesCodec(),
                 NumpyCodec(),
                 Open3DPointCloudCodec(),
-                Open3DPinholeCameraIntrinsicCodec(),
                 StampedTransformCodec(),
+                CameraObservationCodec(),
                 HomogeneousTransformationMatrixCodec(),
                 RosMessageCodec(),
                 KrroodCodec(),
@@ -591,7 +624,7 @@ class CASViewCodecRegistry:
             ]
         )
 
-    def _find_encoder(self, value: Any) -> Optional[ViewCodec]:
+    def _find_encoder(self, value: Any) -> ViewCodec | None:
         """
         Return the first registered codec that can encode ``value``.
         """
@@ -607,24 +640,30 @@ class CASViewCodecRegistry:
         for codec in self.codecs:
             if codec.serializer_id == serializer_id:
                 return codec
-        raise ValueError(f"Unknown CAS view serializer '{serializer_id}'.")
+        raise UnknownViewSerializer(serializer_id=serializer_id)
 
     def encode_view(
         self, view_name: str, value: Any, strict: bool = True
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Encode a single CAS view into a storage document.
+
+        :param view_name: Name identifying the view in the stored document.
+        :param value: View contents to serialize.
+        :param strict: Whether a missing codec raises an exception instead of skipping
+            the view.
+        :return: Encoded view document, or ``None`` if skipped without a matching codec.
+        :raises CASViewCodecMissing: If no codec accepts the value and strict mode is
+            enabled.
         """
         codec = self._find_encoder(value)
         if codec is None:
             if strict:
-                raise TypeError(
-                    f"No codec registered for CAS view '{view_name}' with type '{type(value)}'."
-                )
+                raise CASViewCodecMissing(view_name=view_name, value_type=type(value))
             return None
         return codec.encode(value).to_document(view_name=view_name)
 
-    def decode_view(self, document: Dict[str, Any]) -> tuple[str, Any]:
+    def decode_view(self, document: dict[str, Any]) -> tuple[str, Any]:
         """
         Decode a single storage document into one CAS view.
         """
@@ -634,23 +673,23 @@ class CASViewCodecRegistry:
         return view_name, codec.decode(payload)
 
     def encode_views(
-        self, views: Dict[str, Any], strict: bool = True
-    ) -> List[Dict[str, Any]]:
+        self, views: dict[str, Any], strict: bool = True
+    ) -> list[dict[str, Any]]:
         """
         Encode multiple CAS views into storage documents.
         """
-        documents: List[Dict[str, Any]] = []
+        documents: list[dict[str, Any]] = []
         for view_name, value in views.items():
             document = self.encode_view(view_name, value, strict=strict)
             if document is not None:
                 documents.append(document)
         return documents
 
-    def decode_views(self, documents: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    def decode_views(self, documents: Iterable[dict[str, Any]]) -> dict[str, Any]:
         """
         Decode storage documents into CAS view values.
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         for document in documents:
             view_name, view_value = self.decode_view(document)
             result[view_name] = view_value

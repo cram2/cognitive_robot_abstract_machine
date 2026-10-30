@@ -1,52 +1,37 @@
 import json
-from dataclasses import fields
 
 import numpy as np
-import pytest
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import (
+from cramph.data_types import (
     LifeCycleValues,
     ObservationStateValues,
-    TransitionKind,
 )
-from giskardpy.motion_statechart.exceptions import (
-    NodeNotFoundError,
-)
-from giskardpy.motion_statechart.goals.templates import Sequence
+from cramph.composites import Sequence
 from giskardpy.motion_statechart.graph_node import (
-    TrinaryCondition,
     EndMotion,
-    CancelMotion,
+    StructureCopyMotionStatechartNode,
+    Task,
 )
-from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
-from giskardpy.motion_statechart.motion_statechart import (
-    MotionStatechart,
-    LifeCycleState,
-    ObservationState,
-)
+from cramph.statechart import Statechart
+from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
-    ConstTrueNode,
-    TestNestedGoal,
-)
+from cramph.nodes_for_testing import ConstTrueNode
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import to_json, from_json
 from krrood.symbolic_math.symbolic_math import (
-    trinary_logic_and,
-    trinary_logic_not,
-    trinary_logic_or,
+    logic_and,
 )
+from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -56,63 +41,26 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.world_entity import (
-    Body,
-    WorldEntityReferenceWriter,
-)
+from semantic_digital_twin.world_description.world_entity import Body
+from giskardpy.motion_control import MotionControl
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+
+# %% motion nodes in JSON
 
 
-def test_TrueMonitor():
-    node = ConstTrueNode()
-    json_data = to_json(node)
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-    node_copy = from_json(new_json_data)
-    assert node_copy.name == node.name
-
-
-def test_trinary_transition():
-    msc = MotionStatechart()
-    node1 = ConstTrueNode()
-    node2 = ConstTrueNode()
-    node3 = ConstTrueNode()
-    node4 = ConstTrueNode()
-    msc.add_node(node1)
-    msc.add_node(node2)
-    msc.add_node(node3)
-    msc.add_node(node4)
-
-    node1.start_condition = trinary_logic_and(
-        node2.observation_variable,
-        trinary_logic_or(
-            node3.observation_variable, trinary_logic_not(node4.observation_variable)
-        ),
-    )
-    condition = node1._start_condition
-    json_data = condition.to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-    condition_copy = TrinaryCondition.from_json(new_json_data, motion_statechart=msc)
-    assert condition_copy == condition
-
-
-def test_end_condition_round_trip():
+def _create_executor(world: World) -> StatechartExecutor:
     """
-    An end condition survives serialization, including the predicate it reads.
+    :return: An executor with simulated motion control acting in `world`.
     """
-    msc = MotionStatechart()
-    msc.add_nodes([first := ConstTrueNode(), second := ConstTrueNode()])
-    second.end_condition = trinary_logic_and(
-        first.is_succeeded, second.observation_variable
+    return StatechartExecutor(
+        context=StatechartContext(world=world),
+        extensions=[
+            MotionControl(
+                qp_controller_config=QPControllerConfig.create_with_simulation_defaults()
+            )
+        ],
     )
-    condition = second._end_condition
-
-    condition_copy = TrinaryCondition.from_json(
-        json.loads(json.dumps(condition.to_json())), motion_statechart=msc
-    )
-
-    assert condition_copy == condition
-    assert condition_copy.kind is TransitionKind.END
 
 
 def test_to_json_joint_position_list(mini_world):
@@ -131,102 +79,16 @@ def test_to_json_joint_position_list(mini_world):
     assert node_copy.goal_state == node.goal_state
 
 
-def test_a_motion_statechart_refers_to_world_entities_by_reference(mini_world):
-    """
-    Whoever reads a motion statechart has the world it was built for, so its nodes point
-    at the entities of that world instead of carrying copies of them.
-    """
-    root = mini_world.get_kinematic_structure_entity_by_name("root")
-    tip = mini_world.get_kinematic_structure_entity_by_name("tip")
-    msc = MotionStatechart()
-    msc.add_node(
-        node := CartesianPose(
-            root_link=root,
-            tip_link=tip,
-            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=0.1, reference_frame=root
-            ),
-        )
-    )
-
-    json_data = json.loads(json.dumps(msc.to_json()))
-
-    assert json_data["nodes"][node.index][
-        "root_link"
-    ] == WorldEntityReferenceWriter().write_reference(root)
-
-    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
-    msc_copy = MotionStatechart.from_json(json_data, **tracker.create_kwargs())
-    node_copy = msc_copy.get_node_by_index(node.index)
-    assert node_copy.root_link is root
-    assert node_copy.tip_link is tip
-
-
-def test_a_motion_statechart_refers_to_connections_by_reference(mini_world):
-    """
-    A connection is a world entity like any other, so a node holding one points at the
-    connection of the reader's world.
-    """
-    connection = mini_world.get_connection_by_name("root_T_tip")
-    msc = MotionStatechart()
-    msc.add_node(node := JointPositionReached(connection=connection, position=0.5))
-
-    json_data = json.loads(json.dumps(msc.to_json()))
-
-    assert json_data["nodes"][node.index][
-        "connection"
-    ] == WorldEntityReferenceWriter().write_reference(connection)
-
-    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
-    msc_copy = MotionStatechart.from_json(json_data, **tracker.create_kwargs())
-    assert msc_copy.get_node_by_index(node.index).connection is connection
-
-
-def test_start_condition(mini_world):
-    msc = MotionStatechart()
-    node1 = ConstTrueNode()
-    msc.add_node(node1)
-    node2 = ConstTrueNode()
-    msc.add_node(node2)
-    node3 = ConstTrueNode()
-    msc.add_node(node3)
-    end = ConstTrueNode()
-    msc.add_node(end)
-
-    node1.end_condition = node1.observation_variable
-    node2.start_condition = node1.observation_variable
-    node2.pause_condition = node3.observation_variable
-    end.start_condition = trinary_logic_and(
-        node2.observation_variable, node3.observation_variable
-    )
-
-    json_data = msc.to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-    msc_copy = MotionStatechart.from_json(new_json_data, world=mini_world)
-
-    kin_sim = Executor(context=MotionStatechartContext(world=mini_world))
-    kin_sim.compile(motion_statechart=msc_copy)
-    for index, node in enumerate(msc.nodes):
-        assert node.name == msc_copy.nodes[index].name
-    assert len(msc.edges) == len(msc_copy.edges)
-    for index, edge in enumerate(msc.edges):
-        assert edge == msc_copy.edges[index]
-
-
 def test_executing_json_parsed_statechart(tmp_path):
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
         tip = Body(name=PrefixedName("tip"))
         tip2 = Body(name=PrefixedName("tip2"))
-        ul = DerivativeMap()
-        ul.velocity = 1
-        ll = DerivativeMap()
-        ll.velocity = -1
+        limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1)
         dof = DegreeOfFreedom(
             name=PrefixedName("dof", "a"),
-            limits=DegreeOfFreedomLimits(lower=ll, upper=ul),
+            limits=limits,
         )
         world.add_degree_of_freedom(dof)
         root_C_tip = RevoluteConnection(
@@ -236,7 +98,7 @@ def test_executing_json_parsed_statechart(tmp_path):
 
         dof = DegreeOfFreedom(
             name=PrefixedName("dof", "b"),
-            limits=DegreeOfFreedomLimits(lower=ll, upper=ul),
+            limits=limits,
         )
         world.add_degree_of_freedom(dof)
         root_C_tip2 = RevoluteConnection(
@@ -244,65 +106,42 @@ def test_executing_json_parsed_statechart(tmp_path):
         )
         world.add_connection(root_C_tip2)
 
-    msc = MotionStatechart()
+    statechart = Statechart(context=_create_executor(world).context)
 
     task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 0.5}))
     always_true = ConstTrueNode()
-    msc.add_node(always_true)
-    msc.add_node(task1)
+    statechart.add_node(always_true)
+    statechart.add_node(task1)
     end = EndMotion()
-    msc.add_node(end)
+    statechart.add_node(end)
 
-    task1.start_condition = always_true.observation_variable
-    end.start_condition = trinary_logic_and(
-        task1.observation_variable, always_true.observation_variable
-    )
+    task1.start_condition = always_true.observes_true
+    end.start_condition = logic_and(task1.observes_true, always_true.observes_true)
 
-    json_data = msc.to_json()
+    json_data = statechart.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-    msc_copy = MotionStatechart.from_json(
-        new_json_data, world=world, **tracker.create_kwargs()
+    executor = _create_executor(world)
+    statechart_copy = Statechart.from_json(
+        new_json_data, context=executor.context, **tracker.create_kwargs()
     )
 
-    kin_sim = Executor(
-        context=MotionStatechartContext(
-            world=world,
-            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
-        )
-    )
-    kin_sim.compile(motion_statechart=msc_copy)
+    executor.compile(statechart=statechart_copy)
 
-    task1_copy = msc_copy.get_node_by_index(task1.index)
-    end_copy = msc_copy.get_node_by_index(end.index)
+    task1_copy = statechart_copy.get_node_by_index(task1.index)
+    end_copy = statechart_copy.get_node_by_index(end.index)
     assert task1_copy.observation_state == ObservationStateValues.UNKNOWN
     assert end_copy.observation_state == ObservationStateValues.UNKNOWN
     assert task1_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
     assert end_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
-    msc.draw(str(tmp_path / "muh.pdf"))
-    kin_sim.tick_until_end()
-    msc.draw(str(tmp_path / "muh.pdf"))
+    statechart.draw(str(tmp_path / "muh.pdf"))
+    executor.tick_until_end()
+    statechart.draw(str(tmp_path / "muh.pdf"))
     assert task1_copy.observation_state == ObservationStateValues.TRUE
     assert end_copy.observation_state == ObservationStateValues.TRUE
     assert task1_copy.life_cycle_state == LifeCycleValues.RUNNING
     assert end_copy.life_cycle_state == LifeCycleValues.RUNNING
-
-    life_cycle_json = msc_copy.life_cycle_state.to_json()
-    json_str = json.dumps(life_cycle_json)
-    life_cycle_json_copy = json.loads(json_str)
-    life_cycle_copy = LifeCycleState.from_json(
-        life_cycle_json_copy, motion_statechart=msc_copy
-    )
-    assert life_cycle_copy == msc_copy.life_cycle_state
-
-    observation_json = msc_copy.observation_state.to_json()
-    json_str = json.dumps(observation_json)
-    observation_json_copy = json.loads(json_str)
-    observation_copy = ObservationState.from_json(
-        observation_json_copy, motion_statechart=msc_copy
-    )
-    assert observation_copy == msc_copy.observation_state
 
 
 def test_cart_goal_simple(pr2_world_state_reset: World):
@@ -312,316 +151,171 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
         pos_x=-0.2, reference_frame=tip
     )
 
-    msc = MotionStatechart()
+    statechart = Statechart(context=_create_executor(pr2_world_state_reset).context)
     cart_goal = CartesianPose(
         root_link=root,
         tip_link=tip,
         goal_pose=tip_goal,
     )
-    msc.add_node(cart_goal)
+    statechart.add_node(cart_goal)
     end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = cart_goal.observation_variable
+    statechart.add_node(end)
+    end.start_condition = cart_goal.observes_true
 
-    json_data = msc.to_json()
+    json_data = statechart.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
     tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_state_reset)
     kwargs = tracker.create_kwargs()
-    msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
-
-    kin_sim = Executor(
-        context=MotionStatechartContext(
-            world=pr2_world_state_reset,
-            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
-        )
+    executor = _create_executor(pr2_world_state_reset)
+    statechart_copy = Statechart.from_json(
+        new_json_data, context=executor.context, **kwargs
     )
 
-    kin_sim.compile(motion_statechart=msc_copy)
-    kin_sim.tick_until_end()
+    executor.compile(statechart=statechart_copy)
+    executor.tick_until_end()
 
     fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
     assert np.allclose(fk, tip_goal, atol=cart_goal.translation_threshold)
 
 
-def test_compressed_copy_can_be_plotted(pr2_world_state_reset: World, tmp_path):
-    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
-    tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=-0.2, reference_frame=tip
-    )
-
-    msc = MotionStatechart()
-    cart_goal = CartesianPose(
-        root_link=root,
-        tip_link=tip,
-        goal_pose=tip_goal,
-    )
-    msc.add_node(cart_goal)
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = cart_goal.observation_variable
-    msc.add_node(CancelMotion.when_true(cart_goal))
-
-    msc._expand_goals(MotionStatechartContext.empty())
-    json_data = msc.create_structure_copy().to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-
-    msc_copy = MotionStatechart.from_json(new_json_data)
-    msc_copy._add_transitions()
-    assert len(msc_copy.get_nodes_by_type(EndMotion)) == 1
-    assert len(msc_copy.get_nodes_by_type(CancelMotion)) == 1
-    msc.draw(str(tmp_path / "muh.pdf"))
-
-
-def test_nested_goals(tmp_path):
-    msc = MotionStatechart()
-    msc.add_node(
-        sequence := Sequence(
-            [
-                ConstTrueNode(),
-                TestNestedGoal(),
-            ]
-        )
-    )
-    msc.add_node(EndMotion.when_true(sequence))
-
-    msc._expand_goals(MotionStatechartContext.empty())
-    json_data = msc.create_structure_copy().to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-
-    msc_copy = MotionStatechart.from_json(new_json_data)
-    msc_copy._add_transitions()
-    msc.draw(str(tmp_path / "muh.pdf"))
-
-    for node in msc.nodes:
-        node_copy = msc_copy.get_node_by_index(node.index)
-        assert node.index == node_copy.index
-        if node.parent_node_index is not None:
-            assert node.parent_node.unique_name == node_copy.parent_node.unique_name
-        else:
-            assert node_copy.parent_node_index is None
-
-
-def test_collapsed_goal_survives_json_round_trip():
-    msc = MotionStatechart()
-    msc.add_node(goal := TestNestedGoal())
-    goal.plot_specifications.collapse_children = True
-    msc.add_node(EndMotion.when_true(goal))
-
-    msc._expand_goals(MotionStatechartContext.empty())
-    json_data = msc.create_structure_copy().to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-
-    msc_copy = MotionStatechart.from_json(new_json_data)
-
-    assert msc_copy.get_node_by_index(goal.index).plot_specifications.collapse_children
-
-
-def test_cancel_motion():
-    msc = MotionStatechart()
-    msc.add_node(node := ConstTrueNode())
-    msc.add_node(CancelMotion.when_true(node, exception=NodeNotFoundError(name="muh")))
-
-    json_data = msc.to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-    msc_copy = MotionStatechart.from_json(new_json_data)
-
-    kin_sim = Executor(
-        context=MotionStatechartContext(world=World()),
-    )
-
-    kin_sim.compile(motion_statechart=msc_copy)
-
-    with pytest.raises(Exception):
-        kin_sim.tick_until_end()
-
-
-def test_cancel_motion_to_json_does_not_mutate_dataclass_field():
-    exception_field = next(f for f in fields(CancelMotion) if f.name == "exception")
-    assert exception_field.init is True
-
-    cancel = CancelMotion(exception=Exception("boom"))
-    to_json(cancel)
-
-    assert exception_field.init is True
-    # The class must still be constructible with the exception keyword.
-    CancelMotion(exception=Exception("again"))
-
-
-def test_to_json_does_not_accumulate_edges():
-    msc = MotionStatechart()
-    node1 = ConstTrueNode()
-    node2 = ConstTrueNode()
-    msc.add_node(node1)
-    msc.add_node(node2)
-    node2.start_condition = node1.observation_variable
-
-    first = msc.to_json()
-    edges_after_first = len(msc.edges)
-    second = msc.to_json()
-    edges_after_second = len(msc.edges)
-
-    assert edges_after_first == edges_after_second
-    assert first["unique_edges"] == second["unique_edges"]
-
-
-def test_unreachable_cart_goal(pr2_world_state_reset):
-    root = pr2_world_state_reset.root
-    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
-    msc = MotionStatechart()
-    msc.add_node(
-        cart_goal := CartesianPose(
-            root_link=root,
-            tip_link=tip,
-            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                z=-1,
-                reference_frame=root,
-            ),
-        )
-    )
-    msc.add_node(local_min := LocalMinimumReached())
-    msc.add_node(CancelMotion.when_true(cart_goal))
-    msc.add_node(EndMotion.when_true(local_min))
-
-    json_data = msc.to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-
-    tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_state_reset)
-    kwargs = tracker.create_kwargs()
-    msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
-
-    kin_sim = Executor(
-        context=MotionStatechartContext(
-            world=pr2_world_state_reset,
-            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
-        )
-    )
-
-    kin_sim.compile(motion_statechart=msc_copy)
-
-    kin_sim.tick_until_end()
-
-
-def test_duplicate_condition():
-    """
-    Tests if two condition with the same name and type will be preserved.
-    """
-    msc = MotionStatechart()
-    msc.add_nodes(
+def test_structure_copy_of_a_plain_statechart_keeps_the_motion_node_kinds(
+    mini_world,
+) -> None:
+    connection = mini_world.connections[0]
+    statechart = Statechart(context=_create_executor(mini_world).context)
+    statechart.add_nodes(
         [
-            node1 := ConstTrueNode(),
-            node2 := ConstTrueNode(),
-            node3 := ConstTrueNode(),
-            end := EndMotion(),
+            task := JointPositionList(
+                goal_state=JointState.from_mapping({connection: 0.5})
+            ),
+            monitor := LocalMinimumReached(),
+            end := EndMotion.when_true(task),
         ]
     )
-    node2.start_condition = node1.observation_variable
-    node3.start_condition = node1.observation_variable
-    end.start_condition = trinary_logic_and(
-        node2.observation_variable, node3.observation_variable
+
+    statechart_copy = statechart.create_structure_copy()
+
+    assert type(statechart_copy.get_node_by_index(task.index)) is Task
+    assert type(statechart_copy.get_node_by_index(monitor.index)) is (
+        StructureCopyMotionStatechartNode
     )
-
-    json_data = msc.to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-
-    msc_copy = MotionStatechart.from_json(new_json_data)
-    msc_copy._add_transitions()
-    assert len(msc_copy.unique_edges) == 3
+    assert type(statechart_copy.get_node_by_index(end.index)) is EndMotion
 
 
-def test_node_referenced_by_another_node_is_one_instance_after_json_round_trip():
-    """
-    A node that another node refers to is deserialized as the node of the motion
-    statechart, not as a detached copy.
-    """
-    msc = MotionStatechart()
-    msc.add_node(watched := ConstTrueNode())
-    msc.add_node(still_progressing := StillProgressing(monitored_node=watched))
-    msc.add_node(EndMotion.when_true(watched))
-
-    new_json_data = json.loads(json.dumps(msc.to_json()))
-
-    msc_copy = MotionStatechart.from_json(new_json_data)
-    still_progressing_copy = msc_copy.get_node_by_index(still_progressing.index)
-    assert still_progressing_copy.monitored_node is msc_copy.get_node_by_index(
-        watched.index
-    )
-
-
-def test_child_added_to_goal_is_its_child_once_after_json_round_trip():
-    """
-    A child added to a goal before compilation is a child of the deserialized goal once.
-    """
-    msc = MotionStatechart()
-    msc.add_node(sequence := Sequence())
-    sequence.add_node(child := ConstTrueNode())
-    msc.add_node(EndMotion.when_true(sequence))
-
-    new_json_data = json.loads(json.dumps(msc.to_json()))
-
-    msc_copy = MotionStatechart.from_json(new_json_data)
-    sequence_copy = msc_copy.get_node_by_index(sequence.index)
-    assert [node.name for node in sequence_copy.nodes] == [child.name]
-
-
-def test_children_of_compiled_goal_are_its_children_once_after_json_round_trip():
-    """
-    Compiling adds the children of a goal to the motion statechart while the goal keeps
-    them in its own node list, and each is still a child of the deserialized goal once.
-    """
-    msc = MotionStatechart()
-    msc.add_node(
-        sequence := Sequence(nodes=[ConstTrueNode(name="a"), ConstTrueNode(name="b")])
-    )
-    msc.add_node(EndMotion.when_true(sequence))
-    executor = Executor(
-        context=MotionStatechartContext(
-            world=World(),
-            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
-        )
-    )
-    executor.compile(motion_statechart=msc)
-
-    new_json_data = json.loads(json.dumps(msc.to_json()))
-
-    msc_copy = MotionStatechart.from_json(new_json_data)
-    sequence_copy = msc_copy.get_node_by_index(sequence.index)
-    assert sequence_copy.nodes == [
-        msc_copy.get_node_by_index(node.index) for node in sequence.nodes
-    ]
-
-
-def test_nested_sequence_goal_json_round_trip_compilation():
+def test_nested_sequence_goal_json_round_trip_compilation() -> None:
     """
     A statechart with nested goals watched by a progress monitor can be deserialized and
     compiled.
     """
-    msc = MotionStatechart()
+    statechart = Statechart(context=_create_executor(World()).context)
     leaf_node = ConstTrueNode(name="ConstTrue")
     child_sequence = Sequence(nodes=[leaf_node], name="SequentialNode")
     root = Sequence(nodes=[child_sequence], name="ActionNode")
-    msc.add_node(root)
-    msc.add_node(still_progressing := StillProgressing(monitored_node=root))
-    msc.add_node(still_progressing.cancel_motion())
-    msc.add_node(EndMotion.when_true(root))
+    statechart.add_node(root)
+    statechart.add_node(still_progressing := StillProgressing(monitored_node=root))
+    statechart.add_node(still_progressing.cancel_motion())
+    statechart.add_node(EndMotion.when_true(root))
 
-    json_data = msc.to_json()
+    json_data = statechart.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    msc_copy = MotionStatechart.from_json(new_json_data)
-    executor = Executor(
-        context=MotionStatechartContext(
-            world=World(),
-            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
+    executor = _create_executor(World())
+    statechart_copy = Statechart.from_json(new_json_data, context=executor.context)
+    executor.compile(statechart=statechart_copy)
+
+
+# %% statecharts sent after their goals expanded
+
+
+def test_an_expanded_differential_drive_goal_reaches_its_pose_after_a_json_round_trip(
+    cylinder_bot_diff_world: World,
+) -> None:
+    """
+    A goal expands when it joins, so what is sent is its expanded steps, whose
+    orientations are expressions over the base's forward kinematics.
+    """
+    goal_pose = Pose.from_xyz_rpy(x=0.5, reference_frame=cylinder_bot_diff_world.root)
+    statechart = Statechart(context=_create_executor(cylinder_bot_diff_world).context)
+    statechart.add_node(
+        goal := DifferentialDriveBaseGoal(
+            mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
+                MobileBase
+            )[0],
+            goal_pose=goal_pose,
+            threshold=0.05,
         )
     )
-    executor.compile(motion_statechart=msc_copy)
+    statechart.add_node(EndMotion.when_true(goal))
+    new_json_data = json.loads(json.dumps(statechart.to_json()))
+    statechart.context.cleanup()
+
+    executor = _create_executor(cylinder_bot_diff_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_diff_world)
+    statechart_copy = Statechart.from_json(
+        new_json_data, context=executor.context, **tracker.create_kwargs()
+    )
+    goal_copy = statechart_copy.get_node_by_index(goal.index)
+    executor.compile(statechart=statechart_copy)
+    executor.tick_until_end(1000)
+
+    assert [step.name for step in goal_copy.sequence.nodes] == [
+        step.name for step in goal.sequence.nodes
+    ]
+    assert goal_copy.life_cycle_state == LifeCycleValues.SUCCEEDED
+
+
+def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_round_trip(
+    cylinder_bot_diff_world: World,
+) -> None:
+    """
+    The second leg is given relative to the base, so it ends where it should only if the
+    receiver binds the goal frame when the leg starts, after the first leg moved the
+    base.
+    """
+    bot = cylinder_bot_diff_world.get_body_by_name("bot")
+    statechart = Statechart(context=_create_executor(cylinder_bot_diff_world).context)
+    statechart.add_node(
+        first_leg := DifferentialDriveBaseGoal(
+            mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
+                MobileBase
+            )[0],
+            goal_pose=Pose.from_xyz_rpy(
+                x=1, reference_frame=cylinder_bot_diff_world.root
+            ),
+            threshold=0.05,
+        )
+    )
+    statechart.add_node(
+        second_leg := DifferentialDriveBaseGoal(
+            mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
+                MobileBase
+            )[0],
+            goal_pose=Pose.from_xyz_rpy(x=0.5, reference_frame=bot),
+            threshold=0.05,
+        )
+    )
+    second_leg.start_condition = first_leg.observes_true
+    statechart.add_node(EndMotion.when_true(second_leg))
+    new_json_data = json.loads(json.dumps(statechart.to_json()))
+    statechart.context.cleanup()
+
+    executor = _create_executor(cylinder_bot_diff_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_diff_world)
+    statechart_copy = Statechart.from_json(
+        new_json_data, context=executor.context, **tracker.create_kwargs()
+    )
+    second_leg_copy = statechart_copy.get_node_by_index(second_leg.index)
+    executor.compile(statechart=statechart_copy)
+    executor.tick_until_end(2000)
+
+    assert second_leg_copy.life_cycle_state == LifeCycleValues.SUCCEEDED
+    np.testing.assert_allclose(
+        cylinder_bot_diff_world.compute_forward_kinematics_np(
+            cylinder_bot_diff_world.root, bot
+        )[:3, 3],
+        [1.5, 0, 0],
+        atol=2 * second_leg.threshold,
+    )

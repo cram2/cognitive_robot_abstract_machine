@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import gc
 import os
 import subprocess
@@ -10,7 +12,6 @@ from uuid import UUID, uuid4
 import numpy as np
 import pytest
 from numpy.testing import assert_raises
-from typing_extensions import Optional, Tuple, Type
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.callbacks.callback import (
@@ -31,6 +32,7 @@ from semantic_digital_twin.exceptions import (
     WorldEntityNotFoundError,
     WorldEntityWithIDBelongsToAnotherWorld,
     AlreadyBelongsToAWorldError,
+    WorldHasNoUniqueRootError,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
@@ -48,7 +50,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose2D,
     RotationMatrix,
 )
-from semantic_digital_twin.testing import StateChangeCounter, world_setup
+from semantic_digital_twin.testing import StateChangeCounter, world_setup  # noqa: F401
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
@@ -566,7 +568,7 @@ def test_transform_a_pose_2d(world_setup):
     world.state[connection.dof.id].position = 1.0
     world.notify_state_change()
 
-    pose_2d = Pose2D(x=2.0, y=0.5, yaw=0.3, reference_frame=l2)
+    pose_2d = Pose2D.from_xy_yaw(x=2.0, y=0.5, yaw=0.3, reference_frame=l2)
 
     relative_pose_2d = world.transform(pose_2d, l1)
 
@@ -574,7 +576,7 @@ def test_transform_a_pose_2d(world_setup):
     assert relative_pose_2d.reference_frame == l1
     np.testing.assert_array_almost_equal(
         relative_pose_2d.to_np(),
-        Pose2D.from_pose(world.transform(pose_2d.to_pose(), l1)).to_np(),
+        Pose2D.from_pose(world.transform(pose_2d.pose, l1)).to_np(),
     )
 
 
@@ -896,7 +898,7 @@ def test_remove_connection(world_setup):
         new_connection = FixedConnection(r1, r2)
         world.add_connection(new_connection)
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(WorldHasNoUniqueRootError):
         with world.modify_world():
             # if you remove a connection, the child must be connected some other way or deleted
             world.remove_connection(world.get_connection(r1, r2))
@@ -1482,7 +1484,7 @@ def test_rebind_a_cycle_keeps_its_shape(world_setup):
     @dataclass(eq=False)
     class Link:
         body: Body
-        partner: Optional["Link"] = None
+        partner: Link | None = None
 
     world, l1, l2, bf, r1, r2 = world_setup
     world_copy = deepcopy(world)
@@ -1574,15 +1576,13 @@ def test_set_omni_after_copy(pr2_world_state_reset):
         type(pr2_copy.get_body_by_name("base_footprint").parent_connection) == OmniDrive
     )
 
-    pr2_copy.get_body_by_name("base_footprint").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(10, 10, 0)
-    )
+    pr2_copy.get_body_by_name(
+        "base_footprint"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(10, 10, 0)
     pr2_copy.notify_state_change()
 
     np.testing.assert_array_almost_equal(
-        pr2_copy.get_body_by_name("base_footprint")
-        .global_transform.to_position()
-        .to_np(),
+        pr2_copy.get_body_by_name("base_footprint").global_transform.position.to_np(),
         np.array([10.0, 10.0, 0.0, 1.0]),
     )
 
@@ -1594,6 +1594,20 @@ def test_add_entity_with_duplicate_name(world_setup):
     with world.modify_world():
         world.add_kinematic_structure_entity(body_duplicate)
         world.add_connection(connection)
+
+
+def test_limits_from_position_range_and_speed_bound_the_velocity_in_both_directions():
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+        lower_position=-0.2, upper_position=1.5, maximum_speed=0.7
+    )
+    assert limits.lower == DerivativeMap(position=-0.2, velocity=-0.7)
+    assert limits.upper == DerivativeMap(position=1.5, velocity=0.7)
+
+
+def test_limits_from_position_range_and_speed_leave_omitted_bounds_unbounded():
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=0.7)
+    assert limits.lower == DerivativeMap(velocity=-0.7)
+    assert limits.upper == DerivativeMap(velocity=0.7)
 
 
 def test_overwrite_dof_limits(world_setup):
@@ -1958,6 +1972,39 @@ def test_world_state_trajectory(world_setup, tmp_path):
         traj.append(world.state, time + dt)
 
 
+def test_world_state_trajectory_goes_on_after_adopting_a_model_with_its_degrees_of_freedom(
+    world_setup,
+) -> None:
+    world = world_setup[0]
+    trajectory = WorldStateTrajectory.from_world_state(world.state, time=0.0)
+    world._notify_model_change()
+
+    assert trajectory.records_degrees_of_freedom_of(world.state)
+    trajectory.adopt_world_model_of(world.state)
+    trajectory.append(world.state, time=1.0)
+
+    assert trajectory.times.tolist() == [0.0, 1.0]
+
+
+def test_world_state_trajectory_rejects_a_model_with_other_degrees_of_freedom(
+    world_setup,
+) -> None:
+    world = world_setup[0]
+    trajectory = WorldStateTrajectory.from_world_state(world.state, time=0.0)
+    with world.modify_world():
+        world.add_connection(
+            Connection6DoF.create_with_dofs(
+                world=world,
+                parent=world.root,
+                child=Body(name=PrefixedName("free_box")),
+            )
+        )
+
+    assert not trajectory.records_degrees_of_freedom_of(world.state)
+    with pytest.raises(WrongWorldModelVersion):
+        trajectory.adopt_world_model_of(world.state)
+
+
 def test_merge_into_empty_world(world_setup):
     world, _, _, _, _, _ = world_setup
     world2 = deepcopy(world)
@@ -2072,7 +2119,6 @@ def test_memoization_clears_only_last_modification_block():
     b1_C_b2 = FixedConnection(parent=b2, child=b1)
 
     with world.modify_world():
-
         assert world.root == b1
 
         with world.modify_world():
@@ -2259,8 +2305,8 @@ def test_move_branch_resets_free_connection_derivatives():
 
 
 def create_world_with_driven_child(
-    drive_type: Type[WheeledDrive],
-) -> Tuple[World, Body, Body]:
+    drive_type: type[WheeledDrive],
+) -> tuple[World, Body, Body]:
     """
     Builds a world where ``driven_child`` hangs off the root by ``drive_type`` and
     ``new_parent`` sits elsewhere under the root.
@@ -2523,10 +2569,7 @@ def test_robot_velocity_limit_setup_does_not_touch_environment_joints():
     robot_link = _make_box_body("robot_link")
     drawer_body = _make_box_body("drawer_body")
 
-    env_limits = DegreeOfFreedomLimits(
-        lower=DerivativeMap(None, -10.0, None, None),
-        upper=DerivativeMap(None, 10.0, None, None),
-    )
+    env_limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=10.0)
     with world.modify_world():
         for b in [root, robot_base, robot_link, drawer_body]:
             world.add_kinematic_structure_entity(b)
@@ -2718,7 +2761,7 @@ def test_is_kinematic_structure_entity_in_world_by_name(world_setup):
 # %% moving a branch keeps both worlds replayable
 
 
-def world_with_branch(branch_length: int) -> Tuple[World, Body]:
+def world_with_branch(branch_length: int) -> tuple[World, Body]:
     """
     Build a world whose root carries one branch of the requested length.
 

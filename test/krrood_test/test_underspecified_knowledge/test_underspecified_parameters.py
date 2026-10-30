@@ -1,19 +1,29 @@
 from dataclasses import dataclass
-from typing import List, Any
+from typing_extensions import Any
 
 import pytest
 
-from krrood.parametrization.exceptions import InvalidEllipsis
+from krrood.parametrization.exceptions import (
+    AttributeNotParameterized,
+    InvalidEllipsis,
+    ModelVariableNotBound,
+    ValueOutsideVariableDomain,
+)
+from krrood.parametrization.model_registries import FullyFactorizedRegistry
 from ..dataset.semantic_world_like_classes import Body
 from krrood.entity_query_language.factories import (
     variable,
     a,
     an,
 )
+from krrood.entity_query_language.core.variable import Variable as KRROODVariable
+from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.interval import singleton, reals
 
 from ..dataset.example_classes import (
+    KRROODOrientation,
+    KRROODPose,
     KRROODPosition,
     TestEnum,
     ListOfEnum,
@@ -122,7 +132,7 @@ def test_iterable_of_primitives_produces_indexed_variables():
 
     @dataclass
     class FloatMeasurements:
-        readings: List[Any]
+        readings: list[Any]
 
     prob_q = a(FloatMeasurements)(readings=[1.0, 2.0, 3.0])
     parameters = UnderspecifiedParameters(prob_q)
@@ -150,3 +160,164 @@ def test_list_of_enum_field_produces_indexed_variables():
 
     assert "ListOfEnum.list_of_enum[0]" in parameters.variables
     assert "ListOfEnum.list_of_enum[1]" in parameters.variables
+
+
+# %% variable lookup by attribute
+
+
+def test_variable_of_nested_attribute_is_the_variable_its_literal_conditions():
+    x = 1.0
+    y = 2.0
+    pose = a(KRROODPose)(position=a(KRROODPosition)(x=x, y=y, z=...))
+    parameters = UnderspecifiedParameters(pose)
+    conditions = parameters.conditioning_assignments_from_literal_values
+
+    assert conditions[parameters.variable_of(pose.position.x)] == x
+    assert conditions[parameters.variable_of(pose.position.y)] == y
+
+
+def test_variable_of_attribute_missing_from_the_pattern_raises():
+    position = a(KRROODPosition)(x=1.0, y=...)
+    parameters = UnderspecifiedParameters(position)
+
+    with pytest.raises(AttributeNotParameterized):
+        parameters.variable_of(position.z)
+
+
+# %% translating between model samples and bindings
+
+
+def test_model_sample_from_bindings_inverts_bindings_from_model_samples():
+    query = an(EnumAction)(obj=Body(name="body"), enum=...)
+    parameters = UnderspecifiedParameters(query)
+    model = parameters.resolve_conditioned_and_truncated_model(
+        FullyFactorizedRegistry().get_model(parameters)
+    )
+    samples = model.sample(1)
+    [bindings] = parameters.bindings_from_model_samples(model.variables, samples)
+    assert (
+        parameters.model_sample_from_bindings(model.variables, bindings).tolist()
+        == samples.tolist()
+    )
+
+
+def test_model_sample_from_bindings_rejects_an_unbound_model_variable():
+    query = an(EnumAction)(obj=Body(name="body"), enum=...)
+    parameters = UnderspecifiedParameters(query)
+    model = FullyFactorizedRegistry().get_model(parameters)
+    with pytest.raises(ModelVariableNotBound):
+        parameters.model_sample_from_bindings(model.variables, {})
+
+
+@dataclass
+class PoseOverPositions:
+    """
+    A pose pattern whose position is a variable ranging over positions.
+    """
+
+    positions: list[KRROODPosition]
+    """
+    The positions the variable ranges over.
+    """
+
+    position: KRROODVariable
+    """
+    The variable the pattern assigns to the pose's position.
+    """
+
+    query: Match
+    """
+    The pose pattern.
+    """
+
+
+@pytest.fixture
+def pose_over_two_positions() -> PoseOverPositions:
+    """
+    :return: A pose pattern whose position ranges over two positions.
+    """
+    positions = [KRROODPosition(1.0, 2.0, 3.0), KRROODPosition(4.0, 5.0, 6.0)]
+    position = variable(KRROODPosition, positions)
+    return PoseOverPositions(
+        positions=positions,
+        position=position,
+        query=a(KRROODPose)(
+            position=position, orientation=KRROODOrientation(0.0, 0.0, 0.0, 1.0)
+        ),
+    )
+
+
+def test_model_sample_from_bindings_derives_the_features_of_a_bound_domain_object(
+    pose_over_two_positions,
+):
+    positions = pose_over_two_positions.positions
+    position = pose_over_two_positions.position
+    parameters = UnderspecifiedParameters(pose_over_two_positions.query)
+    model = parameters.resolve_conditioned_and_truncated_model(
+        FullyFactorizedRegistry().get_model(parameters)
+    )
+    bindings = {position._id_: positions[1]}
+    samples = parameters.model_sample_from_bindings(model.variables, bindings)
+    [sample] = samples
+    sample_values = {
+        model_variable.name: value
+        for model_variable, value in zip(model.variables, sample)
+    }
+    assert [
+        sample_values["KRROODPose.position.x"],
+        sample_values["KRROODPose.position.y"],
+        sample_values["KRROODPose.position.z"],
+    ] == [positions[1].x, positions[1].y, positions[1].z]
+    assert list(parameters.bindings_from_model_samples(model.variables, samples)) == [
+        bindings
+    ]
+
+
+# %% bindings outside the domain of a model variable
+
+
+def test_model_sample_from_bindings_refuses_an_object_outside_the_domain(
+    pose_over_two_positions,
+):
+    position = pose_over_two_positions.position
+    parameters = UnderspecifiedParameters(pose_over_two_positions.query)
+    identifier = parameters.variables["KRROODPose.position"]
+    outside_position = KRROODPosition(7.0, 8.0, 9.0)
+    with pytest.raises(ValueOutsideVariableDomain) as error:
+        parameters.model_sample_from_bindings(
+            [identifier], {position._id_: outside_position}
+        )
+    assert error.value.variable == identifier
+    assert error.value.value is outside_position
+
+
+def test_model_sample_from_bindings_refuses_a_feature_of_an_object_outside_the_domain(
+    pose_over_two_positions,
+):
+    position = pose_over_two_positions.position
+    parameters = UnderspecifiedParameters(pose_over_two_positions.query)
+    feature = parameters.variables["KRROODPose.position.x"]
+    outside_position = KRROODPosition(7.0, 8.0, 9.0)
+    with pytest.raises(ValueOutsideVariableDomain) as error:
+        parameters.model_sample_from_bindings(
+            [feature], {position._id_: outside_position}
+        )
+    assert error.value.variable == feature
+    assert error.value.value is outside_position
+
+
+def test_model_sample_from_bindings_refuses_a_value_that_is_no_element_of_a_symbolic_variable():
+    query = an(EnumAction)(obj=Body(name="body"), enum=...)
+    parameters = UnderspecifiedParameters(query)
+    enum = parameters.variables["EnumAction.enum"]
+    with pytest.raises(ValueOutsideVariableDomain) as error:
+        parameters.model_sample_from_bindings(
+            [enum],
+            {
+                query._find_assigned_variable_(
+                    "EnumAction.enum"
+                )._id_: TestEnum.OPTION_A.value
+            },
+        )
+    assert error.value.variable == enum
+    assert error.value.value == TestEnum.OPTION_A.value

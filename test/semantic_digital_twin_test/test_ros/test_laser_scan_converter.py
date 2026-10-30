@@ -199,7 +199,6 @@ def test_subscribed_source_reports_the_reading_of_its_latest_scan(
     assert reading.reference_frame is expected.reference_frame
 
 
-
 def test_a_subscribed_source_reports_a_scan_without_changing_the_lidar(
     rclpy_node, world_with_laser_body
 ):

@@ -15,7 +15,7 @@ The taker is held in a domain-named field, exactly as krrood roles do.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar
+from typing_extensions import Any, Generic, TypeVar
 
 RoleTakerT = TypeVar("RoleTakerT")
 

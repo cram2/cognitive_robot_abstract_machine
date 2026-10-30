@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing_extensions import List
 
-from krrood.entity_query_language.factories import a, an, cause, confounder
+from krrood.entity_query_language.factories import a, an, cause, confounder, variable
 from krrood.parametrization.feature_extraction.aggregations import (
     AggregationStatistic,
     aggregation_statistic,
@@ -34,17 +33,17 @@ class Assembly:
     a literal field to read a type off.
     """
 
-    components: List[Component]
+    components: list[Component]
 
 
-@dataclass
+@dataclass(eq=False)
 class AssemblyAggregations(AggregationStatistic[Assembly]):
-    @aggregation_statistic("components")
+    @aggregation_statistic(variable(Assembly).components)
     def component_count(self) -> int:
         """
         Count of components.
         """
-        return len(self.instance.components)
+        return len(self.components)
 
 
 def test_cause_is_registered_as_a_search_cause_variable():

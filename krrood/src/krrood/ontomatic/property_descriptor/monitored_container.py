@@ -5,15 +5,7 @@ from _weakref import ref as weakref_ref
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import (
-    Optional,
-    Union,
-    Dict,
-    Type,
-    Generic,
-    TYPE_CHECKING,
-    TypeVar,
-)
+from typing_extensions import Generic, TYPE_CHECKING, TypeVar
 
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -23,7 +15,7 @@ if TYPE_CHECKING:
     )
 
 
-monitored_type_map: Dict[Type, Type[MonitoredContainer]] = {}
+monitored_type_map: dict[type, type[MonitoredContainer]] = {}
 """
 A mapping of container types to their monitored container types.
 """
@@ -75,7 +67,7 @@ class MonitoredContainer(Generic[T], ABC):
 
     def __init__(self, *args, descriptor: PropertyDescriptor, **kwargs):
         self._descriptor: PropertyDescriptor = descriptor
-        self._owner_ref: Optional[weakref.ref[Symbol]] = None
+        self._owner_ref: weakref.ref[Symbol] | None = None
         super().__init__(*args, **kwargs)
 
     def _bind_owner(self, owner) -> MonitoredContainer:
@@ -97,7 +89,7 @@ class MonitoredContainer(Generic[T], ABC):
         value: Symbol,
         inferred: bool = False,
         add_relation_to_the_graph: bool = True,
-    ) -> Union[Symbol, weakref.ref[Symbol]]:
+    ) -> Symbol | weakref.ref[Symbol]:
         """
         Call the descriptor on_add with the concrete owner instance.
 
@@ -172,7 +164,7 @@ class MonitoredContainer(Generic[T], ABC):
 
     @classmethod
     @abstractmethod
-    def _get_monitored_type(cls) -> Type:
+    def _get_monitored_type(cls) -> type:
         """
         Get the monitored container type (i.e., the original container type)
         """

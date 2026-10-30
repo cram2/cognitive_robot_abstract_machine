@@ -30,7 +30,7 @@ from timeit import default_timer
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
-from typing_extensions import List, Optional, Tuple, TYPE_CHECKING
+from typing_extensions import List, Tuple, TYPE_CHECKING
 
 from robokudo.annotators.cluster_color import Color
 from robokudo.cas import CASViews
@@ -121,7 +121,7 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
 
     def create_color_histogram_annotations(
         self, color: npt.NDArray
-    ) -> Optional[npt.NDArray]:
+    ) -> npt.NDArray | None:
         """Calculate 2D color histograms for object hypotheses.
 
         For each object hypothesis with a valid ROI mask:

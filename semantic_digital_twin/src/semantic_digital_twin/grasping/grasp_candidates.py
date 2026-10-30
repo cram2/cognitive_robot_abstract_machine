@@ -7,15 +7,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
-from typing_extensions import List
+from typing_extensions import TYPE_CHECKING
 
 from semantic_digital_twin.exceptions import (
     MissingReferenceFrameError,
+    ObjectHasNoWidthWithoutCollision,
     ReferenceFrameMismatchError,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.spatial_types import Point3, Vector3
-from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
 # %% grasp candidates
 
@@ -65,6 +67,36 @@ class GraspCandidate:
         return cls(graspable, Pose(reference_frame=graspable.root))
 
     @property
+    def width_along_closing_axis(self) -> float:
+        """
+        How wide the object stands along the axis the fingers close along, in metres.
+
+        Read as the width of the object's bounding box seen along that axis, which is
+        the object's own width wherever the grasp lies square to the box.
+
+        :raises ObjectHasNoWidthWithoutCollision: If the object carries no collision
+            geometry.
+        """
+        body = self.graspable.root
+        if not body.has_collision():
+            raise ObjectHasNoWidthWithoutCollision(body.name)
+        bounding_box = body.collision.as_bounding_box_collection_in_frame(
+            body
+        ).bounding_box()
+        extents = np.array(
+            [
+                interval.upper - interval.lower
+                for interval in (
+                    bounding_box.x_interval,
+                    bounding_box.y_interval,
+                    bounding_box.z_interval,
+                )
+            ]
+        )
+        closing_direction = self.grasp_pose.to_np()[:3, 1]
+        return float(np.abs(closing_direction) @ extents)
+
+    @property
     def world_T_grasp(self) -> Pose:
         """
         :return: The grasp frame in the world frame, where the object is now.
@@ -79,60 +111,4 @@ class GraspCandidate:
         :param reference_T_object: The pose the object is going to have.
         :return:``reference_T_grasp``, the grasp in the same frame that pose is in.
         """
-        return reference_T_object.to_homogeneous_matrix() @ self.grasp_pose
-
-
-@dataclass(eq=False)
-class HasGraspCandidates(HasRootBody):
-    """
-    A mixin class for semantic annotations that can say where they may be grasped.
-
-    Only an annotation rooted in a body can be grasped at all, since a region carries no
-    collision geometry for fingers to close on.
-    """
-
-    grasp_candidate_count: int = field(default=12, kw_only=True)
-    """
-    How many grasp candidates :meth:`grasp_candidates` generates.
-    """
-
-    def grasp_candidates(self) -> List[GraspCandidate]:
-        """
-        The grasps this annotation offers, in no particular order.
-
-        The default grasps the object at its own origin, from evenly spaced directions
-        around its z-axis. Annotations whose geometry admits a better grip override
-        this.
-        """
-        return [
-            GraspCandidate(
-                self,
-                Pose(
-                    orientation=RotationMatrix.from_rpy(yaw=yaw).to_quaternion(),
-                    reference_frame=self.root,
-                ),
-            )
-            for yaw in np.linspace(
-                0, 2 * np.pi, self.grasp_candidate_count, endpoint=False
-            )
-        ]
-
-
-# %% grasp geometry helpers
-
-
-@dataclass
-class RimWallSection:
-    """
-    Where a bowl's wall runs at one point of its rim, in the bowl's own frame.
-    """
-
-    center: Point3
-    """
-    The middle of the wall, halfway between its inner and its outer surface.
-    """
-
-    outward: Vector3
-    """
-    The direction from the bowl's axis to the wall.
-    """
+        return reference_T_object.homogeneous_matrix @ self.grasp_pose

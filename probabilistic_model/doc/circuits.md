@@ -224,12 +224,13 @@ s1 = SumUnit(probabilistic_circuit = model)
 s1.add_subcircuit(leaf(GaussianDistribution(variable=x, location=0, scale=0.5), model), np.log(0.1))
 s1.add_subcircuit(leaf(GaussianDistribution(variable=x, location=1, scale=2), model), np.log(0.9))
 
-wrong_mode, wrong_max_likelihood = model.root.subcircuits[1].distribution.mode()
+wrong_mode = model.root.subcircuits[1].distribution.mode().event
 wrong_max_likelihood = model.likelihood(np.array([[wrong_mode.simple_sets[0][x].simple_sets[0].lower]]))[0]
 mode_trace = model.univariate_mode_traces(wrong_mode, wrong_max_likelihood)
 
-wrong_mode, wrong_max_likelihood = model.root.subcircuits[0].distribution.mode()
-wrong_max_likelihood = model.likelihood(np.array([[wrong_mode.simple_sets[0][x].simple_sets[0].lower]]))[0]
+wrong_mode = model.root.subcircuits[0].distribution.mode().event
+wrong_max_likelihood
+ = model.likelihood(np.array([[wrong_mode.simple_sets[0][x].simple_sets[0].lower]]))[0]
 mode_trace += model.univariate_mode_traces(wrong_mode, wrong_max_likelihood)
 
 fig = go.Figure(model.plot(), model.plotly_layout())

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import math
 from dataclasses import dataclass
 
@@ -8,7 +9,7 @@ from random_events.interval import singleton
 from random_events.product_algebra import Event, SimpleEvent
 from scipy.stats import multivariate_normal
 from sortedcontainers import SortedSet
-from typing_extensions import List, Optional, Self, Tuple, Type
+from typing_extensions import Any, Self
 
 from probabilistic_model.distributions.multivariate_gaussian import (
     MultivariateGaussianDistribution,
@@ -69,7 +70,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
     def from_distributions(
         cls,
         variables: SortedSet,
-        distributions: List[MultivariateGaussianDistribution],
+        distributions: list[MultivariateGaussianDistribution],
     ) -> Self:
         """
         :param variables: The variables of the circuit.
@@ -90,7 +91,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         )
 
     @classmethod
-    def concatenate(cls, layers: List[Self]) -> Self:
+    def concatenate(cls, layers: list[Self]) -> Self:
         return cls(
             scope=layers[0].scope.copy(),
             mean=np.concatenate([layer.mean for layer in layers]),
@@ -103,13 +104,13 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: Optional[QueryCache] = None
+        self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         return self.untruncated_gaussians.log_density(self.values_of_scope(events))
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: Optional[QueryCache] = None
+        self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         values = self.values_of_scope(events)
         return np.stack(
@@ -129,7 +130,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         self,
         event: SimpleEvent,
         variables: SortedSet,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> NodeValues:
         return sum(
             (
@@ -143,8 +144,8 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
 
     @memoized
     def log_mode_of_nodes(
-        self, variables: SortedSet, cache: Optional[QueryCache] = None
-    ) -> Tuple[List[Event], NodeValues]:
+        self, variables: SortedSet, cache: QueryCache | None = None
+    ) -> tuple[list[Event], NodeValues]:
         # a Gaussian is most dense at its mean
         scope_variables = self.scope_variables(variables)
         modes = [
@@ -166,7 +167,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         self,
         query: MomentQuery,
         variables: SortedSet,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> NodeVariableValues:
         # the moment of one variable is the moment of its univariate marginal
         result = np.zeros((self.number_of_nodes, query.number_of_variables))
@@ -194,7 +195,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
 
     def type_of_layer_truncated_to_hyperrectangle(
         self, hyperrectangle: HyperrectangleArray
-    ) -> Type[Layer]:
+    ) -> type[Layer]:
         if hyperrectangle.is_whole_space:
             return MultivariateGaussianLayer
         return TruncatedMultivariateGaussianLayer
@@ -209,7 +210,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             is MultivariateGaussianLayer
         ):
             return LayerWithLogProbabilities(
-                self.__deepcopy__(), np.zeros(self.number_of_nodes)
+                copy.deepcopy(self), np.zeros(self.number_of_nodes)
             )
         hyperrectangles = hyperrectangle.broadcast_to(self.number_of_nodes)
         log_probabilities = (
@@ -234,7 +235,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         gaussians = self.untruncated_gaussians
         log_likelihood = gaussians.marginal(fixed).log_density(values[None, :])[0]
         if len(free) == 0:
-            return LayerWithLogProbabilities(self.__deepcopy__(), log_likelihood)
+            return LayerWithLogProbabilities(copy.deepcopy(self), log_likelihood)
         return LayerWithLogProbabilities(
             self.over(free, gaussians.conditional(fixed, free, values)),
             log_likelihood,
@@ -256,16 +257,3 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             mean=gaussians.mean,
             covariance=gaussians.covariance,
         )
-
-    def __deepcopy__(self, memo=None) -> MultivariateGaussianLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        result = self.__class__(
-            scope=self.scope.copy(),
-            mean=self.mean.copy(),
-            covariance=self.covariance.copy(),
-        )
-        memo[id(self)] = result
-        return result

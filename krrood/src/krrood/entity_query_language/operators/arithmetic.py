@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any, Iterable, Tuple
+from typing_extensions import Any, Iterable
 
 from krrood.entity_query_language.core.base_expressions import (
     BinaryExpression,
@@ -60,7 +60,7 @@ class ArithmeticOperation(
         self._var_ = self
 
     @property
-    def _product_operands_(self) -> Tuple[SymbolicExpression, ...]:
+    def _product_operands_(self) -> tuple[SymbolicExpression, ...]:
         return self.left, self.right
 
     @property

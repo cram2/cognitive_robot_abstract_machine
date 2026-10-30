@@ -4,8 +4,8 @@ import logging
 import os
 from dataclasses import field, dataclass
 from pathlib import Path
-from typing import Optional, List
-from giskardpy.executor import Executor
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -15,80 +15,73 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
-from .detectors.base import DetectorStateChart, SegmindContext
+from .detectors.base import SegmindContext
 from .episode_player import EpisodePlayer
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class EpisodeSegmenterExecutor(Executor):
+class EpisodeSegmentation(TickingExecutorExtension):
     """
-    Handles the segmentation of episodes by controlling the execution of a
-    detector statechart and maintaining interactive control cycles.
-
-    This class orchestrates interaction between the detector statechart,
-    the simulation player, and the context, enabling episode segmentation
-    and tick-based interactions. It allows for spawning scenes, managing
-    holes, and ensuring state model updates during execution.
+    Segments an episode into events by running detector nodes against a shared
+    :class:`~segmind.detectors.base.SegmindContext` while an episode player steps the
+    world.
     """
 
     player: EpisodePlayer | None = None
     """
-    The episode player responsible for stepping the world. This can be None if no player is used.
+    The episode player responsible for stepping the world, None if the world is stepped
+    by someone else.
     """
 
-    statechart: DetectorStateChart = field(init=False)
-    """
-    The detector statechart that drives the episode execution.
-    """
+    def extend_context(self, context: StatechartContext) -> None:
+        context.ensure_extension(SegmindContext())
 
-    ignored_objects: Optional[List[str]] = field(default_factory=list)
-    """
-    A list of objects that should be ignored during the episode.
-    """
-
-    fixed_objects: Optional[List[str]] = field(default_factory=list)
-    """
-    A list of objects that should be fixed during the episode.
-    """
-
-    def __post_init__(self):
-        """
-        Adds the SegmindContext extension to the context.
-        """
-        super().__post_init__()
-        self.context.add_extension(SegmindContext())
-
-    def start(self):
-        """
-        Starts the episode player.
-        """
+    def after_compile(self, executor: StatechartExecutor) -> None:
+        self.detect_holes(executor.context)
         if self.player:
             self.player.start()
 
-    def compile(self, motion_statechart: DetectorStateChart):
+    @staticmethod
+    def detect_holes(context: StatechartContext) -> None:
         """
-        Compiles the provided statechart and initializes the episode segmenter for execution.
-        """
-        super().compile(motion_statechart)
-        self.detect_holes()
-        if self.player:
-            self.player.start()
+        Collects the bodies of the world that have "hole" in their name as the holes of
+        the :class:`~segmind.detectors.base.SegmindContext`.
 
-    def detect_holes(self):
+        :param context: The context holding the world and the segmind context.
         """
-        Iterates through objects in the world's context and appends objects with
-        "hole" in their name to the list of holes.
-        """
-        segmind_context = self.context.require_extension(SegmindContext)
+        segmind_context = context.require_extension(SegmindContext)
         segmind_context.holes.clear()
-        for o in self.context.world.bodies:
-            if "hole" in o.name.name:
-                segmind_context.holes.append(o)
+        for body in context.world.bodies:
+            if "hole" in body.name.name:
+                segmind_context.holes.append(body)
 
-    def spawn_scene(self, models_dir, file_resolver: Optional[FileUriResolver] = None):
+
+@dataclass
+class EpisodeSceneLoader:
+    """
+    Loads the models of an episode's scene into a world.
+    """
+
+    world: World
+    """
+    The world the models are loaded into.
+    """
+
+    ignored_objects: list[str] = field(default_factory=list)
+    """
+    Names of the models that are not loaded.
+    """
+
+    fixed_objects: list[str] = field(default_factory=list)
+    """
+    Names of the models that are fixed to the root of the world.
+    """
+
+    def spawn_scene(self, models_dir, file_resolver: FileUriResolver | None = None):
         """
         Spawns the scene from the given directory.
 
@@ -101,7 +94,7 @@ class EpisodeSegmenterExecutor(Executor):
         for file in directory.glob("*.stl"):
             self._load_stl(file)
 
-    def _load_urdf(self, file: Path, file_resolver: Optional[FileUriResolver] = None):
+    def _load_urdf(self, file: Path, file_resolver: FileUriResolver | None = None):
         """
         Loads an URDF file into the simulation world.
 
@@ -118,14 +111,12 @@ class EpisodeSegmenterExecutor(Executor):
         )
         obj_world = URDFParser.from_file(str(file), **resolver_kwargs).parse()
         connection = (
-            FixedConnection(parent=self.context.world.root, child=obj_world.root)
+            FixedConnection(parent=self.world.root, child=obj_world.root)
             if obj_name in self.fixed_objects
             else None
         )
-        with self.context.world.modify_world():
-            self.context.world.merge_world(
-                obj_world, *([connection] if connection else [])
-            )
+        with self.world.modify_world():
+            self.world.merge_world(obj_world, *([connection] if connection else []))
 
     def _load_stl(self, file: Path):
         """
@@ -139,10 +130,10 @@ class EpisodeSegmenterExecutor(Executor):
             visual=ShapeCollection([mesh]),
             collision=ShapeCollection([mesh]),
         )
-        with self.context.world.modify_world():
+        with self.world.modify_world():
             connection = Connection6DoF.create_with_dofs(
-                world=self.context.world,
-                parent=self.context.world.root,
+                world=self.world,
+                parent=self.world.root,
                 child=new_body,
             )
-            self.context.world.add_connection(connection)
+            self.world.add_connection(connection)

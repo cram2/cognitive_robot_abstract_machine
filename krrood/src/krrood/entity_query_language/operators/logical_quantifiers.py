@@ -11,7 +11,7 @@ import uuid
 from abc import ABC
 from dataclasses import dataclass
 from functools import cached_property
-from typing import List, Iterable
+from typing_extensions import Iterable
 
 from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.operators.core_logical_operators import (
@@ -48,7 +48,7 @@ class ForAll(QuantifiedConditional):
     """
 
     @cached_property
-    def condition_unique_variable_ids(self) -> List[uuid.UUID]:
+    def condition_unique_variable_ids(self) -> list[uuid.UUID]:
         return [
             v._id_
             for v in self.condition._unique_variables_.difference(

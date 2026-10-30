@@ -1,10 +1,15 @@
 import numpy as np
 import pytest
 
-from semantic_digital_twin.spatial_types import Point3, RotationMatrix, Vector3
+from semantic_digital_twin.spatial_types import (
+    AxisAngle,
+    Point3,
+    RotationMatrix,
+    Vector3,
+)
 
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
-from giskardpy.motion_statechart.graph_node import NodeArtifacts
+from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -75,12 +80,26 @@ def test_rotation_goal_writes_three_equality_constraints():
     builder = GeometricConstraintBuilder(collection)
     builder.add_rotation_goal_constraints(
         frame_R_current=RotationMatrix(),
-        frame_R_goal=RotationMatrix.from_axis_angle(Vector3.Z(), 0.5),
+        frame_R_goal=RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), 0.5)),
         reference_velocity=0.1,
         quadratic_weight=1.0,
         name="goal",
     )
     assert len(collection.equality_constraints) == 3
+    assert len(collection.inequality_constraints) == 0
+
+
+def test_yaw_goal_writes_one_equality_constraint():
+    collection = ConstraintCollection()
+    builder = GeometricConstraintBuilder(collection)
+    builder.add_yaw_goal_constraint(
+        frame_R_current=RotationMatrix(),
+        frame_R_goal=RotationMatrix.from_rpy(roll=0.2, pitch=-0.1, yaw=0.5),
+        reference_velocity=0.1,
+        quadratic_weight=1.0,
+        name="goal",
+    )
+    assert len(collection.equality_constraints) == 1
     assert len(collection.inequality_constraints) == 0
 
 
@@ -94,7 +113,7 @@ def rotation_goal_bounds(angle: float) -> tuple[np.ndarray, np.ndarray, float]:
     collection = ConstraintCollection()
     GeometricConstraintBuilder(collection).add_rotation_goal_constraints(
         frame_R_current=RotationMatrix(),
-        frame_R_goal=RotationMatrix.from_axis_angle(Vector3.Z(), angle),
+        frame_R_goal=RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), angle)),
         reference_velocity=ROTATION_REFERENCE_VELOCITY,
         quadratic_weight=1.0,
     )
@@ -143,7 +162,7 @@ def test_rotation_goal_within_reach_is_not_capped():
 
 
 def test_node_artifacts_geometry_writes_into_its_constraints():
-    artifacts = NodeArtifacts()
+    artifacts = MotionNodeArtifacts()
     artifacts.geometry.add_point_goal_constraints(
         frame_P_current=Point3(0.0, 0.0, 0.0),
         frame_P_goal=Point3(1.0, 2.0, 3.0),

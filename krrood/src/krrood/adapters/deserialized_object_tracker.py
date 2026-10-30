@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Any, Dict, Generic, Self, TypeVar
+from typing_extensions import Any, Generic, Self, TypeVar
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.keyword_argument import SerializationKeywordArgument
@@ -27,13 +27,13 @@ class DeserializedObjectTracker(
     a tracked object retrieves the tracker with :meth:`from_kwargs`.
     """
 
-    tracked_objects: Dict[KeyType, TrackedType] = field(default_factory=dict)
+    tracked_objects: dict[KeyType, TrackedType] = field(default_factory=dict)
     """
     The objects deserialized so far, by their key.
     """
 
     @classmethod
-    def from_kwargs(cls, from_json_kwargs: Dict[str, Any]) -> Self:
+    def from_kwargs(cls, from_json_kwargs: dict[str, Any]) -> Self:
         """
         Retrieves the tracker from the keyword arguments of a ``from_json`` call, and
         adds a new one to them if there is none, so that calls receiving them share it.

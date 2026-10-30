@@ -6,7 +6,7 @@ import uuid
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing_extensions import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -51,7 +51,7 @@ def referring_noun_with_restrictions(
     variable: Variable,
     selected_type: str,
     definiteness: Definiteness,
-    restriction: Optional[RestrictionFragments],
+    restriction: RestrictionFragments | None,
 ) -> NounPhrase:
     """:return: a referring noun phrase for *variable* carrying *restriction* as post-nominal
     modifiers — the shared assembly behind a nested entity noun (*"a Mission with priority greater
@@ -61,7 +61,7 @@ def referring_noun_with_restrictions(
     coordinated *"whose"* block and a *"where"*-headed residual follow. A referring noun phrase is the
     subject of its own modifiers, so the coreference pass pronominalises later mentions correctly.
     """
-    modifiers: List[VerbalizationFragment] = []
+    modifiers: list[VerbalizationFragment] = []
     if restriction is not None:
         modifiers.extend(restriction.inline_modifiers)
         modifiers.extend(restriction.relative_clauses)
@@ -94,7 +94,7 @@ class ParentEdge:
     parent: SymbolicExpression
     """The parent node this edge descends from."""
 
-    field_name: Optional[str] = None
+    field_name: str | None = None
     """The declared predicate field the child fills on *parent*, when *parent* is an
     :class:`InstantiatedVariable` and this edge is one of its declared fields; ``None`` for every
     other structural edge."""
@@ -102,7 +102,7 @@ class ParentEdge:
 
 def _child_edges_by_id(
     expression: SymbolicExpression,
-) -> Dict[uuid.UUID, List[ParentEdge]]:
+) -> dict[uuid.UUID, list[ParentEdge]]:
     """:return: every node's parent edges in *expression*, keyed by the child's ``_id_``. A
     :class:`ParentEdge`'s field name is set only when the parent is an :class:`InstantiatedVariable`
     and the edge is one of its declared fields (so the same variable filling two fields on one
@@ -117,8 +117,8 @@ def _child_edges_by_id(
     shared node once per reachable path, so a parent reached twice would otherwise double-count
     its own child edges.
     """
-    edges: Dict[uuid.UUID, List[ParentEdge]] = defaultdict(list)
-    visited_parents: Set[uuid.UUID] = set()
+    edges: dict[uuid.UUID, list[ParentEdge]] = defaultdict(list)
+    visited_parents: set[uuid.UUID] = set()
     for node in expression._all_expressions_:
         if node._id_ in visited_parents:
             continue
@@ -132,7 +132,7 @@ def _child_edges_by_id(
     return edges
 
 
-def _sole_predicate_field(edges: List[ParentEdge]) -> Optional[ParentEdge]:
+def _sole_predicate_field(edges: list[ParentEdge]) -> ParentEdge | None:
     """:return: the sole edge in *edges* when it is a named predicate field, else ``None``. This is
     the structural (not heuristic) condition for treating a variable as an anonymous operand of that
     one field: it must be reachable through exactly that field and nowhere else in the expression.
@@ -145,7 +145,7 @@ def _sole_predicate_field(edges: List[ParentEdge]) -> Optional[ParentEdge]:
     return edge
 
 
-def _concrete_type_alternatives(type_: type) -> Tuple[type, ...]:
+def _concrete_type_alternatives(type_: type) -> tuple[type, ...]:
     """:return: *type_*'s concrete subclasses, when *type_* is itself never a valid direct
     referent (an abstract base with :func:`~krrood.patterns.specificity_ranking.concrete_subclasses`
     of its own) and the family is small enough to spell out — the operand-naming case behind
@@ -165,7 +165,7 @@ def _concrete_type_alternatives(type_: type) -> Tuple[type, ...]:
     return alternatives
 
 
-def operand_type_alternatives(node: Variable) -> Tuple[type, ...]:
+def operand_type_alternatives(node: Variable) -> tuple[type, ...]:
     """:return: the concrete types that should name *node* in place of its own declared type,
     when that type is an abstract base with a small, nameable family of concrete subclasses
     (:func:`_concrete_type_alternatives`); empty when *node*'s type should be named directly
@@ -179,7 +179,7 @@ def operand_type_alternatives(node: Variable) -> Tuple[type, ...]:
     return _concrete_type_alternatives(type_)
 
 
-def disjunctive_type_head(alternatives: Tuple[type, ...]) -> VerbalizationFragment:
+def disjunctive_type_head(alternatives: tuple[type, ...]) -> VerbalizationFragment:
     """:return: the bare disjunctive noun naming *alternatives* (*"Body or Region"*), each linked
     to its own class — :func:`operand_head_noun`'s same-noun grouping key text.
 
@@ -190,7 +190,7 @@ def disjunctive_type_head(alternatives: Tuple[type, ...]) -> VerbalizationFragme
     )
 
 
-def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
+def operand_head_noun(node: Variable, edges: list[ParentEdge]) -> str:
     """:return: the head noun naming *node* — an *operand*, a variable filling one argument of a
     predicate or function. Resolved in order of decreasing specificity:
 
@@ -312,25 +312,25 @@ class DistinguisherIndex:
       one) that :attr:`Distinguisher.alternative` realises.
     """
 
-    representative_of: Dict[uuid.UUID, uuid.UUID] = field(default_factory=dict)
+    representative_of: dict[uuid.UUID, uuid.UUID] = field(default_factory=dict)
     """Every referent id's representative-referent id — an ``==``-unified group collapses to one
     (see :func:`referent_aliases`); a referent in no identity is its own representative
     referent."""
 
-    noun_of_representative: Dict[uuid.UUID, str] = field(default_factory=dict)
+    noun_of_representative: dict[uuid.UUID, str] = field(default_factory=dict)
     """Each representative referent's resolved head noun."""
 
-    group_size: Dict[str, int] = field(default_factory=dict)
+    group_size: dict[str, int] = field(default_factory=dict)
     """How many distinct representative referents share each noun."""
 
-    _assigned_position: Dict[uuid.UUID, int] = field(default_factory=dict, repr=False)
+    _assigned_position: dict[uuid.UUID, int] = field(default_factory=dict, repr=False)
     """Each representative referent's position within its noun group, counting the first member as
     position 0, filled lazily on first encounter."""
 
-    _next_position: Dict[str, int] = field(default_factory=dict, repr=False)
+    _next_position: dict[str, int] = field(default_factory=dict, repr=False)
     """The next unassigned position for each noun group."""
 
-    def distinguisher_for(self, referent_id: uuid.UUID) -> Optional[Distinguisher]:
+    def distinguisher_for(self, referent_id: uuid.UUID) -> Distinguisher | None:
         """:return: the distinguishing feature for *referent_id*, or ``None`` when it is alone in
         its noun group (or shares no group at all). The first call for a given representative
         referent assigns its position, in call order; every later call for the same representative
@@ -366,22 +366,22 @@ class _HeadNounGrouping:
     later disambiguates by determiner (:class:`DistinguisherIndex`).
     """
 
-    representatives_by_noun: Dict[str, List[uuid.UUID]] = field(
+    representatives_by_noun: dict[str, list[uuid.UUID]] = field(
         default_factory=lambda: defaultdict(list)
     )
     """Each noun's representative referents, in first-encounter order — a noun with two or more is
     disambiguated."""
 
-    members_by_representative: Dict[uuid.UUID, List[uuid.UUID]] = field(
+    members_by_representative: dict[uuid.UUID, list[uuid.UUID]] = field(
         default_factory=lambda: defaultdict(list)
     )
     """Every original referent id that maps to a given representative referent."""
 
-    _noun_of_representative: Dict[uuid.UUID, str] = field(default_factory=dict)
+    _noun_of_representative: dict[uuid.UUID, str] = field(default_factory=dict)
     """The noun a representative referent was first registered under (guards against re-listing
     it)."""
 
-    _type_alternatives_of_representative: Dict[uuid.UUID, Tuple[type, ...]] = field(
+    _type_alternatives_of_representative: dict[uuid.UUID, tuple[type, ...]] = field(
         default_factory=dict
     )
     """The concrete-subclass alternatives a representative referent was first registered under,
@@ -393,7 +393,7 @@ class _HeadNounGrouping:
         referent_id: uuid.UUID,
         representative: uuid.UUID,
         noun: str,
-        type_alternatives: Tuple[type, ...] = (),
+        type_alternatives: tuple[type, ...] = (),
     ) -> None:
         """Record *referent_id* as a member of *representative*, registering it under *noun* (and
         its *type_alternatives*, if any) on first sight — an ``==``-unified group whose members
@@ -408,7 +408,7 @@ class _HeadNounGrouping:
                 )
         self.members_by_representative[representative].append(referent_id)
 
-    def head_nouns(self) -> Dict[uuid.UUID, str]:
+    def head_nouns(self) -> dict[uuid.UUID, str]:
         """:return: every member referent id mapped to its representative referent's resolved
         head noun."""
         return {
@@ -418,7 +418,7 @@ class _HeadNounGrouping:
             for member in self.members_by_representative[representative]
         }
 
-    def type_alternatives(self) -> Dict[uuid.UUID, Tuple[type, ...]]:
+    def type_alternatives(self) -> dict[uuid.UUID, tuple[type, ...]]:
         """:return: every member referent id mapped to its representative referent's
         concrete-subclass alternatives — only for representative referents named by disjunction,
         per :func:`operand_type_alternatives`.
@@ -464,7 +464,7 @@ class NounForm:
     The display label for the noun head.
     """
 
-    type_alternatives: Tuple[type, ...] = ()
+    type_alternatives: tuple[type, ...] = ()
     """
     When non-empty, the noun head is a disjunction of these concrete types
     (:func:`operand_type_alternatives`), rendered as a :class:`~…fragments.base.NounPhrase`
@@ -491,20 +491,20 @@ class ReferringExpressions:
     * :cite:t:`dale1995gricean` — interpreting the Gricean maxims in referring-expression generation.
     """
 
-    seen: Set[uuid.UUID] = field(default_factory=set)
+    seen: set[uuid.UUID] = field(default_factory=set)
     """
     Referent ``_id_`` s introduced so far, used to seed coreference across builds
     sharing this context, so verbalizing the same expression twice reads *"a Robot"*
     then *"the Robot"*.
     """
 
-    head_nouns: Dict[uuid.UUID, str] = field(default_factory=dict)
+    head_nouns: dict[uuid.UUID, str] = field(default_factory=dict)
     """
     Maps referent ``_id_`` → resolved head noun, pre-computed before verbalization begins
     (:func:`operand_head_noun`).
     """
 
-    type_alternatives: Dict[uuid.UUID, Tuple[type, ...]] = field(default_factory=dict)
+    type_alternatives: dict[uuid.UUID, tuple[type, ...]] = field(default_factory=dict)
     """
     Maps referent ``_id_`` → concrete-subclass alternatives, pre-computed alongside
     :attr:`head_nouns` (:func:`operand_type_alternatives`) — present only for a referent whose
@@ -549,7 +549,7 @@ class ReferringExpressions:
         aliases = referent_aliases(expression)
         edges_by_id = _child_edges_by_id(expression)
         grouping = _HeadNounGrouping()
-        seen: Set[uuid.UUID] = set()
+        seen: set[uuid.UUID] = set()
         for node in expression._all_expressions_:
             noun = cls._resolve_head_noun(node, edges_by_id)
             if noun is None or node._id_ in suppressed or node._id_ in seen:
@@ -566,7 +566,7 @@ class ReferringExpressions:
         return grouping
 
     @staticmethod
-    def _aggregation_source_ids(expression: SymbolicExpression) -> Set[uuid.UUID]:
+    def _aggregation_source_ids(expression: SymbolicExpression) -> set[uuid.UUID]:
         """
         Such a variable denotes a population to aggregate over, not a specific entity, so it must not
         consume a disambiguating distinguisher — otherwise the outer subject would pick up a
@@ -583,7 +583,7 @@ class ReferringExpressions:
         >>> transaction._id_ in ReferringExpressions._aggregation_source_ids(source)
         True
         """
-        ids: Set[uuid.UUID] = set()
+        ids: set[uuid.UUID] = set()
         for node in expression._all_expressions_:
             if isinstance(node, Entity) and selected_aggregator(node) is not None:
                 root = aggregation_source_root(node)
@@ -619,8 +619,8 @@ class ReferringExpressions:
     @staticmethod
     def _resolve_head_noun(
         node: SymbolicExpression,
-        edges_by_id: Dict[uuid.UUID, List[ParentEdge]],
-    ) -> Optional[str]:
+        edges_by_id: dict[uuid.UUID, list[ParentEdge]],
+    ) -> str | None:
         """:return: The head noun a node is disambiguated (and later referred to) under — the
         operand-aware resolution (:func:`operand_head_noun`) for a (non-literal) variable, or the
         *value* type noun for a relational attribute. ``None`` for anything that does not denote a
@@ -679,7 +679,7 @@ class ReferringExpressions:
         """
         return self.head_nouns.get(variable._id_, self._variable_type_label(variable))
 
-    def type_alternatives_of(self, variable: Variable) -> Tuple[type, ...]:
+    def type_alternatives_of(self, variable: Variable) -> tuple[type, ...]:
         """:return: *variable*'s concrete-subclass alternatives, pre-computed in the pre-scan
         (:func:`operand_type_alternatives`), or empty when it was not scanned or is named
         directly rather than by disjunction.
@@ -706,7 +706,7 @@ class ReferringExpressions:
         )
 
 
-def _entity_referent_id(node: SymbolicExpression) -> Optional[uuid.UUID]:
+def _entity_referent_id(node: SymbolicExpression) -> uuid.UUID | None:
     """:return: the referent id of an entity-denoting node — a free variable, or a relational hop
     (the related entity it introduces) — else ``None``. The same notion of a numberable referent
     :meth:`ReferringExpressions._is_numberable` uses, so identity and disambiguation agree on what
@@ -716,7 +716,7 @@ def _entity_referent_id(node: SymbolicExpression) -> Optional[uuid.UUID]:
     return node._id_
 
 
-def referent_aliases(expression: SymbolicExpression) -> Dict[uuid.UUID, uuid.UUID]:
+def referent_aliases(expression: SymbolicExpression) -> dict[uuid.UUID, uuid.UUID]:
     """
     :param expression: Root expression to scan.
     :return: A map from each entity referent id that participates in an identity to its
@@ -730,7 +730,7 @@ def referent_aliases(expression: SymbolicExpression) -> Dict[uuid.UUID, uuid.UUI
     >>> len(set(aliases.values()))  # the relation and the variable collapse to one entity
     1
     """
-    parent: Dict[uuid.UUID, uuid.UUID] = {}
+    parent: dict[uuid.UUID, uuid.UUID] = {}
 
     def find(node_id: uuid.UUID) -> uuid.UUID:
         parent.setdefault(node_id, node_id)

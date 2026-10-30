@@ -9,7 +9,7 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 
-from typing_extensions import Iterable, Optional, TYPE_CHECKING, Type
+from typing_extensions import Iterable, Optional, TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import (
     TruthValuedExpression,
@@ -150,7 +150,7 @@ class OR(LogicalBinaryOperator):
 
 
 def chained_logic(
-    operator: Type[LogicalBinaryOperator], *conditions: ConditionType
+    operator: type[LogicalBinaryOperator], *conditions: ConditionType
 ) -> SymbolicExpression:
     """
     A chain of logic operation over multiple conditions, e.g. cond1 | cond2 | cond3.
@@ -170,7 +170,7 @@ def chained_logic(
 
 
 def flatten_operands(
-    expr: SymbolicExpression, operator_type: Type[BinaryExpression]
+    expr: SymbolicExpression, operator_type: type[BinaryExpression]
 ) -> list:
     """
     Recursively flatten a homogeneous binary chain into a flat operand list.

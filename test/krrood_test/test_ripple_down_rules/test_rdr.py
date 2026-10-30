@@ -2,7 +2,6 @@ import os
 import unittest
 from unittest import TestCase
 
-from typing_extensions import List
 
 from krrood.ripple_down_rules.datastructures.case import Case
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
@@ -29,9 +28,9 @@ zoo_cases, _ = load_zoo_dataset(cache_file=CACHE_FILE)
 
 @unittest.skipIf(len(zoo_cases) == 0, "Failed to load dataset")
 class TestRDR(TestCase):
-    all_cases: List[Case]
-    targets: List[str]
-    case_queries: List[CaseQuery]
+    all_cases: list[Case]
+    targets: list[str]
+    case_queries: list[CaseQuery]
     test_results_dir: str = TEST_RESULTS_DIR
     expert_answers_dir: str = os.path.join(
         os.path.dirname(__file__), "test_expert_answers"

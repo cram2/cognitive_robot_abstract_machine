@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import enum
 
-from typing_extensions import Any, List, Optional
+from typing_extensions import Any
 
 from krrood.entity_query_language.utils import is_iterable
 
@@ -33,7 +33,7 @@ def type_noun(type_: type) -> str:
     return _PRIMITIVE_TYPE_NOUNS.get(type_, type_.__name__)
 
 
-def type_members(value: Any) -> Optional[List[type]]:
+def type_members(value: Any) -> list[type] | None:
     """
     :return: the classes of a non-empty iterable of types, or ``None`` when *value* is not
         such a collection.

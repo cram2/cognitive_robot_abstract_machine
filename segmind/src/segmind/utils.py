@@ -5,7 +5,6 @@ import threading
 from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
 
-from typing_extensions import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,7 @@ class PropagatingThread(threading.Thread, ABC):
     when registering instances internally on initialization.
     """
 
-    exception: Optional[Exception] = field(default=None, init=False)
+    exception: Exception | None = field(default=None, init=False)
     """
     Exception that was raised in the thread.
     """

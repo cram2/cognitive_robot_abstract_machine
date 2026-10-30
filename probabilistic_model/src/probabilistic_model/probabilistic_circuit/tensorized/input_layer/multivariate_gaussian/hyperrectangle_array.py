@@ -6,7 +6,7 @@ import numpy as np
 from random_events.interval import Bound, SimpleInterval
 from random_events.product_algebra import SimpleEvent
 from random_events.variable import Variable
-from typing_extensions import List, Self, Sequence
+from typing_extensions import Self, Sequence
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeIndices,
@@ -56,7 +56,7 @@ class HyperrectangleArray:
         )
 
     @classmethod
-    def stack(cls, hyperrectangles: List[Self]) -> Self:
+    def stack(cls, hyperrectangles: list[Self]) -> Self:
         """
         :param hyperrectangles: Single hyperrectangles over the same variables.
         :return: All of them along a new first axis, one per node.
@@ -67,7 +67,7 @@ class HyperrectangleArray:
         )
 
     @classmethod
-    def concatenate(cls, arrays: List[Self]) -> Self:
+    def concatenate(cls, arrays: list[Self]) -> Self:
         """
         :param arrays: Hyperrectangles over the same variables, one per node each.
         :return: All of their hyperrectangles, in order.

@@ -5,11 +5,13 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
-from typing import Dict, Type
-
 from typing_extensions import TYPE_CHECKING
 
-from giskardpy.qp.exceptions import BrakingTimeExceedsHorizonError
+
+from giskardpy.qp.exceptions import (
+    BrakingTimeExceedsHorizonError,
+    PredictionHorizonTooShortForDerivativeError,
+)
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -79,7 +81,7 @@ class QPControllerConfig:
     .. warning:: Minimum value is :attr:`minimum_prediction_horizon`.
     """
 
-    dof_weights: Dict[PrefixedName, DerivativeMap[float]] = field(
+    dof_weights: dict[PrefixedName, DerivativeMap[float]] = field(
         default_factory=lambda: defaultdict(
             lambda: DerivativeMap(None, 0.01, None, None)
         )
@@ -115,7 +117,7 @@ class QPControllerConfig:
     If True, prints config.
     """
 
-    qp_solver_class: Type[QPSolver] = field(default=QPSolverPIQP)
+    qp_solver_class: type[QPSolver] = field(default=QPSolverPIQP)
     """
     Reference to the resolved QP solver class.
     """
@@ -134,8 +136,10 @@ class QPControllerConfig:
                 braking_prediction_horizon, self.minimum_prediction_horizon
             )
         if self.prediction_horizon < self.minimum_prediction_horizon:
-            raise ValueError(
-                f"prediction horizon must be >= {self.minimum_prediction_horizon}."
+            raise PredictionHorizonTooShortForDerivativeError(
+                prediction_horizon=self.prediction_horizon,
+                minimum_prediction_horizon=self.minimum_prediction_horizon,
+                max_derivative=self.max_derivative,
             )
         if self.prediction_horizon < braking_prediction_horizon:
             raise BrakingTimeExceedsHorizonError(
@@ -208,6 +212,21 @@ class QPControllerConfig:
         """
         return cls(
             target_frequency=20, braking_time=timedelta(seconds=0.1), verbose=False
+        )
+
+    @classmethod
+    def create_with_physical_simulation_defaults(cls) -> QPControllerConfig:
+        """
+        Creates a silent configuration for a robot driven against a running physics,
+        where each command becomes the servos' set point.
+
+        The rate is higher than :meth:`create_with_fast_simulation_defaults` picks,
+        since the wall clock of such a run is spent stepping the physics rather than
+        solving the controller, and finer set points reach a goal in less simulated
+        time.
+        """
+        return cls(
+            target_frequency=100, braking_time=timedelta(seconds=0.1), verbose=False
         )
 
     def set_dof_weight(

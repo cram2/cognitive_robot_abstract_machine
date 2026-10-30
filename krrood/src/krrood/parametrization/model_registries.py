@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing_extensions import Type, Dict
 
-from krrood.parametrization.exceptions import RelationalCircuitRegistryRequiresMatch
+from krrood.parametrization.exceptions import (
+    RelationalCircuitRegistryRequiresMatch,
+    UnboundedParameterError,
+)
 from krrood.parametrization.parameterizer import (
     ModelQueryParameters,
     UnderspecifiedParameters,
@@ -14,14 +16,24 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
 from probabilistic_model.probabilistic_circuit.relational.causal import (
     RelationalCausalCircuit,
 )
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     GroundingMode,
     RelationalProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-    ProbabilisticCircuit,
+from probabilistic_model.probabilistic_circuit.groundable_circuit import (
+    GroundableCircuit,
 )
+from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
+    RepresentationType,
+)
+from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
+from probabilistic_model.probabilistic_circuit.tensorized.factories import (
+    uniform_measure_of_event,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
+)
+from probabilistic_model.exceptions import UnboundedEventError
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
@@ -51,12 +63,50 @@ class FullyFactorizedRegistry(ModelRegistry):
 
 
 @dataclass
+class UniformPriorRegistry(ModelRegistry):
+    """
+    A registry that knows nothing but what a statement allows: every parameter is drawn
+    uniformly from where the statement's ``where`` conditions permit it.
+
+    The model is the uniform measure of the values the conditions allow, also when they
+    form several separate regions.
+    """
+
+    def get_model(
+        self, parameters: ModelQueryParameters
+    ) -> LayeredProbabilisticCircuit:
+        """
+        :param parameters: The parameters of the statement. Only a ``Match`` brings
+            ``where`` conditions; the bare selection of ``average(...)`` and the
+            condition of ``probability_of(...)`` bring none.
+        :raises UnboundedParameterError: If the conditions leave a parameter without a
+            lower or an upper bound, which they always do when there are none.
+        """
+        if not isinstance(parameters, UnderspecifiedParameters):
+            raise UnboundedParameterError(
+                parameter_name=", ".join(parameters.variables)
+            )
+        allowed = parameters.truncation_assignments_from_where_conditions
+        if allowed is None:
+            raise UnboundedParameterError(
+                parameter_name=", ".join(parameters.variables)
+            )
+        for name, variable in parameters.variables.items():
+            if variable not in allowed.variables:
+                raise UnboundedParameterError(parameter_name=name)
+        try:
+            return uniform_measure_of_event(allowed)
+        except UnboundedEventError as error:
+            raise UnboundedParameterError(parameter_name=error.variable.name) from error
+
+
+@dataclass
 class DictRegistry(ModelRegistry):
     """
     A registry that uses a dictionary to keep all models.
     """
 
-    models: Dict[Type, ProbabilisticModel]
+    models: dict[type, ProbabilisticModel]
     """
     A dictionary that maps classes to probabilistic models.
     """
@@ -70,7 +120,8 @@ class RelationalCircuitRegistry(ModelRegistry):
     """
     A registry that grounds a RelationalProbabilisticCircuit for the queried statement
     and aligns its variable names to the UnderspecifiedParameters convention before
-    returning.
+    returning. The grounding comes back in the circuit type the relational circuit was
+    fitted in, and a causal query is wrapped in that same type.
 
     Only supports :class:`~krrood.parametrization.parameterizer.UnderspecifiedParameters`
     (i.e. a ``Match``, directly or wrapped by ``distribution_of(...)``): grounding needs
@@ -101,7 +152,7 @@ class RelationalCircuitRegistry(ModelRegistry):
     How undetermined aggregation latents are represented during grounding.
 
     See
-    :class:`~probabilistic_model.probabilistic_circuit.relational.rspn.GroundingMode`.
+    :class:`~probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit.GroundingMode`.
     """
 
     def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:
@@ -114,7 +165,7 @@ class RelationalCircuitRegistry(ModelRegistry):
 
     def _ground_and_rename(
         self, parameters: UnderspecifiedParameters
-    ) -> ProbabilisticCircuit:
+    ) -> GroundableCircuit:
         """
         Ground the relational circuit for ``parameters.statement`` and align its
         variable names to the ``UnderspecifiedParameters`` convention.
@@ -138,8 +189,8 @@ class RelationalCircuitRegistry(ModelRegistry):
 
     @staticmethod
     def _as_causal_circuit(
-        grounded: ProbabilisticCircuit, parameters: UnderspecifiedParameters
-    ) -> CausalCircuit:
+        grounded: RepresentationType, parameters: UnderspecifiedParameters
+    ) -> CausalCircuit[RepresentationType]:
         """
         Wrap an already-grounded, already-renamed circuit as a verified
         ``CausalCircuit`` registering the query's declared cause, effect and confounder
@@ -179,7 +230,7 @@ class CausalCircuitRegistry(ModelRegistry):
     :class:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`.
     """
 
-    circuits: Dict[Type, CausalCircuit]
+    circuits: dict[type, CausalCircuit]
     """
     A dictionary that maps classes to pre-built causal circuits.
     """

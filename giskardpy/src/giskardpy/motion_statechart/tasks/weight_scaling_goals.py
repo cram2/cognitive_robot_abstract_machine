@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.graph_node import ConvergingTask, NodeArtifacts
+from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MaxManipulability(ConvergingTask):
     """
     This goal maximizes the manipulability of the kinematic chain between root_link and
@@ -18,33 +17,32 @@ class MaxManipulability(ConvergingTask):
     joints or odometry joints.
     """
 
-    root_link: Body = field(kw_only=True)
+    root_link: Body
     """
     The root of the kinematic chain whose manipulability is maximized.
     """
 
-    tip_link: Body = field(kw_only=True)
+    tip_link: Body
     """
     The tip of the kinematic chain whose manipulability is maximized.
     """
 
-    manipulability_threshold: float = field(default=0.5, kw_only=True)
+    manipulability_threshold: float = 0.5
     """
     Manipulability value the goal drives the measure towards.
     """
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self) -> MotionNodeArtifacts:
         """
         Build a constraint that drives the manipulability measure towards
         :attr:`manipulability_threshold`.
 
-        :param context: Provides access to world model and kinematic expressions.
         :return: The artifacts of this task, whose error is how far the manipulability measure is from its target value.
         """
-        artifacts = NodeArtifacts()
-        root_P_tip = context.world.compose_forward_kinematics_expression(
+        artifacts = MotionNodeArtifacts()
+        root_P_tip = self.context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_position()[:3]
+        ).position[:3]
 
         joint_symbols = root_P_tip.free_variables()
         position_expression = sm.vstack([root_P_tip])

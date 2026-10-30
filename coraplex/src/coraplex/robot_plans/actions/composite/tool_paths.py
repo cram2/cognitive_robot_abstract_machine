@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import Callable, List, Optional, Tuple
+from typing_extensions import Callable
 
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
@@ -54,7 +54,7 @@ class ToolPathSegment:
     Curve mapping normalized time to a local 3D point.
     """
 
-    cut_index: Optional[int] = None
+    cut_index: int | None = None
     """
     Index of the cut this segment belongs to, if the segment is part of a multi-cut
     path.
@@ -62,7 +62,7 @@ class ToolPathSegment:
 
     def sample(
         self, frame_np: np.ndarray, dt: float, t0: float = 0.0
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Sample the segment's curve in the given frame.
 
@@ -94,7 +94,7 @@ class ToolPath:
     An ordered list of tool path segments forming one continuous path.
     """
 
-    segments: List[ToolPathSegment]
+    segments: list[ToolPathSegment]
     """
     The ordered segments of this path.
     """
@@ -108,7 +108,7 @@ class ToolPath:
 
     def sample(
         self, frame: HomogeneousTransformationMatrix, dt: float = 0.01, t0: float = 0.0
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Sample all segments into one concatenated path.
 
@@ -424,7 +424,7 @@ def _constrain_to_convex_hull_xy(
 
 def _top_surface_hull_xy(
     surface_body: Body, upward_threshold: float = 0.6
-) -> Optional[np.ndarray]:
+) -> np.ndarray | None:
     """
     :param surface_body: The body whose top surface is computed.
     :param upward_threshold: Minimum Z component of a face normal for the face to
@@ -477,7 +477,7 @@ def _duration_scale_from_body(
 def build_container_path(
     container_body: Body,
     pattern: MixingPattern = MixingPattern.SPIRAL,
-    mix_duration: Optional[float] = None,
+    mix_duration: float | None = None,
     reference_size: float = 0.10,
     approach_clearance: float = 0.02,
 ) -> ToolPath:
@@ -699,14 +699,14 @@ class SliceAnchorPlacement:
     Upper bound of the usable cutting interval in meters.
     """
 
-    slice_thickness: Optional[float] = None
+    slice_thickness: float | None = None
     """
     Requested thickness of each slice in meters.
 
     Derived from :attr:`number_of_cuts` if None.
     """
 
-    number_of_cuts: Optional[int] = None
+    number_of_cuts: int | None = None
     """
     Requested number of cuts.
 
@@ -728,7 +728,7 @@ class SliceAnchorPlacement:
     Lower bound on the slice thickness in meters to keep anchors distinct.
     """
 
-    def compute_anchor_positions(self) -> List[float]:
+    def compute_anchor_positions(self) -> list[float]:
         """
         :return: The anchor positions along the axis, ordered from interval start to
             interval end.
@@ -740,7 +740,7 @@ class SliceAnchorPlacement:
             for cut_index in range(1, count + 1)
         ]
 
-    def _resolve_parameters(self, usable_length: float) -> Tuple[float, int]:
+    def _resolve_parameters(self, usable_length: float) -> tuple[float, int]:
         """
         :param usable_length: Length of the usable cutting interval in meters.
         :return: The feasible ``(slice_thickness, number_of_cuts)`` pair after filling
@@ -769,8 +769,8 @@ class SliceAnchorPlacement:
 def build_cutting_path(
     food_body: Body,
     technique: CuttingTechnique = CuttingTechnique.SAW,
-    slice_thickness: Optional[float] = None,
-    number_of_cuts_on_local_x_axis: Optional[int] = None,
+    slice_thickness: float | None = None,
+    number_of_cuts_on_local_x_axis: int | None = None,
     reference_size: float = 0.10,
     slicing_priority: SlicingPriority = SlicingPriority.THICKNESS,
     approach_clearance: float = 0.02,
@@ -906,7 +906,7 @@ def build_cutting_path(
             cut_index=cut_index,
         )
 
-    segments: List[ToolPathSegment] = []
+    segments: list[ToolPathSegment] = []
     for cut_index, x_value in enumerate(x_anchors):
         segments.append(_approach_segment(cut_index, x_value))
         if technique is CuttingTechnique.SAW:

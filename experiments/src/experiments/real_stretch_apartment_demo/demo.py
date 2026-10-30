@@ -2,7 +2,7 @@
 Stretch fetches a cereal box from a shelf, places it on a bedside table and puts it
 back again.
 
-Running with :attr:`~coraplex.datastructures.enums.ExecutionType.REAL` drives the actual
+Running with :class:`~coraplex.plans.executors.RealRobotPlanExecutor` drives the actual
 robot and fetches the world from the running world server. The default runs the whole plan
 in simulation against a world built from the Stretch URDF, so nothing on the network is
 needed.
@@ -24,22 +24,26 @@ RealSense but does not recognize it, so it reports poses without class labels an
 detection is labelled with what the plan asked for. Two consequences: a second object on the
 same shelf layer aborts the run with
 :class:`~coraplex.exceptions.UnidentifiedDetections` rather than risking the wrong grasp,
-and an empty scene aborts with :class:`~coraplex.exceptions.NothingDetected`. Adding a
+and an empty scene fails the detection, which ends the run with
+:class:`~coraplex.exceptions.MotionDidNotFinish`. Adding a
 classifying annotator to that engine removes both without changing this demo.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import (
-    DetectionTechnique,
-    ExecutionType,
-)
+from coraplex.plans.context_extensions import RobotAccess
+from coraplex.plans.plan_transformation import PlanRewriting
+from cramph.context import ContextExtension, StatechartContext
+from cramph.statechart import Statechart
+from coraplex.datastructures.enums import DetectionTechnique
 from coraplex.demonstrations import RobotDemonstration
-from coraplex.plans.factories import sequential
-from coraplex.plans.plan_node import PlanNode
+from coraplex.plans.executors import (
+    PlanExecutor,
+    RealRobotPlanExecutor,
+    KinematicallySimulatedPlanExecutor,
+)
 from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.navigation import LookAtAction, NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -50,14 +54,14 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.robot_plans.plan_transformations import DetectBeforeGrasp
 from krrood.entity_query_language.factories import a
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.connections import Connection6DoFSpecification
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    Connection6DoFSpecification,
-    RobotSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.predetermined_maps.apartment_environment import (
+from semantic_digital_twin.predefined_maps.apartment_environment import (
     ApartmentEnvironment,
 )
 from semantic_digital_twin.robots.stretch import Stretch
@@ -65,6 +69,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Chee
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
+from cramph.composites import Sequence, StatementNode
 
 CEREAL_NAME = "cheeze_it.obj"
 """
@@ -101,21 +106,21 @@ class StretchApartmentDemonstration(RobotDemonstration):
 
     ros_node_name: str = "stretch_demo_node"
 
-    def build_simulated_world(self) -> World:
+    def scene_specification(self) -> WorldSpecification:
         """
-        Put the Stretch on its drive in a world holding nothing but a map body.
+        :return: A world holding nothing but a map body, which :meth:`populate_scene`
+            furnishes.
         """
-        return WorldSpecification(
-            world_parser=None,
-            robots=[
-                RobotSpecification(
-                    semantic_annotation_type=self.used_robot,
-                    odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        1, 1
-                    ),
-                )
-            ],
-        ).to_domain_object()
+        return WorldSpecification(world_parser=None)
+
+    def robot_specification(self) -> RobotSpecification:
+        """
+        :return: The Stretch on its drive, between the shelf and the bedside table.
+        """
+        return RobotSpecification(
+            semantic_annotation_type=self.used_robot,
+            odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
+        )
 
     def is_scene_populated(self, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(CEREAL_NAME)
@@ -141,63 +146,67 @@ class StretchApartmentDemonstration(RobotDemonstration):
             parent_connection_specification=Connection6DoFSpecification(),
         ).spawn(world, parent=world.get_body_by_name(CEREAL_SHELF_LAYER_NAME))
 
-    def build_context(self, world: World) -> Context:
+    def build_context_extensions(self, world: World) -> list[ContextExtension]:
         """
-        Build the plan context around the Stretch in ``world``.
-
-        ..note:: The ROS node has to be in the context for a real robot.
+        Give the plan the Stretch in ``world``, detecting an object before grasping it.
         """
-        return Context(
-            world=world,
-            robot=world.get_semantic_annotations_by_type(self.used_robot)[0],
-            ros_node=self.ros_node,
-            evaluate_conditions=False,
-            alternative_motion_mappings=self.alternative_motion_mappings,
-            plan_transformations=[DetectBeforeGrasp()],
-            _debug=self.debug,
-        )
+        return [
+            RobotAccess(world.get_semantic_annotations_by_type(self.used_robot)[0]),
+            PlanRewriting(transformations=[DetectBeforeGrasp()]),
+        ]
 
-    def build_plan(self, context: Context) -> PlanNode:
+    def build_statechart(self, context: StatechartContext) -> Statechart:
         """
         Carry the cereal box from its shelf to the bedside table and back again.
         """
         world = context.world
+        robot = context.require_extension(RobotAccess).robot
 
         cereal = world.get_semantic_annotations_by_type(CheezeIt)[0]
-        arm = context.robot.all_arms[0]
+        arm = robot.all_arms[0]
         shelf_layer_body = world.get_body_by_name(CEREAL_SHELF_LAYER_NAME)
         bedside_table_body = world.get_body_by_name("bedside_table.dae")
         CEREAL_SHELF_LAYER_T_CEREAL.reference_frame = shelf_layer_body
 
-        plan = sequential(
-            [
-                ParkArmsAction(context.robot.all_arms),
-                SetGripperAction(arm.end_effector, motion=GripperState.CLOSE),
+        plan = Sequence(
+            nodes=[
+                ParkArmsAction(arms=robot.all_arms),
+                SetGripperAction(
+                    configuration=arm.end_effector.default_configuration(
+                        GripperState.CLOSE
+                    )
+                ),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
+                    target_location=Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=shelf_layer_body)),
-                a(NavigateAction)(
-                    target_location=Pose.from_xyz_rpy(
-                        0.8, 0.6, 0, yaw=-np.pi / 2, reference_frame=world.root
+                LookAtAction(
+                    target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                ),
+                StatementNode(
+                    statement=a(NavigateAction)(
+                        target_location=Pose.from_xyz_rpy(
+                            0.8, 0.6, 0, yaw=-np.pi / 2, reference_frame=world.root
+                        )
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=shelf_layer_body)),
+                LookAtAction(
+                    target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                ),
                 DetectAction(
-                    DetectionTechnique.TYPES,
+                    technique=DetectionTechnique.TYPES,
                     object_sem_annotation=CheezeIt,
                     trust_detected_orientation=True,
                     accept_first_if_multiple=True,
                 ),
                 PickUpAction(
-                    cereal.grasp_candidates()[0],
-                    arm,
+                    grasp=cereal.grasp_candidates()[0],
+                    arm=arm,
                 ),
-                ParkArmsAction(context.robot.all_arms),
+                ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
+                    target_location=Pose.from_xyz_rpy(
                         0.8, 0, 0, yaw=np.pi, reference_frame=bedside_table_body
                     )
                 ),
@@ -210,64 +219,87 @@ class StretchApartmentDemonstration(RobotDemonstration):
                         reference_frame=bedside_table_body,
                     ),
                 ),
-                ParkArmsAction(context.robot.all_arms),
-                SetGripperAction(arm.end_effector, motion=GripperState.CLOSE),
+                ParkArmsAction(arms=robot.all_arms),
+                SetGripperAction(
+                    configuration=arm.end_effector.default_configuration(
+                        GripperState.CLOSE
+                    )
+                ),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
+                    target_location=Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=shelf_layer_body)),
-                a(NavigateAction)(
-                    target_location=Pose.from_xyz_rpy(
-                        0.8, 0, 0, yaw=np.pi, reference_frame=bedside_table_body
+                LookAtAction(
+                    target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                ),
+                StatementNode(
+                    statement=a(NavigateAction)(
+                        target_location=Pose.from_xyz_rpy(
+                            0.8, 0, 0, yaw=np.pi, reference_frame=bedside_table_body
+                        )
                     )
                 ),
-                LookAtAction(Pose.from_xyz_rpy(reference_frame=bedside_table_body)),
+                LookAtAction(
+                    target=Pose.from_xyz_rpy(reference_frame=bedside_table_body)
+                ),
                 DetectAction(
-                    DetectionTechnique.TYPES,
+                    technique=DetectionTechnique.TYPES,
                     object_sem_annotation=CheezeIt,
                     trust_detected_orientation=False,
                     accept_first_if_multiple=True,
                 ),
-                a(PickUpAction)(
-                    grasp=cereal.grasp_candidates()[0],
-                    arm=arm,
+                StatementNode(
+                    statement=a(PickUpAction)(
+                        grasp=cereal.grasp_candidates()[0],
+                        arm=arm,
+                    )
                 ),
-                ParkArmsAction(context.robot.all_arms),
+                ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    Pose.from_xyz_rpy(
+                    target_location=Pose.from_xyz_rpy(
                         0.8, 0.6, 0, yaw=-np.pi / 2, reference_frame=world.root
                     )
                 ),
-                a(PlaceAction)(
-                    object_designator=cereal,
-                    target_location=CEREAL_SHELF_LAYER_T_CEREAL.to_pose(),
+                StatementNode(
+                    statement=a(PlaceAction)(
+                        object_designator=cereal,
+                        target_location=CEREAL_SHELF_LAYER_T_CEREAL.pose,
+                    )
                 ),
-                ParkArmsAction(context.robot.all_arms),
-                SetGripperAction(arm.end_effector, motion=GripperState.CLOSE),
-            ],
-            context=context,
+                ParkArmsAction(arms=robot.all_arms),
+                SetGripperAction(
+                    configuration=arm.end_effector.default_configuration(
+                        GripperState.CLOSE
+                    )
+                ),
+            ]
         )
 
-        return plan
+        statechart = Statechart(context=context)
+        statechart.add_node(plan)
+        return statechart
 
 
 def main(
-    execution_type: ExecutionType = ExecutionType.SIMULATED, repetitions: int = 1
+    executor_type: type[PlanExecutor] = KinematicallySimulatedPlanExecutor,
+    repetitions: int = 1,
 ) -> None:
     """
     Run the demonstration.
 
-    :param execution_type: Whether to drive the real robot or simulate it.
+    :param executor_type: The executor running the plan, which decides whether it
+        drives the real robot or simulates it.
     :param repetitions: How often to transport the cereal there and back again.
     """
-    # StretchApartmentDemonstration(used_robot=PR2, execution_type=execution_type).run()
-    # StretchApartmentDemonstration(used_robot=HSRB, execution_type=execution_type).run()
+    # StretchApartmentDemonstration(used_robot=PR2, executor_type=executor_type).run()
+    # StretchApartmentDemonstration(used_robot=HSRB, executor_type=executor_type).run()
     StretchApartmentDemonstration(
-        used_robot=Stretch, execution_type=execution_type, repetitions=repetitions
+        used_robot=Stretch, executor_type=executor_type, repetitions=repetitions
     ).run()
 
 
 if __name__ == "__main__":
-    main(execution_type=ExecutionType.REAL, repetitions=LIVE_DEMONSTRATION_REPETITIONS)
+    main(
+        executor_type=RealRobotPlanExecutor, repetitions=LIVE_DEMONSTRATION_REPETITIONS
+    )

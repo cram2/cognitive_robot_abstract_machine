@@ -1,4 +1,4 @@
-from coraplex.plans.plan import Plan---
+---
 jupyter:
   jupytext:
     text_representation:
@@ -12,112 +12,99 @@ jupyter:
     name: python3
 ---
 # Introduction to Plans
-Plans in CoraPlex refer to a sequence of actions that are executed by the robot. Plans are created using the language 
-expressions introduced in the [Language](language.md) section. Plans can be executed in a simulated environment or on a 
-real robot. 
+A plan in CoraPlex is what the robot does: the nodes a statechart holds at its top level, usually cramph composites
+such as `Sequence`, `Parallel` or `TryInOrder` holding actions. Plans are built from the constructs introduced in the
+[Plan Language](https://cram2.github.io/cognitive_robot_abstract_machine/cramph/examples/plan_language.html) of cramph. An executor then compiles the statechart and executes it, in a simulated environment
+or on a real robot.
 
-A plan consists of nodes these are either LanguageNodes which shape the control flow of the plan or DesignatorNodes 
-are associated with a designator and can be performed by the robot.
-
-We will now go through a simple example of how to create a plan using the CoraPlex language. To create a plan you always 
-need a language expression.
+We will now go through a simple example of how to create and execute a plan.
 
 # Setup a World
 
 ```python
-from coraplex.execution_environment import simulated_robot
+from coraplex.plans.context_extensions import RobotAccess
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from coraplex.testing import setup_world
-from coraplex.datastructures.dataclasses import Context
 from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
 
 pr2 = PR2.from_world(world)
-
-context = Context(world, pr2)
 ```
 
+## The Executor
+An executor runs plans in a world. What a plan's nodes read from their context, such as the robot performing them, is
+given to it as context extensions; the executor builds the statechart context out of them. A `KinematicallySimulatedPlanExecutor`
+ticks the plan in the world itself, a `RealRobotPlanExecutor` sends it to Giskard driving the real robot.
+
+```python
+executor = KinematicallySimulatedPlanExecutor(
+    StatechartContext.with_extensions(world, [RobotAccess(pr2)])
+)
+```
 
 ## Example Plan
+The plan is built in a statechart of the executor's context.
 
 ```python
 from coraplex.robot_plans import *
-from coraplex.plans.factories import *
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from cramph.composites import Sequence
+from cramph.statechart import Statechart
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
-navigate = NavigateAction(Pose.from_xyz_quaternion(1, 1, 0, reference_frame=world.root))
-park = ParkArmsAction(pr2.all_arms)
+navigate = NavigateAction(target_location=Pose.from_xyz_quaternion(1, 1, 0, reference_frame=world.root))
+park = ParkArmsAction(arms=pr2.all_arms)
 
-plan = sequential([navigate, park], context=context).plan
+plan = Sequence(nodes=[navigate, park])
+statechart = Statechart(context=executor.context)
+statechart.add_node(plan)
 ```
 
-This will create a simple plan which has a SequentialNode as its root and two DesignatorNodes as its children. You can 
-open an interactive, real-time visualization of the plan using the `visualize` method.
+This creates a plan with a `Sequence` at the top level of the statechart and the two actions as its children.
+
+You can open an interactive, real-time visualization of the statechart the plan runs in using its `visualize` method.
 
 ```python
-plan.visualize()
-```
-
-## Arguments of Nodes
-
-Nodes hava a number of arguments that provide information about the designator associated with the node and the current 
-state of execution. Arguments of nodes include:
-
-* status: The current status of the node including CREATED, RUNNING, SUCCEEDED, FAILED
-* start_time/end_time: The time when the node started and ended execution
-* reason: The reason for the failure during execution
-* plan: A reference to the plan this node belongs to
-
-Reasons for failure propagate upwards, meaning that if a child node fails the parent will also contain the same reason.
-
-Now let's take a look at the arguments of the plan we just created.
-
-```python
-print(plan.root.status)
-print(plan.root.start_time)
-print(plan.root.reason)
+statechart.visualize()
 ```
 
 ## Plan Execution
-Plans can be executed using the `perform` method. This method will execute the plan and also perform all the resolution
-of Action Designators.
+`compile` prepares the statechart, adding what the plan runs with, and compiles it; `execute` runs it until every
+top-level node of the plan succeeded. Underspecified actions are grounded while the plan runs.
 
 ```python
-
-with simulated_robot:
-    plan.perform()
+executor.compile(statechart)
+executor.execute()
 ```
 
 This will execute the plan in a simulated environment.
 
 ### Collision Avoidance
-The execution environments accept a `collision_avoidance` flag. When set to `True`, an
-`ExternalCollisionAvoidance` goal is added to every motion state chart created within the
-environment, keeping the robot from colliding with the rest of the world while the motions run.
+An executor accepts a `collision_avoidance` flag. When set to `True`, collision avoidance goals are added to the
+statechart, keeping the robot from colliding with the rest of the world while the motions run.
 
 ```python
-with simulated_robot(collision_avoidance=True):
-    plan.perform()
+executor = KinematicallySimulatedPlanExecutor(
+    StatechartContext.with_extensions(world, [RobotAccess(pr2)]),
+    collision_avoidance=True,
+)
 ```
 
-The flag also works when constructing an environment directly, and is restored correctly for
-nested environments:
+An executor runs one statechart, so every plan gets an executor of its own.
+
+## Inspecting a Plan
+
+Every node of an executed plan reports how its run went:
+
+* life_cycle_state: Whether the node has not started, is running or paused, or succeeded, failed or was interrupted
+* start_time/end_time: When the node started and ended
 
 ```python
-from coraplex.datastructures.enums import ExecutionType
-from coraplex.execution_environment import ExecutionEnvironment
-
-with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
-    plan.perform()
-```
-
-Now we can take a look at the arguments of the plan after execution.
-
-```python
-print(plan.root.status)
-print(plan.root.children[0].status)
-print(plan.root.start_time)
-print(plan.root.end_time)
-print(plan.root.reason)
+print(plan.life_cycle_state)
+print(plan.children[0].life_cycle_state)
+print(plan.start_time)
+print(plan.end_time)
 ```

@@ -5,7 +5,7 @@ Welcome to the Giskard Python API documentation. Giskard is a framework for robo
 ## Key Features
 
 - **Constraint-Based Control**: Define motion goals as a set of constraints.
-- **Motion Statecharts**: Compose complex motions using statecharts.
+- **Motion Statecharts**: Compose complex motions using statecharts built on [cramph](https://cram2.github.io/cognitive_robot_abstract_machine/cramph).
 - **Simulation and Execution**: Built-in support for simulation and execution with different pacers.
 - **Integration**: Works seamlessly with the `semantic_digital_twin` package.
 

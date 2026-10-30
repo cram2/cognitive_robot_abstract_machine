@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from typing_extensions import TYPE_CHECKING, Optional, Sequence
+from typing_extensions import TYPE_CHECKING, Sequence
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 def root_context(
     services: MicroplanningServices,
     rules: Sequence[PhraseRule],
-    options: Optional[RenderOptions] = None,
+    options: RenderOptions | None = None,
 ) -> RuleContext:
     """
     Build the :class:`RuleContext` for one node — the **single** definition of the fold
@@ -59,8 +59,8 @@ def root_context(
 def fold(
     node: FoldNode,
     services: MicroplanningServices,
-    rules: Optional[Sequence[PhraseRule]] = None,
-    options: Optional[RenderOptions] = None,
+    rules: Sequence[PhraseRule] | None = None,
+    options: RenderOptions | None = None,
 ) -> VerbalizationFragment:
     """
     Verbalize *node* by dispatching it to its matching grammar rule and recursing — the

@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
@@ -17,6 +17,7 @@ from giskardpy.data_types.exceptions import (
 if TYPE_CHECKING:
     from giskardpy.qp.constraint import GiskardConstraint
     from giskardpy.qp.qp_data import QPData
+    from semantic_digital_twin.spatial_types.derivatives import Derivatives
 
 
 @dataclass
@@ -81,10 +82,10 @@ class QuadraticObjectiveUnsupportedError(QPSolverException):
 
 
 @dataclass
-class BrakingExceedsHorizonError(SetupException):
+class PredictionHorizonTooShortError(SetupException):
     """
-    Raised when a braking from the velocity limit to rest does not fit into the
-    prediction horizon, which every plan must end at rest within.
+    Raised when the prediction horizon of the QP controller is shorter than the
+    configuration requires.
     """
 
     prediction_horizon: int
@@ -94,7 +95,41 @@ class BrakingExceedsHorizonError(SetupException):
 
     minimum_prediction_horizon: int
     """
-    The shortest prediction horizon the braking fits into.
+    The shortest prediction horizon the configuration allows.
+    """
+
+
+@dataclass
+class PredictionHorizonTooShortForDerivativeError(PredictionHorizonTooShortError):
+    """
+    Raised when the explicitly set prediction horizon has too few steps to integrate the
+    highest derivative the QP optimizes.
+    """
+
+    max_derivative: Derivatives
+    """
+    The highest derivative the QP optimizes.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Optimizing up to {self.max_derivative.name} needs a prediction horizon of "
+            f"at least {self.minimum_prediction_horizon}, but it is "
+            f"{self.prediction_horizon}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Raise prediction_horizon to at least {self.minimum_prediction_horizon}, "
+            f"or leave it unset so it is derived from braking_time."
+        )
+
+
+@dataclass
+class BrakingExceedsHorizonError(PredictionHorizonTooShortError):
+    """
+    Raised when a braking from the velocity limit to rest does not fit into the
+    prediction horizon, which every plan must end at rest within.
     """
 
     def suggest_correction(self) -> str:
@@ -210,12 +245,12 @@ class ConstraintTypeMismatchError(QPSolverException):
     The name of the enforcement strategy that received the constraint.
     """
 
-    expected_type: Type[GiskardConstraint]
+    expected_type: type[GiskardConstraint]
     """
     The constraint type the strategy expected.
     """
 
-    actual_type: Type[GiskardConstraint]
+    actual_type: type[GiskardConstraint]
     """
     The constraint type that was actually received.
     """
@@ -241,7 +276,7 @@ class NoFactoryForQPDataTypeError(QPSolverException):
     Raised when no registered factory handles the requested QPData type.
     """
 
-    qp_data_type: Type[QPData]
+    qp_data_type: type[QPData]
     """
     The QPData type for which no factory is registered.
     """

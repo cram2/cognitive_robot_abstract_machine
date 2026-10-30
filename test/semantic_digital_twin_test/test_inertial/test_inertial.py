@@ -2,7 +2,9 @@ import numpy as np
 from numpy.testing import assert_allclose
 from scipy.spatial.transform import Rotation as R
 
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import RotationMatrix, Vector3
+from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.inertial_properties import (
     InertiaTensor,
     PrincipalMoments,
@@ -107,3 +109,14 @@ class TestComponentsAndAssembly:
                     axes_out.data @ np.diag(moments_out.data) @ axes_out.data.T
                 )
                 assert_allclose(sorted_tensor, expected_tensor, atol=1e-12)
+
+
+# %% a body without a description of its inertia
+
+
+def test_a_body_whose_inertia_nobody_described_has_no_inertial():
+    """
+    A placeholder mass would be taken for a real one, for instance by a physical
+    simulation that would otherwise work it out from the body's shapes.
+    """
+    assert Body(name=PrefixedName("undescribed")).inertial is None

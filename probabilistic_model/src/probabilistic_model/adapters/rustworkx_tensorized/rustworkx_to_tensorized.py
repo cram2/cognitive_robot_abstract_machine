@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, List, Tuple, Type
+from typing_extensions import Any
 
 from probabilistic_model.adapters.rustworkx_tensorized.converter import (
     InputType,
@@ -13,6 +13,7 @@ from probabilistic_model.adapters.rustworkx_tensorized.converter import (
 )
 from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
     NotExactlyOneRootError,
+    UnitNotConvertedError,
 )
 from probabilistic_model.distributions.distributions import (
     DiracDeltaDistribution,
@@ -65,6 +66,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.uniform_la
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
+    LayerNode,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
     RowGroupedSparseArray,
@@ -83,18 +85,18 @@ class ConvertedLayer:
     The created layer.
     """
 
-    units: List[Unit]
+    units: list[Unit]
     """
     The units the layer was created from, in the order of its nodes.
     """
 
-    node_of_unit: Dict[int, int]
+    node_of_unit: dict[int, int]
     """
     A map from the hash of a unit to the index of its node in the layer.
     """
 
     @classmethod
-    def of_units(cls, layer: Layer, units: List[Unit]) -> ConvertedLayer:
+    def of_units(cls, layer: Layer, units: list[Unit]) -> ConvertedLayer:
         """
         :param layer: The layer created from the units.
         :param units: The units, in the order of the nodes of the layer.
@@ -113,7 +115,7 @@ class UnitsToLayerConverter(RustworkxToTensorizedConverter[InputType, OutputType
     """
 
     @staticmethod
-    def type_of_unit(unit: Unit) -> Type:
+    def type_of_unit(unit: Unit) -> type:
         """
         :param unit: A unit of a rustworkx circuit.
         :return: The distribution class of a leaf, or the class of any other unit.
@@ -133,7 +135,7 @@ class SumUnitsToSumLayerConverter(UnitsToLayerConverter[SumUnit, SumLayer]):
 
     @classmethod
     def convert(
-        cls, data: List[SumUnit], converted_layers: List[ConvertedLayer]
+        cls, data: list[SumUnit], converted_layers: list[ConvertedLayer]
     ) -> ConvertedLayer:
         variables = np.array(
             [
@@ -174,10 +176,10 @@ class ProductUnitsToProductLayerConverter(
 
     @classmethod
     def convert(
-        cls, data: List[ProductUnit], converted_layers: List[ConvertedLayer]
+        cls, data: list[ProductUnit], converted_layers: list[ConvertedLayer]
     ) -> ConvertedLayer:
-        used_layers: List[ConvertedLayer] = []
-        row_of_layer: Dict[int, int] = {}
+        used_layers: list[ConvertedLayer] = []
+        row_of_layer: dict[int, int] = {}
         rows, columns, values = [], [], []
 
         for unit_index, unit in enumerate(data):
@@ -210,7 +212,7 @@ class LeavesToInputLayerConverter(UnitsToLayerConverter[InputType, OutputType]):
 
     @classmethod
     def convert(
-        cls, data: List[Unit], converted_layers: List[ConvertedLayer]
+        cls, data: list[Unit], converted_layers: list[ConvertedLayer]
     ) -> ConvertedLayer:
         layer = cls.output_type().from_distributions(
             data[0].probabilistic_circuit.variables.index(data[0].variable),
@@ -257,7 +259,7 @@ class MultivariateLeavesToLayerConverter(UnitsToLayerConverter[InputType, Output
 
     @classmethod
     def convert(
-        cls, data: List[Unit], converted_layers: List[ConvertedLayer]
+        cls, data: list[Unit], converted_layers: list[ConvertedLayer]
     ) -> ConvertedLayer:
         layer = cls.output_type().from_distributions(
             data[0].probabilistic_circuit.variables,
@@ -285,6 +287,36 @@ class TruncatedMultivariateGaussianLeavesToTruncatedMultivariateGaussianLayerCon
     """
 
 
+@dataclass
+class ConvertedCircuit:
+    """
+    A layered circuit created from a rustworkx circuit, together with the layers its
+    units became.
+    """
+
+    circuit: LayeredProbabilisticCircuit
+    """
+    The created circuit.
+    """
+
+    converted_layers: list[ConvertedLayer]
+    """
+    Every layer of the circuit, with the units it was created from.
+    """
+
+    def node_of(self, unit: Unit) -> LayerNode:
+        """
+        :param unit: A unit of the rustworkx circuit.
+        :return: The layer and node that the unit became.
+        :raises UnitNotConvertedError: If no layer was created from the unit.
+        """
+        for converted_layer in self.converted_layers:
+            node = converted_layer.node_of_unit.get(hash(unit))
+            if node is not None:
+                return LayerNode(converted_layer.layer, node)
+        raise UnitNotConvertedError(unit)
+
+
 class RustworkxCircuitToLayeredCircuitConverter(
     RustworkxToTensorizedConverter[ProbabilisticCircuit, LayeredProbabilisticCircuit]
 ):
@@ -295,7 +327,15 @@ class RustworkxCircuitToLayeredCircuitConverter(
 
     @classmethod
     def convert(cls, data: ProbabilisticCircuit) -> LayeredProbabilisticCircuit:
-        converted_layers: List[ConvertedLayer] = []
+        return cls.convert_with_layers(data).circuit
+
+    @classmethod
+    def convert_with_layers(cls, data: ProbabilisticCircuit) -> ConvertedCircuit:
+        """
+        :param data: The rustworkx circuit.
+        :return: The layered circuit, and which layer and node every unit became.
+        """
+        converted_layers: list[ConvertedLayer] = []
         for units in reversed(list(data.layers)):
             converted_layers = [
                 RustworkxToTensorizedConverter.convert(group, converted_layers)
@@ -309,15 +349,18 @@ class RustworkxCircuitToLayeredCircuitConverter(
         ]
         if len(roots) != 1:
             raise NotExactlyOneRootError(number_of_roots=len(roots))
-        return LayeredProbabilisticCircuit(SortedSet(data.variables), roots[0].layer)
+        return ConvertedCircuit(
+            LayeredProbabilisticCircuit(SortedSet(data.variables), roots[0].layer),
+            converted_layers,
+        )
 
     @staticmethod
-    def groups_of_level(units: List[Unit]) -> List[List[Unit]]:
+    def groups_of_level(units: list[Unit]) -> list[list[Unit]]:
         """
         :param units: The units of one level of a rustworkx circuit.
         :return: The units grouped by exact type and scope, one group per layer.
         """
-        groups: Dict[Tuple[Type, Tuple], List[Unit]] = {}
+        groups: dict[tuple[type, tuple], list[Unit]] = {}
         for unit in units:
             key = (UnitsToLayerConverter.type_of_unit(unit), tuple(unit.variables))
             groups.setdefault(key, []).append(unit)

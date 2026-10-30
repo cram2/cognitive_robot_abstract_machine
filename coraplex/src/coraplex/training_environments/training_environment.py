@@ -2,7 +2,7 @@ import json
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing_extensions import Any, Generic, TypeVar
 
 from krrood.adapters.json_serializer import from_json
 from krrood.entity_query_language.backends import ProbabilisticBackend
@@ -10,6 +10,7 @@ from krrood.entity_query_language.factories import a, an, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
@@ -20,17 +21,18 @@ from probabilistic_model.probabilistic_circuit.rx.helper import (
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProductUnit,
 )
-from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
-from coraplex.plans.factories import execute_single
 from coraplex.plans.failures import (
     PlanFailure,
     EmptyUnderspecified,
 )
-from coraplex.plans.plan import Plan
-from coraplex.plans.underspecified import UnderspecifiedNode
-from coraplex.robot_plans.actions.base import ActionDescription
+from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.actions.core.misc import MoveToReach
+from cramph.composites import StatementNode
+from cramph.node import StatechartNode
+from cramph.statechart import Statechart
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -43,7 +45,12 @@ from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
 )
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Pose2D
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Point2,
+    Point3,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -51,27 +58,55 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
+TrainedAction = TypeVar("TrainedAction", bound=Action)
+
 
 @dataclass
-class TrainingEnvironment(ABC):
+class TrainingEpisode:
     """
-    A training environment for generating data for the parameterization of actions.
-    """
-
-    action_type: ClassVar[type[ActionDescription]]
-    """
-    The type of action that is trained.
+    The underspecified action one episode of training executes, and the executor
+    executing it.
     """
 
-    executed_plans: list[Plan] = field(default_factory=list)
+    action: StatementNode
+    """
+    The underspecified action whose grounded variants the episode tries.
+    """
+
+    executor: KinematicallySimulatedPlanExecutor
+    """
+    The executor running the action in the world built for the episode.
+    """
+
+
+@dataclass
+class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
+    """
+    A training environment for generating data for the parameterization of the actions
+    of the type it binds.
+    """
+
+    executed_plans: list[StatechartNode] = field(default_factory=list)
     """
     The executed plans during training.
+    """
+
+    tried_actions: list[Action] = field(default_factory=list)
+    """
+    Every action the executed plans tried, whether it succeeded or not.
     """
 
     visualize: bool = False
     """
     Rather create a visualization of the executed plans or not.
     """
+
+    @property
+    def action_type(self) -> type[TrainedAction]:
+        """
+        :return: The type of action that is trained.
+        """
+        return type(self).get_type_of_generic_parameter(TrainedAction)
 
     @abstractmethod
     def setup_world(self, *kwargs) -> World:
@@ -80,14 +115,13 @@ class TrainingEnvironment(ABC):
         """
 
     @abstractmethod
-    def setup_plan(self, limit: int = 10, **kwargs) -> Plan:
+    def setup_episode(self, limit: int = 10, **kwargs: Any) -> TrainingEpisode:
         """
-        Create a plan with an underspecified node as a root.
-
-        This plan is used to generate variants of the actions.
+        Create an underspecified action, in a world of its own, whose grounded variants
+        the episode tries.
 
         :param limit: The maximum number of actions that should be executed.
-        :return: The plan
+        :return: The action and the executor executing it.
         """
 
     def generate_episodes(self, number_of_actions: int = 10):
@@ -110,25 +144,29 @@ class TrainingEnvironment(ABC):
         :param limit: The maximum number of actions that should be executed.
         :return: The number of actions executed in the episode.
         """
-        plan = self.setup_plan(limit)
+        episode = self.setup_episode(limit)
 
         if self.visualize:
             import rclpy
 
             pub = VizMarkerPublisher(
-                _world=plan.context.world,
+                _world=episode.executor.context.world,
                 node=rclpy.create_node("test_node"),
             )
 
-        with simulated_robot:
-            try:
-                plan.perform()
-            except EmptyUnderspecified:
-                # No working solution found in this episode
-                pass
-            self.executed_plans.append(plan)
+        executor = episode.executor
+        statechart = Statechart(context=executor.context)
+        statechart.add_node(episode.action)
+        try:
+            executor.compile(statechart)
+            executor.execute()
+        except EmptyUnderspecified:
+            # No working solution found in this episode
+            pass
+        self.executed_plans.append(episode.action)
 
-        number_of_executed_variants = len(plan.root.children)
+        self.tried_actions.extend(episode.action.grounded_nodes)
+        number_of_executed_variants = len(episode.action.grounded_nodes)
 
         if self.visualize:
             pub.stop()
@@ -138,14 +176,12 @@ class TrainingEnvironment(ABC):
 
 
 @dataclass
-class MoveToReachTrainingEnvironment(TrainingEnvironment):
+class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
     """
     Training environment for MoveToReach actions in an empty world using the PR2.
     """
 
-    action_type = MoveToReach
-
-    model_path: Optional[Path] = None
+    model_path: Path | None = None
     """
     Path to a model file that should be used for the action.
 
@@ -179,7 +215,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
 
         return world_with_urdf
 
-    def setup_plan(self, limit: int = 10, **kwargs) -> UnderspecifiedNode:
+    def setup_episode(self, limit: int = 10, **kwargs: Any) -> TrainingEpisode:
 
         world = self.setup_world()
         [robot] = world.get_semantic_annotations_by_type(AbstractRobot)
@@ -193,7 +229,9 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         move_to_reach = a(MoveToReach)(
             reference_T_grasp=target_pose,
             target_pose_offset_robot=a(Pose2D)(
-                x=..., y=..., yaw=..., reference_frame=None
+                position=a(Point2)(x=..., y=..., reference_frame=None),
+                yaw=...,
+                reference_frame=None,
             ),
             hip_rotation=...,
             end_effector=variable(EndEffector, world.semantic_annotations),
@@ -207,9 +245,19 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         else:
             query_backend = self.setup_backend(move_to_reach)
 
-        context = Context(world=world, robot=robot, query_backend=query_backend)
+        executor = KinematicallySimulatedPlanExecutor(
+            StatechartContext.with_extensions(
+                world,
+                [
+                    RobotAccess(robot),
+                    StatementGrounding(query_backend=query_backend),
+                ],
+            ),
+        )
 
-        return execute_single(move_to_reach, context=context).plan
+        return TrainingEpisode(
+            action=StatementNode(statement=move_to_reach), executor=executor
+        )
 
     def setup_backend(self, underspecified_action: Match) -> ProbabilisticBackend:
         """
@@ -220,10 +268,16 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         :return: The probabilistic backend
         """
         parameters = UnderspecifiedParameters(underspecified_action)
-        robot_x = parameters.variables["MoveToReach.target_pose_offset_robot.x"]
-        robot_y = parameters.variables["MoveToReach.target_pose_offset_robot.y"]
-        hip_rotation = parameters.variables["MoveToReach.hip_rotation"]
-        approach_clearance = parameters.variables["MoveToReach.approach_clearance"]
+        robot_x = parameters.variable_of(
+            underspecified_action.target_pose_offset_robot.position.x
+        )
+        robot_y = parameters.variable_of(
+            underspecified_action.target_pose_offset_robot.position.y
+        )
+        hip_rotation = parameters.variable_of(underspecified_action.hip_rotation)
+        approach_clearance = parameters.variable_of(
+            underspecified_action.approach_clearance
+        )
 
         distribution = fully_factorized(
             means={approach_clearance: 0.05},

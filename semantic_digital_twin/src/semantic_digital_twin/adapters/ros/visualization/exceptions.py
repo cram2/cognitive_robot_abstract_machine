@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Type
 
 from krrood.exceptions import DataclassException
 from semantic_digital_twin.spatial_types.spatial_types import SpatialType
@@ -13,7 +12,7 @@ class CannotRenderSpatialTypeError(DataclassException):
     Raised when no renderer can turn a spatial type into RViz markers.
     """
 
-    spatial_type_type: Type = field(kw_only=True)
+    spatial_type_type: type = field(kw_only=True)
     """
     The type of the spatial type that could not be rendered.
     """

@@ -38,6 +38,7 @@ dependencies = [
     "sqlalchemy",
     "embreex",  # Hardware acceleration for trimesh raycasting
     "rtree",  # For spatial indexing in trimesh
+    "xxhash",  # Fast hashing for trimesh, which hashes meshes to check its caches
     "random_events",
     "plotly",
     "daqp",
@@ -74,6 +75,12 @@ license = "LGPL-3.0-only"
 where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["semantic_digital_twin*"]
 
+[tool.setuptools.package-data]
+"semantic_digital_twin.part_finding" = ["prompts/*.jinja"]
+
+[project.scripts]
+semantic-digital-twin-part-finding-server = "semantic_digital_twin.adapters.part_finding.command_line:PartFindingCommandLine.run"
+
 [tool.setuptools.dynamic]
 version = {attr = "semantic_digital_twin._version.__version__"}
 
@@ -92,6 +99,15 @@ gui = [
 ]
 iris = [
     "drake",
+]
+vision = [
+    # Install torch for your GPU's CUDA version first, see doc/part_finding.md
+    "torch",
+    "torchvision",
+    "transformers>=4.57.1",
+    "accelerate",
+    "bitsandbytes",
+    "pillow",
 ]
 datasets = [
     "py7zr",

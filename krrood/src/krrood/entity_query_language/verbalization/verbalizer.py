@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.vocabulary.english import Directive
@@ -38,8 +38,8 @@ class EQLVerbalizer:
     def build(
         self,
         expression: SymbolicExpression,
-        services: Optional[MicroplanningServices] = None,
-        performative: Optional[Directive] = None,
+        services: MicroplanningServices | None = None,
+        performative: Directive | None = None,
     ) -> VerbalizationFragment:
         """
         Translate *expression* into its natural-language fragment tree.

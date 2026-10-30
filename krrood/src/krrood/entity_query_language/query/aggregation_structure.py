@@ -11,7 +11,6 @@ verbalization, …), not a verbalization-only concern.
 
 from __future__ import annotations
 
-from typing_extensions import Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -34,7 +33,7 @@ def unwrap_result_quantifiers(expression: SymbolicExpression) -> SymbolicExpress
     return inner
 
 
-def selected_aggregator(entity: SymbolicExpression) -> Optional[Aggregator]:
+def selected_aggregator(entity: SymbolicExpression) -> Aggregator | None:
     """
     :param entity: Candidate expression.
     :return: The aggregator selected by *entity*, or ``None`` when *entity* is not an entity
@@ -75,7 +74,7 @@ def is_collapsible_aggregation_subquery(entity: SymbolicExpression) -> bool:
     return is_aggregation_subquery(entity) and not entity.is_constrained_or_grouped
 
 
-def aggregation_leaf_attribute(entity: SymbolicExpression) -> Optional[Attribute]:
+def aggregation_leaf_attribute(entity: SymbolicExpression) -> Attribute | None:
     """
     :param entity: Candidate expression.
     :return: The leaf attribute of the aggregator's child chain (e.g. the ``amount`` node behind
@@ -86,7 +85,7 @@ def aggregation_leaf_attribute(entity: SymbolicExpression) -> Optional[Attribute
     return aggregator._leaf_attribute_ if aggregator is not None else None
 
 
-def aggregation_source_root(entity: SymbolicExpression) -> Optional[Variable]:
+def aggregation_source_root(entity: SymbolicExpression) -> Variable | None:
     """
     :param entity: Candidate expression.
     :return: The root variable that an aggregation subquery aggregates over (e.g. the

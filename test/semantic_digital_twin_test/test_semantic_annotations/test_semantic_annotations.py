@@ -1,35 +1,36 @@
 import logging
 
-import numpy as np
-from numpy.ma.testutils import (
-    assert_equal,
-)  # You could replace this with numpy's regular assert for better compatibility
-
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.explanation.explanation import explain_inference
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
-from krrood.entity_query_language.verbalization.rendering.renderer import (
-    HierarchicalRenderer,
-)
 from krrood.entity_query_language.verbalization.pipeline import (
     verbalize_expression,
     VerbalizationPipeline,
+)
+from krrood.entity_query_language.verbalization.rendering.renderer import (
+    HierarchicalRenderer,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.predefined_maps.kitchen_environment import (
+    KitchenEnvironment,
+)
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Drawer,
-    Wardrobe,
     Door,
 )
 from semantic_digital_twin.testing import *
+from semantic_digital_twin.world_description.connections import (
+    PrismaticConnection,
+    RevoluteConnection,
+)
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -37,7 +38,6 @@ from semantic_digital_twin.world_description.shape_collection import (
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-from typing_extensions import Self
 
 try:
     from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
@@ -61,12 +61,12 @@ class TestSemanticAnnotation(SemanticAnnotation):
 
     _private_entity: Optional[KinematicStructureEntity] = None
     public_entity: Optional[KinematicStructureEntity] = None
-    _private_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
-    public_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
+    _private_entity_list: list[KinematicStructureEntity] = field(default_factory=list)
+    public_entity_list: list[KinematicStructureEntity] = field(default_factory=list)
     _private_annotation: Optional[SemanticAnnotation] = None
     public_annotation: Optional[SemanticAnnotation] = None
-    _private_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
-    public_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
+    _private_annotation_list: list[SemanticAnnotation] = field(default_factory=list)
+    public_annotation_list: list[SemanticAnnotation] = field(default_factory=list)
 
 
 def test_aggregate_bodies(kitchen_world):
@@ -193,48 +193,6 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
     )
 
     assert len(result.bounding_boxes) == 2
-
-
-def test_has_hinge_has_slider_aggregate_bodies():
-    world = World()
-    root = Body(name=PrefixedName("root"))
-    with world.modify_world():
-        world.add_kinematic_structure_entity(root)
-
-    door_body = Body(name=PrefixedName("door_body"))
-    drawer_body = Body(name=PrefixedName("drawer_body"))
-    handle1_body = Body(name=PrefixedName("handle1_body"))
-    handle2_body = Body(name=PrefixedName("handle2_body"))
-    hinge_body = Body(name=PrefixedName("hinge_body"))
-    slider_body = Body(name=PrefixedName("slider_body"))
-    handle1 = Handle(root=handle1_body)
-    handle2 = Handle(root=handle2_body)
-    hinge = Hinge(root=hinge_body)
-    slider = Slider(root=slider_body)
-    drawer = Drawer(root=drawer_body)
-    door = Door(root=door_body)
-    with world.modify_world():
-        world.add_connection(FixedConnection(parent=root, child=door_body))
-        world.add_connection(FixedConnection(parent=root, child=drawer_body))
-        world.add_connection(FixedConnection(parent=root, child=handle2_body))
-        world.add_connection(FixedConnection(parent=root, child=handle1_body))
-        world.add_connection(FixedConnection(parent=root, child=hinge_body))
-        world.add_connection(FixedConnection(parent=root, child=slider_body))
-        world.add_semantic_annotation(handle1)
-        world.add_semantic_annotation(handle2)
-        world.add_semantic_annotation(hinge)
-        world.add_semantic_annotation(slider)
-        world.add_semantic_annotation(drawer)
-        world.add_semantic_annotation(door)
-        door.add(handle2)
-        door.add(hinge)
-        drawer.add(handle1)
-        drawer.add(slider)
-
-    expected_door_bodies = {door_body, handle2_body, hinge_body}
-    expected_drawer_bodies = {drawer_body, handle1_body, slider_body}
-    assert set(door.kinematic_structure_entities) == expected_door_bodies
-    assert set(drawer.kinematic_structure_entities) == expected_drawer_bodies
 
 
 def test_semantic_annotation_hash(apartment_world_copy):
@@ -432,7 +390,7 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
         def setup_hardware_interfaces(self):
             pass
 
-        def setup_joint_states(self) -> List[JointState]:
+        def setup_joint_states(self) -> list[JointState]:
             return []
 
         @classmethod
@@ -665,3 +623,69 @@ def test_combined_mesh_is_empty_without_collision_geometry():
     setup = DrawerWithSlidingHandle.build(ShapeCollection(), ShapeCollection())
 
     assert len(setup.drawer.combined_mesh.vertices) == 0
+
+
+# %% joints of openable parts
+# A door or drawer built with semdt hangs straight from its whole on the active
+# connection that moves it, even when its origin sits away from the hinge.
+
+
+@pytest.fixture
+def kitchen_environment_world() -> World:
+    return KitchenEnvironment().get_world()
+
+
+def test_door_joint_is_the_revolute_connection_it_hangs_from_its_whole_on(
+    kitchen_environment_world,
+):
+    refrigerator = kitchen_environment_world.get_semantic_annotation_by_name(
+        "refrigerator"
+    )
+    fridge_door = kitchen_environment_world.get_semantic_annotation_by_name(
+        "fridge_door"
+    )
+
+    assert fridge_door.movable_joint is fridge_door.root.parent_connection
+    assert isinstance(fridge_door.movable_joint, RevoluteConnection)
+    assert fridge_door.movable_joint.parent is refrigerator.root
+
+
+def test_drawer_joint_is_the_prismatic_connection_it_hangs_from_its_whole_on(
+    kitchen_environment_world,
+):
+    drawer = kitchen_environment_world.get_semantic_annotation_by_name(
+        "counter_drawer_0"
+    )
+
+    assert drawer.movable_joint is drawer.root.parent_connection
+    assert isinstance(drawer.movable_joint, PrismaticConnection)
+
+
+def test_a_drawer_built_with_rails_reports_how_far_it_stands_open(
+    kitchen_environment_world,
+):
+    drawer = kitchen_environment_world.get_semantic_annotation_by_name(
+        "counter_drawer_0"
+    )
+    limits = drawer.movable_joint.dof.limits
+
+    drawer.movable_joint.position = limits.lower.position
+    kitchen_environment_world.notify_state_change()
+    assert drawer.opening_ratio == 0
+
+    drawer.movable_joint.position = limits.upper.position
+    kitchen_environment_world.notify_state_change()
+    assert drawer.opening_ratio == 1
+
+
+def test_every_kitchen_drawer_stands_closed_at_the_lower_limit_of_its_rails(
+    kitchen_environment_world,
+):
+    drawers = kitchen_environment_world.get_semantic_annotations_by_type(Drawer)
+    assert drawers
+
+    for drawer in drawers:
+        drawer.movable_joint.position = drawer.movable_joint.dof.limits.lower.position
+    kitchen_environment_world.notify_state_change()
+
+    assert [drawer.opening_ratio for drawer in drawers] == [0] * len(drawers)

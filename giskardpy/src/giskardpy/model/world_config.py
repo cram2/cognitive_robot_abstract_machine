@@ -4,27 +4,23 @@ import abc
 from abc import ABC
 from dataclasses import dataclass, field
 
-import numpy as np
 from sqlalchemy import select
 
-from krrood.ormatic.data_access_objects.helper import get_dao_class
+from giskardpy.model.exceptions import RobotDescriptionMissingError
+from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
-    OmniDrive,
     FixedConnection,
-    DifferentialDrive,
+    OmniDrive,
+    WheeledDrive,
 )
-from semantic_digital_twin.world_description.world_entity import (
-    Body,
-    KinematicStructureEntity,
-)
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -52,90 +48,115 @@ class EmptyWorld(WorldConfig):
 
 
 @dataclass
-class WorldWithFixedRobot(WorldConfig):
-    urdf: str = field(kw_only=True)
+class WorldWithRobot(WorldConfig, ABC):
+    """
+    A world holding one robot that is described by a URDF.
+    """
+
+    urdf: str | None = field(kw_only=True, default=None)
+    """
+    The URDF of the robot as XML, not a path to it.
+
+    ``None`` loads the description file :attr:`robot_class` declares.
+    """
+
     root_name: PrefixedName = field(default=PrefixedName("map"))
-    robot_name: PrefixedName = field(default=PrefixedName("robot"))
-    robot_root: KinematicStructureEntity = field(init=False)
-    urdf_view: AbstractRobot = field(kw_only=True, default=MinimalRobot)
+    """
+    Name of the root body of the world.
+    """
 
-    def setup_world(self):
-        map = Body(name=self.root_name)
-        self.world.add_body(map)
+    robot_class: type[AbstractRobot] = field(kw_only=True, default=MinimalRobot)
+    """
+    The robot class that is applied to the parsed description.
+    """
 
-        urdf_parser = URDFParser(urdf=self.urdf, prefix="")
-        world_with_robot = urdf_parser.parse()
-        self.urdf_view.from_world(world_with_robot)
-        self.robot_root = world_with_robot.root
-        map_C_robot = FixedConnection(parent=map, child=self.robot_root)
+    def parse_robot(self) -> World:
+        """
+        :return: A world of its own holding the described robot, with the robot class
+            applied to it.
+        """
+        world_with_robot = self.create_urdf_parser().parse()
+        self.robot_class.from_world(world_with_robot)
+        return world_with_robot
 
-        self.world.merge_world(world_with_robot, map_C_robot)
+    def create_urdf_parser(self) -> URDFParser:
+        """
+        :return: A parser of :attr:`urdf`, or of the description file
+            :attr:`robot_class` declares when no URDF is given.
+        :raises RobotDescriptionMissingError: If no URDF is given and the robot class
+            declares no description file.
+        """
+        if self.urdf is not None:
+            return URDFParser(urdf=self.urdf, prefix="")
+        description_file_path = self.robot_class.get_ros_file_path()
+        if not description_file_path:
+            raise RobotDescriptionMissingError(robot_class=self.robot_class)
+        return URDFParser.from_file(description_file_path, prefix="")
 
 
 @dataclass
-class WorldWithOmniDriveRobot(WorldConfig):
-    urdf: str = field(kw_only=True)
-    root_name: PrefixedName = field(default=PrefixedName("map"))
-    robot_name: PrefixedName = field(default=PrefixedName("robot"))
-    odom_body_name: PrefixedName = field(default=PrefixedName("odom"))
-    urdf_view: AbstractRobot = field(kw_only=True, default=MinimalRobot)
-    localization: Connection6DoF = field(init=False)
-    robot: AbstractRobot = field(init=False)
+class WorldWithFixedRobot(WorldWithRobot):
+    """
+    A world whose robot is fixed to the root body.
+    """
 
     def setup_world(self):
-        map = Body(name=self.root_name)
-        odom = Body(name=self.odom_body_name)
-        self.localization = Connection6DoF.create_with_dofs(
-            parent=map, child=odom, world=self.world
-        )
-        self.world.add_connection(self.localization)
+        world_with_robot = self.parse_robot()
 
-        urdf_parser = URDFParser(urdf=self.urdf, prefix="")
-        world_with_robot = urdf_parser.parse()
-        self.robot = self.urdf_view.from_world(world_with_robot)
+        root = Body(name=self.root_name)
+        self.world.add_body(root)
+        root_C_robot = FixedConnection(parent=root, child=world_with_robot.root)
 
-        odom = OmniDrive.create_with_dofs(
-            parent=odom,
-            child=world_with_robot.root,
-            translation_velocity_limits=0.2,
-            rotation_velocity_limits=0.2,
-            world=self.world,
-        )
-
-        self.world.merge_world(world_with_robot, odom)
+        self.world.merge_world(world_with_robot, root_C_robot)
 
 
 @dataclass
-class WorldWithDiffDriveRobot(WorldConfig):
-    urdf: str = field(kw_only=True)
-    root_name: PrefixedName = field(default=PrefixedName("map"))
-    robot_name: PrefixedName = field(default=PrefixedName("robot"))
-    odom_body_name: PrefixedName = field(default=PrefixedName("odom"))
-    urdf_view: AbstractRobot = field(kw_only=True, default=MinimalRobot)
-    localization: Connection6DoF = field(init=False)
-    robot: AbstractRobot = field(init=False)
+class WorldWithMobileRobot(WorldWithRobot):
+    """
+    A world whose robot drives relative to an odometry body, which is itself free to
+    move relative to the root body.
+    """
+
+    odometry_body_name: PrefixedName = field(default=PrefixedName("odom"))
+    """
+    Name of the body the robot drives relative to.
+    """
+
+    drive_class: type[WheeledDrive] = field(kw_only=True, default=OmniDrive)
+    """
+    The kind of connection between the odometry body and the robot.
+    """
+
+    translation_velocity_limit: float = field(kw_only=True, default=0.2)
+    """
+    Velocity limit of the translation of the drive.
+    """
+
+    rotation_velocity_limit: float = field(kw_only=True, default=0.2)
+    """
+    Velocity limit of the rotation of the drive.
+    """
 
     def setup_world(self):
-        map = Body(name=self.root_name)
-        odom = Body(name=self.odom_body_name)
-        self.localization = Connection6DoF.create_with_dofs(
-            parent=map, child=odom, world=self.world
+        world_with_robot = self.parse_robot()
+
+        root = Body(name=self.root_name)
+        odometry_body = Body(name=self.odometry_body_name)
+        localization = Connection6DoF.create_with_dofs(
+            parent=root, child=odometry_body, world=self.world
         )
-        self.world.add_connection(self.localization)
+        self.world.add_connection(localization)
 
-        urdf_parser = URDFParser(urdf=self.urdf, prefix="")
-        world_with_robot = urdf_parser.parse()
-        self.robot = self.urdf_view.from_world(world_with_robot)
-
-        odom = DifferentialDrive.create_with_dofs(
-            parent=odom,
+        drive = self.drive_class.create_with_dofs(
+            parent=odometry_body,
             child=world_with_robot.root,
-            translation_velocity_limits=0.2,
-            rotation_velocity_limits=0.2,
+            translation_velocity_limits=self.translation_velocity_limit,
+            rotation_velocity_limits=self.rotation_velocity_limit,
             world=self.world,
         )
+        drive.has_hardware_interface = True
 
-        self.world.merge_world(world_with_robot, odom)
+        self.world.merge_world(world_with_robot, drive)
 
 
 @dataclass
@@ -150,11 +171,8 @@ class WorldFromDatabaseConfig(WorldConfig):
     Primary key of the world in the semantic digital twin database.
     """
 
-    def setup_collision_config(self):
-        pass
-
     def setup_world(self):
-        ormatic_world_class = get_dao_class(World)
+        ormatic_world_class = get_data_access_object_class(World)
         session = semantic_digital_twin_sessionmaker()()
         world_dao = session.scalar(
             select(ormatic_world_class).where(

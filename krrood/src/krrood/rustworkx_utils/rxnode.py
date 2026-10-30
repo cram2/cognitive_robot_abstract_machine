@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import ClassVar, Optional, List
+from typing_extensions import ClassVar
 
 from krrood.rustworkx_utils.graph_visualizer import GraphVisualizer
 from krrood.rustworkx_utils.utils import ColorLegend
@@ -16,26 +16,26 @@ class RWXNode:
     name: str
     graph: rx.PyDAG
     weight: str = field(default="")
-    data: Optional[Any] = field(default=None)
-    _primary_parent_id: Optional[int] = None
+    data: Any | None = field(default=None)
+    _primary_parent_id: int | None = None
     color: ColorLegend = field(default_factory=ColorLegend)
     # Grouping/boxing options
     wrap_subtree: bool = field(default=False)
-    wrap_facecolor: Optional[str] = field(default=None)
-    wrap_edgecolor: Optional[str] = field(default=None)
+    wrap_facecolor: str | None = field(default=None)
+    wrap_edgecolor: str | None = field(default=None)
     wrap_alpha: float = field(default=0.08)
     # Visual emphasis options
     enclosed: bool = field(default=False)
     enclosed_name: ClassVar[str] = "enclosed"
     faded: bool = field(default=False)
-    border_color: Optional[str] = field(default=None)
+    border_color: str | None = field(default=None)
 
     def __post_init__(self):
         # store self as node data to keep a 1:1 mapping
         self.id: int = self.graph.add_node(self)
 
     # Non-primary connect: add edge without changing primary parent pointer
-    def add_parent(self, parent: "RWXNode", edge_weight=None):
+    def add_parent(self, parent: RWXNode, edge_weight=None):
         # Avoid self-loops
         if parent is self:
             return
@@ -60,23 +60,23 @@ class RWXNode:
         self.graph.remove_edge(parent.id, self.id)
 
     @property
-    def ancestors(self) -> List[RWXNode]:
+    def ancestors(self) -> list[RWXNode]:
         node_ids = rx.ancestors(self.graph, self.id)
         return [self.graph[n_id] for n_id in node_ids]
 
     @property
-    def parents(self) -> List[RWXNode]:
+    def parents(self) -> list[RWXNode]:
         # In this environment rustworkx returns node data objects directly
         return self.graph.predecessors(self.id)
 
     @property
-    def parent(self) -> Optional["RWXNode"]:
+    def parent(self) -> RWXNode | None:
         if self._primary_parent_id is None:
             return None
         return self.graph[self._primary_parent_id]
 
     @parent.setter
-    def parent(self, value: Optional["RWXNode"]):
+    def parent(self, value: RWXNode | None):
         if value is None:
             # detach current parent
             self.graph.remove_edge(self._primary_parent_id, self.id)
@@ -87,23 +87,23 @@ class RWXNode:
         self._primary_parent_id = value.id
 
     @property
-    def children(self) -> List["RWXNode"]:
+    def children(self) -> list[RWXNode]:
         # In this environment rustworkx returns node data objects directly
         return self.graph.successors(self.id)
 
     @property
-    def descendants(self) -> List["RWXNode"]:
+    def descendants(self) -> list[RWXNode]:
         desc_ids = rx.descendants(self.graph, self.id)
         return [self.graph[nid] for nid in desc_ids]
 
     @property
-    def leaves(self) -> List["RWXNode"]:
+    def leaves(self) -> list[RWXNode]:
         return [
             n for n in [self] + self.descendants if self.graph.out_degree(n.id) == 0
         ]
 
     @property
-    def root(self) -> "RWXNode":
+    def root(self) -> RWXNode:
         n = self
         while n.parent is not None:
             n = n.parent
@@ -122,7 +122,7 @@ class RWXNode:
         curve_scale: float = 0.5,
         layout: str = "tidy",
         edge_style: str = "orthogonal",
-        label_max_chars_per_line: Optional[int] = 13,
+        label_max_chars_per_line: int | None = 13,
         filename: str = "pdf_graph.pdf",
         title: str = "Directed Query Graph (Top to Bottom)",
     ):

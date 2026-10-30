@@ -1,40 +1,40 @@
 from datetime import timedelta
 
-from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
+from giskardpy.middleware.ros2.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
-    WorldWithTracyConfig,
     TracyVelocityInterface,
+    WorldWithTracyConfig,
 )
-from giskardpy.middleware.ros2.utils.utils import load_xacro
+from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from rclpy import Parameter
-from rclpy.exceptions import ParameterUninitializedException
 
 
-def main():
-    rospy.init_node("giskard")
-    try:
-        rospy.get_node().declare_parameters(
-            namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
-        )
-        robot_description = rospy.get_node().get_parameter_or("robot_description").value
-    except ParameterUninitializedException as e:
-        robot_description = load_xacro(
-            "package://iai_tracy_description/urdf/tracy.urdf.xacro"
-        )
-    giskard = Giskard(
-        world_config=WorldWithTracyConfig(urdf=robot_description),
+def create_giskard() -> Giskard:
+    """
+    Build a Giskard that commands Tracy, described by what the robot publishes on
+    ``/robot_description``.
+
+    .. note:: The ros node has to be initialized first, because the robot description is
+        read from its topic.
+    """
+    return Giskard(
+        world_config=WorldWithTracyConfig(urdf=get_robot_description()),
         robot_interface_config=TracyVelocityInterface(),
-        server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
+        server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(
             # reproduces the braking of the former prediction_horizon=30
             target_frequency=80,
             braking_time=timedelta(seconds=0.36),
         ),
     )
-    giskard.live()
+
+
+def main() -> None:
+    """
+    Run the Giskard :func:`create_giskard` builds as a ros node until ROS shuts down.
+    """
+    Giskard.launch(create_giskard)
 
 
 if __name__ == "__main__":

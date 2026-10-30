@@ -1,10 +1,9 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
-    NodeArtifacts,
+    MotionNodeArtifacts,
     DebugExpression,
 )
 from semantic_digital_twin.spatial_types import Vector3
@@ -14,7 +13,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class AlignPlanes(ConvergingTask):
     """
     Will orient the tip plane to align with the goal plane.
@@ -22,64 +21,61 @@ class AlignPlanes(ConvergingTask):
     The planes are represented as normal vectors.
     """
 
-    root_link: KinematicStructureEntity = field(kw_only=True)
+    root_link: KinematicStructureEntity
     """
     Root link of the kinematic chain.
     """
 
-    tip_link: KinematicStructureEntity = field(kw_only=True)
+    tip_link: KinematicStructureEntity
     """
     Tip link of the kinematic chain.
     """
 
-    goal_normal: Vector3 = field(kw_only=True)
+    goal_normal: Vector3
     """
     Normal vector of the goal plane.
     """
 
-    tip_normal: Vector3 = field(kw_only=True)
+    tip_normal: Vector3
     """
     Normal vector of the tip plane.
     """
 
-    threshold: float = field(default=0.01, kw_only=True)
+    threshold: float = 0.01
     """
     Angle in radians below which the planes are considered aligned.
     """
 
-    reference_velocity: float = field(default=0.5, kw_only=True)
+    reference_velocity: float = 0.5
     """
     Reference angular velocity for normalization in rad/s.
     """
 
-    weight: float = field(
-        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
-    )
+    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
     Priority weight relative to other tasks.
     """
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self) -> MotionNodeArtifacts:
         """
         Build motion constraints that rotate the tip plane onto the goal plane.
 
-        :param context: Provides access to world model and kinematic expressions.
         :return: The artifacts of this task, whose error is the angle between the two
             plane normals.
         """
-        artifacts = NodeArtifacts()
-        tip_V_tip_normal = context.world.transform(
+        artifacts = MotionNodeArtifacts()
+        tip_V_tip_normal = self.context.world.transform(
             target_frame=self.tip_link, spatial_object=self.tip_normal
         )
         tip_V_tip_normal.scale(1)
-        root_V_root_normal = context.world.transform(
+        root_V_root_normal = self.context.world.transform(
             target_frame=self.root_link, spatial_object=self.goal_normal
         )
         root_V_root_normal.scale(1)
 
-        root_R_tip = context.world.compose_forward_kinematics_expression(
+        root_R_tip = self.context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
-        ).to_rotation_matrix()
+        ).rotation_matrix
         root_V_tip_normal = root_R_tip @ tip_V_tip_normal
         root_V_tip_normal.scale(1)
 
@@ -87,12 +83,12 @@ class AlignPlanes(ConvergingTask):
         current_dbg = DebugExpression(
             name=f"{self.name}/current_normal",
             expression=root_V_tip_normal,
-            color=Color(1, 0, 0, 1),
+            color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
         )
         goal_dbg = DebugExpression(
             name=f"{self.name}/goal_normal",
             expression=root_V_root_normal,
-            color=Color(0, 0, 1, 1),
+            color=Color.from_rgba(red=0, green=0, blue=1, opacity=1),
         )
         artifacts.debug_expressions.append(current_dbg)
         artifacts.debug_expressions.append(goal_dbg)

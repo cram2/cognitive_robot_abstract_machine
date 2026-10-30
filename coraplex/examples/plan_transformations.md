@@ -14,49 +14,76 @@ jupyter:
 
 # Plan Transformations
 
-An action describes the plan it expands into itself. A plan transformation changes that plan from
-the outside: it is applied to every node it matches, right after that node has been expanded and
-before the nodes below it are expanded in turn.
+An action describes the statechart nodes it expands into itself. A plan transformation changes that
+plan from the outside: it is applied to every action and underspecified node it matches, once that
+node has been expanded, before the statechart running the plan is compiled.
 
 That makes transformations the place for behaviour that is not part of an action's own description,
 such as perceiving before a grasp or parking the arms before driving, without giving every action a
-parameter for it. Transformations are registered on the `Context`, next to the alternative motion
-mappings, so they hold for every plan built with that context.
+parameter for it. Transformations are given to the executor running a plan, so they hold for every
+plan it runs.
 
 # Setup a World
 
 ```python
-from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.plans.context_extensions import RobotAccess
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from coraplex.plans.plan_transformation import PlanRewriting
 from coraplex.testing import setup_world
+from cramph.statechart import Statechart
 from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
 
 pr2 = PR2.from_world(world)
 
-context = Context(world, pr2)
+plan_transformations = []
+
+
+def statechart_for(plan):
+    """
+    :return: An executor configured with the transformations registered so far, and a
+        statechart of its context holding `plan`.
+    """
+    executor = KinematicallySimulatedPlanExecutor(
+        StatechartContext.with_extensions(
+            world,
+            [
+                RobotAccess(pr2),
+                PlanRewriting(transformations=plan_transformations),
+            ],
+        ),
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(plan)
+    return executor, statechart
 ```
 
 ## Looking at a Plan
 
-Every node carries the short label the plan visualization puts on it, so a few lines are enough to
-print an expanded plan:
+Putting a plan into a statechart expands it, and preparing that statechart without compiling or
+executing it lets the transformations rewrite it. A few lines are enough to print the expanded plan:
 
 ```python
+def expand(plan):
+    executor, statechart = statechart_for(plan)
+    executor.prepare(statechart)
+    return plan
+
+
 def show(node, depth=0):
-    print("   " * depth + node.node_label)
+    print("   " * depth + type(node).__name__)
     for child in node.children:
         show(child, depth + 1)
 ```
 
 ## A Reach Without Transformations
 
-`ReachAction` moves the gripper to a pre-pose and then makes its final approach onto the object. The
-plan is built by `notify`, which expands the whole plan without executing it.
+`ReachAction` moves the gripper to a pre-pose and then makes its final approach onto the object.
 
 ```python
-from coraplex.plans.factories import execute_single
+from cramph.composites import Sequence
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -64,15 +91,13 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 milk = world.get_semantic_annotations_by_type(Milk)[0]
 grasp = milk.grasp_candidates()[0]
 
-reach = execute_single(ReachAction(grasp=grasp, arm=pr2.right_arm), context=context)
-reach.notify()
+reach = expand(Sequence(nodes=[ReachAction(grasp=grasp, arm=pr2.right_arm)]))
 
 show(reach)
 ```
 
-The two `MoveToolCenterPointMotion` nodes are the pre-pose and the final approach; the condition
-nodes around them are the action's pre- and postcondition. The approach grasps at the pose the world
-already holds.
+The two Cartesian goals in the reach's body are the pre-pose and the final approach. The approach
+grasps at the pose the world already holds.
 
 ## Detecting Before the Grasp
 
@@ -82,22 +107,21 @@ approach acts on a freshly perceived pose. Registering it is the whole change:
 ```python
 from coraplex.robot_plans.plan_transformations import DetectBeforeGrasp
 
-context.plan_transformations.append(DetectBeforeGrasp())
+plan_transformations.append(DetectBeforeGrasp())
 
-reach = execute_single(ReachAction(grasp=grasp, arm=pr2.right_arm), context=context)
-reach.notify()
+reach = expand(Sequence(nodes=[ReachAction(grasp=grasp, arm=pr2.right_arm)]))
 
 show(reach)
 ```
 
-A node is expanded once, so each section builds its own plan rather than expanding the previous one
-again. The look and the detection now sit between the pre-pose and the approach, and both were
-expanded in turn: each has a plan of its own below it.
+A node belongs to one statechart, so each section builds its own plan rather than expanding the
+previous one again. The look and the detection now sit between the pre-pose and the approach, and
+both were expanded in turn: each has a body of its own below it.
 
 The same plan as an interactive graph:
 
 ```python
-reach.plan.visualize()
+reach.statechart.visualize()
 ```
 
 A transformation fires wherever its action is expanded, so the one registration also covers the
@@ -106,8 +130,7 @@ reach that `PickUpAction` builds. Nothing has to be passed down to it:
 ```python
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 
-pick_up = execute_single(PickUpAction(grasp, pr2.right_arm), context=context)
-pick_up.notify()
+pick_up = expand(Sequence(nodes=[PickUpAction(grasp=grasp, arm=pr2.right_arm)]))
 
 show(pick_up)
 ```
@@ -161,20 +184,18 @@ with world.modify_world():
 ```
 
 The transformation is bound to `PickUpAction`, so it inserts next to the pick-up rather than inside
-it. That needs the pick-up to have a parent, which the surrounding `sequential` gives it:
+it. That needs the pick-up to run in a sequence, which holds the new neighbours:
 
 ```python
-from coraplex.plans.factories import sequential
 from coraplex.robot_plans.plan_transformations import OpenDrawerBeforePickUp
 
-context.plan_transformations = [OpenDrawerBeforePickUp()]
+plan_transformations = [OpenDrawerBeforePickUp()]
 
 spoon_annotation = world.get_semantic_annotations_by_type(Spoon)[0]
 
-pick_up = sequential(
-    [PickUpAction(spoon_annotation.grasp_candidates()[0], pr2.right_arm)], context
+pick_up = expand(
+    Sequence(nodes=[PickUpAction(grasp=spoon_annotation.grasp_candidates()[0], arm=pr2.right_arm)])
 )
-pick_up.notify()
 
 show(pick_up)
 ```
@@ -184,8 +205,7 @@ drive are grounded when they are run, and the parking was expanded in turn. The 
 open, so the same registration leaves its pick-up alone:
 
 ```python
-milk_pick_up = sequential([PickUpAction(grasp, pr2.right_arm)], context)
-milk_pick_up.notify()
+milk_pick_up = expand(Sequence(nodes=[PickUpAction(grasp=grasp, arm=pr2.right_arm)]))
 
 show(milk_pick_up)
 ```
@@ -193,16 +213,15 @@ show(milk_pick_up)
 ## Writing a Transformation
 
 A transformation says which nodes it applies to and how their plan changes. Which nodes it applies
-to is the type it is bound to: `PlanTransformation[NavigateAction]` matches the node of every
-navigation, since a navigation is a designator, and a node type in that place matches every node of
-that type instead. `matches_node` does that selection, and `is_applicable` says whether the case a
-matched node describes needs the transformation at all, so one that is always worth applying
-answers `True`.
+to is the type it is bound to: `PlanTransformation[NavigateAction]` matches every navigation,
+since an action is a statechart node. `matches_node` does that selection, and `is_applicable` says
+whether the case a matched node describes needs the transformation at all, so one that is always
+worth applying answers `True`.
 
-How the plan changes is what the subclass brings. `InsertionTransformation` inserts nodes and asks
-for the `position` they are placed at, the `anchor` they are placed next to, and the
-`nodes_to_insert`, which are built anew on every application, since a node belongs to the one plan
-it was inserted into.
+How the plan changes is what the subclass brings. `SequentialInsertion` inserts nodes that run right
+before or right after another node, and asks for that `position`, the `anchor` they run next to,
+and the `nodes_to_insert`, which are built anew on every application, since a node belongs to the
+one statechart it was inserted into.
 
 ```python
 from dataclasses import dataclass
@@ -210,14 +229,14 @@ from dataclasses import dataclass
 from typing_extensions import List
 
 from coraplex.datastructures.enums import InsertionPosition
-from coraplex.plans.plan_node import ActionLike, ActionNode, MotionNode, PlanNode
-from coraplex.plans.plan_transformation import InsertionTransformation
+from coraplex.plans.plan_transformation import SequentialInsertion
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+from cramph.node import StatechartNode
 
 
 @dataclass
-class ParkArmsBeforeNavigating(InsertionTransformation[NavigateAction]):
+class ParkArmsBeforeNavigating(SequentialInsertion[NavigateAction]):
     """
     Parks the arms before the robot drives off, so it does not carry them into the
     furniture it passes.
@@ -227,27 +246,24 @@ class ParkArmsBeforeNavigating(InsertionTransformation[NavigateAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: PlanNode) -> bool:
+    def is_applicable(self, plan_node: NavigateAction) -> bool:
         return True
 
-    def anchor(self, plan_node: ActionNode) -> PlanNode:
-        [drive] = [
-            node for node in plan_node.descendants if isinstance(node, MotionNode)
-        ]
-        return drive
+    def anchor(self, plan_node: NavigateAction) -> StatechartNode:
+        return plan_node
 
-    def nodes_to_insert(self, plan_node: ActionNode) -> List[ActionLike]:
-        return [ParkArmsAction(plan_node.action.robot.all_arms)]
+    def nodes_to_insert(self, plan_node: NavigateAction) -> List[StatechartNode]:
+        return [ParkArmsAction(arms=plan_node.robot.all_arms)]
 ```
 
 ```python
-context.plan_transformations = [ParkArmsBeforeNavigating()]
+plan_transformations = [ParkArmsBeforeNavigating()]
 
-navigate = execute_single(
-    NavigateAction(Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root)),
-    context=context,
+navigate = expand(
+    Sequence(
+        nodes=[NavigateAction(target_location=Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root))]
+    )
 )
-navigate.notify()
 
 show(navigate)
 ```
@@ -255,18 +271,24 @@ show(navigate)
 The parking is part of the plan like any other action, so it is performed with it:
 
 ```python
-with simulated_robot:
-    navigate.perform()
+navigate = Sequence(
+    nodes=[NavigateAction(target_location=Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root))]
+)
 
-print(navigate.status)
+executor, statechart = statechart_for(navigate)
+executor.compile(statechart)
+executor.execute()
+
+print(navigate.life_cycle_state)
 ```
 
 ## Where the Nodes Land
 
-Every insertion says where its nodes go: `BEFORE` or `AFTER` the anchor makes them its siblings,
-`LAST_CHILD` appends them to what the anchor expanded into. The position is part of what the rewrite
-is rather than something its caller passes, so parking once the robot has arrived is a rewrite of
-its own:
+A sequential insertion says when its nodes run: `BEFORE` or `AFTER` the anchor. They become steps of
+the sequence that runs the anchor; where no sequence runs it, because it runs in a `Parallel` or is
+the whole plan, a new sequence takes the anchor's place and runs it together with the inserted
+nodes. The position is part of what the rewrite is rather than something its caller passes, so
+parking once the robot has arrived is a rewrite of its own:
 
 ```python
 @dataclass
@@ -280,13 +302,49 @@ class ParkArmsAfterNavigating(ParkArmsBeforeNavigating):
         return InsertionPosition.AFTER
 
 
-context.plan_transformations = [ParkArmsAfterNavigating()]
+plan_transformations = [ParkArmsAfterNavigating()]
 
-navigate = execute_single(
-    NavigateAction(Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root)),
-    context=context,
+navigate = expand(
+    Sequence(
+        nodes=[NavigateAction(target_location=Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root))]
+    )
 )
-navigate.notify()
+
+show(navigate)
+```
+
+Nodes that run at the same time as the anchor come from a `ParallelInsertion` instead. They join the
+`Parallel` that runs the anchor; where none runs it, a new one takes the anchor's place. Looking at
+where the robot is headed while it drives is such a rewrite:
+
+```python
+from coraplex.plans.plan_transformation import ParallelInsertion
+from coraplex.robot_plans.actions.core.navigation import LookAtAction
+
+
+@dataclass
+class LookAtTheGoalWhileNavigating(ParallelInsertion[NavigateAction]):
+    """
+    Looks at where the robot is headed for as long as it drives there.
+    """
+
+    def is_applicable(self, plan_node: NavigateAction) -> bool:
+        return True
+
+    def anchor(self, plan_node: NavigateAction) -> StatechartNode:
+        return plan_node
+
+    def nodes_to_insert(self, plan_node: NavigateAction) -> List[StatechartNode]:
+        return [LookAtAction(target=plan_node.target_location)]
+
+
+plan_transformations = [LookAtTheGoalWhileNavigating()]
+
+navigate = expand(
+    Sequence(
+        nodes=[NavigateAction(target_location=Pose.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root))]
+    )
+)
 
 show(navigate)
 ```
@@ -308,20 +366,19 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
     How far a drive has to take the robot for parking the arms to be worth it.
     """
 
-    def is_applicable(self, plan_node: PlanNode) -> bool:
-        navigate = plan_node.designator
+    def is_applicable(self, plan_node: NavigateAction) -> bool:
+        navigate = plan_node
         target = navigate.world.transform(navigate.target_location, navigate.world.root)
-        distance = navigate.robot.root.global_pose.to_position().euclidean_distance(
-            target.to_position()
+        distance = navigate.robot.root.global_pose.position.euclidean_distance(
+            target.position
         )
         return float(distance) > self.minimum_distance
 ```
 
 ```python
-context.plan_transformations = [ParkArmsBeforeLongDrives()]
+plan_transformations = [ParkArmsBeforeLongDrives()]
 
-navigate = execute_single(NavigateAction(pr2.root.global_pose), context=context)
-navigate.notify()
+navigate = expand(Sequence(nodes=[NavigateAction(target_location=pr2.root.global_pose)]))
 
 show(navigate)
 ```

@@ -108,7 +108,8 @@ high_ice_cream = SimpleEvent.from_data({ice_cream_sales: closed(9, 10).simple_se
 high_drowning = SimpleEvent.from_data({drowning_incidents: Set.from_iterable([DrowningLevel.HIGH])}).as_composite_set()
 
 # Conditioning: observe high ice cream sales, ask about drowning incidents.
-conditioned, _ = circuit.truncated(high_ice_cream.fill_missing_variables_pure(circuit.variables))
+conditioned = circuit.truncated(high_ice_cream.fill_missing_variables_pure(circuit.variables)).distribution
+
 conditioned.probability(high_drowning.fill_missing_variables_pure(conditioned.variables))
 # 0.7 -- conditioning picks up the confound: high sales lean warm, which leans toward
 # high drowning incidents.
@@ -299,6 +300,42 @@ If the registry resolves anything other than a `CausalCircuit` for a query conta
 is no fallback to plain conditioning. Confounder adjustment is configured on however
 the registered `CausalCircuit` itself was built, not from the query.
 
+#### The circuit type a causal query is answered in
+
+A causal query is answered in whichever circuit type its circuit is stored as, and gives
+the same answers either way. With
+{py:class}`~krrood.parametrization.model_registries.RelationalCircuitRegistry`, that is the
+type the relational circuit was fitted in, so fitting with `LayeredLearning` makes every
+causal query run over layered circuits:
+
+Here `SceneRoom` stands for the class the relational circuit models and `rooms` for its
+training instances:
+
+```python
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.learning_method import LayeredLearning
+from probabilistic_model.probabilistic_circuit.relational.part_learning_methods import (
+    PartLearningMethods,
+)
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
+    RelationalProbabilisticCircuit,
+)
+
+model = RelationalProbabilisticCircuit(
+    SceneRoom,
+    learning_method=LayeredLearning(JointProbabilityTree()),
+    part_learning_methods=PartLearningMethods(LayeredLearning(JointProbabilityTree())),
+).fit(rooms)
+
+backend = ProbabilisticBackend(model_registry=RelationalCircuitRegistry(model))
+```
+
+Nothing changes on the query side: `cause`, `causes_effect()`, `confounder` and
+`rank_causes` read the same, and the circuit a ranked candidate carries is of that same
+type. A layered circuit evaluates a query for all nodes of a layer at once, which makes the
+support-determinism check a grounded circuit has to pass markedly cheaper on a large
+grounding.
+
 #### Ranking every candidate
 
 `evaluate()` only ever narrows to the single best-scoring `cause` candidate. When more
@@ -348,7 +385,9 @@ backend.
 - {py:meth}`~krrood.entity_query_language.query.match.Match.causes_effect`
 - {py:class}`~krrood.entity_query_language.operators.causal.CausesEffect`
 - {py:class}`~krrood.parametrization.model_registries.CausalCircuitRegistry`
+- {py:class}`~krrood.parametrization.model_registries.RelationalCircuitRegistry`
 - {py:class}`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`
+- {py:class}`~probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation.ProbabilisticCircuitRepresentation`
 - {py:class}`~krrood.parametrization.exceptions.DoRequiresCausalCircuitModel`
 - {py:class}`~krrood.parametrization.exceptions.MultipleEffectVariablesNotSupported`
 - {py:class}`~krrood.entity_query_language.exceptions.NoCausesEffectConditionForCause`

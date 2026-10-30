@@ -6,17 +6,17 @@ import logging
 import os
 import sys
 from functools import cached_property
-from typing import Type, Optional, Dict, Any
+from typing_extensions import Any
 
 logger = logging.getLogger(__name__)
 
 
 def get_all_classes_in_module(
-    module_name: str, parent_class: Optional[Type] = None
-) -> Dict[str, Type]:
+    module_name: str, parent_class: type | None = None
+) -> dict[str, type]:
     """
     :param module_name: e.g. giskardpy.goals
-    :param parent_class: e.g. Goal
+    :param parent_class: e.g. CompositeNode
     :return:
     """
     classes = {}
@@ -51,27 +51,6 @@ def clear_cached_properties(instance: Any):
         if isinstance(getattr(type(instance), attr, None), cached_property):
             if attr in instance.__dict__:
                 del instance.__dict__[attr]
-
-
-def string_shortener(original_str: str, max_lines: int, max_line_length: int) -> str:
-    if len(original_str) < max_line_length:
-        return original_str
-    lines = []
-    start = 0
-    for _ in range(max_lines):
-        end = start + max_line_length
-        lines.append(original_str[start:end])
-        if end >= len(original_str):
-            break
-        start = end
-
-    result = "\n".join(lines)
-
-    # Check if string is cut off and add "..."
-    if len(original_str) > start:
-        result = result + "..."
-
-    return result
 
 
 def is_running_in_pytest():
