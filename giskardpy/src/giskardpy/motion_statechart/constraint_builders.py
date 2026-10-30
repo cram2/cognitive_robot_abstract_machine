@@ -191,7 +191,10 @@ class GeometricConstraintBuilder:
         :param frame_R_current: current rotation, turned only about the z-axis of the
             frame. It should depend on active dofs.
         :param frame_R_goal: goal rotation, of which only the yaw is reached
-        :param reference_velocity: value used for normalization rad/s
+        :param reference_velocity: value used for normalization rad/s. The constraint
+            acts on the z-component of the quaternion error, which changes by half the
+            angle, so one plan may demand a rotation of up to twice the angle this
+            velocity sustains.
         """
         frame_R_goal_yaw = RotationMatrix.from_rpy(
             yaw=frame_R_goal.rpy[2], reference_frame=frame_R_goal.reference_frame
@@ -203,6 +206,7 @@ class GeometricConstraintBuilder:
             quadratic_weight=quadratic_weight,
             reference_velocity=reference_velocity,
             name=name,
+            bound_cap=RotationBoundCap(bounds=sm.Vector([-quaternion_error.z])),
         )
 
     @staticmethod

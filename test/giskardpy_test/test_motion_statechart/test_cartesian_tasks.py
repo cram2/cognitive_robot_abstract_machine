@@ -317,15 +317,6 @@ class StraightLine:
         return max(self.distance_from(position) for position in positions)
 
 
-ORIENTATION_SPEED_RATIO_TOLERANCE = 1.15
-"""
-How much faster a far away orientation goal may turn than a close one.
-
-Both turn at the speed the reference velocity sets once they are under way; the margin
-covers that the closer goal starts braking sooner.
-"""
-
-
 def peak_angle_per_tick_towards_roll_goal(world: World, angle: float) -> float:
     """
     Rolls the PR2's right gripper about its own x-axis and measures how fast it turns.
@@ -1764,7 +1755,7 @@ class TestCartesianTasks:
         assert line.maximum_distance_from(path) <= STRAIGHT_LINE_TOLERANCE
 
     def test_orientation_goal_turns_as_fast_far_away_as_close_by(
-        self, pr2_world_state_reset: World
+        self, pr2_world_state_reset: World, orientation_speed_ratio_tolerance: float
     ):
         """
         The angular speed towards an orientation goal is set by its reference velocity,
@@ -1783,7 +1774,7 @@ class TestCartesianTasks:
                 peak_angle_per_tick_towards_roll_goal(pr2_world_state_reset, angle)
             )
 
-        assert peak_speeds[1] <= ORIENTATION_SPEED_RATIO_TOLERANCE * peak_speeds[0]
+        assert peak_speeds[1] <= orientation_speed_ratio_tolerance * peak_speeds[0]
 
     def test_cartesian_position_straight_weighs_its_rows_by_its_weight(
         self, cylinder_bot_world: World

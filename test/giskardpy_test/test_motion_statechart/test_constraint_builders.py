@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from typing_extensions import Callable
 
 from semantic_digital_twin.spatial_types import (
     AxisAngle,
@@ -103,15 +104,35 @@ def test_yaw_goal_writes_one_equality_constraint():
     assert len(collection.inequality_constraints) == 0
 
 
-def rotation_goal_bounds(angle: float) -> tuple[np.ndarray, np.ndarray, float]:
+@pytest.fixture(
+    params=[
+        GeometricConstraintBuilder.add_rotation_goal_constraints,
+        GeometricConstraintBuilder.add_yaw_goal_constraint,
+    ],
+    ids=["rotation", "yaw"],
+)
+def add_rotation_goal(request: pytest.FixtureRequest) -> Callable[..., None]:
+    """
+    :return: A method of :class:`GeometricConstraintBuilder` adding the constraints of a
+        rotation goal.
+    """
+    return request.param
+
+
+def rotation_goal_bounds(
+    add_rotation_goal: Callable[..., None], angle: float
+) -> tuple[np.ndarray, np.ndarray, float]:
     """
     Builds a rotation goal about the z-axis and evaluates its bounds.
 
+    :param add_rotation_goal: The method of :class:`GeometricConstraintBuilder` adding
+        the goal's constraints.
     :param angle: How far the goal is rotated away from the current orientation.
     :return: The uncapped bounds, the capped bounds, and the reachable change.
     """
     collection = ConstraintCollection()
-    GeometricConstraintBuilder(collection).add_rotation_goal_constraints(
+    add_rotation_goal(
+        GeometricConstraintBuilder(collection),
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), angle)),
         reference_velocity=ROTATION_REFERENCE_VELOCITY,
@@ -124,13 +145,15 @@ def rotation_goal_bounds(angle: float) -> tuple[np.ndarray, np.ndarray, float]:
     return uncapped, capped, reach
 
 
-def test_rotation_goal_caps_the_angle_it_demands():
+def test_rotation_goal_caps_the_angle_it_demands(
+    add_rotation_goal: Callable[..., None],
+):
     """
     The bounds are in units of the half angle, so the cap is applied to the angle:
 
     a far away goal demands a rotation of exactly twice the reachable change.
     """
-    uncapped, capped, reach = rotation_goal_bounds(np.pi / 2)
+    uncapped, capped, reach = rotation_goal_bounds(add_rotation_goal, np.pi / 2)
     half_angle = np.arcsin(np.linalg.norm(uncapped))
 
     remaining_half_angle = np.arcsin(np.linalg.norm(uncapped) - np.linalg.norm(capped))
@@ -138,13 +161,15 @@ def test_rotation_goal_caps_the_angle_it_demands():
     assert remaining_half_angle == pytest.approx(half_angle - reach)
 
 
-def test_rotation_goal_demands_as_much_rotation_as_its_reference_velocity_sustains():
+def test_rotation_goal_demands_as_much_rotation_as_its_reference_velocity_sustains(
+    add_rotation_goal: Callable[..., None],
+):
     """
     One plan may change the half angle by the reference velocity sustained over the
     control horizon, as much as a single row of the quaternion error was allowed to
     change before the angle was capped.
     """
-    _, _, reach = rotation_goal_bounds(np.pi / 2)
+    _, _, reach = rotation_goal_bounds(add_rotation_goal, np.pi / 2)
     config = controller_config()
 
     assert reach == pytest.approx(
@@ -154,8 +179,10 @@ def test_rotation_goal_demands_as_much_rotation_as_its_reference_velocity_sustai
     )
 
 
-def test_rotation_goal_within_reach_is_not_capped():
-    uncapped, capped, reach = rotation_goal_bounds(0.01)
+def test_rotation_goal_within_reach_is_not_capped(
+    add_rotation_goal: Callable[..., None],
+):
+    uncapped, capped, reach = rotation_goal_bounds(add_rotation_goal, 0.01)
 
     assert 0.01 < 2 * reach
     assert np.allclose(capped, uncapped)
