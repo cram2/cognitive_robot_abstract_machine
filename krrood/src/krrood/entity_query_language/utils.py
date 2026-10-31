@@ -235,31 +235,6 @@ def merge_args_and_kwargs(
     return all_kwargs
 
 
-def convert_args_and_kwargs_into_hashable_key(
-    dictionary: dict[str, Any],
-) -> tuple[Any, ...]:
-    """
-    Generates a hashable key from the dictionary.
-
-    The key is a tuple of sorted (key, value) pairs. If a value is a dictionary or a
-    set, it is converted to a frozenset of its items. If a value is a list, it is
-    converted to a tuple.
-
-    :param dictionary: The keyword arguments to generate the key from.
-    :return: The generated key as a tuple.
-    """
-    key = []
-    for k, v in dictionary.items():
-        if isinstance(v, dict):
-            v = frozenset(v.items())
-        elif isinstance(v, set):
-            v = frozenset(v)
-        elif isinstance(v, list):
-            v = tuple(v)
-        key.append((k, v))
-    return tuple(sorted(key))
-
-
 def camel_case_to_words(name: str) -> str:
     """
     Convert a CamelCase class name to space-separated lowercase words.

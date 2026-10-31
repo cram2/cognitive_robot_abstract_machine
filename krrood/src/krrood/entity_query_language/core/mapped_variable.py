@@ -24,6 +24,7 @@ from random_events.variable import (
 )
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.entity_query_language.call_arguments import CallArguments
 from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
@@ -42,11 +43,7 @@ from krrood.entity_query_language.exceptions import (
 )
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.math_operations import MathOperator
-from krrood.entity_query_language.utils import (
-    T,
-    merge_args_and_kwargs,
-    convert_args_and_kwargs_into_hashable_key,
-)
+from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.symbol_graph.helpers import (
     get_field_type_endpoint,
@@ -314,27 +311,14 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
         :param kwargs: Keyword arguments to pass to the MappedVariable constructor.
         :return: The retrieved or created MappedVariable instance.
         """
-        cache_item = MappedVariableCacheItem(type_, self, args, kwargs)
+        cache_item = MappedVariableCacheItem(
+            type_, CallArguments.bound_to(type_, (self, *args), kwargs)
+        )
         if cache_item in self._known_mapped_variables_:
             return self._known_mapped_variables_[cache_item]
-        else:
-            instance = type_(**cache_item.all_kwargs)
-            self._known_mapped_variables_[cache_item] = instance
-            return instance
-
-    def _get_mapped_variable_key_(self, type_: type[MappedVariable], *args, **kwargs):
-        """
-        Generates a hashable key for the given type and arguments.
-
-        :param type_: The type of the mapped variable to generate a key for, e.g.,
-            Attribute, Index, etc.
-        :param args: Positional arguments to pass to the MappedVariable constructor.
-        :param kwargs: Keyword arguments to pass to the MappedVariable constructor.
-        :return: The generated hashable key.
-        """
-        args = (self,) + args
-        all_kwargs = merge_args_and_kwargs(type_, args, kwargs, ignore_first=True)
-        return convert_args_and_kwargs_into_hashable_key(all_kwargs)
+        instance = type_(self, *args, **kwargs)
+        self._known_mapped_variables_[cache_item] = instance
+        return instance
 
 
 @dataclass(eq=False, repr=False)
@@ -854,55 +838,19 @@ class FlatVariable(MappedVariable[T]):
         return f"Flatten({self._child_._name_})"
 
 
-@dataclass
+@dataclass(frozen=True)
 class MappedVariableCacheItem:
     """
-    A cache item for mapped variable creation.
-
-    To prevent recreating same mapped variable multiple times, mapping instances are
-    stored in a dictionary with a hashable key. This class is used to generate the key
-    for the dictionary  that stores the mapped variable instances.
+    What identifies a mapped variable among those taken from one variable: two writings
+    of the same mapping give equal cache items.
     """
 
-    type: type[MappedVariable]
+    mapping_type: type[MappedVariable]
     """
-    The mapping type to create, e.g., Attribute, Index, etc.
-    """
-
-    child: CanBehaveLikeAVariable
-    """
-    The child of the mapping (i.e. the original variable on which the mapping is
-    applied).
+    The mapping to create, e.g. :class:`Attribute` or :class:`Call`.
     """
 
-    args: tuple[Any, ...] = field(default_factory=tuple)
+    constructor_arguments: CallArguments
     """
-    Positional arguments to pass to the mapping constructor.
+    The arguments the mapping is constructed with, its child first.
     """
-
-    kwargs: dict[str, Any] = field(default_factory=dict)
-    """
-    Keyword arguments to pass to the mapping constructor.
-    """
-
-    def __post_init__(self):
-        self.args = (self.child,) + self.args
-
-    @cached_property
-    def all_kwargs(self):
-        return merge_args_and_kwargs(
-            self.type, self.args, self.kwargs, ignore_first=True
-        )
-
-    @cached_property
-    def hashable_key(self):
-        return (self.type,) + convert_args_and_kwargs_into_hashable_key(self.all_kwargs)
-
-    def __hash__(self):
-        return hash(self.hashable_key)
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, MappedVariableCacheItem)
-            and self.hashable_key == other.hashable_key
-        )
