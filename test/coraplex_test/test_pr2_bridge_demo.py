@@ -18,6 +18,7 @@ from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Cereal
 from semantic_digital_twin.world import World
 
@@ -192,3 +193,97 @@ def test_demo_help_needs_no_controller() -> None:
             timeout=60,
         )
         assert result.returncode == 0, result.stderr
+
+
+# %% reusable scene specifications
+
+
+def test_scene_specification_contains_objects_without_a_robot(
+    demo_module: ModuleType,
+) -> None:
+    """
+    The controller scene can be merged without spawning a duplicate PR2.
+    """
+    demonstration = demo_module.PR2Demonstration(
+        task=demo_module.DemonstrationTask.PICK_AND_PLACE
+    )
+    world = demonstration.scene_specification().to_domain_object()
+    assert world.get_semantic_annotations_by_type(demonstration.used_robot) == []
+    cereal = world.get_semantic_annotations_by_type(Cereal)
+    assert len(cereal) == 1
+    assert cereal[0].root.global_pose.to_np() == pytest.approx(
+        demonstration.cereal_start.to_np()
+    )
+    demonstration.populate_scene(world)
+    assert world.get_semantic_annotations_by_type(Cereal) == cereal
+
+
+def test_unpopulated_controller_world_is_detected(
+    demo_module: ModuleType, pr2_world_copy: World
+) -> None:
+    """
+    A controller with only the PR2 still needs the manipulation scene.
+    """
+    demonstration = demo_module.PR2Demonstration(
+        task=demo_module.DemonstrationTask.PICK_AND_PLACE
+    )
+    assert demonstration.is_scene_populated(pr2_world_copy) is False
+
+
+# %% measured controller scenes
+
+
+def test_real_pick_and_place_requires_measured_object(
+    demo_module: ModuleType, monkeypatch: pytest.MonkeyPatch, pr2_world_copy: World
+) -> None:
+    """
+    A missing controller object must not be replaced by the simulated scene.
+    """
+    demonstration = demo_module.PR2Demonstration(
+        task=demo_module.DemonstrationTask.PICK_AND_PLACE,
+        execution_type=ExecutionType.REAL,
+    )
+    session = Mock(spec=RobotDemonstrationRosSession)
+    session.node = Mock()
+    session.fetch_world.return_value = pr2_world_copy
+    monkeypatch.setattr(
+        RobotDemonstrationRosSession, "start", Mock(return_value=session)
+    )
+    monkeypatch.setattr("coraplex.demonstrations.WorldSynchronizer", Mock())
+    with pytest.raises(WorldEntityNotFoundError):
+        demonstration.acquire_world()
+
+
+def test_real_pick_and_place_reuses_unannotated_controller_object(
+    demo_module: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    A measured cereal body gains its annotation without duplicating the scene.
+    """
+    demonstration = demo_module.PR2Demonstration(
+        task=demo_module.DemonstrationTask.PICK_AND_PLACE
+    )
+    controller_world = demonstration.build_simulated_world()
+    cereal = controller_world.get_semantic_annotations_by_type(Cereal)[0]
+    with controller_world.modify_world():
+        controller_world.remove_semantic_annotation(cereal)
+    original_bodies = list(controller_world.bodies)
+    original_pose = cereal.root.global_pose.to_np().copy()
+    demonstration.execution_type = ExecutionType.REAL
+    session = Mock(spec=RobotDemonstrationRosSession)
+    session.node = Mock()
+    session.fetch_world.return_value = controller_world
+    monkeypatch.setattr(
+        RobotDemonstrationRosSession, "start", Mock(return_value=session)
+    )
+    monkeypatch.setattr("coraplex.demonstrations.WorldSynchronizer", Mock())
+
+    world = demonstration.acquire_world()
+    demonstration.build_context(world)
+
+    assert world is controller_world
+    assert world.bodies == original_bodies
+    annotations = world.get_semantic_annotations_by_type(Cereal)
+    assert len(annotations) == 1
+    assert annotations[0].root is cereal.root
+    assert cereal.root.global_pose.to_np() == pytest.approx(original_pose)

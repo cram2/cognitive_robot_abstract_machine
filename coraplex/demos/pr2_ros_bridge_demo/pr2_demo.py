@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import argparse
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from enum import StrEnum
 from typing_extensions import TYPE_CHECKING
 
@@ -19,16 +20,24 @@ from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
-from coraplex.testing import setup_world
-from semantic_digital_twin.adapters.urdf import URDFParser
+from krrood.patterns.path_enumeration import PathEnumeration
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Cereal
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Cereal, Milk
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Pose,
 )
+
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 if TYPE_CHECKING:
     from coraplex.plans.plan_node import PlanNode
@@ -57,6 +66,17 @@ class ExecutionMode(StrEnum):
     HARDWARE = "real"
 
 
+class DemonstrationResource(PathEnumeration):
+    """
+    Scene files relative to the CoraPlex resource directory.
+    """
+
+    DIRECTORY = "resources"
+    APARTMENT = "worlds/apartment.urdf"
+    CEREAL = "objects/breakfast_cereal.stl"
+    MILK = "objects/milk.stl"
+
+
 # %% demonstration
 
 
@@ -81,7 +101,7 @@ class PR2Demonstration(RobotDemonstration):
     Sequence selected for this run.
     """
 
-    cereal_body_name: str = "breakfast_cereal.stl"
+    cereal_body_name: str = DemonstrationResource.CEREAL.name
     """
     Existing cereal body to manipulate in the selected world.
     """
@@ -101,44 +121,117 @@ class PR2Demonstration(RobotDemonstration):
     Torso configuration for approaching and placing the cereal.
     """
 
-    def build_simulated_world(self) -> World:
+    resource_directory: Path = field(
+        default_factory=lambda: Path(__file__).resolve().parents[2]
+        / DemonstrationResource.DIRECTORY
+    )
+    """
+    Directory holding the demo's apartment and object meshes.
+    """
+
+    cereal_start: HomogeneousTransformationMatrix = field(
+        default_factory=lambda: HomogeneousTransformationMatrix.from_xyz_rpy(
+            2.37, 1.8, 1.0487
+        )
+    )
+    """
+    Initial cereal pose relative to the apartment root, in metres.
+    """
+
+    milk_start: HomogeneousTransformationMatrix = field(
+        default_factory=lambda: HomogeneousTransformationMatrix.from_xyz_rpy(
+            2.37, 2, 1.0345
+        )
+    )
+    """
+    Initial milk pose relative to the apartment root, in metres.
+    """
+
+    def scene_specification(self) -> WorldSpecification:
         if self.task is not DemonstrationTask.PICK_AND_PLACE:
-            return URDFParser.from_file(PR2.get_ros_file_path()).parse()
-        world = setup_world()
-        robot = PR2.from_world(world)
-        cereal_position = world.get_body_by_name(
-            self.cereal_body_name
-        ).global_pose.position
-        with world.modify_world():
-            robot.root.parent_connection.origin = (
-                HomogeneousTransformationMatrix.from_xyz_rpy(
-                    float(cereal_position.x) - self.simulated_base_distance,
-                    float(cereal_position.y),
-                    reference_frame=world.root,
-                )
-            )
+            return WorldSpecification()
+        return WorldSpecification.from_urdf(
+            str(self.resource_directory / DemonstrationResource.APARTMENT),
+            objects=[
+                SemanticAnnotationWithRootSpecification(
+                    name=self.cereal_body_name,
+                    semantic_annotation_type=Cereal,
+                    root_specification=BodySpecification.mesh(
+                        self.cereal_body_name,
+                        str(self.resource_directory / DemonstrationResource.CEREAL),
+                        parent_T_self=self.cereal_start,
+                    ),
+                ),
+                SemanticAnnotationWithRootSpecification(
+                    name=DemonstrationResource.MILK.name,
+                    semantic_annotation_type=Milk,
+                    root_specification=BodySpecification.mesh(
+                        DemonstrationResource.MILK.name,
+                        str(self.resource_directory / DemonstrationResource.MILK),
+                        parent_T_self=self.milk_start,
+                    ),
+                ),
+            ],
+        )
+
+    def robot_specification(self) -> RobotSpecification:
+        if self.task is not DemonstrationTask.PICK_AND_PLACE:
+            return RobotSpecification(self.used_robot)
+        return RobotSpecification(
+            self.used_robot,
+            world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(
+                float(self.cereal_start.position.x) - self.simulated_base_distance,
+                float(self.cereal_start.position.y),
+            ),
+        )
+
+    def build_simulated_world(self) -> World:
+        specification = self.scene_specification()
+        specification.robots.append(self.robot_specification())
+        return specification.to_domain_object()
+
+    def acquire_world(self) -> World:
+        """
+        Require the measured manipulation object before returning a controller world.
+
+        See :meth:`RobotDemonstration.acquire_world`.
+        """
+        world = super().acquire_world()
+        if self.execution_type is ExecutionType.REAL:
+            self.is_scene_populated(world)
         return world
 
     def is_scene_populated(self, world: World) -> bool:
+        """
+        Require the measured cereal body for real manipulation; missing bodies raise the
+        world's lookup error instead of requesting a synthetic controller scene.
+
+        See :meth:`RobotDemonstration.is_scene_populated`.
+        """
         if self.task is not DemonstrationTask.PICK_AND_PLACE:
             return True
-        cereal_body = world.get_body_by_name(self.cereal_body_name)
-        return any(
-            annotation.root is cereal_body
-            for annotation in world.get_semantic_annotations_by_type(Cereal)
-        )
+        if self.execution_type is ExecutionType.REAL:
+            world.get_body_by_name(self.cereal_body_name)
+            return True
+        return any(body.name.name == self.cereal_body_name for body in world.bodies)
 
     def populate_scene(self, world: World) -> None:
         """
         Annotate the existing cereal body without changing its pose or geometry.
         """
-        if self.task is DemonstrationTask.PICK_AND_PLACE:
-            with world.modify_world():
-                world.add_semantic_annotation(
-                    Cereal(root=world.get_body_by_name(self.cereal_body_name))
-                )
+        if self.task is not DemonstrationTask.PICK_AND_PLACE:
+            return
+        cereal_body = world.get_body_by_name(self.cereal_body_name)
+        if any(
+            annotation.root is cereal_body
+            for annotation in world.get_semantic_annotations_by_type(Cereal)
+        ):
+            return
+        with world.modify_world():
+            world.add_semantic_annotation(Cereal(root=cereal_body))
 
     def build_context(self, world: World) -> Context:
+        self.populate_scene(world)
         robots = world.get_semantic_annotations_by_type(PR2)
         return Context(
             world=world,
