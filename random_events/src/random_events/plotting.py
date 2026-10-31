@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import plotly.graph_objects as go
-from typing_extensions import ClassVar, Dict, List, Union
+from typing_extensions import ClassVar
 
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Symbolic
@@ -39,7 +39,7 @@ class SimpleEventPlotter:
     The simple event to plot.
     """
 
-    def plot(self) -> Union[List[go.Scatter], List[go.Mesh3d]]:
+    def plot(self) -> list[go.Scatter] | list[go.Mesh3d]:
         """
         :return: The event's traces, dispatched on its dimensionality.
         :raises EventContainsSymbolicVariableError: If the event constrains a symbolic
@@ -63,7 +63,7 @@ class SimpleEventPlotter:
             "Plotting is only supported for one, two and three dimensional events."
         )
 
-    def plot_1d(self) -> List[go.Scatter]:
+    def plot_1d(self) -> list[go.Scatter]:
         """
         :return: The event's trace, drawn along a single axis.
         """
@@ -77,7 +77,7 @@ class SimpleEventPlotter:
 
         return [go.Scatter(x=xs, y=ys, mode="lines", name="Event", fill="toself")]
 
-    def plot_2d(self) -> List[go.Scatter]:
+    def plot_2d(self) -> list[go.Scatter]:
         """
         :return: The event's trace, drawn as one filled outline per rectangle it
             decomposes into.
@@ -102,7 +102,7 @@ class SimpleEventPlotter:
 
         return [go.Scatter(x=xs, y=ys, mode="lines", name="Event", fill="toself")]
 
-    def plot_3d(self) -> List[go.Mesh3d]:
+    def plot_3d(self) -> list[go.Mesh3d]:
         """
         :return: One mesh trace per axis-aligned box the event decomposes into.
         """
@@ -153,7 +153,7 @@ class SimpleEventPlotter:
             )
         return traces
 
-    def plotly_layout(self) -> Dict:
+    def plotly_layout(self) -> dict:
         """
         :return: The layout of the event's plot.
         :raises NotImplementedError: If the event constrains a variable other than one,
@@ -266,7 +266,7 @@ class EventPlotter:
     per box.
     """
 
-    def plot(self, color: str = "#636EFA") -> Union[List[go.Scatter], List[go.Mesh3d]]:
+    def plot(self, color: str = "#636EFA") -> list[go.Scatter] | list[go.Mesh3d]:
         """
         :param color: The color to use for the event.
         :return: The traces of every simple set the event is the union of.
@@ -293,7 +293,7 @@ class EventPlotter:
                 traces.append(trace)
         return traces
 
-    def plotly_layout(self) -> Dict:
+    def plotly_layout(self) -> dict:
         """
         :return: The layout of the event's plot.
         """

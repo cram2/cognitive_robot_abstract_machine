@@ -5,7 +5,7 @@ import threading
 import webbrowser
 from dataclasses import dataclass
 
-from typing_extensions import Any, ClassVar, Dict, List, TYPE_CHECKING, Tuple
+from typing_extensions import Any, ClassVar, Dict, TYPE_CHECKING
 
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
@@ -39,7 +39,7 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
         delivery network, so viewing the page needs internet access.
     """
 
-    required_modules: ClassVar[Tuple[str, ...]] = ("flask",)
+    required_modules: ClassVar[tuple[str, ...]] = ("flask",)
     """The libraries needed to serve the application."""
 
     layout_options: ClassVar[GraphLayoutOptions] = GraphLayoutOptions(
@@ -67,7 +67,7 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
     )
     """The vis-network layout options for each :class:`GraphLayout`."""
 
-    def graph_nodes(self) -> List[VisNode]:
+    def graph_nodes(self) -> list[VisNode]:
         """
         :return: The vis-network nodes for the current graph.
         """
@@ -83,7 +83,7 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
             for index in self.graph.node_indices()
         ]
 
-    def graph_edges(self) -> List[VisEdge]:
+    def graph_edges(self) -> list[VisEdge]:
         """
         :return: The vis-network edges for the current graph.
         """

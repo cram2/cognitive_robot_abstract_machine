@@ -1,10 +1,29 @@
+# %% Imports
+import numpy as np
 import pytest
 from std_msgs.msg import String
+
+from robokudo.types.camera import CameraObservation
 
 from robokudo.cas import CASViews
 from robokudo.io.cas_view_codecs import CASViewCodecRegistry
 from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.tf import StampedTransform
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
+from semantic_digital_twin.datastructures.camera_model import (
+    PinholeCameraModel,
+    RationalPolynomialCameraDistortion,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
+
+# %% Camera behavior
 
 
 def test_bytes_codec_roundtrip():
@@ -57,6 +76,60 @@ def test_stamped_transform_codec_roundtrip():
     assert decoded_transform.child_frame == transform.child_frame
     assert decoded_transform.timestamp.sec == transform.timestamp.sec
     assert decoded_transform.timestamp.nanosec == transform.timestamp.nanosec
+
+
+@pytest.mark.parametrize("has_world_pose", [True, False])
+def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
+    monkeypatch, has_world_pose
+):
+    world = World()
+    root = Body(name=PrefixedName(name="world"))
+    with world.modify_world():
+        world.add_body(root)
+    camera_model = PinholeCameraModel.from_field_of_view(
+        resolution=CameraResolution(width=640, height=480),
+        field_of_view=FieldOfView(),
+        distortion=RationalPolynomialCameraDistortion(
+            radial_coefficient_1=0.1,
+            tangential_coefficient_1=0.01,
+        ),
+    )
+    camera = Camera(
+        name=PrefixedName(name="camera"),
+        root=root,
+        camera_model=camera_model,
+    )
+    with world.modify_world():
+        world.add_semantic_annotation(camera)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    monkeypatch.setattr(
+        "robokudo.io.cas_view_codecs.world.get_world_entity_tracker",
+        lambda: tracker,
+    )
+    observation = CameraObservation(
+        camera=camera,
+        effective_camera_model=camera_model,
+        world_T_camera=root.global_transform if has_world_pose else None,
+        timestamp_nanoseconds=123,
+    )
+    registry = CASViewCodecRegistry()
+
+    encoded = registry.encode_view("camera_observation", observation)
+    decoded_name, decoded_observation = registry.decode_view(encoded)
+
+    assert decoded_name == "camera_observation"
+    assert decoded_observation.camera is camera
+    assert decoded_observation.effective_camera_model == camera_model
+    if has_world_pose:
+        np.testing.assert_allclose(
+            decoded_observation.world_T_camera.to_np(),
+            observation.world_T_camera.to_np(),
+        )
+    else:
+        assert decoded_observation.world_T_camera is None
+    assert (
+        decoded_observation.timestamp_nanoseconds == observation.timestamp_nanoseconds
+    )
 
 
 def test_color_to_depth_ratio_roundtrip():

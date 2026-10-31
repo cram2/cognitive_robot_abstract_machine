@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
-from typing_extensions import List
 
 from krrood.entity_query_language.factories import entity, count_range, or_, variable
 from krrood.parametrization.feature_extraction.aggregations import (
@@ -135,12 +134,12 @@ class MutagenesisMolecule:
     Whether the molecule is mutagenic; the dataset's prediction target.
     """
 
-    atoms: List[MutagenesisAtom]
+    atoms: list[MutagenesisAtom]
     """
     The molecule's atoms.
     """
 
-    bonds: List[MutagenesisBond]
+    bonds: list[MutagenesisBond]
     """
     The molecule's bonds.
     """

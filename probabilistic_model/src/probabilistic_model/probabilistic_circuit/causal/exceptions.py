@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Set
+from typing_extensions import Generic
 
-from krrood.exceptions import DataclassException
+from probabilistic_model.exceptions import ProbabilisticModelException
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.variable import Variable
-from typing_extensions import Generic
 
 from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
     NodeType,
@@ -14,11 +13,12 @@ from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representat
 
 
 @dataclass
-class SupportDeterminismViolation(DataclassException):
+class SupportDeterminismViolation(ProbabilisticModelException):
     """
     Base class for all violations produced by verify_support_determinism().
 
-    Inherits from DataclassException so each violation is also a raiseable exception.
+    Each violation is also a raiseable
+    :class:`~probabilistic_model.exceptions.ProbabilisticModelException`.
     Subclasses implement error_message().
     """
 
@@ -31,10 +31,10 @@ class MissingQueryVariableViolation(SupportDeterminismViolation):
     Produced by Check 1 of verify_support_determinism().
     """
 
-    missing_variables: List[Variable]
+    missing_variables: list[Variable]
     """Variables present in the query_set but not in the circuit."""
 
-    available_variables: List[Variable]
+    available_variables: list[Variable]
     """
     All Variables currently registered in the circuit.
     """
@@ -117,7 +117,7 @@ class OverlappingComponentsViolation(
 
 
 @dataclass
-class SupportDeterminismVerificationResult(DataclassException):
+class SupportDeterminismVerificationResult(ProbabilisticModelException):
     """
     Result of verifying support determinism of a circuit against its Marginal
     Determinism Variable Tree.
@@ -137,19 +137,19 @@ class SupportDeterminismVerificationResult(DataclassException):
     True if all three checks passed with no violations.
     """
 
-    violations: List[SupportDeterminismViolation]
+    violations: list[SupportDeterminismViolation]
     """
     Typed violations found, in check order.
 
     Empty when passed is True.
     """
 
-    checked_query_sets: List[Set[Variable]]
+    checked_query_sets: list[set[Variable]]
     """
     All non-empty query_sets from the Marginal Determinism Variable Tree.
     """
 
-    circuit_variables: List[Variable]
+    circuit_variables: list[Variable]
     """
     All Variables present in the circuit at verification time.
     """
@@ -174,7 +174,7 @@ class SupportDeterminismVerificationResult(DataclassException):
 
 
 @dataclass
-class UnregisteredVariableError(DataclassException):
+class UnregisteredVariableError(ProbabilisticModelException):
     """
     Raised when a Variable passed to backdoor_adjustment or diagnose_failure is not
     registered as a cause or effect Variable in the CausalCircuit.
@@ -185,7 +185,7 @@ class UnregisteredVariableError(DataclassException):
     Name of the unregistered Variable.
     """
 
-    registered_names: List[str]
+    registered_names: list[str]
     """
     Names of all Variables registered in the relevant role.
     """
@@ -206,7 +206,7 @@ class UnregisteredVariableError(DataclassException):
 
 
 @dataclass
-class EmptyInterventionalCircuitError(DataclassException):
+class EmptyInterventionalCircuitError(ProbabilisticModelException):
     """
     Raised when backdoor_adjustment produces no ProductUnit components, meaning the
     interventional circuit is empty.
@@ -220,7 +220,7 @@ class EmptyInterventionalCircuitError(DataclassException):
     Name of the cause Variable for which the circuit is empty.
     """
 
-    adjustment_variable_names: List[str]
+    adjustment_variable_names: list[str]
     """
     Names of adjustment Variables used, empty list if no adjustment was applied.
     """
@@ -241,13 +241,13 @@ class EmptyInterventionalCircuitError(DataclassException):
 
 
 @dataclass
-class NoCauseVariablesError(DataclassException):
+class NoCauseVariablesError(ProbabilisticModelException):
     """
     Raised when diagnose_failure finds no numeric cause Variables in observed_values
     that match any registered cause Variable.
     """
 
-    registered_cause_names: List[str]
+    registered_cause_names: list[str]
     """
     Names of all cause Variables registered in the CausalCircuit.
     """

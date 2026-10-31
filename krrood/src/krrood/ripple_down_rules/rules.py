@@ -7,7 +7,7 @@ from types import NoneType
 from uuid import uuid4
 
 from anytree import Node
-from typing_extensions import List, Optional, Self, Union, Dict, Any, Tuple, Type, Set
+from typing_extensions import Self, Dict, Any, Set
 
 from krrood.ripple_down_rules.datastructures.callable_expression import (
     CallableExpression,
@@ -22,27 +22,27 @@ from krrood.ripple_down_rules.helpers import get_an_updated_case_copy
 
 @dataclass
 class Rule(ABC):
-    conditions: Optional[CallableExpression] = field(default=None)
+    conditions: CallableExpression | None = field(default=None)
     """
     The conditions of the rule, which is a callable expression that takes a case and returns a boolean.
     """
-    conclusion: Optional[CallableExpression] = field(default=None)
+    conclusion: CallableExpression | None = field(default=None)
     """
     The conclusion of the rule, which is a callable expression that takes a case and returns a value.
     """
-    _parent: Optional[Rule] = field(default=None)
+    _parent: Rule | None = field(default=None)
     """
     The parent rule of this rule in the ripple down rules tree.
     """
-    corner_case: Optional[Any] = field(default=None)
+    corner_case: Any | None = field(default=None)
     """
     The corner case for which this rule was created.
     """
-    _weight: Optional[RDREdge] = field(default=None)
+    _weight: RDREdge | None = field(default=None)
     """
     The weight of the rule, which is the type of edge connecting the rule to its parent.
     """
-    conclusion_name: Optional[str] = field(default=None)
+    conclusion_name: str | None = field(default=None)
     """
     The name of the conclusion of the rule, which is used to identify the conclusion
     """
@@ -50,7 +50,7 @@ class Rule(ABC):
     """
     A unique id for the rule using uuid4
     """
-    _name: Optional[str] = field(init=False, default=None)
+    _name: str | None = field(init=False, default=None)
     """
     The name of the rule, which is the names of the conditions and the conclusion
     """
@@ -59,7 +59,7 @@ class Rule(ABC):
     Whether the rule has been evaluated or not (i.e. whether the rule has been reached during evaluation of the ripple 
     down rules tree and the conditions have been checked).
     """
-    last_conclusion: Optional[Any] = field(init=False, default=None)
+    last_conclusion: Any | None = field(init=False, default=None)
     """
     The last conclusion of the rule, which is the conclusion of the rule when it was last evaluated.
     """
@@ -72,7 +72,7 @@ class Rule(ABC):
     Whether the rule has contributed to the case query, meaning that it has fired and the conclusion is relevant to the
     case query.
     """
-    fired: Optional[bool] = field(init=False, default=None)
+    fired: bool | None = field(init=False, default=None)
     """
     Whether the rule has fired or not.
     """
@@ -80,7 +80,7 @@ class Rule(ABC):
     """
     Whether the rule is mutually exclusive with other rules.
     """
-    node: Optional[Node] = field(init=False, default=None)
+    node: Node | None = field(init=False, default=None)
 
     def __post_init__(self):
         self.node = Node(self.name, parent=self.parent.node if self.parent else None)
@@ -88,7 +88,7 @@ class Rule(ABC):
         self.node._rdr_rule = self
 
     @property
-    def descendants(self) -> List[Rule]:
+    def descendants(self) -> list[Rule]:
         """
         :return: the descendants of this rule, which are the rules that are children of this rule in the ripple down
          rules tree.
@@ -96,7 +96,7 @@ class Rule(ABC):
         return [child._rdr_rule for child in self.node.descendants]
 
     @property
-    def children(self) -> List[Rule]:
+    def children(self) -> list[Rule]:
         """
         :return: the children of this rule, which are the rules that are direct children of this rule in the ripple down
          rules tree.
@@ -111,7 +111,7 @@ class Rule(ABC):
         return self._parent
 
     @parent.setter
-    def parent(self, new_parent: Optional[Rule]):
+    def parent(self, new_parent: Rule | None):
         """
         Set the parent rule of this rule.
         :param new_parent: The new parent rule to set.
@@ -169,9 +169,7 @@ class Rule(ABC):
             return "white"
 
     @classmethod
-    def from_case_query(
-        cls, case_query: CaseQuery, parent: Optional[Rule] = None
-    ) -> Rule:
+    def from_case_query(cls, case_query: CaseQuery, parent: Rule | None = None) -> Rule:
         """
         Create a SingleClassRule from a CaseQuery.
 
@@ -220,7 +218,7 @@ class Rule(ABC):
         pass
 
     def write_conclusion_as_source_code(
-        self, parent_indent: str = "", defs_file: Optional[str] = None
+        self, parent_indent: str = "", defs_file: str | None = None
     ) -> str:
         """
         Get the source code representation of the conclusion of the rule.
@@ -251,7 +249,7 @@ class Rule(ABC):
 
     def get_conclusion_as_source_code(
         self, conclusion: Any, parent_indent: str = ""
-    ) -> Tuple[Optional[str], str]:
+    ) -> tuple[str | None, str]:
         """
         Convert the conclusion of a rule to source code.
 
@@ -305,7 +303,7 @@ class Rule(ABC):
             )
 
     def write_condition_as_source_code(
-        self, parent_indent: str = "", defs_file: Optional[str] = None
+        self, parent_indent: str = "", defs_file: str | None = None
     ) -> str:
         """
         Get the source code representation of the conditions of the rule.
@@ -358,7 +356,7 @@ class Rule(ABC):
         self.node.name = new_name
 
     @property
-    def semantic_condition_name(self) -> Optional[str]:
+    def semantic_condition_name(self) -> str | None:
         """
         Get the name of the conditions of the rule, which is the user input of the conditions.
         """
@@ -367,7 +365,7 @@ class Rule(ABC):
         return None
 
     @property
-    def semantic_conclusion_name(self) -> Optional[str]:
+    def semantic_conclusion_name(self) -> str | None:
         """
         Get the name of the conclusion of the rule, which is the user input of the conclusion.
         """
@@ -425,21 +423,21 @@ class HasAlternativeRule:
     A mixin class for rules that have an alternative rule.
     """
 
-    _alternative: Optional[Rule] = field(init=False, default=None)
+    _alternative: Rule | None = field(init=False, default=None)
     """
     The alternative rule of the rule, which is evaluated when the rule doesn't fire.
     """
-    furthest_alternative: Optional[List[Rule]] = field(init=False, default=None)
+    furthest_alternative: list[Rule] | None = field(init=False, default=None)
     """
     The furthest alternative rule of the rule, which is the last alternative rule in the chain of alternative rules.
     """
-    all_alternatives: Optional[List[Rule]] = field(init=False, default=None)
+    all_alternatives: list[Rule] | None = field(init=False, default=None)
     """
     All alternative rules of the rule, which is all the alternative rules in the chain of alternative rules.
     """
 
     @property
-    def alternative(self) -> Optional[Rule]:
+    def alternative(self) -> Rule | None:
         return self._alternative
 
     @alternative.setter
@@ -463,13 +461,13 @@ class HasAlternativeRule:
 
 @dataclass
 class HasRefinementRule:
-    _refinement: Optional[HasAlternativeRule] = field(init=False, default=None)
+    _refinement: HasAlternativeRule | None = field(init=False, default=None)
     """
     The refinement rule of the rule, which is evaluated when the rule fires.
     """
 
     @property
-    def refinement(self) -> Optional[Rule]:
+    def refinement(self) -> Rule | None:
         return self._refinement
 
     @refinement.setter
@@ -529,7 +527,7 @@ class MultiClassRefinementRule(Rule, HasAlternativeRule, ABC):
     A rule in the MultiClassRDR classifier, it can have an alternative rule and a top rule.
     """
 
-    top_rule: Optional[MultiClassTopRule] = field(init=False, default=None)
+    top_rule: MultiClassTopRule | None = field(init=False, default=None)
     """
     The top rule of the rule, which is the nearest ancestor that fired and this rule is a refinement of.
     """
@@ -557,7 +555,7 @@ class MultiClassStopRule(MultiClassRefinementRule):
 
     def evaluate_next_rule(
         self, x: Case
-    ) -> Optional[Union[MultiClassRefinementRule, MultiClassTopRule]]:
+    ) -> MultiClassRefinementRule | MultiClassTopRule | None:
         if self.fired:
             self.top_rule.fired = False
             return self.top_rule.alternative
@@ -568,7 +566,7 @@ class MultiClassStopRule(MultiClassRefinementRule):
 
     def get_conclusion_as_source_code(
         self, conclusion: Any, parent_indent: str = ""
-    ) -> Tuple[None, str]:
+    ) -> tuple[None, str]:
         return None, f"{parent_indent}{' ' * 4}pass\n"
 
 
@@ -583,7 +581,7 @@ class MultiClassFilterRule(MultiClassRefinementRule, HasRefinementRule):
 
     def evaluate_next_rule(
         self, x: Case
-    ) -> Optional[Union[MultiClassRefinementRule, MultiClassTopRule]]:
+    ) -> MultiClassRefinementRule | MultiClassTopRule | None:
         if self.fired:
             if self.refinement:
                 case_cp = x
@@ -599,7 +597,7 @@ class MultiClassFilterRule(MultiClassRefinementRule, HasRefinementRule):
 
     def get_conclusion_as_source_code(
         self, conclusion: Any, parent_indent: str = ""
-    ) -> Tuple[None, str]:
+    ) -> tuple[None, str]:
         func, func_call = super().get_conclusion_as_source_code(
             str(conclusion), parent_indent=parent_indent
         )
@@ -617,8 +615,8 @@ class MultiClassFilterRule(MultiClassRefinementRule, HasRefinementRule):
         return func, statement
 
     def get_parent_to_filter(
-        self, parent: Union[None, MultiClassRefinementRule, MultiClassTopRule] = None
-    ) -> Union[MultiClassFilterRule, MultiClassTopRule]:
+        self, parent: None | MultiClassRefinementRule | MultiClassTopRule = None
+    ) -> MultiClassFilterRule | MultiClassTopRule:
         parent = self.parent if parent is None else parent
         if (
             isinstance(parent, (MultiClassFilterRule, MultiClassTopRule))
@@ -640,7 +638,7 @@ class MultiClassTopRule(Rule, HasRefinementRule, HasAlternativeRule):
 
     def evaluate_next_rule(
         self, x: Case
-    ) -> Optional[Union[MultiClassStopRule, MultiClassTopRule]]:
+    ) -> MultiClassStopRule | MultiClassTopRule | None:
         if self.fired and self.refinement:
             case_cp = x
             if isinstance(self.refinement, MultiClassFilterRule):
@@ -653,7 +651,7 @@ class MultiClassTopRule(Rule, HasRefinementRule, HasAlternativeRule):
     def fit_rule(
         self,
         case_query: CaseQuery,
-        refinement_type: Optional[Type[MultiClassRefinementRule]] = None,
+        refinement_type: type[MultiClassRefinementRule] | None = None,
     ):
         if self.fired and case_query.target != self.conclusion:
             if refinement_type in [None, MultiClassStopRule]:
@@ -673,7 +671,7 @@ class MultiClassTopRule(Rule, HasRefinementRule, HasAlternativeRule):
 
     def get_conclusion_as_source_code(
         self, conclusion: Any, parent_indent: str = ""
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         func, func_call = super().get_conclusion_as_source_code(
             str(conclusion), parent_indent=parent_indent
         )

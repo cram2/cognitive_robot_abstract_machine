@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
-from krrood.exceptions import DataclassException
+from probabilistic_model.exceptions import ProbabilisticModelException
 from random_events.variable import Variable
 
 
 @dataclass
-class StatesAreNotColumnIndicesError(DataclassException):
+class StatesAreNotColumnIndicesError(ProbabilisticModelException):
     """
     Raised when the states of a discrete variable cannot be the columns of the
     probability table of a discrete layer of the ``jax`` package.

@@ -11,4 +11,4 @@ The following examples demonstrate the basic usage of Giskard:
 
 ## Advanced Usage
 
-For more complex scenarios, you can compose multiple goals into `Parallel` or `Sequence` nodes, and use custom `Monitors` to trigger transitions in the `MotionStatechart`.
+For more complex scenarios, you can compose nodes with templates such as `Sequence`, `Parallel`, `TryInOrder` or `RepeatUntil`, and use custom `Monitors` to trigger transitions in the `Statechart`. See the [cramph documentation](https://cram2.github.io/cognitive_robot_abstract_machine/cramph/statecharts.html#templates) for how each template wires its children, and [Motion Statecharts](motion_statecharts.md) for what giskardpy adds on top.

@@ -6,9 +6,8 @@ them.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import Self, TYPE_CHECKING
 
-from typing_extensions import Self
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.adapters.world_model_parser import WorldModelParser

@@ -21,7 +21,7 @@ from __future__ import annotations
 import uuid
 
 from py_trees.behaviour import Behaviour
-from typing_extensions import TYPE_CHECKING, Generator, List, Optional, Type, TypeVar
+from typing_extensions import TYPE_CHECKING, Generator, TypeVar
 
 if TYPE_CHECKING:
     from py_trees.composites import Composite
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 def behavior_iterate_except_type(
     tree: Behaviour,
-    child_type: Type,
+    child_type: type,
     direct_descendants: bool = False,
     include_tree: bool = False,
 ) -> Generator[Behaviour, None, None]:
@@ -66,7 +66,7 @@ def behavior_iterate_except_type(
 T = TypeVar("T", bound=Behaviour)
 
 
-def find_parent_of_type(behaviour: Behaviour, parent_type: Type[T]) -> Optional[T]:
+def find_parent_of_type(behaviour: Behaviour, parent_type: type[T]) -> T | None:
     """
     Traverse the given behaviour up until we either hit the top of the tree or find a
     node of type parent_type.
@@ -88,7 +88,7 @@ def find_children_with_name(
     composite: Composite,
     name: str,
     direct_descendants: bool = False,
-) -> Optional[Behaviour]:
+) -> Behaviour | None:
     """
     Iterate() the given composite over its children and return the first child with
     child.name == name.
@@ -105,8 +105,8 @@ def find_children_with_name(
 
 
 def get_scoped_list_of_names(
-    behaviour: Behaviour, scoping_behaviour_type: Type
-) -> List[str]:
+    behaviour: Behaviour, scoping_behaviour_type: type
+) -> list[str]:
     """This method can generate behaviour names which represent the structure of the tree.
     For that, we can prefix (or scope) the name of the input behaviour with a scoping behaviour parent.
     Imagine a tree like this:
@@ -136,7 +136,7 @@ def get_scoped_list_of_names(
 
 
 def get_scoped_name(
-    behaviour: Behaviour, scoping_behaviour_type: Type, delimiter: str = "/"
+    behaviour: Behaviour, scoping_behaviour_type: type, delimiter: str = "/"
 ) -> str:
     """
     Get scoped name string for behavior.
@@ -239,7 +239,7 @@ def add_child_to_parent(parent: Composite, child: Behaviour) -> uuid.UUID:
     return child.id
 
 
-def add_children_to_parent(parent: Composite, children: List[Behaviour]) -> Behaviour:
+def add_children_to_parent(parent: Composite, children: list[Behaviour]) -> Behaviour:
     """
     Append a list of children to the current list.
 

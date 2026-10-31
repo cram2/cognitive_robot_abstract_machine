@@ -15,13 +15,11 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from typing_extensions import (
-    Optional,
     Iterator,
     Iterable,
     Callable,
     Any,
     Collection,
-    Dict,
     TYPE_CHECKING,
 )
 
@@ -73,7 +71,7 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         super().__post_init__()
         self._var_ = self
 
-    def evaluate(self, backend: Optional[QueryBackend] = None) -> Iterator[T]:
+    def evaluate(self, backend: QueryBackend | None = None) -> Iterator[T]:
         """
         Wrap the aggregator in an entity and evaluate it (i.e., make a query
         with this aggregator as the selected expression and evaluate it.).
@@ -123,7 +121,7 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         ...
 
     @property
-    def _source_root_(self) -> Optional[Any]:
+    def _source_root_(self) -> Any | None:
         """
         :return: The root :class:`~krrood.entity_query_language.core.variable.Variable`
             this aggregator aggregates over (e.g. the ``BankTransaction`` behind
@@ -138,7 +136,7 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         return root if isinstance(root, Variable) else None
 
     @property
-    def _leaf_attribute_(self) -> Optional[Any]:
+    def _leaf_attribute_(self) -> Any | None:
         """
         :return: The leaf :class:`~krrood.entity_query_language.core.mapped_variable.Attribute`
             of this aggregator's child chain (e.g. the ``amount`` node behind
@@ -187,7 +185,7 @@ class CountAll(Count[T]):
     without one corrupting another.
     """
 
-    _child_: Optional[GroupedBy] = field(init=False, default=None)
+    _child_: GroupedBy | None = field(init=False, default=None)
     """
     Always ``None``; the count of all rows per group is supplied by the grouping rather than by
     aggregating a child expression.
@@ -212,7 +210,7 @@ class CountRange(Count[T]):
     returned.
     """
 
-    _original_child_: Optional[Selectable[T]] = field(init=False, default=None)
+    _original_child_: Selectable[T] | None = field(init=False, default=None)
 
     def __post_init__(self):
         self._original_child_ = self._child_
@@ -284,12 +282,12 @@ class EntityAggregator(Aggregator[T], ABC):
     The child entity to be aggregated.
     """
 
-    _default_value_: Optional[T] = field(kw_only=True, default=None)
+    _default_value_: T | None = field(kw_only=True, default=None)
     """
     The default value to be returned if the child results are empty.
     """
 
-    _key_function_: Optional[Callable[[Any], Any]] = field(kw_only=True, default=None)
+    _key_function_: Callable[[Any], Any] | None = field(kw_only=True, default=None)
     """
     An optional function that extracts the value to be used in the aggregation.
     """
@@ -332,7 +330,7 @@ class Sum(EntityAggregator[numbers.Number]):
 
     def _apply_aggregation_function_and_get_bindings_(
         self, child_result: OperationResult
-    ) -> Iterator[Dict[uuid.UUID, Optional[IntOrFloat]]]:
+    ) -> Iterator[dict[uuid.UUID, IntOrFloat | None]]:
         for aggregation_result in self.get_aggregation_result_from_child_result(
             child_result
         ):

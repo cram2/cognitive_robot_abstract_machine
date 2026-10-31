@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from inspect import isclass
 from types import NoneType
 
-from typing_extensions import TYPE_CHECKING, ClassVar, Type
+from typing_extensions import TYPE_CHECKING, ClassVar
 
 from krrood.adapters.json_serializer import JSONSerializableTypeRegistry
 from krrood.class_diagrams.wrapped_field import WrappedField
@@ -91,7 +91,7 @@ class FieldToStore:
     The ORMatic instance that stores the field.
     """
 
-    sqlalchemy_builtins: ClassVar[tuple[Type, ...]] = (
+    sqlalchemy_builtins: ClassVar[tuple[type, ...]] = (
         int,
         float,
         str,
@@ -109,7 +109,7 @@ class FieldToStore:
         )
 
     @property
-    def type_endpoint(self) -> Type:
+    def type_endpoint(self) -> type:
         """
         :return: The type the field ultimately points to.
         """
@@ -122,25 +122,25 @@ class FieldToStore:
         """
         return self.type_endpoint in self.sqlalchemy_builtins
 
-    def is_mapped(self, clazz: Type) -> bool:
+    def is_mapped(self, clazz: type) -> bool:
         """
         :return: True if a table maps the class.
         """
         return clazz in self.ormatic.mapped_classes
 
-    def has_type_mapping(self, clazz: Type) -> bool:
+    def has_type_mapping(self, clazz: type) -> bool:
         """
         :return: True if the type mappings give a column type for the class.
         """
         return clazz in self.ormatic.type_mappings
 
-    def has_json_serializer(self, clazz: Type) -> bool:
+    def has_json_serializer(self, clazz: type) -> bool:
         """
         :return: True if a JSON serializer is registered for the class hierarchy.
         """
         return JSONSerializableTypeRegistry().has_type_specific_serializer(clazz)
 
-    def is_stored_as_a_value(self, clazz: Type) -> bool:
+    def is_stored_as_a_value(self, clazz: type) -> bool:
         """
         Whether values of the class are stored whole in their owner's row, so a free type
         parameter of the class leaves nothing undecided about how to store them.

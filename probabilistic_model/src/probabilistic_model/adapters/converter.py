@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import recursive_subclasses
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Dict, Generic, Type, TypeVar
+from typing_extensions import Any, Generic, TypeVar
 
 from probabilistic_model.adapters.exceptions import (
     CannotConvertError,
@@ -33,14 +33,14 @@ class Converter(Generic[InputType, OutputType], SubClassSafeGeneric, ABC):
     """
 
     @classmethod
-    def input_type(cls) -> Type[InputType]:
+    def input_type(cls) -> type[InputType]:
         """
         :return: The type this converter converts.
         """
         return cls.get_generic_type_parameters()[0]
 
     @classmethod
-    def output_type(cls) -> Type[OutputType]:
+    def output_type(cls) -> type[OutputType]:
         """
         :return: The type this converter converts into.
         """
@@ -57,7 +57,7 @@ class Converter(Generic[InputType, OutputType], SubClassSafeGeneric, ABC):
         return type(data) is cls.input_type()
 
     @classmethod
-    def converter_for(cls, data: Any) -> Type[Converter]:
+    def converter_for(cls, data: Any) -> type[Converter]:
         """
         :param data: The object to convert.
         :return: The subclass of this class that handles the object.
@@ -90,7 +90,7 @@ class LayerConversion(Generic[InputType, OutputType]):
     parents stays shared.
     """
 
-    converter: Type[Converter[InputType, OutputType]]
+    converter: type[Converter[InputType, OutputType]]
     """
     The base class of the converters of the layers, which finds the converter of every
     layer.
@@ -101,7 +101,7 @@ class LayerConversion(Generic[InputType, OutputType]):
     The variables of the circuit, in the order the layers index them.
     """
 
-    converted_layers: Dict[int, OutputType] = field(default_factory=dict)
+    converted_layers: dict[int, OutputType] = field(default_factory=dict)
     """
     The result of every layer converted so far, keyed by the id of the layer.
     """

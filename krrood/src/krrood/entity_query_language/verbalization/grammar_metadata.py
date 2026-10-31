@@ -11,9 +11,8 @@ how a boolean field reads as a predicate. It subclasses
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
-from typing_extensions import Optional
 
 from krrood.patterns.field_metadata import FieldMetadata
 
@@ -35,13 +34,13 @@ class GrammarMetadata(FieldMetadata):
     <field> '<value>'"*).
     """
 
-    display_name: Optional[str] = None
+    display_name: str | None = None
     """
     Surface word to use for this field when verbalized, in place of its attribute name
     (*"beginning"* for a field named ``begin``); ``None`` keeps the attribute name.
     """
 
-    boolean_predicate: Optional[BooleanPredicate] = None
+    boolean_predicate: BooleanPredicate | None = None
     """
     How a boolean field reads as a predicate — *"has milk"* / *"produces milk"* / *"is operational"*
     — overriding the default heuristic.

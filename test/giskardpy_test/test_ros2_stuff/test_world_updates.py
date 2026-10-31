@@ -1,12 +1,13 @@
 import json
 import time
 from dataclasses import dataclass, field
-from typing import Any, List
+from typing_extensions import Any
 
 import pytest
 
-from giskardpy.executor import Executor, NoPacing
-from giskardpy.middleware.ros2 import rospy
+from cramph.executor import NoPacing
+from semantic_digital_twin.adapters.ros import rospy
+from giskardpy.middleware.ros2.command_publishing import CommandPublisher
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog, HeartbeatPresence
 from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.exceptions import (
@@ -19,13 +20,11 @@ from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.world_updates import (
     ClientWorldUpdates,
     IncomingWorldUpdates,
+    OutgoingWorldUpdates,
 )
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.monitors.payload_monitors import (
-    CountSimulationTimeSeconds,
-)
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.monitors import CountSimulationTimeSeconds
+from cramph.statechart import Statechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import to_json
 from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
@@ -41,6 +40,9 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.world_entity import Body
+from giskardpy.motion_control import MotionControl
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 
 # %% mimics of the synchronizers
 
@@ -71,7 +73,7 @@ class BufferingSynchronizerMimic:
     The answer this mimic gives about every position it is asked about.
     """
 
-    asked_about_positions: List[StreamPosition] = field(default_factory=list)
+    asked_about_positions: list[StreamPosition] = field(default_factory=list)
     """
     Every position this mimic was asked about.
     """
@@ -329,7 +331,7 @@ class GoalQueueStub:
     Id of the running goal.
     """
 
-    feedback_messages: List[Any] = field(default_factory=list)
+    feedback_messages: list[Any] = field(default_factory=list)
     """
     Every feedback message that was published.
     """
@@ -421,20 +423,22 @@ def control_loop(init_rospy) -> ControlLoopFixture:
     assert len(controlled_world.kinematic_structure_entities) == 2
     controlled_synchronizer.defer_incoming_updates = True
 
-    executor = Executor(
-        context=MotionStatechartContext(
-            world=controlled_world,
-            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
-        ),
+    executor = StatechartExecutor(
+        context=StatechartContext(world=controlled_world),
         pacer=NoPacing(),
+        extensions=[
+            MotionControl(
+                qp_controller_config=QPControllerConfig.create_with_simulation_defaults()
+            )
+        ],
     )
-    motion_statechart = MotionStatechart()
+    motion_statechart = Statechart(context=StatechartContext(world=controlled_world))
     motion_statechart.add_node(counter := CountSimulationTimeSeconds(seconds=1000.0))
     motion_statechart.add_node(EndMotion.when_true(counter))
     executor.compile(
-        MotionStatechart.from_json(
+        Statechart.from_json(
             json.loads(json.dumps(motion_statechart.to_json())),
-            world=controlled_world,
+            context=executor.context,
         )
     )
     action_server = GoalQueueStub()
@@ -443,9 +447,15 @@ def control_loop(init_rospy) -> ControlLoopFixture:
         control_loop=ControlLoop(
             executor=executor,
             action_server=action_server,
-            client_watchdog=ClientWatchdog(presence=HeartbeatPresence(node=rospy.get_node())),
+            client_watchdog=ClientWatchdog(
+                presence=HeartbeatPresence(node=rospy.get_node())
+            ),
             feedback_publisher=ActionFeedbackPublisher(
-                executor=executor, action_server=action_server
+                executor=executor,
+                action_server=action_server,
+                outgoing_world_updates=OutgoingWorldUpdates(
+                    world_synchronizer=controlled_synchronizer
+                ),
             ),
             inputs=WorldStateInputs(world=controlled_world),
             cycle_counter=CycleCounter(),
@@ -526,3 +536,89 @@ class TestRealWorldUpdatesDuringAMotion:
             len(control_loop.controlled_world.kinematic_structure_entities)
             == entities_before + 1
         )
+
+
+# %% a model change the motion makes itself
+
+
+@dataclass
+class CommandPublisherRecordingCalls(CommandPublisher):
+    """
+    Stands in for a publisher to the robot, recording which of its methods ran, in
+    order.
+    """
+
+    calls: list[str] = field(default_factory=list)
+    """
+    The methods that ran, each by its name.
+    """
+
+    def publish(self) -> None:
+        self.calls.append(self.publish.__name__)
+
+    def stop(self) -> None:
+        self.calls.append(self.stop.__name__)
+
+
+@pytest.fixture()
+def local_control_loop(init_rospy) -> ControlLoop:
+    """
+    :return: A control loop running a long motion on a world no other process updates.
+    """
+    world = World(name="local")
+    add_moving_connection(world)
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world),
+        pacer=NoPacing(),
+        extensions=[
+            MotionControl(
+                qp_controller_config=QPControllerConfig.create_with_simulation_defaults()
+            )
+        ],
+    )
+    motion_statechart = Statechart(context=executor.context)
+    motion_statechart.add_node(counter := CountSimulationTimeSeconds(seconds=1000.0))
+    motion_statechart.add_node(EndMotion.when_true(counter))
+    executor.compile(motion_statechart)
+    action_server = GoalQueueStub()
+    return ControlLoop(
+        executor=executor,
+        action_server=action_server,
+        client_watchdog=ClientWatchdog(
+            presence=HeartbeatPresence(node=rospy.get_node())
+        ),
+        feedback_publisher=ActionFeedbackPublisher(
+            executor=executor,
+            action_server=action_server,
+            outgoing_world_updates=OutgoingWorldUpdates(
+                world_synchronizer=PublishingSynchronizerMimic()
+            ),
+        ),
+        inputs=WorldStateInputs(world=world),
+        cycle_counter=CycleCounter(),
+        world_updates=IncomingWorldUpdates(
+            world_synchronizer=BufferingSynchronizerMimic()
+        ),
+    )
+
+
+class TestModelChangesOfTheMotionItself:
+    def test_commands_keep_being_published_while_the_motion_is_built_again(
+        self, local_control_loop: ControlLoop
+    ) -> None:
+        """
+        The controller slows the robot down while the motion statechart is built again
+        after the motion changed the model, so the command publishers are not stopped
+        and a command is published in that cycle too.
+        """
+        publisher = CommandPublisherRecordingCalls()
+        local_control_loop.command_publishers.append(publisher)
+        world = local_control_loop.world
+        with world.modify_world():
+            carried_body = Body(name=PrefixedName("carried_body"))
+            world.add_body(carried_body)
+            world.add_connection(FixedConnection(parent=world.root, child=carried_body))
+
+        local_control_loop.run_cycle()
+
+        assert publisher.calls == [CommandPublisherRecordingCalls.publish.__name__]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from typing_extensions import Any, Dict, Optional, TYPE_CHECKING, Self
+from typing_extensions import Any, TYPE_CHECKING, Self
 
 from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
 from krrood.adapters.json_serializer import from_json, to_json
@@ -46,7 +46,7 @@ class WorldEntityReference:
         """
         return f"{self.subject}_name"
 
-    def write(self, data: Dict[str, Any], entity: WorldEntityWithID) -> None:
+    def write(self, data: dict[str, Any], entity: WorldEntityWithID) -> None:
         """
         Put the reference to an entity into a serialized object.
 
@@ -56,7 +56,7 @@ class WorldEntityReference:
         data[self.id_key] = to_json(entity.id)
         data[self.name_key] = to_json(entity.name)
 
-    def resolve(self, data: Dict[str, Any], **kwargs) -> WorldEntityWithID:
+    def resolve(self, data: dict[str, Any], **kwargs) -> WorldEntityWithID:
         """
         The entity a serialized object refers to.
 
@@ -82,7 +82,7 @@ class WorldEntityWithIDKwargsTracker(
     created with through :meth:`from_world`.
     """
 
-    _world: Optional[World] = field(init=False, default=None)
+    _world: World | None = field(init=False, default=None)
     """
     The world to look up the entities in that were not deserialized from the document.
     """
@@ -101,7 +101,7 @@ class WorldEntityWithIDKwargsTracker(
         tracker._world = world
         return tracker
 
-    def get(self, key: UUID, name: Optional[PrefixedName] = None) -> WorldEntityWithID:
+    def get(self, key: UUID, name: PrefixedName | None = None) -> WorldEntityWithID:
         """
         :param name: The name the reference to the entity went by, which says which
             entity was meant when it cannot be found.
@@ -116,7 +116,7 @@ class WorldEntityWithIDKwargsTracker(
         return self._world.find_world_entity_with_id(key) is not None
 
     def _get_untracked(
-        self, key: UUID, name: Optional[PrefixedName] = None
+        self, key: UUID, name: PrefixedName | None = None
     ) -> WorldEntityWithID:
         """
         :param name: The name the reference to the entity went by, which says which

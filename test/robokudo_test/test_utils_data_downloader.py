@@ -86,7 +86,8 @@ def unpacking_recorder(tmp_path, monkeypatch) -> UnpackingRecorder:
         zip_file.writestr(ARCHIVED_FILE_NAME, b"depth")
 
     recorder = UnpackingRecorder(unpack=pooch.Unzip._extract_file)
-    monkeypatch.setattr(robokudo.utils.data_downloader, "KNOWN_HASH", None)
+    dataset = robokudo.utils.data_downloader.TestDataset(checksum=None)
+    monkeypatch.setattr(robokudo.utils.data_downloader, "TestDataset", lambda: dataset)
     monkeypatch.setattr(pooch, "os_cache", lambda package_name: tmp_path / "cache")
     monkeypatch.setattr(pooch, "HTTPDownloader", lambda: CopyingDownloader(archive))
     monkeypatch.setattr(

@@ -8,10 +8,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing_extensions import Callable, TYPE_CHECKING
 
 import numpy as np
-from typing_extensions import Callable
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.constraint import (

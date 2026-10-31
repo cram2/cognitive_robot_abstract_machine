@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from random_events.interval import Bound, Interval, SimpleInterval
-from typing_extensions import Any, List, Self, Type
+from typing_extensions import Any, Self
 
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
@@ -59,7 +59,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
 
     def type_of_layer_truncated_to_interval(
         self, interval: SimpleInterval
-    ) -> Type[Layer]:
+    ) -> type[Layer]:
         """
         :param interval: A simple interval that is not a singleton.
         :return: The type of the layer :meth:`log_truncated_of_non_singleton_interval`
@@ -69,7 +69,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
 
     def type_of_truncated_layer(
         self, assignment: Interval, singleton_allowed: bool
-    ) -> Type[Layer]:
+    ) -> type[Layer]:
         if len(assignment.simple_sets) > 1:
             return SumLayer
         if not assignment.simple_sets:
@@ -294,7 +294,7 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         return self.__class__(self.variable, self.interval[mask], self.bounds[mask])
 
     @classmethod
-    def concatenate(cls, layers: List[Self]) -> Self:
+    def concatenate(cls, layers: list[Self]) -> Self:
         return cls(
             layers[0].variable,
             np.concatenate([layer.interval for layer in layers]),

@@ -99,7 +99,7 @@ def test_table_world(session, table_world):
 def test_insert(session):
     origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
     scale = Scale(1.0, 1.0, 1.0)
-    color = Color(0.0, 1.0, 1.0)
+    color = Color.from_rgba(red=0.0, green=1.0, blue=1.0)
     shape1 = Box(origin=origin, scale=scale, color=color)
     b1 = Body(name=PrefixedName("b1"), collision=ShapeCollection([shape1]))
 

@@ -792,6 +792,55 @@ def test_a_parameter_only_renamed_by_a_subclass_is_rejected():
         RenamingContainer.get_type_of_generic_parameter(ContentType)
 
 
+def test_sibling_classes_each_read_back_their_own_binding():
+    """
+    Two subclasses binding the same parameter to different types each report their own
+    type, however often either is asked.
+    """
+    ContentType = TypeVar("ContentType")
+
+    @dataclass
+    class Container(Generic[ContentType], SubClassSafeGeneric):
+        content: ContentType
+
+    @dataclass
+    class TextContainer(Container[str]):
+        pass
+
+    @dataclass
+    class NumberContainer(Container[int]):
+        pass
+
+    assert TextContainer.get_type_of_generic_parameter(ContentType) is str
+    assert NumberContainer.get_type_of_generic_parameter(ContentType) is int
+    assert TextContainer.get_type_of_generic_parameter(ContentType) is str
+
+
+def test_a_bound_type_is_looked_up_once_per_class_and_parameter(monkeypatch):
+    """
+    Reading a binding again returns the type found the first time, without resolving the
+    class's substitutions again.
+    """
+    ContentType = TypeVar("ContentType")
+
+    @dataclass
+    class Container(Generic[ContentType], SubClassSafeGeneric):
+        content: ContentType
+
+    @dataclass
+    class TextContainer(Container[str]):
+        pass
+
+    first_lookup = TextContainer.get_type_of_generic_parameter(ContentType)
+    monkeypatch.setattr(
+        TextContainer,
+        "_get_generic_type_substitutions",
+        classmethod(lambda cls: {}),
+    )
+
+    assert TextContainer.get_type_of_generic_parameter(ContentType) is first_lookup
+
+
 # %% attributes an interface declares
 
 

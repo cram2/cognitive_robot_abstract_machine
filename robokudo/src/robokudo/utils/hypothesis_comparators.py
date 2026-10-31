@@ -1,4 +1,6 @@
-from typing_extensions import Dict, Type, Union, Callable, TypeVar, Generic
+from __future__ import annotations
+
+from typing_extensions import Callable, TypeVar, Generic
 
 from robokudo.cas import CAS
 from robokudo.types.core import Annotation, Type as RkType
@@ -20,11 +22,11 @@ class HypothesisComparator(Generic[THyothesis]):
         """
         Function to get a CAS instance, to be used for annotation filtering.
         """
-        self.annotation_comparators: Dict[Type[Annotation], FeatureComparator] = {}
+        self.annotation_comparators: dict[type[Annotation], FeatureComparator] = {}
         """
         Feature comparators used by this hypothesis comparator to compare annotations.
         """
-        self.type_comparators: Dict[Type[RkType], FeatureComparator] = {}
+        self.type_comparators: dict[type[RkType], FeatureComparator] = {}
         """
         Feature comparators used by this hypothesis comparator to compare other robokudo
         types.
@@ -45,10 +47,10 @@ class HypothesisComparator(Generic[THyothesis]):
 
     def with_comparator_for(
         self,
-        compared_type: Type[Union[Annotation, RkType]],
+        compared_type: type[Annotation | RkType],
         weight: float,
         **kwargs,
-    ) -> "HypothesisComparator":
+    ) -> HypothesisComparator:
         """
         Add a feature comparator for the given annotation using the given weight to the
         comparator.

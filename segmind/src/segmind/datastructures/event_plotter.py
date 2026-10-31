@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, abspath
-from typing import List, Optional, Union
+from typing_extensions import Union
 from collections import defaultdict
 
 import pandas as pd
@@ -22,7 +22,7 @@ class EventPlotter:
     A class responsible for plotting events from a timeline.
     """
 
-    def plot(self, events: List[DetectionEvent], show: bool = True, save_path: Optional[str] = None) -> None:
+    def plot(self, events: list[DetectionEvent], show: bool = True, save_path: str | None = None) -> None:
         """
         Plot the given events in a timeline.
 
@@ -43,7 +43,7 @@ class EventPlotter:
         if save_path:
             self._save_plot(fig, save_path)
 
-    def _prepare_data(self, events: List[DetectionEvent]) -> dict:
+    def _prepare_data(self, events: list[DetectionEvent]) -> dict:
         """
         Prepare the data for the plot from the list of events.
         """

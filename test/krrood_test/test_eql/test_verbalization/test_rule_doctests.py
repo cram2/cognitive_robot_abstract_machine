@@ -25,7 +25,6 @@ import importlib
 import pkgutil
 
 import pytest
-from typing_extensions import List
 
 import krrood.entity_query_language.factories as eql
 import krrood.entity_query_language.testing as testing_package
@@ -82,13 +81,13 @@ _GLOBS.update(
 )
 
 
-def _verbalization_modules_with_doctests() -> List[str]:
+def _verbalization_modules_with_doctests() -> list[str]:
     """
     :return: The dotted names of every sub-module of :data:`_SCANNED_PACKAGES` that carries
         ``>>>`` doctest examples, discovered by walking each package — so a doctest added
         anywhere is executed without editing this harness.
     """
-    discovered: List[str] = []
+    discovered: list[str] = []
     finder = doctest.DocTestFinder()
     for package in _SCANNED_PACKAGES:
         for module_info in pkgutil.walk_packages(

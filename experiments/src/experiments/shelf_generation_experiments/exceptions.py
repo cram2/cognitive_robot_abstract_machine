@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from krrood.exceptions import DataclassException
 
@@ -13,7 +12,7 @@ class PathError(DataclassException):
     Raised when a given path is either None or invalid.
     """
 
-    path: Optional[Path]
+    path: Path | None
 
     def error_message(self) -> str:
         return f"Path {self.path} is invalid."

@@ -15,7 +15,7 @@ ext_modules = [
         include_dirs=[
             "src/random_events_lib/random_events_lib/include"
         ],  # Include directory for C++ headers
-        extra_compile_args=["-std=c++17", "-fPIC"],
+        cxx_std=17,
     ),
 ]
 

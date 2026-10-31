@@ -732,6 +732,106 @@ def test_a_shape_sorting_piece_without_a_shape_offers_no_grasp():
         _shape_sorting_piece(ShapeCollection()).grasp_candidates()
 
 
+# %% handle grasp poses
+
+
+def _handle_with_bar_along(
+    bar_axis: int, bar_center: tuple[float, float, float] = (0.0, 0.0, 0.0)
+) -> Handle:
+    """
+    :param bar_axis: The axis of its own frame the handle's bar runs along.
+    :param bar_center: Where the bar's centre lies in the handle's own frame.
+    :return: A handle whose collision box is long along that axis.
+    """
+    extents = [0.03, 0.03, 0.02]
+    extents[bar_axis] = 0.2
+    body = Body(
+        name=PrefixedName(f"handle_along_{bar_axis}", prefix="grasp_candidates"),
+        collision=ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(*bar_center),
+                    scale=Scale(*extents),
+                )
+            ]
+        ),
+    )
+    annotation = Handle(root=body)
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+        world.add_semantic_annotation(annotation)
+    return annotation
+
+
+@pytest.mark.parametrize("bar_axis", [0, 1, 2], ids=["along-x", "along-y", "along-z"])
+def test_a_handle_is_approached_from_every_side_across_its_bar(bar_axis) -> None:
+    """
+    The fingers close around the bar, so neither the approach nor the closing runs
+    along it, and the bar can be approached from any of the four sides around it.
+    """
+    bar_direction = np.eye(3)[bar_axis]
+    grasps = _handle_with_bar_along(bar_axis).grasp_candidates()
+
+    approaches = [axes_of(grasp.grasp_pose)[:, 0] for grasp in grasps]
+    closings = [axes_of(grasp.grasp_pose)[:, 1] for grasp in grasps]
+
+    expected_approaches = [
+        sign * np.eye(3)[axis]
+        for axis in range(3)
+        if axis != bar_axis
+        for sign in (1, -1)
+    ]
+    assert sorted(map(tuple, np.round(approaches, 9))) == sorted(
+        map(tuple, np.round(expected_approaches, 9))
+    )
+    for closing in closings:
+        assert float(np.dot(closing, bar_direction)) == pytest.approx(0, abs=1e-9)
+
+
+def test_a_handle_is_grasped_at_the_centre_of_its_bar() -> None:
+    """
+    A handle's frame may sit at its mount rather than on the bar, so the grasps are
+    placed where the bar is.
+    """
+    bar_center = (0.04, 0.0, -0.01)
+
+    for grasp in _handle_with_bar_along(1, bar_center).grasp_candidates():
+        np.testing.assert_allclose(
+            grasp.grasp_pose.to_np()[:3, 3], bar_center, atol=1e-9
+        )
+
+
+def test_a_kitchen_handle_can_be_approached_into_the_furniture(kitchen_world) -> None:
+    """
+    The kitchen's handle links point out of the furniture with the bar along their
+    y-axis, so one grasp has to approach along their negative x-axis and close along
+    their z-axis.
+    """
+    body = kitchen_world.get_body_by_name("sink_area_left_middle_drawer_handle")
+    handle = Handle(root=body)
+    with kitchen_world.modify_world():
+        kitchen_world.add_semantic_annotation(handle)
+
+    assert any(
+        np.allclose(axes_of(grasp.grasp_pose)[:, 0], [-1, 0, 0], atol=1e-9)
+        and np.allclose(np.abs(axes_of(grasp.grasp_pose)[:, 1]), [0, 0, 1], atol=1e-9)
+        for grasp in handle.grasp_candidates()
+    )
+
+
+def test_a_handle_without_a_shape_offers_no_grasp() -> None:
+    body = Body(name=PrefixedName("shapeless_handle", prefix="grasp_candidates"))
+    handle = Handle(root=body)
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+        world.add_semantic_annotation(handle)
+
+    with pytest.raises(NoGraspGeometry):
+        handle.grasp_candidates()
+
+
 # %% the frame a grasp is expressed in
 
 

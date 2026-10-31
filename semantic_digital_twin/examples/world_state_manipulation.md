@@ -109,7 +109,7 @@ with world.modify_world():
     
     # Add a visual for the new root so we can see the change of position in the visualization
     box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=new_root)
-    box = Box(origin=box_origin, scale=Scale(0.1, 0.1, 0.1), color=Color(1., 0., 0., 1.))
+    box = Box(origin=box_origin, scale=Scale(0.1, 0.1, 0.1), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1.))
     new_root.collision = [box]
     
     world.add_body(new_root)

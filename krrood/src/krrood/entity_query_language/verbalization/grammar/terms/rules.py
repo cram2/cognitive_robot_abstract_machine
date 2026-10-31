@@ -4,7 +4,7 @@ import enum
 import itertools
 from dataclasses import fields, is_dataclass
 
-from typing_extensions import Any, List, Optional
+from typing_extensions import Any
 
 from krrood.entity_query_language.core.mapped_variable import FlatVariable
 from krrood.entity_query_language.core.variable import (
@@ -97,7 +97,7 @@ class VariableRule(PhraseRule):
     @staticmethod
     def _domain_choice(
         node: Variable, context: RuleContext
-    ) -> Optional[VerbalizationFragment]:
+    ) -> VerbalizationFragment | None:
         """In value position, a domain-constrained value-type variable says its candidate set —
         *"one of OPTION_A, OPTION_B, or OPTION_C"* (an enum) / *"one of 1, or 2"* (a primitive), or
         just the value for a singleton domain. ``None`` (use the type-name noun) unless the type is
@@ -197,7 +197,7 @@ class LiteralRule(PhraseRule):
             )
             for name, field_value in self._identifying_fields(value)
         ]
-        modifiers: List[VerbalizationFragment] = (
+        modifiers: list[VerbalizationFragment] = (
             [
                 Prepositions.WITH.as_fragment(),
                 oxford_comma(details, Conjunctions.AND.as_fragment()),
@@ -213,7 +213,7 @@ class LiteralRule(PhraseRule):
         )
 
     @staticmethod
-    def _identifying_fields(value: Any) -> List[tuple]:
+    def _identifying_fields(value: Any) -> list[tuple]:
         """:return: The ``(name, value)`` pairs that identify *value* for display — the attributes a
         :class:`HasIdentifyingAttributes` declares, else the first present conventional identity
         field — keeping only scalar values.
@@ -235,7 +235,7 @@ class LiteralRule(PhraseRule):
         ]
 
     @staticmethod
-    def _declared_identifying_names(value: Any) -> List[str]:
+    def _declared_identifying_names(value: Any) -> list[str]:
         """:return: The identifying attribute names for *value* — the dataclass fields its class marks
         with :attr:`GrammarMetadata.is_identifying_field`, else the first present conventional
         identity field."""
@@ -246,7 +246,7 @@ class LiteralRule(PhraseRule):
         )
 
     @staticmethod
-    def _identifying_attribute_fields(value: Any) -> List[str]:
+    def _identifying_attribute_fields(value: Any) -> list[str]:
         """:return: The names of *value*'s dataclass fields marked as identifying attributes, in
         declaration order (empty when *value* is not a dataclass or marks none)."""
         if not is_dataclass(value):

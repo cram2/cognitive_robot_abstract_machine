@@ -6,7 +6,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Optional
 
 from semantic_digital_twin.world_description.geometry import Scale
 
@@ -155,7 +154,7 @@ class MeshCandidate:
     The generalized category of the object this mesh was captured from.
     """
 
-    scale: Optional[Scale] = None
+    scale: Scale | None = None
     """
     The mesh's own real-world size, as ``(length, width, height)`` on ``(x, y, z)``,
     used to decide whether it fits a target space.
@@ -193,10 +192,10 @@ class MeshTypeMatcher:
     def random_match(
         self,
         object_type: ObjectType,
-        max_extents: Optional[Scale] = None,
-        target_extents: Optional[Scale] = None,
+        max_extents: Scale | None = None,
+        target_extents: Scale | None = None,
         maximum_size_ratio: float = 2.0,
-    ) -> Optional[MeshCandidate]:
+    ) -> MeshCandidate | None:
         """
         Return a candidate whose :attr:`MeshCandidate.object_type` equals *object_type*,
         or ``None`` when the pool holds none.

@@ -25,11 +25,8 @@ from typing_extensions import (
     Iterator,
     List,
     Type,
-    get_args,
-    get_origin,
 )
 
-from krrood.class_diagrams.utils import get_type_hints_of_object, is_union_annotation
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import entity
 from krrood.entity_query_language.query.match import AttributeMatch, Match
@@ -38,7 +35,7 @@ from krrood.entity_query_language.rdr.exceptions import (
     NoInferenceTarget,
     UnsupportedInferenceTarget,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.symbol_graph.helpers import get_wrapped_field
 
 
 @dataclass
@@ -56,34 +53,6 @@ class RDRMatchParser:
         # exist once resolved. Match.resolve() is idempotent, so this is safe if already resolved.
         self.match.resolve()
 
-    @classproperty
-    def unbounded_iterable_origins(cls) -> tuple[type, ...]:
-        """
-        The generic origins whose instances are collections, which cannot be concluded as
-        one value.
-        """
-        return list, set, frozenset, tuple, dict
-
-    @staticmethod
-    def is_ellipsis_target(attribute_match: AttributeMatch) -> bool:
-        """
-        :return: Whether ``attribute_match`` assigns ``...``, i.e. is an inference target.
-        """
-        return attribute_match.assigned_value is ...
-
-    @classmethod
-    def is_unbounded_iterable(cls, annotation: Any) -> bool:
-        """
-        :return: Whether ``annotation`` denotes a collection type, ``Optional`` unwrapped.
-        """
-        if is_union_annotation(annotation):
-            return any(
-                cls.is_unbounded_iterable(argument)
-                for argument in get_args(annotation)
-                if argument is not type(None)
-            )
-        return get_origin(annotation) in cls.unbounded_iterable_origins
-
     @property
     def case_type(self) -> Type:
         """The type whose instances are being completed (e.g. ``Animal``)."""
@@ -100,7 +69,7 @@ class RDRMatchParser:
         targets = [
             attribute_match
             for attribute_match in self.match._matches_with_variables_
-            if self.is_ellipsis_target(attribute_match)
+            if attribute_match.is_unspecified
         ]
         for target in targets:
             self._guard_single_valued(target)
@@ -135,14 +104,16 @@ class RDRMatchParser:
         """Fresh comparator nodes for the concrete attribute constraints (``...`` dropped)."""
         conditions: List[Any] = []
         for leaf in self.match._matches_with_variables_:
-            if self.is_ellipsis_target(leaf):
+            if leaf.is_unspecified:
                 continue
             attribute = getattr(self.variable, leaf.attribute_name)
             conditions.append(attribute == leaf.assigned_variable._value_)
         return conditions
 
     def _guard_single_valued(self, target: AttributeMatch) -> None:
-        name = target.attribute_name
-        annotation = get_type_hints_of_object(self.case_type).get(name)
-        if annotation is not None and self.is_unbounded_iterable(annotation):
-            raise UnsupportedInferenceTarget(self.case_type, name)
+        """
+        :raises UnsupportedInferenceTarget: If ``target``'s field holds a collection.
+        """
+        wrapped_field = get_wrapped_field(self.case_type, target.attribute_name)
+        if wrapped_field is not None and wrapped_field.holds_collection:
+            raise UnsupportedInferenceTarget(self.case_type, target.attribute_name)

@@ -1,18 +1,23 @@
 import numpy as np
 import pytest
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
+from giskardpy.motion_control import MotionControl
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 
 
 def test_end_motion_abruptness(cylinder_bot_world: World):
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
 
-    motion_statechart = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=cylinder_bot_world),
+        extensions=[MotionControl()],
+    )
+    motion_statechart = Statechart(context=executor.context)
     goal = CartesianPose(
         root_link=cylinder_bot_world.root,
         tip_link=tip,
@@ -23,15 +28,14 @@ def test_end_motion_abruptness(cylinder_bot_world: World):
     end = EndMotion.when_true(goal)
     motion_statechart.add_node(end)
 
-    executor = Executor(MotionStatechartContext(world=cylinder_bot_world))
-    executor.compile(motion_statechart=motion_statechart)
+    executor.compile(statechart=motion_statechart)
 
     # We want to check the velocity in the last tick BEFORE cleanup
     # tick_until_end calls cleanup. We'll do it manually.
 
     for i in range(1000):
         executor.tick()
-        if motion_statechart.is_end_motion():
+        if motion_statechart.is_ended():
             break
 
     velocities = cylinder_bot_world.state.velocities

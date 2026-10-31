@@ -15,7 +15,7 @@ jupyter:
 
 # Motion Planning with Graphs of Convex Sets
 This notebook shows how CoraPlex's Graph of Convex Sets (GCS) functionality can be used to plan an end effector path in a complex environment and how to execute that path.
-Paths will be represented as sequences of waypoints. To execute a sequence of waypoints as one motion the MoveTCPWaypointsMotion Designator is introduced which leverages [Giskard](https://github.com/SemRoCo/giskardpy) to calculate the motion of the robot. To follow the below examples Giskard should be started with this command `roslaunch giskardpy giskardpy_pr2_standalone.launch`.
+Paths will be represented as sequences of waypoints. A sequence of waypoints is executed as one motion by a {class}`~cramph.composites.Sequence` of {class}`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPose` goals, which leverages [Giskard](https://github.com/SemRoCo/giskardpy) to calculate the motion of the robot. To follow the below examples Giskard should be started with this command `roslaunch giskardpy giskardpy_pr2_standalone.launch`.
 The following three cells initilaize the CoraPlex world with a kitchen environment and the PR2 robot, and sync it with the world of Giskard. Then a large drawer is opened, the robot is teleported close to that drawer and it's arms are parked.
 
 ```python
@@ -29,10 +29,14 @@ from coraplex.ros_utils.viz_marker_publisher import VizMarkerPublisher
 from coraplex.ros_utils.robot_state_updater import WorldStateUpdater
 from tf.transformations import quaternion_from_matrix
 from coraplex.robot_plans import *
-from coraplex.process_module import real_robot
+from coraplex.plans.context_extensions import RobotAccess
+from cramph.context import StatechartContext
+from coraplex.plans.executors import RealRobotPlanExecutor
+from cramph.statechart import Statechart
 from coraplex.external_interfaces.giskard import sync_worlds
 from coraplex.robot_plans import *
-from coraplex.robot_plans.motions import MoveTCPWaypointsMotion
+from cramph.composites import Sequence
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from geometry_msgs.msg import Quaternion
 
 world = BulletWorld(mode=WorldMode.GUI)
@@ -60,11 +64,15 @@ giskard_wrapper.execute()
 ```
 
 ```python
-with real_robot:
-    try:
-        ParkArmsActionDescription(robot.all_arms).resolve().perform()
-    except:
-        pass
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+
+executor = RealRobotPlanExecutor(
+    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+)
+statechart = Statechart(context=executor.context)
+statechart.add_node(ParkArmsAction(arms=robot.all_arms))
+executor.compile(statechart)
+executor.execute()
 ```
 
 Now, we define a search space for the GCS algorithm around the open drawer and the robot, and calculate the connectivity graph.
@@ -98,17 +106,37 @@ path[-1].pose.orientation = Quaternion(*goal_orientation)
 print('done')
 ```
 
-The MoveTCPWaypointsMotion Designator moves the specified arm to each position in the given path in the order of the list of poses. Therefore it takes as necessary inputs a path of poses and which arm should be used. The other parameters default to the shown values. The ENFORCE_ORIENTATION_FINAL_POINT movement type ensures that only the orientation of the last pose in the list is achieved. It can be changed to ENFORCE_ORIENTATION_STRICT to achieve the orientation for each pose in the list.
+A {class}`~cramph.composites.Sequence` of Cartesian goals moves the specified arm to each pose of the path, one after the other. Each goal names the tool frame that moves and the link the pose is expressed relative to.
 For the path that we provide here the first value is skipped as that is equal to the start pose from earlier.
 
 ```python
-print('move along path to goal pose...')
-from coraplex.datastructures.enums import WaypointsMovementType
-with real_robot:
-    MoveTCPWaypointsMotion(path[1:], robot.right_arm, movement_type=WaypointsMovementType.ENFORCE_ORIENTATION_FINAL_POINT, allow_gripper_collision=False).perform()
+print("move along path to goal pose...")
+
+
+def follow_path(waypoints):
+    tool_frame = robot.right_arm.end_effector.tool_frame
+    return Sequence(
+        nodes=[
+            CartesianPose(
+                root_link=RobotAccess(robot).controlled_root,
+                tip_link=tool_frame,
+                goal_pose=pose,
+            )
+            for pose in waypoints
+        ]
+    )
+
+
+executor = RealRobotPlanExecutor(
+    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+)
+statechart = Statechart(context=executor.context)
+statechart.add_node(follow_path(path[1:]))
+executor.compile(statechart)
+executor.execute()
 ```
 
-Alternatively, before executing the planned path with the MoveTCPWaypointsMotion Designator the path could be further improved by postprocessing the output from the GCS path finding algorithm.
+Alternatively, before executing the planned path the path could be further improved by postprocessing the output from the GCS path finding algorithm.
 For example below is a simpler filter algorithm that removes each waypoint from the path that has a distance from its predecessor below a threshold parameter.
 
 ```python
@@ -135,7 +163,12 @@ print(len(new_path))
 ```
 
 ```python
-print('move along path to goal pose...')
-with real_robot:
-    MoveTCPWaypointsMotion(filter_path(path), robot.right_arm).perform()
+print("move along path to goal pose...")
+executor = RealRobotPlanExecutor(
+    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+)
+statechart = Statechart(context=executor.context)
+statechart.add_node(follow_path(filter_path(path)))
+executor.compile(statechart)
+executor.execute()
 ```

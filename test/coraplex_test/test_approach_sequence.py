@@ -33,7 +33,7 @@ def boxed_pr2_world(simple_pr2_context):
     """
     A PR2 next to a graspable box of known extents, a meter above the world root.
     """
-    world, robot, context = simple_pr2_context
+    world, robot, extensions = simple_pr2_context
     with world.modify_world():
         box = Body(
             name=PrefixedName("approach_box"),

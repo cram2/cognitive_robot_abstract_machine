@@ -140,34 +140,6 @@ class NoControlledJointsError(SetupException):
 
 
 @dataclass
-class NonPositiveRealTimeFactorError(SetupException):
-    """
-    Raised when a simulation is configured to run at a non positive speed.
-    """
-
-    real_time_factor: float
-    """
-    The rejected factor.
-    """
-
-    def error_message(self) -> str:
-        return f"A real time factor of {self.real_time_factor} would never advance the simulation."
-
-    def suggest_correction(self) -> str:
-        return "Use a positive factor, or NoPacing to run as fast as possible."
-
-
-@dataclass
-class JointRegistrationRequiresStandaloneModeError(SetupException):
-    """
-    Raised when joints are registered outside of StandAlone mode.
-    """
-
-    def error_message(self) -> str:
-        return "Joints only need to be registered in StandAlone mode."
-
-    def suggest_correction(self) -> str:
-        return "Remove the manual registration. For real robots, the joints are retrieved from the connected controllers."
 
 
 @dataclass
@@ -180,7 +152,7 @@ class MaxTrajectoryLengthException(PlanningException):
         return "Trajectory exceeded the maximum allowed length."
 
     def suggest_correction(self) -> str:
-        return "Look at the final state of the MotionStatechart to see which nodes are still running. Use the debugger or the MotionStatechart.draw() method to visualize the MotionStatechart."
+        return "Look at the final state of the Statechart to see which nodes are still running. Use the debugger or the Statechart.draw() method to visualize the Statechart."
 
 
 @dataclass

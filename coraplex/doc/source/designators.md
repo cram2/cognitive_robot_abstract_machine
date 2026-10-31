@@ -70,16 +70,10 @@ The grounded designator is carried out. If it fails (e.g., object moved, pose bl
 
 ## The kinds of designators
 
-- Action designators ({class}`~coraplex.robot_plans.actions.base.ActionDescription`)
+- Action designators ({class}`~coraplex.robot_plans.actions.base.Action`)
 
   - Express a task at the highest level of “do this,” such as grasping or opening something.
-  - Internally, they can combine several motions, actions, locations, and sub‑steps.
-  - They check basic conditions before and after, to ensure the task makes sense and succeeds.
-
-- Motion designators ({class}`~coraplex.robot_plans.motions.base.BaseMotion`)
-
-  - Represent concrete robot movements (move joints, move a tool center point, open/close a gripper, etc.).
-  - They are the last step before the motion is turned into a giskard motion state chart and executed.
+  - Internally, they can combine several giskard goals, actions, locations, and sub‑steps.
 
 - Location designators ({class}`~coraplex.locations.base.Location`)
 
@@ -110,7 +104,7 @@ not be constrained to one robot but work across a wide variety of robot platform
 - Clarity: Describe “what” you want; let the system compute the “how.”
 - Flexibility: The same task description adapts across scenes and robots.
 - Robustness: Multiple candidates and late decisions improve success under uncertainty.
-- Composability: High‑level tasks are built by nesting actions, locations, and motions.
+- Composability: High‑level tasks are built by nesting actions, locations, and giskard goals.
 
 ## Typical usage patterns
 

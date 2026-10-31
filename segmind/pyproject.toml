@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 name = "segmind"
 dynamic = ["version"]
 dependencies = [
-    "giskardpy",
+    "cramph",
     "krrood",
     "random_events",
     "semantic_digital_twin",
@@ -29,12 +29,12 @@ where = ["src"]
 include = ["segmind*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "segmind.__version__"}
+version = {attr = "segmind._version.__version__"}
 
 [dependency-groups]
 workspace = [
     "coraplex",
-    "giskardpy",
+    "cramph",
     "krrood",
     "random_events",
     "semantic_digital_twin",

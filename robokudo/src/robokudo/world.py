@@ -4,6 +4,9 @@ General methods to access the current World.
 Reasoning about alternate world states is done in the corresponding Annotators.
 """
 
+from __future__ import annotations
+
+# %% Imports
 import numpy as np
 
 from robokudo.cas import CAS
@@ -22,7 +25,6 @@ from semantic_digital_twin.world_description.geometry import Mesh, Scale, Box
 import sys
 from uuid import UUID
 from threading import Lock
-from typing_extensions import Dict
 
 from robokudo.types.belief_state import ObjectBeliefState
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -50,7 +52,7 @@ _rk_world_lock = Lock()
 Lock for safe creation of the central SemDT World and entity tracker.
 """
 
-_tracked_objects: Dict[UUID, ObjectBeliefState] = {}
+_tracked_objects: dict[UUID, ObjectBeliefState] = {}
 
 
 def get_world_entity_tracker() -> WorldEntityWithIDKwargsTracker:
@@ -248,7 +250,7 @@ def update_connection_transform(
         connection.origin = transform
 
 
-def get_object_belief_states() -> Dict[UUID, ObjectBeliefState]:
+def get_object_belief_states() -> dict[UUID, ObjectBeliefState]:
     """
     Get all object belief states as a map of UUID to belief state.
 
@@ -261,10 +263,11 @@ def _get_world_body_from_cas(cas: CAS, rk_world: World) -> Body | None:
     """
     Return the world-frame body referenced by the CAS, if available.
     """
-    world_frame = cas.world_frame
-    if world_frame is None:
+    observation = cas.camera_observation
+    if observation is None or observation.world_T_camera is None:
         return None
-    return rk_world.get_body_by_name(PrefixedName(name=world_frame))
+    reference_frame = observation.world_T_camera.reference_frame
+    return rk_world.get_body_by_name(reference_frame.name)
 
 
 def _create_world_origin_and_scale_from_latest_bbox(

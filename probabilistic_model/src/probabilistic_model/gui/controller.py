@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional, Dict
 import json
 
 from probabilistic_model.probabilistic_model import ProbabilisticModel
@@ -16,17 +15,17 @@ class ModelController:
     Controller for managing the state and operations of a ProbabilisticModel.
     """
 
-    model: Optional[ProbabilisticModel] = None
+    model: ProbabilisticModel | None = None
     """
     The probabilistic model being managed.
     """
 
-    variable_map: Dict[str, Variable] = field(default_factory=dict)
+    variable_map: dict[str, Variable] = field(default_factory=dict)
     """
     A mapping from variable names to variable objects.
     """
 
-    priors: Optional[VariableMap] = None
+    priors: VariableMap | None = None
     """
     The prior distributions for all variables in the model.
     """
@@ -83,7 +82,7 @@ class ModelController:
         prob_joint = self.model.probability(joint)
         return prob_joint / prob_evidence
 
-    def calculate_posterior(self, evidence: Event) -> Optional[ProbabilisticModel]:
+    def calculate_posterior(self, evidence: Event) -> ProbabilisticModel | None:
         """
         Calculates the posterior distribution given evidence.
         """
@@ -102,7 +101,7 @@ class ModelController:
         except Exception:
             return None
 
-    def calculate_mode(self, evidence: Event) -> Optional[Mode]:
+    def calculate_mode(self, evidence: Event) -> Mode | None:
         """
         Calculates the mode of the model given evidence.
         """

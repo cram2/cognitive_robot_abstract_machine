@@ -17,9 +17,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
-from typing_extensions import List, Optional, Type
 
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.boolean_predicate import (
@@ -66,7 +65,7 @@ class SpelledOutHead(StrEnum):
     ARE = "are"
 
     @classmethod
-    def opening(cls, words: List[str]) -> Optional[SpelledOutHead]:
+    def opening(cls, words: list[str]) -> SpelledOutHead | None:
         """:param words: The words of an attribute's name, in order.
 
         :return: The head *words* opens with and also says something about, or ``None`` when it
@@ -77,7 +76,7 @@ class SpelledOutHead(StrEnum):
         return next((head for head in cls if head == words[0]), None)
 
     @property
-    def predicate_type(self) -> Type[BooleanPredicate]:
+    def predicate_type(self) -> type[BooleanPredicate]:
         """
         The predicate whose head this word spells.
         """
@@ -149,7 +148,7 @@ def boolean_predicate_clause(
     """
     head = replace(predicate.head(), negated=negated, number=number)
     predicate_object = predicate.predicate_object(attribute)
-    constituents: List[ClauseConstituent] = [subject, head]
+    constituents: list[ClauseConstituent] = [subject, head]
     if predicate_object is not None:
         constituents.append(predicate_object)
     return clause(*constituents)
@@ -186,7 +185,7 @@ def boolean_alternative_clause(
             Conjunctions.OR,
             Logicals.NOT,
         )
-    constituents: List[ClauseConstituent] = [subject, Logicals.EITHER, head]
+    constituents: list[ClauseConstituent] = [subject, Logicals.EITHER, head]
     if predicate_object is not None:
         constituents.append(predicate_object)
     constituents += [Conjunctions.OR, Logicals.NOT]

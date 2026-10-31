@@ -4,11 +4,9 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile, DurabilityPolicy
-from typing_extensions import List
 from visualization_msgs.msg import MarkerArray
 
 from semantic_digital_twin.adapters.ros.msg_converter import SemDTToRos2Converter
@@ -50,8 +48,8 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
     """
     Publishes the world model as a visualization marker.
 
-    Markers are stamped with the frame names the world's tf publisher hands out, so
-    equally named bodies are told apart the same way in both.
+    Markers are stamped with, and namespaced by, the frame names the world's tf
+    publisher hands out, so equally named bodies are told apart the same way in both.
     .. warning:: Relies on the tf tree to correctly position the markers.
     .. warning:: To see something in Rviz you must:
         1. add a MarkerArray plugin,
@@ -92,7 +90,7 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
     )
     """QoS profile for the publisher."""
 
-    tf_publisher: Optional[TFPublisher] = field(default=None, kw_only=True)
+    tf_publisher: TFPublisher | None = field(default=None, kw_only=True)
     """
     The publisher of the tf tree the markers are positioned in.
 
@@ -100,14 +98,14 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
     started here while nothing does.
     """
 
-    _collision_publisher: Optional[CollisionVisualizationMarkerPublisher] = field(
+    _collision_publisher: CollisionVisualizationMarkerPublisher | None = field(
         init=False, default=None
     )
     """
     Reference to a collision marker publisher created by this class.
     """
 
-    _started_tf_publisher: Optional[TFPublisher] = field(init=False, default=None)
+    _started_tf_publisher: TFPublisher | None = field(init=False, default=None)
     """
     The tf publisher started here, which is therefore stopped here as well.
 
@@ -189,12 +187,12 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
         frame_names = self.tf_publisher.tf_model_callback.frame_names
         for body in self._world.bodies:
             shapes = self._select_shapes(body)
-            self._add_markers_for_shapes(shapes, str(body.name), frame_names)
+            self._add_markers_for_shapes(shapes, frame_names.assign(body), frame_names)
 
         for region in self._world.regions:
             self._add_markers_for_shapes(
                 region.area.shapes,
-                str(region.name),
+                frame_names.assign(region),
                 frame_names,
                 force_alpha=self.region_alpha,
             )
@@ -203,10 +201,10 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
 
     def _add_markers_for_shapes(
         self,
-        shapes: List[Shape],
+        shapes: list[Shape],
         marker_ns: str,
         frame_names: TfFrameNames,
-        force_alpha: Optional[float] = None,
+        force_alpha: float | None = None,
     ):
         if not shapes:
             return

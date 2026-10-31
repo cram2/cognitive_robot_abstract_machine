@@ -7,7 +7,6 @@ from __future__ import annotations
 import sys
 
 import pytest
-from typing_extensions import List
 
 from cognitive_robot_abstract_machine.exceptions import (
     MissingORMBuildChoiceError,
@@ -39,14 +38,14 @@ The option cut short, the way argparse lets a run abbreviate a long option.
 
 
 @pytest.fixture()
-def recorded_builds(monkeypatch) -> List[str]:
+def recorded_builds(monkeypatch) -> list[str]:
     """
     Replace the real build with a recorder, so the guard can be exercised without paying
     for a whole regeneration.
 
     :return: The list every build appends to.
     """
-    builds: List[str] = []
+    builds: list[str] = []
     monkeypatch.setattr(
         WORKSPACE_ORM_INTERFACES, "regenerate", lambda: builds.append("built")
     )

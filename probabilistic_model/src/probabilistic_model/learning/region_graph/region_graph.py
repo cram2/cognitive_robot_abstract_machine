@@ -6,7 +6,7 @@ import numpy as np
 from jax.experimental.sparse import BCOO
 from random_events.variable import Continuous, Symbolic
 from sortedcontainers import SortedSet
-from typing_extensions import List, Self, Type, Iterable, Union
+from typing_extensions import Self, Type, Iterable
 
 from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
     DifferentiableProductLayer,
@@ -44,7 +44,7 @@ class Region:
     def __hash__(self) -> int:
         return id(self)
 
-    def random_partition(self, k=2) -> List[Self]:
+    def random_partition(self, k=2) -> list[Self]:
         indices = np.arange(len(self.variables))
         np.random.shuffle(indices)
         partitions = [
@@ -187,7 +187,7 @@ class RegionGraph(nx.DiGraph):
 
     def as_probabilistic_circuit(
         self, input_units: int = 5, sum_units: int = 5, key=jax.random.PRNGKey(69)
-    ) -> Union[DifferentiableLayeredCircuit, ClassificationCircuit]:
+    ) -> DifferentiableLayeredCircuit | ClassificationCircuit:
         """
         Convert the region graph to a jax probabilistic circuit.
 

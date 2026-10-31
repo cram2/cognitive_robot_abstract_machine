@@ -1,11 +1,9 @@
 from dataclasses import dataclass
 
 import pytest
-from typing_extensions import Tuple
 
 from krrood.entity_query_language.factories import (
     entity,
-    flat_variable,
     set_of,
     variable,
     the,
@@ -17,7 +15,6 @@ from krrood.entity_query_language.exceptions import (
     CalledMatchMultipleTimes,
     PositionalArgumentsInMatchPattern,
     MatchTypeCannotBeDetermined,
-    ReadOnlyMapping,
     SymbolicDunderAccessError,
 )
 from krrood.entity_query_language.predicate import HasType
@@ -27,13 +24,11 @@ from krrood.entity_query_language.core.mapped_variable import (
 )
 from krrood.entity_query_language.operators.arithmetic import ArithmeticOperation
 from krrood.entity_query_language.operators.comparator import Comparator
-from krrood.entity_query_language.query.match import AttributeMatch, Match
+from krrood.entity_query_language.query.match import Match
 from krrood.entity_query_language.query.query_modifiers import HasQueryModifiers
 from krrood.entity_query_language.core.base_expressions import UnificationDict
 from ..dataset.example_classes import KRROODPositions, KRROODPosition
 from ..dataset.semantic_world_like_classes import (
-    Cabinet,
-    Drawer,
     FixedConnection,
     Container,
     Handle,
@@ -400,6 +395,34 @@ def test_has_ellipsis_attributes_true_for_ellipsis_element_in_plain_set():
     assert match._has_ellipsis_attributes_ is True
 
 
+# %% AttributeMatch.is_unspecified
+
+
+def test_is_unspecified_only_for_the_attribute_assigned_an_ellipsis():
+    match = a(KRROODPosition)(x=..., y=2, z=3)
+    match.resolve()
+
+    unspecified_attribute_names = [
+        attribute_match.attribute_name
+        for attribute_match in match._matches_with_variables_
+        if attribute_match.is_unspecified
+    ]
+    assert unspecified_attribute_names == ["x"]
+
+
+def test_is_unspecified_false_for_an_ellipsis_element_in_a_plain_list():
+    match = a(KRROODPositions)(
+        positions=[KRROODPosition(1, 2, 3)],
+        some_strings=["a", ..., "c"],
+    )
+    match.resolve()
+
+    assert not any(
+        attribute_match.is_unspecified
+        for attribute_match in match._matches_with_variables_
+    )
+
+
 # %% a match reads like a query
 
 
@@ -587,7 +610,7 @@ class SubscriptableRow:
     """
 
     name: str
-    cells: Tuple[int, ...]
+    cells: tuple[int, ...]
 
     def __getitem__(self, index: int) -> int:
         return self.cells[index]
@@ -690,24 +713,3 @@ def test_a_second_pattern_still_raises_when_the_matched_class_is_not_callable():
     match = a(KRROODPosition)(x=1.0)
     with pytest.raises(CalledMatchMultipleTimes):
         match(y=2.0)
-
-
-# %% writing an attribute value back into a match
-
-
-def test_writing_through_a_flattened_attribute_of_a_match_is_rejected():
-    """
-    A flattening reaches every element of a collection without naming one, so a match
-    whose attribute is reached through one has no single place to write the value.
-    """
-    drawer = Drawer(handle=Handle(name="Handle1"), container=Container(name="Drawer1"))
-    match = a(Cabinet)(container=Container(name="Container1"), drawers=[drawer])
-    attribute_match = AttributeMatch(
-        _parent_=match,
-        attribute_name="handle",
-        assigned_value=Handle(name="Handle9"),
-        _variable_=flat_variable(match._variable_.drawers).handle,
-    )
-
-    with pytest.raises(ReadOnlyMapping):
-        attribute_match._update_kwargs_from(match)

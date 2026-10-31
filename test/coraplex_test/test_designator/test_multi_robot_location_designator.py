@@ -3,22 +3,13 @@ from copy import deepcopy
 import numpy as np
 import pytest
 import rclpy
-from typing_extensions import Generator, Tuple
+from typing_extensions import Generator, List, Tuple
 
-from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
-from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
-    StretchMoveToolCenterPoint,
-    StretchMoveSim,
-    StretchMoveReal,
-    StretchClose,
-)
-from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
-from coraplex.datastructures.dataclasses import Context
 
 from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
 from semantic_digital_twin.spatial_types.spatial_types import Pose
-from coraplex.execution_environment import kinematically_simulated_robot
-from coraplex.plans.factories import sequential
+from cramph.composites import Parallel, Sequence, TryAll, TryInOrder
+from cramph.threaded_nodes import FunctionCall
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -39,17 +30,8 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.world import World
 
 from ...conftest import SAMPLING_SEED
-
-# The alternative motion mappings that should be available to the plans in this test module.
-# Resolution filters by robot type and execution type, so passing the full set is always safe.
-ALTERNATIVE_MOTION_MAPPINGS = [
-    HSRBMoveMotion,
-    StretchMoveToolCenterPoint,
-    StretchMoveSim,
-    StretchMoveReal,
-    StretchClose,
-    TiagoMoveSim,
-]
+from ...plan_running import context_of, robot_extensions, run_plan
+from cramph.context import ContextExtension
 
 
 @pytest.fixture(
@@ -126,19 +108,14 @@ def setup_multi_robot_simple_apartment(
 @pytest.fixture
 def multiple_robot_simple_apartment_context(
     setup_multi_robot_simple_apartment,
-) -> Generator[Tuple[World, AbstractRobot, Context]]:
+) -> Generator[tuple[World, AbstractRobot, list[ContextExtension]]]:
     """
-    The shared simple apartment world with one robot, the robot and a context for both,
-    returned to its initial model and state after the test.
+    The shared simple apartment world with one robot, the robot and the context
+    extensions of its plans, returned to its initial model and state after the test.
     """
     world, view = setup_multi_robot_simple_apartment
     snapshot = WorldSnapshot.capture(world)
-    yield world, view, Context(
-        world,
-        view,
-        alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS,
-        sampling_seed=SAMPLING_SEED,
-    )
+    yield world, view, robot_extensions(view)
     snapshot.restore()
 
 
@@ -162,24 +139,26 @@ def _assert_faces(pose: Pose, body) -> None:
 def test_new_reachability_location_body(
     multiple_robot_simple_apartment_context, rclpy_node
 ):
-    world, robot, context = multiple_robot_simple_apartment_context
+    world, robot, extensions = multiple_robot_simple_apartment_context
 
-    plan = sequential(
-        [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
-        context,
+    plan = Sequence(
+        nodes=[
+            ParkArmsAction(arms=robot.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+        ]
     )
-    with kinematically_simulated_robot:
-        plan.perform()
+    run_plan(plan, extensions)
+    world.notify_state_change()
 
-        world.notify_state_change()
+    arm = right_or_only_arm(robot)
+    milk = world.get_body_by_name("milk.stl")
+    location = ReachabilityLocation(
+        Pose(reference_frame=milk),
+        arm,
+        context=context_of(extensions),
+    )
 
-        arm = right_or_only_arm(context.robot)
-        milk = world.get_body_by_name("milk.stl")
-        location = ReachabilityLocation(
-            Pose(reference_frame=milk), arm, context=context
-        )
-
-        pose = next(iter(location))
+    pose = next(iter(location))
 
     assert pose.reference_frame is world.root
     assert _floor_distance(pose, milk) <= float(arm.approximate_length())
@@ -187,44 +166,46 @@ def test_new_reachability_location_body(
 
 
 def test_visibility_location_pose(multiple_robot_simple_apartment_context):
-    world, robot, context = multiple_robot_simple_apartment_context
+    world, robot, extensions = multiple_robot_simple_apartment_context
 
-    plan = sequential(
-        [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
-        context,
+    plan = Sequence(
+        nodes=[
+            ParkArmsAction(arms=robot.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+        ]
     )
-    with kinematically_simulated_robot:
-        plan.perform()
+    run_plan(plan, extensions)
+    world.notify_state_change()
 
-        world.notify_state_change()
+    location = VisibilityLocation(
+        world.get_body_by_name("milk.stl").global_pose,
+        context=context_of(extensions),
+    )
 
-        location = VisibilityLocation(
-            world.get_body_by_name("milk.stl").global_pose, context=context
-        )
-
-        pose = next(iter(location))
+    pose = next(iter(location))
 
     assert pose.reference_frame is world.root
     _assert_faces(pose, world.get_body_by_name("milk.stl"))
 
 
 def test_visibility_location_body(multiple_robot_simple_apartment_context):
-    world, robot, context = multiple_robot_simple_apartment_context
+    world, robot, extensions = multiple_robot_simple_apartment_context
 
-    plan = sequential(
-        [ParkArmsAction(context.robot.all_arms), MoveTorsoAction(TorsoState.HIGH)],
-        context,
+    plan = Sequence(
+        nodes=[
+            ParkArmsAction(arms=robot.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+        ]
     )
-    with kinematically_simulated_robot:
-        plan.perform()
+    run_plan(plan, extensions)
+    world.notify_state_change()
 
-        world.notify_state_change()
+    location = VisibilityLocation(
+        Pose(reference_frame=world.get_body_by_name("milk.stl")),
+        context=context_of(extensions),
+    )
 
-        location = VisibilityLocation(
-            Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
-        )
-
-        pose = next(iter(location))
+    pose = next(iter(location))
 
     assert pose.reference_frame is world.root
     _assert_faces(pose, world.get_body_by_name("milk.stl"))

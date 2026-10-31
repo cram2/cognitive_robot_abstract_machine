@@ -61,7 +61,7 @@ jobs:
           node-version: '18'
 
       - name: Install Graphviz
-        if: ${{ inputs.lib == 'coraplex' || inputs.lib == 'probabilistic_model' || inputs.lib == 'random_events' || inputs.lib == 'krrood' || inputs.lib == 'semantic_digital_twin' }}
+        if: ${{ inputs.lib == 'coraplex' || inputs.lib == 'probabilistic_model' || inputs.lib == 'random_events' || inputs.lib == 'krrood' || inputs.lib == 'semantic_digital_twin' || inputs.lib == 'cramph' }}
         run: |
           sudo apt-get update
           sudo apt-get install graphviz libgraphviz-dev -y

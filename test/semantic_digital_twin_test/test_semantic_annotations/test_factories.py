@@ -1,6 +1,5 @@
 import unittest
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pytest
@@ -100,7 +99,7 @@ class TestFactories(unittest.TestCase):
             returned_handle = Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.1, 0.2, 0.03), thickness=0.03
+                    scale=Scale(0.1, 0.03, 0.2), thickness=0.03
                 ),
             ).spawn(world)
         semantic_handle_annotations = world.get_semantic_annotations_by_type(Handle)
@@ -1197,11 +1196,11 @@ class _AnnotationWithOverlappingPartWholeRelationshipFields(
     both.
     """
 
-    door: Optional[Door] = field(
+    door: Door | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
-    typed_door: Optional[DoorWithType] = field(
+    typed_door: DoorWithType | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )

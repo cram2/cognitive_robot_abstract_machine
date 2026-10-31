@@ -36,6 +36,7 @@ from .test_adapters.test_mjcf import VISUAL_ONLY_GEOM_SCENE
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
+    HandleWiderThanLong,
     InvalidPlaneDimensions,
     MergedRobotAnnotationNotFound,
     MissingConnectionAxisError,
@@ -1217,6 +1218,13 @@ def test_default_spec_matches_handle_without_explicit_scale(empty_world):
     _assert_same_geometry(spec_body.collision, factory.root.collision)
 
 
+def test_default_spec_handle_rejects_width_above_length():
+    with pytest.raises(HandleWiderThanLong):
+        Handle.get_default_root_kinematic_structure_entity_specification(
+            "handle", Scale(x=0.068, y=0.5, z=0.015)
+        )
+
+
 def test_default_spec_matches_door(empty_world):
     scale = Scale(0.03, 1, 2)
     with empty_world.modify_world():
@@ -1746,8 +1754,12 @@ def _factory_overrides():
         for method_name, method in vars(annotation_type).items():
             if not method_name.startswith("create_with_new_"):
                 continue
-            yield annotation_type, method_name, inspect.signature(
-                method.__func__ if isinstance(method, classmethod) else method
+            yield (
+                annotation_type,
+                method_name,
+                inspect.signature(
+                    method.__func__ if isinstance(method, classmethod) else method
+                ),
             )
 
 
@@ -1877,7 +1889,9 @@ def test_entry_way_is_coextensive_with_the_door_leaf(empty_world):
 def test_entry_way_geometry_is_translucent_white(empty_world):
     with empty_world.modify_world():
         door = Door.create_with_new_body_in_world(name="door", world=empty_world)
-    assert door.entry_way.root.area[0].color == Color(R=1.0, G=1.0, B=1.0, A=0.2)
+    assert door.entry_way.root.area[0].color == Color.from_rgba(
+        red=1.0, green=1.0, blue=1.0, opacity=0.2
+    )
 
 
 def test_entry_way_is_named_after_the_door(empty_world):

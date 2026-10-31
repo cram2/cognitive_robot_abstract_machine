@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import os
 import sys
-from typing import Optional
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
@@ -17,7 +16,7 @@ class GUIFactory:
     Factory for creating and starting the Probabilistic Model GUI.
     """
 
-    model: Optional[ProbabilisticModel] = None
+    model: ProbabilisticModel | None = None
     """
     The probabilistic model to display.
     """

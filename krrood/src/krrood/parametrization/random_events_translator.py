@@ -4,7 +4,7 @@ import itertools
 import operator
 from dataclasses import dataclass
 from functools import cached_property
-from typing import assert_never, Dict, TYPE_CHECKING
+from typing_extensions import assert_never, TYPE_CHECKING
 
 import numpy as np
 
@@ -53,7 +53,7 @@ class WhereExpressionToRandomEventTranslator:
     """
 
     @cached_property
-    def variables(self) -> Dict[MappedVariable, random_events.variable.Variable]:
+    def variables(self) -> dict[MappedVariable, random_events.variable.Variable]:
         result = {}
         if self.conditions_root is None:
             return result

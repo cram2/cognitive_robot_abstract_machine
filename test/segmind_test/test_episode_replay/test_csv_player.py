@@ -3,8 +3,9 @@ import time
 from pathlib import Path
 import pytest
 import segmind
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from segmind.episode_segmenter import EpisodeSegmenterExecutor
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+from segmind.episode_segmenter import EpisodeSceneLoader, EpisodeSegmentation
 from segmind.players.csv_player import CSVEpisodePlayer
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -30,14 +31,13 @@ def test_csv_player_context():
         time_between_frames=datetime.timedelta(milliseconds=1),
         position_shift=Vector3(0, 0, 0),
     )
-    context = MotionStatechartContext(world=world)
-    episode_executor = EpisodeSegmenterExecutor(
-        context=context,
-        player=file_player,
-        ignored_objects=["iCub"],
-        fixed_objects=["scene"],
+    context = StatechartContext(world=world)
+    episode_executor = StatechartExecutor(
+        context=context, extensions=[EpisodeSegmentation(player=file_player)]
     )
-    episode_executor.spawn_scene(
+    EpisodeSceneLoader(
+        world=world, ignored_objects=["iCub"], fixed_objects=["scene"]
+    ).spawn_scene(
         models_dir=f"{multiverse_episodes_dir}/icub_montessori_no_hands/models/",
         file_resolver=FileUriResolver(),
     )

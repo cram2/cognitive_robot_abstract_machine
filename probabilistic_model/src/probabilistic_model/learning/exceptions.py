@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from random_events.variable import Variable
 from typing_extensions import TYPE_CHECKING
 
-from krrood.exceptions import DataclassException
+from probabilistic_model.exceptions import ProbabilisticModelException
 
 if TYPE_CHECKING:
     from probabilistic_model.probabilistic_model import ProbabilisticModel
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 # %% exceptions
 @dataclass
-class UnsupportedLeafDistributionError(DataclassException, TypeError):
+class UnsupportedLeafDistributionError(ProbabilisticModelException, TypeError):
     """
     Exception raised when a leaf distribution cannot be learned from weighted rows.
     """
@@ -39,7 +39,7 @@ class UnsupportedLeafDistributionError(DataclassException, TypeError):
 
 
 @dataclass
-class StartingCircuitVariablesMismatchError(DataclassException, ValueError):
+class StartingCircuitVariablesMismatchError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a fit is given other variables than those of the circuit it
     starts from.

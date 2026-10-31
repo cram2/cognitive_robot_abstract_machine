@@ -1,44 +1,24 @@
 from __future__ import annotations
 
-import abc
-from abc import ABC
 from dataclasses import field
-from typing_extensions import List, Optional
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import ObservationStateValues
+from krrood.ormatic.utils import classproperty
+from cramph.node import EndedByOwner
+from cramph.context import ContextExtension
+from giskardpy.motion_statechart.context import MotionControlContext
 from giskardpy.motion_statechart.exceptions import EmptyDegreesOfFreedomError
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
-    NodeArtifacts,
     velocity_convergence_expression,
 )
+from cramph.node import NodeArtifacts
 from giskardpy.utils.decorators import dataclass
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 
-@dataclass
-class ThreadedPayloadMonitor(MotionStatechartNode, ABC):
-    """
-    A monitor which executes its __call__ function when start_condition becomes True.
-
-    Subclass this and implement __init__.py and __call__. The __call__ method should
-    change self.state to True when it's done. Calls __call__ in a separate thread. Use
-    for expensive operations
-    """
-
-    state: ObservationStateValues = field(
-        init=False, default=ObservationStateValues.UNKNOWN
-    )
-
-    @abc.abstractmethod
-    def __call__(self):
-        pass
-
-
-@dataclass(repr=False, eq=False)
-class LocalMinimumReached(MotionStatechartNode):
+@dataclass(repr=False, eq=False, kw_only=True)
+class LocalMinimumReached(EndedByOwner, MotionStatechartNode):
     """
     Checks if the robot has reached a local minimum in the trajectory, by checking if
     all velocities are below a degree of freedoms' max velocity
@@ -66,7 +46,7 @@ class LocalMinimumReached(MotionStatechartNode):
     Windows size for joint convergence check.
     """
 
-    degrees_of_freedom: Optional[List[DegreeOfFreedom]] = None
+    degrees_of_freedom: list[DegreeOfFreedom] | None = None
     """
     Degrees of freedom to check for convergence.
 
@@ -85,12 +65,12 @@ class LocalMinimumReached(MotionStatechartNode):
     of from the start of the whole motion chart.
 
     Set this when the monitor is wrapped around one specific, possibly late-starting
-    motion (e.g. via :class:`~giskardpy.motion_statechart.goals.templates.Parallel`)
+    motion (e.g. via :class:`~cramph.composites.Parallel`)
     -- otherwise ``minimum_time`` could already be satisfied by cycles the chart spent
     on earlier, unrelated motions, before this one ever started.
     """
 
-    _start_cycle_variable: Optional[FloatVariable] = field(
+    _start_cycle_variable: FloatVariable | None = field(
         init=False, default=None, repr=False
     )
     """
@@ -98,22 +78,35 @@ class LocalMinimumReached(MotionStatechartNode):
     ``on_start`` when :attr:`measure_from_own_start` is True.
     """
 
-    def on_start(self, context: MotionStatechartContext):
+    @classproperty
+    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
+        return super().required_context_extensions + (MotionControlContext,)
+
+    def on_start(self) -> None:
         if self.measure_from_own_start:
-            context.float_variable_data.set_value(
+            self.context.float_variable_data.set_value(
                 self._start_cycle_variable,
-                context.control_cycle_variable.evaluate()[0],
+                self.context.tick_variable.evaluate()[0],
             )
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        if self.degrees_of_freedom is not None and not self.degrees_of_freedom:
-            raise EmptyDegreesOfFreedomError(node=self)
+    def set_up(self) -> None:
+        """
+        Register the variable holding the tick this monitor started on, if it measures
+        from its own start.
+        """
+        super().set_up()
         if self.measure_from_own_start:
             self._start_cycle_variable = FloatVariable(f"{self.name}_start_cycle")
-            context.float_variable_data.register_expression(self._start_cycle_variable)
+            self.context.float_variable_data.register_expression(
+                self._start_cycle_variable
+            )
+
+    def build_artifacts(self) -> NodeArtifacts:
+        if self.degrees_of_freedom is not None and not self.degrees_of_freedom:
+            raise EmptyDegreesOfFreedomError(node=self)
         return NodeArtifacts(
             observation=velocity_convergence_expression(
-                context=context,
+                context=self.context,
                 joint_convergence_threshold=self.joint_convergence_threshold,
                 minimum_threshold=self.minimum_threshold,
                 maximum_threshold=self.maximum_threshold,

@@ -23,7 +23,7 @@ from semantic_digital_twin.world_description.geometry import (
 from semantic_digital_twin.world_description.geometry import (
     Sphere as SemDTSphere,
 )
-from typing_extensions import TYPE_CHECKING, Any, List, Optional, Sequence
+from typing_extensions import TYPE_CHECKING, Any, Sequence
 
 from robokudo.types.core import Annotation
 from robokudo.types.cv import BoundingBox3D, KeyPoint, Points3D
@@ -115,12 +115,12 @@ class Plane(Annotation):
     parameters and inlier points.
     """
 
-    model: List[float] = field(default_factory=list)
+    model: list[float] = field(default_factory=list)
     """
     4-dimensional plane equation parameters [a, b, c, d] for ax + by + cz + d = 0
     """
 
-    inliers: List[int] = field(default_factory=list)
+    inliers: list[int] = field(default_factory=list)
     """
     List of pointcloud indices that belong to this plane
     """
@@ -133,7 +133,7 @@ class Shape(Annotation):
     This class stores a SemDT geometry shape and inlier point indices.
     """
 
-    inliers: List[int] = field(default_factory=list)
+    inliers: list[int] = field(default_factory=list)
     """
     List of pointcloud indices that belong to this shape
     """
@@ -196,7 +196,7 @@ class ColorHistogram(Annotation):
     saturation information.
     """
 
-    hist: Optional[npt.NDArray] = None
+    hist: npt.NDArray | None = None
     """
     2D histogram array
     """
@@ -317,7 +317,7 @@ class TextAnnotation(Annotation):
 class SIFTAnnotation(Annotation):
     """SIFT feature annotation."""
 
-    keypoints: List[KeyPoint] = field(default_factory=list)
+    keypoints: list[KeyPoint] = field(default_factory=list)
     """The SIFT keypoints."""
 
     descriptors: Sequence[npt.NDArray[np.float32]] = field(default_factory=list)
@@ -333,7 +333,7 @@ class SIFTAnnotation(Annotation):
             keypoints=[KeyPoint.from_cv(k) for k in keypoints], descriptors=descriptors
         )
 
-    def cv2_keypoints(self) -> List[cv2.KeyPoint]:
+    def cv2_keypoints(self) -> list[cv2.KeyPoint]:
         return [KeyPoint.to_cv(k) for k in self.keypoints]
 
 
@@ -341,10 +341,10 @@ class SIFTAnnotation(Annotation):
 class TSDFAnnotation(Annotation):
     """A TSDF Volume annotation."""
 
-    volume: Optional[o3d.pipelines.integration.ScalableTSDFVolume] = None
+    volume: o3d.pipelines.integration.ScalableTSDFVolume | None = None
     """The Open3D TSDF Volume object."""
 
-    transform: Optional[npt.NDArray[np.float64]] = None
+    transform: npt.NDArray[np.float64] | None = None
     """The transform from the reference frame to the object frame."""
 
     def get_coordinate_frame(self) -> o3d.geometry.TriangleMesh:

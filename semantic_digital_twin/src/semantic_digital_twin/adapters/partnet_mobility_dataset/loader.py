@@ -8,7 +8,6 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import jinja2
-from typing_extensions import List
 
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
@@ -199,7 +198,7 @@ class PartNetMobilityDatasetLoader:
         return label
 
     @property
-    def available_model_ids(self) -> List[int]:
+    def available_model_ids(self) -> list[int]:
         """
         :return: A list of all downloaded models ids.
         """

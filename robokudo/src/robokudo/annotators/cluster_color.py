@@ -20,7 +20,7 @@ import numba
 import numpy as np
 import numpy.ma
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Dict, List, Tuple, Type
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -98,7 +98,7 @@ class ClusterColorAnnotator(BaseAnnotator):
                 self.max_value_black: int = 60
                 self.min_value_white: int = 120
                 self.ratio_annotation_threshold: float = 0.2
-                self.analysis_scope: Type = AnalyzableAnnotation
+                self.analysis_scope: type = AnalyzableAnnotation
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -106,7 +106,7 @@ class ClusterColorAnnotator(BaseAnnotator):
     # To easily define this, we use RGB here and then flip it. OpenCV in python uses BGR per default.
     # Please note, that this color will not be used for the segmentation!
     # The segmentation is mainly done with self.color_hue_positions
-    color_name_to_bgr_values: Dict[Color, Tuple[int, ...]] = {
+    color_name_to_bgr_values: dict[Color, tuple[int, ...]] = {
         Color.RED: tuple(reversed((255, 0, 0))),
         Color.YELLOW: tuple(reversed((255, 255, 0))),
         Color.GREEN: tuple(reversed((0, 255, 0))),
@@ -150,8 +150,8 @@ class ClusterColorAnnotator(BaseAnnotator):
             Color.MAGENTA: hue_intervals[5],
         }
 
-        self.cluster_color_info: List[List[Tuple[Color, int, float]]] = []
-        self.cluster_rois: List[Rect] = []
+        self.cluster_color_info: list[list[tuple[Color, int, float]]] = []
+        self.cluster_rois: list[Rect] = []
 
         # Trigger JIT by calling method first time with empty data
         if self.descriptor.parameters.jit_compile_on_init:
@@ -166,7 +166,7 @@ class ClusterColorAnnotator(BaseAnnotator):
 
     def count_colors_numba(
         self, hsv_image: npt.NDArray, mask: npt.NDArray
-    ) -> Tuple[int, Dict[Color, int]]:
+    ) -> tuple[int, dict[Color, int]]:
         """
         Wrapper function for the numba version of the count colors method.
 
@@ -208,7 +208,7 @@ class ClusterColorAnnotator(BaseAnnotator):
         min_value_white: int,
         number_of_colors: int,
         color_range: float,
-    ) -> Tuple[int, npt.NDArray]:
+    ) -> tuple[int, npt.NDArray]:
         """
         Iterate over the masked pixels on a given hsv image to count how many pixels can
         be assigned to the defined color ranges. Requires the numba library and passes
@@ -269,7 +269,7 @@ class ClusterColorAnnotator(BaseAnnotator):
 
     def count_colors(
         self, hsv_image: npt.NDArray, mask: npt.NDArray
-    ) -> Tuple[int, dict]:
+    ) -> tuple[int, dict]:
         """
         Non-numba version of the count_colors_numba_impl method.
 
@@ -292,7 +292,7 @@ class ClusterColorAnnotator(BaseAnnotator):
         # https://stackoverflow.com/questions/7662458/how-to-split-an-array-according-to-a-condition-in-numpy
         def split(
             arr: npt.NDArray, cond: npt.NDArray
-        ) -> Tuple[npt.NDArray, npt.NDArray]:
+        ) -> tuple[npt.NDArray, npt.NDArray]:
             return arr[cond], arr[~cond]
 
         # Input matrix

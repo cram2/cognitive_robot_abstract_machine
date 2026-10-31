@@ -35,7 +35,7 @@ class DetectorDefinedOutsideSegMind(AbstractDetector):
     A kind of detector some other package defines.
     """
 
-    def update_context_and_events(self, context, segmind_context, tracked_objects):
+    def update_context_and_events(self, segmind_context, tracked_objects):
         return []
 
 
@@ -166,7 +166,7 @@ class DetectorWatchingABodyBesideAnother(AbstractDetector):
     def get_required_detector_types(cls):
         return (ContactDetector,)
 
-    def update_context_and_events(self, context, segmind_context, tracked_objects):
+    def update_context_and_events(self, segmind_context, tracked_objects):
         return []
 
 

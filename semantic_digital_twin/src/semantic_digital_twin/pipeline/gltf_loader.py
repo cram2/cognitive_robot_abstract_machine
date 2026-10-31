@@ -1,6 +1,5 @@
 import logging
 from dataclasses import dataclass, field
-from typing import List, Tuple, Dict, Set, Optional
 import re
 
 import numpy as np
@@ -26,12 +25,12 @@ class NodeProcessingResult:
     body: Body
     """The Body object created from the node's geometry."""
 
-    visited_nodes: Set[str]
+    visited_nodes: set[str]
     """
     Set of node names that were visited during processing.
     """
 
-    children_to_visit: Set[str]
+    children_to_visit: set[str]
     """Set of child node names that need to be processed next."""
 
 
@@ -55,7 +54,7 @@ class GLTFLoader(Step):
     Maximum iterations for grouping similar meshes.
     """
 
-    scene: Optional[trimesh.Scene] = field(default=None, init=False)
+    scene: trimesh.Scene | None = field(default=None, init=False)
     """
     The loaded trimesh Scene.
     """
@@ -121,8 +120,8 @@ class GLTFLoader(Step):
         return match.group(1) if match else node_name
 
     def _collect_matching_children(
-        self, node: str, base_name: str, object_nodes: Set[str]
-    ) -> Tuple[Set[str], Set[str]]:
+        self, node: str, base_name: str, object_nodes: set[str]
+    ) -> tuple[set[str], set[str]]:
         """
         Find child nodes sharing the same base name.
         """
@@ -137,7 +136,7 @@ class GLTFLoader(Step):
                 non_matching.add(child)
         return matching, non_matching
 
-    def _grouping_similar_meshes(self, base_node: str) -> Tuple[Set[str], Set[str]]:
+    def _grouping_similar_meshes(self, base_node: str) -> tuple[set[str], set[str]]:
         """
         Identify related mesh nodes based on their naming patterns.
         """
@@ -165,11 +164,11 @@ class GLTFLoader(Step):
 
         return object_nodes, new_object_nodes
 
-    def _fusion_meshes(self, object_nodes: Set[str]) -> trimesh.Trimesh:
+    def _fusion_meshes(self, object_nodes: set[str]) -> trimesh.Trimesh:
         """
         Combine several geometry nodes into one unified mesh.
         """
-        meshes: List[trimesh.Trimesh] = []
+        meshes: list[trimesh.Trimesh] = []
         for node in object_nodes:
             transform, geometry_name = self.scene.graph.get(node)
             if geometry_name is None:
@@ -189,7 +188,7 @@ class GLTFLoader(Step):
         world: World,
         parent_node: str,
         child_node: str,
-        world_elements: Dict[str, Body],
+        world_elements: dict[str, Body],
     ) -> None:
         """
         Establish a fixed relationship between two bodies in the world.
@@ -210,8 +209,8 @@ class GLTFLoader(Step):
 
     def _build_world_from_elements(
         self,
-        world_elements: Dict[str, Body],
-        connection: Dict[str, List[str]],
+        world_elements: dict[str, Body],
+        connection: dict[str, list[str]],
         world: World,
     ) -> World:
         """
@@ -256,8 +255,8 @@ class GLTFLoader(Step):
         return Body(name=PrefixedName(name))
 
     def _process_node(
-        self, node: str, body_parent: str, visited_nodes: Set[str]
-    ) -> Tuple[Optional[NodeProcessingResult], Set[Tuple[str, str]]]:
+        self, node: str, body_parent: str, visited_nodes: set[str]
+    ) -> tuple[NodeProcessingResult | None, set[tuple[str, str]]]:
         """
         Analyze a scene node and convert it to a body if it contains geometry.
         """
@@ -290,7 +289,7 @@ class GLTFLoader(Step):
 
     def _process_root_node(
         self, root: str
-    ) -> Tuple[Body, Set[str], Set[Tuple[str, str]]]:
+    ) -> tuple[Body, set[str], set[tuple[str, str]]]:
         """
         Initial processing of the scene's root node.
         """
@@ -306,8 +305,8 @@ class GLTFLoader(Step):
 
     def _add_body_to_world_elements(
         self,
-        world_elements: Dict[str, Body],
-        base_name_to_node: Dict[str, str],
+        world_elements: dict[str, Body],
+        base_name_to_node: dict[str, str],
         node: str,
         body: Body,
     ) -> None:
@@ -338,10 +337,10 @@ class GLTFLoader(Step):
         Traverse the scene graph and populate the world with objects.
         """
         root = self._get_root_node()
-        world_elements: Dict[str, Body] = {}
-        base_name_to_node: Dict[str, str] = {}
-        connection: Dict[str, List[str]] = {}
-        visited_nodes: Set[str] = set()
+        world_elements: dict[str, Body] = {}
+        base_name_to_node: dict[str, str] = {}
+        connection: dict[str, list[str]] = {}
+        visited_nodes: set[str] = set()
 
         # Process root
         root_body, root_visited, to_visit_new_node = self._process_root_node(root)

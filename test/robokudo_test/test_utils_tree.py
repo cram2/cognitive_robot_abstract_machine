@@ -1,4 +1,4 @@
-from typing import Any
+from typing_extensions import Any
 
 import py_trees
 import pytest

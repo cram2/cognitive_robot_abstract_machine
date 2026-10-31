@@ -5,7 +5,7 @@ Conditional EQL operator constructs.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing_extensions import Any, List
 
 from krrood.entity_query_language.core.base_expressions import (
     Selectable,
@@ -38,7 +38,7 @@ class CaseWhen(Selectable):
     The value returned if the condition is true.
     """
 
-    else_value: Optional[SymbolicExpression] = None
+    else_value: SymbolicExpression | None = None
     """
     The value returned if the condition is false.
 

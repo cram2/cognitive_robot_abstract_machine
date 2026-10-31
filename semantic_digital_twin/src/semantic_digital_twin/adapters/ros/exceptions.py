@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Type
 
 from krrood.exceptions import DataclassException
 
@@ -19,7 +18,7 @@ class CannotConvertSemDTToRos2Error(ROS2ConversionError):
     Raised when a semDT object cannot be converted to a ROS2 message.
     """
 
-    data_type: Type = field(kw_only=True)
+    data_type: type = field(kw_only=True)
     """
     The type of the object that could not be converted.
     """
@@ -37,7 +36,7 @@ class CannotConvertRos2ToSemDTError(ROS2ConversionError):
     Raised when a ROS2 message cannot be converted to a semDT object.
     """
 
-    data_type: Type = field(kw_only=True)
+    data_type: type = field(kw_only=True)
     """
     The type of the message that could not be converted.
     """

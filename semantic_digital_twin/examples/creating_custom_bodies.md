@@ -49,7 +49,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere, Cylinder, Mesh, Color
 
 box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=0, y=0, z=0, roll=0, pitch=0, yaw=0)
-box = Box(origin=box_origin, scale=Scale(1., 1., 0.5), color=Color(1., 0., 0., 1., ))
+box = Box(origin=box_origin, scale=Scale(1., 1., 0.5), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1., ))
 
 sphere_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(pos_x=0, pos_y=1., pos_z=1., quat_x=0., quat_y=0., quat_z=0.,
                                                    quat_w=1.)

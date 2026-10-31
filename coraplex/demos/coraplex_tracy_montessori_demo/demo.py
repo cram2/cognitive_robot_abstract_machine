@@ -17,12 +17,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.plans.factories import sequential
-from coraplex.plans.plan import Plan
+from coraplex.plans.context_extensions import RobotAccess
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+from cramph.composites import Sequence
+from cramph.context import StatechartContext
+from cramph.statechart import Statechart
 from montessori_board import HoleShape, ShapeSortingBoard
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import StaticJointState
@@ -136,7 +137,8 @@ class SolidContact:
     How the solid bodies of the scene push back once something touches them.
 
     The wooden pieces, the board and the robot are solid, so nothing may sink into them;
-    MuJoCo's soft defaults let a firmly held piece sink several millimetres into the pads.
+    MuJoCo's soft defaults let a firmly held piece sink several millimetres into the
+    pads.
     """
 
     stiffness: ContactStiffness = field(
@@ -184,8 +186,9 @@ class PieceGrip:
 
     def grasp_height(self, gripper: HasTwoFingers) -> float:
         """
-        A grasp is aimed at where the closed fingers meet. The pads reach further along
-        the gripper than that point: open, they end at the tool frame, as on Tracy's
+        A grasp is aimed at where the closed fingers meet.
+
+        The pads reach further along the gripper than that point: open, they end at the tool frame, as on Tracy's
         Robotiq gripper, and closing carries them
         :attr:`~semantic_digital_twin.robots.robot_part_mixins.HasTwoFingers.travel_when_closing`
         further. Gripped this high, the closed pads stay :attr:`closed_pad_clearance`
@@ -218,9 +221,11 @@ class MontessoriScene:
 
     table_top_z: float = 0.88
     """
-    Height of the work surface of the table Tracy is bolted to, which every piece and the
-    board rest on. It is the top of the table's own collision slab, read off the robot's
-    description rather than guessed.
+    Height of the work surface of the table Tracy is bolted to, which every piece and
+    the board rest on.
+
+    It is the top of the table's own collision slab, read off the robot's description
+    rather than guessed.
     """
 
     board_x: float = 0.85
@@ -248,8 +253,8 @@ class MontessoriScene:
 
     piece_row_spacing: float = 0.1
     """
-    How far apart the loose pieces stand, so reaching for one does not sweep the arm into
-    its neighbour.
+    How far apart the loose pieces stand, so reaching for one does not sweep the arm
+    into its neighbour.
     """
 
     resting_clearance: float = 0.001
@@ -305,8 +310,8 @@ class MontessoriScene:
         parked and its body as solid as the pieces it holds, and stand the board and the
         pieces in it.
 
-        A contact is as soft as the softer of the two shapes in it, so a solid piece held
-        between soft pads would still sink into them.
+        A contact is as soft as the softer of the two shapes in it, so a solid piece
+        held between soft pads would still sink into them.
 
         :return: The world.
         """
@@ -418,8 +423,8 @@ class MontessoriScene:
 @dataclass
 class ShapeSortingPlan:
     """
-    The plan that picks every piece of a scene up in turn and lets it go over the hole it
-    fits through.
+    The plan that picks every piece of a scene up in turn and lets it go over the hole
+    it fits through.
     """
 
     scene: MontessoriScene
@@ -433,24 +438,29 @@ class ShapeSortingPlan:
     than being pushed against the lid.
     """
 
-    def build(self, context: Context) -> Plan:
+    def build(self, context: StatechartContext) -> Statechart:
         """
-        The plan begins by parking the arms: a simulated Tracy starts parked already, the
-        real one wherever it was left.
+        The plan begins by parking the arms: a simulated Tracy starts parked already,
+        the real one wherever it was left.
 
-        :param context: The context the actions are built in.
-        :return: The plan that sorts the pieces.
+        :param context: The context of the executor that performs the plan.
+        :return: The statechart that sorts the pieces.
         """
-        robot = context.robot
-        actions = [ParkArmsAction(robot.all_arms)]
+        robot = context.require_extension(RobotAccess).robot
+        actions = [ParkArmsAction(arms=robot.all_arms)]
         for piece, hole in self.scene.holes_of_pieces.items():
             [grasp] = piece.grasp_candidates()
-            actions.append(PickUpAction(grasp, self.scene.sorting_arm(robot)))
+            actions.append(PickUpAction(grasp=grasp, arm=self.scene.sorting_arm(robot)))
             actions.append(
-                PlaceAction(piece, self.release_pose_over(hole, context.world))
+                PlaceAction(
+                    object_designator=piece,
+                    target_location=self.release_pose_over(hole, context.world),
+                )
             )
-        actions.append(ParkArmsAction(robot.all_arms))
-        return sequential(actions, context=context).plan
+        actions.append(ParkArmsAction(arms=robot.all_arms))
+        statechart = Statechart(context=context)
+        statechart.add_node(Sequence(nodes=actions))
+        return statechart
 
     def release_pose_over(self, hole: HoleShape, world: World) -> Pose:
         """

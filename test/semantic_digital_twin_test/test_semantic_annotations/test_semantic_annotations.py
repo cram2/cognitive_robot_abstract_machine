@@ -1,50 +1,43 @@
 import logging
 
-import numpy as np
-from numpy.ma.testutils import (
-    assert_equal,
-)  # You could replace this with numpy's regular assert for better compatibility
-
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.explanation.explanation import explain_inference
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
-from krrood.entity_query_language.verbalization.rendering.renderer import (
-    HierarchicalRenderer,
-)
 from krrood.entity_query_language.verbalization.pipeline import (
     verbalize_expression,
     VerbalizationPipeline,
+)
+from krrood.entity_query_language.verbalization.rendering.renderer import (
+    HierarchicalRenderer,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.predefined_maps.kitchen_environment import (
+    KitchenEnvironment,
+)
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Drawer,
-    Wardrobe,
     Door,
 )
 from semantic_digital_twin.testing import *
-from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
-from semantic_digital_twin.world_description.shape_collection import (
-    BoundingBoxCollection,
-)
-from semantic_digital_twin.predefined_maps.kitchen_environment import (
-    KitchenEnvironment,
-)
 from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     RevoluteConnection,
 )
+from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-from typing_extensions import Self
 
 try:
     from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
@@ -68,12 +61,12 @@ class TestSemanticAnnotation(SemanticAnnotation):
 
     _private_entity: Optional[KinematicStructureEntity] = None
     public_entity: Optional[KinematicStructureEntity] = None
-    _private_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
-    public_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
+    _private_entity_list: list[KinematicStructureEntity] = field(default_factory=list)
+    public_entity_list: list[KinematicStructureEntity] = field(default_factory=list)
     _private_annotation: Optional[SemanticAnnotation] = None
     public_annotation: Optional[SemanticAnnotation] = None
-    _private_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
-    public_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
+    _private_annotation_list: list[SemanticAnnotation] = field(default_factory=list)
+    public_annotation_list: list[SemanticAnnotation] = field(default_factory=list)
 
 
 def test_aggregate_bodies(kitchen_world):
@@ -397,7 +390,7 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
         def setup_hardware_interfaces(self):
             pass
 
-        def setup_joint_states(self) -> List[JointState]:
+        def setup_joint_states(self) -> list[JointState]:
             return []
 
         @classmethod

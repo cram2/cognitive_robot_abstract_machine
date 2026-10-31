@@ -1,8 +1,7 @@
-from typing import Dict, Any
+from typing_extensions import Self, Any
 
 from jaxtyping import Array
 
-from typing_extensions import Self
 
 import jax
 from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
@@ -45,7 +44,7 @@ class DifferentiableDiscreteLayer(DifferentiableInputLayer):
     def log_likelihood_of_nodes_of_value(self, value: Array) -> Array:
         return self.normalized_log_probabilities[:, value.astype(int)][:, 0]
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {
             **super().to_json(),
             "variable": self.variable,
@@ -53,5 +52,5 @@ class DifferentiableDiscreteLayer(DifferentiableInputLayer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(data["variable"], jnp.array(data["log_probabilities"]))

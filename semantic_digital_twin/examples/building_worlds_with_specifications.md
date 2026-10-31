@@ -101,7 +101,7 @@ world = World.create_with_root_body()
 table_top = BodySpecification.box(
     name="table_top", 
     scale=Scale(1.2, 0.8, 0.05), 
-    color=Color(0.6, 0.4, 0.2, 1.0)
+    color=Color.from_rgba(red=0.6, green=0.4, blue=0.2, opacity=1.0)
 ).spawn(world)
 
 assert table_top.name.name == "table_top"

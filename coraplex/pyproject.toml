@@ -34,13 +34,13 @@ dependencies = [
     "numpy",
     "objgraph",
     "pint>=0.21.1",
-    "transforms3d",
     "python-box",
     "rustworkx",
     "pillow",
     "polytope",
     "semantic_digital_twin",
     "trimesh",
+    "cramph",
     "giskardpy",
     "krrood",
 ]
@@ -59,6 +59,7 @@ version = {attr = "coraplex._version.__version__"}
 
 [dependency-groups]
 workspace = [
+    "cramph",
     "giskardpy",
     "krrood",
     "probabilistic_model",

@@ -12,7 +12,7 @@ import pandas as pd
 from random_events.variable import Continuous, Integer, Symbolic
 from sklearn.base import clone
 from stepmix.stepmix import StepMix
-from typing_extensions import Any, Iterable, List, Optional, Union
+from typing_extensions import Any, Iterable
 
 from probabilistic_model.distributions.distributions import (
     DiscreteDistribution,
@@ -59,9 +59,10 @@ class StepMixModel(GaussianMixtureLearningMethod):
     )
     """
     The mixture to fit, by default started from the best of ten k-means runs, since a
-    single random start often ends in a poor local optimum. Its ``init_params`` is one
-    of :class:`InitializationMethod`. Each :meth:`fit` replaces it by a copy fitted
-    on the data.
+    single random start often ends in a poor local optimum.
+
+    Its ``init_params`` is one of :class:`InitializationMethod`. Each :meth:`fit`
+    replaces it by a copy fitted on the data.
     """
 
     covariance_type: CovarianceType = CovarianceType.FULL
@@ -76,14 +77,14 @@ class StepMixModel(GaussianMixtureLearningMethod):
 
     clipped_probability: float = 1e-12
     """
-    StepMix clips categorical probabilities to at least ``1e-15``; probabilities up
-    to this are read as zero.
+    StepMix clips categorical probabilities to at least ``1e-15``; probabilities up to
+    this are read as zero.
     """
 
     def fit(
         self,
         data: pd.DataFrame,
-        variables: Optional[Iterable[AnnotatedVariable]] = None,
+        variables: Iterable[AnnotatedVariable] | None = None,
     ) -> ProbabilisticCircuit:
         variables = self._variables(data, variables)
         continuous = [
@@ -137,8 +138,8 @@ class StepMixModel(GaussianMixtureLearningMethod):
 
     @staticmethod
     def _outcome_codes(
-        variable: Union[Symbolic, Integer], values: pd.Series
-    ) -> tuple[npt.NDArray, List[Any]]:
+        variable: Symbolic | Integer, values: pd.Series
+    ) -> tuple[npt.NDArray, list[Any]]:
         """
         :return: The code ``0, 1, ...`` of every row's outcome, which StepMix reads,
             and the key of each code in a distribution of the variable.
@@ -154,9 +155,9 @@ class StepMixModel(GaussianMixtureLearningMethod):
 
     def _distribution(
         self,
-        variable: Union[Symbolic, Integer],
+        variable: Symbolic | Integer,
         probabilities: npt.NDArray,
-        keys: List[Any],
+        keys: list[Any],
     ) -> DiscreteDistribution:
         """
         :param probabilities: One component's probability of each outcome code.
