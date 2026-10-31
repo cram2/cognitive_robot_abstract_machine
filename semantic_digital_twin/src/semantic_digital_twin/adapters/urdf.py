@@ -10,7 +10,7 @@ from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
     PathResolver,
 )
-from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
+from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NegativeConnectionVelocity,
@@ -219,7 +219,7 @@ class URDFParser(WorldModelParser):
             use_visual_as_collision_backup=use_visual_as_collision_backup,
         )
 
-    def parse(self) -> World:
+    def create_world(self) -> World:
         for joint in self.parsed.joints:
             if connection_type_map.get(joint.type) in (
                 RevoluteConnection,

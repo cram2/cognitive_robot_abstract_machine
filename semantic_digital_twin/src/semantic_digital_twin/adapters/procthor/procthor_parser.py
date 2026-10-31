@@ -43,6 +43,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_source import WorldSource
 
 
 @dataclass
@@ -563,7 +564,6 @@ class ProcthorObject:
             return None
 
         with body_world.modify_world():
-
             for child in self.object_dict.get("children", {}):
                 child_object = ProcthorObject(child, self.session)
                 world_T_child = child_object.world_T_obj
@@ -617,7 +617,7 @@ def unity_to_semantic_digital_twin_transform(
 
 
 @dataclass
-class ProcTHORParser:
+class ProcTHORParser(WorldSource):
     """
     Parses a Procthor JSON file into a semantic digital twin World.
     """
@@ -642,12 +642,10 @@ class ProcTHORParser:
             name=Path(file_path).stem, house=json.load(open(file_path)), session=session
         )
 
-    def parse(self) -> World:
+    def create_world(self) -> World:
         """
-        Parses a JSON file from procthor into a world.
-        Room floor areas are constructed from the supplied polygons
-        Walls and doors are constructed from the supplied polygons
-        Objects are imported from the database
+        :return: A world holding the house's rooms, walls and doors, and its objects if
+            :attr:`session` is given to import them from.
         """
 
         house_name = self.name
@@ -770,9 +768,9 @@ class ProcTHORParser:
                 found_walls.append(wall)
                 used_wall_ids.add(wall_id)
 
-            assert (
-                len(found_walls) == 2
-            ), f"Door {door['id']} should have two walls, but found {len(found_walls)}."
+            assert len(found_walls) == 2, (
+                f"Door {door['id']} should have two walls, but found {len(found_walls)}."
+            )
 
             procthor_walls.append(
                 ProcthorWall(door_dicts=[door], wall_dicts=found_walls)

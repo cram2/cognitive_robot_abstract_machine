@@ -29,9 +29,13 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_source import WorldSource
+
+# %% apartment
+
 
 @dataclass
-class ApartmentEnvironment:
+class ApartmentEnvironment(WorldSource):
     """
     The furniture of the apartment: a shelf, a wall, a bedside table, a sofa, the
     apartment's wall meshes and a two-leaf wardrobe.
@@ -45,24 +49,15 @@ class ApartmentEnvironment:
     describes the same wardrobe this map spawns from meshes.
     """
 
-    def get_world(self) -> World:
-        """
-        Create a world holding nothing but the apartment.
-        """
+    def create_world(self) -> World:
         world = World.create_with_root_body("root")
-        self.populate(world)
-        return world
-
-    def populate(self, world: World) -> None:
-        """
-        Spawn the apartment's furniture into an existing world.
-        """
         self._build_shelf(world)
         self._build_wall_next_to_shelf(world)
         self._build_bedside_table(world)
         self._build_sofa(world)
         self._build_wall_meshes(world)
         self._build_wardrobe(world)
+        return world
 
     @staticmethod
     def mesh_path(mesh_file_name: str) -> str:

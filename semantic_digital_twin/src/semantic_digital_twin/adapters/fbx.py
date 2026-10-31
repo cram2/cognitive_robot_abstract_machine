@@ -136,9 +136,9 @@ class FBXParser(MeshParser):
         Transform vertices from FBX coordinate system to Semantic Digital Twin
         coordinate system.
         """
-        assert (
-            fbx_vertices.ndim == 2 and fbx_vertices.shape[1] == 3
-        ), "vertices must be (N,3)"
+        assert fbx_vertices.ndim == 2 and fbx_vertices.shape[1] == 3, (
+            "vertices must be (N,3)"
+        )
         assert semantic_digital_twin_T_fbx.shape == (
             4,
             4,
@@ -156,12 +156,9 @@ class FBXParser(MeshParser):
         )
         return semantic_digital_twin_vertices[:, :3]
 
-    def parse(self) -> World:
+    def create_world(self) -> World:
         """
-        Parse the FBX file, each object in the FBX file is converted to a body in the
-        world and the meshes are loaded as Mesh objects.
-
-        :return: A World containing content of the FBX file.
+        :return: A world holding one body for every object in the FBX file.
         """
         fbx = fbxloader.FBXLoader(self.file_path)
 

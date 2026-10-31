@@ -15,15 +15,20 @@ from semantic_digital_twin.adapters.package_resolver import (
     PathResolver,
     SearchPathFileResolver,
 )
-from semantic_digital_twin.adapters.world_model_parser import (
-    JointDescription,
-    WorldModelParser,
-)
+from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NegativeConnectionVelocity,
     PathResolutionError,
     ParsingError,
+)
+from semantic_digital_twin.specifications.connections import (
+    ActiveConnection1DOFSpecification,
+    ConnectionSpecification,
+    FixedConnectionSpecification,
+    ConnectionSpecificationWithEndpoints,
+    PrismaticConnectionSpecification,
+    RevoluteConnectionSpecification,
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -35,8 +40,6 @@ from semantic_digital_twin.world_description.connection_properties import JointD
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -55,7 +58,7 @@ from semantic_digital_twin.world_description.inertial_properties import (
     InertiaTensor,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body, Connection
+from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
 
@@ -76,14 +79,16 @@ class GazeboParser(WorldModelParser):
         movable.
     """
 
-    connection_type_map: ClassVar[dict[str, type[Connection]]] = {
-        "revolute": RevoluteConnection,
-        "continuous": RevoluteConnection,
-        "prismatic": PrismaticConnection,
-        "fixed": FixedConnection,
+    connection_specification_types: ClassVar[
+        dict[str, type[ConnectionSpecification]]
+    ] = {
+        "revolute": RevoluteConnectionSpecification,
+        "continuous": RevoluteConnectionSpecification,
+        "prismatic": PrismaticConnectionSpecification,
+        "fixed": FixedConnectionSpecification,
     }
     """
-    Maps a joint's declared type to the connection it becomes.
+    Maps a joint's declared type to the specification of the connection it becomes.
     """
 
     world_link_name: ClassVar[str] = "world"
@@ -197,9 +202,11 @@ class GazeboParser(WorldModelParser):
 
     # %% entry point
 
-    def parse(self) -> World:
+    def create_world(self) -> World:
         """
-        Parses the document into a world.
+        Differs from
+        :meth:`~semantic_digital_twin.world_source.WorldSource.create_world` in what
+        is created from a document without a ``world`` element.
 
         :return: The world described by a ``world`` element, or by a single ``model``
             element if the document describes one model.
@@ -441,8 +448,8 @@ class GazeboParser(WorldModelParser):
         }
         is_static = self.parse_boolean(element.find("static"))
 
-        joint_descriptions = [
-            self.parse_joint(joint_element, bodies, model_T_link, instance_name)
+        connection_specifications_with_endpoints = [
+            self.parse_joint(joint_element, bodies, model_T_link)
             for joint_element in joint_elements
         ]
 
@@ -452,8 +459,10 @@ class GazeboParser(WorldModelParser):
 
         with world.modify_world():
             world.add_kinematic_structure_entity(root_body)
-            for description in joint_descriptions:
-                world.add_connection(self.create_connection(world, description))
+            for (
+                connection_specification_with_endpoints
+            ) in connection_specifications_with_endpoints:
+                connection_specification_with_endpoints.connect(world)
 
             model_T_root = model_T_link[root_body.name.name]
             for link_name, body in bodies.items():
@@ -696,11 +705,9 @@ class GazeboParser(WorldModelParser):
         element: ElementTree.Element,
         bodies: dict[str, Body],
         model_T_link: dict[str, HomogeneousTransformationMatrix],
-        prefix: str,
-    ) -> JointDescription:
+    ) -> ConnectionSpecificationWithEndpoints:
         """
-        Parses a ``joint`` element into a validated description of the connection it
-        becomes.
+        Parses a ``joint`` element into the specification of the joint it states.
 
         The pose of an SDF joint is relative to its child link, so the connection is
         placed at the joint and the child is offset back to its own frame.
@@ -708,18 +715,17 @@ class GazeboParser(WorldModelParser):
         :param element: The ``joint`` element to parse.
         :param bodies: The bodies of the model, by link name.
         :param model_T_link: The poses of the links relative to the model.
-        :param prefix: The prefix of the name of the connection.
-        :return: The description of the joint.
+        :return: The specification of the joint.
         :raises UnsupportedJointType: If the joint type has no connection counterpart.
         """
         joint_name = element.get("name")
         joint_type = element.get("type")
-        connection_type = self.connection_type_map.get(joint_type)
-        if connection_type is None:
+        specification_type = self.connection_specification_types.get(joint_type)
+        if specification_type is None:
             raise UnsupportedJointType(
                 joint_name=joint_name,
                 joint_type=joint_type,
-                supported_types=list(self.connection_type_map),
+                supported_types=list(self.connection_specification_types),
             )
 
         parent_name = element.findtext("parent").strip()
@@ -731,54 +737,24 @@ class GazeboParser(WorldModelParser):
             @ child_T_connection
         )
 
-        description = JointDescription(
-            name=PrefixedName(joint_name, prefix),
-            connection_type=connection_type,
+        if issubclass(specification_type, ActiveConnection1DOFSpecification):
+            specification = specification_type(
+                name=joint_name,
+                connection_T_child=child_T_connection.inverse(),
+                axis=self.parse_axis(element, joint_name, bodies[parent_name]),
+                dof_limits=self.parse_limits(element, joint_type, joint_name),
+                dynamics=self.parse_dynamics(element.find("axis/dynamics")),
+            )
+        else:
+            specification = specification_type(
+                name=joint_name, connection_T_child=child_T_connection.inverse()
+            )
+        return ConnectionSpecificationWithEndpoints(
+            connection_specification=specification,
             parent=bodies[parent_name],
             child=bodies[child_name],
             parent_T_connection=parent_T_connection,
-            connection_T_child=child_T_connection.inverse(),
         )
-        if connection_type is FixedConnection:
-            return description
-
-        description.axis = self.parse_axis(element, joint_name, bodies[parent_name])
-        description.limits = self.parse_limits(element, joint_type, joint_name)
-        description.dynamics = self.parse_dynamics(element.find("axis/dynamics"))
-        return description
-
-    def create_connection(
-        self, world: World, description: JointDescription
-    ) -> Connection:
-        """
-        Creates the connection a joint description denotes, adding its degree of freedom
-        to the world.
-
-        :param world: The world the degree of freedom is added to.
-        :param description: The description of the joint.
-        :return: The connection describing the joint.
-        """
-        if description.connection_type is FixedConnection:
-            return FixedConnection(
-                name=description.name,
-                parent=description.parent,
-                child=description.child,
-                parent_T_connection_expression=description.parent_T_connection,
-                connection_T_child_expression=description.connection_T_child,
-            )
-
-        connection = description.connection_type.create_with_dofs(
-            world=world,
-            parent=description.parent,
-            child=description.child,
-            name=description.name,
-            parent_T_connection_expression=description.parent_T_connection,
-            connection_T_child_expression=description.connection_T_child,
-            dof_limits=description.limits,
-            axis=description.axis,
-        )
-        connection.dynamics = description.dynamics
-        return connection
 
     def parse_axis(
         self, element: ElementTree.Element, joint_name: str, parent_body: Body

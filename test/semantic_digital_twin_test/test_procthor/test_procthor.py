@@ -35,7 +35,6 @@ from semantic_digital_twin.world_description.world_entity import Region, Body
 
 
 class ProcTHORTestCase(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -355,7 +354,7 @@ class ProcTHORTestCase(unittest.TestCase):
 
         world = ProcTHORParser(
             "test_house", house=self.house_json, session=session
-        ).parse()
+        ).create_world()
 
         world.merge_world(obj_world)
 
@@ -369,7 +368,7 @@ class ProcTHORTestCase(unittest.TestCase):
                 "procthor_json",
                 "house_0.json",
             )
-        ).parse()
+        ).create_world()
 
         assert world is not None
 

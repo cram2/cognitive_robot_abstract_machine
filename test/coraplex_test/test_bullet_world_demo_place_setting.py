@@ -44,9 +44,7 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
     demo = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(demo)
     demonstration = demo.BulletWorldDemonstration(used_robot=PR2)
-    world = WorldSpecification.from_urdf(
-        demo.SceneFile.APARTMENT.path
-    ).to_domain_object()
+    world = WorldSpecification.from_urdf(demo.SceneFile.APARTMENT.path).create_world()
     milk, bowl, spoon = demonstration.milk, demonstration.bowl, demonstration.spoon
     for placed_object in demonstration.place_setting:
         placed_object.spawn(world)

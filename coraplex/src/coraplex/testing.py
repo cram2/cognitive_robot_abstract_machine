@@ -96,7 +96,7 @@ def setup_world() -> World:
 
     pr2_sem_world = URDFParser.from_file(
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    ).parse()
+    ).create_world()
     apartment_world = URDFParser.from_file(
         os.path.join(
             os.path.dirname(__file__),
@@ -106,12 +106,12 @@ def setup_world() -> World:
             "worlds",
             "apartment.urdf",
         )
-    ).parse()
+    ).create_world()
     milk_world = STLParser(
         os.path.join(
             os.path.dirname(__file__), "..", "..", "resources", "objects", "milk.stl"
         )
-    ).parse()
+    ).create_world()
     cereal_world = STLParser(
         os.path.join(
             os.path.dirname(__file__),
@@ -121,7 +121,7 @@ def setup_world() -> World:
             "objects",
             "breakfast_cereal.stl",
         )
-    ).parse()
+    ).create_world()
     # apartment_world.merge_world(pr2_sem_world)
     apartment_world.merge_world(milk_world)
     apartment_world.merge_world(cereal_world)

@@ -110,7 +110,7 @@ def build_world() -> World:
                 parent_T_self=PICK_POSE.homogeneous_matrix,
             )
         ],
-    ).to_domain_object()
+    ).create_world()
     # The parcel stands in for any graspable object; the plan only needs an annotation
     # to name it by, not a particular kind of object.
     with world.modify_world():

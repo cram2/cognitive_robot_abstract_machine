@@ -670,7 +670,7 @@ def test_split_chain_of_connections(pr2_world_state_reset):
 def test_robots_and_validate(supported_abstract_robots):
     for abstract_robot in supported_abstract_robots:
         print(f"Testing robot: {abstract_robot.__name__}")
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
         robot = abstract_robot.from_world(world)
         robot.validate()
 
@@ -710,12 +710,12 @@ def test_pr2_automatic_setup_correctly(pr2_world_state_reset):
     verified_parts = set()
 
     def verify_part(part, expected_type, parent_robot):
-        assert isinstance(
-            part, expected_type
-        ), f"Part {part} is not of expected type {expected_type}"
-        assert (
-            part._robot == parent_robot
-        ), f"Part {part} back-reference to robot is incorrect"
+        assert isinstance(part, expected_type), (
+            f"Part {part} is not of expected type {expected_type}"
+        )
+        assert part._robot == parent_robot, (
+            f"Part {part} back-reference to robot is incorrect"
+        )
         verified_parts.add(part)
         return part
 
@@ -747,9 +747,9 @@ def test_pr2_automatic_setup_correctly(pr2_world_state_reset):
     right_gripper = verify_part(right_arm.end_effector, PR2RightGripper, robot)
 
     # 8. Grippers -> Fingers (via HasTwoFingers -> HasFingers mixin)
-    assert (
-        len(left_gripper.fingers) == 2
-    ), "Left gripper should have exactly two fingers"
+    assert len(left_gripper.fingers) == 2, (
+        "Left gripper should have exactly two fingers"
+    )
     l_l_finger = next(
         f for f in left_gripper.fingers if isinstance(f, PR2LeftGripperLeftFinger)
     )
@@ -759,9 +759,9 @@ def test_pr2_automatic_setup_correctly(pr2_world_state_reset):
     verify_part(l_l_finger, PR2LeftGripperLeftFinger, robot)
     verify_part(l_r_finger, PR2LeftGripperRightFinger, robot)
 
-    assert (
-        len(right_gripper.fingers) == 2
-    ), "Right gripper should have exactly two fingers"
+    assert len(right_gripper.fingers) == 2, (
+        "Right gripper should have exactly two fingers"
+    )
     r_l_finger = next(
         f for f in right_gripper.fingers if isinstance(f, PR2RightGripperLeftFinger)
     )
@@ -777,14 +777,14 @@ def test_pr2_automatic_setup_correctly(pr2_world_state_reset):
     all_discovered_parts = set(robot._robot_parts)
 
     missing_from_hierarchy = all_discovered_parts - verified_parts
-    assert (
-        not missing_from_hierarchy
-    ), f"Some robot parts were discovered but not verified: {missing_from_hierarchy}"
+    assert not missing_from_hierarchy, (
+        f"Some robot parts were discovered but not verified: {missing_from_hierarchy}"
+    )
 
     extra_in_hierarchy = verified_parts - all_discovered_parts
-    assert (
-        not extra_in_hierarchy
-    ), f"Some verified parts were not in robot._robot_parts: {extra_in_hierarchy}"
+    assert not extra_in_hierarchy, (
+        f"Some verified parts were not in robot._robot_parts: {extra_in_hierarchy}"
+    )
 
 
 def test_pr2_degrees_of_freedom_with_hardware_interface(pr2_world_state_reset):
@@ -822,13 +822,13 @@ def test_pr2_degrees_of_freedom_with_hardware_interface(pr2_world_state_reset):
 
     actual_dof_names = {dof.name.name for dof in dofs}
 
-    assert (
-        len(dofs) == 17
-    ), f"Expected 17 DOFs with hardware interface, but got {len(dofs)}: {actual_dof_names}"
+    assert len(dofs) == 17, (
+        f"Expected 17 DOFs with hardware interface, but got {len(dofs)}: {actual_dof_names}"
+    )
 
-    assert (
-        actual_dof_names == expected_dof_names
-    ), f"Missing DOFs: {expected_dof_names - actual_dof_names}, Extra DOFs: {actual_dof_names - expected_dof_names}"
+    assert actual_dof_names == expected_dof_names, (
+        f"Missing DOFs: {expected_dof_names - actual_dof_names}, Extra DOFs: {actual_dof_names - expected_dof_names}"
+    )
 
 
 # %% joint name enum

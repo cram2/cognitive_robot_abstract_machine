@@ -182,7 +182,7 @@ def test_every_robot_states_its_axes_in_the_frame_they_belong_to(
     robot there is.
     """
     for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
         abstract_robot.from_world(world)
 
         for end_effector in world.get_semantic_annotations_by_type(EndEffector):
@@ -335,7 +335,7 @@ def test_every_two_finger_gripper_can_measure_where_its_fingers_meet(
     gripper there is answers them rather than only the one they were written against.
     """
     for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
         abstract_robot.from_world(world)
 
         for gripper in world.get_semantic_annotations_by_type(EndEffector):
@@ -541,7 +541,7 @@ def test_every_two_finger_gripper_drives_every_joint_up_to_its_fingertips(
     is, so a goal on the fingertips moves only joints the gripper's states drive.
     """
     for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
         abstract_robot.from_world(world)
 
         for gripper in world.get_semantic_annotations_by_type(EndEffector):
@@ -587,7 +587,7 @@ def test_every_two_finger_gripper_stands_narrower_closed_than_open(
     for every robot there is.
     """
     for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
         abstract_robot.from_world(world)
 
         for gripper in world.get_semantic_annotations_by_type(EndEffector):

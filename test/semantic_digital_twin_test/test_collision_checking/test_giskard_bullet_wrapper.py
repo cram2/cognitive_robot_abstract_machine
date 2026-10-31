@@ -56,7 +56,7 @@ def non_convex_mesh():
         "stl",
         "jeroen_cup.stl",
     )
-    world_with_stl = STLParser(stl_path).parse()
+    world_with_stl = STLParser(stl_path).create_world()
     body: Body = world_with_stl.root
     return body.collision[0]
 

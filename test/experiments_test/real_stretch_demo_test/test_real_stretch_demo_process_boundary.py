@@ -21,7 +21,6 @@ from experiments.real_stretch_apartment_demo.demo import (
     StretchApartmentDemonstration,
 )
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.world import World
 
 RESULT_FETCH_TIMEOUT_SECONDS = 60
 """
@@ -83,7 +82,7 @@ def test_the_scene_counts_as_populated_once_the_cereal_is_spawned(apartment_mesh
     The demonstration decides whether to spawn its scene by the presence of the cereal.
     """
     demonstration = StretchApartmentDemonstration(used_robot=Stretch)
-    world = World.create_with_root_body()
+    world = demonstration.scene_specification().create_world()
     assert not demonstration.is_scene_populated(world)
 
     demonstration.populate_scene(world)

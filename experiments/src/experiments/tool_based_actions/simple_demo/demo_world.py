@@ -80,7 +80,9 @@ def parse_object(stl_file_name: str, color: Color | None = None) -> World:
         appearance if None.
     :return: A world containing the mesh from the demo resources.
     """
-    object_world = STLParser(os.path.join(OBJECTS_DIRECTORY, stl_file_name)).parse()
+    object_world = STLParser(
+        os.path.join(OBJECTS_DIRECTORY, stl_file_name)
+    ).create_world()
     if color is not None:
         object_world.root.visual.dye_shapes(color)
     return object_world

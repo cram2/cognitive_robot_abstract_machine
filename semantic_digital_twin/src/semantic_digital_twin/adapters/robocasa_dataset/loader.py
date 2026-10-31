@@ -157,7 +157,7 @@ def _parse_robosuite_mjcf(parser: MJCFParser) -> World:
         for geom in body.geoms:
             if geom.group == GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1:
                 geom.group = GeomVisibilityAndCollisionType.ONLY_COLLIDABLE
-    return parser.parse()
+    return parser.create_world()
 
 
 def _category_from_class_name(class_name: str) -> str:
@@ -671,7 +671,7 @@ class RoboCasaDatasetLoader:
         Attach a SemanticAnnotation to the root body of a loaded object.
 
         The object's own body is the first body in the world with collision geometry:
-        MJCFParser.parse() always creates an empty placeholder root body named after the
+        :meth:`~semantic_digital_twin.adapters.mjcf.MJCFParser.create_world` always creates an empty placeholder root body named after the
         MJCF worldbody, distinct from the loaded content.
 
         :param world: The world the object was parsed into.

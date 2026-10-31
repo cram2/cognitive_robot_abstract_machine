@@ -441,7 +441,7 @@ def test_json_serialization_with_mesh():
                 "milk.stl",
             )
         )
-        .parse()
+        .create_world()
         .root
     )
 
@@ -462,9 +462,9 @@ def test_json_serialization_with_mesh():
 # %% connection references survive same-name ambiguity
 
 
-def _world_with_two_equally_named_connections() -> (
-    tuple[World, RevoluteConnection, RevoluteConnection]
-):
+def _world_with_two_equally_named_connections() -> tuple[
+    World, RevoluteConnection, RevoluteConnection
+]:
     """
     A world holding two revolute connections that share one name.
 

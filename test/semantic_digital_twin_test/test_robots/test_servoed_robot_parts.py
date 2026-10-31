@@ -79,14 +79,14 @@ def _parse_urdf(robot_type: type[AbstractRobot]) -> World:
     """
     :return: The world ``robot_type``'s URDF describes, without any servo declared.
     """
-    return URDFParser.from_file(robot_type.get_ros_file_path()).parse()
+    return URDFParser.from_file(robot_type.get_ros_file_path()).create_world()
 
 
 def _parse_mjcf(robot_type: type[AbstractRobot]) -> World:
     """
     :return: The world ``robot_type``'s MJCF describes, without any servo declared.
     """
-    return MJCFParser(robot_type.get_ros_file_path()).parse()
+    return MJCFParser(robot_type.get_ros_file_path()).create_world()
 
 
 @pytest.mark.parametrize(

@@ -44,7 +44,7 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
             continue
         try:
             parser = ProcTHORParser(f"house_{index}", house, semantic_world_session)
-            world = parser.parse()
+            world = parser.create_world()
         except Exception as e:
             logging.error(f"Error parsing house {index}: {e}")
             continue

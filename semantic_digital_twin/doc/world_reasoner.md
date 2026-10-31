@@ -30,7 +30,7 @@ from os.path import join, dirname
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-kitchen_world = URDFParser.from_file(join(dirname(__file__), '..', 'resources', 'urdf', 'kitchen-small.urdf')).parse()
+kitchen_world = URDFParser.from_file(join(dirname(__file__), '..', 'resources', 'urdf', 'kitchen-small.urdf')).create_world()
 reasoner = WorldReasoner(kitchen_world)
 
 # The annotations this run inferred.

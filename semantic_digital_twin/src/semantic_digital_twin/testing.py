@@ -283,7 +283,7 @@ def two_arm_robot_world():
         world.add_kinematic_structure_entity(localization_body)
 
         robot_parser = URDFParser.from_file(file_path=robot)
-        world_with_robot = robot_parser.parse()
+        world_with_robot = robot_parser.create_world()
         # world_with_pr2.plot_kinematic_structure()
         root = world_with_robot.root
         c_root_bf = OmniDrive.create_with_dofs(
@@ -300,7 +300,7 @@ def pr2_world():
     )
     pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
     pr2_parser = URDFParser.from_file(file_path=pr2)
-    world_with_pr2 = pr2_parser.parse()
+    world_with_pr2 = pr2_parser.create_world()
     with world_with_pr2.modify_world():
         pr2_root = world_with_pr2.root
         localization_body = Body(name=PrefixedName("odom_combined"))

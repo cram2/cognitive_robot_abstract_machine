@@ -1267,7 +1267,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             URDFParser.from_file(
                 cls.get_ros_file_path(),
                 use_visual_as_collision_backup=cls.uses_visual_as_collision_backup,
-            ).parse()
+            ).create_world()
         )
 
     @classmethod
