@@ -395,22 +395,22 @@ def test_has_ellipsis_attributes_true_for_ellipsis_element_in_plain_set():
     assert match._has_ellipsis_attributes_ is True
 
 
-# %% AttributeMatch.is_unspecified
+# %% AttributeMatch.is_underspecified_single_value
 
 
-def test_is_unspecified_only_for_the_attribute_assigned_an_ellipsis():
+def test_is_underspecified_single_value_only_for_the_attribute_assigned_an_ellipsis():
     match = a(KRROODPosition)(x=..., y=2, z=3)
     match.resolve()
 
     unspecified_attribute_names = [
         attribute_match.attribute_name
         for attribute_match in match._matches_with_variables_
-        if attribute_match.is_unspecified
+        if attribute_match.is_underspecified_single_value
     ]
     assert unspecified_attribute_names == ["x"]
 
 
-def test_is_unspecified_false_for_an_ellipsis_element_in_a_plain_list():
+def test_is_underspecified_single_value_false_for_an_ellipsis_element_in_a_plain_list():
     match = a(KRROODPositions)(
         positions=[KRROODPosition(1, 2, 3)],
         some_strings=["a", ..., "c"],
@@ -418,7 +418,7 @@ def test_is_unspecified_false_for_an_ellipsis_element_in_a_plain_list():
     match.resolve()
 
     assert not any(
-        attribute_match.is_unspecified
+        attribute_match.is_underspecified_single_value
         for attribute_match in match._matches_with_variables_
     )
 
