@@ -468,8 +468,7 @@ class PartiallyAppliedWorldModificationError(WorldValidationError):
     @classproperty
     def issue_tracker_url(cls) -> str:
         """
-        :return: Where to report a modification block that failed in this package's own
-            code.
+        :return: Where to report a failed modification block.
         """
         return "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
 
@@ -487,9 +486,10 @@ class PartiallyAppliedWorldModificationError(WorldValidationError):
 
     def suggest_correction(self) -> str:
         return (
-            f"this is a bug, not a condition to handle. If the "
-            f"{type(self.cause).__name__} comes from your code, fix it there; otherwise "
-            f"report it at {self.issue_tracker_url} with this traceback."
+            f"this is a bug, not a condition to handle: a modification block must not "
+            f"raise. Find where the cause above was raised and fix it there; if the "
+            f"mistake is not in your code, or you cannot tell, report it at "
+            f"{self.issue_tracker_url} with this traceback."
         )
 
 
