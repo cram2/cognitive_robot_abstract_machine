@@ -72,6 +72,7 @@ from krrood.entity_query_language.query.match import Match
 from krrood.exceptions import UnboundGenericParameter
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.robots.hsrb import HSRBGripper
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -1681,6 +1682,46 @@ def test_the_squeeze_is_handed_on_to_the_fingers(pr2_apartment_context):
     )
 
     assert [action.squeeze for action in width_actions_of(plan)] == [squeeze]
+
+
+def test_the_hsr_hand_is_sent_shut_in_a_physical_simulation(hsr_apartment_context):
+    world, view, extensions = hsr_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+
+    plan = rewritten(
+        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)),
+        extensions,
+        executor_for=physically_simulated_executor,
+    )
+
+    assert [action.squeeze for action in width_actions_of(plan)] == [
+        HSRBGripper.squeeze
+    ]
+
+
+def test_the_real_hsr_hand_is_squeezed_as_its_executor_says(hsr_apartment_context):
+    world, view, extensions = hsr_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    executors = []
+
+    def kept_robot_executor(extensions):
+        executors.append(robot_executor(extensions))
+        return executors[-1]
+
+    plan = rewritten(
+        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)),
+        extensions,
+        executor_for=kept_robot_executor,
+    )
+
+    [width_close] = [
+        adaptation
+        for adaptation in executors[0].plan_adaptations
+        if isinstance(adaptation, CloseFingersToObjectWidth)
+    ]
+    assert [action.squeeze for action in width_actions_of(plan)] == [
+        width_close.squeeze
+    ]
 
 
 def test_an_object_without_collision_is_still_held_by_shutting_the_gripper(

@@ -329,6 +329,16 @@ class HasTwoFingers(
         """
         return True
 
+    @classproperty
+    def squeeze(cls) -> float:
+        """
+        How far past the width of what it grasps each finger is sent in a physical
+        simulation, in metres: a servo grips only with the position error it is left
+        with, so fingers sent no further than the object's surface touch it without
+        holding it.
+        """
+        return 0.005
+
     @property
     def finger(self) -> TGenericLeftFinger | TGenericRightFinger:
         concrete_thumb_class = get_generic_type_parameters(self, HasFingers)[0]
