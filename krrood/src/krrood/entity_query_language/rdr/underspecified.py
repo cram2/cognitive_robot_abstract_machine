@@ -33,6 +33,7 @@ from krrood.entity_query_language.query.match import AttributeMatch, Match
 from krrood.entity_query_language.rdr.exceptions import (
     MultipleInferenceTargets,
     NoInferenceTarget,
+    UndeclaredInferenceTarget,
     UnsupportedInferenceTarget,
 )
 from krrood.symbol_graph.helpers import get_wrapped_field
@@ -124,8 +125,12 @@ class RDRMatchParser:
 
     def _guard_single_valued(self, target: AttributeMatch) -> None:
         """
+        :raises UndeclaredInferenceTarget: If ``target`` is not a declared field of the
+            case type.
         :raises UnsupportedInferenceTarget: If ``target``'s field holds a collection.
         """
         wrapped_field = get_wrapped_field(self.case_type, target.attribute_name)
-        if wrapped_field is not None and wrapped_field.holds_collection:
+        if wrapped_field is None:
+            raise UndeclaredInferenceTarget(self.case_type, target.attribute_name)
+        if wrapped_field.holds_collection:
             raise UnsupportedInferenceTarget(self.case_type, target.attribute_name)

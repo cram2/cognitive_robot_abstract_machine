@@ -47,10 +47,14 @@ class AmbiguousBranchSemanticsError(DataclassException):
 
 @dataclass
 class NoInferenceTarget(DataclassException):
-    """Raised when an underspecified ``Match`` has no ``...`` attribute to infer."""
+    """
+    Raised when an underspecified ``Match`` has no ``...`` attribute to infer.
+    """
 
     case_type: type
-    """The type whose instances were queried."""
+    """
+    The type whose instances were queried.
+    """
 
     def error_message(self) -> str:
         return f"{self.case_type.__name__} has no underspecified (`...`) attribute to infer."
@@ -61,10 +65,14 @@ class NoInferenceTarget(DataclassException):
 
 @dataclass
 class MultipleInferenceTargets(DataclassException):
-    """Raised when a single-class RDR is handed more than one ``...`` attribute."""
+    """
+    Raised when a single-class RDR is handed more than one ``...`` attribute.
+    """
 
     attribute_names: list[str]
-    """The names of the attributes that were all marked with ``...``."""
+    """
+    The names of the attributes that were all marked with ``...``.
+    """
 
     def error_message(self) -> str:
         return (
@@ -87,10 +95,14 @@ class UnsupportedInferenceTarget(DataclassException):
     """
 
     case_type: type
-    """The type whose instances were queried."""
+    """
+    The type whose instances were queried.
+    """
 
     attribute_name: str
-    """The name of the unbounded-iterable attribute that was marked with ``...``."""
+    """
+    The name of the unbounded-iterable attribute that was marked with ``...``.
+    """
 
     def error_message(self) -> str:
         return (
@@ -100,6 +112,36 @@ class UnsupportedInferenceTarget(DataclassException):
 
     def suggest_correction(self) -> str:
         return "This will be supported by a future MultiClassRDR."
+
+
+@dataclass
+class UndeclaredInferenceTarget(DataclassException):
+    """
+    Raised when an ``...`` attribute is not a declared field of the case type, so the
+    shape of the value to infer is unknown.
+    """
+
+    case_type: type
+    """
+    The type whose instances were queried.
+    """
+
+    attribute_name: str
+    """
+    The name of the attribute that was marked with ``...``.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.case_type.__name__}.{self.attribute_name} is not a declared field of "
+            f"{self.case_type.__name__}, so the value to infer cannot be checked."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Make {self.case_type.__name__} a dataclass that declares "
+            f"{self.attribute_name} as a field."
+        )
 
 
 # %% corner-case serialization
