@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from enum import IntEnum
@@ -121,6 +122,15 @@ class SymbolicDistributionTestCase(unittest.TestCase):
         probabilities[hash(TestEnum.B)] = 13 / 20
         self.model = SymbolicDistribution(variable=self.x, probabilities=probabilities)
 
+    def test_a_value_unseen_before_serialization_has_no_probability_after_it(self):
+        """
+        A distribution read back from JSON text keeps giving the values it never saw a
+        probability of zero, as the distribution it was written from does.
+        """
+        deserialized = from_json(json.loads(json.dumps(to_json(self.model))))
+
+        self.assertEqual(deserialized.probabilities[hash(TestEnum.C)], 0.0)
+
     def test_sample(self):
         samples = self.model.sample(100)
         likelihoods = self.model.likelihood(samples)
@@ -175,8 +185,9 @@ class SymbolicDistributionTestCase(unittest.TestCase):
         self.assertEqual(prob, 1)
 
     def test_likelihood_survives_a_category_whose_hash_exceeds_the_modulus(self):
-        """A category still scores its true probability when its Python `hash()`
-        falls outside `sys.hash_info.modulus`.
+        """
+        A category still scores its true probability when its Python `hash()` falls
+        outside `sys.hash_info.modulus`.
 
         `probabilities` is keyed by `hash(category)`; `log_likelihood` used to hash
         that already-hashed key a second time. `int.__hash__` reduces any value
@@ -247,6 +258,31 @@ class DiracDeltaDistributionTestCase(unittest.TestCase):
         conditional, probability = self.model.truncated(event)
         self.assertIsNone(conditional)
         self.assertEqual(0, probability)
+
+    def test_truncating_to_its_own_support_keeps_the_distribution(self):
+        """
+        An interval holds its bounds with less precision than a location, so the support
+        of a Dirac delta does not hold its own location exactly.
+
+        Truncating to that support still has to keep the distribution, the way
+        ``probability`` already counts it.
+        """
+        distribution = DiracDeltaDistribution(
+            variable=self.x, location=3.427709925174713
+        )
+        support = distribution.univariate_support
+        self.assertNotEqual(support.simple_sets[0].lower, distribution.location)
+        self.assertEqual(
+            distribution.probability(
+                SimpleEvent.from_data({self.x: support}).as_composite_set()
+            ),
+            1.0,
+        )
+        truncated, probability = distribution.truncated(
+            SimpleEvent.from_data({self.x: support}).as_composite_set()
+        )
+        self.assertEqual(truncated, distribution)
+        self.assertEqual(probability, 1.0)
 
     def test_mode(self):
         mode, log_likelihood = self.model.univariate_log_mode()

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from threading import Thread
 from time import sleep
 from typing import Tuple, Iterable
 
@@ -116,10 +115,7 @@ class GiskardTester(ABC):
         self.giskard = self.setup_giskard()
         self.giskard.setup()
         self.default_root = self.world.root
-        self.motion_server_thread = Thread(
-            target=self.giskard.motion_server.live, name="motion server"
-        )
-        self.motion_server_thread.start()
+        self.giskard.motion_server.start_in_background()
         self.wait_for_cycles(1)
         self.api = GiskardWrapperNode(node_name="tests")
 
@@ -155,12 +151,19 @@ class GiskardTester(ABC):
 
     def close(self):
         """
-        Detach Giskard from the world so nothing of this test reacts to the next one.
+        Stop the motion server and the client, and detach Giskard from the world.
 
-        The ros node is destroyed between tests while worlds are kept alive, so a
-        callback left registered here would publish on a node that is already gone.
+        The motion server's background thread is stopped first: it is the only thing
+        that could still touch the ros node or the world once this method returns. The
+        ros node is destroyed between tests while worlds are kept alive, so a callback
+        left registered here would publish on a node that is already gone.
+
+        :raises MotionServerThreadStillRunningError: If the background thread does not
+            stop in time.
         """
+        self.giskard.motion_server.stop()
         self.giskard.close_world_model_ros_interface()
+        self.api.close()
 
     #
     # BULLET WORLD #####################################################################################################

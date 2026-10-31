@@ -30,14 +30,14 @@ The best solution is to double check the input arguments of the DesignatorDescri
 
 If you get an error when trying to perform an action or motion designator that complains about a missing execution
 environment, then you did not specify how the designator should be executed. You can specify how the designator should
-be performed by wrapping the call in the `simulated_robot` or `real_robot` environment. This is also explained in
+be performed by wrapping the call in the `kinematically_simulated_robot` or `real_robot` environment. This is also explained in
 the [Action Designator Example](https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/action_designator.html#Navigate-Action).
 
 ```python
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 
-with simulated_robot:
+with kinematically_simulated_robot:
    execute_single(NavigateAction(target_location=pose), context=context).perform()
 ```

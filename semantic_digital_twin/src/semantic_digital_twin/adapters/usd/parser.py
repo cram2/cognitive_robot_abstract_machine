@@ -30,7 +30,6 @@ from semantic_digital_twin.adapters.world_model_parser import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.usd_semantics import UsdSemanticLabels
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -783,8 +782,8 @@ class USDParser(WorldModelParser):
             parent_T_connection=parent_T_connection,
             connection_T_child=connection_T_child,
             axis=axis,
-            limits=DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=lower), upper=DerivativeMap(position=upper)
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=lower, upper_position=upper
             ),
         )
 

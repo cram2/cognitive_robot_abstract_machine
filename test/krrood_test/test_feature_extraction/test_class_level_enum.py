@@ -11,7 +11,7 @@ import pytest
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import a
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
 from ..dataset import ormatic_interface  # type: ignore # noqa: F401
@@ -47,7 +47,7 @@ def stationed_robot_circuit() -> RelationalProbabilisticCircuit:
     robots = _stationed_robots(random_state, RobotStation.LAB, 20) + _stationed_robots(
         random_state, RobotStation.FACTORY, 20
     )
-    model = RelationalProbabilisticCircuit(StationedPickingRobot)
+    model = RelationalProbabilisticCircuit()
     model.fit(robots)
     return model
 

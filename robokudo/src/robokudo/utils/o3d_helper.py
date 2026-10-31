@@ -125,14 +125,9 @@ def get_2d_corner_points_from_3d_bb(
         raise ValueError("Division by zero: Bounding box has zero depth.")
     corner_points_in_2d_x = (uvd[:, 0] / uvd[:, 2]).astype(int)
     corner_points_in_2d_y = (uvd[:, 1] / uvd[:, 2]).astype(int)
-    # We have to respect the ratio of the depth and rgb image to properly project back.
-    # Invert from RGB-> Depth to Depth->RGB
-    color2depth_ratio = cas.get(CASViews.COLOR2DEPTH_RATIO)
-    depth2color_ratio = (1 / color2depth_ratio[0], 1 / color2depth_ratio[1])
-    x_scaled = (corner_points_in_2d_x * depth2color_ratio[0]).astype(int)
-    y_scaled = (corner_points_in_2d_y * depth2color_ratio[1]).astype(int)
-    corner_points_in_2d_xy = np.stack((x_scaled, y_scaled), axis=1)
-    return corner_points_in_2d_xy
+    return cas.get(CASViews.COLOR_TO_DEPTH_RATIO).color_pixels(
+        np.stack((corner_points_in_2d_x, corner_points_in_2d_y), axis=1)
+    )
 
 
 def project_points_to_image(
@@ -149,12 +144,8 @@ def project_points_to_image(
     u = (uvd[valid, 0] / z[valid]).astype(int)
     v = (uvd[valid, 1] / z[valid]).astype(int)
 
-    color2depth_ratio = cas.get(CASViews.COLOR2DEPTH_RATIO)
-    depth2color_ratio = (1 / color2depth_ratio[0], 1 / color2depth_ratio[1])
-    u = (u * depth2color_ratio[0]).astype(int)
-    v = (v * depth2color_ratio[1]).astype(int)
-
-    return np.stack([u, v], axis=1), valid
+    color_to_depth_ratio = cas.get(CASViews.COLOR_TO_DEPTH_RATIO)
+    return color_to_depth_ratio.color_pixels(np.stack([u, v], axis=1)), valid
 
 
 def draw_mesh_wireframe_on_image(
@@ -195,7 +186,7 @@ def get_2d_bounding_rect_from_3d_bb(
 ) -> cv2t.Rect:
     """
     Get a cv2.boundingRect which represents the space taken by a open3d boundingbox.
-    Perspective projection and color2depth ratio are taken into account.
+    Perspective projection and color-to-depth ratio are taken into account.
 
     :param cas:
     :param object_bb:
@@ -351,34 +342,23 @@ def get_cloud_from_rgb_depth_and_mask(
     mask: npt.NDArray,
     camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
     depth_truncate: float = 9.0,
-    mask_true_val: int = 255,
+    mask_true_value: int = 255,
 ) -> o3d.geometry.PointCloud:
     """
-    Create point cloud from RGB-D images and mask.
+    Build the colored point cloud of the depth measurements a mask marks.
 
-    Generate a pointcloud from an object mask, rgb and depth image.
-    Important: The depth_image will be changed when executing this function. Provide a copy if necessary.
+    The color image, the depth image and the mask must have the same resolution.
 
-    Constraints:
-      - RGB, Depth image and Mask must be of the same resolution.
-
-
-    :param rgb_image: An image in RGB order. Please note that cv2 normally uses BGR order. So you have to convert first.
-    :param depth_image: A depth image
-    :param mask: a numpy array of dtype np.uint8
-    :param camera_intrinsics: Camera intrinsics for the rgb and depth image
-    :param depth_truncate: During cloud creation, ignore points beyond this many meters
-    :param mask_true_val: If the 'mask' contains a value equal to 'max_true_val', the corresponding value in 'depth'
-    will be included. Otherwise, it will be set to 0.
-    :return: Point cloud from masked RGB-D data
-
-    .. warning::
-       The depth_image will be modified during processing.
-       Provide a copy if the original needs to be preserved.
+    :param rgb_image: Color image in RGB order.
+    :param depth_image: Depth image in millimeters.
+    :param mask: Mask on the depth image.
+    :param camera_intrinsics: Intrinsics of the camera at the depth image resolution.
+    :param depth_truncate: Distance in meters beyond which measurements are left out.
+    :param mask_true_value: Value of the mask pixels whose depth measurements the cloud
+        is built from.
+    :return: The colored point cloud of the masked depth measurements.
     """
-    # Generate a new depth image by keeping all values of the depth image where the mask is *mask_true_val*.
-    # The rest will be set to 0
-    depth_image = np.where(mask == mask_true_val, depth_image, 0)
+    depth_image = np.where(mask == mask_true_value, depth_image, 0)
     o3d_color = o3d.geometry.Image(rgb_image)
     o3d_depth = o3d.geometry.Image(depth_image)
     rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(

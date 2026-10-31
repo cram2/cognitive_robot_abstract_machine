@@ -163,7 +163,9 @@ class MoveToReach(ActionDescription, HasApproachesGraspPoses, HasTcpGoalThreshol
             [
                 NavigateAction(self.standing_pose),
                 MoveManipulatorAction(
-                    self.end_effector.tool_frame_goal(self.reference_T_grasp),
+                    self.end_effector.tool_frame_goal_for_grasp(
+                        self.reference_T_grasp
+                    ),
                     self.end_effector,
                     allow_gripper_collision=False,
                     position_threshold=self.position_threshold,

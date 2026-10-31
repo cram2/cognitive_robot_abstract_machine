@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import select
 import signal
 import subprocess
 import sys
@@ -71,6 +72,34 @@ tool_path = os.path.abspath(
 )
 tool = import_tool(tool_path)
 from collision_matrix_tool import SelfCollisionMatrixInterface, DisableCollisionReason
+
+STARTUP_TIMEOUT_SECONDS = 120
+"""
+How long the launched tool may take to report that it is ready before the test gives up
+on it.
+"""
+
+
+def wait_until_ready(process: subprocess.Popen) -> None:
+    """
+    Read the launched tool's output until it reports that it is ready, and fail the test
+    if it exits or does not report it within :data:`STARTUP_TIMEOUT_SECONDS`.
+    """
+    deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
+    output = []
+    while time.monotonic() < deadline:
+        readable, _, _ = select.select(
+            [process.stdout], [], [], deadline - time.monotonic()
+        )
+        if not readable:
+            break
+        line = process.stdout.readline().decode()
+        if not line:
+            pytest.fail(f"Script exited before it was ready:\n{''.join(output)}")
+        if tool.StatusMessage.READY in line:
+            return
+        output.append(line)
+    pytest.fail(f"Script was not ready in time:\n{''.join(output)}")
 
 
 @pytest.fixture
@@ -147,7 +176,9 @@ def test_script_launch_and_kill():
     process = subprocess.Popen(
         ["python3", script_path],
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        # One stream, read while waiting for readiness, so neither pipe can fill up and block
+        # the tool.
+        stderr=subprocess.STDOUT,
         # start_new_session rather than preexec_fn=os.setsid: preexec_fn is documented
         # as unsafe in the presence of threads, and the xdist workers this runs under
         # are threaded.
@@ -160,13 +191,7 @@ def test_script_launch_and_kill():
     )
 
     try:
-        # Give it enough time to initialize (e.g., 3-5 seconds)
-        time.sleep(5)
-
-        # Check if it crashed immediately
-        if process.poll() is not None:
-            _, stderr = process.communicate()
-            pytest.fail(f"Script crashed on startup. Error: {stderr.decode()}")
+        wait_until_ready(process)
 
         # Send SIGINT (Ctrl+C)
         os.killpg(os.getpgid(process.pid), signal.SIGINT)

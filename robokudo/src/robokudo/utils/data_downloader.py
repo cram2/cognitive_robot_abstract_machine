@@ -1,5 +1,7 @@
 from pathlib import Path
+
 import pooch
+from filelock import FileLock
 
 # ---- Configuration ----
 DATA_PACKAGE_NAME: str = "robokudo_test_data"
@@ -15,10 +17,19 @@ URL: str = (
 
 FILENAME: str = f"{DATA_PACKAGE_NAME}.zip"
 
+LOCK_FILENAME: str = f"{FILENAME}.lock"
+"""
+Name of the lock file, next to the archive, that lets only one process fetch and unpack
+the test data at a time.
+"""
+
 
 def test_data_path() -> Path:
     """
     Retrieve Robokudo test data, downloading and unpacking if needed.
+
+    Safe to call from several processes at once: while one of them fetches and unpacks the data,
+    the others wait for it to finish.
 
     :return: Path to the root extracted dataset directory in the local cache.
 
@@ -26,16 +37,20 @@ def test_data_path() -> Path:
        This function performs network I/O on first use.
     """
     downloader = pooch.HTTPDownloader()
+    # ~/.cache/DATA_PACKAGE_NAME
+    cache_directory = Path(pooch.os_cache(DATA_PACKAGE_NAME))
+    cache_directory.mkdir(parents=True, exist_ok=True)
 
     # Download + verify + unzip
-    extracted_files = pooch.retrieve(
-        url=f"{URL}",
-        known_hash=KNOWN_HASH,
-        path=pooch.os_cache(DATA_PACKAGE_NAME),  # ~/.cache/DATA_PACKAGE_NAME
-        fname=FILENAME,
-        downloader=downloader,
-        processor=pooch.Unzip(),
-    )
+    with FileLock(cache_directory / LOCK_FILENAME):
+        extracted_files = pooch.retrieve(
+            url=f"{URL}",
+            known_hash=KNOWN_HASH,
+            path=cache_directory,
+            fname=FILENAME,
+            downloader=downloader,
+            processor=pooch.Unzip(),
+        )
 
     # Pooch returns list of extracted file paths
     # We usually want the root extracted directory:

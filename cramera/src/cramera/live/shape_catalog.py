@@ -17,7 +17,6 @@ from typing_extensions import List, Optional
 
 from semantic_digital_twin.world_description.geometry import (
     Box,
-    Color,
     Cylinder,
     Mesh,
     Scale,
@@ -26,6 +25,7 @@ from semantic_digital_twin.world_description.geometry import (
 )
 
 from cramera.body_geometry import NumericPose
+from cramera.onboard.bundle_urdf import companion_material_library
 
 SIZE_PRECISION = 4
 """
@@ -111,39 +111,19 @@ class ShapeEntry:
     """
 
 
-def color_to_hex(color: Color) -> str:
-    """
-    A colour as the ``#rrggbb`` hex string the viewer applies.
-
-    :param color: The colour to convert, with channels between 0 and 1.
-    """
-    return "#%02x%02x%02x" % (
-        round(color.R * 255),
-        round(color.G * 255),
-        round(color.B * 255),
-    )
-
-
-def is_default_white(color: Color) -> bool:
-    """
-    Whether a colour is the untouched default, meaning no colour was chosen at all.
-
-    :param color: The colour to check.
-    """
-    return (color.R, color.G, color.B, color.A) == (1.0, 1.0, 1.0, 1.0)
-
-
 def served_mesh_file(shape: Shape) -> Optional[str]:
     """
     The mesh file a shape can be served from, or None when it has none.
 
     :param shape: The shape whose backing file is looked up.
+    :return: The resolved native mesh file, or None for geometry without a file.
     """
-    if not isinstance(shape, Mesh) or not shape.filename:
+    if not isinstance(shape, Mesh):
         return None
-    if not Path(shape.filename).is_file():
+    mesh_file = shape.local_file
+    if not mesh_file.is_file():
         return None
-    return shape.filename
+    return str(mesh_file)
 
 
 def companion_mtl_url(mesh_file: str, mesh_url: str) -> Optional[str]:
@@ -155,39 +135,32 @@ def companion_mtl_url(mesh_file: str, mesh_url: str) -> Optional[str]:
 
     :param mesh_file: The mesh file's path on disk.
     :param mesh_url: The URL the mesh itself is served from.
+    :return: The declared material library's URL, or None without one.
     """
     mesh_path = Path(mesh_file)
-    if mesh_path.suffix.lower() != ".obj":
+    companion = companion_material_library(mesh_path.parent, mesh_path.name)
+    if companion is None:
         return None
-    companion = mesh_path.with_suffix(".mtl")
-    if not companion.is_file():
-        return None
-    return "%s&side=%s" % (mesh_url, urllib.parse.quote(companion.name))
+    return "%s&side=%s" % (mesh_url, urllib.parse.quote(companion, safe=""))
 
 
 def shape_entry(
     shape: Shape,
     mesh_url: Optional[str],
-    fallback_size: List[float],
-    fallback_color: str,
 ) -> ShapeEntry:
     """
     One shape as the viewer builds it.
 
-    A mesh whose backing file is gone degrades to a fallback-sized box, so the body
-    still occupies its place in the scene instead of vanishing.
-
     :param shape: The shape to publish.
     :param mesh_url: URL the shape's mesh is served from, or None for primitives and for
         meshes without a servable file.
-    :param fallback_size: Box extent used when a mesh has no servable file.
-    :param fallback_color: Colour used when the shape carries no colour of its own.
+    :return: The shape's native geometry and appearance in the browser payload.
+    :raises FileNotFoundError: When the mesh has no servable file.
+    :raises TypeError: When the shape is not a supported native geometry type.
     """
     local_pose = NumericPose.of_matrix(shape.origin.to_np()).rounded()
     position, quaternion = local_pose[:3], local_pose[3:]
-    color = (
-        fallback_color if is_default_white(shape.color) else color_to_hex(shape.color)
-    )
+    color = shape.color.to_hex()
     opacity = float(shape.color.A)
     if isinstance(shape, Box):
         return ShapeEntry(
@@ -218,6 +191,7 @@ def shape_entry(
             radius=round(shape.radius, SIZE_PRECISION),
         )
     if isinstance(shape, Mesh) and mesh_url is not None:
+        mesh_file = shape.local_file
         return ShapeEntry(
             kind=ShapeKind.MESH,
             position=position,
@@ -225,18 +199,13 @@ def shape_entry(
             color=color,
             opacity=opacity,
             mesh=mesh_url,
-            mtl=companion_mtl_url(shape.filename, mesh_url),
-            format=Path(shape.filename).suffix.lstrip(".").lower(),
+            mtl=companion_mtl_url(str(mesh_file), mesh_url),
+            format=mesh_file.suffix.lstrip(".").lower(),
             scale=_rounded_axes(shape.scale),
         )
-    return ShapeEntry(
-        kind=ShapeKind.BOX,
-        position=position,
-        quaternion=quaternion,
-        color=color,
-        opacity=opacity,
-        size=list(fallback_size),
-    )
+    if isinstance(shape, Mesh):
+        raise FileNotFoundError(shape.filename)
+    raise TypeError(f"Unsupported shape type: {type(shape).__name__}")
 
 
 def _rounded_axes(scale: Scale) -> List[float]:

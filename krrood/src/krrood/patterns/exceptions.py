@@ -172,3 +172,21 @@ class AmbiguousRuleError(DataclassException):
             "Make the colliding guards mutually exclusive, or have one rule subclass the other "
             "to declare it the more-specific special case."
         )
+
+
+@dataclass
+class InterfaceInstantiationError(DataclassException, TypeError):
+    """
+    Raised when an interface itself is instantiated instead of a class implementing it.
+    """
+
+    interface: Type
+    """
+    The interface that was instantiated.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.interface.__name__} is an interface and cannot be instantiated."
+
+    def suggest_correction(self) -> str:
+        return f"Instantiate a subclass that implements {self.interface.__name__}."

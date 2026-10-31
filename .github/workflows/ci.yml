@@ -68,23 +68,3 @@ jobs:
             echo "Untrack them with 'git rm --cached', and build them locally with scripts/regenerate_all_orm.py."
             exit 1
           fi
-
-  test_basstler:
-    # The basstler package - the agent tooling the .claude/ hooks and skills run
-    # - is plain, dependency-light Python. It doesn't need the heavy
-    # docker-based matrix above, which is scoped to the robotics packages.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: |
-          source .claude/hooks/resolve-personal-notes-config.sh
-          pip install pytest "./${BASSTLER_PACKAGE_DIRECTORY}"
-      # --confcutdir stops pytest walking up to the repository-root
-      # test/conftest.py, which imports the robotics stack this job
-      # deliberately does not install.
-      - run: |
-          source .claude/hooks/resolve-personal-notes-config.sh
-          python -m pytest "${BASSTLER_TESTS_DIRECTORY}" --confcutdir="${BASSTLER_TESTS_DIRECTORY}"

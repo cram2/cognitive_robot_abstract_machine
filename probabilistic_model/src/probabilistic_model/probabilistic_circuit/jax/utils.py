@@ -7,21 +7,21 @@ from scipy.sparse import csr_array, csc_array
 from typing_extensions import Tuple
 
 
-def copy_bcoo(x: BCOO) -> BCOO:
-    return x.__class__(
-        (x.data.copy(), x.indices.copy()),
-        shape=x.shape,
-        indices_sorted=x.indices_sorted,
-        unique_indices=x.unique_indices,
+def copy_bcoo(array: BCOO) -> BCOO:
+    return array.__class__(
+        (array.data.copy(), array.indices.copy()),
+        shape=array.shape,
+        indices_sorted=array.indices_sorted,
+        unique_indices=array.unique_indices,
     )
 
 
-def copy_bcsr(x: BCSR) -> BCSR:
-    return x.__class__(
-        (x.data.copy(), x.indices.copy(), x.indptr.copy()),
-        shape=x.shape,
-        indices_sorted=x.indices_sorted,
-        unique_indices=x.unique_indices,
+def copy_bcsr(array: BCSR) -> BCSR:
+    return array.__class__(
+        (array.data.copy(), array.indices.copy(), array.indptr.copy()),
+        shape=array.shape,
+        indices_sorted=array.indices_sorted,
+        unique_indices=array.unique_indices,
     )
 
 
@@ -63,54 +63,15 @@ def create_bcoo_indices_from_row_lengths(row_lengths: np.array) -> np.array:
     offset_row_lengths = np.concatenate([jnp.array([0]), row_lengths[:-1]])
 
     # create a cumulative sum of the offset row lengths and offset it by the first row length
-    cum_sum = np.repeat(offset_row_lengths, row_lengths)
+    cumulative_sum = np.repeat(offset_row_lengths, row_lengths)
 
     # arrange column indices
     summed_row_lengths = np.arange(row_lengths.sum())
 
     # create the column indices
-    col_indices = summed_row_lengths - cum_sum
+    column_indices = summed_row_lengths - cumulative_sum
 
-    return np.vstack((row_indices, col_indices)).T
-
-
-def create_bcoo_indices_from_row_lengths_np(row_lengths: np.array) -> np.array:
-    """
-    Create the indices of a BCOO array with the given row lengths.
-
-    The shape of the indices is (2, sum(row_lengths)).
-    The shape of the sparse tensor that the indices describe should be (len(row_lengths), max(row_lengths)).
-
-    Example::
-
-        >>> row_lengths = jnp.array([2, 3])
-        >>> create_bcoo_indices_from_row_lengths(row_lengths)
-            [[0 0]
-             [0 1]
-             [1 0]
-             [1 1]
-             [1 2]]
-
-    :param row_lengths: The row lengths.
-    :return: The indices of the sparse tensor
-    """
-
-    # create row indices
-    row_indices = np.repeat(jnp.arange(len(row_lengths)), row_lengths)
-
-    # offset the row lengths by the one element
-    offset_row_lengths = np.concatenate([jnp.array([0]), row_lengths[:-1]])
-
-    # create a cumulative sum of the offset row lengths and offset it by the first row length
-    cum_sum = np.repeat(offset_row_lengths, row_lengths)
-
-    # arrange column indices
-    summed_row_lengths = np.arange(row_lengths.sum())
-
-    # create the column indices
-    col_indices = summed_row_lengths - cum_sum
-
-    return np.vstack((row_indices, col_indices))
+    return np.vstack((row_indices, column_indices)).T
 
 
 def create_bcsr_indices_from_row_lengths(
@@ -135,17 +96,17 @@ def create_bcsr_indices_from_row_lengths(
     offset_row_lengths = jnp.concatenate([jnp.array([0]), row_lengths[:-1]])
 
     # create a cumulative sum of the offset row lengths and offset it by the first row length
-    cum_sum = jnp.repeat(offset_row_lengths, row_lengths)
+    cumulative_sum = jnp.repeat(offset_row_lengths, row_lengths)
 
     # arrange column indices
     summed_row_lengths = jnp.arange(row_lengths.sum())
 
     # create the column indices
-    col_indices = summed_row_lengths - cum_sum
+    column_indices = summed_row_lengths - cumulative_sum
 
     indent_pointer = jnp.concatenate([jnp.array([0]), jnp.cumsum(row_lengths)])
 
-    return col_indices, indent_pointer
+    return column_indices, indent_pointer
 
 
 def embed_sparse_array_in_nan_array(sparse_array: BCOO) -> jax.Array:
@@ -166,12 +127,12 @@ def sample_from_sparse_probabilities_csc(
 
     :param probabilities: The sparse array of probabilities.
     :param amount: The amount of samples to draw from each row.
-    :return: The samples that are drawn for each state in the probabilities indicies.
+    :return: The samples that are drawn for each state in the probabilities indices.
     """
     all_samples = np.concatenate(
         [
-            np.random.multinomial(amount_.item(), pvals=probability_row.data)
-            for amount_, probability_row in zip(amount, probabilities)
+            np.random.multinomial(row_amount.item(), pvals=probability_row.data)
+            for row_amount, probability_row in zip(amount, probabilities)
         ],
         axis=0,
     )
@@ -182,7 +143,7 @@ def sample_from_sparse_probabilities_csc(
     return result
 
 
-def remove_rows_and_cols_where_all(array: jax.Array, value: float) -> jax.Array:
+def remove_rows_and_columns_where_all(array: jax.Array, value: float) -> jax.Array:
     """
     Remove rows and columns from an array where all elements are equal to a given value.
 
@@ -194,16 +155,16 @@ def remove_rows_and_cols_where_all(array: jax.Array, value: float) -> jax.Array:
 
 
         >>> a = jnp.array([[1, 0, 3], [0, 0, 0], [7, 0, 9]])
-        >>> remove_rows_and_cols_where_all(a, 0)
+        >>> remove_rows_and_columns_where_all(a, 0)
         array([[1, 3], [7, 9]])
     """
 
     # get the rows and columns that are not entirely -inf
     valid_rows = (array != value).any(axis=1)
-    valid_cols = (array != value).any(axis=0)
+    valid_columns = (array != value).any(axis=0)
 
-    # remove rows and cols that are entirely -inf
-    valid = array[valid_rows][:, valid_cols]
+    # remove rows and columns that are entirely -inf
+    valid = array[valid_rows][:, valid_columns]
     return valid
 
 
@@ -222,23 +183,23 @@ def shrink_index_array(index_array: jax.Array) -> jax.Array:
     """
     result = index_array.copy()
 
-    for dim in range(index_array.shape[1]):
-        unique_indices = jnp.unique(index_array[:, dim])
+    for column in range(index_array.shape[1]):
+        unique_indices = jnp.unique(index_array[:, column])
 
         # map the old indices to the new indices
         for new_index, unique_index in zip(range(len(unique_indices)), unique_indices):
-            result = result.at[result[:, dim] == unique_index, dim].set(new_index)
+            result = result.at[result[:, column] == unique_index, column].set(new_index)
 
     return result
 
 
-def sparse_remove_rows_and_cols_where_all(array: BCOO, value: float) -> BCOO:
+def sparse_remove_rows_and_columns_where_all(array: BCOO, value: float) -> BCOO:
     """
     Remove rows and columns from a sparse tensor where all elements are equal to a given value.
 
     Example::
         >>> array = BCOO.fromdense(jnp.array([[1, 0, 3], [0, 0, 0], [7, 0, 9]]))
-        >>> sparse_remove_rows_and_cols_where_all(array, 0).todense()
+        >>> sparse_remove_rows_and_columns_where_all(array, 0).todense()
             [[1 3]
              [7 9]]
 

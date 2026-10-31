@@ -25,6 +25,7 @@ from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
+from krrood.patterns.interface import Interface
 from krrood.exceptions import (
     MismatchingNumberOfGenericParametersAndResolvedTypes,
     UnboundGenericParameter,
@@ -112,9 +113,23 @@ class SubClassSafeGeneric(ABC):
             logger.debug(message)
             return
         for name, result in resolution_results.items():
-            if not result.resolved:
+            if not result.resolved or cls._is_declared_by_an_interface(name):
                 continue
             cls._update_field_kwargs(name, {"type": result.resolved_type})
+
+    @classmethod
+    def _is_declared_by_an_interface(cls, name: str) -> bool:
+        """
+        :param name: The name of an annotated attribute of this class.
+        :return: Whether the nearest class annotating it is an interface, which
+            declares the attribute without making it a field.
+        """
+        declaring_class = next(
+            base
+            for base in cls.__mro__
+            if name in vars(base).get("__annotations__", {})
+        )
+        return Interface.is_interface(declaring_class)
 
     @classmethod
     def get_generic_type_parameters(cls) -> List[Type]:

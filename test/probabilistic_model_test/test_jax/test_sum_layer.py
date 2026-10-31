@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from jax.experimental.sparse import BCOO, BCSR
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -10,15 +11,20 @@ from scipy.special import logsumexp
 from sortedcontainers import SortedSet
 
 from probabilistic_model.learning.nyga_induction import NygaInduction
-from probabilistic_model.probabilistic_circuit.jax.input_layer import DiracDeltaLayer
+from probabilistic_model.probabilistic_circuit.jax.gaussian_layer import (
+    DifferentiableGaussianLayer,
+)
+from probabilistic_model.probabilistic_circuit.jax.input_layer import (
+    DifferentiableDiracDeltaLayer,
+)
 from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
-    SparseSumLayer,
-    DenseSumLayer,
+    DifferentiableSparseSumLayer,
+    DifferentiableDenseSumLayer,
 )
 import jax
 
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
-    ProbabilisticCircuit,
+    DifferentiableLayeredCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as NXProbabilisticCircuit,
@@ -28,11 +34,13 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 class DiracSumUnitTestCase(unittest.TestCase):
     x: Continuous = Continuous("x")
 
-    p1_x = DiracDeltaLayer(0, jnp.array([0.0, 1.0]), jnp.array([1, 2]))
-    p2_x = DiracDeltaLayer(0, jnp.array([2.0]), jnp.array([3]))
-    p3_x = DiracDeltaLayer(0, jnp.array([3.0, 4.0, 5.0]), jnp.array([4, 5, 6]))
-    p4_x = DiracDeltaLayer(0, jnp.array([6.0]), jnp.array([1]))
-    sum_layer: SparseSumLayer
+    p1_x = DifferentiableDiracDeltaLayer(0, jnp.array([0.0, 1.0]), jnp.array([1, 2]))
+    p2_x = DifferentiableDiracDeltaLayer(0, jnp.array([2.0]), jnp.array([3]))
+    p3_x = DifferentiableDiracDeltaLayer(
+        0, jnp.array([3.0, 4.0, 5.0]), jnp.array([4, 5, 6])
+    )
+    p4_x = DifferentiableDiracDeltaLayer(0, jnp.array([6.0]), jnp.array([1]))
+    sum_layer: DifferentiableSparseSumLayer
 
     @classmethod
     def setUpClass(cls):
@@ -48,7 +56,7 @@ class DiracSumUnitTestCase(unittest.TestCase):
         weights_p4 = BCOO.fromdense(jnp.array([[0], [0]])) * 2
         weights_p4.data = jnp.log(weights_p4.data)
 
-        cls.sum_layer = SparseSumLayer(
+        cls.sum_layer = DifferentiableSparseSumLayer(
             [cls.p1_x, cls.p2_x, cls.p3_x, cls.p4_x],
             log_weights=[weights_p1, weights_p2, weights_p3, weights_p4],
         )
@@ -121,11 +129,13 @@ class DiracSumUnitTestCase(unittest.TestCase):
 class DiracDenseSumUnitTestCase(unittest.TestCase):
     x: Continuous = Continuous("x")
 
-    p1_x = DiracDeltaLayer(0, jnp.array([0.0, 1.0]), jnp.array([1, 2]))
-    p2_x = DiracDeltaLayer(0, jnp.array([2.0]), jnp.array([3]))
-    p3_x = DiracDeltaLayer(0, jnp.array([3.0, 4.0, 5.0]), jnp.array([4, 5, 6]))
-    p4_x = DiracDeltaLayer(0, jnp.array([6.0]), jnp.array([1]))
-    sum_layer: DenseSumLayer
+    p1_x = DifferentiableDiracDeltaLayer(0, jnp.array([0.0, 1.0]), jnp.array([1, 2]))
+    p2_x = DifferentiableDiracDeltaLayer(0, jnp.array([2.0]), jnp.array([3]))
+    p3_x = DifferentiableDiracDeltaLayer(
+        0, jnp.array([3.0, 4.0, 5.0]), jnp.array([4, 5, 6])
+    )
+    p4_x = DifferentiableDiracDeltaLayer(0, jnp.array([6.0]), jnp.array([1]))
+    sum_layer: DifferentiableDenseSumLayer
 
     @classmethod
     def setUpClass(cls):
@@ -141,7 +151,7 @@ class DiracDenseSumUnitTestCase(unittest.TestCase):
         weights_p4 = jnp.array([[0], [0]]) * 2
         weights_p4 = jnp.log(weights_p4)
 
-        cls.sum_layer = DenseSumLayer(
+        cls.sum_layer = DifferentiableDenseSumLayer(
             [cls.p1_x, cls.p2_x, cls.p3_x, cls.p4_x],
             log_weights=[weights_p1, weights_p2, weights_p3, weights_p4],
         )
@@ -207,10 +217,49 @@ class DiracDenseSumUnitTestCase(unittest.TestCase):
         assert jnp.allclose(l, result)
 
 
+class UnlikelyEventTestCase(unittest.TestCase):
+    """
+    A sum layer stays finite for an event whose likelihood is below the smallest
+    positive single precision number, as the events of a circuit over many variables
+    are.
+    """
+
+    gaussians = DifferentiableGaussianLayer(
+        0, jnp.array([0.0, 1.0]), jnp.zeros(2), jnp.zeros(2)
+    )
+    event = jnp.array([[20.0]])
+    log_weights = jnp.log(jnp.array([[0.25, 0.75]]))
+
+    def expected_log_likelihood(self) -> float:
+        child_log_likelihoods = np.asarray(
+            self.gaussians.log_likelihood_of_nodes(self.event)
+        )
+        return logsumexp(child_log_likelihoods + np.asarray(self.log_weights), axis=1)
+
+    def assert_finite_and_expected(self, sum_layer):
+        log_likelihood = np.asarray(sum_layer.log_likelihood_of_nodes(self.event))
+        self.assertTrue(np.isfinite(log_likelihood).all())
+        np.testing.assert_allclose(
+            log_likelihood[:, 0], self.expected_log_likelihood(), rtol=1e-5
+        )
+
+    def test_sparse_sum_layer(self):
+        self.assert_finite_and_expected(
+            DifferentiableSparseSumLayer(
+                [self.gaussians], [BCOO.fromdense(self.log_weights)]
+            )
+        )
+
+    def test_dense_sum_layer(self):
+        self.assert_finite_and_expected(
+            DifferentiableDenseSumLayer([self.gaussians], [self.log_weights])
+        )
+
+
 class NygaDistributionTestCase(unittest.TestCase):
 
     nx_model: NXProbabilisticCircuit
-    jax_model: ProbabilisticCircuit
+    jax_model: DifferentiableLayeredCircuit
     data: jax.Array
 
     @classmethod
@@ -218,7 +267,9 @@ class NygaDistributionTestCase(unittest.TestCase):
         cls.data = jax.random.normal(jax.random.PRNGKey(69), (1000, 1))
         model = NygaInduction(Continuous("x"), min_samples_per_quantile=10)
         cls.nx_model = model.fit(cls.data)
-        cls.jax_model = ProbabilisticCircuit.from_rustworkx(cls.nx_model)
+        cls.jax_model = CircuitRepresentations().convert(
+            cls.nx_model, DifferentiableLayeredCircuit
+        )
         cls.jax_model.root.validate()
 
     def test_log_likelihood(self):
@@ -226,5 +277,7 @@ class NygaDistributionTestCase(unittest.TestCase):
         self.assertTrue(jnp.all(ll > -jnp.inf))
 
     def test_to_nx(self):
-        nx_model = self.jax_model.to_rustworkx()
+        nx_model = CircuitRepresentations().convert(
+            self.jax_model, NXProbabilisticCircuit
+        )
         self.assertAlmostEqual(logsumexp(nx_model.root.log_weights), 0.0)

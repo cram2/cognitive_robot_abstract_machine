@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -30,6 +31,9 @@ if TYPE_CHECKING:
     from semantic_digital_twin.adapters.multi_sim import MujocoSim
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass
 class Pacer(ABC):
     """
@@ -45,6 +49,13 @@ class Pacer(ABC):
     def sleep(self) -> None:
         """
         Wait until the loop may start its next cycle.
+        """
+
+    def wait_for_standstill(self) -> None:
+        """
+        Wait until the world has caught up with what the loop commanded.
+
+        Nothing to wait for unless the loop drives a physics in lockstep.
         """
 
 
@@ -142,8 +153,53 @@ class SteppedSimulationPacer(Pacer):
     already.
     """
 
+    standstill_velocity: float = 0.01
+    """
+    The joint velocity, in radians or metres per second, below which a joint counts as
+    no longer moving.
+    """
+
+    standstill_time_limit: timedelta = field(default=timedelta(seconds=10))
+    """
+    The simulated time the robot is given to come to a standstill.
+    """
+
     def sleep(self) -> None:
         self.simulation.step_simulation(timedelta(seconds=1 / self.target_frequency))
+
+    def wait_for_standstill(self) -> None:
+        """
+        Step the physics until no servo-driven joint is moving any more, or
+        :attr:`standstill_time_limit` passes.
+
+        A controller stops ticking once its command satisfies it, which is before the
+        joints have got there. A joint held up by something it has run into counts as
+        stopped too.
+        """
+        servo_names = [
+            actuator.name.name for actuator in self.simulation.world.actuators
+        ]
+        if not servo_names:
+            return
+        simulator = self.simulation.simulator
+        standstill_travel = self.standstill_velocity / self.target_frequency
+        previous = simulator.get_actuators_lengths(servo_names).result
+        for _ in range(
+            int(self.standstill_time_limit.total_seconds() * self.target_frequency)
+        ):
+            self.sleep()
+            current = simulator.get_actuators_lengths(servo_names).result
+            travelled = max(
+                abs(current[servo_name] - previous[servo_name])
+                for servo_name in servo_names
+            )
+            previous = current
+            if travelled < standstill_travel:
+                return
+        logger.warning(
+            "The robot was still moving after %s of simulated time.",
+            self.standstill_time_limit,
+        )
 
 
 @dataclass

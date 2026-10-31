@@ -508,6 +508,20 @@ class PendingAnswer {
 const LIVE_PRESETS = {ok: true, title: 'running demo', presets: [UNWORDED_PRESET]};
 const RECORDED_VOCABULARY = {ok: true, entries: [{name: 'recorded_robot'}]};
 
+test('the query hint follows the answering source without replacing typed input', async function () {
+  const panel = mountPanel({'http://bridge/presets': LIVE_PRESETS});
+  await flush();
+  const input = panel.root.part('#query-input');
+  input.value = WORDED_PRESET.code;
+  attach(panel, true);
+  await flush();
+  assert.strictEqual(input.placeholder, LIVE_PRESETS.presets[0].code);
+  assert.strictEqual(input.value, WORDED_PRESET.code);
+  attach(panel, false);
+  await flush();
+  assert.strictEqual(input.placeholder, WORDED_PRESET.code);
+});
+
 function attach(panel, on, url = 'http://bridge') {
   panel.bus.emit('live:changed', {on, url});
 }

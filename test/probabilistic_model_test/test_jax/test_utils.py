@@ -14,7 +14,7 @@ from probabilistic_model.probabilistic_circuit.jax.utils import (
     sample_from_sparse_probabilities_csc,
     create_bcsr_indices_from_row_lengths,
     shrink_index_array,
-    sparse_remove_rows_and_cols_where_all,
+    sparse_remove_rows_and_columns_where_all,
 )
 
 
@@ -66,10 +66,10 @@ class BCOOTestCase(unittest.TestCase):
         result = jnp.array([[0, 2], [1, 0], [2, 1]])
         self.assertTrue(jnp.allclose(new_index_tensor, result))
 
-    def test_sparse_remove_rows_and_cols_where_all(self):
+    def test_sparse_remove_rows_and_columns_where_all(self):
         array = BCOO.fromdense(jnp.array([[1, 0, 3], [0, 0, 0], [7, 0, 9]]))
         result = jnp.array([[1, 3], [7, 9]])
-        new_array = sparse_remove_rows_and_cols_where_all(array, 0)
+        new_array = sparse_remove_rows_and_columns_where_all(array, 0)
         self.assertTrue(jnp.allclose(new_array.todense(), result))
 
 

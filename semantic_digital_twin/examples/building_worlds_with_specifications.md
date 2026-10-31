@@ -91,7 +91,9 @@ Calling `spawn` materializes the body and attaches it to the world root with a `
 by default.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.api import BodySpecification
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
+)
 from semantic_digital_twin.world_description.geometry import Scale, Color
 
 world = World.create_with_root_body()
@@ -251,7 +253,9 @@ carries no inertia or visuals — only geometry, a pose, and children. It shares
 constructors, including `parent_T_self`.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.api import RegionSpecification
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    RegionSpecification,
+)
 
 world = World.create_with_root_body()
 
@@ -286,7 +290,9 @@ The active families (`Prismatic`/`Revolute`/`Screw`) require a movement `axis`, 
 rotation to its translation.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.api import PrismaticConnectionSpecification
+from semantic_digital_twin.specifications.connections import (
+    PrismaticConnectionSpecification,
+)
 from semantic_digital_twin.spatial_types import Vector3
 
 world = World.create_with_root_body()
@@ -319,7 +325,9 @@ This pairs naturally with `to_domain_object`, which materializes a free-standing
 attaching it anywhere.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.api import FixedConnectionSpecification
+from semantic_digital_twin.specifications.connections import (
+    FixedConnectionSpecification,
+)
 
 world = World.create_with_root_body()
 
@@ -352,7 +360,9 @@ materializes the root entity, attaches it, registers the annotation, and materia
 children.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.api import SemanticAnnotationWithRootSpecification
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 world = World.create_with_root_body()
@@ -374,30 +384,32 @@ print("Spawned", type(milk).__name__, "rooted via", type(milk.root.parent_connec
 ```
 
 The root entity is what attaches to the parent, so the connection lives on the root
-specification. You rarely have to state it: each annotation type builds its own through
-`parent_connection_specification()` — a `FixedConnectionSpecification` for most annotations, a
-`PrismaticConnectionSpecification` for a `Slider`, a `RevoluteConnectionSpecification` for a
-`Hinge`. Because each connection family carries exactly the parameters it uses, that method takes
-the parameters of *that* family and no others: `Slider.parent_connection_specification(axis=...)`
-is valid, while offering an `axis` to a fixed annotation is an error rather than a silently
-ignored argument.
+specification. Left unset, the root is fixed to its parent. Because each connection family
+carries exactly the parameters it uses, offering an `axis` to a fixed connection is an error
+rather than a silently ignored argument.
 
-What a type declares is only a default: setting `connection_specification` on the root
-specification replaces it, so a `Milk` may rest rigidly or float freely as a `Connection6DoF`.
+Setting `connection_specification` on the root specification chooses another connection, so a
+`Milk` may rest rigidly or float freely as a `Connection6DoF`, and a drawer slides on the
+prismatic connection its creator gives it. That connection is the drawer's `movable_joint`.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Slider
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
 
 world = World.create_with_root_body()
 
-slider = SemanticAnnotationWithRootSpecification(
-    name="slider",
-    semantic_annotation_type=Slider,
-    root_specification=BodySpecification.box("slider", Scale(0.1, 0.1, 0.1)),
-).spawn(world)  # Slider's default parent connection is prismatic about z
+drawer = SemanticAnnotationWithRootSpecification(
+    name="drawer",
+    semantic_annotation_type=Drawer,
+    root_specification=BodySpecification.box(
+        "drawer",
+        Scale(0.4, 0.5, 0.2),
+        connection_specification=PrismaticConnectionSpecification(axis=Vector3.X()),
+    ),
+).spawn(world)
 
-assert isinstance(slider.root.parent_connection, PrismaticConnection)
-print("Slider root is attached by a", type(slider.root.parent_connection).__name__)
+assert drawer.movable_joint is drawer.root.parent_connection
+assert isinstance(drawer.movable_joint, PrismaticConnection)
+print("The drawer slides on a", type(drawer.movable_joint).__name__)
 ```
 
 ### Default root specifications and nested parts
@@ -551,36 +563,39 @@ print(
 )
 ```
 
-### Parts that carry the whole
+### Joints away from the child's origin
 
-Mounting a part onto a `mechanical_joint` field does more than attach a child: the joint is what
-the *whole* hangs from. Spawning rewires the tree to `parent -> joint -> whole`, with the
-joint's own parent connection (here a revolute connection about `z`) carrying the motion.
+A door's origin sits at its centre, but it swings about the hinge at its edge. The connection
+moves about its own frame, and `connection_T_child` places the child relative to that frame, so
+the door hangs on a single revolute connection without a body for the hinge. `parent_T_self`
+stays the pose of the door itself while the hinge is at its zero position.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Hinge
+from semantic_digital_twin.specifications.connections import (
+    RevoluteConnectionSpecification,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 
 world = World.create_with_root_body()
 
-hinge_part = Hinge.get_annotation_specification(
-    "hinge",
-    Hinge.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.05, 0.05, 0.05)),
-    parent_connection_specification=Hinge.parent_connection_specification(
-        axis=Vector3.Z()
+hinge_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+door = Door.get_annotation_specification(
+    "door",
+    Door.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.03, 1, 2)),
+    parent_connection_specification=RevoluteConnectionSpecification(
+        axis=Vector3.Z(), connection_T_child=hinge_T_door
     ),
-)
-flap = Drawer.get_annotation_specification(
-    "flap",
-    Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.4, 0.5, 0.2)),
-    part_specifications={"mechanical_joint": hinge_part},
 ).spawn(world)
+assert isinstance(door.movable_joint, RevoluteConnection)
 
-# world.root -(revolute)-> hinge -(fixed)-> flap
-assert flap.root.parent_connection.parent is flap.mechanical_joint.root
-assert flap.mechanical_joint.root.parent_connection.parent is world.root
-assert isinstance(flap.mechanical_joint.root.parent_connection, RevoluteConnection)
-print("The flap hangs from its", type(flap.mechanical_joint).__name__)
+door.movable_joint.position = np.pi / 2
+world.notify_state_change()
+
+# The door's centre swung a quarter turn around the hinge, not around itself.
+expected = hinge_T_door.inverse() @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 2) @ hinge_T_door
+assert np.allclose(door.root.global_transform.to_np(), expected.to_np())
+print("Door centre after opening:", door.root.global_transform.position.to_np()[:3])
 ```
 
 The specification validates part keys *at construction time*, so misuse — a list on a singular
@@ -600,7 +615,7 @@ import os
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.api import WorldSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 table_urdf = os.path.join(
     Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "table.urdf"
@@ -652,7 +667,7 @@ is the drive determined by the robot's mobile base, or a fixed connection when t
 no mobile base.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.api import RobotSpecification
+from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.robots.pr2 import PR2
 
 world = WorldSpecification.from_urdf(

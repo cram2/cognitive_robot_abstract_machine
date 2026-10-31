@@ -31,6 +31,7 @@ from typing_extensions import Any, Tuple, TYPE_CHECKING, Optional, List
 
 from robokudo.cas import CASViews
 from robokudo.io.camera_interface import ROSCameraInterface
+from robokudo.types.cv import ColorToDepthRatio
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
 if TYPE_CHECKING:
@@ -90,8 +91,10 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.camera_intrinsic: Optional[o3d.camera.PinholeCameraIntrinsic] = None
         """Camera intrinsic parameters in Open3D format"""
 
-        self.color2depth_ratio: Optional[Tuple[float, float]] = (1.0, 1.0)
-        """Always (1.0, 1.0) since no depth data"""
+        self.color_to_depth_ratio: ColorToDepthRatio = ColorToDepthRatio()
+        """
+        The identity, since there is no depth image.
+        """
 
         self.camera_translation: Optional[List[float]] = None
         """Camera translation from TF"""
@@ -260,7 +263,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         cas.set(CASViews.DEPTH_IMAGE, None)
         cas.set(CASViews.CAMERA_INFO, self.camera_info)
         cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
-        cas.set(CASViews.COLOR2DEPTH_RATIO, (1, 1))
+        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
         self.store_camera_to_world_transform_from_tf(cas, self.timestamp)
 
         self._has_new_data = False

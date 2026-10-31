@@ -101,9 +101,13 @@ class LookingMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        return Pointing(
+        task = Pointing(
             root_link=self.robot.get_torso().root,
             tip_link=self.camera.root,
             goal_point=self.target.position,
             pointing_axis=self.camera.forward_facing_axis,
         )
+        hold_base = self.keep_base_still()
+        if not hold_base:
+            return task
+        return Parallel([task, *hold_base])

@@ -33,12 +33,14 @@ from krrood.entity_query_language.factories import (
     entity,
     variable,
 )
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    RobotSpecification,
-    SemanticAnnotationWithRootSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from segmind.detectors.agent_event_detector_nodes import GraspDetector
 from segmind.detectors.coarse_event_detector_nodes import (
     PickUpDetector,
@@ -87,6 +89,11 @@ class SceneFile(StrEnum):
 class ApartmentBody(StrEnum):
     """
     The apartment's own bodies the demonstration acts on.
+    """
+
+    ROOT = "apartment_root"
+    """
+    The apartment's root, which marks whether the scene was already populated.
     """
 
     SPOON_DRAWER = "cabinet10_drawer_top"
@@ -268,23 +275,22 @@ class BulletWorldDemonstration(RobotDemonstration):
         """
         return self.milk, self.bowl, self.spoon
 
-    def build_simulated_world(self) -> World:
+    def scene_specification(self) -> WorldSpecification:
         """
-        The apartment with the PR2 in it, placed at :attr:`robot_start` through its
-        odom.
+        :return: The apartment.
         """
-        return WorldSpecification.from_urdf(
-            SceneFile.APARTMENT.path,
-            robots=[
-                RobotSpecification(
-                    semantic_annotation_type=self.used_robot,
-                    world_T_odom=self.robot_start,
-                )
-            ],
-        ).to_domain_object()
+        return WorldSpecification.from_urdf(SceneFile.APARTMENT.path)
+
+    def robot_specification(self) -> RobotSpecification:
+        """
+        :return: The PR2, placed at :attr:`robot_start` through its odom.
+        """
+        return RobotSpecification(
+            semantic_annotation_type=self.used_robot, world_T_odom=self.robot_start
+        )
 
     def is_scene_populated(self, world: World) -> bool:
-        return world.is_kinematic_structure_entity_in_world_by_name(Bowl.__name__)
+        return world.is_kinematic_structure_entity_in_world_by_name(ApartmentBody.ROOT)
 
     def populate_scene(self, world: World) -> None:
         """
@@ -360,7 +366,7 @@ class BulletWorldDemonstration(RobotDemonstration):
 
 
 def main(
-    execution_type: ExecutionType = ExecutionType.SIMULATED,
+    execution_type: ExecutionType = ExecutionType.KINEMATICALLY_SIMULATED,
     collision_avoidance: bool = True,
     event_segmentation: bool = True,
     debug: bool = False,

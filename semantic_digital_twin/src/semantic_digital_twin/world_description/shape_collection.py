@@ -217,7 +217,17 @@ class ShapeCollection(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(shapes=[from_json(d, **kwargs) for d in data["shapes"]])
+        """
+        The collection belongs to the frame all its shapes are expressed in, which is the
+        entity it was written from, such as a body whose shapes are replaced.
+        """
+        shapes = [from_json(d, **kwargs) for d in data["shapes"]]
+        frames = {
+            id(shape.origin.reference_frame): shape.origin.reference_frame
+            for shape in shapes
+        }
+        reference_frame = next(iter(frames.values())) if len(frames) == 1 else None
+        return cls(shapes=shapes, reference_frame=reference_frame)
 
     def center_of_mass_in_world(self) -> Point3:
         """

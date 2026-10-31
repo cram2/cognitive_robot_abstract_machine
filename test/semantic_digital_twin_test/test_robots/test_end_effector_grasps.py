@@ -6,6 +6,7 @@ from typing_extensions import List
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.exceptions import (
     GripperAxesNotPerpendicular,
@@ -13,11 +14,12 @@ from semantic_digital_twin.exceptions import (
     NothingHeld,
 )
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -262,12 +264,225 @@ def test_the_held_grasp_is_turned_the_way_the_gripper_faces(pr2_gripper):
     )
 
 
-def test_the_held_grasp_is_the_offset_the_body_hangs_at(pr2_gripper):
+def test_the_held_grasp_sits_where_the_gripper_holds_the_object(pr2_gripper):
+    """
+    The grasp is read at the point the gripper holds an object, so it sits at that
+    point, shifted by how the body hangs off the tool frame.
+    """
     body = hold_body(pr2_gripper)
 
     np.testing.assert_allclose(
         pr2_gripper.held_body_T_grasp.to_np()[:3, 3],
-        -HELD_BODY_OFFSET.to_np()[:3, 3],
+        pr2_gripper.tool_P_grasp_when_closed.to_np()[:3].ravel()
+        - HELD_BODY_OFFSET.to_np()[:3, 3],
         atol=1e-9,
     )
     assert pr2_gripper.held_body_T_grasp.reference_frame is body
+
+
+def test_the_held_grasp_can_be_read_at_any_point_of_the_gripper(pr2_gripper):
+    """
+    Read at the tool frame itself, the grasp is only the offset the body hangs at.
+    """
+    hold_body(pr2_gripper)
+
+    body_T_grasp = pr2_gripper.held_body_T_grasp_at(
+        Point3(0.0, 0.0, 0.0, reference_frame=pr2_gripper.tool_frame)
+    )
+
+    np.testing.assert_allclose(
+        body_T_grasp.to_np()[:3, 3], -HELD_BODY_OFFSET.to_np()[:3, 3], atol=1e-9
+    )
+
+
+# %% where a two-finger gripper's fingers meet
+
+
+def test_the_fingertips_are_the_tips_of_the_two_fingers(pr2_gripper):
+    assert pr2_gripper.fingertips.both == (
+        pr2_gripper.thumb.tip,
+        pr2_gripper.finger.tip,
+    )
+
+
+def test_the_grasp_point_lies_midway_between_the_fingertips(pr2_gripper):
+    thumb_tip, finger_tip = (
+        pr2_gripper.fingertips._bounding_box(fingertip).center.to_np()[:3].ravel()
+        for fingertip in pr2_gripper.fingertips.both
+    )
+
+    np.testing.assert_allclose(
+        pr2_gripper.fingertips.tool_P_grasp.to_np()[:3].ravel(),
+        (thumb_tip + finger_tip) / 2,
+        atol=1e-9,
+    )
+
+
+def test_the_grasp_point_is_read_in_the_frame_it_belongs_to(pr2_gripper):
+    assert pr2_gripper.fingertips.tool_P_grasp.reference_frame is pr2_gripper.tool_frame
+
+
+def test_every_two_finger_gripper_can_measure_where_its_fingers_meet(
+    supported_abstract_robots,
+):
+    """
+    The measurements are read off the robot's own description, so every two-finger
+    gripper there is answers them rather than only the one they were written against.
+    """
+    for abstract_robot in supported_abstract_robots:
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
+        abstract_robot.from_world(world)
+
+        for gripper in world.get_semantic_annotations_by_type(EndEffector):
+            if not isinstance(gripper, HasTwoFingers):
+                continue
+            assert gripper.fingertips.tool_P_grasp.reference_frame is gripper.tool_frame
+            assert gripper.fingertips.surface_depth >= 0.0
+            assert np.linalg.norm(
+                gripper.fingertips.finger_P_thumb(0.05).to_np()[:3].ravel()
+            ) > np.linalg.norm(
+                gripper.fingertips.finger_P_thumb(0.02).to_np()[:3].ravel()
+            )
+
+
+# %% aiming the fingers rather than the tool frame
+
+
+def test_the_tool_frame_goal_for_a_grasp_puts_the_grasp_point_on_it(
+    pr2_gripper, graspable_box
+):
+    """
+    Reaching the returned pose with the tool frame leaves the point where the fingers
+    meet on the grasp frame, which is what the plain tool frame goal does not do.
+    """
+    grasp = graspable_box.grasp_candidates()[0].grasp_pose
+
+    goal = pr2_gripper.tool_frame_goal_for_grasp(grasp)
+
+    reached = goal.homogeneous_matrix.to_np()
+    grasp_point_once_reached = (
+        reached[:3, :3] @ pr2_gripper.fingertips.tool_P_grasp.to_np()[:3].ravel()
+        + reached[:3, 3]
+    )
+    np.testing.assert_allclose(
+        grasp_point_once_reached, grasp.position.to_np()[:3].ravel(), atol=1e-9
+    )
+
+
+def test_the_goal_for_a_grasp_turns_the_gripper_the_same_way_as_the_tool_frame_goal(
+    pr2_gripper, graspable_box
+):
+    grasp = graspable_box.grasp_candidates()[0].grasp_pose
+
+    np.testing.assert_allclose(
+        pr2_gripper.tool_frame_goal_for_grasp(grasp).rotation_matrix.to_np(),
+        pr2_gripper.tool_frame_goal(grasp).rotation_matrix.to_np(),
+        atol=1e-9,
+    )
+
+
+# %% how wide the fingers are sent
+
+
+def test_a_wider_object_sends_the_fingertip_frames_further_apart(pr2_gripper):
+    narrower = np.linalg.norm(
+        pr2_gripper.fingertips.finger_P_thumb(0.02).to_np()[:3].ravel()
+    )
+    wider = np.linalg.norm(
+        pr2_gripper.fingertips.finger_P_thumb(0.05).to_np()[:3].ravel()
+    )
+
+    assert wider - narrower == pytest.approx(0.03)
+
+
+def test_the_separation_a_goal_is_built_for_is_the_one_asked_for(pr2_gripper):
+    """
+    The surfaces stand where they were asked to, which is the distance between the
+    fingertip frames less what each surface sits inside its own frame.
+    """
+    separation = 0.04
+
+    frames_apart = np.linalg.norm(
+        pr2_gripper.fingertips.finger_P_thumb(separation).to_np()[:3].ravel()
+    )
+
+    assert frames_apart - 2 * pr2_gripper.fingertips.surface_depth == pytest.approx(
+        separation
+    )
+
+
+def test_the_thumb_tip_goal_is_read_in_the_other_fingertips_frame(pr2_gripper):
+    goal = pr2_gripper.fingertips.finger_P_thumb(0.04)
+
+    assert goal.reference_frame is pr2_gripper.finger.tip
+
+
+# %% reading where the fingers meet for a state the world does not stand in
+
+
+def test_the_meeting_point_can_be_read_for_another_state_and_the_world_stands_back_up(
+    pr2_gripper,
+):
+    """
+    Standing the gripper in a state inside a reset context is how a state the world
+    does not hold is read, and the positions it held come back afterwards.
+    """
+    world = pr2_gripper._world
+    positions_before = world.state.positions.copy()
+    as_it_stands = pr2_gripper.fingertips.tool_P_grasp
+
+    with world.reset_state_context():
+        pr2_gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
+        while_open = pr2_gripper.fingertips.tool_P_grasp
+
+    np.testing.assert_array_equal(world.state.positions, positions_before)
+    assert not np.allclose(while_open.to_np(), as_it_stands.to_np())
+    np.testing.assert_allclose(
+        pr2_gripper.fingertips.tool_P_grasp.to_np(), as_it_stands.to_np(), atol=1e-9
+    )
+
+
+# %% how far closing carries the point the fingers meet at
+
+
+def test_swinging_fingers_carry_the_point_they_meet_at_further_out(pr2_gripper):
+    """
+    A PR2's jaws swing on a linkage rather than sliding, so the point they meet at
+    travels along the approach axis as they close.
+    """
+    assert pr2_gripper.travel_when_closing > POSITION_TOLERANCE
+
+
+def test_the_travel_is_read_between_the_grippers_own_open_and_closed_states(
+    pr2_gripper,
+):
+    """
+    It is the distance the meeting point covers over the gripper's whole range, which
+    is what a grasp aimed while the gripper is open has to correct for.
+    """
+    world = pr2_gripper._world
+    with world.reset_state_context():
+        reached = []
+        for state_type in (GripperState.OPEN, GripperState.CLOSE):
+            pr2_gripper.get_joint_state_by_type(state_type).apply_to(world)
+            reached.append(pr2_gripper.fingertips.tool_P_grasp)
+    open_P_grasp, closed_P_grasp = reached
+    expected = (closed_P_grasp - open_P_grasp).dot(pr2_gripper.approach_axis)
+
+    assert pr2_gripper.travel_when_closing == pytest.approx(float(expected))
+
+
+def test_reading_the_travel_stands_the_world_back_up(tracy_world):
+    """
+    Reading the travel puts the gripper through its own open and closed states, and the
+    positions the world held come back afterwards. The state version moves, since a
+    reset context announces that it put the state back.
+    """
+    gripper = tracy_world.get_semantic_annotations_by_type(Tracy)[
+        0
+    ].left_arm.end_effector
+    positions_before = tracy_world.state.positions.copy()
+
+    gripper.travel_when_closing
+
+    np.testing.assert_array_equal(tracy_world.state.positions, positions_before)

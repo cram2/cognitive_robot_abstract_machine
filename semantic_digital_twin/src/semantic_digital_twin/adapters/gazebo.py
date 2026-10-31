@@ -26,7 +26,6 @@ from semantic_digital_twin.exceptions import (
     PathResolutionError,
     ParsingError,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -834,25 +833,27 @@ class GazeboParser(WorldModelParser):
         :param joint_name: The name of the joint, used to report a negative velocity.
         :return: The limits of the joint's degree of freedom.
         """
-        lower_limits = DerivativeMap()
-        upper_limits = DerivativeMap()
         limit_element = element.find("axis/limit")
         if limit_element is None:
-            return DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits)
+            return DegreeOfFreedomLimits()
 
+        lower_position = None
+        upper_position = None
         if joint_type != "continuous":
-            lower_limits.position = self.parse_optional_float(limit_element, "lower")
-            upper_limits.position = self.parse_optional_float(limit_element, "upper")
+            lower_position = self.parse_optional_float(limit_element, "lower")
+            upper_position = self.parse_optional_float(limit_element, "upper")
 
         velocity = self.parse_optional_float(limit_element, "velocity")
         if velocity is not None and velocity < 0:
             raise NegativeConnectionVelocity(
                 connection_name=joint_name, velocity=velocity
             )
-        lower_limits.velocity = -velocity if velocity is not None else None
-        upper_limits.velocity = velocity
 
-        return DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits)
+        return DegreeOfFreedomLimits.from_position_range_and_speed(
+            lower_position=lower_position,
+            upper_position=upper_position,
+            maximum_speed=velocity,
+        )
 
     def parse_dynamics(self, element: Optional[ElementTree.Element]) -> JointDynamics:
         """

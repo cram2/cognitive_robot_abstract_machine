@@ -4,7 +4,13 @@ from dataclasses import dataclass
 from typing import List, Set
 
 from krrood.exceptions import DataclassException
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.variable import Variable
+from typing_extensions import Generic
+
+from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
+    NodeType,
+)
 
 
 @dataclass
@@ -46,17 +52,19 @@ class MissingQueryVariableViolation(SupportDeterminismViolation):
 
 
 @dataclass
-class UnnormalizedSumUnitViolation(SupportDeterminismViolation):
+class UnnormalizedMixtureViolation(
+    SupportDeterminismViolation, Generic[NodeType], SubClassSafeGeneric
+):
     """
-    Violation raised when a SumUnit's log-weights do not sum to log(1).
+    Violation raised when the log-weights of a mixture do not sum to log(1).
 
-    Produced by Check 2 of verify_support_determinism(). Unnormalized SumUnits produce
+    Produced by Check 2 of verify_support_determinism(). Unnormalized mixtures produce
     incorrect backdoor adjustment probabilities.
     """
 
-    sum_unit_index: int
+    mixture: NodeType
     """
-    Graph index of the offending SumUnit.
+    The offending mixture, as the representation it was read from refers to its nodes.
     """
 
     actual_log_weight_sum: float
@@ -66,7 +74,7 @@ class UnnormalizedSumUnitViolation(SupportDeterminismViolation):
 
     def error_message(self) -> str:
         return (
-            f"SumUnit (index={self.sum_unit_index}) log-weights sum to "
+            f"The log-weights of mixture {self.mixture} sum to "
             f"{self.actual_log_weight_sum:.6f}, expected 0.0. "
             f"Unnormalized circuits produce incorrect backdoor probabilities."
         )
@@ -76,18 +84,20 @@ class UnnormalizedSumUnitViolation(SupportDeterminismViolation):
 
 
 @dataclass
-class OverlappingChildSupportsViolation(SupportDeterminismViolation):
+class OverlappingComponentsViolation(
+    SupportDeterminismViolation, Generic[NodeType], SubClassSafeGeneric
+):
     """
-    Violation raised when a SumUnit's children have overlapping marginal support on a
+    Violation raised when the components of a mixture have overlapping support on a
     declared query Variable.
 
     Produced by Check 3 of verify_support_determinism(). Overlapping supports violate
     the support-determinism property required for tractable backdoor adjustment.
     """
 
-    sum_unit_index: int
+    mixture: NodeType
     """
-    Graph index of the offending SumUnit.
+    The offending mixture, as the representation it was read from refers to its nodes.
     """
 
     query_variable: Variable
@@ -97,8 +107,8 @@ class OverlappingChildSupportsViolation(SupportDeterminismViolation):
 
     def error_message(self) -> str:
         return (
-            f"SumUnit (index={self.sum_unit_index}) has overlapping children supports "
-            f"on declared query Variable '{self.query_variable.name}': children are not "
+            f"The components of mixture {self.mixture} have overlapping supports "
+            f"on declared query Variable '{self.query_variable.name}': they are not "
             f"support-deterministic for this Variable."
         )
 

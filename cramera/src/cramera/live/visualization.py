@@ -130,12 +130,9 @@ class BridgePlanCallback(PlanCallback, StateHistoryObserver):
         :param node: The plan node that completed.
         """
         plan_ended = self.plan is not None and node is self.plan.root
-        if isinstance(node, MotionNode):
-            self.bridge.observe_motion_ended(node)
-            if plan_ended:
-                self.bridge.observe_chart(node.motion_statechart)
-        else:
-            self.bridge.snapshot_plan()
+        self.bridge.snapshot_plan()
+        if isinstance(node, MotionNode) and plan_ended:
+            self.bridge.observe_chart(node.motion_statechart)
         if (
             not isinstance(node, MotionNode) or plan_ended
         ) and self.bridge.recording is not None:
@@ -234,6 +231,11 @@ class LiveVisualization(PlanVisualization):
     The capture owned by this visualization session.
     """
 
+    _query_attachment: int | None = field(init=False, default=None, repr=False)
+    """
+    Automatic queries owned by this visualization's world attachment.
+    """
+
     _exit_callback: Optional[Callable[[], None]] = field(init=False, default=None)
     """
     The registered finalizer for this session's capture.
@@ -248,7 +250,7 @@ class LiveVisualization(PlanVisualization):
 
     def start(self) -> LiveVisualization:
         """
-        Attach the bridge to the world and start serving the viewer.
+        Start serving the world and its default live queries to the viewer.
 
         :return: This visualization.
         """
@@ -257,7 +259,7 @@ class LiveVisualization(PlanVisualization):
         if self.bridge.recording is not None:
             finalize_recording(self.bridge, self.bridge.recording)
         try:
-            self.bridge.attach(self.world)
+            self._query_attachment = self.bridge.attach(self.world)
             self._recording = Recording()
             self.bridge.recording = self._recording
             self._recording.start()
@@ -296,7 +298,7 @@ class LiveVisualization(PlanVisualization):
 
     def stop(self) -> None:
         """
-        Finalize this session's recording and release its callbacks and server.
+        Finalize the recording and release this session's callbacks, server and queries.
         """
         for callback in self._plan_callbacks:
             callback.stop()
@@ -318,7 +320,12 @@ class LiveVisualization(PlanVisualization):
             self.bridge.live_server.shutdown()
             self.bridge.live_server.server_close()
             self.bridge.live_server = None
-        if self._recording is not None:
-            finalize_recording(self.bridge, self._recording)
-            self._recording = None
-            self.bridge.recording = None
+        try:
+            if self._recording is not None:
+                finalize_recording(self.bridge, self._recording)
+                self._recording = None
+                self.bridge.recording = None
+        finally:
+            if self._query_attachment is not None:
+                self.bridge.release_world_queries(self._query_attachment)
+                self._query_attachment = None

@@ -1,13 +1,25 @@
+import tracemalloc
+
 import numpy as np
 import pytest
+import trimesh
+from PIL import Image
+from trimesh.visual import TextureVisuals
+from trimesh.visual.material import SimpleMaterial
 
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import InvalidCameraResolutionError
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.testing import ray_test_world
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 def test_create_segmentation_mask(ray_test_world):
@@ -250,3 +262,92 @@ def test_max_distance(ray_test_world):
     hits, indices, bodies = rt.ray_test(rays, targets, max_distance=1)
 
     assert len(hits) == 0
+
+
+# %% casting rays into a textured world
+
+TEXTURE_SIZE = 1024
+"""
+The edge length, in pixels, of the texture painted on each box of a textured world.
+"""
+
+
+def _textured_box_body(name: str, seed: int) -> Body:
+    """
+    :return: A body whose collision mesh is a unit box painted with a texture of its
+        own.
+    """
+    body = Body(name=PrefixedName(name))
+    box = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
+    generator = np.random.default_rng(seed)
+    box.visual = TextureVisuals(
+        uv=generator.random((len(box.vertices), 2)),
+        material=SimpleMaterial(
+            image=Image.fromarray(
+                generator.integers(
+                    0, 255, (TEXTURE_SIZE, TEXTURE_SIZE, 3), dtype=np.uint8
+                )
+            )
+        ),
+    )
+    body.collision = ShapeCollection(
+        [
+            Mesh.from_trimesh(
+                mesh=box,
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=body
+                ),
+            )
+        ],
+        reference_frame=body,
+    )
+    return body
+
+
+@pytest.fixture
+def textured_world() -> World:
+    """
+    :return: A world of two textured boxes standing 2 m apart along x.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        for index in range(2):
+            box = _textured_box_body(f"box_{index}", seed=index)
+            world.add_connection(
+                FixedConnection(
+                    parent=root,
+                    child=box,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=2.0 * index, reference_frame=root
+                    ),
+                )
+            )
+    return world
+
+
+def test_a_ray_hits_the_textured_box_it_points_at(textured_world):
+    ray_tracer = RayTracer(textured_world)
+
+    _, _, bodies = ray_tracer.ray_test(
+        np.array([2.0, 0.0, 2.0]), np.array([2.0, 0.0, -2.0])
+    )
+
+    assert bodies == [textured_world.get_body_by_name("box_1")]
+
+
+def test_casting_rays_does_not_decode_the_textures_of_the_world(textured_world):
+    """
+    A ray only meets geometry, so casting it must not unpack a texture.
+    """
+    ray_tracer = RayTracer(textured_world)
+    origins = np.array([[x, 0.0, 2.0] for x in np.linspace(-1.0, 3.0, 50)])
+    targets = origins - np.array([0.0, 0.0, 4.0])
+
+    tracemalloc.start()
+    ray_tracer.ray_test(origins, targets)
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert peak < TEXTURE_SIZE * TEXTURE_SIZE * 3

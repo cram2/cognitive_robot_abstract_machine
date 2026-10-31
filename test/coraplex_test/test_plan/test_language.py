@@ -17,7 +17,7 @@ from coraplex.language import (
     ParallelNode,
     TryInOrderNode,
 )
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import (
     sequential,
     parallel,
@@ -127,7 +127,7 @@ def test_perform_execute_single(pr2_apartment_context):
     act3 = ParkArmsAction(context.robot.all_arms)
 
     plan = sequential([act, act2, act3], context).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
     np.testing.assert_almost_equal(
         robot_view.root.global_transform.to_np()[:3, 3], [0.3, -1.3, 0], decimal=1
@@ -143,7 +143,7 @@ def test_perform_single_designator(pr2_apartment_context):
     world, robot_view, context = pr2_apartment_context
 
     plan = sequential([MoveTorsoAction(TorsoState.HIGH)], context).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert world.state[
@@ -165,7 +165,7 @@ def test_perform_parallel(pr2_apartment_context):
     act3 = code(lambda: check_thread_id(main_thread_id), context=context)
 
     plan = parallel([act, act2, act3], context).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
     plan.validate()
 
@@ -183,7 +183,7 @@ def test_perform_repeat_runs_a_succeeding_motion_once(pr2_apartment_context):
     plan = repeat(
         [MoveTorsoAction(TorsoState.HIGH)], maximum_repetitions=3, context=context
     ).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert world.state[
@@ -201,7 +201,7 @@ def test_repeat_does_not_give_up_on_a_child_that_starts_at_its_goal(
     which must not be mistaken for an attempt that stalled.
     """
     world, robot_view, context = pr2_apartment_context
-    with simulated_robot:
+    with kinematically_simulated_robot:
         sequential([MoveTorsoAction(TorsoState.HIGH)], context).plan.perform()
 
     plan = repeat(
@@ -209,7 +209,7 @@ def test_repeat_does_not_give_up_on_a_child_that_starts_at_its_goal(
         maximum_repetitions=3,
         context=context,
     ).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     [torso_down] = (
@@ -234,7 +234,7 @@ def test_exception_sequential(pr2_apartment_context):
     ).plan
 
     def perform_plan():
-        with simulated_robot:
+        with kinematically_simulated_robot:
             _ = plan.perform()
 
     with pytest.raises(PlanFailure):
@@ -253,7 +253,7 @@ def test_exception_try_in_order(pr2_apartment_context):
     act2 = code(raise_except)
 
     plan = try_in_order([act, act2], context).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         _ = plan.perform()
     assert len(plan.root.children) == 2
     assert plan.root.status == LifeCycleValues.SUCCEEDED
@@ -269,7 +269,7 @@ def test_exception_try_all(pr2_apartment_context):
     act2 = code(raise_except)
 
     plan = try_all([act, act2], context).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         _ = plan.perform()
 
     assert type(plan.root) is TryAllNode
@@ -309,7 +309,7 @@ def test_cancel_monitor_stops_the_motion_it_wraps(pr2_apartment_context):
         context=context,
     ).plan
     with pytest.raises(PlanCancelled):
-        with simulated_robot:
+        with kinematically_simulated_robot:
             plan.perform()
 
     assert _torso_position(world) == pytest.approx(start_position, abs=0.05)
@@ -334,7 +334,7 @@ def test_cancel_monitor_gives_up_on_the_plan_instead_of_stalling(pr2_apartment_c
         context=context,
     ).plan
     with pytest.raises(PlanCancelled):
-        with simulated_robot:
+        with kinematically_simulated_robot:
             plan.perform()
 
 
@@ -350,7 +350,7 @@ def test_never_firing_cancel_monitor_leaves_the_motion_alone(pr2_apartment_conte
         monitor=ConstFalseNode(name="never"),
         context=context,
     ).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert _torso_position(world) == pytest.approx(0.3, abs=0.05)
@@ -374,7 +374,7 @@ def test_repeat_raises_when_it_runs_out_of_attempts(pr2_apartment_context):
     ).plan
 
     with pytest.raises(RepetitionsExhausted):
-        with simulated_robot:
+        with kinematically_simulated_robot:
             plan.perform()
 
 
@@ -387,7 +387,7 @@ def test_repeat_of_a_non_converging_motion_is_attempted(pr2_apartment_context):
     target = Pose.from_xyz_rpy(1, -1, reference_frame=world.root)
 
     plan = repeat([NavigateAction(target)], maximum_repetitions=2, context=context).plan
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
 
     assert plan.root.status == LifeCycleValues.SUCCEEDED

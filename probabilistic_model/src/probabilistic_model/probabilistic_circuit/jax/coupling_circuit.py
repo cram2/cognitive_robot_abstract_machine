@@ -3,12 +3,14 @@ from dataclasses import dataclass
 from functools import cached_property
 
 import jax
-from jax.tree_util import tree_flatten, tree_unflatten
+from jax.tree_util import tree_unflatten
 
 import equinox as eqx
 from typing_extensions import Tuple, List
 from probabilistic_model.exceptions import ShapeMismatchError
-from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import Layer
+from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
+    DifferentiableLayer,
+)
 
 
 @dataclass
@@ -29,7 +31,7 @@ class Conditioner(ABC):
 
     @property
     @abstractmethod
-    def output_length(self):
+    def output_length(self) -> int:
         """
         :return: The length number of parameters that the model outputs.
         """
@@ -48,7 +50,7 @@ class CouplingCircuit(eqx.Module):
     The conditioner that generates the parameters for the circuit.
     """
 
-    circuit: Layer = eqx.field(static=True)
+    circuit: DifferentiableLayer = eqx.field(static=True)
     """
     The circuit to generate the parameters for.
     """
@@ -68,8 +70,8 @@ class CouplingCircuit(eqx.Module):
         self,
         conditioner: Conditioner,
         conditioner_columns: jax.Array,
-        circuit: Layer,
-        circuit_columns,
+        circuit: DifferentiableLayer,
+        circuit_columns: jax.Array,
     ):
         self.conditioner = conditioner
         self.conditioner_columns = conditioner_columns
@@ -91,58 +93,59 @@ class CouplingCircuit(eqx.Module):
             into the structure of the circuit.
         """
         # get the parameters and circuit definition
-        tree_def, static = self.circuit.partition()
+        parameters, _ = self.circuit.partition()
 
         # flatten the parameters
-        flat_model, flat_tree_def = jax.tree_util.tree_flatten(tree_def)
+        flat_parameters, _ = jax.tree_util.tree_flatten(parameters)
 
-        slices = [None] * len(flat_model)
+        slices = [None] * len(flat_parameters)
         offset = 0
-        for index, leaf in enumerate(flat_model):
+        for index, leaf in enumerate(flat_parameters):
             leaf_length = len(leaf)
             slices[index] = (offset, offset + leaf_length)
             offset += leaf_length
 
         return slices
 
-    def create_circuit_from_parameters(self, params: jax.Array) -> Layer:
+    def create_circuit_from_parameters(
+        self, parameters: jax.Array
+    ) -> DifferentiableLayer:
         """
-        Generate a circuit with the structure from self.circuit and the parameters from
-        params.
+        Generate a circuit with the structure from self.circuit and the given parameters.
 
-        :param params: The parameters to be used in the circuit.
+        :param parameters: The parameters to be used in the circuit.
         :return: The circuit
         """
         # get the parameters and circuit definition
-        tree_def, static = self.partition_circuit()
+        circuit_parameters, static = self.partition_circuit()
 
         # flatten the parameters
-        flat_model, flat_tree_def = jax.tree_util.tree_flatten(tree_def)
+        _, parameter_structure = jax.tree_util.tree_flatten(circuit_parameters)
 
         # slice the parameters such that they match the pytree
-        slices_parameters = [
-            params[start:end] for start, end in self.slices_of_parameters_for_flat_model
+        sliced_parameters = [
+            parameters[start:end]
+            for start, end in self.slices_of_parameters_for_flat_model
         ]
 
-        # update the parameters
-        params = tree_unflatten(flat_tree_def, slices_parameters)
-
         # assemble the parameterized model
-        circuit = eqx.combine(params, static)
+        circuit = eqx.combine(
+            tree_unflatten(parameter_structure, sliced_parameters), static
+        )
         return circuit
 
-    def conditional_log_likelihood_single(self, x):
+    def conditional_log_likelihood_single(self, x: jax.Array) -> jax.Array:
         """
         Calculate the truncated log likelihood of a single data point.
 
         :param x: The datapoint
         :return: The truncated log likelihood of the data point
         """
-        params = self.conditioner.generate_parameters(x[self.conditioner_columns])
-        circuit = self.create_circuit_from_parameters(params)
+        parameters = self.conditioner.generate_parameters(x[self.conditioner_columns])
+        circuit = self.create_circuit_from_parameters(parameters)
         return circuit.log_likelihood_of_nodes_single(x[self.circuit_columns])
 
-    def conditional_log_likelihood(self, x):
+    def conditional_log_likelihood(self, x: jax.Array) -> jax.Array:
         return jax.vmap(self.conditional_log_likelihood_single)(x)
 
     def validate(self):
@@ -168,14 +171,14 @@ class LinearConditioner(eqx.Module, Conditioner):
 
     linear: eqx.nn.Linear
 
-    def __init__(self, in_features: int, out_features: int):
+    def __init__(self, number_of_inputs: int, number_of_outputs: int):
         self.linear = eqx.nn.Linear(
-            in_features, out_features, key=jax.random.PRNGKey(69)
+            number_of_inputs, number_of_outputs, key=jax.random.PRNGKey(69)
         )
 
     def generate_parameters(self, x: jax.Array) -> jax.Array:
         return self.linear(x)
 
     @property
-    def output_length(self):
+    def output_length(self) -> int:
         return self.linear.out_features

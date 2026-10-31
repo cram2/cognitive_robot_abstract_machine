@@ -58,6 +58,9 @@ function makeButton(view) {
 }
 
 function makeRoot() {
+  const stepsTree = makeElement();
+  const steps = makeElement();
+  steps.querySelector = function (selector) { return selector === '.steps-tree' ? stepsTree : undefined; };
   const byId = {
     '#graph-empty': makeElement(),
     '#graph-nav': makeElement(),
@@ -66,7 +69,7 @@ function makeRoot() {
     '#gnav-path': makeElement(),
     '#gt-live': makeElement(),
     '.graph-canvas': makeElement(),
-    '#graph-steps': makeElement(),
+    '#graph-steps': steps,
     '#legend': makeElement(),
     '#graph-zoom-in': makeButton(),
     '#graph-zoom-out': makeButton(),
@@ -115,6 +118,7 @@ function errorPage(status) {
 function loadPanel(responses, search) {
   let factory = null;
   let lastBuild = null;
+  let selectNode = null;
   const requested = [];
   const Panels = { define(id, f) { factory = f; } };
   const zooms = [];
@@ -122,7 +126,7 @@ function loadPanel(responses, search) {
   const statuses = [];
   const Graph = {
     attach() {}, build(payload) { lastBuild = payload; },
-    onSelect() {}, onDoubleSelect() {}, highlight() {}, reset() {},
+    onSelect(callback) { selectNode = callback; }, onDoubleSelect() {}, highlight() {}, reset() {},
     setStatuses(map) { statuses.push(map); return true; },
     zoomBy(factor) { zooms.push(factor); }, fit() { zooms.push('fit'); },
     resize() { resizes.push(1); },
@@ -140,6 +144,7 @@ function loadPanel(responses, search) {
   return {
     factory: factory,
     lastBuild: function () { return lastBuild; },
+    select: function (id) { selectNode(id); },
     requested: requested,
     zooms: zooms,
     resizes: resizes,
@@ -158,8 +163,8 @@ test('a live plan is drawn with the groups and legend the bridge sent', async fu
     'http://bridge/plan': {
       signature: 's1',
       nodes: [
-        { id: 'a1', kind: 'AttachNode', label: 'AttachNode', status: 'CREATED', group: 'attachment' },
-        { id: 'm1', kind: 'MotionNode', label: 'MotionNode', status: 'CREATED', group: 'motion' },
+        { id: 'a1', kind: 'AttachNode', label: 'AttachNode', status: 'NOT_STARTED', group: 'attachment' },
+        { id: 'm1', kind: 'MotionNode', label: 'MotionNode', status: 'NOT_STARTED', group: 'motion' },
       ],
       legend: [{ group: 'attachment', label: 'Attach / detach' }],
     },
@@ -189,6 +194,88 @@ test('a live plan is drawn with the groups and legend the bridge sent', async fu
 });
 
 
+// %% native plan descriptions
+test('a live plan shows its native description while keeping the label and target', async function () {
+  const action = {
+    id: 'transport', kind: 'ActionNode', label: 'TransportAction',
+    status: 'RUNNING', group: 'action', target: 'kitchen/milk.stl',
+    description: 'A transport action whose arm is left and whose object is the milk.',
+  };
+  const panel = loadPanel({
+    '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+    '/api/knowledge/view?name=plan': { ok: true, nodes: [], edges: [], details: {}, live: 'plan' },
+    'http://bridge/plan': { signature: 'description', nodes: [action] },
+  });
+  const root = makeRoot();
+  const bus = makeBus();
+  let selected = null;
+  bus.on('entity:select', function (selection) { selected = selection; });
+  const instance = panel.factory(root, bus);
+  try {
+    await flush();
+    root.buttons.find(function (button) { return button.dataset.view === 'plan'; }).click();
+    await flush();
+    bus.emit('live:changed', { on: true, url: 'http://bridge' });
+    await flush();
+
+    const payload = panel.lastBuild();
+    const node = payload.nodes.find(function (entry) { return entry.id === action.id; });
+    panel.select(action.id);
+    assert.ok(node.title.split('\n').includes(action.description));
+    assert.ok(selected.detail.lines.includes(action.description));
+    assert.strictEqual(node.label, action.label);
+    assert.strictEqual(node.target, action.target);
+    assert.strictEqual(Object.hasOwn(node, 'arm'), false);
+  } finally {
+    instance.destroy();
+  }
+});
+
+
+test('step rows and motion details expose descriptions as plain tooltip text', async function () {
+  const descriptions = {
+    action: ['A transport action whose target is <milk> & cereal.'],
+    motion: ['A move motion whose arm is "left".'],
+  };
+  const panel = loadPanel({
+    '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+    '/api/knowledge/view?name=plan': {
+      ok: true, edges: [],
+      nodes: [
+        { id: 'action', kind: 'ActionNode', label: 'Transport', group: 'action' },
+        { id: 'motion', parent: 'action', kind: 'MotionNode', label: 'Move', group: 'motion' },
+      ],
+      details: {
+        action: { label: 'Transport', lines: descriptions.action },
+        motion: { label: 'Move', lines: descriptions.motion },
+      },
+    },
+  });
+  const root = makeRoot();
+  const stepTree = root.control('#graph-steps').querySelector('.steps-tree');
+  const rows = Object.keys(descriptions).map(function (id) {
+    return { dataset: { id: id }, title: '' };
+  });
+  stepTree.querySelectorAll = function (selector) {
+    return selector === '.st-row, .st-leaf' ? rows : [];
+  };
+  const instance = panel.factory(root, makeBus());
+  try {
+    await flush();
+    root.buttons.find(function (button) { return button.dataset.view === 'plan'; }).click();
+    await flush();
+
+    rows.forEach(function (row) {
+      assert.strictEqual(row.title, descriptions[row.dataset.id].join('\n'));
+      assert.ok(stepTree.innerHTML.includes('data-id="' + row.dataset.id + '"'));
+      assert.strictEqual(stepTree.innerHTML.includes(row.title), false);
+    });
+  } finally {
+    instance.destroy();
+  }
+});
+
+
 // %% live statechart colour groups
 test('statechart nodes are grouped by the kind of node giskardpy compiled', async function () {
   const panel = loadPanel({
@@ -201,7 +288,7 @@ test('statechart nodes are grouped by the kind of node giskardpy compiled', asyn
         { id: 'g0', name: 'ReachGoal', class_name: 'Goal', life_cycle: 'RUNNING', observation: '1' },
         { id: 't1', parent: 'g0', name: 'CartesianPose', class_name: 'CartesianPose', life_cycle: 'RUNNING', observation: '1' },
         { id: 'm1', parent: 'g0', name: 'PoseReached', class_name: 'PoseReached', life_cycle: 'RUNNING', observation: '0' },
-        { id: 'e1', parent: 'g0', name: 'EndMotion', class_name: 'EndMotion', life_cycle: 'CREATED', observation: '0' },
+        { id: 'e1', parent: 'g0', name: 'EndMotion', class_name: 'EndMotion', life_cycle: 'NOT_STARTED', observation: '0' },
       ],
       edges: [],
     },
@@ -468,18 +555,19 @@ const RECORDED_STATECHARTS = {
   ],
   moments: [
     { chart: 0, lifeCycles: ['RUNNING', 'NOT_STARTED'], observations: ['UNKNOWN', 'FALSE'] },
-    { chart: 0, lifeCycles: ['DONE', 'DONE'], observations: ['TRUE', 'TRUE'] },
+    { chart: 0, lifeCycles: ['SUCCEEDED', 'SUCCEEDED'], observations: ['TRUE', 'TRUE'] },
     { chart: 1, lifeCycles: ['RUNNING'], observations: ['UNKNOWN'] },
   ],
   frames: [-1, 0, 1, 2],
 };
 
-function loadRecordedChartPanel() {
+function loadRecordedChartPanel(presentation) {
   return loadPanel({
     '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
     '/api/knowledge/view?name=chart': {
       ok: true, nodes: [], edges: [], details: {}, live: 'chart',
       empty: 'no motion here', recorded: RECORDED_STATECHARTS,
+      ...(presentation || {}),
     },
   });
 }
@@ -493,6 +581,23 @@ async function showRecordedChart(panel) {
   await flush();
   return { instance: instance, bus: bus, root: root };
 }
+
+test('recorded charts retain their palette through status updates and gaps between motions', async function () {
+  const styles = { RUNNING: { label: 'recorded label', color: '#123456' } };
+  const order = ['RUNNING'];
+  const panel = loadRecordedChartPanel({ statusStyles: styles, statusOrder: order });
+  const shown = await showRecordedChart(panel);
+  try {
+    for (const index of [1, 2, 0, 3]) {
+      shown.bus.emit('scene:frame', { index: index });
+      assert.strictEqual(panel.lastBuild().statusStyles, styles);
+      assert.strictEqual(panel.lastBuild().statusOrder, order);
+    }
+    assert.ok(panel.requested.every(url => !url.startsWith('http://bridge')));
+  } finally {
+    shown.instance.destroy();
+  }
+});
 
 test('the replayed statechart is the one the played frame recorded', async function () {
   const panel = loadRecordedChartPanel();
@@ -520,7 +625,7 @@ test('playing on within one statechart re-colours it instead of rebuilding', asy
     shown.bus.emit('scene:frame', { index: 2 });
 
     assert.strictEqual(panel.lastBuild(), built);
-    assert.deepStrictEqual(panel.statuses.at(-1), { g0: 'DONE', m1: 'DONE' });
+    assert.deepStrictEqual(panel.statuses.at(-1), { g0: 'SUCCEEDED', m1: 'SUCCEEDED' });
   } finally {
     shown.instance.destroy();
   }
@@ -620,3 +725,93 @@ test('a view that arrives after the reader moved on is not drawn', async functio
     instance.destroy();
   }
 });
+
+// %% lifecycle labels
+for (const status of ['PAUSED', 'INTERRUPTED', 'NOT_STARTED']) {
+  test('the step list labels lifecycle ' + status, async function () {
+    const style = { label: 'supplied label for ' + status, color: '#13579b' };
+    const panel = loadPanel({
+      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {}, statusStyles: { [status]: style }, statusOrder: [status] },
+      '/api/knowledge/view?name=plan': { ok: true, nodes: [], edges: [], details: {}, live: 'plan' },
+      'http://bridge/plan': { signature: 'step', nodes: [
+        { id: 'action', kind: 'ActionNode', label: 'Transport', status: status, group: 'action' },
+      ] },
+    });
+    const root = makeRoot();
+    const bus = makeBus();
+    const instance = panel.factory(root, bus);
+    try {
+      await flush();
+      root.buttons.find(function (button) { return button.dataset.view === 'plan'; }).click();
+      await flush();
+      bus.emit('live:changed', { on: true, url: 'http://bridge' });
+      await flush();
+      const html = root.control('#graph-steps').querySelector('.steps-tree').innerHTML;
+      assert.match(html, new RegExp('>' + style.label + '</span>'));
+      assert.match(html, new RegExp('--status-color:' + style.color));
+      assert.strictEqual(panel.lastBuild().statusStyles[status], style);
+      assert.deepStrictEqual(panel.lastBuild().statusOrder, [status]);
+    } finally {
+      instance.destroy();
+    }
+  });
+}
+
+// %% authoritative plan status
+for (const status of ['NOT_STARTED', 'RUNNING', 'PAUSED', 'INTERRUPTED', 'FAILED', 'SUCCEEDED']) {
+  test('a parent step keeps native ' + status + ' after its motion succeeds', async function () {
+    const panel = loadPanel({
+      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {},
+        statusStyles: { [status]: { color: '#123456', label: status } } },
+      '/api/knowledge/view?name=plan': { ok: true, nodes: [], edges: [], details: {}, live: 'plan' },
+      'http://bridge/plan': { signature: 'parent-motion', nodes: [
+        { id: 'action', kind: 'ActionNode', label: 'Transport', status: status, group: 'action' },
+        { id: 'motion', parent: 'action', kind: 'MotionNode', label: 'Move', status: 'SUCCEEDED', group: 'motion' },
+      ] },
+    });
+    const root = makeRoot();
+    const bus = makeBus();
+    const instance = panel.factory(root, bus);
+    try {
+      await flush();
+      root.buttons.find(function (button) { return button.dataset.view === 'plan'; }).click();
+      await flush();
+      bus.emit('live:changed', { on: true, url: 'http://bridge' });
+      await flush();
+      const html = root.control('#graph-steps').querySelector('.steps-tree').innerHTML;
+      const parentRow = html.split('</div>')[0];
+      assert.match(parentRow, new RegExp('>' + status + '</span>'));
+    } finally {
+      instance.destroy();
+    }
+  });
+}
+
+// %% status text is not markup
+for (const fromPalette of [true, false]) {
+  test('a ' + (fromPalette ? 'supplied label' : 'recorded unknown status') + ' is rendered as text', async function () {
+    const label = '<img src=x onerror=alert(1)> & failed';
+    const status = fromPalette ? 'RUNNING' : label;
+    const style = { label: label, color: '#123456' };
+    const panel = loadPanel({
+      '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+      '/api/knowledge/view?name=plan': {
+        ok: true, edges: [], details: {}, statusStyles: fromPalette ? { [status]: style } : {},
+        nodes: [{ id: 'action', kind: 'ActionNode', label: 'Transport', status: status, group: 'action' }],
+      },
+    });
+    const root = makeRoot();
+    const instance = panel.factory(root, makeBus());
+    try {
+      await flush();
+      root.buttons.find(button => button.dataset.view === 'plan').click();
+      await flush();
+      const html = root.control('#graph-steps').querySelector('.steps-tree').innerHTML;
+      assert.doesNotMatch(html, /<img/);
+      assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt; &amp; failed<\/span>/);
+      assert.doesNotMatch(html, /class="sp sp-/);
+    } finally {
+      instance.destroy();
+    }
+  });
+}

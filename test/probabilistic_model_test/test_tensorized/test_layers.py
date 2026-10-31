@@ -10,7 +10,15 @@ import unittest
 import numpy as np
 import pandas as pd
 from krrood.adapters.json_serializer import from_json, to_json
-from random_events.interval import Bound, SimpleInterval, closed, open, reals, singleton
+from random_events.interval import (
+    Bound,
+    SimpleInterval,
+    closed,
+    open,
+    open_closed,
+    reals,
+    singleton,
+)
 from random_events.product_algebra import SimpleEvent
 from random_events.variable import Continuous, Integer
 from scipy.sparse import coo_array
@@ -35,10 +43,12 @@ from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_event,
     uniform_measure_of_simple_event,
 )
-from probabilistic_model.exceptions import ShapeMismatchError
+from probabilistic_model.exceptions import (
+    NumberOfWeightsMismatchError,
+    ShapeMismatchError,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     NonPositiveScaleError,
-    NumberOfWeightsMismatchError,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
@@ -93,7 +103,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.utils import (
 )
 from probabilistic_model.utils import MissingDict
 from .test_layered_probabilistic_circuit import shared_children_circuit
-
 
 x = Continuous("x")
 y = Continuous("y")
@@ -329,6 +338,58 @@ class VectorizedTruncationTestCase(unittest.TestCase):
                 SimpleEvent.from_data({x: assignment}).as_composite_set()
             )
             self.assertAlmostEqual(float(np.exp(log_probabilities[node])), expected)
+
+    def test_dirac_delta_layer_probability_agrees_with_the_scalar_truncation(self):
+        layer = DiracDeltaLayer(0, np.array([0.0, 1.0, 2.0]), np.array([1.0, 1.0, 1.0]))
+        for assignment in (
+            closed(1.0, 2.0),
+            open(1.0, 2.0),
+            closed(0.5, 1.5),
+            closed(5.0, 6.0),
+        ):
+            with self.subTest(str(assignment)):
+                event = SimpleEvent.from_data({x: assignment})
+                probabilities = layer.probability_of_simple_event_of_nodes(
+                    event, SortedSet([x])
+                )
+                expected_log_probabilities = [
+                    layer.node_distribution(node, x).log_truncated(
+                        event.as_composite_set()
+                    )[1]
+                    for node in range(layer.number_of_nodes)
+                ]
+                np.testing.assert_array_equal(
+                    probabilities, np.exp(expected_log_probabilities)
+                )
+
+    def test_dirac_delta_layer_contains_a_location_an_interval_cannot_hold_exactly(
+        self,
+    ):
+        """
+        An interval holds its bounds with less precision than a location, so a singleton
+        built from a location does not hold that location exactly.
+
+        The layer still has to recognise it, or a circuit gives its own support
+        probability zero.
+        """
+        location = 3.427709925174713
+        layer = DiracDeltaLayer(0, np.array([location]), np.array([1.0]))
+        self.assertNotEqual(singleton(location).simple_sets[0].lower, location)
+        self.assertEqual(
+            layer.probability_of_simple_event_of_nodes(
+                SimpleEvent.from_data({x: singleton(location)}), SortedSet([x])
+            ),
+            np.array([1.0]),
+        )
+
+    def test_dirac_delta_layer_excludes_a_location_outside_its_tolerance(self):
+        layer = DiracDeltaLayer(0, np.array([1.0]), np.array([1.0]))
+        self.assertEqual(
+            layer.probability_of_simple_event_of_nodes(
+                SimpleEvent.from_data({x: closed(1.0 + 1e-3, 2.0)}), SortedSet([x])
+            ),
+            np.array([0.0]),
+        )
 
     def test_dirac_delta_layer_agrees_with_the_scalar_truncation(self):
         layer = DiracDeltaLayer(0, np.array([0.0, 1.0, 2.0]), np.array([1.0, 1.0, 1.0]))

@@ -383,9 +383,9 @@ class GraphOfConvexPolygons(
             for shape in entity.collision.shapes
         ]
 
-        bounds = result.search_space.bounding_boxes[0].to_point3_bounds()
+        search_box = result.search_space.bounding_boxes[0]
         seeds = list(extra_seed_points) + settings.coverage_grid_seeds(
-            bounds.lower, bounds.upper
+            search_box.lower, search_box.upper
         )
 
         regions: List[HPolyhedron] = []

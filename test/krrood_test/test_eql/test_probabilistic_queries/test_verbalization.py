@@ -61,3 +61,14 @@ def test_verbalize_probability_of_conjunction():
     assert text.startswith("the probability that")
     assert "the a of a Coin is less than 0.5" in text
     assert "the b of the Coin is less than 1" in text
+
+
+def test_verbalize_probability_of_condition_given_evidence():
+    x = variable(Coin)
+
+    text = verbalize_expression(probability_of(x.a < 0.5, evidence=x.b < 1))
+
+    assert text == (
+        "the probability that the a of a Coin is less than 0.5 "
+        "given that the b of the Coin is less than 1"
+    )

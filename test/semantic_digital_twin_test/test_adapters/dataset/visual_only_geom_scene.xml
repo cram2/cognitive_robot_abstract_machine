@@ -1,0 +1,7 @@
+<mujoco>
+  <worldbody>
+    <body name="shelf">
+      <geom type="box" size="0.1 0.1 0.1" contype="0" conaffinity="0"/>
+    </body>
+  </worldbody>
+</mujoco>

@@ -3,7 +3,6 @@ from os.path import dirname
 
 from typing_extensions import Optional, List, Dict, Any, ClassVar
 
-from semantic_digital_twin.semantic_annotations.mixins import HasMechanicalJoint
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from semantic_digital_twin.reasoning.reasoner import CaseReasoner
@@ -85,20 +84,13 @@ class WorldReasoner:
 
     def _hold_in_world(self, semantic_annotation: SemanticAnnotation) -> None:
         """
-        Give the world the inferred annotation, and the joint that already moves it.
+        Give the world the inferred annotation.
 
         An inferred annotation the world already holds an equal of is dropped in favour
         of the one the world holds, so that reasoning over a world that was annotated
-        before does not store a second copy of what it recognises, and so that the joint
-        is given to the annotation everything else refers to.
+        before does not store a second copy of what it recognises.
 
         :param semantic_annotation: The annotation a rule inferred.
         """
-        annotation_in_world = self.world.get_semantic_annotation_equal_to(
-            semantic_annotation
-        )
-        if annotation_in_world is None:
+        if self.world.get_semantic_annotation_equal_to(semantic_annotation) is None:
             self.world.add_semantic_annotation_recursively(semantic_annotation)
-            annotation_in_world = semantic_annotation
-        if isinstance(annotation_in_world, HasMechanicalJoint):
-            annotation_in_world.create_default_mechanical_joint()

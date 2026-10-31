@@ -24,8 +24,9 @@ numerically integrating the joint density.
 
 from __future__ import annotations
 
+import math
 import unittest
-from enum import IntEnum
+from enum import Enum, IntEnum
 from unittest import mock
 
 import numpy as np
@@ -35,9 +36,10 @@ from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.set import Set
 from random_events.variable import Continuous, Integer, Symbolic
 
+from probabilistic_model.adapters.exceptions import CannotConvertError
 from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
-    CannotConvertError,
     NotExactlyOneRootError,
+    UnitNotConvertedError,
 )
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
@@ -46,6 +48,7 @@ from probabilistic_model.adapters.rustworkx_tensorized.tensorized_to_rustworkx i
     LayeredCircuitToRustworkxCircuitConverter,
 )
 from probabilistic_model.distributions.distributions import (
+    DiracDeltaDistribution,
     IntegerDistribution,
     SymbolicDistribution,
 )
@@ -118,6 +121,35 @@ class SparseSymbolEnum(IntEnum):
 
 
 sparse = Symbolic(name="sparse", domain=Set.from_iterable(SparseSymbolEnum))
+
+
+class SymbolWithLargeHash(Enum):
+    """
+    Domain elements whose hashes are larger than the hashes Python reduces integers to,
+    so that hashing such a hash again does not give it back.
+    """
+
+    FIRST = 2**62 + 2**20
+    SECOND = 2**62 + 2**21
+
+    def __hash__(self) -> int:
+        return self.value
+
+
+class SymbolWithHashBeyondFloatPrecision(Enum):
+    """
+    Domain elements whose hashes need more significant bits than the mantissa of a float
+    holds, so that storing such a hash as a float does not give it back.
+
+    Their hashes still differ as floats, so the positions of the elements stay
+    unambiguous.
+    """
+
+    FIRST = 2**62 + 1
+    SECOND = 2**62 + 1025
+
+    def __hash__(self) -> int:
+        return self.value
 
 
 class UnconvertibleUniformDistribution(UniformDistribution):
@@ -293,6 +325,26 @@ class ConversionTestCase(unittest.TestCase):
                 layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
                 self.assertEqual(list(layered.variables), list(rx_circuit.variables))
                 layered.validate()
+
+    def test_the_product_units_of_a_level_become_the_nodes_of_one_layer(self):
+        circuit = shared_children_circuit()
+        converted = RustworkxCircuitToLayeredCircuitConverter.convert_with_layers(
+            circuit
+        )
+        product_units = [
+            unit for unit in circuit.nodes() if isinstance(unit, ProductUnit)
+        ]
+        nodes = [converted.node_of(unit) for unit in product_units]
+        self.assertIs(nodes[0].layer, nodes[1].layer)
+        self.assertIsInstance(nodes[0].layer, ProductLayer)
+        self.assertEqual({node.node for node in nodes}, {0, 1})
+
+    def test_a_unit_of_another_circuit_was_not_converted(self):
+        converted = RustworkxCircuitToLayeredCircuitConverter.convert_with_layers(
+            shared_children_circuit()
+        )
+        with self.assertRaises(UnitNotConvertedError):
+            converted.node_of(shared_children_circuit().root)
 
     def test_a_leaf_without_a_converter_is_reported(self):
         circuit = RxCircuit()
@@ -1257,6 +1309,75 @@ class SymbolicEncodingTestCase(unittest.TestCase):
             encoding.indices_of_hashes(np.array([5.0, np.nan])), [-1, -1]
         )
 
+    def test_a_distribution_over_elements_with_large_hashes_keeps_its_probabilities(
+        self,
+    ):
+        variable = Symbolic(
+            name="large_hash", domain=Set.from_iterable(SymbolWithLargeHash)
+        )
+        distribution = SymbolicDistribution(
+            variable=variable,
+            probabilities=MissingDict(
+                float,
+                {
+                    hash(SymbolWithLargeHash.FIRST): 0.25,
+                    hash(SymbolWithLargeHash.SECOND): 0.75,
+                },
+            ),
+        )
+        layer = SymbolicLayer.from_distributions(0, [distribution])
+        self.assertEqual(
+            dict(layer.node_distribution(0, variable).probabilities),
+            dict(distribution.probabilities),
+        )
+
+    def test_a_distribution_over_elements_whose_hashes_exceed_float_precision_keeps_its_probabilities(
+        self,
+    ):
+        variable = Symbolic(
+            name="beyond_float_precision",
+            domain=Set.from_iterable(SymbolWithHashBeyondFloatPrecision),
+        )
+        distribution = SymbolicDistribution(
+            variable=variable,
+            probabilities=MissingDict(
+                float,
+                {
+                    hash(SymbolWithHashBeyondFloatPrecision.FIRST): 0.25,
+                    hash(SymbolWithHashBeyondFloatPrecision.SECOND): 0.75,
+                },
+            ),
+        )
+        layer = SymbolicLayer.from_distributions(0, [distribution])
+        self.assertEqual(
+            dict(layer.node_distribution(0, variable).probabilities),
+            dict(distribution.probabilities),
+        )
+
+    def test_the_support_of_a_symbolic_circuit_agrees_with_rustworkx(self):
+        variable = Symbolic(
+            name="beyond_float_precision",
+            domain=Set.from_iterable(SymbolWithHashBeyondFloatPrecision),
+        )
+        circuit = RxCircuit()
+        leaf(
+            SymbolicDistribution(
+                variable=variable,
+                probabilities=MissingDict(
+                    float,
+                    {
+                        hash(SymbolWithHashBeyondFloatPrecision.FIRST): 0.25,
+                        hash(SymbolWithHashBeyondFloatPrecision.SECOND): 0.75,
+                    },
+                ),
+            ),
+            circuit,
+        )
+        self.assertEqual(
+            RustworkxCircuitToLayeredCircuitConverter.convert(circuit).support,
+            circuit.support,
+        )
+
     def test_symbolic_layer_stores_positions_in_the_domain(self):
         [symbolic_layer] = [
             layer for layer in self.layered.layers if isinstance(layer, SymbolicLayer)
@@ -1482,6 +1603,48 @@ class LayerTestCase(unittest.TestCase):
             layer.cumulative_distribution_of_nodes(points)[:, 0],
             distribution.cumulative_distribution_function(points),
         )
+
+
+class SupportOfPointMassesTestCase(unittest.TestCase):
+    """
+    A circuit of Dirac deltas at locations an interval cannot hold exactly must still
+    give its own support, and every region of it, the probability the same circuit of
+    units gives.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        generator = np.random.default_rng(0)
+        cls.rx_circuit = RxCircuit()
+        root = SumUnit(probabilistic_circuit=cls.rx_circuit)
+        for _ in range(20):
+            product = ProductUnit(probabilistic_circuit=cls.rx_circuit)
+            for variable in (x, y):
+                product.add_subcircuit(
+                    leaf(
+                        DiracDeltaDistribution(
+                            variable=variable,
+                            location=float(generator.uniform(0, 5)),
+                        ),
+                        cls.rx_circuit,
+                    )
+                )
+            root.add_subcircuit(product, math.log(1 / 20))
+        cls.layered = RustworkxCircuitToLayeredCircuitConverter.convert(cls.rx_circuit)
+
+    def test_the_support_has_probability_one(self):
+        self.assertAlmostEqual(
+            self.layered.probability(self.layered.support), 1.0, places=9
+        )
+
+    def test_every_region_of_the_support_agrees_with_rustworkx(self):
+        for simple_set in self.rx_circuit.support.simple_sets:
+            with self.subTest(str(simple_set)):
+                self.assertAlmostEqual(
+                    self.layered.probability(simple_set.as_composite_set()),
+                    self.rx_circuit.probability(simple_set.as_composite_set()),
+                    places=9,
+                )
 
 
 if __name__ == "__main__":

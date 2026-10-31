@@ -45,7 +45,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
     PlanarBoundingBox,
-    Bounds,
+    CoordinateBounds,
 )
 from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
     GraphOfConvexSets,
@@ -372,7 +372,7 @@ class GraphOfBoundingBoxes(
         return result
 
     def _segment_is_collision_free(
-        self, start: PointT, end: PointT, node_bounds: List[Bounds[np.ndarray]]
+        self, start: PointT, end: PointT, node_bounds: List[CoordinateBounds]
     ) -> bool:
         """
         Check whether a straight-line segment stays entirely within free space.

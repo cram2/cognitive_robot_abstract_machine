@@ -215,6 +215,21 @@ class QPControllerConfig:
             target_frequency=20, braking_time=timedelta(seconds=0.1), verbose=False
         )
 
+    @classmethod
+    def create_with_physical_simulation_defaults(cls) -> QPControllerConfig:
+        """
+        Creates a silent configuration for a robot driven against a running physics,
+        where each command becomes the servos' set point.
+
+        The rate is higher than :meth:`create_with_fast_simulation_defaults` picks,
+        since the wall clock of such a run is spent stepping the physics rather than
+        solving the controller, and finer set points reach a goal in less simulated
+        time.
+        """
+        return cls(
+            target_frequency=100, braking_time=timedelta(seconds=0.1), verbose=False
+        )
+
     def set_dof_weight(
         self, dof_name: PrefixedName, derivative: Derivatives, weight: float
     ):

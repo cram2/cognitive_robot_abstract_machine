@@ -78,24 +78,39 @@ def grasp_from_above(graspable) -> GraspCandidate:
 # %% approach sequences
 
 
+def _fingers_at(goal, end_effector) -> np.ndarray:
+    """
+    :param goal: A tool frame goal, in the grasp frame's own reference frame.
+    :param end_effector: The end effector the goal is for.
+    :return: Where the point its fingers meet at lands once the goal is reached, which
+        is what the sequence aims and so what the clearances are measured at.
+    """
+    reached = goal.homogeneous_matrix.to_np()
+    tool_P_grasp = end_effector.tool_P_grasp_when_closed.to_np()[:3].ravel()
+    return reached[:3, :3] @ tool_P_grasp + reached[:3, 3]
+
+
 def test_pre_grasp_pose_clears_the_body_it_grasps(boxed_pr2_world):
     """
     A grasp at the body's own origin has to be approached from outside the body, so the
     pre-grasp pose stands off by half of it plus the clearance.
     """
     _, robot, graspable = boxed_pr2_world
+    end_effector = robot.left_arm.end_effector
     action = HasApproachesGraspPoses()
 
     origin_grasp = grasp_at_origin(graspable)
     poses = action.grasp_pose_sequence(
         origin_grasp.grasp_pose,
-        robot.left_arm.end_effector,
+        end_effector,
         origin_grasp,
     )
 
     expected_standoff = BOX_SCALE.x / 2 + action.approach_clearance
     np.testing.assert_allclose(
-        poses.pre_grasp.to_np()[:3, 3], [-expected_standoff, 0, 0], atol=1e-9
+        _fingers_at(poses.pre_grasp, end_effector),
+        [-expected_standoff, 0, 0],
+        atol=1e-9,
     )
 
 
@@ -105,17 +120,18 @@ def test_pre_grasp_pose_of_a_surface_grasp_only_adds_the_clearance(boxed_pr2_wor
     beyond the clearance -- this is what lets a bowl be grasped at its rim.
     """
     _, robot, graspable = boxed_pr2_world
+    end_effector = robot.left_arm.end_effector
     action = HasApproachesGraspPoses()
     surface_grasp = grasp_from_above(graspable)
 
     poses = action.grasp_pose_sequence(
         surface_grasp.grasp_pose,
-        robot.left_arm.end_effector,
+        end_effector,
         surface_grasp,
     )
 
     np.testing.assert_allclose(
-        poses.pre_grasp.to_np()[:3, 3],
+        _fingers_at(poses.pre_grasp, end_effector),
         [0, 0, BOX_SCALE.z / 2 + action.approach_clearance],
         atol=1e-9,
     )
@@ -194,7 +210,7 @@ def test_grasp_pose_is_the_middle_of_the_sequence(boxed_pr2_world):
 
     np.testing.assert_allclose(
         poses.grasp.to_np(),
-        end_effector.tool_frame_goal(grasp.grasp_pose).to_np(),
+        end_effector.tool_frame_goal_for_grasp(grasp.grasp_pose).to_np(),
         atol=1e-9,
     )
 
@@ -254,12 +270,15 @@ def test_sequence_without_a_body_stands_off_by_the_clearance_alone(boxed_pr2_wor
     _, robot, graspable = boxed_pr2_world
     action = HasApproachesGraspPoses()
 
+    end_effector = robot.left_arm.end_effector
     poses = action.grasp_pose_sequence(
-        grasp_at_origin(graspable).grasp_pose, robot.left_arm.end_effector
+        grasp_at_origin(graspable).grasp_pose, end_effector
     )
 
     np.testing.assert_allclose(
-        poses.pre_grasp.to_np()[:3, 3], [-action.approach_clearance, 0, 0], atol=1e-9
+        _fingers_at(poses.pre_grasp, end_effector),
+        [-action.approach_clearance, 0, 0],
+        atol=1e-9,
     )
 
 
@@ -282,7 +301,7 @@ def _assert_the_gripper_approaches_along_the_grasp(world, end_effector) -> None:
         root_R_tool @ end_effector.approach_axis.to_np()[:3], [1, 0, 0], atol=1e-9
     )
     np.testing.assert_allclose(
-        poses.pre_grasp.to_np()[:3, 3],
+        _fingers_at(poses.pre_grasp, end_effector),
         [-action._approach_distance(grasp), 0, 0],
         atol=1e-9,
     )
@@ -301,4 +320,65 @@ def test_a_tracy_gripper_approaches_along_the_grasp(tracy_world):
     tracy = tracy_world.get_semantic_annotations_by_type(Tracy)[0]
     _assert_the_gripper_approaches_along_the_grasp(
         tracy_world, tracy.left_arm.end_effector
+    )
+
+
+# %% which point of the gripper the sequence is aimed at
+
+
+def test_a_grasp_is_aimed_at_the_point_the_fingers_meet_at(boxed_pr2_world):
+    """
+    A gripper's tool frame need not sit where its fingers meet, so the sequence aims
+    the point they meet at rather than the tool frame itself.
+    """
+    _, robot, graspable = boxed_pr2_world
+    end_effector = robot.left_arm.end_effector
+    grasp = grasp_at_origin(graspable)
+
+    poses = HasApproachesGraspPoses().grasp_pose_sequence(
+        grasp.grasp_pose, end_effector, grasp
+    )
+
+    np.testing.assert_allclose(
+        poses.grasp.to_np(),
+        end_effector.tool_frame_goal_for_grasp(grasp.grasp_pose).to_np(),
+        atol=1e-9,
+    )
+
+
+def test_reaching_the_grasp_goal_leaves_the_fingers_on_the_grasp(boxed_pr2_world):
+    """
+    Reaching the returned pose puts the point the fingers meet at on the grasp frame,
+    which is what makes them close on the object rather than beside it.
+    """
+    _, robot, graspable = boxed_pr2_world
+    end_effector = robot.left_arm.end_effector
+    grasp = grasp_at_origin(graspable)
+    poses = HasApproachesGraspPoses().grasp_pose_sequence(
+        grasp.grasp_pose, end_effector, grasp
+    )
+
+    np.testing.assert_allclose(
+        _fingers_at(poses.grasp, end_effector),
+        grasp.grasp_pose.position.to_np()[:3].ravel(),
+        atol=1e-9,
+    )
+
+
+def test_the_approach_travels_the_distance_it_was_given(boxed_pr2_world):
+    """
+    The pre-grasp pose is aimed at the same point of the gripper as the grasp, so the
+    gripper travels the approach distance rather than that distance plus the offset
+    between the tool frame and where the fingers meet.
+    """
+    _, robot, graspable = boxed_pr2_world
+    end_effector = robot.left_arm.end_effector
+    grasp = grasp_at_origin(graspable)
+    sequence = HasApproachesGraspPoses()
+
+    poses = sequence.grasp_pose_sequence(grasp.grasp_pose, end_effector, grasp)
+
+    travelled = poses.grasp.to_np()[:3, 3] - poses.pre_grasp.to_np()[:3, 3]
+    np.testing.assert_allclose(
+        np.linalg.norm(travelled), sequence._approach_distance(grasp), atol=1e-9
     )

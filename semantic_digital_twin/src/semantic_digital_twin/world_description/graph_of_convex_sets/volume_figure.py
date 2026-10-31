@@ -30,7 +30,7 @@ from random_events.product_algebra import Event
 from typing_extensions import List, Sequence
 
 from semantic_digital_twin.spatial_types import Point3
-from semantic_digital_twin.world_description.geometry import Bounds
+from semantic_digital_twin.world_description.geometry import CoordinateBounds
 from semantic_digital_twin.world_description.graph_of_convex_sets.plotting import (
     FigurePalette,
     NavigationScene,
@@ -607,7 +607,7 @@ class GraphOfConvexSetsVolumeFigure:
 
     @staticmethod
     def _axis(
-        title: str, palette: FigurePalette, bounds: Bounds[np.ndarray], axis: int
+        title: str, palette: FigurePalette, bounds: CoordinateBounds, axis: int
     ) -> dict[str, object]:
         """
         :param title: The axis label.

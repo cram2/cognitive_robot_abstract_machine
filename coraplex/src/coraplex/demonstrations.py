@@ -1,10 +1,11 @@
 """
 Scaffolding shared by real-world robot demonstrations.
 
-A demonstration acquires a world, populates it with the objects it manipulates and
-performs one plan against it. The parts that do not vary between demonstrations -- ROS
-session ownership, fetching the world from a running controller and wrapping execution in
-the right environment -- live here, so a demonstration only writes its own scene and plan.
+A demonstration acquires a world holding its robot and its scene, and performs one plan
+against it. The parts that do not vary between demonstrations -- ROS session ownership,
+fetching the world from a running controller, merging the scene into it and wrapping
+execution in the right environment -- live here, so a demonstration only writes its own
+scene and plan.
 """
 
 from __future__ import annotations
@@ -28,7 +29,10 @@ from coraplex.plans.plan_node import PlanNode
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
 
 # %% ros session
 
@@ -135,9 +139,13 @@ class RobotDemonstration(ABC):
     """
     A robot demonstration that runs either in simulation or against a real controller.
 
-    A real run takes its world from the controller and keeps it synchronized, so the
-    objects the demonstration spawns reach the controller before the plan needs them. A
-    simulated run builds its own world and publishes it to Rviz, so its progress can be
+    The scene, the map the robot acts in together with the objects the plan acts on, is
+    built the same way for both kinds of run, by :meth:`build_scene`, and holds no robot.
+
+    A real run takes its world, with the robot in it, from the controller and keeps it
+    synchronized, and merges the scene into it unless the controller already holds it,
+    so the scene reaches the controller before the plan needs it. A simulated run puts
+    the robot into the scene instead, and publishes it to Rviz, so its progress can be
     watched the same way a real run's can.
     """
 
@@ -151,7 +159,7 @@ class RobotDemonstration(ABC):
     Name of the node a real run registers.
     """
 
-    execution_type: ExecutionType = ExecutionType.SIMULATED
+    execution_type: ExecutionType = ExecutionType.KINEMATICALLY_SIMULATED
     """
     Whether the plan drives the real robot or a simulated one.
     """
@@ -193,23 +201,42 @@ class RobotDemonstration(ABC):
     """
 
     @abstractmethod
-    def build_simulated_world(self) -> World:
+    def scene_specification(self) -> WorldSpecification:
         """
-        Build the world for a simulated run, without contacting a controller.
+        :return: The map this demonstration acts in, without any robot, see
+            :meth:`build_scene`.
+        """
+
+    @abstractmethod
+    def robot_specification(self) -> RobotSpecification:
+        """
+        How a simulated run puts :attr:`used_robot` into the scene. A real run takes the
+        robot from the controller instead.
+
+        :return: The robot to put into the scene, with where it starts and how fast its
+            drive is.
         """
 
     @abstractmethod
     def is_scene_populated(self, world: World) -> bool:
         """
-        Implementations should define a condition which without a doubt define the scene was already populated
-        before, populating a scene in a different process multiple times, for example because one restarts the demo in
-        the current process.
+        Whether ``world`` already holds the scene, for instance because the controller
+        serving it was given the scene by an earlier run, in which case a real run does
+        not merge it in a second time.
+
+        :param world: The world the controller serves.
+        :return: Whether ``world`` holds the scene already.
         """
 
-    @abstractmethod
     def populate_scene(self, world: World) -> None:
         """
-        Add the objects and furniture this demonstration acts on to ``world``.
+        Add what the plan needs to the freshly built map in ``world``, such as the
+        objects it acts on and the semantic annotations of the furniture, see
+        :meth:`build_scene`.
+
+        Adds nothing unless a demonstration says what it needs.
+
+        :param world: The scene, which holds no robot yet.
         """
 
     @abstractmethod
@@ -255,10 +282,54 @@ class RobotDemonstration(ABC):
         """
         return AlternativeMotion.discover_all()
 
+    def build_scene(self) -> World:
+        """
+        Build the scene: the map of :meth:`scene_specification`, populated by
+        :meth:`populate_scene`.
+
+        :return: A world holding the scene and no robot.
+        """
+        scene = self.scene_specification().to_domain_object()
+        self.populate_scene(scene)
+        return scene
+
+    def build_simulated_world(self) -> World:
+        """
+        Build the world for a simulated run, without contacting a controller: the scene,
+        with the robot of :meth:`robot_specification` put into it.
+
+        :return: A world holding the scene and the robot.
+        """
+        world = self.build_scene()
+        self.robot_specification().spawn(world)
+        return world
+
+    def fetch_real_world(self) -> World:
+        """
+        Fetch the world the controller serves and keep it synchronized with it, and
+        merge the scene into it unless :meth:`is_scene_populated` finds it there already.
+
+        The scene's root is fixed to the root of the fetched world, which is the map frame
+        the robot localizes in.
+
+        :return: The world the controller serves, holding the scene.
+        """
+        world = self.ros_session.fetch_world()
+        WorldSynchronizer(_world=world, node=self.ros_session.node)
+        if not self.is_scene_populated(world):
+            scene = self.build_scene()
+            world.merge_world(
+                scene,
+                root_connection=FixedConnection(parent=world.root, child=scene.root),
+            )
+        return world
+
     def acquire_world(self) -> World:
         """
-        Obtain the world to act on: from the running controller for a real run, and from
-        this demonstration's own description otherwise.
+        Obtain the world to act on: built by :meth:`build_simulated_world` for a
+        simulated run, and by :meth:`fetch_real_world` otherwise.
+
+        :return: The world the plan is performed in.
         """
         self.ros_session = RobotDemonstrationRosSession.start(self.ros_node_name)
         VisualizationSession.register(self.stop_visualization)
@@ -272,20 +343,16 @@ class RobotDemonstration(ABC):
                 collision_visualization=True,
             ).start()
             return world
-        world = self.ros_session.fetch_world()
-        WorldSynchronizer(_world=world, node=self.ros_session.node)
-        return world
+        return self.fetch_real_world()
 
     def run(self) -> World:
         """
-        Acquire a world, populate it if needed, and perform the plan against it.
+        Acquire a world, and perform the plan against it.
 
         :return: The world the demonstration acted on.
         """
         try:
             world = self.acquire_world()
-            if not self.is_scene_populated(world):
-                self.populate_scene(world)
             for _ in range(self.repetitions):
                 context = self.build_context(world)
                 plan = self.build_plan(context)

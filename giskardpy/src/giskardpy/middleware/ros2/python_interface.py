@@ -10,6 +10,7 @@ import rclpy
 from json_msgs.action import JsonAction
 from json_msgs.action._json_action import JsonAction_Result
 from giskardpy.middleware.ros2 import rospy
+from giskardpy.middleware.ros2.client_presence import ClientHeartbeatPublisher
 from giskardpy.middleware.ros2.exceptions import NoActiveGoalToCancelError
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
@@ -23,6 +24,7 @@ from rclpy import Context, Parameter, Future
 from rclpy.action.client import ClientGoalHandle
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from semantic_digital_twin.adapters.ros.messages import MetaData
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -54,6 +56,20 @@ class GiskardWrapper:
     Keeps this world in step with the world Giskard controls around a goal.
     """
 
+    announces_presence: bool = field(default=False, kw_only=True)
+    """
+    Whether this client announces itself to Giskard from the start, see
+    :meth:`announce_presence`.
+    """
+
+    heartbeat_publisher: ClientHeartbeatPublisher | None = field(
+        init=False, default=None
+    )
+    """
+    Announces to Giskard that this client is still waiting for its goal, or ``None``
+    while this client does not announce itself.
+    """
+
     _motion_statechart: MotionStatechart | None = field(
         init=False, default=None, repr=False
     )
@@ -69,9 +85,37 @@ class GiskardWrapper:
         self.world_updates = ClientWorldUpdates(
             world_synchronizer=WorldSynchronizer.of_world(self.world)
         )
+        if self.announces_presence:
+            self.announce_presence()
         giskard_topic = f"{self.giskard_node_name}/command"
         self._client = MyActionClient(self.node_handle, JsonAction, giskard_topic)
         sleep(0.3)
+
+    @property
+    def client(self) -> MetaData:
+        """
+        Who this client is, as it names itself in its goals and its heartbeats.
+        """
+        return self.world_updates.world_synchronizer.meta_data
+
+    def announce_presence(self) -> None:
+        """
+        Start announcing to Giskard that this client is still there.
+
+        Giskard only watches clients that announce themselves. It stops the goal of one
+        whose announcements stop arriving, so that a robot does not finish a motion
+        nobody is waiting for any more. This is off unless asked for, because a client
+        on a machine too busy to announce itself in time looks just like one that died.
+
+        Does nothing if this client already announces itself.
+        """
+        if self.heartbeat_publisher is not None:
+            return
+        self.heartbeat_publisher = ClientHeartbeatPublisher(
+            node=self.node_handle,
+            client=self.client,
+            giskard_node_name=self.giskard_node_name,
+        )
 
     @property
     def robot_name(self) -> PrefixedName:
@@ -137,6 +181,7 @@ class GiskardWrapper:
         goal_msg = JsonAction.Goal()
         goal = MotionGoal.for_motion_statechart(
             motion_statechart,
+            client=self.client,
             required_position=self.world_updates.required_position(),
         )
         goal_msg.goal = json.dumps(goal.to_json())
@@ -190,6 +235,17 @@ class GiskardWrapper:
         """
         ...
 
+    def close(self) -> None:
+        """
+        Stop announcing this client's heartbeat to Giskard, if it announces one.
+
+        Does not touch :attr:`node_handle`: it was given to this wrapper by its caller,
+        who owns its lifecycle.
+        """
+        if self.heartbeat_publisher is None:
+            return
+        self.heartbeat_publisher.stop()
+
 
 @dataclass
 class GiskardWrapperNode(GiskardWrapper):
@@ -241,3 +297,14 @@ class GiskardWrapperNode(GiskardWrapper):
             target=self.__spin, daemon=False, name="background giskard wrapper spinner"
         )
         self.spinner.start()
+
+    def close(self) -> None:
+        """
+        Stop the heartbeat and destroy the node this wrapper created for itself.
+
+        Removes the node from Giskard's shared executor before destroying it, since a
+        destroyed node left registered there would break the next spin.
+        """
+        super().close()
+        rospy.executor.remove_node(self.node_handle)
+        self.node_handle.destroy_node()

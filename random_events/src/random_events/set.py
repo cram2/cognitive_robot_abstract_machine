@@ -186,3 +186,9 @@ class Set(AbstractCompositeSet):
         :return: A map that maps the hashes of each element in all_elements to the element.
         """
         return {hash(elem): elem for elem in self.all_elements}
+
+    def is_singleton(self) -> bool:
+        """
+        :return: Whether the set contains exactly one element.
+        """
+        return len(self.simple_sets) == 1

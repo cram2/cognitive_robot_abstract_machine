@@ -388,6 +388,50 @@ def test_robot_is_not_in_collision_while_it_keeps_its_distance(cylinder_bot_worl
     assert not robot.is_in_collision
 
 
+def test_robot_is_not_in_collision_exactly_at_the_violated_distance(
+    cylinder_bot_world,
+):
+    """
+    A contact exactly at the violated distance does not violate it, as collision
+    avoidance treats it.
+    """
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+        "environment"
+    )
+    collision_manager = cylinder_bot_world.collision_manager
+    collision_manager.extend_temporary_rule(
+        [
+            AvoidCollisionBetweenGroups(
+                buffer_zone_distance=10,
+                violated_distance=0.0,
+                body_group_a=[robot.root],
+                body_group_b=[environment],
+            )
+        ]
+    )
+    collision_manager.update_collision_matrix()
+    [contact] = [
+        contact
+        for contact in collision_manager.compute_collisions().contacts
+        if contact.body_a is environment or contact.body_b is environment
+    ]
+    collision_manager.clear_temporary_rules()
+    collision_manager.extend_temporary_rule(
+        [
+            AvoidCollisionBetweenGroups(
+                buffer_zone_distance=10,
+                violated_distance=contact.distance,
+                body_group_a=[robot.root],
+                body_group_b=[environment],
+            )
+        ]
+    )
+    collision_manager.update_collision_matrix()
+
+    assert not robot.is_in_collision
+
+
 def test_robot_is_not_in_collision_when_nothing_is_checked(cylinder_bot_world):
     """
     With every collision of the robot allowed, no contact is reported for it.
