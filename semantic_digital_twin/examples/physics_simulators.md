@@ -214,7 +214,7 @@ def spawn_free_box(
     name: str = "box",
     position: tuple = (0.0, 0.0, 1.5),
     scale: Scale = Scale(0.1, 0.1, 0.1),
-    color: Color = Color(1.0, 1.0, 0.0, 1.0),
+    color: Color = Color.from_rgba(red=1.0, green=1.0, blue=0.0, opacity=1.0),
 ) -> Body:
     """
     Spawn a free-floating box attached to the world root via a 6-DoF connection.
@@ -263,7 +263,7 @@ def spawn_robot_body(spawn_world: World) -> Body:
     box = Box(
         origin=box_origin,
         scale=Scale(0.4, 0.4, 1.0),
-        color=Color(0.9, 0.9, 0.9, 1.0),
+        color=Color.from_rgba(red=0.9, green=0.9, blue=0.9, opacity=1.0),
     )
     spawn_body.collision = ShapeCollection([box], reference_frame=spawn_body)
 
@@ -289,7 +289,7 @@ def spawn_arm(spawn_world: World, root_body: Body) -> RevoluteConnection:
     box = Box(
         origin=box_origin,
         scale=Scale(0.1, 0.5, 0.1),
-        color=Color(0.9, 0.1, 0.1, 1.0),
+        color=Color.from_rgba(red=0.9, green=0.1, blue=0.1, opacity=1.0),
     )
     spawn_arm_body.collision = ShapeCollection(
         [box], reference_frame=spawn_arm_body

@@ -7,7 +7,7 @@ from __future__ import annotations
 from copy import copy, deepcopy
 from dataclasses import dataclass, field, fields, is_dataclass
 
-from typing_extensions import Any, Dict, TYPE_CHECKING, TypeVar
+from typing_extensions import Any, TYPE_CHECKING, TypeVar
 
 from krrood.adapters.json_serializer import list_like_classes
 from semantic_digital_twin.exceptions import (
@@ -36,7 +36,7 @@ class WorldEntityRebinding:
     The world whose own entities the rebound objects refer to.
     """
 
-    rebound: Dict[int, Any] = field(default_factory=dict)
+    rebound: dict[int, Any] = field(default_factory=dict)
     """
     What each object already reached was rebound into, by the id of that object.
 

@@ -40,6 +40,7 @@ from semantic_digital_twin.world_description.geometry import (
     Color,
     Cylinder,
     Mesh,
+    MeshFileFormat,
     Texture,
 )
 from semantic_digital_twin.world_description.inertial_properties import Inertial
@@ -233,7 +234,7 @@ def test_world_multi_sim_with_change(test_urdf_1_world):
         box = Box(
             origin=box_origin,
             scale=Scale(1.0, 1.5, 0.5),
-            color=Color(1.0, 0.0, 0.0, 1.0),
+            color=Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0),
         )
         new_body.collision = ShapeCollection([box], reference_frame=new_body)
 
@@ -256,7 +257,7 @@ def test_world_multi_sim_with_change(test_urdf_1_world):
         region_box = Box(
             scale=Scale(0.1, 0.5, 0.2),
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=region),
-            color=Color(0.0, 1.0, 0.0, 0.8),
+            color=Color.from_rgba(red=0.0, green=1.0, blue=0.0, opacity=0.8),
         )
         region.area = ShapeCollection([region_box], reference_frame=region)
 
@@ -840,7 +841,7 @@ def test_spawn_body_with_connections():
         box = Box(
             origin=box_origin,
             scale=Scale(0.4, 0.4, 1.0),
-            color=Color(0.9, 0.9, 0.9, 1.0),
+            color=Color.from_rgba(red=0.9, green=0.9, blue=0.9, opacity=1.0),
         )
         spawn_body.collision = ShapeCollection([box], reference_frame=spawn_body)
 
@@ -856,7 +857,7 @@ def test_spawn_body_with_connections():
         cylinder = Cylinder(
             width=0.2,
             height=0.1,
-            color=Color(0.9, 0.1, 0.1, 1.0),
+            color=Color.from_rgba(red=0.9, green=0.1, blue=0.1, opacity=1.0),
         )
         spawn_left_shoulder_body.collision = ShapeCollection(
             [cylinder], reference_frame=spawn_left_shoulder_body
@@ -889,7 +890,7 @@ def test_spawn_body_with_connections():
         cylinder = Cylinder(
             width=0.2,
             height=0.1,
-            color=Color(0.9, 0.1, 0.1, 1.0),
+            color=Color.from_rgba(red=0.9, green=0.1, blue=0.1, opacity=1.0),
         )
         spawn_right_shoulder_body.collision = ShapeCollection(
             [cylinder], reference_frame=spawn_right_shoulder_body
@@ -1042,7 +1043,7 @@ def test_world_sim_state_sync():
                         reference_frame=plane_body
                     ),
                     scale=Scale(2.0, 2.0, plane_half_thickness * 2),
-                    color=Color(1.0, 1.0, 0.0, 1.0),
+                    color=Color.from_rgba(red=1.0, green=1.0, blue=0.0, opacity=1.0),
                 )
             ],
             reference_frame=plane_body,
@@ -1058,7 +1059,7 @@ def test_world_sim_state_sync():
                     scale=Scale(
                         box_half_size * 2, box_half_size * 2, box_half_size * 2
                     ),
-                    color=Color(1.0, 0.0, 0.0, 1.0),
+                    color=Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0),
                 )
             ],
             reference_frame=falling_box,
@@ -1472,7 +1473,7 @@ def _build_box_on_plane_world() -> BoxOnPlaneWorld:
                         reference_frame=ground_plane
                     ),
                     scale=Scale(2.0, 2.0, 0.1),
-                    color=Color(1.0, 1.0, 0.0, 1.0),
+                    color=Color.from_rgba(red=1.0, green=1.0, blue=0.0, opacity=1.0),
                 )
             ],
             reference_frame=ground_plane,
@@ -1487,7 +1488,7 @@ def _build_box_on_plane_world() -> BoxOnPlaneWorld:
                         reference_frame=box
                     ),
                     scale=Scale(0.2, 0.2, 0.2),
-                    color=Color(1.0, 0.0, 0.0, 1.0),
+                    color=Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0),
                 )
             ],
             reference_frame=box,
@@ -1701,7 +1702,7 @@ def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
                         reference_frame=ground_plane
                     ),
                     scale=Scale(2.0, 2.0, 0.1),
-                    color=Color(1.0, 1.0, 0.0, 1.0),
+                    color=Color.from_rgba(red=1.0, green=1.0, blue=0.0, opacity=1.0),
                 )
             ],
             reference_frame=ground_plane,
@@ -1727,7 +1728,9 @@ def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
                         scale=Scale(
                             box_half_size * 2, box_half_size * 2, box_half_size * 2
                         ),
-                        color=Color(0.9, 0.3, 0.3, 1.0),
+                        color=Color.from_rgba(
+                            red=0.9, green=0.3, blue=0.3, opacity=1.0
+                        ),
                     )
                 ],
                 reference_frame=cube,
@@ -1768,6 +1771,60 @@ def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
             )
     finally:
         stop_multisim_if_running(multi_sim)
+
+
+# %% meshes written as glb
+
+
+def _textured_tetrahedron_as_glb(directory, texture_color: tuple[int, int, int]) -> str:
+    """
+    Writes a tetrahedron painted with a one-coloured texture as a GLB file.
+
+    :param directory: The directory to write the mesh and its texture into.
+    :param texture_color: The colour of the texture image.
+    :return: The path of the written mesh.
+    """
+    texture_file = directory / "wood.png"
+    Image.new("RGB", (4, 4), color=texture_color).save(texture_file)
+    tetrahedron = trimesh.Trimesh(
+        vertices=[[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        faces=[[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]],
+        process=False,
+    )
+    corner_uv = numpy.tile([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], (4, 1))
+    return Mesh.from_trimesh(
+        mesh=tetrahedron,
+        uv=corner_uv,
+        texture_file_path=str(texture_file),
+        directory=directory,
+        file_type=MeshFileFormat.GLB,
+    ).filename
+
+
+def test_meshes_written_as_glb_compile(tmp_path):
+    box = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
+    glb_file = Mesh.from_trimesh(
+        mesh=box, directory=tmp_path, file_type=MeshFileFormat.GLB
+    ).filename
+    world = _world_with_meshes(visual_file=glb_file, collision_file=glb_file)
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    model = builder.spec.compile()
+
+    assert model.nmesh == len(builder.spec.meshes)
+
+
+def test_a_textured_mesh_written_as_glb_keeps_its_texture(tmp_path):
+    texture_color = (120, 60, 20)
+    glb_file = _textured_tetrahedron_as_glb(tmp_path, texture_color=texture_color)
+    world = _world_with_meshes(visual_file=glb_file, collision_file=glb_file)
+    builder = MujocoBuilder()
+
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [texture] = builder.spec.textures
+    assert Image.open(texture.file).convert("RGB").getpixel((0, 0)) == texture_color
 
 
 # %% stepped simulation

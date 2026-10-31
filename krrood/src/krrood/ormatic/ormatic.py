@@ -5,7 +5,6 @@ from dataclasses import dataclass, field, is_dataclass
 from functools import cached_property
 from inspect import isclass
 from types import ModuleType
-from typing import Set
 
 import rustworkx as rx
 import sqlalchemy
@@ -17,7 +16,6 @@ from krrood.ormatic.helper import (
     OrmaticInterfaceInformation,
 )
 from sortedcontainers import SortedSet
-from typing_extensions import List, Type, Dict
 from typing_extensions import Optional, TextIO
 
 from krrood.ormatic.default_type_mappings import DefaultTypeMapping
@@ -72,7 +70,7 @@ class ORMatic:
     The alternative mappings, type mappings, and externally-mapped classes to use.
     """
 
-    ormatic_interface_dependencies: List[ModuleType] = field(default_factory=list)
+    ormatic_interface_dependencies: list[ModuleType] = field(default_factory=list)
     """
     The already-generated ormatic-interface modules this interface builds on, if any.
 
@@ -90,7 +88,7 @@ class ORMatic:
     A set of modules that need to be imported.
     """
 
-    type_annotation_map: Dict[str, str] = field(default_factory=dict, init=False)
+    type_annotation_map: dict[str, str] = field(default_factory=dict, init=False)
     """
     The string version of type mappings that is used in jinja.
     """
@@ -102,14 +100,14 @@ class ORMatic:
     Extracted from the class dependency graph.
     """
 
-    wrapped_tables: Dict[WrappedClass, WrappedTable] = field(
+    wrapped_tables: dict[WrappedClass, WrappedTable] = field(
         default_factory=dict, init=False
     )
     """
     The wrapped tables instances for the SQLAlchemy conversion.
     """
 
-    external_tables: Dict[WrappedClass, ExternalTable] = field(
+    external_tables: dict[WrappedClass, ExternalTable] = field(
         default_factory=dict, init=False
     )
     """
@@ -120,7 +118,7 @@ class ORMatic:
     relationships, and parent classes that point at them.
     """
 
-    association_objects: List[AssociationObject] = field(
+    association_objects: list[AssociationObject] = field(
         default_factory=list, init=False
     )
     """
@@ -150,7 +148,7 @@ class ORMatic:
             self.imported_modules.add(get_module_of_type(external_table.dao_class))
 
     @property
-    def alternative_mappings(self) -> List[Type[AlternativeMapping]]:
+    def alternative_mappings(self) -> list[type[AlternativeMapping]]:
         return self.interface_information.alternative_mappings
 
     @property
@@ -158,7 +156,7 @@ class ORMatic:
         return TypeDict(self.interface_information.type_mappings)
 
     @property
-    def externally_mapped_classes(self) -> Dict[Type, Type]:
+    def externally_mapped_classes(self) -> dict[type, type]:
         return self.interface_information.externally_mapped_classes
 
     def _fill_type_mappings(self):
@@ -219,7 +217,7 @@ class ORMatic:
             )
 
     @property
-    def alternatively_maps_relations(self) -> List[AlternativelyMaps]:
+    def alternatively_maps_relations(self) -> list[AlternativelyMaps]:
         return [
             edge
             for edge in self.class_dependency_graph._dependency_graph.edges()
@@ -228,7 +226,7 @@ class ORMatic:
 
     @staticmethod
     def register_externally_mapped_class(
-        dao_class: Type, externally_mapped_classes: Dict[Type, Type]
+        dao_class: type, externally_mapped_classes: dict[type, type]
     ) -> None:
         """
         Register the domain class(es) ``dao_class`` maps as already-mapped, so a
@@ -248,7 +246,7 @@ class ORMatic:
 
     def get_alternative_mapping(
         self, wrapped_class: WrappedClass
-    ) -> Optional[WrappedClass]:
+    ) -> WrappedClass | None:
         """
         Finds and returns an alternative mapping for the given wrapped class, if one
         exists, based on the relations specified in `alternatively_maps_relations`.
@@ -272,7 +270,7 @@ class ORMatic:
             self.imported_modules.add(get_module_of_type(custom_type))
 
     @property
-    def wrapped_classes_in_topological_order(self) -> List[WrappedClass]:
+    def wrapped_classes_in_topological_order(self) -> list[WrappedClass]:
         """
         :return: All wrapped classes in topological order (a parent precedes its children).
 
@@ -305,7 +303,7 @@ class ORMatic:
         return str(wrapped_class.clazz)
 
     @property
-    def mapped_classes(self) -> List[Type]:
+    def mapped_classes(self) -> list[type]:
         return [key.clazz for key in self.wrapped_tables.keys()] + [
             key.clazz for key in self.external_tables.keys()
         ]
@@ -361,10 +359,10 @@ class ORMatic:
     @classmethod
     def from_package(
         cls,
-        packages: List[ModuleType],
-        ormatic_interface_dependencies: List[ModuleType],
-        ignored_classes: Set[Type],
-        type_mappings: Dict[Type, Type],
+        packages: list[ModuleType],
+        ormatic_interface_dependencies: list[ModuleType],
+        ignored_classes: set[type],
+        type_mappings: dict[type, type],
         ignore_krrood_test_classes: bool = True,
     ):
         """
@@ -379,7 +377,7 @@ class ORMatic:
         :return: The ORMatic instance.
         """
         all_classes, all_alternative_mappings, all_type_mappings = set(), set(), {}
-        all_externally_mapped_classes: Dict[Type, Type] = {}
+        all_externally_mapped_classes: dict[type, type] = {}
 
         # every interface shares one Base, so anything already mapped anywhere in the
         # running process must be reused, not just what an explicit dependency mapped

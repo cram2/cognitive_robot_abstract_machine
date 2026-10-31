@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Tuple, Dict
 
 import gurobipy
 import numpy as np
@@ -68,7 +67,7 @@ class QPSolverGurobi(QPSolver[QPDataExplicit]):
         for name in dir(gurobipy.GRB.status)
         if "__" not in name
     }
-    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
+    _times: dict[tuple[int, int, int], list] = defaultdict(list)
 
     def init(self, qp_data: QPDataExplicit):
         self.qpProblem = gurobipy.Model("qp")

@@ -19,7 +19,7 @@ import random
 import statistics
 import time
 from dataclasses import dataclass, field
-from typing import Callable
+from typing_extensions import Callable
 
 import plotly.graph_objects as go
 import tqdm

@@ -9,7 +9,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
 import requests
-from typing_extensions import Any, Dict, List, Optional, Self
+from typing_extensions import Any, Self
 
 from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.exceptions import DatasetServerError, PathResolutionError
@@ -47,7 +47,7 @@ class ListedItem:
     """
 
     @classmethod
-    def from_json(cls, data: Dict[str, Any]) -> Self:
+    def from_json(cls, data: dict[str, Any]) -> Self:
         """
         :param data: One element of a listing.
         :return: The item it describes.
@@ -118,7 +118,7 @@ class DatasetServer(PathResolver):
     """
 
     @classmethod
-    def from_environment(cls) -> Optional[Self]:
+    def from_environment(cls) -> Self | None:
         """
         Build the server the environment describes.
 
@@ -148,7 +148,7 @@ class DatasetServer(PathResolver):
             self._copy_directory(relative_file.parent, cached_directory)
         return str(cached_directory / relative_file.name)
 
-    def list_directory(self, relative_directory: PurePosixPath) -> List[ListedItem]:
+    def list_directory(self, relative_directory: PurePosixPath) -> list[ListedItem]:
         """
         :param relative_directory: The directory to list, relative to the dataset root.
         :return: What the server reports the directory holds.

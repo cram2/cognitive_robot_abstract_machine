@@ -1,26 +1,40 @@
+from enum import StrEnum
+
 import numpy as np
 import pytest
 
-from krrood.entity_query_language.factories import evaluate_condition
-
-from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.container import CloseAction, OpenAction
-from coraplex.robot_plans.motions.gripper import (
-    MoveGripperMotion,
-    MoveToolCenterPointMotion,
-)
+from cramph.node import StatechartNode
+from giskardpy.motion_statechart.goals.gripper import MoveGripper
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Pose,
+    RotationMatrix,
+    Vector3,
+)
 from .conftest import left_or_only_arm
+from ..plan_running import simulated_executor, statechart_of
 
 # %% fixtures
 
-DRAWER_HANDLE = "handle_cab10_m"
-"""
-The handle of the apartment's middle cabinet drawer.
-"""
+
+class ApartmentBody(StrEnum):
+    """
+    The apartment's own bodies the tests act on.
+    """
+
+    DRAWER_HANDLE = "handle_cab10_m"
+    """
+    The handle of the apartment's middle cabinet drawer.
+    """
+
+    DRAWER = "cabinet10_drawer_middle"
+    """
+    The middle cabinet drawer the handle pulls out.
+    """
 
 
 @pytest.fixture
@@ -28,8 +42,8 @@ def pr2_at_drawer(pr2_apartment_context):
     """
     A PR2 in the apartment, with the drawer handle it works on annotated as such.
     """
-    world, robot, context = pr2_apartment_context
-    body = world.get_body_by_name(DRAWER_HANDLE)
+    world, robot, extensions = pr2_apartment_context
+    body = world.get_body_by_name(ApartmentBody.DRAWER_HANDLE)
     annotated = [
         handle
         for handle in world.get_semantic_annotations_by_type(Handle)
@@ -39,15 +53,15 @@ def pr2_at_drawer(pr2_apartment_context):
         with world.modify_world():
             world.add_semantic_annotation_recursively(handle := Handle(root=body))
         annotated = [handle]
-    return world, robot, context, annotated[0]
+    return world, robot, extensions, annotated[0]
 
 
-def motions_of(action) -> list:
+def goals_of(step: StatechartNode) -> list[StatechartNode]:
     """
-    :param action: The action whose plan to read.
-    :return: The designators of the plan the action builds, in execution order.
+    :param step: A step of an expanded action.
+    :return: The step and every node below it.
     """
-    return [node.designator for node in action._action_plan.children]
+    return [step, *step.descendants]
 
 
 # %% backing off the handle
@@ -59,26 +73,23 @@ def test_gripper_backs_off_the_handle_after_letting_go(pr2_at_drawer, action_typ
     The gripper still straddles the handle once it opens, so the action ends by
     clearing it along the direction it approached from.
     """
-    world, robot, context, handle = pr2_at_drawer
-    action = action_type(handle, left_or_only_arm(robot))
-    sequential([action], context)
+    world, robot, extensions, handle = pr2_at_drawer
+    arm = left_or_only_arm(robot)
+    grasp = GraspCandidate.from_body_origin(handle)
+    action = action_type(grasp=grasp, arm=arm)
+    statechart_of(simulated_executor(extensions), action)
 
-    motions = motions_of(action)
-    gripper_openings = [
-        index
-        for index, motion in enumerate(motions)
-        if isinstance(motion, MoveGripperMotion) and motion.motion is GripperState.OPEN
+    *_, letting_go, back_off = action.nodes
+
+    assert [
+        node.width for node in goals_of(letting_go) if isinstance(node, MoveGripper)
+    ] == [arm.end_effector.separation_in(GripperState.OPEN)]
+    [back_off_goal] = [
+        node for node in goals_of(back_off) if isinstance(node, CartesianPose)
     ]
-    back_off = motions[-1]
-
-    assert isinstance(back_off, MoveToolCenterPointMotion)
-    assert gripper_openings[-1] == len(motions) - 2
     np.testing.assert_allclose(
-        back_off.target.to_np(),
-        action.back_off_pose(
-            Pose(reference_frame=handle.root),
-            left_or_only_arm(robot).end_effector,
-        ).to_np(),
+        back_off_goal.goal_pose.to_np(),
+        action.back_off_pose(grasp.grasp_pose, arm.end_effector).to_np(),
         atol=1e-9,
     )
 
@@ -88,12 +99,13 @@ def test_back_off_pose_clears_the_grasp_by_the_release_clearance(pr2_at_drawer):
     The gripper backs straight out along the way it came in, by the clearance it is
     given and no further.
     """
-    world, robot, context, handle = pr2_at_drawer
-    action = OpenAction(handle, left_or_only_arm(robot))
-    sequential([action], context)
-
+    world, robot, extensions, handle = pr2_at_drawer
     end_effector = left_or_only_arm(robot).end_effector
+    action = OpenAction(
+        grasp=GraspCandidate.from_body_origin(handle), arm=left_or_only_arm(robot)
+    )
     grasp_pose = Pose(reference_frame=handle.root)
+
     tool_goal = end_effector.tool_frame_goal_for_grasp(grasp_pose)
     back_off = action.back_off_pose(grasp_pose, end_effector)
 
@@ -107,23 +119,41 @@ def test_back_off_pose_clears_the_grasp_by_the_release_clearance(pr2_at_drawer):
     )
 
 
-# %% what the actions promise
-
-
-def test_open_promises_the_container_is_open_rather_than_still_held(pr2_at_drawer):
+def test_back_off_pose_clears_the_drawer_of_a_grasp_from_above(pr2_at_drawer):
     """
-    The action ends with the gripper clear of the handle, so what it leaves behind is
-    an open container, not a handle still between the fingers.
+    A grasp from above closes with one finger between the handle and the drawer front,
+    so the gripper backs off until it is clear of the drawer, and by the release
+    clearance beyond its top.
     """
-    world, robot, context, handle = pr2_at_drawer
-    action = OpenAction(handle, left_or_only_arm(robot))
-    sequential([action], context)
-    drawer = handle.root.get_first_parent_connection_of_type(ActiveConnection1DOF)
-    drawer.position = 0.45
-    world.notify_state_change()
+    world, robot, extensions, handle = pr2_at_drawer
+    arm = left_or_only_arm(robot)
+    world_T_handle = world.transform(Pose(reference_frame=handle.root), world.root)
+    downward = Vector3(0, 0, -1, reference_frame=world.root)
+    pull_axis = Vector3(1, 0, 0, reference_frame=world.root)
+    grasp_pose = world.transform(
+        Pose(
+            position=world_T_handle.position,
+            orientation=RotationMatrix.from_vectors(x=downward, y=pull_axis).quaternion,
+            reference_frame=world.root,
+        ),
+        handle.root,
+    )
+    action = OpenAction(grasp=GraspCandidate(handle, grasp_pose), arm=arm)
 
-    assert evaluate_condition(
-        action.post_condition(
-            action.bound_variables, context, action.designator_parameter
-        )
+    tool_goal = world.transform(
+        arm.end_effector.tool_frame_goal_for_grasp(grasp_pose), world.root
+    )
+    back_off = world.transform(
+        action.back_off_pose(grasp_pose, arm.end_effector), world.root
+    )
+    drawer = world.get_body_by_name(ApartmentBody.DRAWER)
+    drawer_top = (
+        drawer.collision.as_bounding_box_collection_in_frame(world.root)
+        .bounding_box()
+        .z_interval.upper
+    )
+    grasp_height = world_T_handle.to_np()[2, 3]
+
+    assert back_off.to_np()[2, 3] - tool_goal.to_np()[2, 3] == pytest.approx(
+        drawer_top - grasp_height + action.release_clearance, abs=1e-3
     )

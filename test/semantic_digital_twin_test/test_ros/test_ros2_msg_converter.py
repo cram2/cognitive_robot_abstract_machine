@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 
@@ -267,7 +268,7 @@ def test_convert_mesh_shape(cylinder_bot_world):
     )
     mesh = Mesh(
         filename=stl_file,
-        color=Color(0.0, 0.0, 0.0, 0.0),
+        color=Color.from_rgba(red=0.0, green=0.0, blue=0.0, opacity=0.0),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             1, 2, 3, reference_frame=cylinder_bot_world.get_body_by_name("map")
         ),
@@ -317,6 +318,82 @@ def test_drawing_a_mesh_leaves_its_geometry_unloaded(cylinder_bot_world):
     SemDTToRos2Converter.convert(mesh)
 
     assert "mesh" not in vars(mesh)
+
+
+# %% mesh files that move between machines
+
+
+def map_origin(world) -> HomogeneousTransformationMatrix:
+    """
+    :return: The identity pose in the map of the given world.
+    """
+    return HomogeneousTransformationMatrix.from_xyz_rpy(
+        reference_frame=world.get_body_by_name("map")
+    )
+
+
+@pytest.fixture
+def installed_mesh_file(tmp_path, monkeypatch) -> Path:
+    """
+    :return: A mesh file in the share directory of the package ``mesh_package``, which
+        is registered in an ament prefix.
+    """
+    share = tmp_path / "share"
+    (share / "ament_index" / "resource_index" / "packages").mkdir(parents=True)
+    (share / "ament_index" / "resource_index" / "packages" / "mesh_package").touch()
+    mesh_file = share / "mesh_package" / "meshes" / "jeroen_cup.stl"
+    mesh_file.parent.mkdir(parents=True)
+    shutil.copy(
+        Path(files("semantic_digital_twin")).parent.parent
+        / "resources"
+        / "stl"
+        / "jeroen_cup.stl",
+        mesh_file,
+    )
+    monkeypatch.setenv("AMENT_PREFIX_PATH", str(tmp_path))
+    return mesh_file
+
+
+def test_a_mesh_in_a_package_is_published_by_package_uri(
+    cylinder_bot_world, installed_mesh_file
+):
+    mesh = Mesh(
+        filename=str(installed_mesh_file), origin=map_origin(cylinder_bot_world)
+    )
+
+    marker = SemDTToRos2Converter.convert(mesh)
+
+    assert marker.mesh_resource == "package://mesh_package/meshes/jeroen_cup.stl"
+
+
+def test_a_mesh_outside_any_package_is_published_by_file_uri(
+    cylinder_bot_world, tmp_path
+):
+    mesh_file = tmp_path / "jeroen_cup.stl"
+    shutil.copy(
+        Path(files("semantic_digital_twin")).parent.parent
+        / "resources"
+        / "stl"
+        / "jeroen_cup.stl",
+        mesh_file,
+    )
+    mesh = Mesh(filename=str(mesh_file), origin=map_origin(cylinder_bot_world))
+
+    marker = SemDTToRos2Converter.convert(mesh)
+
+    assert marker.mesh_resource == f"file://{mesh_file}"
+
+
+def test_a_package_uri_mesh_is_found_in_the_local_install(
+    cylinder_bot_world, installed_mesh_file
+):
+    marker = SemDTToRos2Converter.convert(
+        Mesh(filename=str(installed_mesh_file), origin=map_origin(cylinder_bot_world))
+    )
+
+    mesh = Ros2ToSemDTConverter.convert(marker, cylinder_bot_world)
+
+    assert mesh.filename == str(installed_mesh_file)
 
 
 # %% nothing converts the given object

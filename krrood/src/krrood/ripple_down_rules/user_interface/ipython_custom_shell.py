@@ -1,6 +1,5 @@
 import os
 import sys
-from typing_extensions import Optional, List
 
 from IPython.core.magic import magics_class, Magics, line_magic
 from IPython.terminal.embed import InteractiveShellEmbed
@@ -26,16 +25,16 @@ class MyMagics(Magics):
     def __init__(
         self,
         shell,
-        code_to_modify: Optional[str] = None,
-        prompt_for: Optional[PromptFor] = None,
-        case_query: Optional[CaseQuery] = None,
+        code_to_modify: str | None = None,
+        prompt_for: PromptFor | None = None,
+        case_query: CaseQuery | None = None,
     ):
         super().__init__(shell)
-        self.case_query: Optional[CaseQuery] = case_query
+        self.case_query: CaseQuery | None = case_query
         self.rule_editor = TemplateFileCreator(
             case_query, prompt_for=prompt_for, code_to_modify=code_to_modify
         )
-        self.all_code_lines: Optional[List[str]] = None
+        self.all_code_lines: list[str] | None = None
         self.edited: bool = False
         self.loaded: bool = False
 
@@ -108,9 +107,9 @@ Displays the rule tree for the current case query.
 class CustomInteractiveShell(InteractiveShellEmbed):
     def __init__(
         self,
-        code_to_modify: Optional[str] = None,
-        prompt_for: Optional[PromptFor] = None,
-        case_query: Optional[CaseQuery] = None,
+        code_to_modify: str | None = None,
+        prompt_for: PromptFor | None = None,
+        case_query: CaseQuery | None = None,
         **kwargs,
     ):
         kwargs.update({"user_ns": case_query.scope})
@@ -150,10 +149,10 @@ class IPythonShell:
 
     def __init__(
         self,
-        header: Optional[str] = None,
-        prompt_for: Optional[PromptFor] = None,
-        case_query: Optional[CaseQuery] = None,
-        code_to_modify: Optional[str] = None,
+        header: str | None = None,
+        prompt_for: PromptFor | None = None,
+        case_query: CaseQuery | None = None,
+        code_to_modify: str | None = None,
     ):
         """
         Initialize the Ipython shell with the given scope and header.
@@ -166,12 +165,12 @@ class IPythonShell:
             user to modify.
         """
         self.header: str = header or ">>> Embedded Ipython Shell"
-        self.case_query: Optional[CaseQuery] = case_query
-        self.prompt_for: Optional[PromptFor] = prompt_for
-        self.code_to_modify: Optional[str] = code_to_modify
-        self.user_input: Optional[str] = None
+        self.case_query: CaseQuery | None = case_query
+        self.prompt_for: PromptFor | None = prompt_for
+        self.code_to_modify: str | None = code_to_modify
+        self.user_input: str | None = None
         self.shell: CustomInteractiveShell = self._init_shell()
-        self.all_code_lines: List[str] = []
+        self.all_code_lines: list[str] = []
 
     def _init_shell(self):
         """

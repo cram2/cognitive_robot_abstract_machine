@@ -38,6 +38,7 @@ dependencies = [
     "sqlalchemy",
     "embreex",  # Hardware acceleration for trimesh raycasting
     "rtree",  # For spatial indexing in trimesh
+    "xxhash",  # Fast hashing for trimesh, which hashes meshes to check its caches
     "random_events",
     "plotly",
     "daqp",

@@ -1,17 +1,15 @@
 import json
 import time
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.goals.collision_avoidance import SelfCollisionAvoidance
-from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
+from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
 )
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.adapters.ros.world_fetcher import (
     FetchWorldServer,
@@ -24,16 +22,26 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
+from giskardpy.motion_control import MotionControl
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 
 
-def to_and_from_json(motion_statechart: MotionStatechart, target_world: World):
+def to_and_from_json(
+    motion_statechart: Statechart, target_executor: StatechartExecutor
+) -> Statechart:
+    """
+    :return: `motion_statechart` sent through JSON into the context of `target_executor`.
+    """
     json_data = motion_statechart.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(target_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(target_executor.context.world)
     kwargs = tracker.create_kwargs()
-    return MotionStatechart.from_json(new_json_data, **kwargs)
+    return Statechart.from_json(
+        new_json_data, context=target_executor.context, **kwargs
+    )
 
 
 def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_reset):
@@ -55,10 +63,14 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
         "base_footprint"
     )
 
-    msc = MotionStatechart()
-    msc.add_node(
+    client_executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_state_reset),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=client_executor.context)
+    statechart.add_node(
         Sequence(
-            [
+            nodes=[
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_str_dict(
                         {
@@ -74,7 +86,7 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
                     )
                 ),
                 Parallel(
-                    [
+                    nodes=[
                         CartesianPose(
                             root_link=base_footprint,
                             tip_link=r_tip,
@@ -89,12 +101,14 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
             ]
         )
     )
-    msc.add_node(local_min := LocalMinimumReached())
-    msc.add_node(EndMotion.when_true(local_min))
+    statechart.add_node(local_min := LocalMinimumReached())
+    statechart.add_node(EndMotion.when_true(local_min))
 
-    msc_copy = to_and_from_json(msc, pr2_world_copy)
+    executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_copy), extensions=[MotionControl()]
+    )
+    statechart_copy = to_and_from_json(statechart, executor)
 
-    kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
-    kin_sim.compile(motion_statechart=msc_copy)
+    executor.compile(statechart=statechart_copy)
 
-    kin_sim.tick_until_end(500)
+    executor.tick_until_end(500)

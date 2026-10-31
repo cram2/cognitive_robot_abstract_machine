@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing_extensions import Self, Any
 
 import optax
 from jax.experimental.sparse import BCOO
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
-from typing_extensions import Self, Optional
 
 from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
     DifferentiableProductLayer,
@@ -51,14 +50,14 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
     def log_likelihood(self, x: jax.Array) -> jax.Array:
         return self.root.log_likelihood_of_nodes(x)[:, 0]
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         result = super().to_json()
         result["variables"] = [to_json(variable) for variable in self.variables]
         result["root"] = self.root.to_json()
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         variables = SortedSet(
             from_json(variable, **kwargs) for variable in data["variables"]
         )
@@ -69,7 +68,7 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
         self,
         data: jax.Array,
         epochs: int = 100,
-        optimizer: Optional[optax.GradientTransformation] = None,
+        optimizer: optax.GradientTransformation | None = None,
         **kwargs,
     ) -> None:
         """
@@ -115,7 +114,7 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
     """
 
     def as_probabilistic_circuit(
-        self, class_variable: Symbolic, class_probabilities: Optional[jax.Array] = None
+        self, class_variable: Symbolic, class_probabilities: jax.Array | None = None
     ) -> DifferentiableLayeredCircuit:
         """
         Create a full probabilistic circuit from this classification circuit.
@@ -189,7 +188,7 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
         data: jax.Array,
         labels: jax.Array,
         epochs: int = 100,
-        optimizer: Optional[optax.GradientTransformation] = None,
+        optimizer: optax.GradientTransformation | None = None,
     ) -> None:
         """
         Fit the circuit to the data using generative training with the cross-entropy as

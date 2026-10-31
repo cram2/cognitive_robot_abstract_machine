@@ -3,16 +3,23 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
-from giskardpy.middleware.ros2.command_publishing import MultiDOFCommandFormat
-from giskardpy.middleware.ros2.robot_interface_config import RobotInterfaceConfig
+from giskardpy.middleware.ros2.command_publishing import (
+    MultiDOFCommandFormat,
+    TwistStampedFormat,
+)
+from giskardpy.middleware.ros2.robot_interface_config import (
+    ClosedLoopRobotInterfaceConfig,
+)
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
     RootTipPair,
 )
-from giskardpy.model.world_config import WorldWithOmniDriveRobot
+from giskardpy.model.world_config import WorldWithMobileRobot
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.garmi import Garmi, GarmiJoint
-from semantic_digital_twin.world_description.connections import OmniDrive
-from world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    OmniDrive,
+)
 
 
 class GarmiInteractiveMarkerChain(Enum):
@@ -25,43 +32,24 @@ class GarmiInteractiveMarkerChain(Enum):
 
 
 @dataclass
-class WorldWithGarmiConfig(WorldWithOmniDriveRobot):
+class WorldWithGarmiConfig(WorldWithMobileRobot):
     """
     World configuration for the GARMI robot.
 
-    Builds a map -> odom_combined -> GARMI kinematic tree using an omni-drive base.
+    Builds a map -> odom -> GARMI kinematic tree using an omni-drive base.
     """
 
-    odom_body_name: PrefixedName = field(
-        default_factory=lambda: PrefixedName("odom_combined")
+    odometry_body_name: PrefixedName = field(
+        default_factory=lambda: PrefixedName("odom")
     )
-    urdf_view: Garmi = field(kw_only=True, default=Garmi)
+    robot_class: type[Garmi] = field(kw_only=True, default=Garmi, init=False)
+    """
+    The robot class that is applied to the parsed description.
+    """
 
 
 @dataclass
-class GarmiStandaloneInterface(RobotInterfaceConfig):
-    """
-    Simulates the mecanum wheels, lift, head, both FR3 arms, grippers and drive of GARMI
-    without talking to hardware.
-    """
-
-    def setup(self) -> None:
-        self.register_controlled_joints(
-            [
-                *GarmiJoint.wheels(),
-                *GarmiJoint.lift(),
-                *GarmiJoint.head(),
-                *GarmiJoint.left_arm(),
-                *GarmiJoint.right_arm(),
-                *GarmiJoint.left_fingers(),
-                *GarmiJoint.right_fingers(),
-                self.world.get_connections_by_type(OmniDrive)[0].name,
-            ]
-        )
-
-
-@dataclass
-class GarmiVelocityInterface(RobotInterfaceConfig):
+class GarmiVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
     Closed-loop velocity interface for the real GARMI robot.
 
@@ -78,8 +66,10 @@ class GarmiVelocityInterface(RobotInterfaceConfig):
         )
         omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
         self.sync_odometry_topic("/r100_0603/platform/odom/filtered", omni_drive)
-        self.add_base_cmd_velocity(
-            cmd_vel_topic="/r100_0603/cmd_vel_unstamped", joint=omni_drive
+        self.add_drive_velocity_command_topic(
+            command_topic="/r100_0603/joy_teleop/cmd_vel",
+            drive=omni_drive,
+            command_format=TwistStampedFormat(),
         )
 
         # The merged whole-robot joint state (~50 Hz): arms + lift, the platform's
@@ -87,13 +77,13 @@ class GarmiVelocityInterface(RobotInterfaceConfig):
         # stay available if a joint group needs faster sync.
         self.sync_joint_state_topic("/garmi/joint_states")
 
-        self.add_joint_velocity_group_controller(
-            cmd_topic="/garmi/arms/left_arm_joint_velocity_controller/reference",
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/garmi/arms/left_arm_joint_velocity_controller/reference",
             connections=GarmiJoint.left_arm(),
             command_format=MultiDOFCommandFormat(),
         )
-        self.add_joint_velocity_group_controller(
-            cmd_topic="/garmi/arms/right_arm_joint_velocity_controller/reference",
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/garmi/arms/right_arm_joint_velocity_controller/reference",
             connections=GarmiJoint.right_arm(),
             command_format=MultiDOFCommandFormat(),
         )

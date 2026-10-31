@@ -12,7 +12,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import Any, Callable, Iterator, Optional, TYPE_CHECKING
+from typing_extensions import Any, Callable, Iterator, TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
@@ -57,7 +57,7 @@ class Ordering(ResultTransformer):
     Whether to order the results in descending order.
     """
 
-    key: Optional[Callable] = None
+    key: Callable | None = None
     """
     An optional function extracting the comparison key from the ordering variable's
     value.
@@ -97,12 +97,12 @@ class Quantification(ResultTransformer):
     stays inspectable.
     """
 
-    constraint: Optional[ResultQuantificationConstraint] = None
+    constraint: ResultQuantificationConstraint | None = None
     """
     The result-count constraint to enforce, or ``None`` to accept any number of results.
     """
 
-    owner: Optional[Any] = None
+    owner: Any | None = None
     """
     The query this stage quantifies, reported in quantification errors.
     """

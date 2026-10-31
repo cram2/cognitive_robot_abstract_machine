@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from typing import Any
+from typing_extensions import Any
 
 import pytest
 from json_msgs.action import JsonAction
 from rclpy.node import Node
 
-from giskardpy.middleware.ros2 import ros2_interface, rospy
+from giskardpy.middleware.ros2 import ros2_interface
+from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
 
 # %% test doubles

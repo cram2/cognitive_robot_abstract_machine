@@ -1,3 +1,4 @@
+# %% Imports
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -5,7 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import List, Self, TYPE_CHECKING
+from typing_extensions import Self, TYPE_CHECKING
 
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.lidar_reading import LidarReading
@@ -16,7 +17,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasInputSource,
     TGenericInputSource,
 )
-from semantic_digital_twin.robots.robot_parts import Sensor
+from semantic_digital_twin.robots.robot_parts import AbstractRobotPart, Sensor
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -56,19 +57,21 @@ class SimulatedLidarSource(LidarSource):
             world_T_lidar[:3, 3], (lidar.scan_pattern.beam_count, 1)
         )
 
-        points, index_ray, _ = lidar.root._world.ray_tracer.ray_test(
+        ray_intersections = lidar.root._world.ray_tracer.ray_test(
             world_P_lidar,
             world_P_lidar + world_V_beams * lidar.scan_pattern.maximum_range,
             multiple_hits=True,
             min_distance=lidar.scan_pattern.minimum_range,
             max_distance=lidar.scan_pattern.maximum_range,
         )
+        hit_points = ray_intersections.hit_points
+        ray_indices = ray_intersections.ray_indices
 
         return LidarReading(
             reference_frame=lidar.root,
             scan_pattern=lidar.scan_pattern,
             ranges=self._nearest_hit_per_beam(
-                points, index_ray, world_P_lidar, lidar.scan_pattern.beam_count
+                hit_points, ray_indices, world_P_lidar, lidar.scan_pattern.beam_count
             ),
         )
 
@@ -102,7 +105,7 @@ class SimulatedLidarSource(LidarSource):
 
 
 @dataclass(eq=False)
-class Lidar(Sensor, HasInputSource[LidarSource], ABC):
+class Lidar(Sensor, AbstractRobotPart, HasInputSource[LidarSource], ABC):
     """
     A lidar is a sensor that measures the distance to the surfaces around it along a fan
     of beams.
@@ -135,7 +138,7 @@ class Lidar(Sensor, HasInputSource[LidarSource], ABC):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod

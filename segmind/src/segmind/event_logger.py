@@ -13,7 +13,7 @@ from threading import RLock
 from segmind.datastructures.event_plotter import EventPlotter
 from segmind.datastructures.events import DetectionEvent, EventWithTrackedObjects
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
-from typing_extensions import List, Optional, Type, Callable, Tuple
+from typing_extensions import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +30,8 @@ class EventCallbacks(UserDict):
 
     def __setitem__(
         self,
-        key: Type[DetectionEvent],
-        value: List[Tuple[ConditionFunction, CallbackFunction]],
+        key: type[DetectionEvent],
+        value: list[tuple[ConditionFunction, CallbackFunction]],
     ):
         if key not in self:
             super().__setitem__(key, value)
@@ -51,7 +51,7 @@ class EventLogger:
     """
     A boolean indicating whether events should be annotated.
     """
-    events_to_annotate: List[Type[DetectionEvent]] = field(default=None)
+    events_to_annotate: list[type[DetectionEvent]] = field(default=None)
     """
     A list of event types that should be annotated if annotation is enabled.
     """
@@ -59,7 +59,7 @@ class EventLogger:
     """
     A dictionary that maps event types to a list of callbacks that should be called when the event occurs.
     """
-    timeline: List[DetectionEvent] = field(default_factory=list, init=False)
+    timeline: list[DetectionEvent] = field(default_factory=list, init=False)
     """
     A list of all events.
     """
@@ -75,11 +75,11 @@ class EventLogger:
     """
     A lock for the event callbacks.
     """
-    annotation_queue: Optional[queue.Queue] = field(default=None, init=False)
+    annotation_queue: queue.Queue | None = field(default=None, init=False)
     """
     A queue for annotation events.
     """
-    annotation_thread: Optional[EventAnnotationThread] = field(default=None, init=False)
+    annotation_thread: EventAnnotationThread | None = field(default=None, init=False)
     """
     A thread for annotating events.
     """
@@ -101,9 +101,9 @@ class EventLogger:
 
     def add_callback(
         self,
-        event_type: Type[DetectionEvent],
+        event_type: type[DetectionEvent],
         callback: CallbackFunction,
-        condition: Optional[ConditionFunction] = None,
+        condition: ConditionFunction | None = None,
     ) -> None:
         """
         Add a callback for an event type.
@@ -171,7 +171,7 @@ class EventLogger:
         if isinstance(event, EventWithTrackedObjects):
             event.update_object_trackers_with_event(factory)
 
-    def plot_events(self, show: bool = True, save_path: Optional[str] = None):
+    def plot_events(self, show: bool = True, save_path: str | None = None):
         """
         Plot all events that have been logged in a timeline.
         """
@@ -185,7 +185,7 @@ class EventLogger:
         logger.debug("Events:")
         logger.debug(self.__str__())
 
-    def get_events(self) -> List[DetectionEvent]:
+    def get_events(self) -> list[DetectionEvent]:
         """
         Get all events that have been logged.
         """

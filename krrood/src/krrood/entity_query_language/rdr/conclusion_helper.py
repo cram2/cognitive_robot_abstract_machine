@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from typing_extensions import TYPE_CHECKING, Any, Optional
+from typing_extensions import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.rdr.interface import CaseContext
@@ -40,7 +40,7 @@ class ConclusionSupportPresenter(ConclusionHelper):
     """
 
     @abstractmethod
-    def present(self, context: CaseContext) -> Optional[str]:
+    def present(self, context: CaseContext) -> str | None:
         """
         Render supporting material for the case.
 
@@ -57,7 +57,7 @@ class ConclusionSuggester(ConclusionHelper):
     """
 
     @abstractmethod
-    def suggest(self, context: CaseContext) -> Optional[Any]:
+    def suggest(self, context: CaseContext) -> Any | None:
         """
         Propose a candidate conclusion for the case.
 

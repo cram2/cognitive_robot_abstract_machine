@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import ClassVar, Iterable, Protocol, Union, runtime_checkable
+from typing_extensions import ClassVar, Iterable, Protocol, runtime_checkable
 
 from krrood.entity_query_language.predicate import VerbalizationField
 from krrood.entity_query_language.utils import camel_case_to_words
@@ -65,7 +65,7 @@ class Noun(ClauseElement):
     rendered fragment, or a literal noun given by its *head word only*.
     """
 
-    content: Union[str, "ClauseConstituent"]
+    content: str | ClauseConstituent
     """
     A literal noun *head* (the article is a feature, not part of the text — write
     ``"instance"``, not ``"an instance"``), or any constituent (a field, a rendered
@@ -95,7 +95,7 @@ class Noun(ClauseElement):
         return self.content.as_fragment()
 
     @classmethod
-    def the(cls, head: str) -> "Noun":
+    def the(cls, head: str) -> Noun:
         """:return: a definite literal noun (*"the name"*).
 
         >>> Noun.the("name").as_fragment().definiteness
@@ -104,7 +104,7 @@ class Noun(ClauseElement):
         return cls(head, definiteness=Definiteness.DEFINITE)
 
     @classmethod
-    def bare(cls, head: str) -> "Noun":
+    def bare(cls, head: str) -> Noun:
         """:return: a bare literal noun with no article (*"of type"*, not *"of a type"*).
 
         >>> Noun.bare("type").as_fragment().definiteness
@@ -199,7 +199,7 @@ class OneOf(ClauseElement):
     domain-constrained variable uses.
     """
 
-    members: Union[Iterable, VerbalizationField]
+    members: Iterable | VerbalizationField
     """
     The admissible values — a predicate
     :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound to a
@@ -256,7 +256,7 @@ class DisjunctivePhrase(ClauseElement):
     bound to a single (non- iterable) value keeps that value's own rendered fragment.
     """
 
-    members: Union[Iterable, VerbalizationField]
+    members: Iterable | VerbalizationField
     """
     The admissible values — a predicate
     :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound to an

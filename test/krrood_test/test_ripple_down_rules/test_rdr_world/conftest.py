@@ -3,7 +3,6 @@ from os.path import dirname
 from pathlib import Path
 
 import pytest
-from typing_extensions import Type
 
 from ..conf.world.handles_and_containers import HandlesAndContainersWorld
 from ..datasets import *
@@ -49,7 +48,7 @@ def drawer_case_queries() -> List[CaseQuery]:
 class ExpertConfig:
     filename: str
     use_loaded_answers: bool
-    expert_type: Type[Expert] = field(default=Human)
+    expert_type: type[Expert] = field(default=Human)
 
 
 @pytest.fixture

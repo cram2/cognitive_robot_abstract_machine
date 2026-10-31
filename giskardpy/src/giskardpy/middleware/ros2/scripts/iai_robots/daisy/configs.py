@@ -1,53 +1,45 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from enum import Enum
 
 from giskardpy.middleware.ros2.robot_interface_config import (
-    StandAloneRobotInterfaceConfig,
-    RobotInterfaceConfig,
+    ClosedLoopRobotInterfaceConfig,
+)
+from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
+    RootTipPair,
 )
 from giskardpy.model.world_config import WorldWithFixedRobot
-from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.daisy import DAiSy, DAiSyController
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 
+class DAiSyInteractiveMarkerChain(Enum):
+    """
+    The kinematic chains controllable via interactive markers.
+    """
+
+    LEFT_ARM = RootTipPair(root_link="map", tip_link="left_gripper_tool_frame")
+    RIGHT_ARM = RootTipPair(root_link="map", tip_link="right_gripper_tool_frame")
+
+
 @dataclass
-class DAiSyVelocityInterface(RobotInterfaceConfig):
+class DAiSyVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
     Commands both arms of DAiSy through their forward velocity controllers.
     """
 
     def setup(self):
         self.sync_robot_parts()
-        joints_left = [
-            DAiSyJoint.LEFT_SHOULDER_PAN,
-            DAiSyJoint.LEFT_SHOULDER_LIFT,
-            DAiSyJoint.LEFT_ELBOW,
-            DAiSyJoint.LEFT_WRIST_1,
-            DAiSyJoint.LEFT_WRIST_2,
-            DAiSyJoint.LEFT_WRIST_3,
-        ]
-        self.add_joint_velocity_group_controller(
-            cmd_topic="/left_forward_velocity_controller/commands",
-            connections=joints_left,
-        )
-        joints_right = [
-            DAiSyJoint.RIGHT_SHOULDER_PAN,
-            DAiSyJoint.RIGHT_SHOULDER_LIFT,
-            DAiSyJoint.RIGHT_ELBOW,
-            DAiSyJoint.RIGHT_WRIST_1,
-            DAiSyJoint.RIGHT_WRIST_2,
-            DAiSyJoint.RIGHT_WRIST_3,
-        ]
-        self.add_joint_velocity_group_controller(
-            cmd_topic="/right_forward_velocity_controller/commands",
-            connections=joints_right,
+        self.discover_interfaces_from_controller_manager(
+            whitelist=[
+                DAiSyController.LEFT_FORWARD_VELOCITY,
+                DAiSyController.RIGHT_FORWARD_VELOCITY,
+            ]
         )
 
 
 @dataclass
-class WorldWithDaisyConfig(WorldWithFixedRobot):
+class WorldWithDAiSyConfig(WorldWithFixedRobot):
     """
     A world containing only DAiSy, whose base is fixed to the world root.
     """
@@ -57,43 +49,7 @@ class WorldWithDaisyConfig(WorldWithFixedRobot):
     Name of the body DAiSy is attached to.
     """
 
-    urdf_view: AbstractRobot = field(kw_only=True, default=DAiSy, init=False)
+    robot_class: type[DAiSy] = field(kw_only=True, default=DAiSy, init=False)
     """
-    Semantic view that is applied to the parsed urdf.
-    """
-
-    def setup_world(self, robot_name: Optional[str] = None) -> None:
-        super().setup_world()
-        self.robot = self.world.get_semantic_annotations_by_type(DAiSy)[0]
-
-
-@dataclass
-class DaisyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
-    """
-    Simulates both arms and both grippers of DAiSy without talking to hardware.
-    """
-
-    joint_names: List[str] = field(
-        init=False,
-        default_factory=lambda: [
-            DAiSyJoint.LEFT_SHOULDER_PAN,
-            DAiSyJoint.LEFT_SHOULDER_LIFT,
-            DAiSyJoint.LEFT_ELBOW,
-            DAiSyJoint.LEFT_WRIST_1,
-            DAiSyJoint.LEFT_WRIST_2,
-            DAiSyJoint.LEFT_WRIST_3,
-            DAiSyJoint.RIGHT_SHOULDER_PAN,
-            DAiSyJoint.RIGHT_SHOULDER_LIFT,
-            DAiSyJoint.RIGHT_ELBOW,
-            DAiSyJoint.RIGHT_WRIST_1,
-            DAiSyJoint.RIGHT_WRIST_2,
-            DAiSyJoint.RIGHT_WRIST_3,
-            DAiSyJoint.LEFT_GRIPPER_FINGER,
-            DAiSyJoint.LEFT_GRIPPER_RIGHT_FINGER,
-            DAiSyJoint.RIGHT_GRIPPER_FINGER,
-            DAiSyJoint.RIGHT_GRIPPER_RIGHT_FINGER,
-        ],
-    )
-    """
-    The arm and gripper joints of DAiSy.
+    The robot class that is applied to the parsed description.
     """

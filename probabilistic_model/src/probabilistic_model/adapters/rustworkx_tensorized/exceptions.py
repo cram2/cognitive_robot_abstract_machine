@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from krrood.exceptions import DataclassException
+from probabilistic_model.exceptions import ProbabilisticModelException
 from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class NotExactlyOneRootError(DataclassException):
+class NotExactlyOneRootError(ProbabilisticModelException):
     """
     Raised when the converted layers of a circuit do not contain exactly one layer that
     holds the root of the circuit.
@@ -31,7 +31,7 @@ class NotExactlyOneRootError(DataclassException):
 
 
 @dataclass
-class UnitNotConvertedError(DataclassException):
+class UnitNotConvertedError(ProbabilisticModelException):
     """
     Raised when a unit is looked up that no layer of a converted circuit was created
     from.

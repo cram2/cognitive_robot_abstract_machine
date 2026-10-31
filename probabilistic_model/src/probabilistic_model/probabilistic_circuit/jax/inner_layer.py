@@ -12,7 +12,7 @@ from jax.tree_util import tree_flatten
 from jaxtyping import Int, Array
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from probabilistic_model.exceptions import ShapeMismatchError
-from typing_extensions import List, Iterator, Tuple, Union, Dict, Any, Self, Optional
+from typing_extensions import Iterator, Any, Self
 
 from probabilistic_model.probabilistic_circuit.jax.utils import copy_bcoo
 
@@ -24,7 +24,7 @@ class DifferentiableLayer(eqx.Module, SubclassJSONSerializer, ABC):
     Layers have the same scope (set of variables) for every node in them.
     """
 
-    _variables: Optional[Array] = eqx.field(static=False, default=None)
+    _variables: Array | None = eqx.field(static=False, default=None)
     """
     The variable indices of the layer.
     """
@@ -65,7 +65,7 @@ class DifferentiableLayer(eqx.Module, SubclassJSONSerializer, ABC):
         """
         raise NotImplementedError
 
-    def all_layers(self) -> List[DifferentiableLayer]:
+    def all_layers(self) -> list[DifferentiableLayer]:
         """
         :return: A list of all layers in the circuit.
         """
@@ -73,7 +73,7 @@ class DifferentiableLayer(eqx.Module, SubclassJSONSerializer, ABC):
 
     def all_layers_with_depth(
         self, depth: int = 0
-    ) -> List[Tuple[int, DifferentiableLayer]]:
+    ) -> list[tuple[int, DifferentiableLayer]]:
         """
         :return: A list of tuples of all layers in the circuit with their depth.
         """
@@ -88,7 +88,7 @@ class DifferentiableLayer(eqx.Module, SubclassJSONSerializer, ABC):
         """
         raise NotImplementedError
 
-    def partition(self) -> Tuple[Any, Any]:
+    def partition(self) -> tuple[Any, Any]:
         """
         Partition the layer into the parameters and the static structure.
 
@@ -121,12 +121,12 @@ class DifferentiableInnerLayer(DifferentiableLayer, ABC):
     Abstract Base Class for inner layers.
     """
 
-    child_layers: List[DifferentiableLayer]
+    child_layers: list[DifferentiableLayer]
     """
     The child layers of this layer.
     """
 
-    def __init__(self, child_layers: List[DifferentiableLayer]):
+    def __init__(self, child_layers: list[DifferentiableLayer]):
         super().__init__()
         self.child_layers = child_layers
         self.variables  # initialize the variables of the layer
@@ -137,7 +137,7 @@ class DifferentiableInnerLayer(DifferentiableLayer, ABC):
     def reset_variables(self):
         object.__setattr__(self, "_variables", None)
 
-    def all_layers(self) -> List[DifferentiableLayer]:
+    def all_layers(self) -> list[DifferentiableLayer]:
         """
         :return: A list of all layers in the circuit.
         """
@@ -148,7 +148,7 @@ class DifferentiableInnerLayer(DifferentiableLayer, ABC):
 
     def all_layers_with_depth(
         self, depth: int = 0
-    ) -> List[Tuple[int, DifferentiableLayer]]:
+    ) -> list[tuple[int, DifferentiableLayer]]:
         """
         :return: A list of tuples of all layers in the circuit with their depth.
         """
@@ -157,7 +157,7 @@ class DifferentiableInnerLayer(DifferentiableLayer, ABC):
             result.extend(child_layer.all_layers_with_depth(depth + 1))
         return result
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         result = super().to_json()
         result["child_layers"] = [
             child_layer.to_json() for child_layer in self.child_layers
@@ -185,7 +185,7 @@ class DifferentiableInputLayer(DifferentiableLayer, ABC):
     def set_variables(self, value: jax.Array):
         object.__setattr__(self, "_variables", value)
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         result = super().to_json()
         result["variable"] = self._variables[0].item()
         return result
@@ -208,15 +208,13 @@ class DifferentiableInputLayer(DifferentiableLayer, ABC):
 
 
 class DifferentiableSumLayer(DifferentiableInnerLayer, ABC):
-    log_weights: List[Union[jax.Array, BCOO]]
-    child_layers: Union[
-        List[DifferentiableProductLayer], List[DifferentiableInputLayer]
-    ]
+    log_weights: list[jax.Array | BCOO]
+    child_layers: list[DifferentiableProductLayer] | list[DifferentiableInputLayer]
 
     def __init__(
         self,
-        child_layers: List[DifferentiableLayer],
-        log_weights: List[Union[jax.Array, BCOO]],
+        child_layers: list[DifferentiableLayer],
+        log_weights: list[jax.Array | BCOO],
     ):
         super().__init__(child_layers)
         self.log_weights = log_weights
@@ -234,7 +232,7 @@ class DifferentiableSumLayer(DifferentiableInnerLayer, ABC):
                 )
 
     @property
-    def log_weighted_child_layers(self) -> Iterator[Tuple[BCOO, DifferentiableLayer]]:
+    def log_weighted_child_layers(self) -> Iterator[tuple[BCOO, DifferentiableLayer]]:
         """
         :returns: Yields the log-weights and the child layers zipped together.
         """
@@ -252,7 +250,7 @@ class DifferentiableSumLayer(DifferentiableInnerLayer, ABC):
 
 
 class DifferentiableSparseSumLayer(DifferentiableSumLayer):
-    log_weights: List[BCOO]
+    log_weights: list[BCOO]
 
     @property
     def number_of_components(self) -> int:
@@ -318,7 +316,7 @@ class DifferentiableSparseSumLayer(DifferentiableSumLayer):
         log_weights = [copy_bcoo(log_weight) for log_weight in self.log_weights]
         return self.__class__(child_layers, log_weights)
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         result = super().to_json()
         result["log_weights"] = [
             (
@@ -331,7 +329,7 @@ class DifferentiableSparseSumLayer(DifferentiableSumLayer):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         child_layers = [
             DifferentiableLayer.from_json(child_layer)
             for child_layer in data["child_layers"]
@@ -349,10 +347,8 @@ class DifferentiableSparseSumLayer(DifferentiableSumLayer):
 
 
 class DifferentiableDenseSumLayer(DifferentiableSumLayer):
-    log_weights: List[jax.Array]
-    child_layers: Union[
-        List[DifferentiableProductLayer], List[DifferentiableInputLayer]
-    ]
+    log_weights: list[jax.Array]
+    child_layers: list[DifferentiableProductLayer] | list[DifferentiableInputLayer]
 
     @property
     def number_of_components(self) -> float:
@@ -409,7 +405,7 @@ class DifferentiableDenseSumLayer(DifferentiableSumLayer):
         log_weights = [jnp.copy(log_weight) for log_weight in self.log_weights]
         return self.__class__(child_layers, log_weights)
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         result = super().to_json()
         result["log_weights"] = [
             child_log_weights.tolist() for child_log_weights in self.log_weights
@@ -417,7 +413,7 @@ class DifferentiableDenseSumLayer(DifferentiableSumLayer):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         child_layers = [
             DifferentiableLayer.from_json(child_layer)
             for child_layer in data["child_layers"]
@@ -433,13 +429,13 @@ class DifferentiableProductLayer(DifferentiableInnerLayer):
     A layer that represents the product of multiple other units.
     """
 
-    child_layers: List[Union[DifferentiableSparseSumLayer, DifferentiableInputLayer]]
+    child_layers: list[DifferentiableSparseSumLayer | DifferentiableInputLayer]
     """
     The child of a product layer is a list that contains groups sum units with the same
     scope or groups of input units with the same scope.
     """
 
-    edges: Int[BCOO, "len(child_layers), number_of_nodes"] = eqx.field(static=True)
+    edges: Int[BCOO, len(child_layers), number_of_nodes] = eqx.field(static=True)
     """
     The edges consist of a sparse matrix containing integers.
 
@@ -452,7 +448,7 @@ class DifferentiableProductLayer(DifferentiableInnerLayer):
     The shape is (#child_layers, #nodes).
     """
 
-    def __init__(self, child_layers: List[DifferentiableLayer], edges: BCOO):
+    def __init__(self, child_layers: list[DifferentiableLayer], edges: BCOO):
         """
         Initialize the product layer.
 
@@ -512,7 +508,7 @@ class DifferentiableProductLayer(DifferentiableInnerLayer):
         edges = copy_bcoo(self.edges)
         return self.__class__(child_layers, edges)
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         result = super().to_json()
         result["edges"] = (
             self.edges.data.tolist(),
@@ -522,7 +518,7 @@ class DifferentiableProductLayer(DifferentiableInnerLayer):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         child_layers = [
             DifferentiableLayer.from_json(child_layer)
             for child_layer in data["child_layers"]

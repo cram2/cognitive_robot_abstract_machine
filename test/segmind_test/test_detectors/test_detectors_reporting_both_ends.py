@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 from segmind.datastructures.events import (
     ContactEvent,
     ContainmentEvent,
@@ -30,8 +31,8 @@ from segmind.detectors.spatial_relation_detector_nodes import (
     ContainmentDetector,
     SupportDetector,
 )
-from segmind.episode_segmenter import EpisodeSegmenterExecutor
-from segmind.statecharts.segmind_statechart import SegmindStatechart
+from segmind.episode_segmenter import EpisodeSegmentation
+from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -40,7 +41,8 @@ from ..conftest import RESTING_ON_THE_TABLE, WHERE_THE_MILK_STOOD
 
 MOVING_TICKS = 5
 """
-How many ticks a test keeps a body moving, which is more than a motion detector's window.
+How many ticks a test keeps a body moving, which is more than a motion detector's
+window.
 """
 
 
@@ -48,9 +50,11 @@ def _ticking(world: World, *detectors: AbstractDetector):
     """
     :return: An executor ticking only ``detectors``, and the context they log to.
     """
-    executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
+    )
     segmind_context = executor.context.require_extension(SegmindContext)
-    executor.compile(SegmindStatechart().build_statechart(list(detectors)))
+    executor.compile(DetectorStatechartBuilder(list(detectors)).build(executor.context))
     executor.tick()
     return executor, segmind_context
 

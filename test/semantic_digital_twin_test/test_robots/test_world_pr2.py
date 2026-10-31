@@ -2,7 +2,6 @@ from collections import defaultdict
 
 import numpy as np
 import pytest
-from typing_extensions import List
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -479,7 +478,7 @@ def test_an_arm_covers_the_chain_down_to_its_end_effector(pr2_world_state_reset)
 
 
 def test_kinematic_chains(pr2_world_state_reset):
-    semantic_kinematic_chain_annotation: List[KinematicChain] = (
+    semantic_kinematic_chain_annotation: list[KinematicChain] = (
         pr2_world_state_reset.get_semantic_annotations_by_type(KinematicChain)
     )
     for chain in semantic_kinematic_chain_annotation:

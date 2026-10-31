@@ -1,4 +1,5 @@
-"""Generate real SDT objects with sampled masses for the confidence-aware pipeline.
+"""
+Generate real SDT objects with sampled masses for the confidence-aware pipeline.
 
 The confidence model needs a population of "familiar" objects to fit on. Rather than
 hand-authoring them, this module drives EQL's :class:`ProbabilisticBackend` with a
@@ -17,26 +18,32 @@ from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Any, List, Type
+from typing_extensions import Any
 
 
 @dataclass
 class MassDistribution:
-    """The familiar mass distribution to sample one class' objects from."""
+    """
+    The familiar mass distribution to sample one class' objects from.
+    """
 
-    object_class: Type
+    object_class: type
     """The semantic-annotation class to generate, e.g. ``Cup`` or ``Pot``."""
 
     mean: float
-    """The mean mass, in kilograms, familiar objects of this class are sampled around."""
+    """
+    The mean mass, in kilograms, familiar objects of this class are sampled around.
+    """
 
     standard_deviation: float
     """The standard deviation of the mass, in kilograms, familiar objects are sampled with."""
 
     number_of_samples: int
-    """How many objects of this class to generate."""
+    """
+    How many objects of this class to generate.
+    """
 
-    def generate_objects(self) -> List[Any]:
+    def generate_objects(self) -> list[Any]:
         """
         Sample ``number_of_samples`` objects of ``object_class``.
 
@@ -61,8 +68,9 @@ class MassDistribution:
         return list(backend.evaluate(query))
 
 
-def generate_familiar_objects(mass_distributions: List[MassDistribution]) -> List[Any]:
-    """Generate real SDT objects with sampled masses via EQL's probabilistic backend.
+def generate_familiar_objects(mass_distributions: list[MassDistribution]) -> list[Any]:
+    """
+    Generate real SDT objects with sampled masses via EQL's probabilistic backend.
 
     :param mass_distributions: The per-class distributions to sample objects from.
     :return: The generated objects, grouped by distribution in the given order.

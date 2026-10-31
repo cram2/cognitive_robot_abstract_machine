@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+# %% Imports
 import os
 from pathlib import Path
 import json
@@ -14,14 +17,16 @@ from robokudo import world as rk_world
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
 import robokudo.utils.data_downloader
-import robokudo.utils.tree_execution
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.storage import StorageWriter
 from robokudo.cas import CASViews
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
-from robokudo.io.storage import Storage
+from robokudo.io.storage import Storage, StorageDocumentField
+import robokudo.utils.tree_execution
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+
 from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
@@ -32,19 +37,25 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _camera_info_k_values(camera_info):
-    if hasattr(camera_info, "k"):
-        return list(camera_info.k)
-    return list(camera_info.K)
-
-
 def _build_writer_pipeline(db_name: str) -> Pipeline:
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=False,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
-        kinect_height_fix_mode=True,
         color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
+    )
+    camera_config = file_reader_descriptor.parameters.camera_config
+    camera_config.static_camera_transform_enabled = True
+    camera_config.static_world_T_camera = (
+        HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=0.1,
+            pos_y=0.2,
+            pos_z=0.3,
+            quat_x=0.0,
+            quat_y=0.0,
+            quat_z=0.0,
+            quat_w=1.0,
+        )
     )
 
     writer_descriptor = StorageWriter.Descriptor()
@@ -77,7 +88,8 @@ def _build_reader_pipeline(db_name: str) -> Pipeline:
 
 
 class TestStorageRoundtripPipeline:
-    def test_store_and_replay_sensor_data_roundtrip(self):
+    def test_store_and_replay_sensor_data_roundtrip(self) -> None:
+        rk_world.init_world_with_entity_tracker()
         db_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
         storage = Storage(db_name)
         writer_node = Node(
@@ -102,21 +114,30 @@ class TestStorageRoundtripPipeline:
             assert "state" in world_snapshot_payload
             assert {"ids", "states"}.issubset(world_snapshot_payload["state"])
 
-            tracker = rk_world.init_world_with_entity_tracker()
-            WorldModelSnapshot.apply_to_json_snapshot_to_world(
-                rk_world.world_instance(),
-                world_snapshot_payload,
-                **tracker.create_kwargs(),
+            query_document = Storage.encode_view_document(
+                CASViews.QUERY, {"recorded": True}
             )
-            assert len(rk_world.world_instance().state.keys()) == len(
-                world_snapshot_payload["state"]["ids"]
+            query_id = (
+                storage.db[Storage.VIEW_COLLECTION_NAME]
+                .insert_one(query_document)
+                .inserted_id
             )
+            view_ids = dict(stored_record[StorageDocumentField.VIEW_IDS])
+            view_ids[CASViews.QUERY] = query_id
+            storage.db.cas.update_one(
+                {"_id": stored_record["_id"]},
+                {"$set": {StorageDocumentField.VIEW_IDS: view_ids}},
+            )
+
+            rk_world.init_world_with_entity_tracker()
+            assert rk_world.world_instance().is_empty()
 
             reader_pipeline = _build_reader_pipeline(db_name)
             reader_status = robokudo.utils.tree_execution.run_tree_once(
                 reader_pipeline, reader_node
             )
             assert reader_status is py_trees.common.Status.SUCCESS
+            assert not reader_pipeline.cas.contains(CASViews.QUERY)
 
             np.testing.assert_array_equal(
                 writer_pipeline.cas.get(CASViews.COLOR_IMAGE),
@@ -128,21 +149,50 @@ class TestStorageRoundtripPipeline:
                 equal_nan=True,
             )
 
-            writer_camera_info = writer_pipeline.cas.get(CASViews.CAMERA_INFO)
-            reader_camera_info = reader_pipeline.cas.get(CASViews.CAMERA_INFO)
-            assert writer_camera_info.width == reader_camera_info.width
-            assert writer_camera_info.height == reader_camera_info.height
-            assert _camera_info_k_values(writer_camera_info) == _camera_info_k_values(
-                reader_camera_info
+            writer_observation = writer_pipeline.cas.require_camera_observation()
+            reader_observation = reader_pipeline.cas.require_camera_observation()
+            assert reader_observation.camera is not writer_observation.camera
+            assert (
+                reader_observation.camera
+                is rk_world.world_instance().get_semantic_annotation_by_id(
+                    reader_observation.camera.id
+                )
             )
-
-            writer_camera_intrinsic = writer_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
-            reader_camera_intrinsic = reader_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
-            assert writer_camera_intrinsic.width == reader_camera_intrinsic.width
-            assert writer_camera_intrinsic.height == reader_camera_intrinsic.height
-            np.testing.assert_allclose(
-                writer_camera_intrinsic.intrinsic_matrix,
-                reader_camera_intrinsic.intrinsic_matrix,
+            assert reader_observation.camera.id == writer_observation.camera.id
+            assert (
+                reader_observation.camera.root.id == writer_observation.camera.root.id
+            )
+            assert reader_observation.camera.name == writer_observation.camera.name
+            assert (
+                reader_observation.camera.camera_model
+                == writer_observation.camera.camera_model
+            )
+            assert (
+                reader_observation.camera.camera_range
+                == writer_observation.camera.camera_range
+            )
+            assert tuple(reader_observation.camera.modalities) == tuple(
+                writer_observation.camera.modalities
+            )
+            assert {
+                str(key) for key in rk_world.world_instance().state.keys()
+            }.isdisjoint({str(key) for key in world_snapshot_payload["state"]["ids"]})
+            assert (
+                writer_observation.effective_camera_model
+                == reader_observation.effective_camera_model
+            )
+            assert (
+                writer_observation.timestamp_nanoseconds
+                == reader_observation.timestamp_nanoseconds
+            )
+            reader_pose = reader_observation.world_T_camera_or_raise()
+            writer_pose = writer_observation.world_T_camera_or_raise()
+            np.testing.assert_array_equal(reader_pose.to_np(), writer_pose.to_np())
+            assert reader_pose.reference_frame.id == writer_pose.reference_frame.id
+            assert reader_pose.child_frame is reader_observation.camera.root
+            assert (
+                reader_observation.camera.root.parent_connection.parent
+                is reader_pose.reference_frame
             )
 
             assert writer_pipeline.cas.get(CASViews.COLOR_TO_DEPTH_RATIO) == (

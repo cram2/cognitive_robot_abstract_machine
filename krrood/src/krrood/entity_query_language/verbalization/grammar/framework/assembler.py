@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import ClassVar, Generic, Optional, Type
+from typing_extensions import ClassVar, Generic
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     VerbalizationFragment,
@@ -36,12 +36,12 @@ class Assembler(Generic[TSymbolicExpression, TPlan], SubClassSafeGeneric):
     The per-node context (recursion entry and microplanning services).
     """
 
-    planner: ClassVar[Optional[Type[Planner]]] = None
+    planner: ClassVar[type[Planner] | None] = None
     """
     The paired planner (set per family); ``None`` for realisation-only assemblers.
     """
 
-    def plan(self, node: TSymbolicExpression) -> Optional[TPlan]:
+    def plan(self, node: TSymbolicExpression) -> TPlan | None:
         """
         :param node: The node to plan.
         :return: The plan from the paired planner via the shared read model (computed once per

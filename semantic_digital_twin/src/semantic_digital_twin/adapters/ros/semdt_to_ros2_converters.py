@@ -213,10 +213,25 @@ class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
 class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
 
     @classmethod
+    def mesh_resource_of(cls, mesh: Mesh) -> str:
+        """
+        :return: A ``package://`` URI when the mesh file lies in a package's share
+            directory, so the receiving machine resolves it in its own install;
+            otherwise a ``file://`` URI.
+        """
+        if mesh.filename.startswith("package://"):
+            return mesh.filename
+        parts = mesh.local_file.parts
+        if "share" not in parts[:-2]:
+            return "file://" + str(mesh.local_file)
+        share_index = len(parts) - 1 - parts[::-1].index("share")
+        return "package://" + "/".join(parts[share_index + 1 :])
+
+    @classmethod
     def convert(cls, data: Mesh) -> Marker:
         marker = super().convert(data)
         marker.type = visualization_msgs.Marker.MESH_RESOURCE
-        marker.mesh_resource = "file://" + str(data.local_file)
+        marker.mesh_resource = cls.mesh_resource_of(data)
         marker.scale.x = data.scale.x
         marker.scale.y = data.scale.y
         marker.scale.z = data.scale.z

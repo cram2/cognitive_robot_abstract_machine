@@ -23,6 +23,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 
+from .dataset.robots_on_a_drive import RobotOnADifferentialDrive, RobotOnAnOmniDrive
 from .living_worlds import (
     LivingWorlds,
 )
@@ -34,14 +35,16 @@ try:
 except ImportError:
     Garmi = None
 
-try:
-    from coraplex.datastructures.dataclasses import Context
-except ModuleNotFoundError:
-    # ROS dependencies.
-    Context = None
+from .sampling import SAMPLING_SEED
 
 try:
-    from giskardpy.middleware.ros2 import rospy
+    from .plan_running import robot_extensions
+except ModuleNotFoundError:
+    # ROS dependencies.
+    robot_extensions = None
+
+try:
+    from semantic_digital_twin.adapters.ros import rospy
 except ModuleNotFoundError:
     # ROS dependencies.
     rospy = None
@@ -49,13 +52,12 @@ from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
-from typing_extensions import Iterator, List, Type, TypeVar
+from typing_extensions import Iterator, TypeVar
 
 CallbackT = TypeVar("CallbackT", bound=Callback)
 """
 The kind of publisher a test started.
 """
-
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
@@ -81,7 +83,6 @@ from semantic_digital_twin.robots.icub3 import ICub3
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.mmp_dresden import MMPDresden
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
-
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Table,
@@ -105,7 +106,6 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
-    Pose,
 )
 from semantic_digital_twin.utils import (
     rclpy_installed,
@@ -132,52 +132,42 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
 )
-
 ###############################
 ### Fixture Usage Guide #######
 ###############################
 
 """
-This file composes the Pytest fixtures for all tests in the monorepo. 
+This file composes the Pytest fixtures for all tests in the monorepo.
+
 Some basic facts about fixtures:
- * conftest.py and test directories inherit the fixtures from contests from upper directories 
- * Fixtures can be scoped, possible values are: function, class, module, package, session 
- * Fixtures can use other fixtures 
+ * conftest.py and test directories inherit the fixtures from contests from upper directories
+ * Fixtures can be scoped, possible values are: function, class, module, package, session
+ * Fixtures can use other fixtures
     * This only works the requesting fixture is scoped less or equal the the requested fixture (function requesting session works)
- * The return/yield value of fixtures is being cached. 
+ * The return/yield value of fixtures is being cached.
     * In case of worlds this is important since always the same world is returned by a session scoped fixture
 
 General Remarks:
     * Apparently generating the robot semantic view takes some time so it should be done in the session scoped setup
 
-The structure of fixtures in this conftest: 
-    * World setup fixtures: 
+The structure of fixtures in this conftest:
+    * World setup fixtures:
         These setup a world and return it, they are scoped for a whole session
-         THEY SHOULD NOT BE USED DIRECTLY! 
-         This is the case since the returned world will always be the same and changing the state or model of it will 
+         THEY SHOULD NOT BE USED DIRECTLY!
+         This is the case since the returned world will always be the same and changing the state or model of it will
          cause side effects in other tests. They can only be used if the test does not change the state or model
-    * Merging setup fixtures: 
-        These combine one or more different worlds from other fixtures. 
-        THEY SHOULD NOT BE USED DIRECTLY 
-        for the same reason as the world setup fixtures. 
+    * Merging setup fixtures:
+        These combine one or more different worlds from other fixtures.
+        THEY SHOULD NOT BE USED DIRECTLY
+        for the same reason as the world setup fixtures.
     * State reset fixture:
-        This fixtures are scoped for functions and reset the state between tests runs. 
+        This fixtures are scoped for functions and reset the state between tests runs.
         THEY CAN BE USED FOR TESTS THAT ONLY CHANGE THE STATE
-        Since resetting the state between test runs is easy this is the most common fixture for tests 
-    * Model changing fixtures: 
-        This fixtures are scoped for functions, they are a copy of the world from the world setup and are discarded 
-        after the test since there is no good method to reset the model after a test has changed it. 
-
+        Since resetting the state between test runs is easy this is the most common fixture for tests
+    * Model changing fixtures:
+        This fixtures are scoped for functions, they are a copy of the world from the world setup and are discarded
+        after the test since there is no good method to reset the model after a test has changed it.
 """
-
-
-# %% repeatable location samples
-
-SAMPLING_SEED = 0
-"""
-The sampling seed of every plan context the tests build, so location samples repeat.
-"""
-
 
 LIVING_WORLDS = pytest.StashKey[LivingWorlds]()
 """
@@ -289,7 +279,10 @@ def mini_world() -> World:
 
 @pytest.fixture()
 def world_with_two_bodies() -> tuple[World, Body, Body]:
-    """A fresh world with an unconnected parent and child body, ready to receive a connection."""
+    """
+    A fresh world with an unconnected parent and child body, ready to receive a
+    connection.
+    """
     world = World()
     parent = Body(name=PrefixedName("parent"))
     child = Body(name=PrefixedName("child"))
@@ -305,7 +298,7 @@ def cylinder_bot_world():
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
         )
         robot_world.add_body(robot)
-        MinimalRobot.from_world(robot_world)
+        RobotOnAnOmniDrive.from_world(robot_world)
     world = World()
     with world.modify_world():
         body = Body(
@@ -486,7 +479,7 @@ def cylinder_bot_diff_world():
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
         )
         robot_world.add_body(robot)
-        MinimalRobot.from_world(robot_world)
+        RobotOnADifferentialDrive.from_world(robot_world)
     world = World()
     with world.modify_world():
         body = Body(
@@ -515,7 +508,7 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-    robot_semantic_annotation: Type[AbstractRobot],
+    robot_semantic_annotation: type[AbstractRobot],
     robot_starting_pose: HomogeneousTransformationMatrix | None = None,
     urdf_path_resolver: PathResolver | None = None,
     robot_localization_pose: HomogeneousTransformationMatrix | None = None,
@@ -580,9 +573,7 @@ def _hsr_world_setup():
 
 @pytest.fixture(scope="function")
 def hsr_world_copy(_hsr_world_setup):
-    result = deepcopy(_hsr_world_setup)
-    HSRB.from_world(result)
-    return result
+    return deepcopy(_hsr_world_setup)
 
 
 @pytest.fixture(scope="session")
@@ -610,10 +601,20 @@ def daisy_world():
     if not daisy_installed():
         pytest.skip("DAiSy not installed")
     daisy = "package://iai_daisy_description/robots/daisy.urdf.xacro"
-    daisy_parser = URDFParser.from_file(file_path=daisy)
-    world_with_daisy = daisy_parser.parse()
-    DAiSy.from_world(world_with_daisy)
+    try:
+        daisy_parser = URDFParser.from_file(file_path=daisy)
+        world_with_daisy = daisy_parser.parse()
+        DAiSy.from_world(world_with_daisy)
+    except Exception:
+        pytest.skip(
+            "DAiSy URDF could not be parsed (missing dependency or body mismatch)"
+        )
     return world_with_daisy
+
+
+@pytest.fixture(scope="function")
+def daisy_world_copy(daisy_world):
+    return deepcopy(daisy_world)
 
 
 @pytest.fixture(scope="session")
@@ -797,11 +798,7 @@ def apartment_world_pr2_copy_with_context(_apartment_world_setup, _pr2_world_set
     return (
         result,
         result.get_semantic_annotations_by_type(AbstractRobot)[0],
-        Context(
-            result,
-            result.get_semantic_annotations_by_type(AbstractRobot)[0],
-            sampling_seed=SAMPLING_SEED,
-        ),
+        robot_extensions(result.get_semantic_annotations_by_type(AbstractRobot)[0]),
     )
 
 
@@ -957,7 +954,7 @@ def multi_story_building(_elevator_world_setup):
         ),
     )
 
-    def add_level(level_type: Type[Level], name: str, center_height: float) -> None:
+    def add_level(level_type: type[Level], name: str, center_height: float) -> None:
         """
         Add a region spanning one storey and annotate it as that level.
 
@@ -1018,9 +1015,9 @@ def pr2_apartment_world(_pr2_world_setup, _apartment_world_setup):
     apartment_copy = deepcopy(_apartment_world_setup)
 
     pr2_copy.merge_world(apartment_copy)
-    pr2_copy.get_body_by_name("base_footprint").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
-    )
+    pr2_copy.get_body_by_name(
+        "base_footprint"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
     return pr2_copy
 
 
@@ -1033,7 +1030,7 @@ def simple_pr2_world_setup(_pr2_world_setup, _simple_apartment_setup):
     return (
         pr2_copy,
         robot_view,
-        Context(pr2_copy, robot_view, sampling_seed=SAMPLING_SEED),
+        robot_extensions(robot_view),
     )
 
 
@@ -1050,7 +1047,7 @@ def hsr_apartment_world(_hsr_world_setup, _apartment_world_setup):
     return (
         apartment_copy,
         robot_view,
-        Context(apartment_copy, robot_view, sampling_seed=SAMPLING_SEED),
+        robot_extensions(robot_view),
     )
 
 
@@ -1110,7 +1107,7 @@ class RosPublishers:
     on a world outliving the test publishes on a node that is already destroyed.
     """
 
-    started: List[Callback] = field(default_factory=list)
+    started: list[Callback] = field(default_factory=list)
     """
     The publishers started so far, in the order they were started.
     """
@@ -1167,7 +1164,9 @@ def init_rospy():
 @pytest.fixture(scope="function")
 def rclpy_node():
     """
-    You can use this fixture if you want to use the marker visualizer of semDT and need a ros node.
+    You can use this fixture if you want to use the marker visualizer of semDT and need
+    a ros node.
+
     ..warning::
         This fixture can not be used in multiple tests at once
     """

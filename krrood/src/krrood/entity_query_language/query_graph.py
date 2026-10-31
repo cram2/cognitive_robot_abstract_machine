@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from ordered_set import OrderedSet
-from typing_extensions import ClassVar, Optional, Dict, Any
+from typing_extensions import ClassVar, Any
 
 from krrood.entity_query_language.rules.conclusion import Conclusion
 from krrood.entity_query_language.rules.conclusion_selector import ConclusionSelector
@@ -71,7 +71,7 @@ class QueryGraph:
     An expression representing the query.
     """
 
-    satisfied_condition_ids: Optional[OrderedSet[UUID]] = None
+    satisfied_condition_ids: OrderedSet[UUID] | None = None
     """
     Optional frozenset of satisfied condition UUIDs for coloring condition nodes.
 
@@ -84,7 +84,7 @@ class QueryGraph:
     The graph representation of the query, used for visualization and introspection.
     """
 
-    expression_node_map: Dict[SymbolicExpression, QueryNode] = field(
+    expression_node_map: dict[SymbolicExpression, QueryNode] = field(
         init=False, default_factory=dict
     )
     """
@@ -156,7 +156,7 @@ class QueryGraph:
         curve_scale: float = 0.5,
         layout: str = "tidy",
         edge_style: str = "orthogonal",
-        label_max_chars_per_line: Optional[int] = 13,
+        label_max_chars_per_line: int | None = 13,
         filename: str = "query_graph.pdf",
     ):
         """
@@ -217,7 +217,7 @@ class QueryGraph:
 
     def construct_graph(
         self,
-        expression: Optional[SymbolicExpression] = None,
+        expression: SymbolicExpression | None = None,
     ) -> QueryNode:
         """
         Construct the graph representation of the query, used for visualization and
@@ -284,7 +284,7 @@ class ColorLegend(RXUtilsColorLegend):
     def from_expression(
         cls,
         expression: SymbolicExpression,
-        satisfied_condition_ids: Optional[OrderedSet[UUID]] = None,
+        satisfied_condition_ids: OrderedSet[UUID] | None = None,
     ) -> ColorLegend:
         name = expression.__class__.__name__
         color = "white"

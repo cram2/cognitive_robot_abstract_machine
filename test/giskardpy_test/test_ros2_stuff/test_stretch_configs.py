@@ -2,14 +2,13 @@ from datetime import timedelta
 
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
-    StretchStandaloneInterface,
     StretchVelocityInterface,
     WorldWithStretchConfigDiffDrive,
 )
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
+from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.robots.stretch import Stretch
+from semantic_digital_twin.robots.stretch import Stretch, StretchJoint
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     DifferentialDrive,
@@ -18,29 +17,13 @@ from semantic_digital_twin.world_description.connections import (
 # %% controlled joints
 
 
-def test_controlled_joints_resolve_the_drive_from_the_world(stretch_world_copy):
+def test_stretch_declares_both_wheels_as_controlled(stretch_world_copy) -> None:
     """
-    The base drive is looked up in the world instead of being named by a literal, so the
-    interface controls the base whatever the drive connection ended up being called.
+    The wheels are driven by the same velocity controller as the arm, so the robot
+    declares them next to the base drive.
     """
-    drive = stretch_world_copy.get_connections_by_type(DifferentialDrive)[0]
-    interface = StretchStandaloneInterface()
-
-    controlled_joint_names = interface.controlled_joint_names(stretch_world_copy)
-
-    assert controlled_joint_names[0] == drive.name
-    assert controlled_joint_names[1:] == interface.joint_names
-
-
-def test_every_controlled_joint_exists_in_the_world(stretch_world_copy):
-    """
-    Registering a joint the world does not know about fails at setup time, so every
-    declared name must resolve to a connection.
-    """
-    interface = StretchStandaloneInterface()
-
-    for joint_name in interface.controlled_joint_names(stretch_world_copy):
-        assert stretch_world_copy.get_connection_by_name(joint_name) is not None
+    for joint_name in (StretchJoint.RIGHT_WHEEL, StretchJoint.LEFT_WHEEL):
+        assert stretch_world_copy.get_connection_by_name(joint_name).is_controlled
 
 
 # %% velocity interface
@@ -71,7 +54,7 @@ def test_velocity_interface_sets_up_against_the_robot_description(init_rospy):
             urdf=load_xacro(Stretch.get_ros_file_path())
         ),
         robot_interface_config=StretchVelocityInterface(),
-        server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
+        server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(
             target_frequency=25, braking_time=timedelta(seconds=1.15)
         ),

@@ -23,7 +23,7 @@ from __future__ import annotations
 import enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import Any, ClassVar, Iterator, Optional
+from typing_extensions import Any, ClassVar, Iterator
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import (
@@ -413,7 +413,7 @@ class ConstantCondition(enum.Enum):
         return Literal(_value_=self.value, _name__=self.name.lower())
 
     @classmethod
-    def stated_by(cls, expression: SymbolicExpression) -> Optional[ConstantCondition]:
+    def stated_by(cls, expression: SymbolicExpression) -> ConstantCondition | None:
         """
         :param expression: An EQL condition.
         :return: The outcome it states outright, or ``None`` when it depends on a scene.
@@ -444,7 +444,7 @@ class StatedProposition(ABC):
     """
 
     @classmethod
-    def stated_by(cls, expression: SymbolicExpression) -> Optional[StatedProposition]:
+    def stated_by(cls, expression: SymbolicExpression) -> StatedProposition | None:
         """
         :param expression: A node of an EQL condition.
         :return: The proposition it states, or ``None`` when it composes others rather than
@@ -542,7 +542,7 @@ class MeasuredComparison(StatedProposition):
     """
 
     @staticmethod
-    def measure_of(comparison: Comparator) -> Optional[InstantiatedVariable]:
+    def measure_of(comparison: Comparator) -> InstantiatedVariable | None:
         """
         :param comparison: A comparison a condition states.
         :return: The measured value it compares, or ``None`` when it compares none.

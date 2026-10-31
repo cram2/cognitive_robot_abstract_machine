@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
-from typing_extensions import TYPE_CHECKING, List, Optional
+from typing_extensions import TYPE_CHECKING
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import ConditionType, a
@@ -123,7 +123,7 @@ class SurfaceGrasp:
     How far the closing direction is turned about the direction of approach, in radians.
     """
 
-    result: Optional[GraspResult] = field(default=None)
+    result: GraspResult | None = field(default=None)
     """
     What happened when the grasp was tried; ``None`` while it has not been.
     """
@@ -170,7 +170,7 @@ class SurfaceGrasp:
 
     def _surface_point(
         self, graspable: HasGraspCandidates, outward: NDArray[np.float64]
-    ) -> Optional[NDArray[np.float64]]:
+    ) -> NDArray[np.float64] | None:
         """
         Cast a horizontal ray from outside the object towards its vertical axis.
 
@@ -275,7 +275,7 @@ def from_any_side(
     grasp: Match[SurfaceGrasp],
     largest_pitch: float = 1.2,
     largest_roll: float = math.pi / 4,
-) -> List[ConditionType]:
+) -> list[ConditionType]:
     """
     :param grasp: A statement's grasp.
     :param largest_pitch: How far the approach may tilt off vertical, in radians.
@@ -297,8 +297,8 @@ def from_any_side(
 def draw_surface_grasps(
     statement: Match[SurfaceGrasp],
     number_of_grasps: int,
-    model_registry: Optional[ModelRegistry] = None,
-) -> List[SurfaceGrasp]:
+    model_registry: ModelRegistry | None = None,
+) -> list[SurfaceGrasp]:
     """
     :param statement: A statement of where an object may be grasped.
     :param number_of_grasps: How many grasps to draw, as the statement's limit.

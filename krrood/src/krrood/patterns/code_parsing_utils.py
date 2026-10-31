@@ -2,9 +2,7 @@ import ast
 import inspect
 from functools import lru_cache
 from textwrap import dedent
-from typing import Optional
 
-from typing_extensions import Type
 
 from krrood.entity_query_language.exceptions import (
     WrongPropertyReturnStatementImplementation,
@@ -14,7 +12,7 @@ from krrood.entity_query_language.exceptions import (
 
 @lru_cache
 def get_accessed_attribute_name_in_return_statement_of_property(
-    property_object: property, clazz: Optional[Type] = None
+    property_object: property, clazz: type | None = None
 ) -> str:
     """
     :param property_object: The property to extract the accessed attribute name from.

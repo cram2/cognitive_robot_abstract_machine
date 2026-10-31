@@ -48,8 +48,8 @@ world = World()
 root = Body(name=PrefixedName(name="root", prefix="world"))
 
 # Geometry for a square base plate and a "camera" box
-base_plate_shape = Box(scale=Scale(0.6, 0.6, 0.05), color=Color(0.3, 0.3, 0.3, 1.0))
-camera_shape = Box(scale=Scale(0.10, 0.06, 0.05), color=Color(0.1, 0.2, 0.8, 1.0))
+base_plate_shape = Box(scale=Scale(0.6, 0.6, 0.05), color=Color.from_rgba(red=0.3, green=0.3, blue=0.3, opacity=1.0))
+camera_shape = Box(scale=Scale(0.10, 0.06, 0.05), color=Color.from_rgba(red=0.1, green=0.2, blue=0.8, opacity=1.0))
 
 base_body = Body(
     name=PrefixedName(name="base", prefix="transform_example"),

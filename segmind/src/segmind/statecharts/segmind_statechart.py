@@ -1,42 +1,34 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
 
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from segmind.detectors.atomic_event_detectors_nodes import ContactDetector, TranslationDetector, \
-    RotationDetector
-from segmind.detectors.base import DetectorStateChart, AbstractDetector
-from segmind.detectors.coarse_event_detector_nodes import PlacingDetector, PickUpDetector
-from segmind.detectors.spatial_relation_detector_nodes import SupportDetector, \
-    ContainmentDetector, InsertionDetector
+from cramph.context import StatechartContext
+from cramph.statechart import Statechart
+from segmind.detectors.atomic_event_detectors_nodes import (
+    ContactDetector,
+    TranslationDetector,
+)
+from segmind.detectors.base import AbstractDetector
+from segmind.detectors.coarse_event_detector_nodes import (
+    PlacingDetector,
+    PickUpDetector,
+)
+from segmind.detectors.spatial_relation_detector_nodes import (
+    SupportDetector,
+    ContainmentDetector,
+    InsertionDetector,
+)
 
 
 @dataclass
-class SegmindStatechart(MotionStatechart):
+class DetectorStatechartBuilder:
     """
-    Represents the statechart for Segmind, encapsulating its construction and management.
-
-    This class is used to build a statechart for Segmind by establishing various detectors
-    that act as nodes within the statechart. Each detector is instantiated with a unique
-    name and a shared context. These detectors are then added as nodes to the statechart.
+    Builds a statechart that runs detectors against a shared
+    :class:`~segmind.detectors.base.SegmindContext`.
     """
 
-
-    def build_statechart(self, detectors:List[AbstractDetector]=None) -> DetectorStateChart:
-        """
-        Build a statechart with various detector nodes.
-
-        This method constructs a statechart used to manage different states and transitions
-        within a detection system. Each detector node corresponds to a specific event or
-        state in the system, such as contact, support, and containment detection. Once initialized, the statechart is populated with these
-        nodes for future state management.
-
-        :return: A statechart instance with detector nodes.
-        """
-
-        statechart = DetectorStateChart()
-        default_detectors = [
+    detectors: list[AbstractDetector] = field(
+        default_factory=lambda: [
             ContactDetector(),
             SupportDetector(),
             ContainmentDetector(),
@@ -45,10 +37,17 @@ class SegmindStatechart(MotionStatechart):
             InsertionDetector(),
             PickUpDetector(),
         ]
+    )
+    """
+    The detectors the statechart runs; by default every detector except the rotation
+    detectors.
+    """
 
-        detectors = detectors if detectors else default_detectors
-
-        statechart.add_nodes(detectors)
-
-
+    def build(self, context: StatechartContext) -> Statechart:
+        """
+        :param context: The context of the executor that runs the statechart.
+        :return: A statechart holding :attr:`detectors` as its nodes.
+        """
+        statechart = Statechart(context=context)
+        statechart.add_nodes(self.detectors)
         return statechart

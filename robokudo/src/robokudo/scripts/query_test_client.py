@@ -6,7 +6,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol
+from typing_extensions import TYPE_CHECKING, Any, Protocol
 
 import rclpy
 from action_msgs.msg import GoalStatus
@@ -33,7 +33,7 @@ class ResultQueue(Protocol):
     Queue-like object receiving the action client's final result dictionary.
     """
 
-    def put(self, item: Dict[str, Any]) -> None:
+    def put(self, item: dict[str, Any]) -> None:
         """
         Store one result dictionary.
         """
@@ -71,7 +71,7 @@ class RoboKudoActionClient:
     Make sure to spin it externally.
     """
 
-    preempt_timer: Optional[float] = None
+    preempt_timer: float | None = None
     """
     Delay before automatically cancelling an active goal.
     """
@@ -88,12 +88,12 @@ class RoboKudoActionClient:
     ROS client communicating with the query action server.
     """
 
-    _cancel_timer: Optional[Timer] = field(init=False, default=None)
+    _cancel_timer: Timer | None = field(init=False, default=None)
     """
     Timer for cancellation of the active goal.
     """
 
-    _goal_handle: Optional[ClientGoalHandle] = field(init=False, default=None)
+    _goal_handle: ClientGoalHandle | None = field(init=False, default=None)
     """
     Handle of the active goal.
     """
@@ -103,22 +103,22 @@ class RoboKudoActionClient:
     Whether processing of the current goal has finished.
     """
 
-    last_feedback: Optional[Query_FeedbackMessage] = field(init=False, default=None)
+    last_feedback: Query_FeedbackMessage | None = field(init=False, default=None)
     """
     Most recently received feedback.
     """
 
-    goal_status: Optional[int] = field(init=False, default=None)
+    goal_status: int | None = field(init=False, default=None)
     """
     Final status of the current goal.
     """
 
-    goal_result: Optional[Query_Result] = field(init=False, default=None)
+    goal_result: Query_Result | None = field(init=False, default=None)
     """
     Final result of the current goal.
     """
 
-    cancel_response: Optional[Future] = field(init=False, default=None)
+    cancel_response: Future | None = field(init=False, default=None)
     """
     Response to the latest cancellation request.
     """
@@ -258,7 +258,7 @@ class RoboKudoActionClient:
         self._action_client.destroy()
 
 
-def main_cli(args: Optional[List[str]] = None) -> None:
+def main_cli(args: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="RoboKudo Action Client")
     parser.add_argument(
         "--preempt_timer",
@@ -294,8 +294,8 @@ def main_cli(args: Optional[List[str]] = None) -> None:
 
 def main(
     timeout_seconds: float = 20.0,
-    result: Optional[ResultQueue] = None,
-    readiness: Optional[ReadinessSignal] = None,
+    result: ResultQueue | None = None,
+    readiness: ReadinessSignal | None = None,
 ) -> None:
     """
     Send one query and report its result.
@@ -316,7 +316,7 @@ def main(
     executor.add_node(node)
     if readiness is not None:
         readiness.set()
-    result_dict: Dict[str, Any] = dict()
+    result_dict: dict[str, Any] = dict()
     result_dict["timed_out"] = False
 
     try:

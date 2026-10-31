@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional, Self, Type
+from typing_extensions import Self
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -47,7 +47,7 @@ class WorldModelParser(ABC):
 
     @classmethod
     @abstractmethod
-    def from_file(cls, file_path: str, prefix: Optional[str] = None) -> Self:
+    def from_file(cls, file_path: str, prefix: str | None = None) -> Self:
         """
         Create a parser for the world described by a file.
 
@@ -83,7 +83,7 @@ class JointDescription:
     (SDF, USD, ...).
     """
 
-    connection_type: Type[Connection]
+    connection_type: type[Connection]
     """
     The type of connection the joint becomes.
     """
@@ -108,18 +108,18 @@ class JointDescription:
     The pose of the child body relative to the joint.
     """
 
-    name: Optional[PrefixedName] = None
+    name: PrefixedName | None = None
     """
     The name of the connection the joint becomes, ``None`` to let the connection
     generate a default name from its parent and child.
     """
 
-    axis: Optional[Vector3] = None
+    axis: Vector3 | None = None
     """
     The axis the joint moves along, in the frame of the joint.
     """
 
-    limits: Optional[DegreeOfFreedomLimits] = None
+    limits: DegreeOfFreedomLimits | None = None
     """
     The limits of the joint's degree of freedom.
     """

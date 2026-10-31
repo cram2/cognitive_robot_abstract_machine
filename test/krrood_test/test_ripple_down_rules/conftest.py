@@ -1,5 +1,4 @@
 import pytest
-from typing_extensions import Type
 
 from .conf.world.handles_and_containers import HandlesAndContainersWorld
 from .datasets import *
@@ -89,7 +88,7 @@ def view_rdr(
 
 
 @pytest.fixture
-def view_case_query(world: World, view_type: Type[View]) -> CaseQuery:
+def view_case_query(world: World, view_type: type[View]) -> CaseQuery:
     """
     Create a CaseQuery for the given view type in the provided world.
     """

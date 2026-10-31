@@ -4,7 +4,7 @@ import copy
 import itertools
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, Generic, List, Optional, Set, Tuple, Union
+from typing_extensions import Any, Generic, Union
 
 from anytree import NodeMixin, PreOrderIter, findall
 from random_events.interval import closed
@@ -56,17 +56,17 @@ class MarginalDeterminismTreeNode(NodeMixin):
     :param parent_node: Parent node in the tree. None for the root.
     """
 
-    variables: Set[Variable]
+    variables: set[Variable]
     """All Variables in this node's subtree."""
 
-    query_set: Set[Variable] = field(default=None)
+    query_set: set[Variable] = field(default=None)
     """
     Variables for which the mixtures at this level must be support-deterministic.
 
     Defaults to an empty set.
     """
 
-    parent_node: Optional[MarginalDeterminismTreeNode] = field(default=None)
+    parent_node: MarginalDeterminismTreeNode | None = field(default=None)
     """
     Parent node supplied at construction.
 
@@ -82,7 +82,7 @@ class MarginalDeterminismTreeNode(NodeMixin):
 
     def find_node_for_variable(
         self, variable: Variable
-    ) -> Optional[MarginalDeterminismTreeNode]:
+    ) -> MarginalDeterminismTreeNode | None:
         """
         Return the shallowest node whose query_set contains variable, or None.
 
@@ -96,7 +96,7 @@ class MarginalDeterminismTreeNode(NodeMixin):
         )
         return results[0] if results else None
 
-    def all_query_sets(self) -> List[Set[Variable]]:
+    def all_query_sets(self) -> list[set[Variable]]:
         """
         Return all non-empty query_sets in pre-order (depth-first) order.
 
@@ -107,9 +107,9 @@ class MarginalDeterminismTreeNode(NodeMixin):
     @classmethod
     def from_causal_graph(
         cls,
-        causal_variables: List[Variable],
-        effect_variables: List[Variable],
-        causal_priority_order: List[Variable] = None,
+        causal_variables: list[Variable],
+        effect_variables: list[Variable],
+        causal_priority_order: list[Variable] = None,
     ) -> MarginalDeterminismTreeNode:
         """
         Build a Marginal Determinism Variable Tree from a causal graph specification.
@@ -129,8 +129,8 @@ class MarginalDeterminismTreeNode(NodeMixin):
     @classmethod
     def _build_subtree(
         cls,
-        ordered: List[Variable],
-        parent: Optional[MarginalDeterminismTreeNode],
+        ordered: list[Variable],
+        parent: MarginalDeterminismTreeNode | None,
     ) -> MarginalDeterminismTreeNode:
         """
         Recursively build a subtree from an ordered list of Variables.
@@ -194,7 +194,7 @@ class FailureDiagnosisResult:
     Zero indicates the observed value lies entirely outside the training distribution.
     """
 
-    recommended_region: Optional[Event]
+    recommended_region: Event | None
     """
     The cause support region with the highest interventional probability, as a composite
     set event.
@@ -208,7 +208,7 @@ class FailureDiagnosisResult:
     Interventional probability of the recommended region.
     """
 
-    all_variable_results: Dict[Variable, Dict[str, Any]]
+    all_variable_results: dict[Variable, dict[str, Any]]
     """
     Per-variable diagnosis results keyed by Variable.
 
@@ -307,12 +307,12 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
     Tree encoding which Variables the mixtures must be support-deterministic over.
     """
 
-    causal_variables: List[Variable]
+    causal_variables: list[Variable]
     """
     Ordered list of cause Variables registered at construction time.
     """
 
-    effect_variables: List[Variable]
+    effect_variables: list[Variable]
     """
     Ordered list of effect Variables registered at construction time.
     """
@@ -326,8 +326,8 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         cls,
         circuit: RepresentationType,
         marginal_determinism_tree: MarginalDeterminismTreeNode,
-        causal_variables: List[Variable],
-        effect_variables: List[Variable],
+        causal_variables: list[Variable],
+        effect_variables: list[Variable],
     ) -> CausalCircuit[RepresentationType]:
         """
         Construct a CausalCircuit from an existing circuit without retraining.
@@ -343,15 +343,15 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         )
 
     def _check_query_variables_exist(
-        self, all_query_variables: Set[Variable]
-    ) -> List[MissingQueryVariableViolation]:
+        self, all_query_variables: set[Variable]
+    ) -> list[MissingQueryVariableViolation]:
         """
         Check that every Variable in every query_set exists in the circuit.
 
         :param all_query_variables: Union of all Variables across all query_sets.
         :returns: List of violations, empty if all Variables are present.
         """
-        circuit_variables: Set[Variable] = set(self.probabilistic_circuit.variables)
+        circuit_variables: set[Variable] = set(self.probabilistic_circuit.variables)
         missing_variables = [
             v for v in all_query_variables if v not in circuit_variables
         ]
@@ -364,7 +364,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             )
         ]
 
-    def _check_mixtures_normalized(self) -> List[UnnormalizedMixtureViolation]:
+    def _check_mixtures_normalized(self) -> list[UnnormalizedMixtureViolation]:
         """
         Check that the log-weights of every mixture sum to log(1).
 
@@ -380,7 +380,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
 
     @staticmethod
     def _components_split_on_variable(
-        component_supports: List[Event],
+        component_supports: list[Event],
     ) -> bool:
         """
         Whether the mixture splits on the query Variable, which it does as soon as its
@@ -395,7 +395,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         return any(other != first for other in others)
 
     @staticmethod
-    def _overlapping_pair_exists(component_supports: List[Event]) -> bool:
+    def _overlapping_pair_exists(component_supports: list[Event]) -> bool:
         """
         Return True if any pair of component supports intersects in more than a
         boundary.
@@ -413,7 +413,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
 
     def _check_mixture_for_variable(
         self, mixture: MixtureOverVariable
-    ) -> Optional[OverlappingComponentsViolation]:
+    ) -> OverlappingComponentsViolation | None:
         """
         Check a single mixture for disjoint components, given each component's support
         already restricted to one query Variable.
@@ -435,8 +435,8 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         return None
 
     def _check_support_disjointness(
-        self, all_query_variables: Set[Variable]
-    ) -> List[OverlappingComponentsViolation]:
+        self, all_query_variables: set[Variable]
+    ) -> list[OverlappingComponentsViolation]:
         """
         Check that for each declared query Variable, no mixture that splits on that
         Variable has components with overlapping support.
@@ -467,11 +467,11 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             query sets, circuit variables — in one object.
         """
         checked_query_sets = self.marginal_determinism_tree.all_query_sets()
-        all_query_variables: Set[Variable] = {
+        all_query_variables: set[Variable] = {
             v for qs in checked_query_sets for v in qs
         }
 
-        violations: List[SupportDeterminismViolation] = (
+        violations: list[SupportDeterminismViolation] = (
             self._check_query_variables_exist(all_query_variables)
         )
         if violations:
@@ -499,7 +499,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         self,
         cause_variable: Variable,
         effect_variable: Variable,
-        adjustment_variables: List[Variable] = None,
+        adjustment_variables: list[Variable] = None,
     ) -> RepresentationType:
         """
         Compute P(effect | do(cause)) as a new circuit of the same type.
@@ -539,7 +539,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             cause_variable, effect_variable, adjustment_variables or []
         )
 
-    def _circuit_truncated_to(self, event: Event) -> Optional[RepresentationType]:
+    def _circuit_truncated_to(self, event: Event) -> RepresentationType | None:
         """
         Truncate a copy of the wrapped circuit to an event.
 
@@ -559,7 +559,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         cause_region: SupportRegion,
         effect_branch: RepresentationType,
         cause_marginal_circuit: RepresentationType,
-    ) -> Optional[RepresentationType]:
+    ) -> RepresentationType | None:
         """
         Build one branch of the interventional circuit: the cause restricted to its own
         region, multiplied by the effect distribution that region implies.
@@ -589,7 +589,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         self,
         cause_variable: Variable,
         effect_variable: Variable,
-        adjustment_variables: List[Variable],
+        adjustment_variables: list[Variable],
     ) -> RepresentationType:
         """
         Compute P(cause, effect | do(cause)): a mixture over the disjoint cause regions,
@@ -607,8 +607,8 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             [cause_variable]
         )
         adjustment_partitions = self._adjustment_partitions(adjustment_variables)
-        products: List[RepresentationType] = []
-        log_weights: List[float] = []
+        products: list[RepresentationType] = []
+        log_weights: list[float] = []
         for cause_region in self._extract_disjoint_regions_for_variable(cause_variable):
             effect_branch = self._effect_branch_for_cause_region(
                 cause_region, effect_variable, adjustment_partitions
@@ -633,8 +633,8 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         return type(self.probabilistic_circuit).mixture_of(products, log_weights)
 
     def _adjustment_partitions(
-        self, adjustment_variables: List[Variable]
-    ) -> List[SupportRegion]:
+        self, adjustment_variables: list[Variable]
+    ) -> list[SupportRegion]:
         """
         :param adjustment_variables: Variables to adjust for, possibly none.
         :returns: One region per distinct value combination of the adjustment variables
@@ -655,8 +655,8 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         self,
         cause_region: SupportRegion,
         effect_variable: Variable,
-        adjustment_partitions: List[SupportRegion],
-    ) -> Optional[RepresentationType]:
+        adjustment_partitions: list[SupportRegion],
+    ) -> RepresentationType | None:
         """
         Build the effect side of one branch of the interventional circuit.
 
@@ -680,8 +680,8 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         self,
         cause_region: SupportRegion,
         effect_variable: Variable,
-        adjustment_partitions: List[SupportRegion],
-    ) -> Optional[RepresentationType]:
+        adjustment_partitions: list[SupportRegion],
+    ) -> RepresentationType | None:
         """
         Build ``sum_z P(effect | cause in region, Z=z) * P(Z=z)`` as a mixture over the
         adjustment partitions, each weighted by its own probability.
@@ -696,8 +696,8 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         :returns: The adjusted effect distribution, or None if every partition's joint
             truncation with this cause region was empty.
         """
-        components: List[RepresentationType] = []
-        log_weights: List[float] = []
+        components: list[RepresentationType] = []
+        log_weights: list[float] = []
         for adjustment_partition in adjustment_partitions:
             # fill first: intersection_with keeps only the left operand's variables.
             joint_event = adjustment_partition.event.fill_missing_variables_pure(
@@ -721,7 +721,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         self,
         variable: Variable,
         base_circuit: RepresentationType = None,
-    ) -> List[SupportRegion]:
+    ) -> list[SupportRegion]:
         """
         Return a :class:`SupportRegion` for each support region of variable.
 
@@ -732,7 +732,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         circuit = (
             base_circuit if base_circuit is not None else self.probabilistic_circuit
         )
-        regions: List[SupportRegion] = []
+        regions: list[SupportRegion] = []
         variable_support = circuit.support.marginal([variable])
         for simple_region in variable_support.simple_sets:
             region_event = SimpleEvent.from_data(
@@ -759,7 +759,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         self,
         variable: Variable,
         base_circuit: RepresentationType = None,
-    ) -> List[SupportRegion]:
+    ) -> list[SupportRegion]:
         """
         The disjoint support regions a variable takes, one per distinct value the
         circuit's branches hold, each carrying the probability of every branch holding
@@ -773,7 +773,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         circuit = (
             base_circuit if base_circuit is not None else self.probabilistic_circuit
         )
-        regions_by_value: Dict[Any, SupportRegion] = {}
+        regions_by_value: dict[Any, SupportRegion] = {}
         for simple_region in circuit.support.simple_sets:
             for value in self._split_into_atomic_values(simple_region[variable]):
                 if value in regions_by_value:
@@ -793,7 +793,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
     @staticmethod
     def _split_into_atomic_values(
         value: Union[AbstractCompositeSet, *compatible_types],
-    ) -> List[Union[AbstractSimpleSet, *compatible_types]]:
+    ) -> list[Union[AbstractSimpleSet, *compatible_types]]:
         """
         Split *value* into the elements it holds: the disjoint ranges of an
         :class:`~random_events.interval.Interval` or the values of a
@@ -815,7 +815,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         self,
         variable: Variable,
         interventional_circuit: RepresentationType,
-    ) -> Optional[Event]:
+    ) -> Event | None:
         """
         The disjoint support region of a variable the interventional circuit gives the
         highest probability, or None where it has none.
@@ -828,7 +828,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             None.
         """
         best_probability = -1.0
-        best_region: Optional[Event] = None
+        best_region: Event | None = None
         for region in self._extract_disjoint_regions_for_variable(variable):
             region_probability = float(
                 interventional_circuit.probability(
@@ -844,8 +844,8 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
 
     def _extract_leaf_regions_for_variables(
         self,
-        variables: List[Variable],
-    ) -> List[SupportRegion]:
+        variables: list[Variable],
+    ) -> list[SupportRegion]:
         """
         Return a :class:`SupportRegion` for the joint support of variables.
 
@@ -861,7 +861,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         :returns: List of regions, one per joint region, each with positive probability,
             in the order of their values.
         """
-        regions_by_values: Dict[Any, SupportRegion] = {}
+        regions_by_values: dict[Any, SupportRegion] = {}
         joint_support = self.probabilistic_circuit.support.marginal(variables)
         for simple_region in joint_support.simple_sets:
             atomic_values_per_variable = [
@@ -914,7 +914,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         self,
         cause_variable: Variable,
         interventional_circuit: RepresentationType,
-    ) -> Optional[Event]:
+    ) -> Event | None:
         """
         Return the cause support region with the highest interventional probability, or
         None if no regions are found.
@@ -927,7 +927,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         :returns: Composite set event of the highest-probability region, or None.
         """
         best_probability = -1.0
-        best_region: Optional[Event] = None
+        best_region: Event | None = None
         for region in self._extract_leaf_regions_for_variable(cause_variable):
             region_probability = float(
                 interventional_circuit.probability(
@@ -946,9 +946,9 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         cause_variable: Variable,
         observed_value: float,
         effect_variable: Variable,
-        adjustment_variables: List[Variable],
+        adjustment_variables: list[Variable],
         query_resolution: float,
-    ) -> Tuple[Dict[str, Any], RepresentationType]:
+    ) -> tuple[dict[str, Any], RepresentationType]:
         """
         Run diagnosis for a single cause Variable at its observed value.
 
@@ -980,10 +980,10 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
 
     def diagnose_failure(
         self,
-        observed_values: Dict[Variable, float],
+        observed_values: dict[Variable, float],
         effect_variable: Variable,
         query_resolution: float = 0.005,
-        adjustment_variables: List[Variable] = None,
+        adjustment_variables: list[Variable] = None,
     ) -> FailureDiagnosisResult:
         """
         Identify the primary cause Variable whose observed value is most anomalous under
@@ -1012,8 +1012,8 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         if adjustment_variables is None:
             adjustment_variables = []
 
-        all_variable_results: Dict[Variable, Dict[str, Any]] = {}
-        interventional_circuits_by_cause: Dict[Variable, RepresentationType] = {}
+        all_variable_results: dict[Variable, dict[str, Any]] = {}
+        interventional_circuits_by_cause: dict[Variable, RepresentationType] = {}
 
         for cause_variable in self.causal_variables:
             if cause_variable not in observed_values or not cause_variable.is_numeric:

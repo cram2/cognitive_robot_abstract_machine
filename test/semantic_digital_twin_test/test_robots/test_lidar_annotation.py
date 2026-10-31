@@ -4,7 +4,6 @@ import math
 from dataclasses import dataclass
 
 import pytest
-from typing_extensions import Type
 
 from semantic_digital_twin.adapters.sensors.lidar import Lidar, SimulatedLidarSource
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -23,12 +22,12 @@ class LidarCase:
     One robot's base lidar, as its description mounts it.
     """
 
-    robot: Type[AbstractRobot]
+    robot: type[AbstractRobot]
     """
     The robot the lidar is mounted on.
     """
 
-    lidar: Type[Lidar]
+    lidar: type[Lidar]
     """
     The lidar the robot's mobile base is expected to carry.
     """

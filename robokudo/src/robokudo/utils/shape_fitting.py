@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 import open3d as o3d
 from scipy.optimize import least_squares
-from typing_extensions import Optional, List, Union, Tuple
+from typing_extensions import Union
 
 MAX_ACCEPTABLE_RADIUS_GROWTH_WITHOUT_STRONG_INLIER_GAIN = 1.35
 MIN_INLIER_GAIN_TO_ACCEPT_LARGER_RADIUS = 0.03
@@ -149,7 +149,7 @@ def fit_sphere(
     max_radius_to_observed_extent_ratio: float = np.inf,
     max_center_distance_to_bbox_diagonal_ratio: float = np.inf,
     min_inlier_ratio: float = 0.0,
-) -> Optional[SphereFit]:
+) -> SphereFit | None:
     """
     Fit a sphere model and return model quality and inliers.
     """
@@ -259,7 +259,7 @@ def fit_cylinder(
     max_initializations: int = 8,
     consensus_trials: int = 24,
     inlier_polishing_iterations: int = 0,
-) -> Optional[CylinderFit]:
+) -> CylinderFit | None:
     """
     Fit a cylinder model and return model quality and inliers.
     """
@@ -327,7 +327,7 @@ def fit_cylinder(
         dtype=np.float64,
     )
 
-    best_fit: Optional[CylinderFit] = None
+    best_fit: CylinderFit | None = None
     for initial_parameters in initial_parameter_sets:
         candidate_fit = _fit_cylinder_from_initialization(
             points=points,
@@ -360,7 +360,7 @@ def _fit_cylinder_from_initialization(
     upper_bounds: np.ndarray,
     constraints: CylinderFitConstraints,
     initialization_settings: CylinderInitializationSettings,
-) -> Optional[CylinderFit]:
+) -> CylinderFit | None:
     """
     Run one cylinder optimization from one initialization and validate the result.
     """
@@ -403,7 +403,7 @@ def _build_cylinder_fit_from_parameters(
     parameters: np.ndarray,
     points: np.ndarray,
     constraints: CylinderFitConstraints,
-) -> Optional[CylinderFit]:
+) -> CylinderFit | None:
     """
     Validate one optimized cylinder parameter vector and construct a fit object.
     """
@@ -481,7 +481,7 @@ def refit_cylinder_with_fixed_axis(
     fixed_axis_direction: np.ndarray,
     constraints: CylinderFitConstraints,
     min_inlier_ratio: float,
-) -> Optional[CylinderFit]:
+) -> CylinderFit | None:
     """
     Refit cylinder radius and finite height while keeping axis direction fixed.
     """
@@ -538,7 +538,7 @@ def _fit_fixed_axis_cylinder_radius(
     axis_point: np.ndarray,
     axis_direction: np.ndarray,
     constraints: CylinderFitConstraints,
-) -> Optional[FixedAxisCylinderRadiusFit]:
+) -> FixedAxisCylinderRadiusFit | None:
     """
     Fit and polish cylinder radius for a fixed axis.
     """
@@ -582,7 +582,7 @@ def _fit_fixed_axis_cylinder_radius(
 
 def _fixed_axis_cylinder_inliers(
     radial_distances: np.ndarray, radius: float, distance_threshold: float
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Return absolute residuals and inliers for a fixed cylinder radius.
     """
@@ -596,7 +596,7 @@ def _fixed_axis_cylinder_extent(
     axis_point: np.ndarray,
     axis_direction: np.ndarray,
     max_height: float,
-) -> Optional[FixedAxisCylinderExtent]:
+) -> FixedAxisCylinderExtent | None:
     """
     Return finite height and center along a fixed cylinder axis.
     """
@@ -695,14 +695,14 @@ def _generate_cylinder_initial_parameter_sets(
     points: np.ndarray,
     constraints: CylinderFitConstraints,
     initialization_settings: CylinderInitializationSettings,
-) -> List[np.ndarray]:
+) -> list[np.ndarray]:
     """
     Generate distinct initialization vectors for cylinder multi-start optimization.
     """
     centroid = points.mean(axis=0)
     median_point = np.median(points, axis=0)
 
-    axis_candidates: List[np.ndarray] = []
+    axis_candidates: list[np.ndarray] = []
     for principal_axis in _principal_axes(points):
         _append_axis_if_distinct(axis_candidates, principal_axis)
 
@@ -720,7 +720,7 @@ def _generate_cylinder_initial_parameter_sets(
     for consensus_axis, _, _ in consensus_axis_candidates:
         _append_axis_if_distinct(axis_candidates, consensus_axis)
 
-    initial_parameter_sets: List[np.ndarray] = []
+    initial_parameter_sets: list[np.ndarray] = []
     axis_points = [centroid, median_point]
     for axis_direction in axis_candidates:
         for axis_point in axis_points:
@@ -760,7 +760,7 @@ def _consensus_axis_candidates(
     distance_threshold: float,
     max_radius: float,
     trial_count: int,
-) -> List[Tuple[np.ndarray, float, float]]:
+) -> list[tuple[np.ndarray, float, float]]:
     """
     Return axis candidates ranked by provisional inlier ratio and residual error.
     """
@@ -768,7 +768,7 @@ def _consensus_axis_candidates(
         return []
 
     random_generator = np.random.default_rng(0)
-    provisional_candidates: List[Tuple[np.ndarray, float, float]] = []
+    provisional_candidates: list[tuple[np.ndarray, float, float]] = []
     point_count = len(points)
     for _ in range(trial_count):
         first_index = int(random_generator.integers(0, point_count))
@@ -813,7 +813,7 @@ def _provisional_cylinder_axis_quality(
     axis_direction: np.ndarray,
     radius: float,
     distance_threshold: float,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Return provisional inlier ratio and error for one axis and radius hypothesis.
     """
@@ -838,7 +838,7 @@ def _initial_cylinder_radius(
     axis_point: np.ndarray,
     axis_direction: np.ndarray,
     max_radius: float,
-) -> Optional[float]:
+) -> float | None:
     """
     Estimate a robust initial cylinder radius for one axis hypothesis.
     """
@@ -855,7 +855,7 @@ def _initial_cylinder_radius(
 
 
 def _append_axis_if_distinct(
-    axis_candidates: List[np.ndarray],
+    axis_candidates: list[np.ndarray],
     axis_direction: np.ndarray,
     min_angle_degrees: float = 8.0,
 ) -> None:
@@ -923,7 +923,7 @@ def fit_cuboid(
     distance_threshold: float,
     max_extent: float = np.inf,
     min_inlier_ratio: float = 0.0,
-) -> Optional[CuboidFit]:
+) -> CuboidFit | None:
     """
     Fit a cuboid model and return model quality and inliers.
     """
@@ -986,7 +986,7 @@ def refit_cuboid_with_fixed_orientation(
     distance_threshold: float,
     max_extent: float = np.inf,
     min_inlier_ratio: float = 0.0,
-) -> Optional[CuboidFit]:
+) -> CuboidFit | None:
     """
     Refit cuboid center and extents while keeping rotation fixed.
     """
@@ -1044,14 +1044,14 @@ def refit_cuboid_with_fixed_orientation(
 
 
 def select_best_shape(
-    candidates: List[FittedShape],
+    candidates: list[FittedShape],
     score_tolerance: float = 0.05,
     prefer_cuboid_when_close: bool = False,
     cuboid_preference_score_margin: float = 0.06,
     cuboid_preference_inlier_ratio_tolerance: float = 0.05,
     cuboid_box_like_cross_section_asymmetry_threshold: float = 0.12,
     cuboid_box_like_cube_axis_similarity_tolerance: float = 0.12,
-) -> Optional[FittedShape]:
+) -> FittedShape | None:
     """
     Return the best shape candidate with volume-aware tie-breaking.
     """
@@ -1143,7 +1143,7 @@ def compute_fit_score(
     return inlier_ratio - 0.35 * normalized_error - complexity_penalty
 
 
-def _principal_axes(points: np.ndarray) -> List[np.ndarray]:
+def _principal_axes(points: np.ndarray) -> list[np.ndarray]:
     centered_points = points - points.mean(axis=0)
     covariance_matrix = np.cov(centered_points.T)
     eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)

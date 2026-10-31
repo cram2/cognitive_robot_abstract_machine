@@ -4,6 +4,16 @@ The world SegMind's tests watch.
 
 from __future__ import annotations
 
+# %% ORM interfaces
+
+# Built before any test module imports a mapped datastructure: pytest imports every
+# conftest of a run before calling any hook, so a hook would fire too late. The build runs
+# once per process and never on an xdist worker.
+from ..orm_interface_build import regenerate_orm_interfaces
+
+regenerate_orm_interfaces()
+
+
 from dataclasses import dataclass, field
 
 import numpy as np

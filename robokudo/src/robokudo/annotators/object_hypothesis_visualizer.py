@@ -16,7 +16,7 @@ import trimesh
 from py_trees.common import Status
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import TYPE_CHECKING, Dict, List, Tuple
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -30,7 +30,7 @@ from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypo
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import (
     draw_mesh_wireframe_on_image,
-    draw_wireframe_of_obb_into_image,
+    draw_bounding_box_wireframe,
     trimesh_to_o3d_mesh,
 )
 from robokudo.utils.type_conversion import (
@@ -81,13 +81,13 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self._mesh_cache: Dict[Tuple[object, ...], o3d.geometry.TriangleMesh] = {}
+        self._mesh_cache: dict[tuple[object, ...], o3d.geometry.TriangleMesh] = {}
 
-    def _iter_mesh_visuals(self, body: Body) -> List[Mesh]:
+    def _iter_mesh_visuals(self, body: Body) -> list[Mesh]:
         """Return mesh-based visual shapes for a body."""
         return [shape for shape in body.visual if isinstance(shape, Mesh)]
 
-    def _mesh_cache_key(self, shape: Mesh) -> Tuple[object, ...]:
+    def _mesh_cache_key(self, shape: Mesh) -> tuple[object, ...]:
         """Create a stable cache key for mesh conversion results."""
         filename = shape.filename
         if filename:
@@ -112,7 +112,7 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
         self,
         image: npt.NDArray[np.uint8],
         text: str,
-        color: Tuple[int, int, int] = (0, 0, 255),
+        color: tuple[int, int, int] = (0, 0, 255),
         font: int = cv2.FONT_HERSHEY_SIMPLEX,
         font_scale: float = 1.0,
         thickness: int = 2,
@@ -213,7 +213,7 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
             for bb_annotation in bb_annotations:
                 obb = get_o3d_obb_from_bounding_box_annotation(bb_annotation)
                 visualized_geometries.append(obb)
-                draw_wireframe_of_obb_into_image(self.get_cas(), visualization_img, obb)
+                draw_bounding_box_wireframe(self.get_cas(), visualization_img, obb)
 
             pose_annotations = self.get_cas().filter_by_type(
                 type_to_include=PoseAnnotation,

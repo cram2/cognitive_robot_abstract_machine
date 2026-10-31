@@ -11,16 +11,7 @@ from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Continuous, Variable
 from scipy.stats import multivariate_normal, norm
 from scipy.stats._multivariate import multivariate_normal_frozen
-from typing_extensions import (
-    Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Self,
-    Tuple,
-)
+from typing_extensions import Any, Iterable, Iterator, Self
 
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.distributions.truncated_multivariate_gaussian import (
@@ -121,7 +112,7 @@ class Covariance:
         row, column = max(first, second), min(first, second)
         return float(self.lower_triangle[row * (row + 1) // 2 + column])
 
-    def marginal(self, indices: List[int]) -> Self:
+    def marginal(self, indices: list[int]) -> Self:
         """
         :param indices: The rows and columns to keep, in the order to keep them in.
         :return: The covariance of only those.
@@ -153,7 +144,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
     answers its own through :mod:`scipy.stats.norm`.
     """
 
-    variables: Tuple[Continuous, ...]
+    variables: tuple[Continuous, ...]
     """
     The variables of the distribution.
     """
@@ -265,7 +256,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
 
     def _bounds_of_boxes(
         self, event: SimpleEvent
-    ) -> Iterator[Tuple[npt.NDArray, npt.NDArray]]:
+    ) -> Iterator[tuple[npt.NDArray, npt.NDArray]]:
         """
         :param event: The event to split into boxes.
         :return: The lower and the upper bounds of each box the event makes, laid out
@@ -296,7 +287,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
 
     # %% reading fewer variables
 
-    def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
+    def marginal(self, variables: Iterable[Variable]) -> Self | None:
         """
         :param variables: The variables to keep. They are kept in this distribution's
             own order, whatever order they are asked for in, and those it is not over
@@ -312,7 +303,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
             return None
         return self._marginal_over_variable_indices(indices)
 
-    def _marginal_over_variable_indices(self, indices: List[int]) -> Self:
+    def _marginal_over_variable_indices(self, indices: list[int]) -> Self:
         """
         :param indices: The indices of the variables to keep, in this distribution's own
             order.
@@ -326,7 +317,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
 
     # %% fixing variables at a value
 
-    def log_conditional(self, point: Dict[Variable, Any]) -> LogConditioning[Self]:
+    def log_conditional(self, point: dict[Variable, Any]) -> LogConditioning[Self]:
         """
         Fix some of the variables at the values given and answer with the distribution
         over the rest, which stays Gaussian.
@@ -364,8 +355,8 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
 
     def _conditional_over_variable_indices(
         self,
-        free_indices: List[int],
-        fixed_indices: List[int],
+        free_indices: list[int],
+        fixed_indices: list[int],
         fixed_at: npt.NDArray,
     ) -> Self:
         """
@@ -473,7 +464,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
 
     # %% translation and scaling
 
-    def apply_translation(self, translation: Dict[Variable, float]):
+    def apply_translation(self, translation: dict[Variable, float]):
         """
         Move the mean, leaving the covariance as it is.
 
@@ -483,7 +474,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
         for index, variable in enumerate(self.variables):
             self.mean[index] += translation.get(variable, 0.0)
 
-    def apply_scaling(self, scaling: Dict[Variable, float]):
+    def apply_scaling(self, scaling: dict[Variable, float]):
         """
         Scale the variables, which scales the mean once and the covariance once per
         variable it relates.

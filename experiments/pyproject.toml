@@ -11,6 +11,7 @@ dynamic = ["version"]
 dependencies = [
     "line_profiler",
     "coraplex",
+    "cramph",
     "giskardpy",
     "krrood",
     "probabilistic_model",
@@ -29,6 +30,7 @@ version = {attr = "experiments._version.__version__"}
 [dependency-groups]
 workspace = [
     "coraplex",
+    "cramph",
     "giskardpy",
     "krrood",
     "random_events",

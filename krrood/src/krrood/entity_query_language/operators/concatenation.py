@@ -8,7 +8,7 @@ selectable expressions.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Tuple, Iterable
+from typing_extensions import Iterable
 
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
@@ -31,7 +31,7 @@ class Concatenation(EvaluatesChildrenInSequence, CanBehaveLikeAVariable[T]):
     falsy value is concatenated like any other.
     """
 
-    _operation_children_: Tuple[Selectable, ...] = field(default_factory=tuple)
+    _operation_children_: tuple[Selectable, ...] = field(default_factory=tuple)
     """
     The children of the concatenate operation.
 
@@ -55,7 +55,7 @@ class Concatenation(EvaluatesChildrenInSequence, CanBehaveLikeAVariable[T]):
         )
 
     @property
-    def _variables_(self) -> Tuple[Selectable[T], ...]:
+    def _variables_(self) -> tuple[Selectable[T], ...]:
         """
         The variables to concatenate.
         """

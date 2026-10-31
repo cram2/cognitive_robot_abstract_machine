@@ -110,8 +110,8 @@ MATERIAL_COLORED_LINKS_URDF = os.path.join(
 """
 Description whose bare mesh links take their color from a material the description
 names, from a material of their own, and from no material, beside a mesh whose file
-paints itself and a box with a material of its own; its mesh files are named relative
-to the package's resources.
+paints itself and a box with a material of its own; its mesh files are named relative to
+the package's resources.
 """
 
 
@@ -136,12 +136,12 @@ def material_colored_world():
 
 def test_a_mesh_takes_the_color_of_the_material_it_names(material_colored_world):
     [shape] = _body_named(material_colored_world, "named_mesh_link").visual.shapes
-    assert shape.color == Color(0.85, 0.51, 0.16, 1)
+    assert shape.color == Color.from_rgba(red=0.85, green=0.51, blue=0.16, opacity=1)
 
 
 def test_a_mesh_takes_the_color_of_its_own_material(material_colored_world):
     [shape] = _body_named(material_colored_world, "inline_mesh_link").visual.shapes
-    assert shape.color == Color(0.8, 0, 0, 1)
+    assert shape.color == Color.from_rgba(red=0.8, green=0, blue=0, opacity=1)
 
 
 def test_a_mesh_without_a_material_keeps_the_default_color(material_colored_world):
@@ -157,7 +157,7 @@ def test_a_mesh_that_paints_itself_keeps_its_own_look(material_colored_world):
 
 def test_a_primitive_takes_the_color_of_its_own_material(material_colored_world):
     [shape] = _body_named(material_colored_world, "inline_box_link").visual.shapes
-    assert shape.color == Color(0, 0.6, 0, 1)
+    assert shape.color == Color.from_rgba(red=0, green=0.6, blue=0, opacity=1)
 
 
 @pytest.fixture
@@ -333,8 +333,8 @@ JOINT_AXES_URDF = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "dataset", "joint_axes.urdf"
 )
 """
-Description with a floating joint and a revolute joint about an axis that is neither
-a coordinate axis nor of unit length.
+Description with a floating joint and a revolute joint about an axis that is neither a
+coordinate axis nor of unit length.
 """
 
 

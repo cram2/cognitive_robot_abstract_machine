@@ -3,7 +3,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-from typing_extensions import Callable, Dict, Any, Generic, Iterator, TypeVar
+from typing_extensions import Callable, Any, Generic, Iterator, TypeVar
 
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.patterns.exceptions import KeywordNamesNoFactoryParameter
@@ -25,19 +25,14 @@ class HasFactoryAndKwargs(Generic[T]):
     The factory function to construct `T` with the keyword arguments.
     """
 
-    _kwargs_: Dict[str, Any] = field(default_factory=dict, kw_only=True)
+    _kwargs_: dict[str, Any] = field(default_factory=dict, kw_only=True)
     """
     The keyword arguments to pass to the factory.
     """
 
-    def construct_instance(self):
+    def construct_instance(self) -> T:
         """
         Construct a python object from the CallableAndKwargs instance.
-
-        A keyword argument that names no parameter of :attr:`_factory_` is refused,
-        unless :attr:`_factory_` accepts arbitrary keywords (a ``**kwargs`` parameter)
-        or :meth:`_is_kept_out_of_construction_` says the keyword means something other
-        than a constructor argument.
 
         ..note:: This method may work with ellipsis, but it's not guaranteed to work with all types.
 
@@ -46,13 +41,7 @@ class HasFactoryAndKwargs(Generic[T]):
             of :attr:`_factory_` and is not kept out of construction.
         """
         constructed_kwargs = {}
-        for key, value in self._kwargs_.items():
-            if self._is_kept_out_of_construction_(key, type(value)):
-                continue
-            if not self._is_factory_parameter_(key):
-                raise KeywordNamesNoFactoryParameter(
-                    factory=self._factory_, keyword=key
-                )
+        for key, value in self._factory_keyword_arguments_.items():
             if isinstance(value, list_like_classes):
                 constructed_kwargs[key] = type(value)(
                     self._recurse_construct_instance_and_get_value(element)
@@ -63,6 +52,30 @@ class HasFactoryAndKwargs(Generic[T]):
                     self._recurse_construct_instance_and_get_value(value)
                 )
         return self._factory_(**constructed_kwargs)
+
+    @property
+    def _factory_keyword_arguments_(self) -> dict[str, Any]:
+        """
+        The keyword arguments that are passed to :attr:`_factory_`.
+
+        A keyword argument that names no parameter of :attr:`_factory_` is refused,
+        unless :attr:`_factory_` accepts arbitrary keywords (a ``**kwargs`` parameter)
+        or :meth:`_is_kept_out_of_construction_` says the keyword means something other
+        than a constructor argument, in which case it is left out.
+
+        :raises KeywordNamesNoFactoryParameter: If a keyword argument names no parameter
+            of :attr:`_factory_` and is not kept out of construction.
+        """
+        factory_keyword_arguments = {}
+        for key, value in self._kwargs_.items():
+            if self._is_kept_out_of_construction_(key, type(value)):
+                continue
+            if not self._is_factory_parameter_(key):
+                raise KeywordNamesNoFactoryParameter(
+                    factory=self._factory_, keyword=key
+                )
+            factory_keyword_arguments[key] = value
+        return factory_keyword_arguments
 
     def _stated_values_(self, keyword: str) -> Iterator[Any]:
         """

@@ -6,7 +6,7 @@ from enum import Enum
 
 import daqp
 import numpy as np
-from typing_extensions import Dict, TYPE_CHECKING, List, Tuple
+from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import (
@@ -167,7 +167,7 @@ class InverseKinematicsSolver:
         max_iterations: int = 200,
         translation_velocity: float = 0.2,
         rotation_velocity: float = 0.2,
-    ) -> Dict[DegreeOfFreedom, float]:
+    ) -> dict[DegreeOfFreedom, float]:
         """
         Solve inverse kinematics problem.
 
@@ -239,7 +239,7 @@ class InverseKinematicsSolver:
 
     def _solve_qp_step(
         self, qp_problem: QPProblem, solver_state: SolverState
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Evaluate the QP matrices at the current state and solve the QP.
 
@@ -339,7 +339,7 @@ class QPProblem:
 
     def _extract_dofs(
         self,
-    ) -> Tuple[
+    ) -> tuple[
         list[DegreeOfFreedom],
         list[DegreeOfFreedom],
         list[FloatVariable],
@@ -359,10 +359,10 @@ class QPProblem:
             active_dofs_set.update(connection.active_dofs)
             passive_dofs_set.update(connection.passive_dofs)
 
-        active_dofs: List[DegreeOfFreedom] = list(
+        active_dofs: list[DegreeOfFreedom] = list(
             sorted(active_dofs_set, key=lambda d: str(d.id))
         )
-        passive_dofs: List[DegreeOfFreedom] = list(
+        passive_dofs: list[DegreeOfFreedom] = list(
             sorted(passive_dofs_set, key=lambda d: str(d.id))
         )
 
@@ -490,8 +490,8 @@ class ConstraintBuilder:
     """
 
     def build_box_constraints(
-        self, active_dofs: List[DegreeOfFreedom]
-    ) -> Tuple[Vector, Vector]:
+        self, active_dofs: list[DegreeOfFreedom]
+    ) -> tuple[Vector, Vector]:
         """
         Build position and velocity limit constraints for DOFs.
         """
@@ -521,8 +521,8 @@ class ConstraintBuilder:
         return Vector(lower_constraints), Vector(upper_constraints)
 
     def build_goal_constraints(
-        self, active_variables: List[FloatVariable]
-    ) -> Tuple[Matrix, Matrix]:
+        self, active_variables: list[FloatVariable]
+    ) -> tuple[Matrix, Matrix]:
         """
         Build position and rotation goal constraints.
         """
@@ -545,7 +545,7 @@ class ConstraintBuilder:
 
     def _compute_position_error(
         self, root_T_tip: HomogeneousTransformationMatrix
-    ) -> Tuple[Vector, Vector]:
+    ) -> tuple[Vector, Vector]:
         """
         Compute position error with velocity limits.
 
@@ -568,7 +568,7 @@ class ConstraintBuilder:
 
     def _compute_rotation_error(
         self, root_T_tip: HomogeneousTransformationMatrix
-    ) -> Tuple[Vector, Vector]:
+    ) -> tuple[Vector, Vector]:
         """
         Compute rotation error with velocity limits.
 

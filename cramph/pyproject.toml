@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cramph"
+authors = [
+    { name="Simon Stelter", email="stelter@uni-bremen.de" },
+]
+description = "A generic statechart engine with node life cycles, transition conditions, ticking and composite nodes."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+keywords=["robotics", "statechart"]
+dynamic = ["version"]
+dependencies = [
+    "numpy",
+    "rustworkx",
+    "matplotlib>=3.6.2",
+    "pydot",
+    "typing_extensions",
+    "krrood",
+    "semantic_digital_twin",
+]
+license = "LGPL-3.0-only"
+
+[project.urls]
+"Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
+"Bug Tracker" = 'https://github.com/cram2/cognitive_robot_abstract_machine/issues'
+
+[tool.setuptools.packages.find]
+where = ["src"]  # list of folders that contain the packages (["."] by default)
+include = ["cramph*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "cramph._version.__version__"}
+
+[dependency-groups]
+workspace = [
+    "krrood",
+    "semantic_digital_twin",
+]

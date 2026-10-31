@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cached_property
 
-from typing_extensions import TYPE_CHECKING, Optional, Type, Iterator, Tuple, Union
+from typing_extensions import TYPE_CHECKING, Iterator
 
 from krrood.class_diagrams.class_diagram import Association, AssociationThroughRoleTaker
 from krrood.class_diagrams.wrapped_field import WrappedField
@@ -41,7 +41,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             return False
 
     @cached_property
-    def inverse_of(self) -> Optional[Type[PropertyDescriptor]]:
+    def inverse_of(self) -> type[PropertyDescriptor] | None:
         """
         The inverse of the relation if it exists.
         """
@@ -110,7 +110,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             ).update_source_and_add_to_graph_and_apply_implications()
 
     @cached_property
-    def super_relations(self) -> Iterator[Tuple[WrappedInstance, WrappedField]]:
+    def super_relations(self) -> Iterator[tuple[WrappedInstance, WrappedField]]:
         """
         Find neighboring symbols connected by super edges.
 
@@ -121,7 +121,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             relations.
         """
         source_type = self.source.instance_type
-        property_descriptor_cls: Type[PropertyDescriptor] = (
+        property_descriptor_cls: type[PropertyDescriptor] = (
             self.wrapped_field.property_descriptor.__class__
         )
         for association in property_descriptor_cls.get_superproperties_associations(
@@ -134,7 +134,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             yield source, association.wrapped_field
 
     @property
-    def inverse_domain_and_field(self) -> Tuple[WrappedInstance, WrappedField]:
+    def inverse_domain_and_field(self) -> tuple[WrappedInstance, WrappedField]:
         """
         Get the inverse of the property descriptor.
 
@@ -153,7 +153,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
     @cached_property
     def inverse_association(
         self,
-    ) -> Optional[Union[Association, AssociationThroughRoleTaker]]:
+    ) -> Association | AssociationThroughRoleTaker | None:
         """
         Return the inverse field (if it exists) stored in the target of this relation.
         """
@@ -223,7 +223,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         )
 
     @cached_property
-    def property_descriptor_cls(self) -> Type[PropertyDescriptor]:
+    def property_descriptor_cls(self) -> type[PropertyDescriptor]:
         """
         Return the property descriptor class of the relation.
         """

@@ -1,6 +1,7 @@
 # Giskardpy
 Giskardpy is an open source library for implementing motion control frameworks.
 It uses constraint and optimization based task space control to control the whole body of mobile manipulators.
+Motions are composed as motion statecharts, which are built on the generic statechart engine [cramph](../cramph).
 
 Giskardpy is part of the [CRAM monorepo](https://github.com/cram2/cognitive_robot_abstract_machine) and builds on
 `krrood` and `semantic_digital_twin`, which provide the world model it controls.

@@ -9,7 +9,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from typing_extensions import Any, Callable, List, Optional, Tuple
+from typing_extensions import Any, Callable
 
 from krrood.patterns.caching import MemoizationCache, copy_memoize, memoize
 
@@ -23,16 +23,16 @@ that the two computations cannot overlap.
 
 
 def run_concurrently(
-    calls: List[Callable[[], Any]],
-) -> Tuple[List[Any], List[BaseException]]:
+    calls: list[Callable[[], Any]],
+) -> tuple[list[Any], list[BaseException]]:
     """
     Runs every call in its own thread and collects the results and the errors raised.
 
     Threads are daemons joined with a timeout, so a deadlock fails the test instead of
     hanging the suite.
     """
-    results: List[Any] = []
-    errors: List[BaseException] = []
+    results: list[Any] = []
+    errors: list[BaseException] = []
     lock = threading.Lock()
 
     def run(call: Callable[[], Any]) -> None:
@@ -73,7 +73,7 @@ class _ReentrancyDetectingValue:
     equal to the original.
     """
 
-    _copy_in_progress: List[bool] = field(default_factory=lambda: [False])
+    _copy_in_progress: list[bool] = field(default_factory=lambda: [False])
     """
     One-element flag shared by every copy made directly from this instance, marking
     whether some thread is currently inside :meth:`__deepcopy__` on it.
@@ -162,7 +162,7 @@ class _NestingOwner:
     before either descends into the other owner.
     """
 
-    nested_owner: Optional[_NestingOwner] = None
+    nested_owner: _NestingOwner | None = None
     """
     The owner whose :meth:`inner` the outer call descends into.
     """

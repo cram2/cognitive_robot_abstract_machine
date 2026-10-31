@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Dict, Tuple, Type
 
 from krrood.entity_query_language.verbalization.grammar.framework.planner import (
     Planner,
@@ -25,7 +24,7 @@ class Microplan:
     its ``build``) and gives later stages a single source of truth to consult.
     """
 
-    _cache: Dict[Tuple[int, type], object] = field(default_factory=dict)
+    _cache: dict[tuple[int, type], object] = field(default_factory=dict)
     """
     Memoised plans keyed by ``(id(node), planner)`` — node *identity* (not equality,
     which EQL overrides to build comparators) paired with the planner that produced the
@@ -35,7 +34,7 @@ class Microplan:
     def plan_for(
         self,
         node: TSymbolicExpression,
-        planner: Type[Planner[TSymbolicExpression, TPlan]],
+        planner: type[Planner[TSymbolicExpression, TPlan]],
     ) -> TPlan:
         """
         :param node: The EQL node to plan.

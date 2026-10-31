@@ -90,6 +90,24 @@ class CollisionGroup:
         return max(max_avoided_bodies, default=1)
 
 
+@dataclass(frozen=True)
+class CollisionGroupCombination:
+    """
+    Two collision groups whose contacts with each other are considered together, in a
+    fixed order.
+    """
+
+    group_a: CollisionGroup
+    """
+    The group the contact points and distances are measured from.
+    """
+
+    group_b: CollisionGroup
+    """
+    The group the contact normals point away from.
+    """
+
+
 @dataclass
 class CollisionGroupConsumer(CollisionConsumer, ABC):
     """

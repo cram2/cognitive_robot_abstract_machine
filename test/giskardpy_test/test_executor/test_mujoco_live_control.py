@@ -15,10 +15,11 @@ import pytest
 
 from ...pytest_environment import runs_in_continuous_integration
 
-from giskardpy.executor import Executor, SteppedSimulationPacer
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor, SteppedSimulationPacer
+from cramph.statechart import Statechart
+from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
@@ -69,20 +70,19 @@ def test_the_simulated_arm_reaches_the_pose_giskard_commands_live(parked_tracy):
     reach = CartesianPosition(
         name="reach", root_link=world.root, tip_link=tool_frame, goal_point=goal_point
     )
-    motion_statechart = MotionStatechart()
-    motion_statechart.add_nodes([reach, EndMotion.when_true(reach)])
     controller_config = QPControllerConfig(target_frequency=control_frequency)
 
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        executor = Executor(
-            context=MotionStatechartContext(
-                world=world, qp_controller_config=controller_config
-            ),
+        executor = StatechartExecutor(
+            context=StatechartContext(world=world),
             pacer=SteppedSimulationPacer(simulation),
+            extensions=[MotionControl(qp_controller_config=controller_config)],
         )
-        executor.compile(motion_statechart=motion_statechart)
+        motion_statechart = Statechart(context=executor.context)
+        motion_statechart.add_nodes([reach, EndMotion.when_true(reach)])
+        executor.compile(statechart=motion_statechart)
         executor.tick_until_end(timeout=tick_limit)
         simulation.step_simulation(timedelta(seconds=1))
         simulated = numpy.array(
@@ -93,5 +93,5 @@ def test_the_simulated_arm_reaches_the_pose_giskard_commands_live(parked_tracy):
     finally:
         simulation.stop_simulation()
 
-    assert motion_statechart.is_end_motion()
+    assert motion_statechart.is_ended()
     assert numpy.linalg.norm(simulated - goal_point.to_np()[:3]) <= tracking_tolerance

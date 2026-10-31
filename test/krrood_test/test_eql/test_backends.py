@@ -15,12 +15,20 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.variable import Continuous
 
 from ..dataset.derived_attributes import Rectangle
+from ..dataset.identity_hashed_values_created_on_access import (
+    PlacementOnAPoint,
+    PointsCreatedOnEveryAccess,
+)
 from ..dataset.semantic_world_like_classes import Apple, Body
 from krrood.entity_query_language.backends import (
     SQLAlchemyBackend,
     EntityQueryLanguageBackend,
     EntityQueryLanguageGenerativeBackend,
     ProbabilisticBackend,
+)
+from krrood.entity_query_language.core.base_expressions import (
+    OperationResult,
+    ProbabilisticOperationResult,
 )
 from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.exceptions import (
@@ -31,11 +39,13 @@ from krrood.entity_query_language.factories import (
     entity,
     a,
     an,
+    flat_variable,
     variable_from,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.entity_query_language.core.variable import Variable as KRROODVariable
 from krrood.parametrization.model_registries import DictRegistry
+from krrood.patterns.role import Role
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.interval import reals
 from random_events.set import Set
@@ -44,6 +54,7 @@ from ..dataset.example_classes import (
     KRROODPose,
     KRROODPosition,
     KRROODPositions,
+    KRROODPositionsSubclassWithAnotherKRROODPosition,
     KRROODOrientation,
     Atom,
     Element,
@@ -396,3 +407,214 @@ def test_enumerating_backend_keeps_instances_whose_factory_renames_a_stated_valu
         (3, RECTANGLE_SIDES[0][1]),
         (4, RECTANGLE_SIDES[0][1]),
     }
+
+
+# %% a pattern keyword bound to an expression derived from a variable
+
+
+UPRIGHT = KRROODOrientation(0.0, 0.0, 0.0, 1.0)
+"""
+The orientation every generated pose takes, so that only its position varies.
+"""
+
+
+def test_generative_backend_grounds_a_keyword_bound_to_a_flattening_of_a_variable() -> (
+    None
+):
+    """
+    A keyword bound to the flattened values of a variable's attribute takes each of
+    those values in turn, for each value of the variable, in their order.
+    """
+    holders = [
+        KRROODPositions([KRROODPosition(1, 0, 0), KRROODPosition(2, 0, 0)], []),
+        KRROODPositions([KRROODPosition(3, 0, 0)], []),
+    ]
+    holder = variable_from(holders)
+    query = a(KRROODPose)(position=flat_variable(holder.positions), orientation=UPRIGHT)
+
+    poses = list(query.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+
+    assert [pose.position for pose in poses] == [
+        position for each_holder in holders for position in each_holder.positions
+    ]
+
+
+def test_generative_backend_grounds_a_keyword_bound_to_an_attribute_of_a_variable() -> (
+    None
+):
+    holders = [
+        KRROODPositionsSubclassWithAnotherKRROODPosition(
+            [], [], KRROODPosition(1, 0, 0)
+        ),
+        KRROODPositionsSubclassWithAnotherKRROODPosition(
+            [], [], KRROODPosition(2, 0, 0)
+        ),
+    ]
+    holder = variable_from(holders)
+    query = a(KRROODPose)(position=holder.positions2, orientation=UPRIGHT)
+
+    poses = list(query.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+
+    assert [pose.position for pose in poses] == [
+        each_holder.positions2 for each_holder in holders
+    ]
+
+
+def test_probabilistic_backend_grounds_a_keyword_bound_to_a_flattening_of_a_variable() -> (
+    None
+):
+    """
+    A keyword bound to the flattened values of a variable's attribute takes its sampled
+    values only from those flattened values.
+    """
+    holders = [
+        KRROODPositions([KRROODPosition(1, 0, 0), KRROODPosition(2, 0, 0)], []),
+        KRROODPositions([KRROODPosition(3, 0, 0)], []),
+    ]
+    holder = variable_from(holders)
+    query = a(KRROODPose)(position=flat_variable(holder.positions), orientation=UPRIGHT)
+
+    flattened_positions = [
+        position for each_holder in holders for position in each_holder.positions
+    ]
+
+    poses = list(query.evaluate(backend=ProbabilisticBackend()))
+
+    assert poses
+    assert {pose.position for pose in poses} <= set(flattened_positions)
+
+
+def test_probabilistic_backend_grounds_a_keyword_bound_to_an_attribute_of_a_variable() -> (
+    None
+):
+    holders = [
+        KRROODPositionsSubclassWithAnotherKRROODPosition(
+            [], [], KRROODPosition(1, 0, 0)
+        ),
+        KRROODPositionsSubclassWithAnotherKRROODPosition(
+            [], [], KRROODPosition(2, 0, 0)
+        ),
+    ]
+    holder = variable_from(holders)
+    query = a(KRROODPose)(position=holder.positions2, orientation=UPRIGHT)
+
+    poses = list(query.evaluate(backend=ProbabilisticBackend()))
+
+    assert poses
+    assert {pose.position for pose in poses} <= {
+        each_holder.positions2 for each_holder in holders
+    }
+
+
+def test_probabilistic_backend_grounds_a_keyword_bound_to_values_created_on_every_evaluation() -> (
+    None
+):
+    """
+    A keyword bound to an expression whose values are created anew on every evaluation
+    takes values that expression created.
+    """
+    points_holder = PointsCreatedOnEveryAccess([1.0, 2.0])
+    holder = variable_from([points_holder])
+    query = a(PlacementOnAPoint)(point=flat_variable(holder.points))
+
+    placements = list(query.evaluate(backend=ProbabilisticBackend()))
+
+    assert placements
+    assert {placement.point.coordinate for placement in placements} <= set(
+        points_holder.coordinates
+    )
+
+
+# %% generation constructs instances from bindings rather than writing into the pattern
+
+
+def test_enumerating_backend_leaves_the_pattern_unchanged():
+    width = variable(int, [1, 2, 3, 4])
+    height = variable(int, [3, 4, 6])
+    area = 12
+    query = a(Rectangle)(width=width, height=height, area=area)
+    list(query.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+    assert query._kwargs_["width"] is width
+    assert query._kwargs_["height"] is height
+    assert query._kwargs_["area"] == area
+
+
+def test_probabilistic_backend_leaves_the_pattern_unchanged(rectangle_model):
+    first_width, first_height = RECTANGLE_SIDES[0]
+    area = first_width * first_height
+    query = a(Rectangle)(width=..., height=..., area=area)
+    backend = ProbabilisticBackend(
+        number_of_samples=20, model_registry=DictRegistry({Rectangle: rectangle_model})
+    )
+    list(query.evaluate(backend=backend))
+    assert query._kwargs_ == {"width": ..., "height": ..., "area": area}
+    assert [
+        attribute_match.assigned_variable._value_
+        for attribute_match in query._matches_with_variables_
+    ] == [
+        attribute_match.assigned_value
+        for attribute_match in query._matches_with_variables_
+    ]
+
+
+# %% rows of bindings carry their log-likelihood under the model
+
+
+@pytest.fixture
+def rectangle_backend(rectangle_model) -> ProbabilisticBackend:
+    """
+    :return: A backend that samples rectangles from the rectangle model.
+    """
+    return ProbabilisticBackend(
+        number_of_samples=20, model_registry=DictRegistry({Rectangle: rectangle_model})
+    )
+
+
+def test_probabilistic_backend_samples_bindings_with_their_log_likelihood(
+    rectangle_backend,
+):
+    query = a(Rectangle)(width=..., height=...)
+    width = query._find_assigned_variable_("Rectangle.width")
+    height = query._find_assigned_variable_("Rectangle.height")
+    rows = list(rectangle_backend.sample_bindings(query))
+    assert len(rows) == rectangle_backend.number_of_samples
+    assert {
+        (row.bindings[width._id_], row.bindings[height._id_]) for row in rows
+    } <= set(RECTANGLE_SIDES)
+    assert [row.log_likelihood for row in rows] == pytest.approx(
+        [np.log(1 / len(RECTANGLE_SIDES))] * len(rows)
+    )
+
+
+def test_probabilistic_backend_computes_the_log_likelihood_of_given_bindings(
+    rectangle_backend,
+):
+    query = a(Rectangle)(width=..., height=...)
+    width = query._find_assigned_variable_("Rectangle.width")
+    height = query._find_assigned_variable_("Rectangle.height")
+    rectangle_width, rectangle_height = RECTANGLE_SIDES[1]
+    bindings = {width._id_: rectangle_width, height._id_: rectangle_height}
+    row = rectangle_backend.compute_log_likelihood(query, bindings)
+    assert row.bindings == bindings
+    assert row.log_likelihood == pytest.approx(np.log(1 / len(RECTANGLE_SIDES)))
+
+
+def test_bindings_the_model_cannot_produce_have_no_likelihood(rectangle_backend):
+    query = a(Rectangle)(width=..., height=...)
+    width = query._find_assigned_variable_("Rectangle.width")
+    height = query._find_assigned_variable_("Rectangle.height")
+    first_width, _ = RECTANGLE_SIDES[0]
+    _, second_height = RECTANGLE_SIDES[1]
+    row = rectangle_backend.compute_log_likelihood(
+        query, {width._id_: first_width, height._id_: second_height}
+    )
+    assert row.log_likelihood == -np.inf
+
+
+def test_a_sampled_row_is_a_role_of_the_operation_result_of_its_bindings(
+    rectangle_backend,
+):
+    query = a(Rectangle)(width=..., height=...)
+    row = next(rectangle_backend.sample_bindings(query))
+    assert isinstance(row.role_taker, OperationResult)
+    assert Role.roles_for(row.role_taker, ProbabilisticOperationResult) == [row]

@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 
 import matplotlib
 import numpy as np
-from typing_extensions import List
 
 # Force non-interactive backend to avoid GUI backend requirements in headless/test environments.
 matplotlib.use("Agg", force=True)
@@ -49,7 +48,7 @@ class DebugExpressionTrajectoryPlotter:
     If True, a legend is added to each subplot.
     """
 
-    def reset(self, debug_expressions: List[DebugExpression]) -> None:
+    def reset(self, debug_expressions: list[DebugExpression]) -> None:
         """
         Prepare to record the given debug expressions, discarding any previous data.
         """

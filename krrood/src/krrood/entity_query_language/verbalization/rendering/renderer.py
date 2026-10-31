@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import TYPE_CHECKING, Optional
+from typing_extensions import TYPE_CHECKING
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
@@ -39,7 +39,7 @@ class FragmentRenderer(ABC):
     Format-specific markup logic (plain, ANSI, HTML).
     """
 
-    link_resolver: Optional[SourceLinkResolver] = field(default=None)
+    link_resolver: SourceLinkResolver | None = field(default=None)
     """
     Optional resolver that maps source references to URL strings.
     """

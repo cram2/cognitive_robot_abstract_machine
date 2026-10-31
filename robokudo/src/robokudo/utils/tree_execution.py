@@ -18,7 +18,7 @@ Dependencies:
 from __future__ import annotations
 
 import time
-from typing import Callable, TypeVar
+from typing_extensions import TYPE_CHECKING, Callable, TypeVar
 
 import rclpy
 from py_trees.blackboard import Blackboard
@@ -26,7 +26,6 @@ from py_trees.common import Status
 from py_trees.decorators import OneShot
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from typing_extensions import TYPE_CHECKING, Optional
 
 from robokudo.garden import grow_tree
 from robokudo.utils.tree import setup_with_descendants_rk
@@ -56,9 +55,9 @@ def _query_is_active() -> bool:
 def _tick_tree_until(
     ae_root: BehaviourTree,
     node: Node,
-    stop_condition: Callable[[int], Optional[_T]],
+    stop_condition: Callable[[int], _T | None],
     tick_rate: int,
-) -> Optional[_T]:
+) -> _T | None:
     """
     Tick an already setup tree until ``stop_condition`` returns a result.
     """
@@ -109,7 +108,7 @@ def run_tree_once(
     include_gui: bool = False,
     max_iterations: int = 500,
     tick_rate: int = 5,
-) -> Optional[Status]:
+) -> Status | None:
     """
     Execute a behavior tree once with monitoring.
 
@@ -133,7 +132,7 @@ def run_tree_once(
     assert isinstance(ae_root.root, OneShot)
     one_shot = ae_root.root
 
-    def stop_condition(tick_count: int) -> Optional[Status]:
+    def stop_condition(tick_count: int) -> Status | None:
         if tick_count >= max_iterations:
             return one_shot.status
 
@@ -154,7 +153,7 @@ def run_tree_until_successful_cas_count(
     include_gui: bool = False,
     max_iterations: int = 500,
     tick_rate: int = 20,
-    on_successful_cas: Optional[Callable[[CAS], None]] = None,
+    on_successful_cas: Callable[[CAS], None] | None = None,
 ) -> list:
     """
     Execute a tree until a requested number of distinct successful CASes exist.
@@ -175,7 +174,7 @@ def run_tree_until_successful_cas_count(
     seen_cas_ids = set()
     successful_cas_instances = []
 
-    def stop_condition(tick_count: int) -> Optional[list]:
+    def stop_condition(tick_count: int) -> list | None:
         if tree.status is Status.SUCCESS:
             cas = tree.cas
             if cas.cas_id not in seen_cas_ids:

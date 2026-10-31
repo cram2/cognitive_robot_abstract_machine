@@ -4,16 +4,16 @@ import threading
 import time
 from contextlib import ExitStack, AbstractContextManager
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Tuple, Type
+from typing_extensions import Self, Any, Callable
 
 import numpy as np
-from typing_extensions import Self
 
-from giskardpy.executor import Executor
+from cramph.executor import StatechartExecutor
 from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from semantic_digital_twin.input_synchronization import WorldStateInputs
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.compiled_tick import CompiledTick
+from cramph.statechart import Statechart
 from giskardpy.qp.qp_controller import QPController
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.exceptions import DataclassException
@@ -23,7 +23,7 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
 )
 from semantic_digital_twin.world import World
 
-PhasePath = Tuple[str, ...]
+PhasePath = tuple[str, ...]
 """
 The chain of phase names from the control cycle down to one measured call.
 """
@@ -42,7 +42,7 @@ class PhaseDefinition:
     One method whose runtime is attributed to a phase of the control cycle.
     """
 
-    owner: Type[Any]
+    owner: type[Any]
     """
     Class the method is defined on.
     """
@@ -58,14 +58,16 @@ class PhaseDefinition:
     """
 
 
-CONTROL_CYCLE_PHASES: Tuple[PhaseDefinition, ...] = (
+CONTROL_CYCLE_PHASES: tuple[PhaseDefinition, ...] = (
     PhaseDefinition(ControlLoop, "run_cycle", CONTROL_CYCLE_PHASE),
     PhaseDefinition(ControlLoop, "apply_world_updates", "apply_world_updates"),
     PhaseDefinition(WorldStateInputs, "synchronize", "synchronize_inputs"),
     PhaseDefinition(ControlLoop, "raise_if_canceled", "check_cancel"),
-    PhaseDefinition(Executor, "tick", "executor_tick"),
+    PhaseDefinition(StatechartExecutor, "tick", "executor_tick"),
     PhaseDefinition(CollisionManager, "compute_collisions", "compute_collisions"),
-    PhaseDefinition(MotionStatechart, "tick", "statechart_tick"),
+    PhaseDefinition(Statechart, "tick", "statechart_tick"),
+    PhaseDefinition(CompiledTick, "settle", "settle"),
+    PhaseDefinition(CompiledTick, "_take_over_latest_pass", "settle_pass"),
     PhaseDefinition(QPController, "compute_command", "qp_solve"),
     PhaseDefinition(World, "apply_control_commands", "apply_control_commands"),
     PhaseDefinition(World, "notify_state_change", "notify_state_change"),
@@ -108,7 +110,7 @@ class _ThreadLocalPhaseStack(threading.local):
     Gives every thread its own stack of entered phases.
     """
 
-    stack: List[_OpenPhase] = field(default_factory=list)
+    stack: list[_OpenPhase] = field(default_factory=list)
     """
     The phases the thread has entered and not yet left.
     """
@@ -125,12 +127,12 @@ class PhaseSamples(SubclassJSONSerializer):
     Chain of phase names leading to this phase.
     """
 
-    inclusive_durations: List[float] = field(default_factory=list)
+    inclusive_durations: list[float] = field(default_factory=list)
     """
     Seconds each call took, including the phases it called.
     """
 
-    exclusive_durations: List[float] = field(default_factory=list)
+    exclusive_durations: list[float] = field(default_factory=list)
     """
     Seconds each call spent outside of the phases it called.
     """
@@ -189,7 +191,7 @@ class PhaseSamples(SubclassJSONSerializer):
         """
         return float(np.percentile(self.inclusive_durations, percentile))
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {
             **super().to_json(),
             "path": list(self.path),
@@ -198,7 +200,7 @@ class PhaseSamples(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
         Rebuild the samples, turning the stored path back into the tuple that keys it.
 
@@ -240,7 +242,7 @@ class CallTreeProfile(SubclassJSONSerializer):
     cycle.
     """
 
-    phases: Dict[PhasePath, PhaseSamples] = field(default_factory=dict)
+    phases: dict[PhasePath, PhaseSamples] = field(default_factory=dict)
     """
     Measurements per phase, in the order the phases were first entered.
     """
@@ -286,7 +288,7 @@ class CallTreeProfile(SubclassJSONSerializer):
         """
         return self.control_cycle.inclusive_mean / self.control_dt
 
-    def children_of(self, path: PhasePath) -> List[PhaseSamples]:
+    def children_of(self, path: PhasePath) -> list[PhaseSamples]:
         """
         The phases that were called directly by the phase at the given path.
 
@@ -299,7 +301,7 @@ class CallTreeProfile(SubclassJSONSerializer):
             if samples.path[:-1] == path and len(samples.path) == len(path) + 1
         ]
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {
             **super().to_json(),
             "scenario_name": self.scenario_name,
@@ -310,7 +312,7 @@ class CallTreeProfile(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
         Rebuild a profile, keying the phases by the path each one carries.
 
@@ -370,20 +372,20 @@ class ControlLoopProfiler(AbstractContextManager):
     Seconds one control cycle may take, used to judge the measurements.
     """
 
-    phase_definitions: Tuple[PhaseDefinition, ...] = CONTROL_CYCLE_PHASES
+    phase_definitions: tuple[PhaseDefinition, ...] = CONTROL_CYCLE_PHASES
     """
     The methods that are measured.
     """
 
     # %% init False
-    phases: Dict[PhasePath, PhaseSamples] = field(init=False, default_factory=dict)
+    phases: dict[PhasePath, PhaseSamples] = field(init=False, default_factory=dict)
     """
     Measurements collected so far.
     """
 
     compile_duration: float = field(init=False, default=0.0)
     """
-    Seconds the last :meth:`giskardpy.executor.Executor.compile` took.
+    Seconds the last :meth:`cramph.executor.StatechartExecutor.compile` took.
     """
 
     _open_phases: _ThreadLocalPhaseStack = field(
@@ -467,20 +469,20 @@ class ControlLoopProfiler(AbstractContextManager):
         """
         Measure how long the controller of a goal takes to build.
         """
-        original = Executor.compile
+        original = StatechartExecutor.compile
 
-        def timed(instance: Executor, *args: Any, **kwargs: Any) -> Any:
+        def timed(instance: StatechartExecutor, *args: Any, **kwargs: Any) -> Any:
             started_at = time.perf_counter()
             try:
                 return original(instance, *args, **kwargs)
             finally:
                 self.compile_duration = time.perf_counter() - started_at
 
-        self._replace_method(Executor, "compile", original, timed)
+        self._replace_method(StatechartExecutor, "compile", original, timed)
 
     def _replace_method(
         self,
-        owner: Type[Any],
+        owner: type[Any],
         method_name: str,
         original: Callable[..., Any],
         replacement: Callable[..., Any],
@@ -503,7 +505,7 @@ class ControlLoopProfiler(AbstractContextManager):
             self._exit_stack.callback(delattr, owner, method_name)
         setattr(owner, method_name, replacement)
 
-    def _open_phases_of_current_thread(self) -> List[_OpenPhase]:
+    def _open_phases_of_current_thread(self) -> list[_OpenPhase]:
         """
         The phases the calling thread has entered and not yet left.
 

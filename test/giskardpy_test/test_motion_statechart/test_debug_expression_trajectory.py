@@ -1,17 +1,13 @@
 import numpy as np
 import pytest
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.debug_expression_trajectory import (
     DebugExpressionTrajectory,
 )
-from giskardpy.motion_statechart.exceptions import (
-    EmptyDebugExpressionTrajectoryError,
-    PlotterNotConfiguredError,
-)
+from giskardpy.motion_statechart.exceptions import EmptyDebugExpressionTrajectoryError
+from cramph.exceptions import MissingExecutorExtensionError
 from giskardpy.motion_statechart.graph_node import DebugExpression, EndMotion
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.statechart import Statechart
 from giskardpy.motion_statechart.plotters.debug_expression_trajectory_plotter import (
     DebugExpressionTrajectoryPlotter,
 )
@@ -20,15 +16,22 @@ from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.exceptions import NonMonotonicTimeError
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world import World
+from giskardpy.motion_control import DebugExpressionRecording
+from giskardpy.motion_control import MotionControl
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 
 
-def _build_motion_statechart(cylinder_bot_world: World) -> MotionStatechart:
+def _build_motion_statechart(
+    cylinder_bot_world: World, executor: StatechartExecutor
+) -> Statechart:
     """
-    Build a motion statechart that moves the bot to a Cartesian point.
+    Build a motion statechart that moves the bot to a Cartesian point, in the context of
+    `executor`.
     """
     root = cylinder_bot_world.root
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-    motion_statechart = MotionStatechart()
+    motion_statechart = Statechart(context=executor.context)
     goal = CartesianPosition(
         root_link=root,
         tip_link=tip,
@@ -40,15 +43,18 @@ def _build_motion_statechart(cylinder_bot_world: World) -> MotionStatechart:
     return motion_statechart
 
 
-def _build_executor(cylinder_bot_world: World) -> Executor:
+def _build_executor(cylinder_bot_world: World) -> StatechartExecutor:
     """
     Build an executor that moves the bot to a Cartesian point while recording.
     """
-    executor = Executor(
-        context=MotionStatechartContext(world=cylinder_bot_world),
-        debug_expression_plotter=DebugExpressionTrajectoryPlotter(),
+    executor = StatechartExecutor(
+        context=StatechartContext(world=cylinder_bot_world),
+        extensions=[
+            MotionControl(),
+            DebugExpressionRecording(plotter=DebugExpressionTrajectoryPlotter()),
+        ],
     )
-    executor.compile(motion_statechart=_build_motion_statechart(cylinder_bot_world))
+    executor.compile(statechart=_build_motion_statechart(cylinder_bot_world, executor))
     return executor
 
 
@@ -57,7 +63,9 @@ class TestDebugExpressionRecording:
         executor = _build_executor(cylinder_bot_world)
         executor.tick_until_end()
 
-        trajectory = executor.debug_expression_plotter.debug_expression_trajectory
+        trajectory = executor.require_extension(
+            DebugExpressionRecording
+        ).plotter.debug_expression_trajectory
         assert len(trajectory.recorded_debug_expressions) > 0
         assert len(trajectory.times) > 1
         for recorded in trajectory.recorded_debug_expressions:
@@ -67,7 +75,9 @@ class TestDebugExpressionRecording:
         executor = _build_executor(cylinder_bot_world)
         executor.tick_until_end()
 
-        trajectory = executor.debug_expression_plotter.debug_expression_trajectory
+        trajectory = executor.require_extension(
+            DebugExpressionRecording
+        ).plotter.debug_expression_trajectory
         current = next(
             recorded
             for recorded in trajectory.recorded_debug_expressions
@@ -83,7 +93,7 @@ class TestDebugExpressionRecording:
         executor.tick_until_end()
 
         output = tmp_path / "debug_expressions.pdf"
-        executor.plot_debug_expressions(str(output))
+        executor.require_extension(DebugExpressionRecording).plotter.plot(str(output))
 
         assert output.exists()
         assert output.stat().st_size > 0
@@ -95,7 +105,7 @@ class TestDebugExpressionRecording:
         executor.tick_until_end()
 
         output = tmp_path / "debug_expressions" / "debug_expressions.pdf"
-        executor.plot_debug_expressions(str(output))
+        executor.require_extension(DebugExpressionRecording).plotter.plot(str(output))
 
         assert output.exists()
         assert output.stat().st_size > 0
@@ -103,12 +113,19 @@ class TestDebugExpressionRecording:
     def test_plot_raises_when_plotter_not_configured(
         self, cylinder_bot_world: World, tmp_path
     ):
-        executor = Executor(context=MotionStatechartContext(world=cylinder_bot_world))
-        executor.compile(motion_statechart=_build_motion_statechart(cylinder_bot_world))
+        executor = StatechartExecutor(
+            context=StatechartContext(world=cylinder_bot_world),
+            extensions=[MotionControl()],
+        )
+        executor.compile(
+            statechart=_build_motion_statechart(cylinder_bot_world, executor)
+        )
 
         output = tmp_path / "debug_expressions.pdf"
-        with pytest.raises(PlotterNotConfiguredError):
-            executor.plot_debug_expressions(str(output))
+        with pytest.raises(MissingExecutorExtensionError):
+            executor.require_extension(DebugExpressionRecording).plotter.plot(
+                str(output)
+            )
 
 
 class TestDebugExpressionTrajectory:

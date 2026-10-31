@@ -76,7 +76,6 @@ from typing_extensions import (
     get_origin,
     get_args,
     Tuple,
-    Optional,
     List,
     Union,
     Self,
@@ -129,7 +128,7 @@ def filter_data(data, selected_indices):
         prev = idx
 
 
-def fill_in_missing_kwargs(func: Callable, **kwargs) -> Dict[str, Any]:
+def fill_in_missing_kwargs(func: Callable, **kwargs) -> dict[str, Any]:
     """
     Fill in missing kwargs with kwargs from the function signature.
 
@@ -149,8 +148,8 @@ def fill_in_missing_kwargs(func: Callable, **kwargs) -> Dict[str, Any]:
 
 
 def get_and_import_python_modules_in_a_package(
-    file_paths: List[str], parent_package_name: Optional[str] = None
-) -> List[Optional[ModuleType]]:
+    file_paths: list[str], parent_package_name: str | None = None
+) -> list[ModuleType | None]:
     """
     :param file_paths: The paths to the python files to import.
     :param parent_package_name: The name of the parent package to use for relative imports.
@@ -180,8 +179,8 @@ def get_and_import_python_modules_in_a_package(
 
 def get_and_import_python_module(
     python_file_path: str,
-    package_import_path: Optional[str] = None,
-    parent_package_name: Optional[str] = None,
+    package_import_path: str | None = None,
+    parent_package_name: str | None = None,
 ) -> ModuleType:
     """
     :param python_file_path: The path to the python file to import.
@@ -202,7 +201,7 @@ def get_and_import_python_module(
     return module
 
 
-def are_results_subclass_of_types(result_types: List[Any], types_: List[Type]) -> bool:
+def are_results_subclass_of_types(result_types: list[Any], types_: list[type]) -> bool:
     """
     Check if all results are subclasses of the given types.
 
@@ -216,13 +215,13 @@ def are_results_subclass_of_types(result_types: List[Any], types_: List[Type]) -
     return True
 
 
-def get_origin_type_of_function_output(func: Callable) -> Optional[Type]:
+def get_origin_type_of_function_output(func: Callable) -> type | None:
     """
     Get the origin type of a function return type.
 
     :param func: The function object.
     """
-    origin_type: Optional[Type] = None
+    origin_type: type | None = None
     try:
         origin_type = get_origin(get_type_hints(func)["return"])
     except NameError:
@@ -241,7 +240,7 @@ def get_origin_type_of_function_output(func: Callable) -> Optional[Type]:
 
 
 def get_arg_type_of_function_output(
-    func: Callable, output_type: Type, *func_args, package_name: Optional[str] = None
+    func: Callable, output_type: type, *func_args, package_name: str | None = None
 ):
     if output_type is Self and len(func_args) > 0:
         func_class = get_method_class_if_exists(func, *func_args)
@@ -279,7 +278,7 @@ def get_arg_type_of_function_output(
         return output_type
 
 
-def get_imports_from_scope(scope: Dict[str, Any]) -> List[str]:
+def get_imports_from_scope(scope: dict[str, Any]) -> list[str]:
     """
     Get the imports from the given scope.
 
@@ -290,7 +289,7 @@ def get_imports_from_scope(scope: Dict[str, Any]) -> List[str]:
 
 
 def encapsulate_user_input(
-    user_input: str, func_signature: str, func_doc: Optional[str] = None
+    user_input: str, func_signature: str, func_doc: str | None = None
 ) -> str:
     """
     Encapsulate the user input string with a function definition.
@@ -352,7 +351,7 @@ def build_user_input_from_conclusion(conclusion: Any) -> str:
     return user_input
 
 
-def update_case_in_case_query(case_query: CaseQuery, conclusions: Dict[str, Any]):
+def update_case_in_case_query(case_query: CaseQuery, conclusions: dict[str, Any]):
     """
     Update the case with the conclusions.
 
@@ -436,8 +435,8 @@ def have_common_types(conclusion: Any, target: Any) -> bool:
 
 
 def calculate_precision_and_recall(
-    pred_cat: Dict[str, Any], target: Dict[str, Any]
-) -> Tuple[List[bool], List[bool]]:
+    pred_cat: dict[str, Any], target: dict[str, Any]
+) -> tuple[list[bool], list[bool]]:
     """
     :param pred_cat: The predicted category.
     :param target: The target category.
@@ -478,8 +477,8 @@ def ask_llm(prompt):
 
 
 def get_case_attribute_type(
-    original_case: Any, attribute_name: str, known_value: Optional[Any] = None
-) -> Type:
+    original_case: Any, attribute_name: str, known_value: Any | None = None
+) -> type:
     """
     :param original_case: The case to get the attribute from.
     :param attribute_name: The name of the attribute.
@@ -588,7 +587,7 @@ def extract_dependencies(code_lines):
     return required_lines
 
 
-def typing_to_python_type(typing_hint: Type) -> Type:
+def typing_to_python_type(typing_hint: type) -> type:
     """
     Convert a typing hint to a python type.
 
@@ -609,7 +608,7 @@ def typing_to_python_type(typing_hint: Type) -> Type:
         return typing_hint
 
 
-def capture_variable_assignment(code: str, variable_name: str) -> Optional[str]:
+def capture_variable_assignment(code: str, variable_name: str) -> str | None:
     """
     Capture the assignment of a variable in the given code.
 
@@ -665,7 +664,7 @@ def get_func_rdr_model_name(func: Callable, include_file_name: bool = False) -> 
     return str_to_snake_case(model_name)
 
 
-def get_file_that_ends_with(directory_path: str, suffix: str) -> Optional[str]:
+def get_file_that_ends_with(directory_path: str, suffix: str) -> str | None:
     """
     Get the file that ends with the given suffix in the model directory.
 
@@ -679,7 +678,7 @@ def get_file_that_ends_with(directory_path: str, suffix: str) -> Optional[str]:
     return None
 
 
-def get_function_return_type(func: Callable) -> Union[Type, None, Tuple[Type, ...]]:
+def get_function_return_type(func: Callable) -> type | None | tuple[type, ...]:
     """
     Get the return type of a function.
 
@@ -693,7 +692,7 @@ def get_function_return_type(func: Callable) -> Union[Type, None, Tuple[Type, ..
     return get_type_from_type_hint(type_hint)
 
 
-def get_type_from_type_hint(type_hint: Type) -> Union[Type, Tuple[Type, ...]]:
+def get_type_from_type_hint(type_hint: type) -> type | tuple[type, ...]:
     origin = get_origin(type_hint)
     args = get_args(type_hint)
     if origin not in [list, set, None, Union, Iterator]:
@@ -729,7 +728,7 @@ def get_function_representation(func: Callable) -> str:
     return func_name
 
 
-def get_method_args_as_dict(method: Callable, *args, **kwargs) -> Dict[str, Any]:
+def get_method_args_as_dict(method: Callable, *args, **kwargs) -> dict[str, Any]:
     """
     Get the arguments of a method as a dictionary.
 
@@ -751,7 +750,7 @@ def get_method_args_as_dict(method: Callable, *args, **kwargs) -> Dict[str, Any]
     return dict(zip(func_arg_names, func_arg_values))
 
 
-def get_method_class_if_exists(method: Callable, *args) -> Optional[Type]:
+def get_method_class_if_exists(method: Callable, *args) -> type | None:
     """
     Get the class of a method if it has one.
 
@@ -769,7 +768,7 @@ def get_method_class_if_exists(method: Callable, *args) -> Optional[Type]:
     return None
 
 
-def flatten_list(a: List):
+def flatten_list(a: list):
     a_flattened = []
     for c in a:
         if is_iterable(c):
@@ -779,7 +778,7 @@ def flatten_list(a: List):
     return a_flattened
 
 
-def make_list(value: Any) -> List:
+def make_list(value: Any) -> list:
     """
     Make a list from a value.
 
@@ -868,7 +867,7 @@ def _pickle_thread(thread_obj) -> Any:
 copyreg.pickle(threading.Thread, _pickle_thread)
 
 
-def copy_case(case: Union[Case, SQLTable]) -> Union[Case, SQLTable, Any]:
+def copy_case(case: Case | SQLTable) -> Case | SQLTable | Any:
     """
     Copy a case.
 
@@ -942,7 +941,7 @@ def copy_orm_instance_with_relationships(instance: SQLTable) -> SQLTable:
     return instance_cp
 
 
-def get_value_type_from_type_hint(attr_name: str, obj: Any) -> Type:
+def get_value_type_from_type_hint(attr_name: str, obj: Any) -> type:
     """
     Get the value type from the type hint of an object attribute.
 
@@ -979,7 +978,7 @@ def get_value_type_from_type_hint(attr_name: str, obj: Any) -> Type:
 
 def get_hint_for_attribute(
     attr_name: str, obj: Any
-) -> Tuple[Optional[Type], Optional[Type], Tuple[Type]]:
+) -> tuple[type | None, type | None, tuple[type]]:
     """
     Get the type hint for an attribute of an object.
 
@@ -1004,8 +1003,8 @@ def get_hint_for_attribute(
 
 
 def get_origin_and_args_from_type_hint(
-    type_hint: Type,
-) -> Tuple[Optional[Type], Tuple[Type]]:
+    type_hint: type,
+) -> tuple[type | None, tuple[type]]:
     """
     Get the origin and arguments from a type hint.W.
 
@@ -1020,7 +1019,7 @@ def get_origin_and_args_from_type_hint(
         return origin, args
 
 
-def table_rows_as_str(row_dicts: List[Dict[str, Any]], columns_per_row: int = 20):
+def table_rows_as_str(row_dicts: list[dict[str, Any]], columns_per_row: int = 20):
     """
     Print a table row.
 
@@ -1095,10 +1094,10 @@ def dataclass_to_dict(obj):
 
 def get_attribute_name(
     obj: Any,
-    attribute: Optional[Any] = None,
-    attribute_type: Optional[Type] = None,
-    possible_value: Optional[Any] = None,
-) -> Optional[str]:
+    attribute: Any | None = None,
+    attribute_type: type | None = None,
+    possible_value: Any | None = None,
+) -> str | None:
     """
     Get the name of an attribute from an object.
 
@@ -1111,7 +1110,7 @@ def get_attribute_name(
     :param possible_value: A possible value of the attribute to get the name of.
     :return: The name of the attribute.
     """
-    attribute_name: Optional[str] = None
+    attribute_name: str | None = None
     if attribute_name is None and attribute is not None:
         attribute_name = get_attribute_name_from_value(obj, attribute)
     if attribute_name is None and attribute_type is not None:
@@ -1121,9 +1120,7 @@ def get_attribute_name(
     return attribute_name
 
 
-def get_attribute_by_type(
-    obj: Any, prop_type: Type
-) -> Tuple[Optional[str], Optional[Any]]:
+def get_attribute_by_type(obj: Any, prop_type: type) -> tuple[str | None, Any | None]:
     """
     Get a property from an object by type.
 
@@ -1160,7 +1157,7 @@ def get_attribute_by_type(
     return None, None
 
 
-def get_attribute_name_from_value(obj: Any, attribute_value: Any) -> Optional[str]:
+def get_attribute_name_from_value(obj: Any, attribute_value: Any) -> str | None:
     """
     Get the name of an attribute from an object.
 
@@ -1220,14 +1217,14 @@ def can_be_a_set(value: Any) -> bool:
         return False
 
 
-def get_all_subclasses(cls: Type) -> Dict[str, Type]:
+def get_all_subclasses(cls: type) -> dict[str, type]:
     """
     Get all subclasses of a class recursively.
 
     :param cls: The class to get the subclasses of.
     :return: A dictionary of all subclasses.
     """
-    all_subclasses: Dict[str, Type] = {}
+    all_subclasses: dict[str, type] = {}
     for sub_cls in cls.__subclasses__():
         all_subclasses[sub_cls.__name__.lower()] = sub_cls
         all_subclasses.update(get_all_subclasses(sub_cls))
@@ -1241,7 +1238,7 @@ def make_tuple(value: Any) -> Any:
     return tuple(value) if is_iterable(value) else (value,)
 
 
-def make_set(value: Any) -> Set:
+def make_set(value: Any) -> set:
     """
     Make a set from a value.
 
@@ -1661,9 +1658,9 @@ def render_tree(
     root: Node,
     use_dot_exporter: bool = False,
     filename: str = "scrdr",
-    only_nodes: List[Node] = None,
+    only_nodes: list[Node] = None,
     show_in_console: bool = False,
-    color_map: Optional[Callable[[Node], str]] = None,
+    color_map: Callable[[Node], str] | None = None,
     view: bool = False,
     use_legend: bool = True,
 ) -> None:
@@ -1757,7 +1754,7 @@ def draw_tree(root: Node, fig: Figure):
 
 
 def encapsulate_code_lines_into_a_function(
-    code_lines: List[str],
+    code_lines: list[str],
     function_name: str,
     function_signature: str,
     func_doc: str,
