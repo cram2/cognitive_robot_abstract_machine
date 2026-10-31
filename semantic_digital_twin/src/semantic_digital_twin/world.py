@@ -53,7 +53,7 @@ from semantic_digital_twin.exceptions import (
     SemanticAnnotationCircularDependencyError,
     WorldIsNotATreeError,
     WorldContainsOrphanedDegreeOfFreedom,
-    BrokenWorldModificationHistoryError,
+    PartiallyAppliedWorldModificationError,
     MismatchingWorld,
     InsufficientModificationHistoryError,
     InvalidRollbackVersionError,
@@ -280,18 +280,18 @@ class WorldModelUpdateContextManager:
                     model_manager.pending_publications.clear()
                     # discard the modifications of the failed block too, so that the
                     # next block does not record and publish them as its own
-                    history_is_broken = (
-                        len(model_manager.current_model_modification_block) > 0
-                    )
+                    failed_block = model_manager.current_model_modification_block
                     model_manager.current_model_modification_block = (
                         WorldModelModificationBlock()
                     )
                     self.world.world_is_being_modified = False
                     model_manager._current_modifications_will_be_published = None
-                    if history_is_broken:
-                        raise BrokenWorldModificationHistoryError(
-                            world=self.world, potential_cause=exc_val
-                        )
+                    if len(failed_block) > 0:
+                        raise PartiallyAppliedWorldModificationError(
+                            world=self.world,
+                            cause=exc_val,
+                            applied_modifications=failed_block,
+                        ) from exc_val
                 raise exc_val
 
             self.world.delete_orphaned_dofs()
