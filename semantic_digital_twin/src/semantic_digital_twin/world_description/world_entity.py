@@ -30,6 +30,8 @@ from krrood.entity_query_language.predicate import Symbol
 from krrood.patterns.caching import memoize
 from krrood.symbolic_math.symbolic_math import Matrix
 from krrood.utils import get_full_class_name
+from krrood.patterns.identifier_and_name import HasID, HasName
+from krrood_spatial_math.cartesian_frame_3d import CartesianFrame3D
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityReference,
     WorldEntityWithIDKwargsTracker,
@@ -46,6 +48,7 @@ from semantic_digital_twin.world_description.connection_properties import (
     VelocityServoGains,
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
+    GenericSpatialType,
     HomogeneousTransformationMatrix,
     Point3,
     Pose,
@@ -69,7 +72,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(eq=False)
-class WorldEntity(Symbol):
+class WorldEntity(Symbol, HasName):
     """
     A class representing an entity in the world.
 
@@ -140,7 +143,7 @@ class WorldEntity(Symbol):
 
 
 @dataclass(eq=False)
-class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
+class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
     """
     A WorldEntity that has a unique identifier.
 
@@ -368,7 +371,9 @@ class WorldEntityWithSimulatorProperties(WorldEntityWithID, HasSimulatorProperti
 
 
 @dataclass(eq=False)
-class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
+class KinematicStructureEntity(
+    WorldEntityWithSimulatorProperties, CartesianFrame3D, ABC
+):
     """
     An entity that is part of the kinematic structure of the world.
     """
@@ -387,6 +392,9 @@ class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
     def remove_from_world(self):
         super().remove_from_world()
         self.index = None
+
+    def express(self, value: GenericSpatialType) -> GenericSpatialType:
+        return self._world.transform(value, self)
 
     @property
     @abstractmethod

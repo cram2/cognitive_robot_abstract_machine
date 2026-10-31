@@ -8,7 +8,9 @@ import trimesh.boolean
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.adapters.json_field import JSONField
 from krrood.symbolic_math.symbolic_math import FloatVariable
+from krrood_spatial_math.exceptions import MissingCartesianFrame3DResolver
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -135,8 +137,21 @@ def test_KinematicStructureEntityNotInKwargs():
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
-    with pytest.raises(MissingWorldError):
+    with pytest.raises(MissingCartesianFrame3DResolver):
         Point3.from_json(json_data, **kwargs)
+
+
+def test_a_point_named_by_its_former_module_is_read_as_a_point():
+    point = Point3(1, 2, 3)
+    json_data = point.to_json()
+    json_data[JSONField.TYPE] = (
+        "semantic_digital_twin.spatial_types.spatial_types.Point3"
+    )
+
+    point_copy = from_json(json_data)
+
+    assert type(point_copy) is Point3
+    assert np.allclose(point_copy.to_np(), point.to_np())
 
 
 def test_KinematicStructureEntityNotInKwargs2():

@@ -25,6 +25,7 @@ dependencies = [
   "physics_simulators",
   "experiments",
   "segmind",
+  "krrood_spatial_math",
   "ipykernel>=7.2.0",
   "lark-parser>=0.12.0",
   "tqdm"
@@ -93,7 +94,8 @@ members = [
   "physics_simulators",
   "robokudo",
   "experiments",
-  "segmind"
+  "segmind",
+  "domain_models/krrood_spatial_math"
 ]
 
 [tool.uv.sources]
@@ -108,6 +110,7 @@ robokudo              = { workspace = true }
 physics_simulators    = { workspace = true }
 segmind               = { workspace = true }
 experiments           = { workspace = true }
+krrood_spatial_math   = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -124,6 +127,7 @@ robokudo = { path = "robokudo", develop = true }
 physics_simulators = { path = "physics_simulators", develop = true }
 experiments = { path = "experiments", develop = true }
 segmind = { path = "segmind", develop = true }
+krrood_spatial_math = { path = "domain_models/krrood_spatial_math", develop = true }
 
 [tool.setuptools]
 packages = ["cognitive_robot_abstract_machine"]
