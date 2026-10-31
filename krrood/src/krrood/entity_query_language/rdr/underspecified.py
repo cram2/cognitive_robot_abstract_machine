@@ -40,7 +40,9 @@ from krrood.symbol_graph.helpers import get_wrapped_field
 
 @dataclass
 class RDRMatchParser:
-    """Reads an underspecified :class:`Match` for RDR-based attribute inference."""
+    """
+    Reads an underspecified :class:`Match` for RDR-based attribute inference.
+    """
 
     match: Match
     """
@@ -55,21 +57,27 @@ class RDRMatchParser:
 
     @property
     def case_type(self) -> Type:
-        """The type whose instances are being completed (e.g. ``Animal``)."""
+        """
+        The type whose instances are being completed (e.g. ``Animal``).
+        """
         return self.match._type_
 
     @property
     def variable(self) -> Variable:
-        """The EQL variable the query ranges over."""
+        """
+        The EQL variable the query ranges over.
+        """
         return self.match._variable_
 
     @cached_property
     def inference_targets(self) -> List[AttributeMatch]:
-        """The ``...`` attribute leaves to infer (each validated as single-valued)."""
+        """
+        The ``...`` attribute leaves to infer (each validated as single-valued).
+        """
         targets = [
             attribute_match
             for attribute_match in self.match._matches_with_variables_
-            if attribute_match.is_unspecified
+            if attribute_match.is_underspecified_single_value
         ]
         for target in targets:
             self._guard_single_valued(target)
@@ -86,7 +94,9 @@ class RDRMatchParser:
 
     @property
     def target_attribute_name(self) -> str:
-        """The name of the single attribute this query asks to infer."""
+        """
+        The name of the single attribute this query asks to infer.
+        """
         return self.single_target().attribute_name
 
     def filtered_cases(self) -> Iterator[Any]:
@@ -101,10 +111,12 @@ class RDRMatchParser:
         return query.evaluate()
 
     def _concrete_conditions(self) -> List[Any]:
-        """Fresh comparator nodes for the concrete attribute constraints (``...`` dropped)."""
+        """
+        Fresh comparator nodes for the concrete attribute constraints (``...`` dropped).
+        """
         conditions: List[Any] = []
         for leaf in self.match._matches_with_variables_:
-            if leaf.is_unspecified:
+            if leaf.is_underspecified_single_value:
                 continue
             attribute = getattr(self.variable, leaf.attribute_name)
             conditions.append(attribute == leaf.assigned_variable._value_)

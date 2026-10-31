@@ -939,9 +939,10 @@ class AttributeMatch(AbstractMatchExpression[T]):
         return attr
 
     @property
-    def is_unspecified(self) -> bool:
+    def is_underspecified_single_value(self) -> bool:
         """
-        Whether the attribute is assigned ``...`` itself, leaving its value unspecified.
+        Whether the attribute is assigned ``...`` itself, leaving its single value
+        underspecified; a collection holding ``...`` as an element does not count.
         """
         return self.assigned_value is ...
 
