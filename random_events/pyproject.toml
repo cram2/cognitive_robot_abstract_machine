@@ -12,7 +12,7 @@ dependencies = [
     "sortedcontainers",
     "pybind11",
     "setuptools-scm",
-    "krrood",
+    "krrood>=26.10.0",
 ]
 description = "Random random events for probabilistic reasoning"
 readme = "README.md"
@@ -36,6 +36,7 @@ classifiers = [
 [project.urls]
 "Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
 "Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]

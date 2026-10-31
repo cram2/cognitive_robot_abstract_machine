@@ -49,6 +49,7 @@ license = "LGPL-3.0-only"
 [project.urls]
 "Source" = 'https://github.com/cram2/coraplex'
 "Bug Tracker" = 'https://github.com/cram2/coraplex/issues'
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)
