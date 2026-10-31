@@ -17,6 +17,10 @@ from ..dataset.type_checking_cycle_owner import Content, HolderBindingItsContent
 from ..dataset.type_checking_import_of_missing_module import (
     OwnerOfAnnotationFromMissingModule,
 )
+from ..dataset.type_checking_plain_import_of_missing_module import (
+    OwnerOfAnnotationNextToUninstalledImport,
+)
+from ..dataset.latebound_annotation_type import LateBoundAnnotationType
 
 
 def test_get_scope_from_imports_basic():
@@ -110,6 +114,20 @@ def test_scope_holds_the_other_imports_when_one_targets_a_missing_module():
     assert scope["Optional"] == Optional
     assert scope["dataclass"] == dataclass
     assert "GeneratedMapping" not in scope
+
+
+def test_scope_holds_the_other_imports_when_a_plain_import_targets_an_uninstalled_package():
+    """
+    A file whose plain ``import`` statement names a package that is not installed must
+    still yield the scope its remaining imports define.
+    """
+    source_path = inspect.getsourcefile(OwnerOfAnnotationNextToUninstalledImport)
+
+    scope = get_scope_from_imports(file_path=source_path)
+
+    assert scope["Optional"] == Optional
+    assert scope["LateBoundAnnotationType"] is LateBoundAnnotationType
+    assert "uninstalled_optional_dependency" not in scope
 
 
 # %% function-local imports

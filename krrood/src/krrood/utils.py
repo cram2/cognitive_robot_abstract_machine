@@ -9,7 +9,7 @@ import types
 from dataclasses import Field
 from dataclasses import fields, MISSING
 from functools import lru_cache
-from importlib.util import resolve_name
+from importlib.util import find_spec, resolve_name
 from inspect import isclass
 from os import PathLike
 from os.path import dirname
@@ -456,6 +456,8 @@ def get_scope_from_imports(
     """
     Create a scope dictionary from imports in a Python file or an AST tree.
 
+    An absolute import whose top-level package is not installed contributes no names.
+
     :param file_path: The path to the Python file to extract imports from.
     :param tree: An AST tree to extract imports from. If provided, file_path is ignored.
     :param package_name: The name of the package to use for relative imports.
@@ -619,10 +621,20 @@ def _handle_import_node(
     :param package_name: The package name to use for relative imports.
     """
     for alias in node.names:
-        module_name = alias.name
+        if not is_top_level_package_installed(alias.name):
+            continue
         asname = alias.asname or alias.name
-        module = get_and_import_module(module_name, package_name)
-        scope[asname] = module
+        scope[asname] = get_and_import_module(alias.name, package_name)
+
+
+def is_top_level_package_installed(module_name: str) -> bool:
+    """
+    :param module_name: The absolute name of a module.
+    :return: Whether the top-level package of *module_name* is installed or already
+        imported.
+    """
+    top_level_package = module_name.partition(".")[0]
+    return top_level_package in sys.modules or find_spec(top_level_package) is not None
 
 
 @lru_cache(maxsize=None)
@@ -663,8 +675,9 @@ def _handle_import_from_node(
     """
     Process a from-import node and update the provided scope mapping.
 
-    A statement whose module cannot be imported, because it is missing or only partially
-    initialized in a circular import, contributes no names and is skipped, just as a
+    A statement whose top-level package is not installed contributes no names. A
+    statement whose module cannot be imported, because it is missing or only partially
+    initialized in a circular import, is skipped likewise, just as a
     name missing from an imported module is: the scope is built for
     best-effort name resolution, so one statement that cannot be bound must not cost
     the caller every other name in the file.
@@ -682,6 +695,12 @@ def _handle_import_from_node(
     :return: the (possibly) updated package_name to mimic original behavior.
     """
     module_name = node.module
+    if (
+        node.level == 0
+        and module_name is not None
+        and not is_top_level_package_installed(module_name)
+    ):
+        return package_name
 
     # Resolve relative imports (may update package_name and module_name)
     resolved_module_name, resolved_package_name = _resolve_relative_import(

@@ -4,6 +4,11 @@ from krrood.class_diagrams.utils import get_type_hints_of_object
 
 from ..dataset.latebound_annotation_type import LateBoundAnnotationType
 from ..dataset.subclass_importing_missing_module import SubclassImportingMissingModule
+from ..dataset.type_checking_plain_import_of_missing_module import (
+    OwnerOfAnnotationNextToUninstalledImport,
+)
+
+# %% subclass module importing a missing module
 
 
 def test_annotation_resolves_from_a_base_when_the_subclass_module_import_is_missing():
@@ -19,5 +24,20 @@ def test_annotation_resolves_from_a_base_when_the_subclass_module_import_is_miss
     get_type_hints_of_object.cache_clear()
 
     type_hints = get_type_hints_of_object(SubclassImportingMissingModule)
+
+    assert type_hints["value"] == Optional[LateBoundAnnotationType]
+
+
+# %% uninstalled package named in a TYPE_CHECKING block
+
+
+def test_annotation_resolves_when_its_module_names_an_uninstalled_package():
+    """
+    An annotation must resolve from its module's ``TYPE_CHECKING`` imports even when
+    that block also imports a package that is not installed.
+    """
+    get_type_hints_of_object.cache_clear()
+
+    type_hints = get_type_hints_of_object(OwnerOfAnnotationNextToUninstalledImport)
 
     assert type_hints["value"] == Optional[LateBoundAnnotationType]
