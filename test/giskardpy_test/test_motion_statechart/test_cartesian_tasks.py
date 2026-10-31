@@ -275,6 +275,15 @@ motion starts at, and it can only correct a lateral offset on the tick after it
 appeared.
 """
 
+REAIMED_LINE_TOLERANCE = 0.025
+"""
+How far the tip of a point goal may stray from the straight line to the goal, in meters.
+
+A point goal aims at the goal again from wherever the tip is on every tick, instead of
+pulling the tip back onto the line the motion started on, so a lateral offset is not
+corrected but only stops growing. On the PR2 arm this accumulates to about 22 mm.
+"""
+
 
 @dataclass
 class StraightLine:
@@ -306,6 +315,41 @@ class StraightLine:
         :return: Distance of the position that strayed furthest from this line.
         """
         return max(self.distance_from(position) for position in positions)
+
+
+def peak_angle_per_tick_towards_roll_goal(world: World, angle: float) -> float:
+    """
+    Rolls the PR2's right gripper about its own x-axis and measures how fast it turns.
+
+    :param world: A PR2 world.
+    :param angle: How far the goal is rolled away from the current orientation.
+    :return: The largest angle the gripper turned within one control cycle.
+    """
+    tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    root = world.get_kinematic_structure_entity_by_name("base_link")
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[MotionControl()]
+    )
+    motion_statechart = Statechart(context=executor.context)
+    orientation_goal = CartesianOrientation(
+        root_link=root,
+        tip_link=tip,
+        goal_orientation=RotationMatrix.from_axis_angle(
+            AxisAngle(Vector3.X(), angle, reference_frame=tip)
+        ),
+    )
+    motion_statechart.add_node(orientation_goal)
+    motion_statechart.add_node(EndMotion.when_true(orientation_goal))
+    executor.compile(statechart=motion_statechart)
+
+    rotations = [world.compute_forward_kinematics_np(root, tip)[:3, :3].copy()]
+    while not executor.statechart.is_ended():
+        executor.tick()
+        rotations.append(world.compute_forward_kinematics_np(root, tip)[:3, :3].copy())
+    return max(
+        np.arccos(np.clip((np.trace(before.T @ after) - 1) / 2, -1, 1))
+        for before, after in zip(rotations, rotations[1:])
+    )
 
 
 def record_tip_path(
@@ -345,7 +389,6 @@ def record_tip_path(
 
 
 class TestCartesianPositionTrajectory:
-
     def _points_to_np(self, positions: list[Point3] | np.ndarray) -> np.ndarray:
         """
         Convert a sequence of `Point3` or an `ndarray` of shape (N, 3) into an `ndarray`
@@ -1711,6 +1754,94 @@ class TestCartesianTasks:
         line = StraightLine(start=path[0], end=goal_pose.to_np()[:3, 3])
         assert line.maximum_distance_from(path) <= STRAIGHT_LINE_TOLERANCE
 
+    def test_orientation_goal_turns_as_fast_far_away_as_close_by(
+        self, pr2_world_state_reset: World, orientation_speed_ratio_tolerance: float
+    ):
+        """
+        The angular speed towards an orientation goal is set by its reference velocity,
+        not by how far away the goal is.
+
+        Capping the half-angle rows directly makes the angular speed grow with
+        1/cos(angle/2), so a goal at 150 degrees would turn more than twice as fast as
+        one at 30 degrees.
+        """
+        initial_state = pr2_world_state_reset.state._data.copy()
+        peak_speeds = []
+        for angle in (np.radians(30), np.radians(150)):
+            pr2_world_state_reset.state._data[:] = initial_state
+            pr2_world_state_reset.notify_state_change()
+            peak_speeds.append(
+                peak_angle_per_tick_towards_roll_goal(pr2_world_state_reset, angle)
+            )
+
+        assert peak_speeds[1] <= orientation_speed_ratio_tolerance * peak_speeds[0]
+
+    def test_cartesian_position_straight_weighs_its_rows_by_its_weight(
+        self, cylinder_bot_world: World
+    ):
+        """
+        Progress along the line costs the task's weight, and leaving the line costs that
+        weight times the lateral weight factor.
+        """
+        task = CartesianPositionStraight(
+            root_link=cylinder_bot_world.root,
+            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            goal_point=Point3(x=1, reference_frame=cylinder_bot_world.root),
+            weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+            name="straight",
+        )
+
+        add_to_statechart_with_motion_control(task, cylinder_bot_world)
+        artifacts = task.build()
+
+        weights = {
+            constraint.name: constraint.quadratic_weight
+            for constraint in artifacts.constraints.equality_constraints
+        }
+        lateral_weight = task.weight * task.LATERAL_WEIGHT_FACTOR
+        assert weights == {
+            "line/progress": task.weight,
+            "line/y": lateral_weight,
+            "line/z": lateral_weight,
+        }
+
+    def test_cartesian_position_moves_straight_towards_a_diagonal_goal(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        A point goal whose direction is not aligned with an axis of the root frame must
+        still be approached along the straight line to it.
+
+        Capping each axis of the error on its own would point the motion along the
+        diagonal of the cap instead.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
+        start = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)[:3, 3]
+        goal_point = Point3(
+            start[0] + 0.25, start[1] + 0.15, start[2] + 0.1, reference_frame=root
+        )
+
+        executor = StatechartExecutor(
+            context=StatechartContext(world=pr2_world_state_reset),
+            extensions=[MotionControl()],
+        )
+        motion_statechart = Statechart(context=executor.context)
+        position_goal = CartesianPosition(
+            root_link=root, tip_link=tip, goal_point=goal_point
+        )
+        motion_statechart.add_node(position_goal)
+        motion_statechart.add_node(EndMotion.when_true(position_goal))
+        executor.compile(statechart=motion_statechart)
+        path = record_tip_path(executor, position_goal, root, tip)
+
+        line = StraightLine(start=path[0], end=goal_point.to_np()[:3])
+        assert line.maximum_distance_from(path) <= REAIMED_LINE_TOLERANCE
+
     def test_straight_line_starts_where_the_task_starts(
         self, pr2_world_state_reset: World
     ):
@@ -2305,9 +2436,9 @@ class TestVelocityTasks:
             limit_node=half_velocity_limit,
         )
 
-        assert (
-            tight_cycles >= 2 * loose_cycles
-        ), f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+        assert tight_cycles >= 2 * loose_cycles, (
+            f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+        )
 
     @pytest.mark.parametrize(
         "limit_cls",
@@ -2348,9 +2479,9 @@ class TestVelocityTasks:
             limit_node=half_velocity_limit,
         )
 
-        assert (
-            tight_cycles >= 2 * loose_cycles
-        ), f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+        assert tight_cycles >= 2 * loose_cycles, (
+            f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+        )
 
 
 class TestDebugExpressions:
@@ -2491,7 +2622,6 @@ class TestDebugExpressions:
 
 
 class TestDistanceAlongAxis:
-
     def test_points_on_two_links_end_the_distance_apart_along_the_axis(
         self, prismatic_bot2: World
     ) -> None:

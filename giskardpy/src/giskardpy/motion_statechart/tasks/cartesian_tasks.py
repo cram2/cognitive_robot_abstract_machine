@@ -539,6 +539,14 @@ class CartesianPositionStraight(CartesianTask):
     threshold: float = 0.01
     """Distance threshold for goal achievement in meters."""
 
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE.value, kw_only=True
+    )
+    """
+    Cost of falling behind on the line; leaving the line costs
+    :attr:`LATERAL_WEIGHT_FACTOR` times as much.
+    """
+
     _line_start_binding: ForwardKinematicsBinding = field(init=False)
     """Binding for the tip pose the line starts at."""
 
@@ -596,14 +604,12 @@ class CartesianPositionStraight(CartesianTask):
         root_R_line = RotationMatrix.from_x_axis(root_V_line)
         line_V_travelled = root_R_line.inverse() @ (root_P_tip - root_P_line_start)
 
-        lateral_weight = (
-            DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE * self.LATERAL_WEIGHT_FACTOR
-        )
+        lateral_weight = self.weight * self.LATERAL_WEIGHT_FACTOR
         artifacts.geometry.add_position_constraint(
             expression_current=line_V_travelled[0],
             expression_goal=line_length,
             reference_velocity=self.reference_velocity,
-            quadratic_weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
+            quadratic_weight=self.weight,
             name="line/progress",
         )
         artifacts.geometry.add_position_constraint(

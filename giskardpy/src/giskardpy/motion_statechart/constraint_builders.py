@@ -6,6 +6,7 @@ import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.qp.bound_cap import RotationBoundCap, VectorBoundCap
 from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from semantic_digital_twin.spatial_types import (
@@ -51,6 +52,9 @@ class GeometricConstraintBuilder:
         """
         Adds three constraints to move frame_P_current to frame_P_goal.
 
+        The error is capped by its length rather than per axis, so a far away goal is
+        approached along the straight line to it.
+
         Make sure that both points are expressed relative to the same frame!
         :param frame_P_current: a vector describing a 3D point. It should depend on
             active dofs.
@@ -58,6 +62,9 @@ class GeometricConstraintBuilder:
         :param reference_velocity: m/s
         """
         frame_V_error = frame_P_goal - frame_P_current
+        error_cap = VectorBoundCap(
+            bounds=sm.Vector([frame_V_error[i] for i in range(3)])
+        )
         for i in range(3):
             self.collection.add_equality_constraint(
                 task_expression=frame_P_current[i],
@@ -65,6 +72,7 @@ class GeometricConstraintBuilder:
                 quadratic_weight=quadratic_weight,
                 reference_velocity=reference_velocity,
                 name=self._indexed_constraint_name(name, i),
+                bound_cap=error_cap,
             )
 
     def add_position_constraint(
@@ -145,11 +153,17 @@ class GeometricConstraintBuilder:
         :param frame_R_current: current rotation as rotation matrix. It should depend on
             active dofs.
         :param frame_R_goal: goal rotation as rotation matrix
-        :param reference_velocity: value used for normalization rad/s
+        :param reference_velocity: value used for normalization rad/s. The constraints
+            act on the vector part of the quaternion error, which changes by half the
+            angle, so one plan may demand a rotation of up to twice the angle this
+            velocity sustains.
         """
         quaternion_error = self._quaternion_error(frame_R_current, frame_R_goal)
 
         # w is redundant
+        error_cap = RotationBoundCap(
+            bounds=sm.Vector([-quaternion_error[i] for i in range(3)])
+        )
         for i in range(3):
             self.collection.add_equality_constraint(
                 task_expression=quaternion_error[i],
@@ -157,6 +171,7 @@ class GeometricConstraintBuilder:
                 quadratic_weight=quadratic_weight,
                 reference_velocity=reference_velocity,
                 name=self._indexed_constraint_name(name, i),
+                bound_cap=error_cap,
             )
 
     def add_yaw_goal_constraint(
@@ -176,7 +191,10 @@ class GeometricConstraintBuilder:
         :param frame_R_current: current rotation, turned only about the z-axis of the
             frame. It should depend on active dofs.
         :param frame_R_goal: goal rotation, of which only the yaw is reached
-        :param reference_velocity: value used for normalization rad/s
+        :param reference_velocity: value used for normalization rad/s. The constraint
+            acts on the z-component of the quaternion error, which changes by half the
+            angle, so one plan may demand a rotation of up to twice the angle this
+            velocity sustains.
         """
         frame_R_goal_yaw = RotationMatrix.from_rpy(
             yaw=frame_R_goal.rpy[2], reference_frame=frame_R_goal.reference_frame
@@ -188,6 +206,7 @@ class GeometricConstraintBuilder:
             quadratic_weight=quadratic_weight,
             reference_velocity=reference_velocity,
             name=name,
+            bound_cap=RotationBoundCap(bounds=sm.Vector([-quaternion_error.z])),
         )
 
     @staticmethod
