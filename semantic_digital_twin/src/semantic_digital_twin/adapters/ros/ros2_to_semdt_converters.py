@@ -87,11 +87,23 @@ class PoseStampedToSemDTConverter(
         return result
 
 
+# %% unstamped poses
+
+
 @dataclass
 class PoseToSemDTConverter(Ros2ToSemDTConverter[geometry_msgs.Pose, Pose]):
+    """
+    Convert an unstamped ROS pose without assigning a reference frame.
+    """
 
     @classmethod
-    def convert(cls, data: geometry_msgs.Pose, world: World) -> Pose:
+    def convert(cls, data: geometry_msgs.Pose, world: World | None = None) -> Pose:
+        """
+        Convert a pose without requiring a world for frame lookup.
+
+        :param world: Optional world accepted for compatibility with
+            :meth:`Ros2ToSemDTConverter.convert`.
+        """
         result = Pose.from_xyz_quaternion(
             pos_x=data.position.x,
             pos_y=data.position.y,
