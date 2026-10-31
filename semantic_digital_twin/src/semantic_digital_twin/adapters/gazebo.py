@@ -202,10 +202,10 @@ class GazeboParser(WorldModelParser):
 
     # %% entry point
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         """
         Differs from
-        :meth:`~semantic_digital_twin.world_source.WorldSource.to_domain_object` in what
+        :meth:`~semantic_digital_twin.world_source.WorldSource.create_world` in what
         is created from a document without a ``world`` element.
 
         :return: The world described by a ``world`` element, or by a single ``model``

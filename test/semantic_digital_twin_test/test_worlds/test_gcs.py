@@ -525,7 +525,7 @@ def test_path_from_to_scales_to_a_real_apartment_scene():
 
     It now runs a single-source Dijkstra search instead.
     """
-    world = MJCFParser(os.path.join(MJCF_DIR, "iai_apartment.xml")).to_domain_object()
+    world = MJCFParser(os.path.join(MJCF_DIR, "iai_apartment.xml")).create_world()
     search_space = BoundingBoxCollection(
         [
             VolumetricBoundingBox(

@@ -68,7 +68,7 @@ Your goal:
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-world = URDFParser.from_file(table_urdf).to_domain_object()
+world = URDFParser.from_file(table_urdf).create_world()
 # Find the table surface body named "top"
 top = [b for b in world.bodies if b.name.name == "top"][0]
 # Create a thin region at the table surface and attach it to the body "top"

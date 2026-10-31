@@ -260,18 +260,18 @@ def test_world_specification_robotless():
     world = WorldSpecification(
         world_source=None,
         objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
-    ).to_domain_object()
+    ).create_world()
     assert not world.is_empty()
     assert world.get_body_by_name("obj") is not None
 
 
-def test_to_domain_object_is_repeatable():
+def test_create_world_is_repeatable():
     spec = WorldSpecification(
         world_source=None,
         objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
     )
-    first = spec.to_domain_object()
-    second = spec.to_domain_object()
+    first = spec.create_world()
+    second = spec.create_world()
 
     assert first is not second
     assert len(first.bodies) == 2
@@ -281,7 +281,7 @@ def test_to_domain_object_is_repeatable():
 def test_world_specification_from_urdf_environment():
     world = WorldSpecification.from_urdf(
         os.path.join(RESOURCES, "urdf", "table.urdf")
-    ).to_domain_object()
+    ).create_world()
     assert not world.is_empty()
     assert world.root is not None
 
@@ -290,8 +290,8 @@ def test_materialized_environments_share_no_entity_ids():
     specification = WorldSpecification.from_urdf(
         os.path.join(RESOURCES, "urdf", "table.urdf")
     )
-    first = specification.to_domain_object()
-    second = specification.to_domain_object()
+    first = specification.create_world()
+    second = specification.create_world()
 
     first_ids = {body.id for body in first.bodies}
     second_ids = {body.id for body in second.bodies}
@@ -304,9 +304,9 @@ def test_world_specification_builds_on_a_map_written_in_code():
         world_source=KitchenEnvironment(),
         objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
     )
-    world = specification.to_domain_object()
+    world = specification.create_world()
 
-    assert len(world.bodies) == len(KitchenEnvironment().to_domain_object().bodies) + 1
+    assert len(world.bodies) == len(KitchenEnvironment().create_world().bodies) + 1
     assert world.get_body_by_name("obj").parent_kinematic_structure_entity == world.root
 
 
@@ -317,7 +317,7 @@ def test_world_specification_builds_on_another_world_specification():
     world = WorldSpecification(
         world_source=inner,
         objects=[BodySpecification.box("outer_obj", Scale(1, 1, 1))],
-    ).to_domain_object()
+    ).create_world()
 
     assert {body.name.name for body in world.bodies} == {
         world.root.name.name,
@@ -332,8 +332,8 @@ def test_world_specification_builds_on_another_world_specification():
     ids=["kitchen", "apartment"],
 )
 def test_predefined_maps_share_no_entity_ids(world_source: WorldSource):
-    first = world_source.to_domain_object()
-    second = world_source.to_domain_object()
+    first = world_source.create_world()
+    second = world_source.create_world()
 
     first_ids = {body.id for body in first.bodies}
     assert len(first_ids) == len(first.bodies)
@@ -344,14 +344,14 @@ def test_world_specification_from_mjcf_environment():
     pytest.importorskip("mujoco")
     world = WorldSpecification.from_mjcf(
         os.path.join(RESOURCES, "mjcf", "table.xml")
-    ).to_domain_object()
+    ).create_world()
     assert not world.is_empty()
     assert world.root is not None
 
 
 def test_world_specification_from_mjcf_keeps_visual_only_geoms_out_of_collision():
     pytest.importorskip("mujoco")
-    world = WorldSpecification.from_mjcf(VISUAL_ONLY_GEOM_SCENE).to_domain_object()
+    world = WorldSpecification.from_mjcf(VISUAL_ONLY_GEOM_SCENE).create_world()
 
     shelf = world.get_body_by_name("shelf")
     assert len(shelf.visual.shapes) == 1
@@ -362,7 +362,7 @@ def test_world_specification_from_mjcf_collides_every_geom_when_asked():
     pytest.importorskip("mujoco")
     world = WorldSpecification.from_mjcf(
         VISUAL_ONLY_GEOM_SCENE, use_visual_as_collision_backup=True
-    ).to_domain_object()
+    ).create_world()
 
     shelf = world.get_body_by_name("shelf")
     assert len(shelf.collision.shapes) == 1
@@ -372,7 +372,7 @@ def test_world_specification_from_gazebo_environment():
     world = WorldSpecification.from_gazebo(
         os.path.join(RESOURCES, "gazebo", "mini_warehouse", "worlds", "mini.world"),
         objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
-    ).to_domain_object()
+    ).create_world()
 
     assert not world.is_empty()
     assert world.get_body_by_name("obj") is not None
@@ -612,7 +612,7 @@ def test_world_specification_with_robot():
                     ),
                 )
             ],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -641,7 +641,7 @@ def test_robot_specification_applies_the_drive_velocity_limits_it_is_given():
                     drive_rotation_velocity_limits=rotation_velocity_limits,
                 )
             ],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -658,7 +658,7 @@ def test_robot_specification_keeps_the_drives_own_velocity_limits_by_default():
         world = WorldSpecification(
             world_source=None,
             robots=[RobotSpecification(semantic_annotation_type=PR2)],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -717,7 +717,7 @@ def test_world_specification_from_urdf_with_robot():
         world = WorldSpecification.from_urdf(
             os.path.join(RESOURCES, "urdf", "table.urdf"),
             robots=[RobotSpecification(semantic_annotation_type=PR2)],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -752,7 +752,7 @@ def test_world_specification_with_several_robots():
                     world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
                 ),
             ],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -784,7 +784,7 @@ def test_world_specification_annotation_starting_object():
                 BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
             )
         ],
-    ).to_domain_object()
+    ).create_world()
     milks = world.get_semantic_annotations_by_type(Milk)
     assert len(milks) == 1
 

@@ -362,7 +362,7 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
 
 def test_minimal_robot_annotation(pr2_world_state_reset):
     urdf_path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    world_copy = URDFParser.from_xacro(urdf_path).to_domain_object()
+    world_copy = URDFParser.from_xacro(urdf_path).create_world()
     with world_copy.modify_world():
         MinimalRobot.from_world(world_copy)
         pr2_root = world_copy.root
@@ -632,7 +632,7 @@ def test_combined_mesh_is_empty_without_collision_geometry():
 
 @pytest.fixture
 def kitchen_environment_world() -> World:
-    return KitchenEnvironment().to_domain_object()
+    return KitchenEnvironment().create_world()
 
 
 def test_door_joint_is_the_revolute_connection_it_hangs_from_its_whole_on(

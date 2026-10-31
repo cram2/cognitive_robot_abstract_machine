@@ -174,7 +174,7 @@ class MJCFParser(WorldModelParser):
             file_path, use_visual_as_collision_backup=use_visual_as_collision_backup
         )
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         self.world = World()
         worldbody: mujoco.MjsBody = self.spec.worldbody
         with self.world.modify_world():

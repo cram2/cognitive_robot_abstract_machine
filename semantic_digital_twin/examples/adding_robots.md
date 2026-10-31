@@ -43,7 +43,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 
 # Replace this with the path to your robot's URDF or MJCF file.
 parser = URDFParser.from_file("/path/to/your/robot.urdf")
-world = parser.to_domain_object()
+world = parser.create_world()
 world.visualize_world_structure()
 ```
 
@@ -573,7 +573,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 
 # Re-parse your URDF to get a fresh world, then annotate it with your robot class.
 parser = URDFParser.from_file("/path/to/your/robot.urdf")
-world = parser.to_domain_object()
+world = parser.create_world()
 
 robot = MyRobot.from_world(world)
 

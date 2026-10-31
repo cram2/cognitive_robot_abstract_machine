@@ -44,7 +44,7 @@ APARTMENT_URDF_PATH = os.path.join(
 def hammer_forward_kinematics_composition(
     thread_count: int, duration_seconds: float
 ) -> None:
-    world = URDFParser.from_file(file_path=APARTMENT_URDF_PATH).to_domain_object()
+    world = URDFParser.from_file(file_path=APARTMENT_URDF_PATH).create_world()
     bodies = world.kinematic_structure_entities
     root = world.root
     stop_time = time.monotonic() + duration_seconds

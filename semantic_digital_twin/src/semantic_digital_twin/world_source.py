@@ -24,7 +24,7 @@ class WorldSource(ABC):
     """
 
     @abstractmethod
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         """
         Create the world this source describes.
 

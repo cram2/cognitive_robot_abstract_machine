@@ -53,7 +53,7 @@ Base.metadata.create_all(bind=session.bind)
 # load the table world from urdf
 urdf_dir = os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf")
 table = os.path.join(urdf_dir, "table.urdf")
-world = URDFParser.from_file(table).to_domain_object()
+world = URDFParser.from_file(table).create_world()
 ```
 
 Next, we create a semantic annotation that describes the table.

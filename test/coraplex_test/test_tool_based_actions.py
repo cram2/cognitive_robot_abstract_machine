@@ -463,7 +463,7 @@ def test_a_wipe_stalled_close_to_its_final_waypoint_is_done(
 
 @pytest.fixture(scope="module")
 def justin_world():
-    world = URDFParser.from_file(Justin.get_ros_file_path()).to_domain_object()
+    world = URDFParser.from_file(Justin.get_ros_file_path()).create_world()
     Justin.from_world(world)
     return world
 

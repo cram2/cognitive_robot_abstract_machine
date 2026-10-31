@@ -642,7 +642,7 @@ class ProcTHORParser(WorldSource):
             name=Path(file_path).stem, house=json.load(open(file_path)), session=session
         )
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         """
         :return: A world holding the house's rooms, walls and doors, and its objects if
             :attr:`session` is given to import them from.

@@ -70,7 +70,7 @@ def _world_with_a_robot_behind_a_displaced_odom(
         ],
     )
     try:
-        return specification.to_domain_object()
+        return specification.create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 

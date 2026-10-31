@@ -118,17 +118,17 @@ def stop_multisim_if_running(multi_sim: MujocoSim) -> None:
 
 @pytest.fixture
 def test_urdf_1_world():
-    return URDFParser.from_file(file_path=TEST_URDF_1).to_domain_object()
+    return URDFParser.from_file(file_path=TEST_URDF_1).create_world()
 
 
 @pytest.fixture
 def test_mjcf_1_world():
-    return MJCFParser(TEST_MJCF_1).to_domain_object()
+    return MJCFParser(TEST_MJCF_1).create_world()
 
 
 @pytest.fixture
 def test_mjcf_2_world():
-    return MJCFParser(TEST_MJCF_2).to_domain_object()
+    return MJCFParser(TEST_MJCF_2).create_world()
 
 
 def test_every_simulation_saves_its_world_to_a_file_of_its_own(tmp_path):
@@ -191,9 +191,7 @@ def test_world_multi_sim_in_5s(test_urdf_1_world):
 
 def test_apartment_multi_sim_in_5s():
     try:
-        test_urdf_2_world = URDFParser.from_file(
-            file_path=TEST_URDF_2
-        ).to_domain_object()
+        test_urdf_2_world = URDFParser.from_file(file_path=TEST_URDF_2).create_world()
     except ParsingError:
         pytest.skip("Skipping HSRB krrood_test due to URDF parsing error.")
 
@@ -623,7 +621,7 @@ def test_a_cylinder_keeps_its_size_through_a_round_trip(tmp_path):
         world=_world_with_one_cylinder(cylinder), file_path=str(tmp_path / "scene.xml")
     )
 
-    parsed_world = MJCFParser(str(tmp_path / "scene.xml")).to_domain_object()
+    parsed_world = MJCFParser(str(tmp_path / "scene.xml")).create_world()
 
     [parsed_cylinder] = parsed_world.get_body_by_name("link").collision.shapes
     assert (parsed_cylinder.width, parsed_cylinder.height) == pytest.approx(
@@ -651,7 +649,7 @@ def test_contact_declarations_and_gravity_compensation_survive_a_round_trip(tmp_
 
     builder = MujocoBuilder()
     builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
-    parsed_world = MJCFParser(str(tmp_path / "scene.xml")).to_domain_object()
+    parsed_world = MJCFParser(str(tmp_path / "scene.xml")).create_world()
 
     parsed_link = parsed_world.get_body_by_name("link")
     [parsed_shape] = parsed_link.collision.shapes
@@ -774,7 +772,7 @@ def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
 
 def test_mujoco_with_tracy_dae_files():
     try:
-        dae_world = URDFParser.from_file(file_path=TEST_URDF_TRACY).to_domain_object()
+        dae_world = URDFParser.from_file(file_path=TEST_URDF_TRACY).create_world()
     except ParsingError:
         pytest.skip("Skipping tracy test due to URDF parsing error.")
 
@@ -808,7 +806,7 @@ def test_mujocosim_world_with_added_objects(test_urdf_1_world):
         "milk.stl",
     )
     stl_parser = STLParser(milk_path)
-    mesh_world = stl_parser.to_domain_object()
+    mesh_world = stl_parser.create_world()
     transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=0.5, reference_frame=test_urdf_1_world.root
     )

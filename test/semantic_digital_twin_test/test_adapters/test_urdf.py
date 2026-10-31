@@ -59,7 +59,7 @@ def test_link_without_collision_geometry_has_none_by_default():
     """
     A link that describes no collision keeps none, so a description is read as written.
     """
-    world = URDFParser.from_file(VISUAL_ONLY_LINK_URDF).to_domain_object()
+    world = URDFParser.from_file(VISUAL_ONLY_LINK_URDF).create_world()
 
     cover = _body_named(world, "cover_link")
     assert len(cover.visual.shapes) == 1
@@ -74,7 +74,7 @@ def test_visual_geometry_stands_in_when_a_link_has_no_collision_geometry():
     """
     world = URDFParser.from_file(
         VISUAL_ONLY_LINK_URDF, use_visual_as_collision_backup=True
-    ).to_domain_object()
+    ).create_world()
 
     cover = _body_named(world, "cover_link")
     [collision_shape] = cover.collision.shapes
@@ -88,10 +88,10 @@ def test_visual_geometry_is_left_out_where_the_link_already_collides():
     The visual is a stand-in, not an addition: a link that describes its own collision
     keeps exactly that geometry.
     """
-    as_written = URDFParser.from_file(VISUAL_ONLY_LINK_URDF).to_domain_object()
+    as_written = URDFParser.from_file(VISUAL_ONLY_LINK_URDF).create_world()
     with_backup = URDFParser.from_file(
         VISUAL_ONLY_LINK_URDF, use_visual_as_collision_backup=True
-    ).to_domain_object()
+    ).create_world()
 
     base_as_written = _body_named(as_written, "base_link")
     base_with_backup = _body_named(with_backup, "base_link")
@@ -131,7 +131,7 @@ def material_colored_world():
     return URDFParser.from_file(
         MATERIAL_COLORED_LINKS_URDF,
         path_resolver=SearchPathFileResolver(root_directories=[resources]),
-    ).to_domain_object()
+    ).create_world()
 
 
 def test_a_mesh_takes_the_color_of_the_material_it_names(material_colored_world):
@@ -223,7 +223,7 @@ def tiago_parser():
 
 
 def test_table_parsing(table_parser):
-    world = table_parser.to_domain_object()
+    world = table_parser.create_world()
     world.validate()
     assert len(world.kinematic_structure_entities) == 6
 
@@ -234,21 +234,21 @@ def test_table_parsing(table_parser):
 
 
 def test_kitchen_parsing(kitchen_parser):
-    world = kitchen_parser.to_domain_object()
+    world = kitchen_parser.create_world()
     world.validate()
     assert len(world.kinematic_structure_entities) > 0
     assert len(world.connections) > 0
 
 
 def test_apartment_parsing(apartment_parser):
-    world = apartment_parser.to_domain_object()
+    world = apartment_parser.create_world()
     world.validate()
     assert len(world.kinematic_structure_entities) > 0
     assert len(world.connections) > 0
 
 
 def test_pr2_parsing(pr2_parser):
-    world = pr2_parser.to_domain_object()
+    world = pr2_parser.create_world()
     world.validate()
     assert len(world.kinematic_structure_entities) > 0
     assert len(world.connections) > 0
@@ -256,7 +256,7 @@ def test_pr2_parsing(pr2_parser):
 
 
 def test_mimic_joints(pr2_parser):
-    world = pr2_parser.to_domain_object()
+    world = pr2_parser.create_world()
     joint_to_be_mimicked = world.get_connection_by_name(
         PR2Joint.LEFT_GRIPPER_LEFT_FINGER
     )
@@ -266,14 +266,14 @@ def test_mimic_joints(pr2_parser):
 
 
 def test_declared_joint_dynamics_are_imported(tiago_parser):
-    world = tiago_parser.to_domain_object()
+    world = tiago_parser.create_world()
     dynamics = world.get_connection_by_name(TiagoJoint.LEFT_ARM_1).dynamics
     assert dynamics.damping == 40.0
     assert dynamics.dry_friction == 1.0
 
 
 def test_undeclared_joint_dynamics_default_to_zero(pr2_parser):
-    world = pr2_parser.to_domain_object()
+    world = pr2_parser.create_world()
     dynamics = world.get_connection_by_name("r_gripper_motor_slider_joint").dynamics
     assert dynamics.damping == 0.0
     assert dynamics.dry_friction == 0.0
@@ -281,7 +281,7 @@ def test_undeclared_joint_dynamics_default_to_zero(pr2_parser):
 
 
 def test_declared_link_inertial_is_imported(pr2_parser):
-    world = pr2_parser.to_domain_object()
+    world = pr2_parser.create_world()
     inertial = world.get_body_by_name("l_elbow_flex_link").inertial
     assert inertial.mass == 1.90327
     assert inertial.center_of_mass.to_np()[:3].tolist() == [0.01014, 0.00032, -0.01211]
@@ -316,13 +316,13 @@ def test_inertia_tensor_is_expressed_in_the_link_frame(table_parser):
 
 
 def test_a_link_that_declares_no_inertial_gets_none(table_parser):
-    assert table_parser.to_domain_object().root.inertial is None
+    assert table_parser.create_world().root.inertial is None
 
 
 def test_xacro():
     path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     parser = URDFParser.from_xacro(path)
-    world = parser.to_domain_object()
+    world = parser.create_world()
     world.validate()
     assert len(world.kinematic_structure_entities) > 0
     assert len(world.connections) > 0
@@ -350,7 +350,7 @@ def _child_pose_after_moving(world, joint_name, position):
 
 
 def test_floating_joint_becomes_a_6dof_connection():
-    world = URDFParser.from_file(JOINT_AXES_URDF).to_domain_object()
+    world = URDFParser.from_file(JOINT_AXES_URDF).create_world()
 
     connection = world.get_connection_by_name("base_to_free")
     assert isinstance(connection, Connection6DoF)
@@ -362,7 +362,7 @@ def test_joint_rotates_about_its_declared_axis():
     """
     An axis is read as the direction it declares, not rounded to a coordinate axis.
     """
-    world = URDFParser.from_file(JOINT_AXES_URDF).to_domain_object()
+    world = URDFParser.from_file(JOINT_AXES_URDF).create_world()
 
     pose = _child_pose_after_moving(world, "base_to_knob", pi / 3)
 
@@ -393,9 +393,9 @@ def test_movable_joint_without_axis_is_rejected():
     A joint that declares no axis is not given one, so a description is read as written.
     """
     with pytest.raises(MissingURDFJointAxisError, match="base_to_slider"):
-        URDFParser(urdf=_slider_urdf("")).to_domain_object()
+        URDFParser(urdf=_slider_urdf("")).create_world()
 
 
 def test_joint_with_zero_length_axis_is_rejected():
     with pytest.raises(ZeroLengthURDFJointAxisError, match="base_to_slider"):
-        URDFParser(urdf=_slider_urdf('<axis xyz="0 0 0"/>')).to_domain_object()
+        URDFParser(urdf=_slider_urdf('<axis xyz="0 0 0"/>')).create_world()

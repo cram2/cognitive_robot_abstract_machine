@@ -82,7 +82,7 @@ class PipelineTestCase(unittest.TestCase):
         self.assertEqual(filtered_world.root.name, PrefixedName("body1", "krrood_test"))
 
     def test_center_local_geometry_and_preserve_world_pose(self):
-        world = FBXParser(self.fbx_path).to_domain_object()
+        world = FBXParser(self.fbx_path).create_world()
 
         original_bounding_boxes = [
             body.collision.as_bounding_box_collection_at_origin(
@@ -119,7 +119,7 @@ class PipelineTestCase(unittest.TestCase):
 
     def test_body_replace(self):
         dresser_pattern = re.compile(r"^.*dresser_(?!drawer\b).*$", re.IGNORECASE)
-        world = FBXParser(self.fbx_path).to_domain_object()
+        world = FBXParser(self.fbx_path).create_world()
 
         self.assertIsNotNone(world.get_body_by_name("dresser_205"))
         self.assertIsNotNone(world.get_body_by_name("dresser_217"))
@@ -154,7 +154,7 @@ class PipelineTestCase(unittest.TestCase):
         )
 
     def test_dresser_from_body(self):
-        world = FBXParser(self.fbx_path).to_domain_object()
+        world = FBXParser(self.fbx_path).create_world()
 
         self.assertIsNotNone(dresser := world.get_body_by_name("dresser_205"))
 
@@ -163,7 +163,7 @@ class PipelineTestCase(unittest.TestCase):
         self.assertEqual(dresser.name.name, "dresser_205")
 
     def test_drawer_from_body(self):
-        world = FBXParser(self.fbx_path).to_domain_object()
+        world = FBXParser(self.fbx_path).create_world()
 
         self.assertIsNotNone(drawer := world.get_body_by_name("dresser_drawer_205_1"))
 
@@ -172,7 +172,7 @@ class PipelineTestCase(unittest.TestCase):
         self.assertEqual(drawer.name.name, "dresser_drawer_205_1")
 
     def test_door_from_body(self):
-        world = FBXParser(self.fbx_path).to_domain_object()
+        world = FBXParser(self.fbx_path).create_world()
 
         self.assertIsNotNone(door := world.get_body_by_name("dresser_door_217_1"))
 

@@ -670,9 +670,7 @@ def test_split_chain_of_connections(pr2_world_state_reset):
 def test_robots_and_validate(supported_abstract_robots):
     for abstract_robot in supported_abstract_robots:
         print(f"Testing robot: {abstract_robot.__name__}")
-        world = URDFParser.from_file(
-            abstract_robot.get_ros_file_path()
-        ).to_domain_object()
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
         robot = abstract_robot.from_world(world)
         robot.validate()
 

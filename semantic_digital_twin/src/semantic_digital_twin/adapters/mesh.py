@@ -21,7 +21,7 @@ class MeshParser(WorldSource):
     The path to the mesh file.
     """
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         """
         :return: A world holding a single body shaped by the mesh.
         """

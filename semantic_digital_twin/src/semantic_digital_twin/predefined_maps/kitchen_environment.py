@@ -87,7 +87,7 @@ class KitchenEnvironment(WorldSource):
     rooms' floor areas.
     """
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         world = World.create_with_root_body("root")
 
         self._build_environment_walls(world)

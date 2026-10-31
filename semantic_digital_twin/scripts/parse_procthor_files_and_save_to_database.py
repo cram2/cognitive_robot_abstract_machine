@@ -108,7 +108,7 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> list[WorldMappin
     )
 
     parser = FBXParser(fbx_file_path)
-    world = parser.to_domain_object()
+    world = parser.create_world()
     world = pipeline.apply(world)
 
     worlds = remove_root_and_move_children_into_new_worlds(world)

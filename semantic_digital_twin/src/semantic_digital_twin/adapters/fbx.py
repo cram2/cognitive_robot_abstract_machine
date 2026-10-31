@@ -156,7 +156,7 @@ class FBXParser(MeshParser):
         )
         return semantic_digital_twin_vertices[:, :3]
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         """
         :return: A world holding one body for every object in the FBX file.
         """

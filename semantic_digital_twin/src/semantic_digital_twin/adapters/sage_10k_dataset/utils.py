@@ -44,7 +44,7 @@ def create_hsrb_in_world(world: World):
     hsr = os.path.join(urdf_dir, "hsrb.urdf")
 
     hsrb_parser = URDFParser.from_file(file_path=hsr)
-    world_with_hsrb = hsrb_parser.to_domain_object()
+    world_with_hsrb = hsrb_parser.create_world()
     with world_with_hsrb.modify_world():
         hsrb_root = world_with_hsrb.root
         localization_body = Body(name=PrefixedName("odom_combined"))

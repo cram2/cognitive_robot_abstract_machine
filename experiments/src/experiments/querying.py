@@ -159,12 +159,8 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
     """
     world = setup_world()
 
-    spoon = STLParser(
-        str(_CORAPLEX_RESOURCES / "objects" / "spoon.stl")
-    ).to_domain_object()
-    bowl = STLParser(
-        str(_CORAPLEX_RESOURCES / "objects" / "bowl.stl")
-    ).to_domain_object()
+    spoon = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "spoon.stl")).create_world()
+    bowl = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "bowl.stl")).create_world()
 
     with world.modify_world():
         world.merge_world_at_pose(

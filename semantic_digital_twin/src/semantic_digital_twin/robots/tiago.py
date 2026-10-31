@@ -1157,7 +1157,7 @@ class TiagoMujoco(AbstractRobot, HasMobileBase[TiagoMujocoMobileBase]):
         :return: This robot, read from its MJCF without the world body MJCF puts above
             every robot's root.
         """
-        world = MJCFParser(cls.get_ros_file_path()).to_domain_object()
+        world = MJCFParser(cls.get_ros_file_path()).create_world()
         with world.modify_world():
             world.remove_kinematic_structure_entity(world.root)
         return cls.from_world(world)

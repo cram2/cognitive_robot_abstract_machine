@@ -16,7 +16,7 @@ your_ros2_package_name = "iai_offis_g1_description"
 your_path_from_package_root_to_urdf = "urdf/offis_unitree_g1.urdf"
 robot_world = URDFParser.from_file(
     f"package://{your_ros2_package_name}/{your_path_from_package_root_to_urdf}"
-).to_domain_object()
+).create_world()
 robot_world.visualize_world_structure().show()
 
 world = World.create_with_root_body("map")

@@ -525,7 +525,7 @@ def world_with_urdf_factory(
             robot_semantic_annotation.uses_visual_as_collision_backup
         ),
     )
-    world_with_urdf = urdf_parser.to_domain_object()
+    world_with_urdf = urdf_parser.create_world()
     if robot_semantic_annotation is not None:
         robot_semantic_annotation.from_world(world_with_urdf)
 
@@ -591,7 +591,7 @@ def tracy_world():
     if not tracy_installed():
         pytest.skip("Tracy not installed")
     tracy_parser = URDFParser.from_file(file_path=Tracy.get_ros_file_path())
-    world_with_tracy = tracy_parser.to_domain_object()
+    world_with_tracy = tracy_parser.create_world()
     Tracy.from_world(world_with_tracy)
     return world_with_tracy
 
@@ -603,7 +603,7 @@ def daisy_world():
     daisy = "package://iai_daisy_description/robots/daisy.urdf.xacro"
     try:
         daisy_parser = URDFParser.from_file(file_path=daisy)
-        world_with_daisy = daisy_parser.to_domain_object()
+        world_with_daisy = daisy_parser.create_world()
         DAiSy.from_world(world_with_daisy)
     except Exception:
         pytest.skip(
@@ -643,7 +643,7 @@ def _apartment_world_setup():
             "worlds",
             "apartment.urdf",
         )
-    ).to_domain_object()
+    ).create_world()
     milk_world = STLParser(
         os.path.join(
             os.path.dirname(__file__),
@@ -653,7 +653,7 @@ def _apartment_world_setup():
             "objects",
             "milk.stl",
         )
-    ).to_domain_object()
+    ).create_world()
     cereal_world = STLParser(
         os.path.join(
             os.path.dirname(__file__),
@@ -663,7 +663,7 @@ def _apartment_world_setup():
             "objects",
             "breakfast_cereal.stl",
         )
-    ).to_domain_object()
+    ).create_world()
     spoon_world = STLParser(
         os.path.join(
             os.path.dirname(__file__),
@@ -673,7 +673,7 @@ def _apartment_world_setup():
             "objects",
             "spoon.stl",
         )
-    ).to_domain_object()
+    ).create_world()
 
     apartment_world.merge_world_at_pose(
         milk_world,
@@ -902,7 +902,7 @@ def _simple_apartment_setup():
             "objects",
             "milk.stl",
         )
-    ).to_domain_object()
+    ).create_world()
     world.merge_world_at_pose(
         milk_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
@@ -921,7 +921,7 @@ def kitchen_world():
         "kitchen-small.urdf",
     )
     parser = URDFParser.from_file(file_path=path)
-    world = parser.to_domain_object()
+    world = parser.create_world()
     world.validate()
     return world
 
@@ -1001,7 +1001,7 @@ def apartment_environment_world(apartment_meshes):
     """
     A world holding nothing but the apartment of :class:`ApartmentEnvironment`.
     """
-    return ApartmentEnvironment().to_domain_object()
+    return ApartmentEnvironment().create_world()
 
 
 @pytest.fixture(scope="session")

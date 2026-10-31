@@ -82,7 +82,7 @@ def parse_object(stl_file_name: str, color: Color | None = None) -> World:
     """
     object_world = STLParser(
         os.path.join(OBJECTS_DIRECTORY, stl_file_name)
-    ).to_domain_object()
+    ).create_world()
     if color is not None:
         object_world.root.visual.dye_shapes(color)
     return object_world

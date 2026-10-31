@@ -48,7 +48,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def parse(stage) -> World:
-    return USDParser(stage=stage, prefix="object").to_domain_object()
+    return USDParser(stage=stage, prefix="object").create_world()
 
 
 # %% joints

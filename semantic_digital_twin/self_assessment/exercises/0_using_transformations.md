@@ -52,7 +52,7 @@ from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
 root = Path(files("semantic_digital_twin")).parent.parent
 urdf_path = os.path.join(root, "resources", "urdf", "table.urdf")
-table_world = URDFParser.from_file(urdf_path).to_domain_object()
+table_world = URDFParser.from_file(urdf_path).create_world()
 
 root_C_left_leg = table_world.get_body_by_name("left_front_leg").parent_connection
 moved_root_T_left_leg = HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5, y=-0.5)

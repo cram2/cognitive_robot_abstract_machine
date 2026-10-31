@@ -68,7 +68,7 @@ questions = [
       "question": "What is the correct sequence to parse a URDF into a World?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "URDFParser.from_file(path).to_domain_object()", "correct": True},
+        {"answer": "URDFParser.from_file(path).create_world()", "correct": True},
         {"answer": "World.parse(path)", "correct": False},
         {"answer": "URDFParser(path).world()", "correct": False},
         {"answer": "parse_urdf_to_world(path)", "correct": False}

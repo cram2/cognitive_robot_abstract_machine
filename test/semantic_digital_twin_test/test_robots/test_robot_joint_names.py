@@ -55,7 +55,7 @@ def robot_world(request: pytest.FixtureRequest) -> World:
     module's tests of that robot and released once they have run.
     """
     robot_type: type[AbstractRobot] = request.param
-    return URDFParser.from_file(robot_type.get_ros_file_path()).to_domain_object()
+    return URDFParser.from_file(robot_type.get_ros_file_path()).create_world()
 
 
 # %% joint-name enums against the parsed description

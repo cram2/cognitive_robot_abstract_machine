@@ -289,9 +289,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
             )
 
         return cls(
-            world_loader=lambda: URDFParser.from_file(
-                str(urdf_path)
-            ).to_domain_object(),
+            world_loader=lambda: URDFParser.from_file(str(urdf_path)).create_world(),
             search_space_factory=_search_space_factory,
             environment_name=Path(urdf_path).stem,
         )

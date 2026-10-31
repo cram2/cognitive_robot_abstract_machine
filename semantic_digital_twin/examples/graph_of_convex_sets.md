@@ -110,7 +110,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 apartment = os.path.realpath(os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "kitchen.urdf"))
 
 apartment_parser = URDFParser.from_file(apartment)
-world = apartment_parser.to_domain_object()
+world = apartment_parser.create_world()
 
 search_space = BoundingBoxCollection([VolumetricBoundingBox(min_x=-2, max_x=2,
                            min_y=-2, max_y=2,

@@ -149,17 +149,17 @@ class WorldSpecification(WorldSource):
             objects=objects or [],
         )
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         """
         Differs from
-        :meth:`~semantic_digital_twin.world_source.WorldSource.to_domain_object` in
+        :meth:`~semantic_digital_twin.world_source.WorldSource.create_world` in
         merging every robot into a new world of :attr:`world_source` first, then
         spawning all :attr:`objects` relative to the world root.
 
         :return: The world of :attr:`world_source`, holding the robots and objects.
         """
         if self.world_source is not None:
-            world = self.world_source.to_domain_object()
+            world = self.world_source.create_world()
         else:
             world = World.create_with_root_body()
         for robot_specification in self.robots:

@@ -49,7 +49,7 @@ class ApartmentEnvironment(WorldSource):
     describes the same wardrobe this map spawns from meshes.
     """
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         world = World.create_with_root_body("root")
         self._build_shelf(world)
         self._build_wall_next_to_shelf(world)

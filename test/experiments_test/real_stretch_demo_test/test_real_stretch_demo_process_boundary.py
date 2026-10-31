@@ -82,7 +82,7 @@ def test_the_scene_counts_as_populated_once_the_cereal_is_spawned(apartment_mesh
     The demonstration decides whether to spawn its scene by the presence of the cereal.
     """
     demonstration = StretchApartmentDemonstration(used_robot=Stretch)
-    world = demonstration.scene_specification().to_domain_object()
+    world = demonstration.scene_specification().create_world()
     assert not demonstration.is_scene_populated(world)
 
     demonstration.populate_scene(world)

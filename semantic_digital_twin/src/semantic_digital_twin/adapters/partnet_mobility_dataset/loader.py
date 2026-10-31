@@ -89,7 +89,7 @@ class PartNetMobilityDatasetLoader:
             path_resolver=FileUriResolver(
                 base_directory=self.directory / str(model_id)
             ),
-        ).to_domain_object()
+        ).create_world()
         self._apply_semantics_to_world(world, model_id)
         return world
 

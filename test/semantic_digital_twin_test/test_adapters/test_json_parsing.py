@@ -441,7 +441,7 @@ def test_json_serialization_with_mesh():
                 "milk.stl",
             )
         )
-        .to_domain_object()
+        .create_world()
         .root
     )
 

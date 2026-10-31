@@ -68,4 +68,4 @@ def table_world():
     )
     table_path = os.path.join(urdf_dir, "table.urdf")
 
-    return URDFParser.from_file(file_path=table_path).to_domain_object()
+    return URDFParser.from_file(file_path=table_path).create_world()

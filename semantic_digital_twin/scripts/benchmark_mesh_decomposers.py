@@ -27,7 +27,7 @@ def load_non_convex_mesh():
         "stl",
         "jeroen_cup.stl",
     )
-    body: Body = STLParser(stl_path).to_domain_object().root
+    body: Body = STLParser(stl_path).create_world().root
     return body.collision[0]
 
 

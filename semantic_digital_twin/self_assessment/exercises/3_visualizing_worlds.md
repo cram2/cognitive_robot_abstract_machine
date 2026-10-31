@@ -44,7 +44,7 @@ Your goal:
 :tags: [exercise]
 root = Path(files("semantic_digital_twin")).parent.parent
 table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
-world = URDFParser.from_file(table_urdf).to_domain_object()
+world = URDFParser.from_file(table_urdf).create_world()
 
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 import threading
@@ -58,7 +58,7 @@ viz = ...
 :tags: [example-solution]
 root = Path(files("semantic_digital_twin")).parent.parent
 table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
-world = URDFParser.from_file(table_urdf).to_domain_object()
+world = URDFParser.from_file(table_urdf).create_world()
 
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher

@@ -315,7 +315,7 @@ class MontessoriScene:
 
         :return: The world.
         """
-        world = URDFParser.from_file(Tracy.get_ros_file_path()).to_domain_object()
+        world = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
         tracy = Tracy.from_world(world)
         self.solid_contact.with_friction(ContactFriction()).apply_to(
             world.bodies_with_collision

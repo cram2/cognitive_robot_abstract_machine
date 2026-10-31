@@ -24,7 +24,7 @@ def jeroen_cup_world_fixture():
         "resources",
         "stl",
     )
-    world = STLParser(os.path.join(stl_dir, "jeroen_cup.stl")).to_domain_object()
+    world = STLParser(os.path.join(stl_dir, "jeroen_cup.stl")).create_world()
     world.root.name = PrefixedName("root")
     return world
 

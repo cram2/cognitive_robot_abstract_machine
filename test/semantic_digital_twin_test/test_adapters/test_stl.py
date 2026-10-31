@@ -30,7 +30,7 @@ class STLAdapterTestCase(unittest.TestCase):
 
     def test_stl_parsing(self):
         stl_parser = STLParser(self.milk_path)
-        world = stl_parser.to_domain_object()
+        world = stl_parser.create_world()
         world.validate()
 
         self.assertEqual(len(world.kinematic_structure_entities), 1)
@@ -39,8 +39,8 @@ class STLAdapterTestCase(unittest.TestCase):
         self.assertEqual(Mesh, type(world.kinematic_structure_entities[0].collision[0]))
 
     def test_parse_and_merge(self):
-        milk_world = STLParser(self.milk_path).to_domain_object()
-        cup_world = STLParser(self.cup).to_domain_object()
+        milk_world = STLParser(self.milk_path).create_world()
+        cup_world = STLParser(self.cup).create_world()
 
         milk_world.merge_world(cup_world)
         self.assertEqual(len(milk_world.kinematic_structure_entities), 2)

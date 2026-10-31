@@ -354,7 +354,7 @@ class ProcTHORTestCase(unittest.TestCase):
 
         world = ProcTHORParser(
             "test_house", house=self.house_json, session=session
-        ).to_domain_object()
+        ).create_world()
 
         world.merge_world(obj_world)
 
@@ -368,7 +368,7 @@ class ProcTHORTestCase(unittest.TestCase):
                 "procthor_json",
                 "house_0.json",
             )
-        ).to_domain_object()
+        ).create_world()
 
         assert world is not None
 

@@ -234,7 +234,7 @@ class GiskardTester(ABC):
                 parent_link
             )
         urdf_parser = URDFParser(urdf=urdf, prefix=name)
-        world_from_urdf = urdf_parser.to_domain_object()
+        world_from_urdf = urdf_parser.create_world()
         with self.api.world.modify_world():
             parent_C_urdf_root = FixedConnection(
                 parent=parent_link,

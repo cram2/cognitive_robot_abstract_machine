@@ -225,7 +225,7 @@ def test_trimesh(rclpy_node):
             "stl",
             "milk.stl",
         )
-    ).to_domain_object()
+    ).create_world()
     visual: Mesh = world.root.visual.shapes[0]
     world.root.visual.shapes[0] = visual
     with world.modify_world():

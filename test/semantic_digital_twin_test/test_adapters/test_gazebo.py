@@ -189,19 +189,19 @@ class TestSingleModelParsing:
     """
 
     def test_body_is_named_after_model_and_link(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.simple_shapes).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.simple_shapes).create_world()
         assert len(world.bodies) == 1
         assert world.bodies[0].name.name == "link"
         assert world.bodies[0].name.prefix == "simple_shapes"
         assert world.validate()
 
     def test_parses_every_visual_shape(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.simple_shapes).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.simple_shapes).create_world()
         shapes = body_named(world, "link").visual.shapes
         assert [type(shape) for shape in shapes] == [Box, Cylinder, Sphere]
 
     def test_parses_shape_dimensions(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.simple_shapes).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.simple_shapes).create_world()
         box, cylinder, sphere = body_named(world, "link").visual.shapes
         assert (box.scale.x, box.scale.y, box.scale.z) == (0.2, 0.4, 0.6)
         assert cylinder.width == 0.3
@@ -209,12 +209,12 @@ class TestSingleModelParsing:
         assert sphere.radius == 0.35
 
     def test_parses_shape_origin(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.simple_shapes).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.simple_shapes).create_world()
         box = body_named(world, "link").visual.shapes[0]
         assert np.allclose(box.origin.to_np()[:3, 3], [1.0, 0.0, 0.0])
 
     def test_parses_material_color(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.simple_shapes).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.simple_shapes).create_world()
         box = body_named(world, "link").visual.shapes[0]
         assert (box.color.R, box.color.G, box.color.B, box.color.A) == (
             0.25,
@@ -224,11 +224,11 @@ class TestSingleModelParsing:
         )
 
     def test_collisions_are_separate_from_visuals(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.simple_shapes).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.simple_shapes).create_world()
         assert len(body_named(world, "link").collision.shapes) == 1
 
     def test_parses_inertial_properties(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.simple_shapes).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.simple_shapes).create_world()
         inertial = body_named(world, "link").inertial
         assert inertial.mass == 2.5
         assert np.allclose(inertial.center_of_mass.to_np()[:3], [0.1, 0.2, 0.3])
@@ -244,7 +244,7 @@ class TestJointParsing:
     """
 
     def test_revolute_joint_becomes_revolute_connection(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.hinged_door).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
         assert isinstance(connection_named(world, "hinge"), RevoluteConnection)
         assert world.validate()
 
@@ -253,7 +253,7 @@ class TestJointParsing:
         SDF states link poses relative to the model, so at rest the child must sit where
         the model placed it rather than at the joint.
         """
-        world = GazeboParser.from_file(gazebo_paths.hinged_door).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
         frame_T_door = world.compute_forward_kinematics_np(
             body_named(world, "frame"), body_named(world, "door")
         )
@@ -264,7 +264,7 @@ class TestJointParsing:
         The hinge is turned a quarter turn about y, so its own x axis points along the
         negative z axis of the parent, and the door must swing about that.
         """
-        world = GazeboParser.from_file(gazebo_paths.hinged_door).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
         connection = connection_named(world, "hinge")
         connection.position = pi / 2
         world.notify_state_change()
@@ -278,12 +278,12 @@ class TestJointParsing:
         assert np.allclose(frame_T_door[:3, :3], rotation_about_negative_z, atol=1e-9)
 
     def test_parses_axis(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.hinged_door).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
         axis = connection_named(world, "hinge").axis.to_np().flatten()[:3]
         assert np.allclose(axis, [1.0, 0.0, 0.0])
 
     def test_parses_limits(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.hinged_door).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
         limits = connection_named(world, "hinge").raw_dof.limits
         assert limits.lower.position == -1.4
         assert limits.upper.position == 1.4
@@ -291,17 +291,17 @@ class TestJointParsing:
         assert limits.upper.velocity == 2.5
 
     def test_parses_dynamics(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.hinged_door).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
         dynamics = connection_named(world, "hinge").dynamics
         assert dynamics.damping == 0.7
         assert dynamics.dry_friction == 0.3
 
     def test_joint_name_is_not_prefixed(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.hinged_door).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
         assert connection_named(world, "hinge").name.prefix is None
 
     def test_prismatic_joint_becomes_prismatic_connection(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.drawer).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.drawer).create_world()
         connection = connection_named(world, "slide")
         assert isinstance(connection, PrismaticConnection)
         assert connection.raw_dof.limits.upper.position == 0.45
@@ -312,7 +312,7 @@ class TestJointParsing:
         A continuous joint turns without end, so the limits its file declares must not
         constrain its position.
         """
-        world = GazeboParser.from_file(gazebo_paths.drawer).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.drawer).create_world()
         limits = connection_named(world, "spin").raw_dof.limits
         assert limits.lower.position is None
         assert limits.upper.position is None
@@ -328,12 +328,12 @@ class TestWorldParsing:
     """
 
     def test_world_has_a_root_of_its_own(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         assert world.root.name.name == "mini_warehouse"
         assert world.validate()
 
     def test_instantiates_every_active_model(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         assert {body.name.prefix for body in world.bodies if body.name.prefix} == {
             "shelf_001",
             "shelf_002",
@@ -346,14 +346,14 @@ class TestWorldParsing:
         Gazebo's non-canonical idiom names the instance on the wrapping model element
         rather than inside the include.
         """
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         shelf_bodies = [
             body for body in world.bodies if body.name.prefix == "shelf_001"
         ]
         assert [body.name.name for body in shelf_bodies] == ["link"]
 
     def test_wrapped_include_is_placed_by_the_sibling_pose(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         shelf = [body for body in world.bodies if body.name.prefix == "shelf_001"][0]
         root_T_shelf = world.compute_forward_kinematics_np(world.root, shelf)
         assert np.allclose(root_T_shelf[:3, 3], [2.5, -1.5, 0.0])
@@ -363,13 +363,13 @@ class TestWorldParsing:
         When both the wrapper and the include carry a pose, the pose of the include is
         expressed in the wrapper, as Gazebo composes them.
         """
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         shelf = [body for body in world.bodies if body.name.prefix == "shelf_002"][0]
         root_T_shelf = world.compute_forward_kinematics_np(world.root, shelf)
         assert np.allclose(root_T_shelf[:3, 3], [-3.0, 4.0, 0.25])
 
     def test_canonical_include_takes_its_name_from_the_include(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         pallet = [
             body for body in world.bodies if body.name.prefix == "pallet_canonical"
         ][0]
@@ -377,22 +377,22 @@ class TestWorldParsing:
         assert np.allclose(root_T_pallet[:3, 3], [1.0, 2.0, 0.075])
 
     def test_inline_model_is_placed_at_its_pose(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         crate = [body for body in world.bodies if body.name.prefix == "inline_crate"][0]
         root_T_crate = world.compute_forward_kinematics_np(world.root, crate)
         assert np.allclose(root_T_crate[:3, 3], [0.0, 0.0, 0.5])
 
     def test_commented_out_model_is_absent(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         assert all(body.name.prefix != "shelf_003" for body in world.bodies)
 
     def test_static_model_is_attached_rigidly(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         shelf = [body for body in world.bodies if body.name.prefix == "shelf_001"][0]
         assert isinstance(shelf.parent_connection, FixedConnection)
 
     def test_movable_model_keeps_its_degrees_of_freedom(self, gazebo_paths):
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         pallet = [
             body for body in world.bodies if body.name.prefix == "pallet_canonical"
         ][0]
@@ -403,7 +403,7 @@ class TestWorldParsing:
         A world usually instantiates the same model many times, and each instance must
         get its own bodies so that they can be placed independently.
         """
-        world = GazeboParser.from_file(gazebo_paths.mini_world).to_domain_object()
+        world = GazeboParser.from_file(gazebo_paths.mini_world).create_world()
         shelves = [
             body
             for body in world.bodies
@@ -427,34 +427,32 @@ class TestUnsupportedConstructs:
 
     def test_unsupported_joint_type(self, gazebo_paths):
         with pytest.raises(UnsupportedJointType) as error:
-            GazeboParser.from_file(gazebo_paths.unsupported_joint).to_domain_object()
+            GazeboParser.from_file(gazebo_paths.unsupported_joint).create_world()
         assert "ball" in str(error.value)
 
     def test_unsupported_geometry_type(self, gazebo_paths):
         with pytest.raises(UnsupportedGeometryType) as error:
-            GazeboParser.from_file(gazebo_paths.unsupported_geometry).to_domain_object()
+            GazeboParser.from_file(gazebo_paths.unsupported_geometry).create_world()
         assert "plane" in str(error.value)
 
     def test_pose_with_named_frame_attribute(self, gazebo_paths):
         with pytest.raises(UnsupportedPoseReference) as error:
-            GazeboParser.from_file(gazebo_paths.named_pose_frame).to_domain_object()
+            GazeboParser.from_file(gazebo_paths.named_pose_frame).create_world()
         assert "some_frame" in str(error.value)
 
     def test_pose_with_named_relative_to_attribute(self, gazebo_paths):
         with pytest.raises(UnsupportedPoseReference) as error:
-            GazeboParser.from_file(
-                gazebo_paths.named_pose_relative_to
-            ).to_domain_object()
+            GazeboParser.from_file(gazebo_paths.named_pose_relative_to).create_world()
         assert "some_frame" in str(error.value)
 
     def test_axis_in_the_parent_model_frame(self, gazebo_paths):
         with pytest.raises(UnsupportedAxisReference) as error:
-            GazeboParser.from_file(gazebo_paths.model_frame_axis).to_domain_object()
+            GazeboParser.from_file(gazebo_paths.model_frame_axis).create_world()
         assert "lift" in str(error.value)
 
     def test_axis_expressed_in_another_frame(self, gazebo_paths):
         with pytest.raises(UnsupportedAxisReference) as error:
-            GazeboParser.from_file(gazebo_paths.expressed_in_axis).to_domain_object()
+            GazeboParser.from_file(gazebo_paths.expressed_in_axis).create_world()
         assert "__model__" in str(error.value)
 
 
@@ -466,7 +464,7 @@ def aws_warehouse_world():
     """
     Fixture providing the parsed AWS RoboMaker small warehouse world.
     """
-    return GazeboParser.from_file(TestSmallWarehouseWorld.world_uri).to_domain_object()
+    return GazeboParser.from_file(TestSmallWarehouseWorld.world_uri).create_world()
 
 
 class TestSmallWarehouseWorld:

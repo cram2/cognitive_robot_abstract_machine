@@ -219,7 +219,7 @@ class URDFParser(WorldModelParser):
             use_visual_as_collision_backup=use_visual_as_collision_backup,
         )
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         for joint in self.parsed.joints:
             if connection_type_map.get(joint.type) in (
                 RevoluteConnection,

@@ -39,9 +39,9 @@ Now to set up the environment, we will use URDF files for the robot and the envi
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").to_domain_object()
-milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").to_domain_object()
-pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").to_domain_object()
+apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").create_world()
+milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").create_world()
+pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
 ```
 
 ```{note}

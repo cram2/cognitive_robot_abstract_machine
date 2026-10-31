@@ -36,7 +36,7 @@ from semantic_digital_twin.world_description.connections import Connection6DoF, 
 # We use the same configuration as in pr2_world_setup
 urdf_path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
 urdf_parser = URDFParser.from_file(file_path=urdf_path)
-world = urdf_parser.to_domain_object()
+world = urdf_parser.create_world()
 
 # Initialize PR2 semantic annotation
 try:

@@ -105,7 +105,7 @@ def test_a_servo_keeps_the_joint_dynamics_its_description_states(mounted_tiago):
     An MJCF states each joint's own damping and friction, so declaring a servo on that
     joint leaves them alone rather than replacing them with the servo's own.
     """
-    as_described = MJCFParser(TiagoMujoco.get_ros_file_path()).to_domain_object()
+    as_described = MJCFParser(TiagoMujoco.get_ros_file_path()).create_world()
 
     for connection in mounted_tiago.connections:
         if not isinstance(connection, ActiveConnection1DOF):

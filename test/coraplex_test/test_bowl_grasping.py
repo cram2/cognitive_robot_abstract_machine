@@ -59,7 +59,7 @@ def split_off_rim(bowl: Bowl, rim_depth: float = 0.02) -> Rim:
 
 @pytest.fixture
 def bowl() -> Bowl:
-    world = STLParser(BOWL_MESH).to_domain_object()
+    world = STLParser(BOWL_MESH).create_world()
     annotation = Bowl(root=world.get_body_by_name("bowl.stl"))
     with world.modify_world():
         world.add_semantic_annotation(annotation)
@@ -135,7 +135,7 @@ def pr2_and_bowl(simple_pr2_context):
     A PR2 in a world with the demos' bowl standing on the counter.
     """
     world, robot, _ = simple_pr2_context
-    bowl_world = STLParser(BOWL_MESH).to_domain_object()
+    bowl_world = STLParser(BOWL_MESH).create_world()
     with world.modify_world():
         world.merge_world_at_pose(
             bowl_world,

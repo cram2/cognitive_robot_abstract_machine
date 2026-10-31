@@ -41,7 +41,7 @@ def build_single_joint_stage(
     """
     A minimal in-memory stage with a root link ("carcass") and a child link ("child")
     connected by one joint of ``joint_type``, in the same shape
-    :meth:`~semantic_digital_twin.adapters.usd.parser.USDParser.to_domain_object`
+    :meth:`~semantic_digital_twin.adapters.usd.parser.USDParser.create_world`
     reads: ``Xform`` links each holding one ``Mesh``, and a joint prim with
     body0/body1 relationships and localPos/localRot/axis/limit attributes.
 

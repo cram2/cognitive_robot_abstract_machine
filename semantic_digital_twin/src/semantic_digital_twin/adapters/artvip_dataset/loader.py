@@ -136,7 +136,7 @@ class ArtVipDatasetLoader:
         :raises ArtVipObjectNotFoundError: if no dataset entry matches category and name.
         """
         main_usd_path = self._download_object_if_not_exists(category, name)
-        world = USDParser.from_file(str(main_usd_path), prefix=name).to_domain_object()
+        world = USDParser.from_file(str(main_usd_path), prefix=name).create_world()
         with world.modify_world():
             world.add_semantic_annotation(
                 NaturalLanguageWithTypeDescription(

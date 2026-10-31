@@ -55,7 +55,7 @@ _APARTMENT_URDF = _REPO_ROOT / "coraplex" / "resources" / "worlds" / "apartment.
 
 def _build_hsrb_world() -> World:
     urdf_parser = URDFParser.from_file(file_path=HSRB.get_ros_file_path())
-    world = urdf_parser.to_domain_object()
+    world = urdf_parser.create_world()
     HSRB.from_world(world)
 
     with world.modify_world():
@@ -77,7 +77,7 @@ def build_cram_world():
     extensions being what its plans read from their context.
     """
     hsrb_world = _build_hsrb_world()
-    apartment = URDFParser.from_file(str(_APARTMENT_URDF)).to_domain_object()
+    apartment = URDFParser.from_file(str(_APARTMENT_URDF)).create_world()
     hsrb_world.merge_world(apartment)
     hsrb_world.get_body_by_name(
         "base_footprint"

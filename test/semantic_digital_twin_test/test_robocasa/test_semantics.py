@@ -111,7 +111,7 @@ def test_mjcf_document_from_element_copy_is_parseable_by_mjcf_parser():
 
     world = MJCFParser.from_xml_string(
         _mjcf_document_from_element_copy(fixture_body)
-    ).to_domain_object()
+    ).create_world()
 
     assert world.get_body_by_name("hinge_cabinet_main") is not None
 
@@ -163,7 +163,7 @@ def test_parse_robosuite_mjcf_keeps_default_group_geoms_collidable():
 def test_attach_semantic_annotation_uses_kitchen_appliance_resolver():
     world = MJCFParser(
         str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
-    ).to_domain_object()
+    ).create_world()
     body = world.get_body_by_name("hinge_cabinet_main")
 
     loader = RoboCasaDatasetLoader()
@@ -177,7 +177,7 @@ def test_attach_semantic_annotation_uses_kitchen_appliance_resolver():
 def test_attach_semantic_annotation_falls_back_to_natural_language():
     world = MJCFParser(
         str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
-    ).to_domain_object()
+    ).create_world()
     body = world.get_body_by_name("hinge_cabinet_main")
 
     loader = RoboCasaDatasetLoader()
@@ -193,7 +193,7 @@ def test_attach_semantic_annotation_falls_back_to_natural_language():
 def test_attach_semantic_annotation_attaches_door_and_handle_sub_parts():
     world = MJCFParser(
         str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
-    ).to_domain_object()
+    ).create_world()
     body = world.get_body_by_name("hinge_cabinet_main")
     door_body = world.get_body_by_name("hinge_cabinet_door")
 
@@ -219,14 +219,14 @@ def test_attach_semantic_annotation_attaches_door_and_handle_sub_parts():
 def test_find_body_returns_none_for_missing_body():
     world = MJCFParser(
         str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
-    ).to_domain_object()
+    ).create_world()
     assert RoboCasaDatasetLoader._find_body(world, "does_not_exist") is None
 
 
 def test_find_body_falls_back_to_prefix_match():
     world = MJCFParser(
         str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
-    ).to_domain_object()
+    ).create_world()
 
     body = RoboCasaDatasetLoader._find_body(world, "hinge_cabinet")
 
@@ -237,7 +237,7 @@ def test_find_body_falls_back_to_prefix_match():
 def test_apply_object_semantics_annotates_body_with_collision_not_root():
     world = MJCFParser(
         str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
-    ).to_domain_object()
+    ).create_world()
 
     loader = RoboCasaDatasetLoader()
     loader._apply_object_semantics(world, "cabinet")
