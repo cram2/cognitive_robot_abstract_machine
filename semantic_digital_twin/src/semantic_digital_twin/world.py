@@ -278,15 +278,20 @@ class WorldModelUpdateContextManager:
                 if not model_manager._active_world_model_update_context_manager_ids:
                     # discard publications buffered before the error; they must not be sent
                     model_manager.pending_publications.clear()
-                    if len(model_manager.current_model_modification_block):
-                        raise BrokenWorldModificationHistoryError(
-                            world=self.world, potential_cause=exc_val
-                        )
+                    # discard the modifications of the failed block too, so that the
+                    # next block does not record and publish them as its own
+                    history_is_broken = (
+                        len(model_manager.current_model_modification_block) > 0
+                    )
                     model_manager.current_model_modification_block = (
                         WorldModelModificationBlock()
                     )
                     self.world.world_is_being_modified = False
                     model_manager._current_modifications_will_be_published = None
+                    if history_is_broken:
+                        raise BrokenWorldModificationHistoryError(
+                            world=self.world, potential_cause=exc_val
+                        )
                 raise exc_val
 
             self.world.delete_orphaned_dofs()

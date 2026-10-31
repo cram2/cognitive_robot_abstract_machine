@@ -75,6 +75,7 @@ from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithID,
 )
 from semantic_digital_twin.world_description.world_modification import (
+    AddKinematicStructureEntityModification,
     AttributeUpdateModification,
 )
 from semantic_digital_twin.world_description.world_state import (
@@ -2750,6 +2751,48 @@ def test_memoized_queries_match_graph_after_exception():
     graph_names = {b.name.name for b in world.kinematic_structure.nodes()}
     memoized_names = {b.name.name for b in world.bodies}
     assert memoized_names == graph_names
+
+
+def test_world_accepts_modification_block_after_broken_history():
+    world = World()
+    body_1 = Body(name=PrefixedName("body_1", prefix="review"))
+    body_2 = Body(name=PrefixedName("body_2", prefix="review"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body_1)
+
+    with pytest.raises(BrokenWorldModificationHistoryError):
+        with world.modify_world():
+            world.add_connection(FixedConnection(parent=body_1, child=body_2))
+            raise RuntimeError("simulated user error")
+
+    assert not world.world_is_being_modified
+    with world.modify_world(publish_changes=False):
+        pass
+
+
+def test_modification_block_after_broken_history_records_only_its_own_modifications():
+    world = World()
+    body_1 = Body(name=PrefixedName("body_1", prefix="review"))
+    body_2 = Body(name=PrefixedName("body_2", prefix="review"))
+    body_3 = Body(name=PrefixedName("body_3", prefix="review"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body_1)
+
+    with pytest.raises(BrokenWorldModificationHistoryError):
+        with world.modify_world():
+            world.add_connection(FixedConnection(parent=body_1, child=body_2))
+            raise RuntimeError("simulated user error")
+
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body_3)
+        world.add_connection(FixedConnection(parent=body_1, child=body_3))
+
+    added_entity_ids = [
+        modification.kinematic_structure_entity.id
+        for modification in world.modification_history[-1].modifications
+        if isinstance(modification, AddKinematicStructureEntityModification)
+    ]
+    assert added_entity_ids == [body_3.id]
 
 
 def test_is_kinematic_structure_entity_in_world_by_name(world_setup):
