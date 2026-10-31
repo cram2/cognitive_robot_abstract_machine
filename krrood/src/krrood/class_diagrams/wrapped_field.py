@@ -31,7 +31,9 @@ from krrood.class_diagrams.utils import (
     behaves_like_a_built_in_type,
     common_base_class,
     get_type_hints_of_object,
+    is_union_annotation,
 )
+from krrood.ormatic.utils import classproperty
 from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
@@ -163,6 +165,29 @@ class WrappedField:
     @cached_property
     def is_container(self) -> bool:
         return get_origin(self.resolved_type) in self.container_types
+
+    @classproperty
+    def collection_types(cls) -> tuple[type, ...]:
+        """
+        The generic origins of annotations whose values are collections of values.
+        """
+        return list, set, frozenset, tuple, dict
+
+    @cached_property
+    def holds_collection(self) -> bool:
+        """
+        Whether the field's value is a collection of values, or, for a union such as
+        ``Optional``, whether any member of the union is.
+        """
+        annotations = (
+            get_args(self.resolved_type)
+            if is_union_annotation(self.resolved_type)
+            else (self.resolved_type,)
+        )
+        return any(
+            get_origin(annotation) in self.collection_types
+            for annotation in annotations
+        )
 
     @cached_property
     def container_type(self) -> type | None:

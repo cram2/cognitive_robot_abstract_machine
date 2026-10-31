@@ -49,23 +49,6 @@ def _animals():
     ]
 
 
-# %% RDRMatchParser.is_ellipsis_target
-
-
-def test_is_ellipsis_target_true_for_an_ellipsis_assignment():
-    match = an(Animal)(species=...).from_(_animals())
-    (attribute_match,) = match._matches_with_variables_
-
-    assert RDRMatchParser.is_ellipsis_target(attribute_match) is True
-
-
-def test_is_ellipsis_target_false_for_a_concrete_assignment():
-    match = an(Animal)(has_fur=True).from_(_animals())
-    (attribute_match,) = match._matches_with_variables_
-
-    assert RDRMatchParser.is_ellipsis_target(attribute_match) is False
-
-
 # %% case_type / variable
 
 

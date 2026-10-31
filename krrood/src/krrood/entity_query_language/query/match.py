@@ -938,6 +938,13 @@ class AttributeMatch(AbstractMatchExpression[T]):
         self._variable_ = attr
         return attr
 
+    @property
+    def is_unspecified(self) -> bool:
+        """
+        Whether the attribute is assigned ``...`` itself, leaving its value unspecified.
+        """
+        return self.assigned_value is ...
+
     @cached_property
     def is_type_filter_needed(self):
         """
