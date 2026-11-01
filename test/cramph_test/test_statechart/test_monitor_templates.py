@@ -20,6 +20,7 @@ from cramph.composites import (
     PausedUntilTrue,
     PausedWhileTrue,
     Sequence,
+    StartedWhenTrue,
     StoppedWhenTrue,
 )
 from cramph.monitors import CountTicks
@@ -251,6 +252,7 @@ def tick_compiled(node: StatechartNode) -> StatechartExecutor:
     [
         (PausedWhileTrue, ConstFalseNode),
         (PausedUntilTrue, ConstTrueNode),
+        (StartedWhenTrue, ConstTrueNode),
         (StoppedWhenTrue, ConstFalseNode),
     ],
 )
@@ -323,3 +325,46 @@ def test_paused_until_true_never_runs_its_node_before_the_monitor_observed_true(
 
     assert LifeCycleValues.PAUSED in life_cycles
     assert LifeCycleValues.RUNNING not in life_cycles
+
+
+# %% starting once the monitor observed True
+
+
+def test_started_when_true_never_starts_its_node_before_the_monitor_observed_true() -> (
+    None
+):
+    """
+    Unlike pausing, the monitored node is not even started while the monitor has not
+    observed True, so nothing it does on starting happens.
+    """
+    monitored_node = ConstTrueNode(name="monitored")
+    goal = StartedWhenTrue(
+        monitor=ConstFalseNode(name="monitor"), monitored_node=monitored_node
+    )
+
+    tick_compiled(goal)
+
+    assert goal.life_cycle_state == LifeCycleValues.RUNNING
+    assert monitored_node.life_cycle_state == LifeCycleValues.NOT_STARTED
+
+
+def test_started_when_true_runs_its_node_from_when_the_monitor_observed_true() -> None:
+    """
+    The monitored node starts on the monitor observing True, and runs unpaused from
+    then on.
+    """
+    monitored_node = ConstTrueNode(name="monitored")
+    goal = StartedWhenTrue(
+        monitor=CountTicks(name="monitor", ticks=SETTLE_TICKS // 2),
+        monitored_node=monitored_node,
+    )
+    executor = compile_chart([goal])
+
+    life_cycles = []
+    for _ in range(SETTLE_TICKS):
+        executor.tick()
+        life_cycles.append(monitored_node.life_cycle_state)
+
+    assert life_cycles[0] == LifeCycleValues.NOT_STARTED
+    assert life_cycles[-1] == LifeCycleValues.RUNNING
+    assert LifeCycleValues.PAUSED not in life_cycles

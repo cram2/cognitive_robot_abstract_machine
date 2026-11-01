@@ -788,6 +788,24 @@ class PausedUntilTrue(MonitoredCompositeNode):
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
+class StartedWhenTrue(MonitoredCompositeNode):
+    """
+    Starts the monitored node only once the monitor observes True, and lets it run from
+    then on, whatever the monitor observes afterwards.
+
+    Unlike :class:`PausedUntilTrue`, which starts the monitored node paused, nothing the
+    monitored node does when it starts happens before, such as putting collision rules
+    in force.
+    """
+
+    def wire_monitor(self) -> None:
+        self.monitored_node.start_condition = logic_and(
+            self.monitored_node.start_condition,
+            self.monitor.observes_true,
+        )
+
+
+@dataclass(repr=False, eq=False, kw_only=True)
 class StoppedWhenTrue(MonitoredCompositeNode):
     """
     Interrupts the monitored node as soon as the monitor observes True.
