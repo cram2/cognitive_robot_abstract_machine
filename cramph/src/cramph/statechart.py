@@ -558,7 +558,7 @@ class Statechart(SubclassJSONSerializer):
     def remove_node(self, node: StatechartNode) -> None:
         """
         Removes a node and everything below it from the statechart, and from the node it
-        is a child of.
+        is a child of, which a control structure node rewires its other children for.
 
         The nodes that stay keep their order and are numbered anew without gaps.
 
@@ -574,10 +574,20 @@ class Statechart(SubclassJSONSerializer):
             raise StatechartAlreadyCompiledError()
         removed_nodes = [node, *node.descendants]
         kept_nodes = [kept for kept in self._nodes if kept not in removed_nodes]
-        self._check_not_referenced(removed_nodes, kept_nodes)
         parent_node = node.parent_node
+        position = None
         if parent_node is not None and node in parent_node.nodes:
-            parent_node.nodes.remove(node)
+            # Unlisted and rewired first, since a control structure node reads the
+            # children it lists, as a parallel deciding its failure does.
+            position = parent_node.nodes.index(node)
+            parent_node.nodes.pop(position)
+            self._rewire_after_its_children_changed(parent_node)
+        still_referenced = self._reference_to_any_of(removed_nodes, kept_nodes)
+        if still_referenced is not None:
+            if position is not None:
+                parent_node.nodes.insert(position, node)
+                self._rewire_after_its_children_changed(parent_node)
+            raise still_referenced
         self._renumber(kept_nodes)
         self.compiler.nodes_to_rebuild = [
             rebuilt
@@ -641,9 +651,7 @@ class Statechart(SubclassJSONSerializer):
             if isinstance(replacement, CompositeNode):
                 self._expand(replacement)
             if holder is not None:
-                holder._wire_children()
-                if holder.parent_node is not None:
-                    holder.parent_node._succeed_at_its_goal(holder)
+                self._rewire_after_its_children_changed(holder)
             if not holds_node:
                 self.remove_node(node)
                 self._replaced_nodes.remove(record)
@@ -660,12 +668,28 @@ class Statechart(SubclassJSONSerializer):
         return node
 
     @staticmethod
-    def _check_not_referenced(
-        removed_nodes: list[StatechartNode], kept_nodes: list[StatechartNode]
-    ) -> None:
+    def _rewire_after_its_children_changed(holder: CompositeNode) -> None:
         """
-        :raises RemovedNodeStillReferencedError: If a node of `kept_nodes` refers to a
-            node of `removed_nodes` through a condition or as a prerequisite.
+        Wires the children of `holder` anew, and `holder` in the node holding it, whose
+        wiring reads the children of `holder`, once a child joined or left it. A holder
+        that is no control structure node wires nothing.
+
+        :param holder: The node whose children changed.
+        """
+        if not isinstance(holder, ControlStructureNode):
+            return
+        holder._wire_children()
+        if holder.parent_node is not None:
+            holder.parent_node._succeed_at_its_goal(holder)
+
+    @staticmethod
+    def _reference_to_any_of(
+        removed_nodes: list[StatechartNode], kept_nodes: list[StatechartNode]
+    ) -> RemovedNodeStillReferencedError | None:
+        """
+        :return: The error naming the first node of `kept_nodes` that refers to a node of
+            `removed_nodes` through a condition or as a prerequisite, or None if none
+            does.
         """
         for kept_node in kept_nodes:
             referenced_nodes = list(kept_node.prerequisite_nodes) + [
@@ -675,9 +699,10 @@ class Statechart(SubclassJSONSerializer):
             ]
             for referenced_node in referenced_nodes:
                 if referenced_node in removed_nodes:
-                    raise RemovedNodeStillReferencedError(
+                    return RemovedNodeStillReferencedError(
                         removed_node=referenced_node, referencing_node=kept_node
                     )
+        return None
 
     def _renumber(self, kept_nodes: list[StatechartNode]) -> None:
         """

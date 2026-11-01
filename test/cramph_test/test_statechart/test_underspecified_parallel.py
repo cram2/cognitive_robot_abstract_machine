@@ -139,3 +139,28 @@ def test_stopping_the_grounding_starts_the_combinations_anew() -> None:
     node.stop_grounding()
 
     assert _names_of(node.next_combination(backend, 10)) == ["a1", "b1"]
+
+
+# %% a statement going on from the candidate it was handed
+
+
+def test_a_statement_handed_a_candidate_goes_on_with_the_others_of_its_ranking() -> None:
+    """
+    The statement goes on with the candidates its ranking pulled for earlier
+    combinations, then with those beyond, and never with the one it was handed.
+    """
+    node = _underspecified_parallel(["a1", "a2", "a3"], ["b1"])
+    backend = EntityQueryLanguageGenerativeBackend()
+    node.next_combination(backend, 10)
+    combination = node.next_combination(backend, 10)
+    [statement, _] = node.statements
+    continuation = StatementNode(statement=statement.statement)
+
+    continuation.ground_on_from(node.ranking_of(statement), combination[statement])
+
+    assert _names_of(combination) == ["a2", "b1"]
+    assert [
+        continuation.next_candidate(backend, 10).name,
+        continuation.next_candidate(backend, 10).name,
+        continuation.next_candidate(backend, 10),
+    ] == ["a1", "a3", None]

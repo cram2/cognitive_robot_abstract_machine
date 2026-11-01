@@ -143,6 +143,11 @@ class BuiltSubtree:
     The candidate each statement of :attr:`root` that was grounded beforehand runs.
     """
 
+    originals: dict[StatementNode, StatementNode]
+    """
+    The statement each statement of :attr:`candidates` was rebuilt from.
+    """
+
     def hand_over_candidates(self) -> None:
         """
         Let every statement of :attr:`candidates` run its candidate, once :attr:`root`
@@ -212,18 +217,37 @@ class SubtreeRebuild:
     Whether a branch was cut below the node rebuilt last.
     """
 
+    @staticmethod
+    def root_around(node: StatechartNode) -> StatechartNode:
+        """
+        :param node: A node of a running plan.
+        :return: The node holding everything that runs beside `node`: the outermost
+            parallel above it with no action in between, or `node` itself if there is
+            none. A parallel that is an action, and one above an action, are left out,
+            because a trial builds an action anew from its parameters, which grounds
+            what it runs anew.
+        """
+        root = node
+        for ancestor in node.path:
+            if isinstance(ancestor, Action):
+                return root
+            if isinstance(ancestor, Parallel):
+                root = ancestor
+        return root
+
     @classmethod
     def remainder_of(
-        cls, root: StatechartNode, statement: StatementNode, proposal: Action
+        cls, root: StatechartNode, proposals: dict[StatementNode, Action]
     ) -> SubtreeRebuild:
         """
         :param root: A running node of a plan.
-        :param statement: The statement grounding a candidate on its own, `root` or a
-            node below it.
-        :param proposal: The candidate proposed for `statement`.
+        :param proposals: The candidate proposed for each statement being grounded,
+            below `root`, `root` itself or below an
+            :class:`~cramph.composites.UnderspecifiedParallel` there.
         :return: The rebuild of what is left to run of `root`: the nodes that ended are
             left out, since what they did is in the world already, a statement running
-            a candidate keeps running it, and `statement` runs `proposal`.
+            a candidate keeps running it, and each statement of `proposals` runs its
+            proposal.
         """
         descendants = root.descendants
         running_candidates = {
@@ -235,7 +259,7 @@ class SubtreeRebuild:
         }
         return cls(
             root=root,
-            candidates={**running_candidates, statement: proposal},
+            candidates={**running_candidates, **proposals},
             left_out={
                 node for node in descendants if node.life_cycle_state.is_terminal
             },
@@ -248,9 +272,15 @@ class SubtreeRebuild:
             of its own, which grounds a candidate itself once the one it is handed
             failed.
         """
+        root = self._rebuild_onto(world, for_trial=False)
         return BuiltSubtree(
-            root=self._rebuild_onto(world, for_trial=False),
+            root=root,
             candidates=self._handed_over,
+            originals={
+                self._rebuilt[statement]: statement
+                for statement in self.candidates
+                if self._rebuilt.get(statement) in self._handed_over
+            },
         )
 
     def build_for_trial(self, world: World) -> StatechartNode:
@@ -330,14 +360,19 @@ class SubtreeRebuild:
         self, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         """
-        :return: The child `node` runs now, rebuilt, or None if it runs none, which cuts
-            the branch, since what `node` will run is not chosen yet.
+        :return: The child `node` runs now, rebuilt; the parallel of an
+            :class:`~cramph.composites.UnderspecifiedParallel` that runs none yet,
+            rebuilt with the candidates of its statements; or None for any other node
+            that runs none, which cuts the branch, since what `node` will run is not
+            chosen yet.
         """
         latest_child = node.latest_child
-        if latest_child is None or latest_child.life_cycle_state.is_terminal:
-            self._cut = True
-            return None
-        return self._rebuild_node(latest_child)
+        if latest_child is not None and not latest_child.life_cycle_state.is_terminal:
+            return self._rebuild_node(latest_child)
+        if isinstance(node, UnderspecifiedParallel):
+            return self._rebuild_node(node.parallel)
+        self._cut = True
+        return None
 
     def _rebuild_value(self, owner: StatechartNode, value: Any) -> Any:
         """
@@ -611,37 +646,18 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
             None once the statement ran out of actions that succeed their trial.
         """
         grounding = node.context.require_extension(StatementGrounding)
-        root = self._remainder_root(node)
+        root = SubtreeRebuild.root_around(node)
         proposal = node.next_candidate(
             grounding.query_backend, grounding.candidates_to_try
         )
         while proposal is not None:
-            if self.trial.succeeds(
-                SubtreeRebuild.remainder_of(root, statement=node, proposal=proposal)
-            ):
+            if self.trial.succeeds(SubtreeRebuild.remainder_of(root, {node: proposal})):
                 return self.steps_of(proposal)
             proposal = node.next_candidate(
                 grounding.query_backend, grounding.candidates_to_try
             )
         node.stop_grounding()
         return None
-
-    @staticmethod
-    def _remainder_root(node: StatementNode) -> StatechartNode:
-        """
-        :return: The node holding everything that runs beside `node`: the outermost
-            parallel above it with no action in between, or `node` itself if there is
-            none. A parallel that is an action, and one above an action, are left out,
-            because a trial builds an action anew from its parameters, which grounds
-            what it runs anew.
-        """
-        root = node
-        for ancestor in node.path:
-            if isinstance(ancestor, Action):
-                return root
-            if isinstance(ancestor, Parallel):
-                root = ancestor
-        return root
 
     def cleanup(self) -> None:
         """
@@ -655,8 +671,9 @@ class UnderspecifiedParallelChildChooser(PlanChildChooser[UnderspecifiedParallel
     """
     Grounds the statements of every
     :class:`~cramph.composites.UnderspecifiedParallel` together, into the first
-    combination of their candidates whose trial succeeds as the whole parallel, and runs
-    the parallel with them, see :class:`SubtreeRebuild`.
+    combination of their candidates whose trial succeeds, tried in what is left to run
+    around the node, see :meth:`SubtreeRebuild.remainder_of`, and runs the parallel with
+    them.
 
     It chooses once per run of the node: a statement whose child failed grounds a
     candidate of its own, see :class:`UnderspecifiedChildChooser`, so a branch that
@@ -685,13 +702,21 @@ class UnderspecifiedParallelChildChooser(PlanChildChooser[UnderspecifiedParallel
             node.stop_grounding()
             return None
         grounding = node.context.require_extension(StatementGrounding)
+        root = SubtreeRebuild.root_around(node)
         combination = node.next_combination(
             grounding.query_backend, grounding.candidates_to_try
         )
         while combination is not None:
-            grounded = SubtreeRebuild(root=node.parallel, candidates=combination)
-            if self.trial.succeeds(grounded):
-                built = grounded.build(node.context.world)
+            if self.trial.succeeds(SubtreeRebuild.remainder_of(root, combination)):
+                built = SubtreeRebuild(root=node.parallel, candidates=combination).build(
+                    node.context.world
+                )
+                # Each statement goes on from its candidate once that failed, rather
+                # than grounding its statement anew from the first candidate.
+                for rebuilt, statement in built.originals.items():
+                    rebuilt.ground_on_from(
+                        node.ranking_of(statement), combination[statement]
+                    )
                 self._built[node] = built
                 return Sequence(nodes=[built.root])
             combination = node.next_combination(
@@ -735,9 +760,13 @@ class UnderspecifiedParallelChildChooser(PlanChildChooser[UnderspecifiedParallel
 @dataclass
 class GroundTheStatementsOfAParallelTogether(PlanTransformation[Parallel]):
     """
-    Puts a :class:`~cramph.composites.UnderspecifiedParallel` in the place of every
-    parallel with statements that start with it, so that they are grounded together,
-    each to a candidate suiting the others, before any of them runs.
+    Puts the branches of every parallel that start with a statement into one
+    :class:`~cramph.composites.UnderspecifiedParallel`, so that their statements are
+    grounded together, each to a candidate suiting the others, before any of them runs.
+
+    The other branches stay in the parallel and start with it. A parallel whose branches
+    all start with a statement, or that needs a number of its children to succeed, is put
+    into the :class:`~cramph.composites.UnderspecifiedParallel` as a whole.
     """
 
     def is_applicable(self, plan_node: Parallel) -> bool:
@@ -749,11 +778,26 @@ class GroundTheStatementsOfAParallelTogether(PlanTransformation[Parallel]):
         )
 
     def apply(self, plan_node: Parallel) -> None:
-        plan_node.statechart.replace(
-            plan_node,
+        statechart = plan_node.statechart
+        statements = self.statements_starting_with(plan_node)
+        grouped = [
+            branch
+            for branch in plan_node.nodes
+            if self.statements_starting_with(branch)
+        ]
+        if len(grouped) == len(plan_node.nodes) or plan_node.minimum_success is not None:
+            statechart.replace(
+                plan_node,
+                UnderspecifiedParallel(parallel=plan_node, statements=statements),
+            )
+            return
+        first, *others = grouped
+        for branch in others:
+            statechart.remove_node(branch)
+        statechart.replace(
+            first,
             UnderspecifiedParallel(
-                parallel=plan_node,
-                statements=self.statements_starting_with(plan_node),
+                parallel=Parallel(nodes=grouped), statements=statements
             ),
         )
 

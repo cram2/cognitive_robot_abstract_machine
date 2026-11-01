@@ -1118,12 +1118,69 @@ def test_a_statement_later_in_a_branch_is_not_grounded_with_the_parallel(
             ),
         ]
     )
+    statement, later = side_by_side.nodes
+    plan = Sequence(nodes=[side_by_side])
+
+    _prepared(plan, extensions)
+
+    grounding, beside = side_by_side.nodes
+    assert grounding.statements == [statement]
+    assert beside is later
+
+
+def test_a_branch_without_a_statement_starting_with_it_stays_beside_the_grounded_ones(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    Only the branches starting with a statement wait for the statements to be grounded,
+    so the others start with the parallel, such as a node letting a gripper touch its
+    surroundings meanwhile.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    side_by_side = Parallel(
+        nodes=[
+            _statement_claiming_one_of([0], slot_dof_ids),
+            ClaimSlotAction(slot=2, slot_dof_ids=slot_dof_ids),
+            _statement_claiming_one_of([1], slot_dof_ids),
+        ]
+    )
+    first, beside, second = side_by_side.nodes
+    plan = Sequence(nodes=[side_by_side])
+
+    _prepared(plan, extensions)
+
+    assert plan.nodes == [side_by_side]
+    [grounding, kept] = side_by_side.nodes
+    assert isinstance(grounding, UnderspecifiedParallel)
+    assert kept is beside
+    assert grounding.parallel.nodes == [first, second]
+    assert grounding.statements == [first, second]
+
+
+def test_a_parallel_needing_a_number_of_successes_is_grounded_as_a_whole(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    Its branches beside the statements are grounded with them, since the successes it
+    counts are those of its own children.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    side_by_side = Parallel(
+        nodes=[
+            _statement_claiming_one_of([0], slot_dof_ids),
+            ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
+        ],
+        minimum_success=1,
+    )
     plan = Sequence(nodes=[side_by_side])
 
     _prepared(plan, extensions)
 
     [grounding] = plan.nodes
-    assert grounding.statements == [side_by_side.nodes[0]]
+    assert isinstance(grounding, UnderspecifiedParallel)
+    assert grounding.parallel is side_by_side
 
 
 def test_a_parallel_without_statements_starting_with_it_stays_as_it_is(
@@ -1170,10 +1227,12 @@ def test_the_statements_of_a_parallel_inside_a_parallel_are_grounded_with_the_ou
 
 def _grounded_parallel_of(plan: Sequence) -> Parallel:
     """
-    :return: The parallel the node grounding the statements of the parallel `plan`
+    :return: The parallel the node grounding the statements of the parallel in `plan`
         runs, which it chose as its one child.
     """
-    [grounding] = plan.nodes
+    [grounding] = [
+        node for node in plan.descendants if isinstance(node, UnderspecifiedParallel)
+    ]
     [steps] = grounding.chosen_children
     [parallel] = steps.nodes
     return parallel
@@ -1313,6 +1372,45 @@ def test_only_the_failed_statement_is_grounded_again_after_the_other_branch_succ
     assert real.world is world
 
 
+def test_a_statement_grounded_together_proposes_no_candidate_it_ran_again(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The statement grounded together with the one beside it goes on from the candidate
+    its parallel handed it once that one failed, as a statement grounding on its own
+    goes on from the candidate it ran, so no attempt of its claims a slot it claimed
+    already.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    failing_probe = register_probe()
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    _statement_claiming_one_of(
+                        [2, 3],
+                        slot_dof_ids,
+                        ticks_before_claiming=5,
+                        probe_key=failing_probe,
+                        fail_on_attempt_number=2,
+                    ),
+                    _statement_claiming_one_of([1], slot_dof_ids),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    failed, _ = _grounded_parallel_of(plan).nodes
+    assert [node.slot for node in failed.grounded_nodes] == [2, 3]
+    assert [
+        call.position_at_entry == SlotPosition.CLAIMED
+        for call in _registered_probes[failing_probe].calls
+    ] == [False, False, False, False]
+
+
 def test_a_statement_grounded_again_is_tried_without_what_already_ended(
     apartment_world_pr2_copy_with_context,
 ):
@@ -1341,7 +1439,7 @@ def test_a_statement_grounded_again_is_tried_without_what_already_ended(
 
     run_plan(plan, extensions)
 
-    grounded, _ = _grounded_parallel_of(plan).nodes
+    [grounded] = _grounded_parallel_of(plan).nodes
     assert [node.slot for node in grounded.grounded_nodes] == [2, 3]
 
 
@@ -1376,7 +1474,7 @@ def test_a_statement_grounded_again_is_tried_beside_what_still_runs(
 
     run_plan(plan, extensions)
 
-    grounded, _ = _grounded_parallel_of(plan).nodes
+    [grounded] = _grounded_parallel_of(plan).nodes
     assert [node.slot for node in grounded.grounded_nodes] == [0, 2]
 
 
@@ -1533,7 +1631,10 @@ def test_a_failing_branch_without_a_statement_fails_its_parallel_without_running
         executor.compile(statechart_of(executor, plan))
         executor.execute()
 
-    [grounding] = plan.nodes
-    assert grounding.life_cycle_state == LifeCycleValues.FAILED
+    [parallel] = plan.nodes
+    [grounding] = [
+        node for node in parallel.nodes if isinstance(node, UnderspecifiedParallel)
+    ]
+    assert parallel.life_cycle_state == LifeCycleValues.FAILED
     assert len(grounding.chosen_children) == 1
     assert len(_registered_probes[statement_probe].calls) == 2

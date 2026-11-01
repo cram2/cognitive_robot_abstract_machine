@@ -1355,6 +1355,36 @@ class StatementNode(CompositeNodeChoosingItsChild):
         self._candidates_pulled += 1
         return candidate
 
+    def ground_on_from(self, ranking: RankedCandidates, handed: Any) -> None:
+        """
+        Takes over the grounding of the node `ranking` pulled its candidates from, which
+        handed this node `handed`, as if this node had pulled them: its next candidates
+        are the others `ranking` pulled, in rank order, then those beyond them.
+
+        :param ranking: The ranking the candidate this node runs was taken from.
+        :param handed: The candidate of `ranking` this node runs.
+        """
+        source = ranking.statement
+        others = [candidate for candidate in ranking.pulled if candidate is not handed]
+        self.candidate_limit = source.candidate_limit
+        self._candidates_pulled = source._candidates_pulled - len(others)
+        self._candidates = self._chained(others, source._candidates)
+        source._candidates = None
+
+    @staticmethod
+    def _chained(
+        first: list[Any], rest: Generator[Any, None, None] | None
+    ) -> Generator[Any, None, None]:
+        """
+        :param first: The candidates yielded first.
+        :param rest: The candidates yielded after `first`, none if None.
+        :return: `first`, then `rest`, as a generator, which :meth:`stop_grounding`
+            closes, `rest` with it.
+        """
+        yield from first
+        if rest is not None:
+            yield from rest
+
     def stop_grounding(self) -> None:
         """
         Releases the candidates of the statement once no further child will be asked
@@ -1546,6 +1576,14 @@ class UnderspecifiedParallel(CompositeNodeChoosingItsChild):
     until they are exhausted or released by :meth:`stop_grounding`.
     """
 
+    _rankings: dict[StatementNode, RankedCandidates] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The ranking of the candidates of each of :attr:`statements` the combinations are
+    taken from, for as long as :attr:`_combinations` is open.
+    """
+
     def next_combination(
         self, query_backend: QueryBackend, default_candidate_limit: int
     ) -> dict[StatementNode, Any] | None:
@@ -1560,23 +1598,30 @@ class UnderspecifiedParallel(CompositeNodeChoosingItsChild):
             combination left.
         """
         if self._combinations is None:
-            self._combinations = iter(
-                CandidateCombinations(
-                    rankings=[
-                        RankedCandidates(
-                            statement=statement,
-                            query_backend=query_backend,
-                            default_candidate_limit=default_candidate_limit,
-                        )
-                        for statement in self.statements
-                    ]
+            self._rankings = {
+                statement: RankedCandidates(
+                    statement=statement,
+                    query_backend=query_backend,
+                    default_candidate_limit=default_candidate_limit,
                 )
+                for statement in self.statements
+            }
+            self._combinations = iter(
+                CandidateCombinations(rankings=list(self._rankings.values()))
             )
         combination = next(self._combinations, None)
         if combination is None:
             self.stop_grounding()
             return None
         return dict(zip(self.statements, combination))
+
+    def ranking_of(self, statement: StatementNode) -> RankedCandidates:
+        """
+        :param statement: One of :attr:`statements`.
+        :return: The ranking the candidate of `statement` in the latest combination was
+            taken from.
+        """
+        return self._rankings[statement]
 
     def stop_grounding(self) -> None:
         """
@@ -1586,6 +1631,7 @@ class UnderspecifiedParallel(CompositeNodeChoosingItsChild):
         The next :meth:`next_combination` grounds the statements anew.
         """
         self._combinations = None
+        self._rankings = {}
         for statement in self.statements:
             statement.stop_grounding()
 
